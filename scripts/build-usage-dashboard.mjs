@@ -1,356 +1,227 @@
 #!/usr/bin/env node
-// @Codex: rigenera la dashboard pubblica da aggregati locali CodexBar.
-
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+// @Codex: publication renderer; reads only the sanitized aggregate snapshot.
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const README = path.join(ROOT, 'README.md');
-const SVG = path.join(ROOT, 'screenshots/token-models.svg');
-const CODEXBAR = process.env.CODEXBAR_BIN || resolveCodexBar();
-const HISTORY_DAYS = Number.parseInt(process.env.USAGE_DASHBOARD_DAYS || '365', 10);
 const START = '<!-- usage-dashboard:start -->';
 const END = '<!-- usage-dashboard:end -->';
-
-const CODEX_FAMILIES = [
-  ['astra', 'GPT-6 Astra', '#33506b', (model) => model.startsWith('gpt-6-astra')],
-  ['sol', 'GPT-5.6 Sol', '#5f50b7', (model) => model === 'gpt-5.6-sol'],
-  ['gpt54', 'GPT-5.4 + mini', '#4b3f97', (model) => model.startsWith('gpt-5.4')],
-  ['terra', 'GPT-5.6 Terra', '#887bcf', (model) => model === 'gpt-5.6-terra'],
-  ['gpt55', 'GPT-5.5 storico', '#312968', (model) => model === 'gpt-5.5'],
-  ['gpt53', 'GPT-5.3 Codex + Spark', '#9b90d3', (model) => model.startsWith('gpt-5.3')],
-  ['unknown', 'Modello non registrato', '#b8b1d8', (model) => model === 'unknown'],
-  ['luna', 'GPT-5.6 Luna', '#a99fdd', (model) => model === 'gpt-5.6-luna'],
-  ['review', 'Codex Auto Review', '#cbc5e7', (model) => model === 'codex-auto-review'],
-  ['other', 'Altri modelli Codex', '#ddd9ec', () => true],
-];
-
-const CLAUDE_FAMILIES = [
-  ['opus48', 'Opus 4.8', '#9f4b31', (model) => model.includes('opus-4-8')],
-  ['fable', 'Fable 5', '#cf7450', (model) => model.includes('fable-5')],
-  ['opus47', 'Opus 4.7 storico', '#8d412d', (model) => model.includes('opus-4-7')],
-  ['opus5', 'Opus 5', '#b95f3e', (model) => model.includes('opus-5')],
-  ['sonnet', 'Sonnet 5', '#e5a17e', (model) => model.includes('sonnet-5')],
-  ['delegated', 'OpenAI via Claude Code', '#7568c7', (model) => /^(gpt-|codex-)/.test(model)],
-  ['haiku', 'Haiku storico', '#edb99f', (model) => model.includes('haiku')],
-  ['local', 'Modelli locali e residui', '#f2d2c2', (model) => /(?:mlx|gguf|qwen|devstral)/.test(model)],
-  ['other', 'Altri modelli Claude', '#f4ded3', () => true],
-];
-
-if (!Number.isInteger(HISTORY_DAYS) || HISTORY_DAYS < 1 || HISTORY_DAYS > 365) {
-  throw new Error('USAGE_DASHBOARD_DAYS deve essere un intero tra 1 e 365.');
+const EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'unknown'];
+const MODELS = new Set([
+  'gpt-5.2', 'gpt-5.2-codex', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.4',
+  'gpt-5.5', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-astra',
+  'gpt-6-luna', 'gpt-6-sol', 'gpt-daybreak-blue-latest', 'gpt-reserve', 'codex-auto-review',
+  'claude-fable-5', 'claude-haiku-4-5', 'claude-opus-4-7', 'claude-opus-4-8',
+  'claude-opus-5', 'claude-sonnet-5', 'devstral-gguf', 'qwen25-coder:14b-q4',
+  'qwen3-coder:30b-a3b-q4', 'qwen3.6:35b-a3b', 'qwen36-mlx', 'qwen3coder30:latest',
+  'chatgpt-web/extra-high', 'chatgpt-web/high', 'chatgpt-web/pro', 'unknown',
+]);
+const COLORS = ['#315875', '#b75e3d', '#7266a1', '#38867f', '#ab8141', '#657b45', '#9c6583', '#626e86', '#b5b1a8'];
+const integer = (n) => new Intl.NumberFormat('it-IT', { useGrouping: 'always' }).format(n);
+const compact = (n) => n >= 1e9 ? `${(n / 1e9).toLocaleString('it-IT', { maximumFractionDigits: 2 })} mld` : n >= 1e6 ? `${(n / 1e6).toLocaleString('it-IT', { maximumFractionDigits: 1 })} mln` : integer(n);
+const escape = (s) => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+const label = (s) => s === 'unknown' ? 'Non registrato' : s;
+const sum = (rows) => rows.reduce((n, r) => {
+  const next = n + r.tokens;
+  assert(Number.isSafeInteger(next), 'Token total overflow');
+  return next;
+}, 0);
+function keys(value, names) {
+  assert(value && typeof value === 'object' && !Array.isArray(value), 'Expected object');
+  assert.deepEqual(Object.keys(value).sort(), [...names].sort(), 'Unexpected or missing public field');
 }
-
-const version = readCodexBarVersion();
-const codex = readProvider('codex');
-const claude = readProvider('claude');
-const total = {
-  totalTokens: addTokens(codex.totalTokens, claude.totalTokens, 'Totale combinato'),
-  cacheReadTokens: addTokens(codex.cacheReadTokens, claude.cacheReadTokens, 'Cache combinata'),
-};
-const snapshot = snapshotDate(Math.max(codex.updatedAt, claude.updatedAt));
-const period = {
-  first: [codex.firstDate, claude.firstDate].sort()[0],
-  last: [codex.lastDate, claude.lastDate].sort().at(-1),
-};
-const families = {
-  codex: groupFamilies(codex.models, CODEX_FAMILIES, codex.totalTokens),
-  claude: groupFamilies(claude.models, CLAUDE_FAMILIES, claude.totalTokens),
-};
-
-const readme = readFileSync(README, 'utf8');
-const startAt = readme.indexOf(START);
-const endAt = readme.indexOf(END);
-if (startAt === -1 || endAt === -1 || endAt < startAt) {
-  throw new Error('Marcatori usage-dashboard mancanti o non validi. Dashboard non modificata.');
+function token(n) { assert(Number.isSafeInteger(n) && n >= 0, 'Invalid token count'); }
+function date(s) {
+  assert(typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s), 'Invalid date');
+  assert.equal(new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10), s, 'Invalid calendar date');
 }
-
-const block = buildReadmeBlock({ codex, claude, total, snapshot, period, version });
-const nextReadme = readme.slice(0, startAt) + block + readme.slice(endAt + END.length);
-const nextSvg = buildSvg({ codex, claude, total, snapshot, period, version, families });
-writeSnapshot(nextReadme, nextSvg);
-
-console.log(`Snapshot ${snapshot.iso}`);
-console.log(`Periodo ${period.first} / ${period.last}`);
-console.log(`Totale ${formatInteger(total.totalTokens)} token`);
-console.log(`Codex ${formatInteger(codex.totalTokens)} token`);
-console.log(`Claude Code ${formatInteger(claude.totalTokens)} token`);
-console.log(`Cache letta ${formatInteger(total.cacheReadTokens)} token (${formatPct(total.cacheReadTokens, total.totalTokens)})`);
-console.log(`Copertura Codex ${coverageLabel(codex)}, Claude Code ${coverageLabel(claude)}`);
-console.log(`Fonte ${version}, finestra richiesta ${HISTORY_DAYS} giorni`);
-
-function readCodexBarVersion() {
-  const output = execFileSync(CODEXBAR, ['--version'], {
-    encoding: 'utf8',
-    maxBuffer: 1024 * 1024,
-  }).trim();
-  if (!/^CodexBar \d+\.\d+\.\d+$/.test(output)) {
-    throw new Error(`Versione CodexBar non interpretabile: ${output}`);
-  }
-  return output;
+export function providerFor(model) {
+  if (model.startsWith('gpt-') || model === 'codex-auto-review') return 'OpenAI';
+  if (model.startsWith('claude-')) return 'Anthropic';
+  return 'Non determinato';
 }
-
-function resolveCodexBar() {
-  const executable = execFileSync('/usr/bin/which', ['codexbar'], {
-    encoding: 'utf8',
-    maxBuffer: 1024 * 1024,
-  }).trim();
-  if (!path.isAbsolute(executable)) {
-    throw new Error('Eseguibile CodexBar non trovato nel PATH.');
-  }
-  return executable;
-}
-
-function readProvider(provider) {
-  const output = execFileSync(CODEXBAR, [
-    'cost',
-    '--provider', provider,
-    '--days', String(HISTORY_DAYS),
-    '--refresh',
-    '--json',
-  ], {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  const rows = JSON.parse(output);
-  if (!Array.isArray(rows)) {
-    throw new Error(`Risposta CodexBar non valida per ${provider}.`);
-  }
-  const record = rows.find((row) => row?.provider === provider);
-  if (!record || record.source !== 'local' || !record.totals || !Array.isArray(record.daily)) {
-    throw new Error(`Aggregato CodexBar locale non disponibile per ${provider}.`);
-  }
-  if (record.daily.length === 0) {
-    throw new Error(`Aggregato CodexBar senza giorni disponibili per ${provider}.`);
-  }
-
-  const models = new Map();
-  let dailyTotal = 0;
-  const dates = new Set();
-  for (const day of record.daily) {
-    const date = isoDate(day.date, `Data CodexBar non valida per ${provider}`);
-    if (dates.has(date)) {
-      throw new Error(`Data CodexBar duplicata per ${provider}: ${date}.`);
-    }
-    dates.add(date);
-    if (!Array.isArray(day.modelBreakdowns)) {
-      throw new Error(`Breakdown CodexBar mancante per ${provider} il ${date}.`);
-    }
-    const dayTotal = tokenInteger(day.totalTokens, `Totale giornaliero ${provider} ${date}`);
-    const breakdownTotal = day.modelBreakdowns.reduce(
-      (sum, item) => addTokens(
-        sum,
-        tokenInteger(item.totalTokens, `Totale modello ${provider} ${date}`),
-        `Breakdown ${provider} ${date}`,
-      ),
-      0,
-    );
-    if (breakdownTotal !== dayTotal) {
-      throw new Error(`Breakdown CodexBar non riconciliato per ${provider} il ${date}.`);
-    }
-    dailyTotal = addTokens(dailyTotal, dayTotal, `Totale giornaliero cumulativo ${provider}`);
-    for (const item of day.modelBreakdowns) {
-      const model = typeof item.modelName === 'string' && item.modelName.trim()
-        ? item.modelName.trim()
-        : 'unknown';
-      models.set(
-        model,
-        addTokens(
-          models.get(model) || 0,
-          tokenInteger(item.totalTokens, `Totale modello ${provider} ${date}`),
-          `Totale modello cumulativo ${provider} ${model}`,
-        ),
-      );
+export function validate(data) {
+  keys(data, ['schemaVersion', 'snapshotDate', 'scope', 'attribution', 'environments', 'effortSource', 'history', 'effort']);
+  assert.equal(data.schemaVersion, 2);
+  assert.equal(data.scope, 'mediflow', 'Only MediFlow usage may be published');
+  keys(data.attribution, ['method', 'unattributedUsage']);
+  assert.equal(data.attribution.method, 'verified-repository-checkout');
+  assert.equal(data.attribution.unattributedUsage, 'excluded');
+  date(data.snapshotDate);
+  for (const name of ['history', 'effort']) {
+    const seen = new Set();
+    assert(Array.isArray(data[name]) && data[name].length, `Missing ${name}`);
+    for (const r of data[name]) {
+      keys(r, ['date', 'environment', 'provider', 'model', 'effort', 'tokens']);
+      date(r.date); assert(r.date <= data.snapshotDate, 'Future data'); token(r.tokens);
+      assert(['codex', 'claude'].includes(r.environment), 'Unknown environment');
+      assert(MODELS.has(r.model), 'Review new model identifiers before publishing');
+      assert.equal(r.provider, providerFor(r.model), 'Inconsistent provider inference');
+      assert(EFFORTS.includes(r.effort), 'Unknown effort');
+      if (name === 'history') assert.equal(r.effort, 'unknown', 'History has no effort dimension');
+      else assert.equal(r.environment, 'codex', 'Response series covers Codex only');
+      const key = [r.date, r.environment, r.model, r.effort].join('|');
+      assert(!seen.has(key), 'Duplicate aggregate'); seen.add(key);
     }
   }
-
-  const totalTokens = tokenInteger(record.totals.totalTokens, `Totale ${provider}`);
-  const cacheReadTokens = tokenInteger(record.totals.cacheReadTokens, `Cache letta ${provider}`);
-  if (cacheReadTokens > totalTokens) {
-    throw new Error(`Cache letta superiore al totale per ${provider}.`);
+  assert(Array.isArray(data.environments) && data.environments.length === 2);
+  assert.deepEqual(data.environments.map((x) => x.environment).sort(), ['claude', 'codex']);
+  for (const source of data.environments) {
+    keys(source, ['environment', 'source', 'from', 'to', 'historyCoverageEstablished', 'totalTokens', 'cacheReadTokens']);
+    if (source.environment === 'codex') assert.match(source.source, /^CodexBar \d+\.\d+\.\d+$/);
+    else assert.equal(source.source, 'Claude Code local response records');
+    assert.equal(source.historyCoverageEstablished, false, 'Project history is partial');
+    token(source.totalTokens); token(source.cacheReadTokens);
+    assert(source.cacheReadTokens <= source.totalTokens);
+    const rows = data.history.filter((r) => r.environment === source.environment);
+    assert.equal(sum(rows), source.totalTokens, 'History does not reconcile');
+    const dates = rows.map((r) => r.date).sort();
+    assert.equal(dates[0], source.from); assert.equal(dates.at(-1), source.to);
   }
-  const modelTotal = [...models.values()].reduce(
-    (sum, value) => addTokens(sum, value, `Totale modelli ${provider}`),
-    0,
-  );
-  if (dailyTotal !== totalTokens || modelTotal !== totalTokens) {
-    throw new Error(`Totale CodexBar non riconciliato per ${provider}.`);
-  }
-
-  const updatedAt = Date.parse(record.updatedAt);
-  if (!Number.isFinite(updatedAt)) {
-    throw new Error(`Timestamp CodexBar non interpretabile per ${provider}.`);
-  }
-  if (typeof record.historyCoverageIsEstablished !== 'boolean') {
-    throw new Error(`Copertura storica CodexBar non dichiarata per ${provider}.`);
-  }
-
-  return {
-    provider,
-    updatedAt,
-    historyCoverageIsEstablished: record.historyCoverageIsEstablished,
-    totalTokens,
-    cacheReadTokens,
-    models,
-    firstDate: [...dates].sort()[0],
-    lastDate: [...dates].sort().at(-1),
-  };
+  const e = data.effortSource;
+  keys(e, ['method', 'timezone', 'from', 'to', 'totalTokens', 'responseRecords', 'missingFiles', 'completeHistory']);
+  assert.equal(e.method, 'unique-codex-response-usage-with-matching-turn-context');
+  assert.equal(e.timezone, 'Europe/Rome'); assert.equal(e.completeHistory, false);
+  token(e.totalTokens); token(e.responseRecords); token(e.missingFiles);
+  assert.equal(sum(data.effort), e.totalTokens, 'Effort series does not reconcile');
+  const dates = data.effort.map((r) => r.date).sort();
+  assert.equal(dates[0], e.from); assert.equal(dates.at(-1), e.to);
+  return data;
 }
 
-function writeSnapshot(nextReadme, nextSvg) {
-  const svgTemp = `${SVG}.tmp-${process.pid}`;
-  const readmeTemp = `${README}.tmp-${process.pid}`;
-  const previousSvg = readFileSync(SVG, 'utf8');
-  let svgPromoted = false;
-
-  try {
-    writeFileSync(svgTemp, nextSvg);
-    writeFileSync(readmeTemp, nextReadme);
-    renameSync(svgTemp, SVG);
-    svgPromoted = true;
-    renameSync(readmeTemp, README);
-  } catch (error) {
-    if (svgPromoted) writeFileSync(SVG, previousSvg);
-    throw error;
-  } finally {
-    if (existsSync(svgTemp)) unlinkSync(svgTemp);
-    if (existsSync(readmeTemp)) unlinkSync(readmeTemp);
-  }
+function totals(rows, dimension) {
+  const groups = new Map();
+  for (const r of rows) groups.set(r[dimension], (groups.get(r[dimension]) ?? 0) + r.tokens);
+  return [...groups].sort((a, b) => b[1] - a[1]);
 }
-
-function groupFamilies(models, definitions, expectedTotal) {
-  const groups = definitions.map(([key, label, color]) => ({ key, label, color, tokens: 0 }));
-  for (const [model, tokens] of models) {
-    const index = definitions.findIndex(([, , , match]) => match(model));
-    groups[index].tokens = addTokens(groups[index].tokens, tokens, `Famiglia modello ${groups[index].label}`);
+function periodsBetween(from, to, daily) {
+  const result = [];
+  const d = new Date(`${from.slice(0, daily ? 10 : 7)}${daily ? '' : '-01'}T00:00:00Z`);
+  const last = to.slice(0, daily ? 10 : 7);
+  while (d.toISOString().slice(0, daily ? 10 : 7) <= last) {
+    result.push(d.toISOString().slice(0, daily ? 10 : 7));
+    if (daily) d.setUTCDate(d.getUTCDate() + 1); else d.setUTCMonth(d.getUTCMonth() + 1);
   }
-  const result = groups.filter((group) => group.tokens > 0).sort((a, b) => b.tokens - a.tokens);
-  const total = result.reduce(
-    (sum, group) => addTokens(sum, group.tokens, 'Totale famiglie modello'),
-    0,
-  );
-  if (total !== expectedTotal) throw new Error('Raggruppamento modelli non riconciliato.');
   return result;
 }
-
-function buildReadmeBlock({ codex, claude, total, snapshot, period, version }) {
-  const alt = `Snapshot ${snapshot.label}: ${formatCompact(total.totalTokens)} token di sessione, ${formatCompact(codex.totalTokens)} in Codex e ${formatCompact(claude.totalTokens)} in Claude Code; ${formatCompact(total.cacheReadTokens)} da cache letta.`;
-  return `${START}\n\n` +
-    `| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |\n` +
-    `| :-- | :-- | --: | :-- | --: | :-- |\n` +
-    `| **${snapshot.label}** | ${period.first} → ${period.last} | **${formatInteger(total.totalTokens)}** | Codex ${formatInteger(codex.totalTokens)} · Claude Code ${formatInteger(claude.totalTokens)} | ${formatInteger(total.cacheReadTokens)} (${formatPct(total.cacheReadTokens, total.totalTokens)}) | Codex ${coverageLabel(codex)} · Claude Code ${coverageLabel(claude)} |\n\n` +
-    `<img src="./screenshots/token-models.svg" alt="${alt}" width="720" loading="lazy"/>\n\n` +
-    `La fonte è **${version}**, comando locale \`cost --refresh\`, con una finestra massima di ${HISTORY_DAYS} giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.\n\n` +
-    `**ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.\n\n` +
-    `Rigenera il grafico con \`npm run build:usage-dashboard\`. Usa \`CODEXBAR_BIN\` per scegliere un eseguibile diverso e \`USAGE_DASHBOARD_DAYS\` per impostare una finestra da 1 a 365 giorni.\n\n` +
-    `Le barre sono divise per modello e usano la stessa scala. La cache letta è una parte dell'input Codex, mentre CodexBar la espone come categoria separata per Claude Code: per questo il grafico non impila categorie di token con semantiche diverse. Sono pubblicati soltanto aggregati. Nessun prompt, contenuto di sessione, costo o percorso locale entra nel README o nell'SVG.\n\n` +
-    `Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.\n\n` +
-    `La responsabilità del progetto resta mia.\n\n${END}`;
+export function chartSeries(rows, dimension, daily = false, top = Infinity) {
+  const ranking = totals(rows, dimension).map(([name]) => name);
+  const categories = dimension === 'effort' ? EFFORTS.filter((e) => ranking.includes(e)) : ranking.slice(0, top);
+  const other = ranking.length > top;
+  if (other) categories.push('Altri modelli');
+  const dates = rows.map((r) => r.date).sort();
+  const periods = periodsBetween(dates[0], dates.at(-1), daily);
+  const groups = new Map(periods.map((p) => [p, new Map(categories.map((c) => [c, 0]))]));
+  const observed = new Set();
+  for (const r of rows) {
+    const period = r.date.slice(0, daily ? 10 : 7);
+    const c = categories.includes(r[dimension]) ? r[dimension] : 'Altri modelli';
+    const group = groups.get(period);
+    group.set(c, group.get(c) + r.tokens); observed.add(period);
+  }
+  return { categories, periods, groups, observed };
 }
-
-function buildSvg({ codex, claude, total, snapshot, period, version, families }) {
-  const width = 824;
-  const max = Math.max(codex.totalTokens, claude.totalTokens, 1);
-  const segments = (groups, y) => {
-    let x = 48;
-    return groups.map((group) => {
-      const segmentWidth = width * group.tokens / max;
-      const rect = `<rect x="${x.toFixed(2)}" y="${y}" width="${segmentWidth.toFixed(2)}" height="38" fill="${group.color}"/>`;
-      x += segmentWidth;
-      return rect;
-    }).join('\n    ');
-  };
-  const legend = (groups, y, columns) => groups.map((group, index) => {
-    const x = 48 + (index % columns) * (824 / columns);
-    const rowY = y + Math.floor(index / columns) * 25;
-    return `<rect x="${x.toFixed(0)}" y="${rowY - 9}" width="10" height="10" rx="3" fill="${group.color}"/><text class="body" x="${(x + 17).toFixed(0)}" y="${rowY}">${group.label} · ${formatCompact(group.tokens)}</text>`;
-  }).join('\n    ');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 720" width="920" height="720" role="img" aria-label="Dashboard token di sessione del ${snapshot.label}: totale ${formatInteger(total.totalTokens)}, Codex ${formatInteger(codex.totalTokens)}, Claude Code ${formatInteger(claude.totalTokens)}.">
-  <style>
-    .frame{fill:#fbfaf7;stroke:#d9d7d1}.panel,.track{fill:#f0eee8}.rule{stroke:#e1ded8}.ink{fill:#181a1d}.muted{fill:#66707b}.body{fill:#31363d}.guide{stroke:#c9c6bf}
-  </style>
-  <defs><clipPath id="codex-bar"><rect x="48" y="168" width="824" height="38" rx="19"/></clipPath><clipPath id="claude-bar"><rect x="48" y="407" width="824" height="38" rx="19"/></clipPath></defs>
-  <rect class="frame" x="6" y="6" width="908" height="708" rx="28" stroke-width="1.5"/>
-  <text class="ink" x="48" y="62" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="25" font-weight="720">Il lavoro assistito per ambiente</text>
-  <text class="muted" x="48" y="92" font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13">${version} · log ${period.first}–${period.last} · snapshot ${snapshot.label}</text>
-  <rect class="panel" x="692" y="40" width="180" height="64" rx="16"/><text class="muted" x="712" y="62" font-family="Inter,sans-serif" font-size="10.5" font-weight="700" letter-spacing="0.8">TOTALE</text><text class="ink" x="712" y="90" font-family="Inter,sans-serif" font-size="23" font-weight="760">${formatCompact(total.totalTokens)}</text>
-  <line class="rule" x1="48" y1="126" x2="872" y2="126"/>
-  <text class="ink" x="48" y="153" font-family="Inter,sans-serif" font-size="15" font-weight="700">Codex</text><text x="872" y="153" text-anchor="end" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="15" font-weight="650" fill="#7568c7">${formatCompact(codex.totalTokens)}</text>
-  <rect class="track" x="48" y="168" width="824" height="38" rx="19"/><g clip-path="url(#codex-bar)">${segments(families.codex, 168)}</g>
-  <g font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="10.5">${legend(families.codex, 237, 2)}</g>
-  <line class="rule" x1="48" y1="365" x2="872" y2="365"/>
-  <text class="ink" x="48" y="392" font-family="Inter,sans-serif" font-size="15" font-weight="700">Claude Code</text><text x="872" y="392" text-anchor="end" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="15" font-weight="650" fill="#cf7450">${formatCompact(claude.totalTokens)}</text>
-  <rect class="track" x="48" y="407" width="824" height="38" rx="19"/><g clip-path="url(#claude-bar)">${segments(families.claude, 407)}</g><line class="guide" x1="872" y1="164" x2="872" y2="449" stroke-dasharray="3 5"/>
-  <g font-family="Inter,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="10.5">${legend(families.claude, 476, 2)}</g>
-  <rect class="panel" x="48" y="594" width="824" height="60" rx="18"/><text class="muted" x="68" y="617" font-family="Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="0.45">LETTURA DEL DATO</text><text class="ink" x="68" y="641" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="13" font-weight="600">Cache letta: ${formatCompact(total.cacheReadTokens)} token (${formatPct(total.cacheReadTokens, total.totalTokens)} del contesto).</text>
-  <text class="muted" x="48" y="691" font-family="Inter,sans-serif" font-size="10">Copertura: Codex ${coverageLabel(codex)} · Claude Code ${coverageLabel(claude)}</text><text class="muted" x="872" y="691" text-anchor="end" font-family="Inter,sans-serif" font-size="10">Stessa scala per entrambe le barre · valori arrotondati</text>
+function text(x, y, value, cls = 'body', extra = '') {
+  return `<text x="${x}" y="${y}" class="${cls}" ${extra}>${escape(value)}</text>`;
+}
+function panel(y, title, subtitle, rows, dimension, daily = false, top = Infinity) {
+  const { categories, periods, groups, observed } = chartSeries(rows, dimension, daily, top);
+  const left = 152, width = 782, height = 174, chartTop = y + 88, bottom = chartTop + height;
+  const maximum = Math.max(...[...groups.values()].map((g) => [...g.values()].reduce((a, b) => a + b, 0)), 1);
+  const slot = width / periods.length, bar = Math.min(slot * 0.66, 68);
+  let out = `<rect x="32" y="${y}" width="936" height="386" rx="20" class="panel"/>`;
+  out += text(56, y + 32, title, 'section') + text(56, y + 55, subtitle, 'muted');
+  for (let i = 0; i <= 4; i++) {
+    const gy = bottom - height * i / 4;
+    out += `<line x1="${left}" x2="934" y1="${gy}" y2="${gy}" class="grid"/>`;
+    out += text(left - 12, gy + 4, i ? compact(maximum * i / 4) : '0', 'axis', 'text-anchor="end"');
+  }
+  periods.forEach((p, index) => {
+    const x = left + slot * index + (slot - bar) / 2;
+    let base = bottom;
+    if (!observed.has(p)) out += text(x + bar / 2, bottom - 6, 'n.d.', 'axis', 'text-anchor="middle"');
+    categories.forEach((c, ci) => {
+      const tokens = groups.get(p).get(c), h = tokens * height / maximum;
+      if (tokens) out += `<rect x="${x.toFixed(2)}" y="${(base - h).toFixed(2)}" width="${bar.toFixed(2)}" height="${h.toFixed(3)}" fill="${COLORS[ci % COLORS.length]}"><title>${escape(`${p} · ${label(c)}: ${integer(tokens)} token`)}</title></rect>`;
+      base -= h;
+    });
+    if (!daily || index % 4 === 0 || index === periods.length - 1) {
+      const display = daily ? p.slice(8) : new Date(`${p}-01T00:00:00Z`).toLocaleDateString('it-IT', { month: 'short', timeZone: 'UTC' });
+      out += text(x + bar / 2, bottom + 20, display, 'axis', 'text-anchor="middle"');
+    }
+  });
+  categories.forEach((c, i) => {
+    const x = 56 + (i % 3) * 300, cy = y + 317 + Math.floor(i / 3) * 23;
+    out += `<rect x="${x}" y="${cy - 10}" width="11" height="11" rx="3" fill="${COLORS[i % COLORS.length]}"/>` + text(x + 18, cy, label(c), 'legend');
+  });
+  return out;
+}
+export function renderSvg(data) {
+  validate(data);
+  const total = sum(data.history);
+  const from = data.history.map((r) => r.date).sort()[0];
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1400" viewBox="0 0 1000 1400" role="img" aria-labelledby="title desc">
+<title id="title">MediFlow: storico dei token di sviluppo, snapshot ${data.snapshotDate}</title>
+<desc id="desc">Solo registrazioni attribuite alle checkout verificate di MediFlow: ${integer(total)} token. Altri progetti e attribuzioni incerte esclusi; copertura parziale. Provider dedotto dal nome del modello. Il grafico effort usa una serie distinta e parziale di risposte Codex, non sommabile al totale. Tabelle esatte in docs/development-usage.md.</desc>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;fill:#242b31}.title{font-size:27px;font-weight:700}.section{font-size:18px;font-weight:650}.body{font-size:14px}.muted{font-size:13px;fill:#59656b}.axis{font-size:11px;fill:#647078}.legend{font-size:12px}.panel{fill:#fffdfa;stroke:#deded6}.grid{stroke:#e3e4dd;stroke-width:1}</style>
+<rect width="1000" height="1400" rx="24" fill="#f3f3ed"/>
+${text(42, 49, 'MediFlow · sviluppo assistito', 'title')}
+${text(42, 77, `Snapshot ${data.snapshotDate} · log dal ${from} · solo checkout MediFlow verificate`, 'muted')}
+${text(958, 49, compact(total) + ' token', 'section', 'text-anchor="end"')}
+${text(42, 105, 'Token registrati, cache inclusa · copertura parziale · altri progetti e attribuzioni incerte esclusi', 'body')}
+${panel(128, '01  Provider del modello · per mese', 'CodexBar e record Claude Code · provider dedotto dal nome del modello', data.history, 'provider')}
+${panel(530, '02  Modelli · per mese', 'Otto identificatori principali; tutti gli altri sono inclusi in «Altri modelli»', data.history, 'model', false, 8)}
+${panel(932, '03  Effort registrato · per giorno', `Solo risposte individuali Codex · ${data.effortSource.from} → ${data.effortSource.to} · ${compact(data.effortSource.totalTokens)} token`, data.effort, 'effort', true)}
+${text(42, 1352, 'La serie effort è parziale e separata: non si somma allo storico. n.d. = nessun record disponibile.', 'muted')}
+${text(42, 1376, 'Fonti, copertura, conteggi esatti e matrice modello × effort sono nella pagina di approfondimento.', 'muted')}
 </svg>\n`;
 }
 
-function snapshotDate(timestamp) {
-  const date = new Date(timestamp);
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'Europe/Rome',
-  }).formatToParts(date).map(({ type, value }) => [type, value]));
-  return {
-    iso: `${parts.year}-${parts.month}-${parts.day}`,
-    label: new Intl.DateTimeFormat('it-IT', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'Europe/Rome',
-    }).format(date),
+export function renderTables(data) {
+  validate(data);
+  const monthly = (rows, dimension) => {
+    const s = chartSeries(rows, dimension);
+    const header = `| ${dimension === 'provider' ? 'Provider dedotto' : 'Identificatore modello'} | ${s.periods.join(' | ')} | Totale |\n| :-- | ${s.periods.map(() => '--:').join(' | ')} | --: |\n`;
+    return header + totals(rows, dimension).map(([name, total]) => `| ${label(name)} | ${s.periods.map((p) => integer(s.groups.get(p).get(name) ?? 0)).join(' | ')} | ${integer(total)} |`).join('\n');
   };
-}
-
-function formatInteger(value) {
-  return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 }).format(value);
-}
-
-function formatCompact(value) {
-  return new Intl.NumberFormat('it-IT', {
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatPct(part, whole) {
-  if (!whole) return '0%';
-  return `${new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(part * 100 / whole)}%`;
-}
-
-function coverageLabel(provider) {
-  return provider.historyCoverageIsEstablished ? 'attestata' : 'UNKNOWN';
-}
-
-function tokenInteger(value, label) {
-  const result = Number(value);
-  if (!Number.isSafeInteger(result) || result < 0) {
-    throw new Error(`${label}: valore token CodexBar non valido.`);
+  const pair = new Map();
+  for (const r of data.effort) {
+    const key = `${r.provider} | ${r.model} | ${label(r.effort)}`;
+    pair.set(key, (pair.get(key) ?? 0) + r.tokens);
   }
-  return result;
+  return `${START}\n\nSnapshot: **${data.snapshotDate}**. Token registrati nelle checkout verificate di **MediFlow: ${integer(sum(data.history))}**. Altri progetti e attribuzioni incerte esclusi.\n\n` +
+    '| Ambiente che registra | Fonte | Periodo disponibile | Token | Cache letta (inclusa) | Copertura |\n| :-- | :-- | :-- | --: | --: | :-- |\n' +
+    data.environments.map((e) => `| ${e.environment === 'codex' ? 'Codex' : 'Claude Code'} | ${e.source} | ${e.from} → ${e.to} | ${integer(e.totalTokens)} | ${integer(e.cacheReadTokens)} | Parziale |`).join('\n') +
+    '\n\n### Storico mensile per provider\n\n' + monthly(data.history, 'provider') +
+    '\n\n### Storico mensile completo per modello\n\nValori zero indicano assenza di token registrati, non prova di mancato utilizzo. L’ultimo mese è parziale.\n\n' + monthly(data.history, 'model') +
+    `\n\n### Provider, modello ed effort registrato\n\nSerie separata: **${data.effortSource.from} → ${data.effortSource.to}**, **${integer(data.effortSource.totalTokens)} token** in **${integer(data.effortSource.responseRecords)} risposte**. ${integer(data.effortSource.missingFiles)} file indicizzati non erano disponibili: la copertura non è completa.\n\n` +
+    '| Provider dedotto | Identificatore modello | Effort registrato | Token |\n| :-- | :-- | :-- | --: |\n' +
+    [...pair].sort((a, b) => b[1] - a[1]).map(([name, n]) => `| ${name} | ${integer(n)} |`).join('\n') + `\n\n${END}`;
 }
-
-function addTokens(left, right, label) {
-  const result = left + right;
-  if (!Number.isSafeInteger(result) || result < 0) {
-    throw new Error(`${label}: somma token CodexBar non valida.`);
-  }
-  return result;
+export function replaceBlock(source, replacement) {
+  assert.equal(source.split(START).length, 2, 'Expected one start marker');
+  assert.equal(source.split(END).length, 2, 'Expected one end marker');
+  const first = source.indexOf(START), last = source.indexOf(END);
+  assert(last > first, 'Reversed markers');
+  return source.slice(0, first) + replacement + source.slice(last + END.length);
 }
-
-function isoDate(value, label) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${label}: ${String(value)}.`);
+export function build(root = ROOT, check = false) {
+  const data = validate(JSON.parse(readFileSync(path.join(root, 'docs/data/development-usage.json'), 'utf8')));
+  const doc = path.join(root, 'docs/development-usage.md');
+  const outputs = new Map([
+    [path.join(root, 'screenshots/token-models.svg'), renderSvg(data)],
+    [doc, replaceBlock(readFileSync(doc, 'utf8'), renderTables(data))],
+  ]);
+  for (const [file, contents] of outputs) {
+    if (check) assert.equal(readFileSync(file, 'utf8'), contents, `Outdated publication: ${path.basename(file)}`);
+    else writeFileSync(file, contents);
   }
-  const timestamp = Date.parse(`${value}T00:00:00Z`);
-  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) {
-    throw new Error(`${label}: ${value}.`);
-  }
-  return value;
+  console.log(`${check ? 'Verified' : 'Generated'} dashboard ${data.snapshotDate}; ${data.history.length} historical aggregates, ${data.effort.length} effort aggregates.`);
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const args = process.argv.slice(2);
+  assert(args.length === 0 || (args.length === 1 && args[0] === '--check'), 'Only --check is supported');
+  build(ROOT, args[0] === '--check');
 }

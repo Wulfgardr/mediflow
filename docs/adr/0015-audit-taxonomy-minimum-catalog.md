@@ -766,3 +766,78 @@ prove HTTP reali delle superfici e UI per le azioni effettivamente esposte.
 La guardia strutturale verifica delega e ordine mutazione/audit, non sostituisce
 le prove comportamentali. Restano esclusi writer document-derived, direct-native
 e headless, schema database, CRUD generico, pubblicazione e accettazione clinica.
+
+
+## Coorte prescrizioni protesiche ordinarie (27 settembre 2026)
+
+WUL-720 estende il confine di audit obbligatorio alle cinque mutazioni
+esistenti: POST, PUT e DELETE Web; POST e PUT della rete paired. La baseline
+`d73b46228` esegue l'audit dopo la modifica e il wrapper paired intercetta
+gli errori; le prove SQLite devono caratterizzare gli effetti prima della
+correzione. Il catalogo protesico, le prestazioni e i loro item rimangono
+famiglie distinte. Non si aggiungono DELETE paired, API locali v1 o writer
+headless.
+
+Il writer protesico conserva normalizzazione e adapter attuali. La decisione
+di ammissione, il controllo della versione, la mutazione di esattamente una
+riga e l'evento obbligatorio avvengono nella stessa transazione sincrona
+IMMEDIATE. Il paziente deve esistere e non essere eliminato; l'archiviazione
+da sola non impedisce l'operazione. La relazione paired con l'ambulatorio
+viene riletta dentro la stessa transazione, anche per PUT. Identita e scope
+provengono dal contesto ammesso, mai da campi aggiunti dal chiamante.
+
+Una versione obsoleta mantiene il conflitto 409 e lo snapshot minimizzato
+esistente; una risorsa o un padre non disponibile produce 404 senza effetti.
+Un errore o inserimento ignorato dell'audit annulla l'intera mutazione. Anche
+una scrittura di dominio ignorata dopo l'ammissione e un errore di integrita,
+non un successo o un conflitto di versione fittizio. Il DELETE host resta
+fisico e il suo audit conserva la versione rimossa: non si introduce una
+nuova cancellazione logica o un replay idempotente.
+
+Eventi, attore derivato dalla sessione, superficie e flag paired restano
+riconoscibili. L'audit contiene soltanto nomi dei campi, classificazioni
+ammesse, identificativi tecnici e versione; nessun testo clinico o ciphertext.
+Normalizzatori, omissione/null, campi ignorati, date, limiti del corpo e
+risposte dei duplicati restano quelli attuali. I residui del contratto di
+input generale restano in WUL-720; questa coorte non ne dichiara la chiusura.
+
+Le prove richieste comprendono successi e riletture, cinque rollback per
+ciascun guasto audit FAIL/IGNORE, DML ignorata, scope/versione/padre, retry e
+concorrenza, adapter reali e percorso Web ordinario. La review indipendente e
+i gate integrati completano la candidata locale; non attestano una release
+o un deployment clinico.
+
+
+## Coorte prescrizioni prestazioni e item ordinari (27 settembre 2026)
+
+WUL-720 applica il confine C04 alle dieci mutazioni gia esistenti: POST, PUT
+e DELETE Web di prescrizione e item; POST e PUT paired di entrambi. I writer
+document-derived e le transizioni con Clinical Commit Receipt conservano i
+propri contratti. Nessuna nuova operazione paired, v1 locale o headless.
+
+Una transazione sincrona IMMEDIATE comprende riesame del paziente non
+eliminato, identita coerente item/prescrizione, scope paired, versione,
+mutazione e audit obbligatorio. Un paziente solo archiviato resta ammesso.
+Per un item, il padre deve esistere e riferirsi allo stesso paziente. Scope
+e identita derivano dal contesto ammesso e dalle righe lette, non da nuove
+proprieta del payload. Stato mancante/non disponibile restituisce 404;
+versione obsoleta mantiene 409 con lo snapshot esistente.
+
+Guasti o inserimenti ignorati dell'audit annullano dati e versione. DML
+ignorata dopo l'ammissione causa errore di integrita; non diventa un successo
+o un conflitto fittizio. DELETE prescrizione conserva la cancellazione
+fisica e la cascata degli item sotto la versione dell'aggregato; la mancata
+rimozione di un figlio annulla tutto. L'audit di DELETE conserva la versione
+rimossa, senza nuovi eventi per ogni figlio o replay della risposta.
+
+Attore e superficie derivano dall'host; audit minimizzato e compatibile,
+nessun valore clinico. Il retry PUT con versione precedente resta conflitto:
+dopo risposta persa occorre rileggere, non ripetere alla cieca. Restano
+invariati normalizzatori, ciphertext, omissione/null, campi ignorati, date,
+limiti del corpo e risposta dei duplicati. Quei residui restano WUL-720.
+
+Le prove devono osservare baseline e candidato su SQLite reale, guasti
+audit FAIL/IGNORE e DML ignorata per le dieci mutazioni, cascata, concorrenza,
+negazioni e rilettura. Adapter HTTP reali e percorso Web sintetico completano
+la prova; review indipendente e CI sono richieste prima del merge. Questa
+coorte non chiude WUL-720 e non qualifica la release o il deployment clinico.

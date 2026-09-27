@@ -192,21 +192,14 @@ fonti del prodotto.
 Codex e Claude Code hanno contribuito alla progettazione, all'implementazione,
 alla revisione e alla verifica. Lo sviluppo assistito ha usato le famiglie
 OpenAI GPT-5.2, GPT-5.3 Codex/Spark, GPT-5.4/mini, GPT-5.5, GPT-5.6
-Sol/Terra/Luna e GPT-6 Astra; per Anthropic, Opus 4.8, Fable 5, Sonnet 5 e,
+Sol/Terra/Luna e GPT-6 Astra/Sol/Luna; per Anthropic, Opus 4.8, Fable 5, Sonnet 5 e,
 in una quota esplorativa storica, Haiku 4.5.
 
-La rilevazione locale del 5 settembre 2026, prodotta da CodexBar 0.56.4,
-copre il periodo dal 1 febbraio al 5 settembre 2026 e conta
-**50.810.826.389 token di sessione**: 44.773.273.634 registrati da Codex e
-6.037.552.755 da Claude Code. Di questi, 48.607.240.570 token (95,7%)
-riguardano cache letta.
-
-Poiché **non sono filtrati per repository**, questi aggregati non misurano
-i token impiegati esclusivamente per MediFlow o per la 0.8.5, né attestano
-la completezza storica di Codex. Descrivono il contesto elaborato, non righe
-di codice, costo o qualità: per la stessa ragione, conteggi con coperture
-diverse non sono direttamente confrontabili.
-[Dashboard e metodo](./README.md#sviluppo-assistito).
+La [dashboard pubblica](./docs/development-usage.md) mostra lo storico dei token
+per provider e modello e una serie separata per l’effort registrato, con fonte,
+data, copertura e limiti. Gli aggregati includono solo registrazioni associate
+alle checkout verificate di MediFlow; altri progetti e attribuzioni incerte
+sono esclusi. La copertura è parziale; i token non misurano costo o qualità.
 
 - **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, usato in alcune sessioni per preparare selezioni e diff per gli agenti.
 - **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): visibilità locale sull'uso dei modelli e fonte del conteggio storico del README.

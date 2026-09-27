@@ -1,5 +1,5 @@
 ---
-summary: "EHR and provider-software scouting behind Lume's attention grammar: three GPT-5.6 lanes (US advanced apps, GP vendors worldwide, open health design systems), adopted patterns and rejections."
+summary: "EHR and provider-software scouting behind Lume's attention grammar: US advanced apps, GP vendors worldwide, open health design systems, adopted patterns and rejections."
 read_when:
   - "Refining the attention grammar, worklist, provenance, or safety rules of Lume."
   - "Checking what the GP/EHR market does and where MediFlow's competitive white space is."
@@ -7,7 +7,7 @@ read_when:
 
 # La perlustrazione
 
-Dopo ADR 0078, la ricerca del 2026-07-12 ha approfondito tre ambiti dai quali ricavare scelte di interfaccia: applicativi avanzati per i professionisti sanitari USA, gestionali per general practitioner con UI pubbliche e fonti aperte su design sanitario e usabilità. Il lavoro è stato affidato a tre lane web GPT-5.6 Terra via Codex CLI, in sola lettura, con S1 e S2 a effort high e S3 medium. Fable ne ha definito i prompt, curato la sintesi e integrato i risultati nella specifica.
+Dopo ADR 0078, la ricerca del 2026-07-12 ha approfondito tre ambiti dai quali ricavare scelte di interfaccia: applicativi avanzati per i professionisti sanitari USA, gestionali per general practitioner con UI pubbliche e fonti aperte su design sanitario e usabilità. La ricognizione documentale in sola lettura ha distinto questi tre ambiti e ne ha integrato i risultati nella specifica.
 
 ## 1. Cosa hanno trovato le lane
 

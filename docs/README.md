@@ -71,6 +71,12 @@ pubblico, mentre il [gemello web navigabile e confronto visuale](./design/2026-0
 le prove sintetiche WUL-676 precedenti alla promozione UI: nessuno dei due
 sostituisce il runtime.
 
+## Trasparenza sullo sviluppo
+
+[Disclosure e consumi](./development-usage.md) conserva lo storico pubblico dei
+token per provider, modello ed effort registrato, con fonti, dati aggregati e
+limiti di attribuzione. Non descrive i consumi del runtime clinico.
+
 ## Preferenze modello per esperienza
 
 La scelta utile non è «quale AI per tutto», ma quale strumento ammesso usare
@@ -148,23 +154,10 @@ runtime o il design attivo.
 conserva il contratto `mf085-fix-a-web-20260904`, le regressioni e i limiti di
 quella candidatura sorgente. Non è una ricevuta di rilascio.
 
-## 📚 Policy di consultazione (agent)
+## Contratti per componente
 
-Per un agente, orientarsi significa anzitutto individuare chi governi il
-lavoro richiesto. La sequenza seguente collega presentazione, regole
-operative, stato, architettura, sicurezza e contributi. Le ADR vanno scelte
-per pertinenza, verificando stato e successione degli emendamenti: la data
-più recente, da sola, non rende una decisione applicabile a ogni tema.
-
-1. [README.md](../README.md)
-2. [AGENTS.md](../AGENTS.md)
-3. [docs/README.md](./README.md) (questo file)
-4. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
-5. [ARCHITECTURE.md](../ARCHITECTURE.md)
-6. [SECURITY.md](../SECURITY.md)
-7. [CONTRIBUTING.md](../CONTRIBUTING.md)
-8. [docs/repository-topology.md](./repository-topology.md)
-9. [docs/adr/](./adr/README.md) (pertinenti al tema, con i successivi emendamenti)
+Consultare gli ADR pertinenti al tema, verificando stato ed emendamenti.
+La sola data non rende una decisione applicabile a ogni componente.
 
 Gli approfondimenti seguenti mantengono nomi e riferimenti tecnici per
 rendere reperibili i contratti. «Proposto», «candidato» e «storico» qualificano
@@ -237,18 +230,17 @@ il documento o la prova nominati, non l’intero prodotto.
 
 Per una lettura completa, questo ordine porta dal motivo del progetto al
 suo funzionamento e infine all’inventario. Per un intervento circoscritto
-restano sufficienti i contratti pertinenti, secondo AGENTS.md.
+restano sufficienti i contratti pertinenti e [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 1. [README.md](../README.md)
-2. [AGENTS.md](../AGENTS.md)
-3. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
-4. [ARCHITECTURE.md](../ARCHITECTURE.md)
-5. [SECURITY.md](../SECURITY.md)
-6. [CONTRIBUTING.md](../CONTRIBUTING.md)
-7. [docs/repository-topology.md](./repository-topology.md)
-8. [docs/adr/](./adr/README.md) (pertinenti al tema, con i successivi emendamenti)
-9. [docs/walkthrough.md](./walkthrough.md)
-10. [docs/markdown-index.md](./markdown-index.md)
+2. [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
+3. [ARCHITECTURE.md](../ARCHITECTURE.md)
+4. [SECURITY.md](../SECURITY.md)
+5. [CONTRIBUTING.md](../CONTRIBUTING.md)
+6. [docs/repository-topology.md](./repository-topology.md)
+7. [docs/adr/](./adr/README.md) (pertinenti al tema, con i successivi emendamenti)
+8. [docs/walkthrough.md](./walkthrough.md)
+9. [docs/markdown-index.md](./markdown-index.md)
 
 ## 🧱 Convenzione stato documenti
 
@@ -275,7 +267,6 @@ installato, clinicamente qualificato o pubblicato.
 | Onboarding progetto | [README.md](../README.md) | `CANONICAL` | Presenta il lavoro ambulatoriale, l’uso senza AI e le scelte che tengono insieme dati, documenti e attività. |
 | Contratto prodotto | [PRODUCT.md](../PRODUCT.md) | `CANONICAL` | Definisce finalità, destinatari, compiti e ruoli delle piattaforme; separa limiti, anti-goal e direzione successiva alla 0.8. |
 | Contratto design | [DESIGN.md](../DESIGN.md) | `CANONICAL` | Principi Lume condivisi, adattamenti per piattaforma, stati, accessibilità ed eccezioni intenzionali. |
-| Regole operative per agent | [AGENTS.md](../AGENTS.md) | `CANONICAL` | Stabilisce come iniziare il lavoro, scegliere repository e worktree, tutelare i dati e verificare la consegna. |
 | Governance e topologia repository | [docs/repository-topology.md](./repository-topology.md) | `CANONICAL` | Indica l’unica repository pubblica operativa e separa runtime, sito di presentazione e artefatti locali che devono restare fuori da Git. |
 | Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Distingue la release sorgente 0.8.6 pubblicata, i contratti implementativi e le prove storiche con i propri SHA; mantiene aperta la decisione sul deployment clinico. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Spiega perché dati, interfacce e funzioni intelligenti abbiano responsabilità separate, fissando i principi stabili. |
@@ -296,7 +287,7 @@ installato, clinicamente qualificato o pubblicato.
 | Write paired osservazioni | [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md) | `CANONICAL` | Slice per read/create/update/soft-delete osservazioni su `/api/v1/network/patients/{id}/observations*` con `observations.version`, capability dedicate, audit PHI-safe e hard delete/AI/documenti fuori scope. |
 | Runbook manutenzione OpenAPI | [docs/openapi/README.md](./openapi/README.md) | `SECONDARY` | Workflow operativo per mantenere aggiornata la spec durante lo sviluppo. |
 | Parity localhost/client Apple | [docs/parity-matrix.md](./parity-matrix.md) | `CANONICAL` | Fotografia corrente di 66 capability (30 full, 13 partial, 23 host-only), manifest QA e gate P6 residuo in `WUL-481`. |
-| Recovery UI/parity 0.8 | [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | `SECONDARY / RUN RECORD` | Registra recovery Claude, candidata locale, ownership, prove eseguite e blocker. Non sostituisce la matrice canonica. |
+| Recovery UI/parity 0.8 | [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | `SECONDARY / RUN RECORD` | Registra candidata locale, responsabilità, prove eseguite e impedimenti della recovery. Non sostituisce la matrice canonica. |
 | Provider intelligenti post-0.8 | [docs/analysis/2026-07-28-provider-program-post-0.8-run.md](./analysis/2026-07-28-provider-program-post-0.8-run.md) | `SECONDARY / RUN RECORD` | Registra stato reale, trust boundary, locality Ollama, auth provider, DAG e gate del programma separato dalla release 0.8. |
 | Intelligence Fabric post-0.8 | [docs/analysis/2026-07-29-intelligence-fabric-run.md](./analysis/2026-07-29-intelligence-fabric-run.md) | `SECONDARY / RUN RECORD` | Registra nucleo, giunture, prove, limiti, packet e stato del candidato locale WUL-522. |
 | Matrice runtime AI post-0.8 | [docs/ai-runtime-serving-matrix.md](./ai-runtime-serving-matrix.md) | `CANONICAL / POST-0.8 GOVERNANCE` | Distingue compatibilità tecnica, benchmark, osservazione shadow e ammissione all’esecuzione per compito, modello e runtime. |
