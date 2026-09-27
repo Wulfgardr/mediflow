@@ -9,9 +9,8 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
     const dir = process.env.MEDIFLOW_DATA_DIR;
     const url = new URL(baseURL!);
-    const token = process.env.MEDIFLOW_LOCAL_API_TOKEN;
-    if (!dir || !isAbsolute(dir) || !token || url.hostname !== '127.0.0.1' || !url.port || url.port === '3000') {
-        throw new Error('Dedicated synthetic data, local authorization and loopback port required');
+    if (!dir || !isAbsolute(dir) || url.hostname !== '127.0.0.1' || !url.port || url.port === '3000') {
+        throw new Error('Dedicated synthetic data and loopback port required');
     }
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -24,21 +23,33 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
     expect(list.status()).toBe(200);
     const live = (await list.json() as Array<{ id: string; type: string }>).find(item => item.type === 'live');
     expect(live).toBeTruthy();
-    const headers = { Authorization: `Bearer ${token}` };
     const patientIds: string[] = [];
     for (const lastName of ['SoloProva', 'Condiviso']) {
         const patientId = randomUUID();
-        const response = await page.request.post('/api/v1/patients', { headers, data: {
+        // @Codex: create through the authenticated Web route; its destination is
+        // the active/default ambulatory, then scope these synthetic IDs below.
+        const response = await page.request.post('/api/patients', { data: {
             id: patientId, firstName: 'Sintetico', lastName,
             taxCode: `AMB${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
-            ambulatoryId: id, isAdi: false,
+            isAdi: false,
         } });
         expect(response.status()).toBe(201);
+        expect((await response.json() as { id: string }).id).toBe(patientId);
+        expect((await page.request.get(`/api/patients/${patientId}`)).status()).toBe(200);
         patientIds.push(patientId);
     }
     const sql = new Database(join(dir, 'medical.db'), { fileMustExist: true });
     try {
-        sql.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(patientIds[1], live!.id);
+        // @Codex: fixture-only alignment; the Web legacy route selected the
+        // default/active destination. Keep versions at their create value.
+        sql.transaction(() => {
+            for (const patientId of patientIds) {
+                sql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=?').run(patientId);
+                sql.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(patientId, id);
+                expect(sql.prepare('UPDATE patients SET ambulatory_id=? WHERE id=?').run(id, patientId).changes).toBe(1);
+            }
+            sql.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(patientIds[1], live!.id);
+        })();
         const read = () => ({
             ambulatory: sql.prepare('SELECT * FROM ambulatories WHERE id=?').get(id) as Record<string, unknown>,
             patients: sql.prepare('SELECT * FROM patients WHERE id IN (?, ?) ORDER BY id').all(...patientIds) as Array<Record<string, unknown>>,
@@ -95,8 +106,8 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         const readback = await page.request.get('/api/ambulatories');
         expect(readback.status()).toBe(200);
         expect((await readback.json() as Array<{ id: string; version: number }>).find(item => item.id === id)?.version).toBe(3);
-        expect((await page.request.get(`/api/v1/patients/${patientIds[0]}`, { headers })).status()).toBe(404);
-        expect((await page.request.get(`/api/v1/patients/${patientIds[1]}`, { headers })).status()).toBe(200);
+        expect((await page.request.get(`/api/patients/${patientIds[0]}`)).status()).toBe(404);
+        expect((await page.request.get(`/api/patients/${patientIds[1]}`)).status()).toBe(200);
         expect(pageErrors).toEqual([]);
         await page.screenshot({ path: testInfo.outputPath('clear-completed.png') });
         await testInfo.attach('clear-readback.json', { contentType: 'application/json', body: JSON.stringify({ actions, after }) });
