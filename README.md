@@ -367,10 +367,11 @@ responsabilità del progetto rimangono dell’autore.
 <details>
 <summary><strong>Disclosure e storico dei token per provider, modello ed effort</strong></summary>
 
-![Storico dei token di tutti i progetti locali, per provider e modello; effort su una serie Codex distinta e parziale](./screenshots/token-models.svg)
+![Storico dei token attribuiti a MediFlow, per provider e modello; effort su una serie Codex distinta e parziale](./screenshots/token-models.svg)
 
-Lo storico mostra il contesto elaborato nei log locali, **cache inclusa**;
-non misura il consumo esclusivo di MediFlow, il costo o la qualità del codice.
+Lo storico include solo registrazioni associate alle **checkout verificate di
+MediFlow**, cache inclusa. Altri progetti e attribuzioni incerte sono esclusi:
+la copertura è parziale e i token non misurano costo o qualità del codice.
 Il provider è dedotto dall’identificatore del modello e resta distinto
 dall’ambiente che registra l’uso. L’effort compare solo dove è registrato,
 in una serie con copertura propria che non si somma ai totali storici.

@@ -43,11 +43,12 @@ export function providerFor(model) {
   return 'Non determinato';
 }
 export function validate(data) {
-  keys(data, ['schemaVersion', 'snapshotDate', 'scope', 'historySource', 'historyDaysRequested', 'environments', 'effortSource', 'history', 'effort']);
-  assert.equal(data.schemaVersion, 1);
-  assert.equal(data.scope, 'all-local-projects');
-  assert.match(data.historySource, /^CodexBar \d+\.\d+\.\d+$/);
-  assert(Number.isInteger(data.historyDaysRequested) && data.historyDaysRequested > 0 && data.historyDaysRequested <= 365);
+  keys(data, ['schemaVersion', 'snapshotDate', 'scope', 'attribution', 'environments', 'effortSource', 'history', 'effort']);
+  assert.equal(data.schemaVersion, 2);
+  assert.equal(data.scope, 'mediflow', 'Only MediFlow usage may be published');
+  keys(data.attribution, ['method', 'unattributedUsage']);
+  assert.equal(data.attribution.method, 'verified-repository-checkout');
+  assert.equal(data.attribution.unattributedUsage, 'excluded');
   date(data.snapshotDate);
   for (const name of ['history', 'effort']) {
     const seen = new Set();
@@ -59,7 +60,7 @@ export function validate(data) {
       assert(MODELS.has(r.model), 'Review new model identifiers before publishing');
       assert.equal(r.provider, providerFor(r.model), 'Inconsistent provider inference');
       assert(EFFORTS.includes(r.effort), 'Unknown effort');
-      if (name === 'history') assert.equal(r.effort, 'unknown', 'CodexBar has no effort dimension');
+      if (name === 'history') assert.equal(r.effort, 'unknown', 'History has no effort dimension');
       else assert.equal(r.environment, 'codex', 'Response series covers Codex only');
       const key = [r.date, r.environment, r.model, r.effort].join('|');
       assert(!seen.has(key), 'Duplicate aggregate'); seen.add(key);
@@ -68,8 +69,10 @@ export function validate(data) {
   assert(Array.isArray(data.environments) && data.environments.length === 2);
   assert.deepEqual(data.environments.map((x) => x.environment).sort(), ['claude', 'codex']);
   for (const source of data.environments) {
-    keys(source, ['environment', 'from', 'to', 'historyCoverageEstablished', 'totalTokens', 'cacheReadTokens']);
-    assert.equal(typeof source.historyCoverageEstablished, 'boolean');
+    keys(source, ['environment', 'source', 'from', 'to', 'historyCoverageEstablished', 'totalTokens', 'cacheReadTokens']);
+    if (source.environment === 'codex') assert.match(source.source, /^CodexBar \d+\.\d+\.\d+$/);
+    else assert.equal(source.source, 'Claude Code local response records');
+    assert.equal(source.historyCoverageEstablished, false, 'Project history is partial');
     token(source.totalTokens); token(source.cacheReadTokens);
     assert(source.cacheReadTokens <= source.totalTokens);
     const rows = data.history.filter((r) => r.environment === source.environment);
@@ -125,7 +128,7 @@ function text(x, y, value, cls = 'body', extra = '') {
 }
 function panel(y, title, subtitle, rows, dimension, daily = false, top = Infinity) {
   const { categories, periods, groups, observed } = chartSeries(rows, dimension, daily, top);
-  const left = 96, width = 838, height = 174, chartTop = y + 88, bottom = chartTop + height;
+  const left = 152, width = 782, height = 174, chartTop = y + 88, bottom = chartTop + height;
   const maximum = Math.max(...[...groups.values()].map((g) => [...g.values()].reduce((a, b) => a + b, 0)), 1);
   const slot = width / periods.length, bar = Math.min(slot * 0.66, 68);
   let out = `<rect x="32" y="${y}" width="936" height="386" rx="20" class="panel"/>`;
@@ -160,18 +163,18 @@ export function renderSvg(data) {
   const total = sum(data.history);
   const from = data.history.map((r) => r.date).sort()[0];
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1400" viewBox="0 0 1000 1400" role="img" aria-labelledby="title desc">
-<title id="title">Sviluppo assistito: storico dei token, snapshot ${data.snapshotDate}</title>
-<desc id="desc">Aggregati di tutti i progetti locali. ${integer(total)} token CodexBar; provider dedotto dal nome del modello. Il grafico effort usa una serie distinta e parziale di risposte Codex, non sommabile al totale. Tabelle esatte in docs/development-usage.md.</desc>
+<title id="title">MediFlow: storico dei token di sviluppo, snapshot ${data.snapshotDate}</title>
+<desc id="desc">Solo registrazioni attribuite alle checkout verificate di MediFlow: ${integer(total)} token. Altri progetti e attribuzioni incerte esclusi; copertura parziale. Provider dedotto dal nome del modello. Il grafico effort usa una serie distinta e parziale di risposte Codex, non sommabile al totale. Tabelle esatte in docs/development-usage.md.</desc>
 <style>text{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;fill:#242b31}.title{font-size:27px;font-weight:700}.section{font-size:18px;font-weight:650}.body{font-size:14px}.muted{font-size:13px;fill:#59656b}.axis{font-size:11px;fill:#647078}.legend{font-size:12px}.panel{fill:#fffdfa;stroke:#deded6}.grid{stroke:#e3e4dd;stroke-width:1}</style>
 <rect width="1000" height="1400" rx="24" fill="#f3f3ed"/>
-${text(42, 49, 'Sviluppo assistito, nel tempo', 'title')}
-${text(42, 77, `Snapshot ${data.snapshotDate} · log dal ${from} · tutti i progetti locali`, 'muted')}
+${text(42, 49, 'MediFlow · sviluppo assistito', 'title')}
+${text(42, 77, `Snapshot ${data.snapshotDate} · log dal ${from} · solo checkout MediFlow verificate`, 'muted')}
 ${text(958, 49, compact(total) + ' token', 'section', 'text-anchor="end"')}
-${text(42, 105, 'Contesto elaborato, cache inclusa. Non è il costo né il consumo esclusivo di MediFlow.', 'body')}
-${panel(128, '01  Provider del modello · per mese', 'CodexBar · attribuzione dal nome; ambiente Codex e Claude Code conservato nei dati', data.history, 'provider')}
-${panel(530, '02  Modelli · per mese', 'CodexBar · otto identificatori principali; tutti gli altri sono inclusi in «Altri modelli»', data.history, 'model', false, 8)}
+${text(42, 105, 'Token registrati, cache inclusa · copertura parziale · altri progetti e attribuzioni incerte esclusi', 'body')}
+${panel(128, '01  Provider del modello · per mese', 'CodexBar e record Claude Code · provider dedotto dal nome del modello', data.history, 'provider')}
+${panel(530, '02  Modelli · per mese', 'Otto identificatori principali; tutti gli altri sono inclusi in «Altri modelli»', data.history, 'model', false, 8)}
 ${panel(932, '03  Effort registrato · per giorno', `Solo risposte individuali Codex · ${data.effortSource.from} → ${data.effortSource.to} · ${compact(data.effortSource.totalTokens)} token`, data.effort, 'effort', true)}
-${text(42, 1352, 'La serie effort è parziale e separata: non si somma allo storico CodexBar. n.d. = nessun record disponibile.', 'muted')}
+${text(42, 1352, 'La serie effort è parziale e separata: non si somma allo storico. n.d. = nessun record disponibile.', 'muted')}
 ${text(42, 1376, 'Fonti, copertura, conteggi esatti e matrice modello × effort sono nella pagina di approfondimento.', 'muted')}
 </svg>\n`;
 }
@@ -188,9 +191,9 @@ export function renderTables(data) {
     const key = `${r.provider} | ${r.model} | ${label(r.effort)}`;
     pair.set(key, (pair.get(key) ?? 0) + r.tokens);
   }
-  return `${START}\n\nSnapshot: **${data.snapshotDate}**. Token storici CodexBar: **${integer(sum(data.history))}**.\n\n` +
-    '| Ambiente che registra | Periodo disponibile | Token | Cache letta (inclusa) | Copertura attestata dalla fonte |\n| :-- | :-- | --: | --: | :-- |\n' +
-    data.environments.map((e) => `| ${e.environment === 'codex' ? 'Codex' : 'Claude Code'} | ${e.from} → ${e.to} | ${integer(e.totalTokens)} | ${integer(e.cacheReadTokens)} | ${e.historyCoverageEstablished ? 'Sì, per i log disponibili' : 'No: completezza sconosciuta'} |`).join('\n') +
+  return `${START}\n\nSnapshot: **${data.snapshotDate}**. Token registrati nelle checkout verificate di **MediFlow: ${integer(sum(data.history))}**. Altri progetti e attribuzioni incerte esclusi.\n\n` +
+    '| Ambiente che registra | Fonte | Periodo disponibile | Token | Cache letta (inclusa) | Copertura |\n| :-- | :-- | :-- | --: | --: | :-- |\n' +
+    data.environments.map((e) => `| ${e.environment === 'codex' ? 'Codex' : 'Claude Code'} | ${e.source} | ${e.from} → ${e.to} | ${integer(e.totalTokens)} | ${integer(e.cacheReadTokens)} | Parziale |`).join('\n') +
     '\n\n### Storico mensile per provider\n\n' + monthly(data.history, 'provider') +
     '\n\n### Storico mensile completo per modello\n\nValori zero indicano assenza di token registrati, non prova di mancato utilizzo. L’ultimo mese è parziale.\n\n' + monthly(data.history, 'model') +
     `\n\n### Provider, modello ed effort registrato\n\nSerie separata: **${data.effortSource.from} → ${data.effortSource.to}**, **${integer(data.effortSource.totalTokens)} token** in **${integer(data.effortSource.responseRecords)} risposte**. ${integer(data.effortSource.missingFiles)} file indicizzati non erano disponibili: la copertura non è completa.\n\n` +
