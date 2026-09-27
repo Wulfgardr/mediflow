@@ -128,10 +128,10 @@ distinto e non attesta la Definition of Done.
 
 Il coordinamento ordinario è affidato ad **Astra Medium, senza Fast**,
 perché visione del progetto, obiettivo di consegna, priorità, contratti,
-integrazione e accettazione finale rimangano nello stesso ruolo. Astra delega
-l'esecuzione ordinaria e interviene direttamente sulle diagnosi difficili,
-sui conflitti tra contributi e sulle scelte che richiedano una comprensione
-trasversale. La strategia va misurata sul risultato accettato: non garantisce
+integrazione e accettazione finale rimangano nello stesso ruolo. Il coordinatore
+sceglie collaboratori Luna, Sol o Astra secondo il compito e mantiene il lavoro
+strettamente accoppiato al contesto complessivo, i conflitti tra contributi e
+le decisioni trasversali. La strategia va misurata sul risultato accettato: non garantisce
 qualità equivalente né minor consumo. Rispettare modello, effort e modalità
 scelti esplicitamente dall'utente.
 
@@ -147,9 +147,21 @@ scelti esplicitamente dall'utente.
   ownership, invarianti e criteri espliciti; gestisce le dipendenze che rendono
   inadeguata una trasformazione meccanica affidata a Luna. Usare `mediflow-sol`.
   Non ridefinisce semantica, autorità o protezioni per far passare i test.
-  Le ambiguità di contratto e il ragionamento superiore tornano ad Astra:
+  Le ambiguità di contratto e il ragionamento superiore tornano al coordinatore,
+  che può assegnare un'analisi separabile ad Astra specialista:
   non aumentare automaticamente Sol a High, Extra High, Max o Ultra.
-- Luna e Sol sono esecutori finali: non coordinano altri agenti e non
+- **Astra specialista** affronta sottoproblemi complessi e separabili quando
+  interpretazione, diagnosi causale, interazioni tra sottosistemi o revisione
+  delle prove richiedano questo livello. Usare `mediflow-astra`, specificando
+  nell'incarico e nella chiamata l'effort: Low/Medium per analisi delimitate,
+  High/Max per nuclei particolarmente difficili, con motivazione nel checkpoint.
+  Il profilo fissa il modello, ma lascia l'effort alla chiamata per non
+  sovrascriverlo. Non ereditare implicitamente Ultra dal coordinatore; verificare
+  l'impostazione effettiva. Scegliere direttamente il livello adatto, senza
+  tentativi preliminari obbligatori con Luna o Sol e senza quote tra modelli.
+  Lo specialista restituisce conclusioni, prove e limiti; l'integrazione e
+  l'accettazione finale restano al coordinatore.
+- Luna, Sol e Astra specialista sono esecutori finali: non coordinano altri agenti e non
   delegano ulteriormente. Scegliere direttamente il profilo adeguato, senza
   attraversare ogni livello. Dopo fallimenti ripetuti, correggere brief o
   approccio e riassegnare solo una volta identificato il limite; non consumare
@@ -157,24 +169,28 @@ scelti esplicitamente dall'utente.
 - Prima della delega verificare modello, effort e modalità effettivi del ruolo
   nella checkout usata. Un profilo indisponibile non va sostituito di nascosto:
   segnalare il limite e proseguire nel coordinatore con il lavoro compatibile.
-  I profili locali risiedono in `.codex/`, esclusa da Git, quindi non presumere
-  che seguano ogni worktree. Misurare le equivalenze tra effort, modelli e consumo.
+  I profili del progetto in `.codex/` sono esclusi da Git e non seguono
+  automaticamente ogni worktree. Il profilo `mediflow-astra` è installato a
+  livello utente in `~/.codex/agents/`; verificarne comunque la disponibilità
+  nella sessione. Il default locale Sol Medium resta un ripiego tecnico, non
+  un vincolo sulla scelta esplicita. Misurare effort, modelli e consumo senza
+  presumere equivalenze.
 - **Astra Ultra** resta una modalità separata, scelta intenzionalmente
   dall'utente, per problemi con parti indipendenti che beneficiano
   dell'esplorazione parallela. Una catena causale strettamente seriale richiede
-  analisi concentrata, non più agenti. Una difficoltà non autorizza il passaggio automatico a Ultra
-  o a uno swarm di Astra. Per un nucleo difficile e indipendente, il coordinatore
-  può scegliere un sub-agent Astra Light/Low, se disponibile e utile rispetto
-  a Sol Medium, motivandolo nel checkpoint; non assumere equivalenze di costo
-  o qualità.
+  analisi concentrata, non più agenti. Una difficoltà non autorizza il passaggio
+  automatico del coordinatore a Ultra. In Ultra la squadra può essere mista:
+  modello ed effort dei collaboratori seguono il singolo incarico, non quelli
+  del coordinatore. Non aprire ulteriori livelli di delega.
 
 ## Criteri di assegnazione e responsabilita
 
 Delegare a un modello meno capace solo se Astra puo verificare il risultato con
 un lavoro sostanzialmente inferiore a quello necessario per produrlo direttamente.
 Se accettare una conclusione richiede di ricostruire quasi tutto il ragionamento
-del collaboratore, tenere l'analisi in Astra; delegare eventualmente la sola
-raccolta di evidenze. Un test superato dimostra il suo esito, non la sufficienza
+del collaboratore, evitare quel passaggio a un modello meno capace: scegliere
+Astra specialista se l'analisi è separabile e produce prove valutabili, oppure
+tenerla nel coordinatore se è accoppiata al programma. Un test superato dimostra il suo esito, non la sufficienza
 del test rispetto a un requisito di sicurezza o di rilascio.
 
 Prima di un incarico non banale, valutare insieme:
@@ -188,14 +204,15 @@ Prima di un incarico non banale, valutare insieme:
 Affidare l'esecuzione a Luna o Sol solo con perimetro e output espliciti,
 verifica economica, errore contenibile e nessuna necessita di ridefinire il
 significato del compito. Scegliere direttamente il livello adatto; non provare
-prima Luna per principio. Astra mantiene diagnosi causali ambigue, decisioni
-trasversali, significato dei confini di sicurezza e sufficienza delle prove per
-PASS/HOLD/FAIL, ferme le decisioni e autorizzazioni riservate all'utente.
+prima Luna per principio. Astra specialista può analizzare diagnosi ambigue e
+confini complessi entro l'incarico; il coordinatore mantiene le decisioni
+trasversali, il significato dei confini di sicurezza e l'accettazione delle
+prove per PASS/HOLD/FAIL, ferme le decisioni e autorizzazioni riservate all'utente.
 
 Nel brief/checkpoint esistente indicare in poche righe incarico, esecutore,
 responsabile della decisione, motivo della scelta, prova attesa e condizione di
-ritorno ad Astra. Non creare un documento o una nuova procedura per ogni delega.
-Se Astra deve correggere ripetutamente l'interpretazione per una classe di compiti,
+ritorno al coordinatore. Non creare un documento o una nuova procedura per ogni delega.
+Se il coordinatore deve correggere ripetutamente l'interpretazione per una classe di compiti,
 registrarlo nel checkpoint e assegnare quella classe a un livello adeguato o
 trattenerla direttamente; distinguere questa ricostruzione dalla normale verifica.
 Ridurre il parallelismo quando il lavoro residuo diventa seriale.
@@ -206,7 +223,7 @@ In MediFlow la delega è il percorso ordinario per l'esecuzione separabile che
 soddisfa i criteri di assegnazione sopra e
 sostituisce il default globale "Work solo by default". Una volta ricostruiti
 baseline e contratti, assegnare ai collaboratori il lavoro indipendente e
-mantenere nel coordinatore il nucleo complesso. L'esecuzione diretta resta
+mantenere nel coordinatore il nucleo strettamente accoppiato al programma. L'esecuzione diretta resta
 appropriata per un compito breve, strettamente accoppiato o per il quale
 preparazione e integrazione costerebbero più del lavoro stesso. Non applicare
 un tetto documentale fisso di tre collaboratori: rispettare concorrenza
