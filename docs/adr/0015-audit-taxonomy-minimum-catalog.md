@@ -806,3 +806,38 @@ ciascun guasto audit FAIL/IGNORE, DML ignorata, scope/versione/padre, retry e
 concorrenza, adapter reali e percorso Web ordinario. La review indipendente e
 i gate integrati completano la candidata locale; non attestano una release
 o un deployment clinico.
+
+
+## Coorte prescrizioni prestazioni e item ordinari (27 settembre 2026)
+
+WUL-720 applica il confine C04 alle dieci mutazioni gia esistenti: POST, PUT
+e DELETE Web di prescrizione e item; POST e PUT paired di entrambi. I writer
+document-derived e le transizioni con Clinical Commit Receipt conservano i
+propri contratti. Nessuna nuova operazione paired, v1 locale o headless.
+
+Una transazione sincrona IMMEDIATE comprende riesame del paziente non
+eliminato, identita coerente item/prescrizione, scope paired, versione,
+mutazione e audit obbligatorio. Un paziente solo archiviato resta ammesso.
+Per un item, il padre deve esistere e riferirsi allo stesso paziente. Scope
+e identita derivano dal contesto ammesso e dalle righe lette, non da nuove
+proprieta del payload. Stato mancante/non disponibile restituisce 404;
+versione obsoleta mantiene 409 con lo snapshot esistente.
+
+Guasti o inserimenti ignorati dell'audit annullano dati e versione. DML
+ignorata dopo l'ammissione causa errore di integrita; non diventa un successo
+o un conflitto fittizio. DELETE prescrizione conserva la cancellazione
+fisica e la cascata degli item sotto la versione dell'aggregato; la mancata
+rimozione di un figlio annulla tutto. L'audit di DELETE conserva la versione
+rimossa, senza nuovi eventi per ogni figlio o replay della risposta.
+
+Attore e superficie derivano dall'host; audit minimizzato e compatibile,
+nessun valore clinico. Il retry PUT con versione precedente resta conflitto:
+dopo risposta persa occorre rileggere, non ripetere alla cieca. Restano
+invariati normalizzatori, ciphertext, omissione/null, campi ignorati, date,
+limiti del corpo e risposta dei duplicati. Quei residui restano WUL-720.
+
+Le prove devono osservare baseline e candidato su SQLite reale, guasti
+audit FAIL/IGNORE e DML ignorata per le dieci mutazioni, cascata, concorrenza,
+negazioni e rilettura. Adapter HTTP reali e percorso Web sintetico completano
+la prova; review indipendente e CI sono richieste prima del merge. Questa
+coorte non chiude WUL-720 e non qualifica la release o il deployment clinico.

@@ -16,6 +16,8 @@ import {
 /* @Codex */
 import { dbServer } from './db-server';
 /* @Codex */
+import { activePatients } from './patient-lifecycle';
+/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
 /* @Codex */
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
@@ -36,16 +38,16 @@ import {
     parsePrescriptionDate,
 } from './prescription-domain';
 /* @Codex */
-import { patientsToAmbulatories, serviceCatalogEntries, servicePrescriptionItems, servicePrescriptions } from './schema';
+import { patients, patientsToAmbulatories, serviceCatalogEntries, servicePrescriptionItems, servicePrescriptions } from './schema';
 /* @Codex */
 import {
     listChangedFields,
     requestIdFromRequest,
-    safeWriteAuditEventFromRequest,
-    writeAuditEvent,
+    auditContextFromSession,
+    withAuditContextMetadata,
+    writeAuditEventInTransaction,
     type AuditEventType,
     type AuditRedactedMetadata,
-    type AuditSubjectType,
 } from './security/audit';
 /* @Codex */
 import type { ServerSession } from './security/server-session';
@@ -81,14 +83,14 @@ function badRequest(error: string): MutationResponse {
     return { status: 400, value: { error } };
 }
 
-class PrescriptionDeleteConflict extends Error {
-    constructor(readonly value: Record<string, unknown>) {
-        super('Prescription delete conflict');
-    }
-}
-
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
+}
+
+/* @Codex: patient admission is checked on the same transaction as the write. */
+function activeParentExists(tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0], patientId: string): boolean {
+    return Boolean(tx.select({ id: patients.id }).from(patients)
+        .where(and(eq(patients.id, patientId), activePatients())).get());
 }
 
 function patientIsInScope(
@@ -333,36 +335,30 @@ function selectServicePrescriptionItemConflictSnapshot(tx: Parameters<Parameters
     }).from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, id)).get() ?? null;
 }
 
-async function writeNetworkAuditEvent(input: {
-    context: NetworkWriteContext;
-    eventType: AuditEventType;
-    subjectType: AuditSubjectType;
-    subjectRef: string;
-    metadata?: AuditRedactedMetadata | null;
-}): Promise<void> {
-    try {
-        await writeAuditEvent({
-            eventType: input.eventType,
-            outcome: 'success',
-            actorType: 'user',
-            actorRef: input.context.session.userId,
-            subjectType: input.subjectType,
-            subjectRef: input.subjectRef,
-            sourceSurface: 'native',
-            requestId: requestIdFromRequest(input.context.request),
-            redactedMetadata: {
-                ...(input.metadata ?? {}),
-                flags: [
-                    ...(input.metadata?.flags ?? []),
-                    'auth:paired-client',
-                    `paired-client:${input.context.pairedClient.clientId}`,
-                    'scope:ambulatory',
-                ],
-            },
-        });
-    } catch (error) {
-        console.error('[MediFlow] Network service prescription audit write failed:', error);
-    }
+/* @Codex: audit actor and surface come from the admitted context. */
+function serviceAuditInput(
+    context: HostContext | NetworkWriteContext,
+    surface: 'host' | 'network',
+    eventType: AuditEventType,
+    subjectType: 'service_prescription' | 'service_prescription_item',
+    subjectRef: string,
+    metadata?: AuditRedactedMetadata | null,
+) {
+    const actor = auditContextFromSession(context.session);
+    const flags = surface === 'network'
+        ? [...(metadata?.flags ?? []), 'auth:paired-client', `paired-client:${(context as NetworkWriteContext).pairedClient.clientId}`, 'scope:ambulatory']
+        : metadata?.flags;
+    return {
+        eventType, outcome: 'success' as const,
+        actorType: surface === 'network' ? 'user' as const : actor.actorType,
+        actorRef: surface === 'network' ? context.session.userId : actor.actorRef,
+        subjectType, subjectRef,
+        sourceSurface: surface === 'network' ? 'native' as const : actor.sourceSurface,
+        requestId: requestIdFromRequest(context.request),
+        redactedMetadata: surface === 'network'
+            ? { ...(metadata ?? {}), flags }
+            : withAuditContextMetadata(actor, metadata),
+    };
 }
 
 /* @Codex */
@@ -430,20 +426,17 @@ export async function createHostServicePrescription(context: HostContext, rawBod
     if (!parsed.success) return badRequest('Payload non valido');
     const normalized = normalizeServicePrescriptionCreate(parsed.data);
     if (!normalized.ok) return badRequest(normalized.error);
-
-    await dbServer.insert(servicePrescriptions).values(normalized.values);
-    await safeWriteAuditEventFromRequest(context.request, context.session, {
-        eventType: 'service.prescription.created',
-        subjectType: 'service_prescription',
-        subjectRef: normalized.values.id,
-        redactedMetadata: {
+    return dbServer.transaction((tx): MutationResponse => {
+        if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Not found' } };
+        const inserted = tx.insert(servicePrescriptions).values(normalized.values).run();
+        if (inserted.changes !== 1) throw new Error('Service prescription create did not write exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription.created', 'service_prescription', normalized.values.id, {
             changedFields: listChangedFields(rawBody, ['id']),
             flags: [`source:${normalized.values.source}`, `status:${normalized.values.status}`, `category:${normalized.values.category}`],
             resourceVersion: 1,
-        },
-    }, '[MediFlow] Service prescription audit write failed:');
-
-    return { status: 201, value: { id: normalized.values.id, version: 1 } };
+        }));
+        return { status: 201, value: { id: normalized.values.id, version: 1 } };
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
@@ -462,103 +455,39 @@ async function updateServicePrescription(
     if (expectedVersion === null) return badRequest('Version is required');
     const normalized = normalizeServicePrescriptionUpdate(body);
     if (!normalized.ok) return badRequest(normalized.error);
-
-    const commit = dbServer.transaction((tx): MutationResponse => {
-        const existing = tx.select({ item: servicePrescriptions })
-            .from(servicePrescriptions)
-            .where(eq(servicePrescriptions.id, context.id))
-            .get();
+    return dbServer.transaction((tx): MutationResponse => {
+        const existing = tx.select().from(servicePrescriptions).where(eq(servicePrescriptions.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Service prescription not found' : 'Not found' } };
-
-        const updateResult = tx.update(servicePrescriptions)
-            .set({ ...normalized.values, version: expectedVersion + 1 })
-            .where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion)))
-            .run();
-        if (updateResult.changes === 0) {
-            return {
-                status: 409,
-                value: buildPrescriptionVersionConflictPayload(
-                    'service_prescription',
-                    expectedVersion,
-                    context.id,
-                    selectServicePrescriptionConflictSnapshot(tx, context.id),
-                ),
-            };
-        }
+        if (!activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription', expectedVersion, context.id, selectServicePrescriptionConflictSnapshot(tx, context.id)) };
+        const updated = tx.update(servicePrescriptions).set({ ...normalized.values, version: expectedVersion + 1 })
+            .where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion))).run();
+        if (updated.changes !== 1) throw new Error('Service prescription update did not write exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription.updated', 'service_prescription', context.id, {
+            changedFields: listChangedFields(body as Record<string, unknown>, ['version']), resourceVersion: expectedVersion + 1,
+        }));
         return { status: 200, value: { success: true } };
-    });
-
-    if (commit.status !== 200) return commit;
-
-    if (surface === 'host') {
-        await safeWriteAuditEventFromRequest(context.request, (context as HostContext).session, {
-            eventType: 'service.prescription.updated',
-            subjectType: 'service_prescription',
-            subjectRef: context.id,
-            redactedMetadata: {
-                changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
-                resourceVersion: expectedVersion + 1,
-            },
-        }, '[MediFlow] Service prescription audit write failed:');
-    } else {
-        await writeNetworkAuditEvent({
-            context: context as NetworkWriteContext,
-            eventType: 'service.prescription.updated',
-            subjectType: 'service_prescription',
-            subjectRef: context.id,
-            metadata: {
-                changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
-                resourceVersion: expectedVersion + 1,
-            },
-        });
-    }
-
-    return commit;
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
 export async function deleteHostServicePrescription(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
-    let commit: MutationResponse;
-    try {
-        commit = dbServer.transaction((tx): MutationResponse => {
-            const existing = selectServicePrescriptionConflictSnapshot(tx, context.id);
-            if (!existing) return { status: 404, value: { error: 'Service prescription not found' } };
-            if (existing.version !== expectedVersion) {
-                return {
-                    status: 409,
-                    value: buildPrescriptionVersionConflictPayload('service_prescription', expectedVersion, context.id, existing),
-                };
-            }
-
-            // Child cascade is guarded by the parent aggregate-root version; requiring
-            // child versions would make deletes fragile after propagated transitions.
-            tx.delete(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, context.id)).run();
-            const deleteResult = tx.delete(servicePrescriptions)
-                .where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion)))
-                .run();
-            if (deleteResult.changes === 0) {
-                throw new PrescriptionDeleteConflict(buildPrescriptionVersionConflictPayload(
-                    'service_prescription',
-                    expectedVersion,
-                    context.id,
-                    selectServicePrescriptionConflictSnapshot(tx, context.id),
-                ));
-            }
-            return { status: 200, value: { success: true } };
-        });
-    } catch (error) {
-        if (error instanceof PrescriptionDeleteConflict) return { status: 409, value: error.value };
-        throw error;
-    }
-    if (commit.status !== 200) return commit;
-
-    await safeWriteAuditEventFromRequest(context.request, context.session, {
-        eventType: 'service.prescription.deleted',
-        subjectType: 'service_prescription',
-        subjectRef: context.id,
-        redactedMetadata: { resourceVersion: expectedVersion },
-    }, '[MediFlow] Service prescription audit write failed:');
-    return commit;
+    return dbServer.transaction((tx): MutationResponse => {
+        const existing = selectServicePrescriptionConflictSnapshot(tx, context.id);
+        if (!existing) return { status: 404, value: { error: 'Service prescription not found' } };
+        if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription', expectedVersion, context.id, existing) };
+        // @Codex: the aggregate version guards its hard-delete cascade.
+        const childCount = tx.select({ count: sql<number>`count(*)` }).from(servicePrescriptionItems)
+            .where(eq(servicePrescriptionItems.prescriptionId, context.id)).get()?.count ?? 0;
+        const children = tx.delete(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, context.id)).run();
+        if (children.changes !== childCount) throw new Error('Service prescription cascade did not remove every item');
+        const deleted = tx.delete(servicePrescriptions).where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion))).run();
+        if (deleted.changes !== 1) throw new Error('Service prescription delete did not remove exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription.deleted', 'service_prescription', context.id,
+            { resourceVersion: expectedVersion }));
+        return { status: 200, value: { success: true } };
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
@@ -568,61 +497,22 @@ export async function createHostServicePrescriptionItem(context: HostContext, ra
     return createServicePrescriptionItem(context, parsed.data, 'host');
 }
 
-async function createServicePrescriptionItem(
-    context: HostContext | NetworkWriteContext,
-    body: ServicePrescriptionItemCreatePayload,
-    surface: 'host' | 'network'
-): Promise<MutationResponse> {
+async function createServicePrescriptionItem(context: HostContext | NetworkWriteContext, body: ServicePrescriptionItemCreatePayload, surface: 'host' | 'network'): Promise<MutationResponse> {
     const prescriptionId = optionalPrescriptionText(body.prescriptionId);
     if (!prescriptionId) return badRequest('Missing required service prescription item fields');
-
-    const commit = dbServer.transaction((tx): MutationResponse => {
-        const parent = tx.select({ id: servicePrescriptions.id, patientId: servicePrescriptions.patientId })
-            .from(servicePrescriptions)
-            .where(eq(servicePrescriptions.id, prescriptionId))
-            .get();
+    return dbServer.transaction((tx): MutationResponse => {
+        const parent = tx.select({ id: servicePrescriptions.id, patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, prescriptionId)).get();
         if (!parent) return { status: 404, value: { error: surface === 'host' ? 'Service prescription not found' : 'Not found' } };
-        if (surface === 'network' && !patientIsInScope(tx, parent.patientId, (context as NetworkWriteContext).scopeAmbulatoryId)) {
-            return { status: 404, value: { error: 'Not found' } };
-        }
-
+        if (!activeParentExists(tx, parent.patientId) || (surface === 'network' && !patientIsInScope(tx, parent.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
         const normalized = normalizeServicePrescriptionItemCreate(body, parent);
         if (!normalized.ok) return badRequest(normalized.error);
-        tx.insert(servicePrescriptionItems).values(normalized.values).run();
+        const inserted = tx.insert(servicePrescriptionItems).values(normalized.values).run();
+        if (inserted.changes !== 1) throw new Error('Service prescription item create did not write exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription_item.created', 'service_prescription_item', normalized.values.id, {
+            changedFields: listChangedFields(body as Record<string, unknown>, ['id']), resourceVersion: 1,
+        }));
         return { status: 201, value: { id: normalized.values.id, version: 1 } };
-    });
-
-    if (commit.status !== 201) return commit;
-    await writeServicePrescriptionItemAudit(context, surface, 'service.prescription_item.created', commit.value.id, {
-        changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
-        resourceVersion: 1,
-    });
-    return commit;
-}
-
-async function writeServicePrescriptionItemAudit(
-    context: HostContext | NetworkWriteContext,
-    surface: 'host' | 'network',
-    eventType: AuditEventType,
-    subjectRef: string,
-    metadata: AuditRedactedMetadata
-): Promise<void> {
-    if (surface === 'host') {
-        await safeWriteAuditEventFromRequest((context as HostContext).request, (context as HostContext).session, {
-            eventType,
-            subjectType: 'service_prescription_item',
-            subjectRef,
-            redactedMetadata: metadata,
-        }, '[MediFlow] Service prescription item audit write failed:');
-        return;
-    }
-    await writeNetworkAuditEvent({
-        context: context as NetworkWriteContext,
-        eventType,
-        subjectType: 'service_prescription_item',
-        subjectRef,
-        metadata,
-    });
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
@@ -632,78 +522,41 @@ export async function updateHostServicePrescriptionItem(context: HostContext & {
     return updateServicePrescriptionItem(context, parsed.data, 'host');
 }
 
-async function updateServicePrescriptionItem(
-    context: (HostContext | NetworkWriteContext) & { id: string },
-    body: ServicePrescriptionItemUpdatePayload,
-    surface: 'host' | 'network'
-): Promise<MutationResponse> {
+async function updateServicePrescriptionItem(context: (HostContext | NetworkWriteContext) & { id: string }, body: ServicePrescriptionItemUpdatePayload, surface: 'host' | 'network'): Promise<MutationResponse> {
     const expectedVersion = parsePrescriptionExpectedVersion(body.version);
     if (expectedVersion === null) return badRequest('Version is required');
     const normalized = normalizeServicePrescriptionItemUpdate(body);
     if (!normalized.ok) return badRequest(normalized.error);
-
-    const commit = dbServer.transaction((tx): MutationResponse => {
-        const existing = tx.select({ item: servicePrescriptionItems })
-            .from(servicePrescriptionItems)
-            .where(eq(servicePrescriptionItems.id, context.id))
-            .get();
+    return dbServer.transaction((tx): MutationResponse => {
+        const existing = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: surface === 'host' ? 'Service prescription item not found' : 'Not found' } };
-        if (surface === 'network' && !patientIsInScope(tx, existing.item.patientId, (context as NetworkWriteContext).scopeAmbulatoryId)) {
-            return { status: 404, value: { error: 'Not found' } };
-        }
-
-        const updateResult = tx.update(servicePrescriptionItems)
-            .set({ ...normalized.values, version: expectedVersion + 1 })
-            .where(and(eq(servicePrescriptionItems.id, context.id), eq(servicePrescriptionItems.version, expectedVersion)))
-            .run();
-        if (updateResult.changes === 0) {
-            return {
-                status: 409,
-                value: buildPrescriptionVersionConflictPayload(
-                    'service_prescription_item',
-                    expectedVersion,
-                    context.id,
-                    selectServicePrescriptionItemConflictSnapshot(tx, context.id),
-                ),
-            };
-        }
+        const parent = tx.select({ patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
+        if (!parent || parent.patientId !== existing.patientId || !activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
+        const updated = tx.update(servicePrescriptionItems).set({ ...normalized.values, version: expectedVersion + 1 })
+            .where(and(eq(servicePrescriptionItems.id, context.id), eq(servicePrescriptionItems.version, expectedVersion))).run();
+        if (updated.changes !== 1) throw new Error('Service prescription item update did not write exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription_item.updated', 'service_prescription_item', context.id, {
+            changedFields: listChangedFields(body as Record<string, unknown>, ['version']), resourceVersion: expectedVersion + 1,
+        }));
         return { status: 200, value: { success: true } };
-    });
-
-    if (commit.status !== 200) return commit;
-    await writeServicePrescriptionItemAudit(context, surface, 'service.prescription_item.updated', context.id, {
-        changedFields: listChangedFields(body as Record<string, unknown>, ['version']),
-        resourceVersion: expectedVersion + 1,
-    });
-    return commit;
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
 export async function deleteHostServicePrescriptionItem(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
-    const commit = dbServer.transaction((tx): MutationResponse => {
-        const existing = selectServicePrescriptionItemConflictSnapshot(tx, context.id);
+    return dbServer.transaction((tx): MutationResponse => {
+        const existing = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, context.id)).get();
         if (!existing) return { status: 404, value: { error: 'Service prescription item not found' } };
-
-        const deleteResult = tx.delete(servicePrescriptionItems)
-            .where(and(eq(servicePrescriptionItems.id, context.id), eq(servicePrescriptionItems.version, expectedVersion)))
-            .run();
-        if (deleteResult.changes === 0) {
-            return {
-                status: 409,
-                value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, existing),
-            };
-        }
+        const parent = tx.select({ patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
+        if (!parent || parent.patientId !== existing.patientId || !activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
+        const deleted = tx.delete(servicePrescriptionItems).where(and(eq(servicePrescriptionItems.id, context.id), eq(servicePrescriptionItems.version, expectedVersion))).run();
+        if (deleted.changes !== 1) throw new Error('Service prescription item delete did not remove exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription_item.deleted', 'service_prescription_item', context.id,
+            { resourceVersion: expectedVersion }));
         return { status: 200, value: { success: true } };
-    });
-    if (commit.status !== 200) return commit;
-
-    await safeWriteAuditEventFromRequest(context.request, context.session, {
-        eventType: 'service.prescription_item.deleted',
-        subjectType: 'service_prescription_item',
-        subjectRef: context.id,
-        redactedMetadata: { resourceVersion: expectedVersion },
-    }, '[MediFlow] Service prescription item audit write failed:');
-    return commit;
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
@@ -712,33 +565,20 @@ export async function createNetworkScopedServicePrescription(context: NetworkPat
     if (!parsed.success) return badRequest('Payload non valido');
     const normalized = normalizeServicePrescriptionCreate(parsed.data);
     if (!normalized.ok) return badRequest(normalized.error);
-
-    const commit = dbServer.transaction((tx): MutationResponse => {
-        if (!patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
-        tx.insert(servicePrescriptions).values(normalized.values).run();
+    return dbServer.transaction((tx): MutationResponse => {
+        if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
+        const inserted = tx.insert(servicePrescriptions).values(normalized.values).run();
+        if (inserted.changes !== 1) throw new Error('Service prescription create did not write exactly one row');
+        writeAuditEventInTransaction(tx, serviceAuditInput(context, 'network', 'service.prescription.created', 'service_prescription', normalized.values.id,
+            { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 }));
         return { status: 201, value: { id: normalized.values.id, version: 1 } };
-    });
-    if (commit.status !== 201) return commit;
-    await writeNetworkAuditEvent({
-        context,
-        eventType: 'service.prescription.created',
-        subjectType: 'service_prescription',
-        subjectRef: commit.value.id,
-        metadata: { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 },
-    });
-    return commit;
+    }, { behavior: 'immediate' });
 }
 
 /* @Codex */
 export async function updateNetworkScopedServicePrescription(context: NetworkPrescriptionContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
-    const scoped = await dbServer.select({ id: servicePrescriptions.id })
-        .from(servicePrescriptions)
-        .innerJoin(patientsToAmbulatories, eq(servicePrescriptions.patientId, patientsToAmbulatories.patientId))
-        .where(and(eq(servicePrescriptions.id, context.prescriptionId), eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId)))
-        .get();
-    if (!scoped) return { status: 404, value: { error: 'Not found' } };
     return updateServicePrescription({ ...context, id: context.prescriptionId }, parsed.data, 'network');
 }
 
