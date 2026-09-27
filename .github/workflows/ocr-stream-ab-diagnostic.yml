@@ -1,0 +1,239 @@
+name: OCR stream A/B diagnostic
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ocr-stream-ab-diagnostic.yml
+      - e2e/ocr-stream-ab.diagnostic.ts
+      - playwright.ocr-stream-ab.config.ts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ocr-stream-ab-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      E2E_BASE_URL: http://127.0.0.1:3123
+      E2E_PIN: "1234"
+      MEDIFLOW_NEXT_DIST_DIR: .next-e2e
+      MEDIFLOW_OCR_LIFECYCLE_PROBE: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install fixed Playwright Chromium from lockfile
+        run: npx playwright install --with-deps chromium
+
+      - name: Build standalone synthetic runtime
+        run: |
+          test -z "$(git status --porcelain)"
+          export MEDIFLOW_APP_REVISION="$(git rev-parse --short=12 HEAD)"
+          export MEDIFLOW_APP_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+          export MEDIFLOW_APP_WORKTREE_HASH=clean
+          unset MEDIFLOW_APP_SOURCE_FINGERPRINT MEDIFLOW_APP_FINGERPRINT
+          unset E2E_BASE_URL E2E_PIN MEDIFLOW_RUNTIME_TWIN NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN
+          E2E_BUILD_DATA="$(mktemp -d "${RUNNER_TEMP}/mediflow-build-data.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_BUILD_DATA}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          npm run build
+          E2E_RUNTIME="$(mktemp -d "${RUNNER_TEMP}/mediflow-ocr-ab-runtime.XXXXXX")"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/standalone/." "${E2E_RUNTIME}/"
+          mkdir -p "${E2E_RUNTIME}/public" "${E2E_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static"
+          cp -R public/. "${E2E_RUNTIME}/public/"
+          cp -R "${MEDIFLOW_NEXT_DIST_DIR}/static/." "${E2E_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static/"
+          {
+            printf 'E2E_ISOLATED_STANDALONE_DIR=%s\n' "${E2E_RUNTIME}"
+            printf 'MEDIFLOW_APP_REVISION=%s\n' "${MEDIFLOW_APP_REVISION}"
+            printf 'MEDIFLOW_APP_BRANCH=%s\n' "${MEDIFLOW_APP_BRANCH}"
+            printf 'MEDIFLOW_APP_WORKTREE_HASH=%s\n' "${MEDIFLOW_APP_WORKTREE_HASH}"
+          } >> "$GITHUB_ENV"
+
+      - name: Seed marked synthetic database
+        run: |
+          E2E_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-ocr-ab.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${E2E_DATA_DIR}"
+          export MEDIFLOW_E2E_DATA_DIR="${E2E_DATA_DIR}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          printf '%s\n' 'Synthetic E2E fixture; OCR diagnostic only.' > "${E2E_DATA_DIR}/SYNTHETIC_ONLY"
+          {
+            printf 'MEDIFLOW_DATA_DIR=%s\n' "${E2E_DATA_DIR}"
+            printf 'MEDIFLOW_E2E_DATA_DIR=%s\n' "${E2E_DATA_DIR}"
+            printf 'MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1\n'
+            printf 'E2E_DISABLE_LEGACY_COPY=1\n'
+          } >> "$GITHUB_ENV"
+          node scripts/prepare-e2e-db.mjs
+
+      - name: Start isolated loopback standalone
+        run: |
+          cd "${E2E_ISOLATED_STANDALONE_DIR}"
+          NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3123 node server.js > "${RUNNER_TEMP}/next-ocr-ab.log" 2>&1 &
+          echo "$!" > "${RUNNER_TEMP}/next-ocr-ab.pid"
+
+      - name: Wait for server readiness
+        run: |
+          for i in $(seq 1 180); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3123/api/auth/check || echo 000)"
+            if [ "$code" = "200" ]; then exit 0; fi
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/next-ocr-ab.pid")" 2>/dev/null; then
+              echo 'Standalone server exited before readiness.'
+              tail -50 "${RUNNER_TEMP}/next-ocr-ab.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          echo 'Standalone server did not become ready.'
+          tail -50 "${RUNNER_TEMP}/next-ocr-ab.log"
+          exit 1
+
+      - name: Run diagnostic A/B only
+        run: |
+          mkdir -p .codex/ocr-stream-ab
+          npx playwright test --config=playwright.ocr-stream-ab.config.ts \
+            --repeat-each=5 --retries=0 --workers=1
+
+      - name: Stop isolated server
+        if: always()
+        run: |
+          if [ -f "${RUNNER_TEMP}/next-ocr-ab.pid" ]; then
+            kill "$(cat "${RUNNER_TEMP}/next-ocr-ab.pid")" 2>/dev/null || true
+          fi
+
+      - name: Sanitize diagnostic report
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import base64
+          import json
+          import math
+          import os
+          import pathlib
+          import re
+
+          source = pathlib.Path(os.environ.get('OCR_AB_RAW_REPORT', '.codex/ocr-stream-ab/results.json'))
+          target = pathlib.Path(os.environ.get('OCR_AB_SANITIZED_OUTPUT', 'ocr-stream-ab-sanitized.json'))
+          if not source.is_file():
+              target.write_text(json.dumps({'schemaVersion': 1, 'diagnosticOnly': True,
+                  'rawReportPresent': False, 'runs': []}, indent=2) + '\n')
+              raise SystemExit(0)
+
+          report = json.loads(source.read_text())
+          titles = {
+              'diagnostic protected PDF project terminal: stream-on': 'stream-on',
+              'diagnostic protected PDF project terminal: stream-off': 'stream-off',
+          }
+          statuses = {'passed', 'failed', 'timedOut', 'skipped', 'interrupted'}
+          terminals = {'finished', 'failed', 'timeout'}
+          commands = {'not_requested', 'pending', 'accepted', 'rejected'}
+          lifecycle_events = {'fetch-start', 'headers', 'fetch-error', 'reader-acquired',
+              'reader-read', 'reader-error', 'reader-cancel', 'reader-release',
+              'signal-abort', 'pagehide', 'page-unavailable'}
+          lifecycle_errors = {'AbortError', 'TypeError', 'SyntaxError', 'RangeError', 'other'}
+          errors = {'none', 'request_timeout', 'terminal_timeout', 'observer_disposed',
+              'redacted_or_unknown'}
+
+          def enum(value, allowed):
+              return value if isinstance(value, str) and value in allowed else 'unknown'
+
+          def count(value):
+              return value if type(value) is int and 0 <= value <= 100_000_000 else None
+
+          def milliseconds(value):
+              return value if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1_000_000 else None
+
+          def attachment(result, name):
+              for item in result.get('attachments', []):
+                  if item.get('name') != name or item.get('contentType') != 'application/json':
+                      continue
+                  try:
+                      return json.loads(base64.b64decode(item['body'], validate=True))
+                  except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+                      return None
+              return None
+
+          runs = []
+          repeat = {'stream-on': 0, 'stream-off': 0}
+          for suite in report.get('suites', []):
+              for spec in suite.get('specs', []):
+                  arm = titles.get(spec.get('title'))
+                  if arm is None:
+                      continue
+                  for test in spec.get('tests', []):
+                      repeat[arm] += 1
+                      results = test.get('results', []) or [{}]
+                      for result in results:
+                          raw = attachment(result, 'ocr-stream-ab-diagnostic-only.json')
+                          reader = attachment(result, 'ocr-lifecycle-diagnostic-only')
+                          observations = []
+                          if isinstance(raw, dict) and raw.get('arm') == arm:
+                              for item in raw.get('outcomes', []):
+                                  if not isinstance(item, dict):
+                                      continue
+                                  error = item.get('errorEnum')
+                                  error = error if isinstance(error, str) and (
+                                      error in errors or re.fullmatch(r'net::ERR_[A-Z0-9_]{1,80}', error)) else 'unknown'
+                                  observations.append({
+                                      'terminal': enum(item.get('terminal'), terminals),
+                                      'status': count(item.get('status')),
+                                      'receivedBytes': count(item.get('receivedBytes')),
+                                      'encodedBytes': count(item.get('encodedBytes')),
+                                      'eventStreamedBytes': count(item.get('eventStreamedBytes')),
+                                      'bufferedBytes': count(item.get('bufferedBytes')),
+                                      'streamCommand': enum(item.get('streamCommand'), commands),
+                                      'errorEnum': error,
+                                  })
+                          events = []
+                          if isinstance(reader, dict):
+                              for item in reader.get('events', []):
+                                  if not isinstance(item, dict):
+                                      continue
+                                  events.append({
+                                      'event': enum(item.get('event'), lifecycle_events),
+                                      'sequence': count(item.get('sequence')),
+                                      'atMs': milliseconds(item.get('at')),
+                                      'bytes': count(item.get('bytes')),
+                                      'done': item.get('done') if type(item.get('done')) is bool else None,
+                                      'aborted': item.get('aborted') if type(item.get('aborted')) is bool else None,
+                                      'error': enum(item.get('error'), lifecycle_errors) if item.get('error') is not None else None,
+                                  })
+                          status = enum(result.get('status'), statuses)
+                          runs.append({
+                              'arm': arm, 'repeatIndex': repeat[arm], 'status': status,
+                              'durationMs': milliseconds(result.get('duration')),
+                              'diagnosticAttachmentPresent': isinstance(raw, dict),
+                              'readerAttachmentPresent': isinstance(reader, dict),
+                              'streamArmInterpretable': raw.get('streamArmInterpretable')
+                                  if isinstance(raw, dict) and type(raw.get('streamArmInterpretable')) is bool else None,
+                              'outcomes': observations, 'readerEvents': events,
+                          })
+          summary = {'passed': 0, 'failed': 0, 'timedOut': 0, 'skipped': 0, 'interrupted': 0, 'unknown': 0}
+          for run in runs:
+              summary[run['status']] += 1
+          target.write_text(json.dumps({'schemaVersion': 1, 'diagnosticOnly': True,
+              'rawReportPresent': True, 'summary': summary, 'runs': runs}, indent=2) + '\n')
+          PY
+
+      - name: Upload sanitized diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-stream-ab-diagnostic
+          path: ocr-stream-ab-sanitized.json
+          if-no-files-found: ignore
+          retention-days: 7
