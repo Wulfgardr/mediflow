@@ -177,6 +177,12 @@ Per ignorare gli esiti salvati, usa `--no-persisted-checks`.
 
 Poiché registra gli esiti dichiarati senza eseguire i controlli, il monitor
 non sostituisce la prova: conserva separatamente gli output dei controlli.
+La decisione `continue` riguarda soltanto questi metadati, non l'accettazione
+del risultato né un'autorizzazione a promuoverlo. Per coorti con più fasi,
+il contratto e la disposizione dei contributi seguono
+[AGENTS.md, Contratto e unità di consegna](./AGENTS.md#contratto-e-unità-di-consegna)
+e la skill locale `issue-delivery-manager`; i controlli obbligatori sotto
+restano applicabili.
 
 Il monitor non stampa il diff né i percorsi modificati; quando il diff
 contiene un percorso protetto, restituisce `blocked`.
