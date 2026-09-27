@@ -16,8 +16,9 @@ prodotto, adozione di procedure o completamento di WUL-686/687/688.
 Sul sorgente `aaa18f5ab05a3392da13879f0fa0a0392f52dd64` sono state eseguite
 nuove prove locali. Gli undici file esaminati del percorso di preparazione,
 consenso, governance, esecuzione, runner e misura non presentano differenze
-rispetto al tag `v0.8.6`. Il modello, il worker e l'interprete recuperati dalla
-precedente installazione di collaudo corrispondono ai pin correnti. Questo
+rispetto al tag `v0.8.6`. Modello, worker e pacchetti corrispondono ai pin
+correnti; l'identità dell'interprete recuperato dalla precedente installazione
+di collaudo è registrata nelle ricevute. Questo
 recupero aggiorna la precedente ricerca incompleta degli artifact; non cambia
 l'osservazione di assenza della configurazione nel percorso operativo standard.
 
