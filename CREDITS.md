@@ -197,8 +197,9 @@ in una quota esplorativa storica, Haiku 4.5.
 
 La [dashboard pubblica](./docs/development-usage.md) mostra lo storico dei token
 per provider e modello e una serie separata per l’effort registrato, con fonte,
-data, copertura e limiti. Gli aggregati riguardano tutti i progetti locali:
-non misurano il consumo esclusivo di MediFlow, costo o qualità.
+data, copertura e limiti. Gli aggregati includono solo registrazioni associate
+alle checkout verificate di MediFlow; altri progetti e attribuzioni incerte
+sono esclusi. La copertura è parziale; i token non misurano costo o qualità.
 
 - **[Repo Prompt CE](https://github.com/repoprompt/repoprompt-ce)** (Eric Provencher): context engineering open source, usato in alcune sessioni per preparare selezioni e diff per gli agenti.
 - **[CodexBar](https://github.com/steipete/CodexBar)** (Peter Steinberger): visibilità locale sull'uso dei modelli e fonte del conteggio storico del README.
