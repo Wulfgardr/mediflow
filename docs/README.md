@@ -416,3 +416,8 @@ un’autorizzazione implicita derivata dall’account.
 scripts/run-strip-types.mjs --test e attribuisce la responsabilità del
 cleanup delle fixture. La separazione del percorso di test evita di
 confondere i suoi dati con quelli dell’applicazione.
+
+[ADR 0138](./adr/0138-explicit-data-directory-bootstrap.md) impedisce al runtime
+di copiare un database legacy nella cartella dati scelta esplicitamente.
+Copre anche il primo avvio nativo; non qualifica da solo la separazione
+tra archivi, sessioni e copie di sicurezza.

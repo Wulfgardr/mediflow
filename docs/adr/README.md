@@ -119,3 +119,5 @@ prima porzione di lavoro verificabile:
 - [0129-function-model-catalog-preferences.md](./0129-function-model-catalog-preferences.md): definisce catalogo dell’host, scelta predefinita per esperienza e variazione occasionale; la UI non ammette modelli.
 
 - [0130-node-test-data-dir-preflight.md](./0130-node-test-data-dir-preflight.md): verifica preventivamente la directory dati del launcher dei test Node e interrompe il percorso se i requisiti non sono rispettati.
+
+- [0138-explicit-data-directory-bootstrap.md](./0138-explicit-data-directory-bootstrap.md): impedisce la copia legacy implicita nelle cartelle dati scelte, preservando la migrazione storica verso il default.

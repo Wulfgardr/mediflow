@@ -11,9 +11,9 @@ if (argumentsAfterScript.length > 1 || (argumentsAfterScript.length === 1 && arg
 const createEmptyOnly = argumentsAfterScript[0] === '--create-empty-only';
 const database = path.join(directory, 'medical.db');
 const selectedDatabase = process.env.MEDIFLOW_DB_PATH || database;
-const legacyDatabase = path.join(process.cwd(), 'medical.db');
 // Custom paths and existing data retain their existing bootstrap/recovery path.
-if (path.resolve(selectedDatabase) === path.resolve(database) && !fs.existsSync(legacyDatabase)) {
+// A legacy file in cwd cannot override the explicitly selected native archive.
+if (path.resolve(selectedDatabase) === path.resolve(database)) {
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     const before = fs.lstatSync(directory);
     if (!before.isDirectory() || before.isSymbolicLink()) throw new Error('NATIVE_DATA_DIRECTORY_INVALID');

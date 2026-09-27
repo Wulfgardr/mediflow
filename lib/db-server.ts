@@ -62,7 +62,12 @@ function recoverSwapArtifacts(): void {
 }
 if (!isNextProductionBuild) recoverSwapArtifacts();
 
-if (!isNextProductionBuild && !fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+// An explicitly selected archive must not adopt an unrelated database from cwd.
+// Keep the historical default-root migration, with the same opt-out as E2E setup.
+const allowLegacyBootstrapCopy = !process.env.MEDIFLOW_DATA_DIR
+    && process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1';
+if (!isNextProductionBuild && allowLegacyBootstrapCopy
+    && !fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
     // Copy through SQLite (recovers pages still in the legacy -wal sidecar)
     // and stage + rename so a failed copy never leaves a torn medical.db:
     // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).

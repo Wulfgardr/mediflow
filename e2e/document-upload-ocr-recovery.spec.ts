@@ -6,6 +6,7 @@ import { mapAnyDocLocalFailure } from '../lib/domain/documents/anydoc-local-extr
 import type { AttachmentExtractionProjectionGrant } from '../lib/domain/documents/attachment-extraction-projection-protocol';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
+import { createAnyDocConsumerDiagnostic } from './anydoc-consumer-diagnostic';
 
 const TEXT = 'DOCUMENTO SINTETICO PER RECUPERO';
 const RTF = Buffer.from(`{\\rtf1\\ansi ${TEXT}}`);
@@ -83,34 +84,38 @@ for (const failure of ['engine_absent', 'timeout', 'crash', 'transport_interrupt
 }
 
 for (const input of ['protected', 'corrupt'] as const) {
-  test(`OCR recovery UI: real ${input} PDF keeps manual review available after retry`, async ({ page }) => {
+  test(`OCR recovery UI: real ${input} PDF keeps manual review available after retry`, async ({ page }, testInfo) => {
     const bytes = input === 'protected' ? readFileSync('e2e/fixtures/ocr-synthetic-protected.pdf')
       : Buffer.from('%PDF-1.7\nsynthetic corrupt document\n%%EOF');
     const file = await fixture(page, bytes, 'pdf');
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const observed = await observeAnyDocProjectResponse(page, file.id);
-      try {
-        const responsePromise = page.waitForResponse(response => response.request().method() === 'POST'
-          && response.request().headers()['x-mediflow-extraction-action'] === 'project'
-          && response.url().endsWith(`/api/attachments/${file.id}/local-extraction`));
-        void responsePromise.catch(() => {});
-        await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
-        const response = await responsePromise;
-        expect(response.status()).toBe(200);
-        const projection = await observed.json(response);
-        expect(projection.grantId === response.request().headers()['x-mediflow-extraction-grant']).toBe(true);
-        expect(projection).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
-          acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
-        const result = projection.extraction;
-        expect(result).toMatchObject({ status: 'review_required', markdown: '', candidateUse: 'blocked',
-          detail: input === 'protected' ? 'encrypted_document' : 'malformed_document', review: 'required', writes: 0, apply: 'none' });
-        expect(result.receipt.ocrProvenance).toBeUndefined();
-        await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
-        await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
-        await expect(page.getByRole('button', { name: `Visualizza ${file.name}`, exact: true })).toBeEnabled();
-        observed.assertSameResponse(response);
-      } finally { await observed.dispose(); }
-    }
+    const diagnostic = await createAnyDocConsumerDiagnostic(page, file.id);
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await diagnostic.arm(attempt + 1);
+        const observed = await observeAnyDocProjectResponse(page, file.id);
+        try {
+          const responsePromise = page.waitForResponse(response => response.request().method() === 'POST'
+            && response.request().headers()['x-mediflow-extraction-action'] === 'project'
+            && response.url().endsWith(`/api/attachments/${file.id}/local-extraction`));
+          void responsePromise.catch(() => {});
+          await page.getByRole('button', { name: `Estrai testo localmente da ${file.name}` }).click();
+          const response = await responsePromise;
+          expect(response.status()).toBe(200);
+          const projection = await observed.json(response);
+          expect(projection.grantId === response.request().headers()['x-mediflow-extraction-grant']).toBe(true);
+          expect(projection).toMatchObject({ schemaVersion: 'mediflow.attachment_extraction_projection.v1',
+            acquisition: { origin: 'authenticated_client_decryption', ciphertextEquality: 'not_attested' } });
+          const result = projection.extraction;
+          expect(result).toMatchObject({ status: 'review_required', markdown: '', candidateUse: 'blocked',
+            detail: input === 'protected' ? 'encrypted_document' : 'malformed_document', review: 'required', writes: 0, apply: 'none' });
+          expect(result.receipt.ocrProvenance).toBeUndefined();
+          await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
+          await expect(page.getByText(/Revisione manuale necessaria/).first()).toBeVisible();
+          await expect(page.getByRole('button', { name: `Visualizza ${file.name}`, exact: true })).toBeEnabled();
+          observed.assertSameResponse(response);
+        } finally { await observed.dispose(); }
+      }
+    } finally { await diagnostic.attachAndDispose(testInfo); }
   });
 }
 

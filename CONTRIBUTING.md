@@ -82,6 +82,11 @@ il launcher termina prima del target con `MEDIFLOW_TEST_DATA_DIR_REQUIRED`
 statico può aprire il DB prima che intervengano gli hook della fixture.
 Il launcher conserva il percorso esplicito, ma non ne gestisce la pulizia.
 
+Un percorso dati esplicito impedisce al runtime di importare automaticamente
+`medical.db` dalla directory di lavoro (ADR 0138). Il preparatore E2E è distinto:
+usare anche `MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1` per impedirgli di copiare dati
+legacy prima dell'avvio del runtime. I test devono creare le proprie fixture.
+
 Nel perimetro documentato per la 0.8.5, AnyDoc è il primo passaggio automatico
 locale. Il codice comprende instradamento, manifest, materializzazione e
 rendering delle sole pagine `needsOcr`, che vengono elaborate con Apple Vision

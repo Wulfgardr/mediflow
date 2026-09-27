@@ -13,6 +13,24 @@ prodotto, adozione di procedure o completamento di WUL-686/687/688.
 
 ### Prove tecniche aggiuntive del 27 settembre 2026
 
+#### Correzione dell'avvio su cartella dati esplicita
+
+[ADR 0138](../adr/0138-explicit-data-directory-bootstrap.md) introduce un
+prerequisito dell'isolamento: il runtime non cerca né copia il database della
+directory di lavoro quando la cartella dati è stata scelta esplicitamente.
+Il veto della copia legacy vale anche nel runtime. Il primo avvio nativo
+mantiene il rifiuto di una cartella non vuota senza database, anche in presenza
+di un legacy nella directory di lavoro.
+
+La regressione usa due archivi SQLite sintetici, riavvio, percorso relativo,
+veto e migrazione verso il default. Verifica inoltre che i controlli del
+primo avvio nativo non vengano saltati. Non prova isolamento delle sessioni,
+scheduler, copie esterne, recupero completo o uso clinico. Il preparatore E2E
+ha ancora bisogno del veto esplicito; questo intervento non modifica il tag
+`v0.8.6`. Le evidenze precedenti sotto conservano la propria revisione.
+
+#### Redattore e controlli del confine remoto
+
 Sul sorgente `aaa18f5ab05a3392da13879f0fa0a0392f52dd64` sono state eseguite
 nuove prove locali. Gli undici file esaminati del percorso di preparazione,
 consenso, governance, esecuzione, runner e misura non presentano differenze
