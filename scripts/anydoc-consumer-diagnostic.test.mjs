@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 
 // Evaluate only the test helper in a separate realm; no application/DB imports.
-const source = fs.readFileSync(new URL('./anydoc-consumer-diagnostic.ts', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../e2e/anydoc-consumer-diagnostic.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 function fixture() {
   const chunk = { done: false, value: new Uint8Array([83, 69, 67, 82, 69, 84]) };
