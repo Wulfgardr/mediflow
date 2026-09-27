@@ -11,6 +11,200 @@ La ricerca documenta requisiti, condizioni ed evidenze nel sorgente pubblico.
 Non attesta conformità, adeguatezza di un deployment, qualificazione del
 prodotto, adozione di procedure o completamento di WUL-686/687/688.
 
+### Prove tecniche aggiuntive del 27 settembre 2026
+
+Sul sorgente `aaa18f5ab05a3392da13879f0fa0a0392f52dd64` sono state eseguite
+nuove prove locali. Gli undici file esaminati del percorso di preparazione,
+consenso, governance, esecuzione, runner e misura non presentano differenze
+rispetto al tag `v0.8.6`. Modello, worker e pacchetti corrispondono ai pin
+correnti; l'identità dell'interprete recuperato dalla precedente installazione
+di collaudo è registrata nelle ricevute. Questo
+recupero aggiorna la precedente ricerca incompleta degli artifact; non cambia
+l'osservazione di assenza della configurazione nel percorso operativo standard.
+
+- **Modello reale:** `benchmark-redaction-runtime.ts measure` supera i corpus
+  base di 9 casi e email di 6 casi, con `shadowReady:true`, nessun fallimento,
+  recall critico e integrità degli offset pari a 1 e leak vietati pari a 0.
+  Il corpus base conserva una organizzazione non critica non riconosciuta;
+  questi risultati non dimostrano anonimizzazione o copertura universale.
+- **Quattro funzioni:** preparazione dei profili sintetici Patient Insight,
+  Smart Import, Document Synthesis e Treatment Reasoning con il runner reale;
+  identificativo sintetico rimosso dal payload, hash e dimensione coerenti,
+  risposta simulata riconciliata localmente e sessione invalidata alla chiusura.
+  Nessun trasporto verso un provider è stato eseguito.
+- **Confini e rifiuti:** 98 test superati, senza skip, nei file
+  `ordinary-integration.test.ts`, `ordinary-preparation.test.ts` e
+  `ai-redaction-evidence.test.ts`. Questi test usano sostituti per NER e peer
+  e, nei casi positivi dichiarati, per il controllo di uscita: il loro esito
+  non qualifica il provider o l'installazione operativa.
+
+Le prove finali usano una directory nuova e il bootstrap canonico con
+`MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1`. I primi tentativi, invalidati da una copia
+legacy automatica e dal rifiuto dello schema, restano evidenze diagnostiche
+private: non sono considerati collaudi isolati riusciti. Nessuna migrazione
+del database originario è stata eseguita da questo lavoro.
+
+SHA-256 dei report sintetici: base
+`fa43ab730bfa745394608bfb01ac59d83f14cbb4b4a0a5d7ac48fcf364c0cd59`;
+email `9ec516dd656eaac9691750bca7f6605ad7087c08c2bf6cf9ba9f5c9119900257`;
+quattro funzioni
+`1c583fdc72de1949bb18c269b5bfe46255c0509c732be2f60c0f4f5847f6febd`.
+Le ricevute rimangono separate dai dati operativi e conservano il perimetro
+sintetico della prova. Non è stato scritto un nuovo record di ammissione
+`latest.json` nella configurazione operativa. Installazione effettiva,
+condizioni del servizio, procedure adottate e revisione competente restano
+criteri aperti di WUL-685–688.
+
+### Riesame del 27 settembre 2026: piani ChatGPT e decisione per contesto
+
+Il riesame comprende sia attività autonoma sia lavoro per una struttura. La
+valutazione del servizio remoto riguarda il percorso effettivo di MediFlow:
+**accesso ChatGPT tramite Codex app-server**, come definito in ADR 0134.
+Non presuppone che ogni piano possa usare ogni modello, che l'accesso riuscito
+ammetta dati sanitari o che una garanzia di un account valga per tutti gli utenti.
+Le condizioni individuali restano nel dossier riservato del deployment;
+questa matrice pubblica descrive criteri generali, senza account o accordi privati.
+
+La consegna sorgente `v0.8.6` resta distinta dal seguito del 23 settembre:
+le correzioni runtime PR 358 e il dossier PR 359 sono stati integrati in `main`.
+I paragrafi sottostanti che descrivono quei candidati come locali conservano
+la fotografia della preparazione, non lo stato successivo della pubblicazione.
+La dichiarazione di autonomia organizzativa acquisita il 27 settembre aggiorna
+anche le precedenti indicazioni «istruzioni da concordare». Restano da documentare
+la configurazione adottata e le procedure effettive: i campi storici delle schede
+non annullano il chiarimento e non costituiscono documenti adottati.
+Nessuna nuova qualifica runtime è stata eseguita in questo riesame documentale.
+
+#### Cosa distingue i piani e le garanzie sui dati
+
+| Configurazione | Elementi utili alla valutazione | Conseguenza per MediFlow |
+| --- | --- | --- |
+| Piano personale ordinario | I termini individuali e i controlli del piano si applicano anche all'accesso Codex. Esclusione dall'addestramento e chat temporanee non equivalgono a conservazione nulla [O1, O2]. | Non ammettere genericamente dati sanitari o supporto a decisioni mediche in base al solo abbonamento. Verificare anche il limite contrattuale sugli output riferiti a persone e sulle decisioni materiali/mediche [O3]. |
+| Account con condizioni particolari | Una garanzia aggiuntiva può modificare il trattamento dei dati per quell'account. Occorre collegarla a servizio, workspace, canale, categorie di contenuto, durata ed eventuali eccezioni. | Valutazione individuale. Una garanzia di conservazione non modifica da sola gli usi consentiti, non attribuisce un DPA e non autorizza il trattamento per conto della struttura. |
+| ChatGPT Business | Dati aziendali esclusi dall'addestramento per impostazione predefinita; workspace e condizioni per servizi professionali [O4, O5]. | Opzione da valutare per l'attività autonoma o un'organizzazione. Identificare il cliente, l'accordo/DPA effettivamente applicabile e le impostazioni del percorso Codex; non attribuire automaticamente le opzioni Enterprise o la zero retention. |
+| ChatGPT Enterprise | Controlli organizzativi più articolati, gestione degli accessi e della conservazione; residenza disponibile per clienti e contenuti idonei [O4, O6]. | Base preferibile da valutare per una struttura che deve governare utenti, servizi e dati. L'ammissione richiede il workspace autorizzato e i controlli effettivi, oltre alla valutazione del singolo uso clinico. |
+| API con Zero Data Retention | Controllo soggetto ad approvazione, organizzazione/progetto ed endpoint compatibili, con limiti espliciti [O7]. | È un percorso distinto dall'OAuth ChatGPT scelto per la 0.8.6. Non trasferire una garanzia API al collegamento corrente; un cambio di canale richiede un proprio contratto e qualifica. |
+
+**Raccomandazione progettuale:** mantenere distinta la compatibilità di accesso
+dall'ammissione dei dati. Un piano professionale facilita la governance, ma
+non sostituisce la decisione sul deployment. Non serve una regola assoluta
+«solo Enterprise», né è sostenibile una regola «qualunque piano è ammesso».
+Ogni configurazione ammessa deve identificare account/workspace, canale,
+funzioni, classi di dati, condizioni, prove e responsabile della decisione.
+Questa raccomandazione non modifica il runtime o i suoi blocchi esistenti.
+
+Il codice esaminato alla revisione `d73b4622892eb361b873ae3d7e39ab0e2ebee70a`
+richiede un thread `ephemeral: true` in
+`lib/chatgpt-execution/execution-service.ts`. È un controllo del percorso di
+esecuzione; non è una ricevuta della cancellazione o della conservazione sui
+server del fornitore. La documentazione ufficiale distingue le politiche del
+workspace ChatGPT da quelle dell'organizzazione API [O8].
+
+#### Broker locale: implementazione osservata e prova ancora necessaria
+
+Il confine richiesto dall'[ADR 0077](../adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
+è già presente nel percorso nominato ChatGPT: non occorre dedurre un nuovo
+broker dal confronto fra piani. La ricognizione sullo stesso `d73b462` segue
+Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning fino
+ai profili e alla preparazione condivisi. Non è un audit di ogni possibile
+accesso di agenti o strumenti esterni; quel confine resta assegnato a WUL-731.
+
+1. Le operazioni dell'host acquisiscono le fonti autorizzate e costruiscono
+   profili specifici della funzione; non espongono al provider l'intero archivio.
+2. `ordinary-preparation.ts` chiama realmente `runner.extract` locale. La
+   sessione di redazione combina GLiNER e controlli deterministici, inclusi
+   gli identificativi noti forniti dal contesto locale, e costruisce il testo
+   con token sostitutivi. Non è soltanto un'etichetta di provenienza.
+3. `product-consent.ts` lega la conferma alla funzione e al contenuto preparato,
+   identificato da hash e numero di byte. Il controllo
+   `ordinary-egress-chokepoint.ts` ricontrolla contenuto, consenso e condizioni
+   di ammissione prima dell'invio; l'audit di autorizzazione non prova una
+   trasmissione riuscita.
+4. `ordinary-governance.ts` richiede modello/worker fissati e prove correnti
+   riferite agli artifact e al corpus. Un file mancante, una discordanza o
+   una prova scaduta impediscono l'invio; il login non sostituisce questi controlli.
+5. La risposta è validata e i token riconosciuti sono riconciliati localmente.
+   La mappa in RAM è limitata alla sessione e viene invalidata alla chiusura.
+
+Gli otto file del nucleo condiviso esaminati (preparazione, governance,
+controllo di uscita, consenso, sessione di redazione, runner GLiNER, profili e
+flusso ordinario) non hanno delta fra `v0.8.6` e `d73b462`, come verificato con
+Git. È una verifica di continuità del sorgente, non una nuova prova eseguita.
+Il vecchio gate generico che resta chiuso non va confuso con il controllo
+specifico del percorso ChatGPT, che rilegge le condizioni sopra elencate.
+
+Il meccanismo descritto è **minimizzazione e pseudonimizzazione reversibile
+localmente**. La narrativa residua può conservare elementi identificanti;
+non si dichiara anonimizzazione sulla base della sola sostituzione dei nomi.
+L'[EDPB distingue le due proprietà](https://www.edpb.europa.eu/topics/ai-and-technology/anonymisation-pseudonymisation_en).
+Il filtro locale riduce ciò che esce; la retention del provider riguarda ciò
+che accade dopo la ricezione. I due controlli restano complementari.
+
+Per il deployment concreto resta da documentare, con sole fixture sintetiche:
+identità dell'installazione e validità delle sue prove redaction; contenuto
+effettivamente trasmesso dalle quattro funzioni; mancato invio quando il
+filtro/prova/consenso non è valido; riconciliazione e invalidazione locale;
+assenza di contenuto clinico nei log e di percorsi alternativi nella
+configurazione autorizzata. Le prove storiche WUL-689 vanno riusate nei limiti
+del loro candidato; qui non è stato avviato il runtime, letto un archivio
+reale, cambiata un'impostazione o contattato un provider con dati clinici.
+
+Controllo locale del 27 settembre, ore 10:07 UTC: nella directory predefinita
+macOS `MediFlow/ai/rollout-readiness/redaction` non risultano la directory,
+`runtime.json`, `latest.json` o `latest.md`. Sono state controllate soltanto
+esistenza e metadati dei percorsi ricavati dal sorgente, senza aprire database
+o impostazioni. `latest.md` è un resoconto facoltativo; i controlli di ammissione
+leggono il descrittore e la prova JSON, non la sua presentazione Markdown.
+Su tale percorso manca quindi la prova di installazione e
+readiness richiesta dal gate; non è un collaudo del blocco durante l'esecuzione
+né una ricerca in eventuali directory dati alternative. Prima di qualificare
+il deployment occorre identificare il runtime scelto e produrre le prove sul
+suo effettivo archivio di configurazione, usando fixture sintetiche.
+
+#### Decisione candidata e condizioni che restano aperte
+
+| Uso valutato | Esito sostenuto dalle evidenze attuali | Condizione necessaria per l'ammissione |
+| --- | --- | --- |
+| Collaudo con fixture sintetiche | Proseguibile nel perimetro tecnico già autorizzato; nessuna nuova prova eseguita qui | Mantenere isolamento, limiti del candidato e assenza di dati reali |
+| Attività autonoma, cartella locale senza AI | Ammissione clinica ancora aperta; non dipende dalla scelta di ChatGPT | Professionista responsabile: finalità e ruoli, procedure delle quattro schede, configurazione/copie/recupero effettivi e riesame dei gap tecnici pertinenti |
+| Attività autonoma con AI locale o remota | Ammissione da decidere per singola funzione e flusso | Revisione di finalità, influenza sulla decisione medica e classificazione; per il remoto aggiungere condizioni applicabili all'account e al canale, copertura del trattamento e prova pertinente sul candidato |
+| Attività per struttura, con o senza AI | Il referente riferisce il 27 settembre ampia autonomia operativa, anche per AI remota. È una dichiarazione acquisita, non un documento istituzionale esaminato; ammissione tecnica ancora aperta | Tradurre l'autonomia dichiarata in una configurazione precisa: archivio/copie separati, funzioni e servizio scelti, procedure e responsabili, prove del confine dati. Restano da confermare ruoli e condizioni del trattamento concreto |
+
+Il trattamento necessario alla cura e gli usi ulteriori vanno valutati
+separatamente secondo i chiarimenti del Garante [G-IT]. Il mancato obbligo di
+consenso privacy per determinate attività di cura non è una autorizzazione
+generale all'invio di dati a un servizio remoto. La zero retention non esclude
+che vi sia trattamento di dati né risolve la classificazione delle funzioni AI.
+La documentazione HIPAA di Codex riguarda specifici servizi, accessi e accordi
+[O9]; non viene trasposta come attestazione GDPR per il contesto italiano.
+
+**WUL-685–688 rimangono In Review.** Il riesame chiarisce come valutare i piani,
+ma non completa l'adozione delle procedure, la revisione competente o la
+decisione finale di ammissione. Restano i medesimi owner: WUL-685 per ruoli e
+applicabilità, WUL-686 per privacy e procedure, WUL-687 per funzioni AI e
+supervisione, WUL-688 per la decisione integrata. Le correzioni tecniche già
+assegnate alla 0.9 conservano i propri responsabili e non sono dichiarate
+eseguite su `v0.8.6`.
+
+#### Fonti rilette il 27 settembre 2026
+
+- **O1:** [Codex e piano ChatGPT](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan), condizioni e controlli dati del canale autenticato.
+- **O2:** [Controlli dati ChatGPT](https://help.openai.com/en/articles/7730893-data-controls-in-chatgpt), distinzione fra addestramento, cronologia e conservazione delle chat temporanee.
+- **O3:** [Termini europei individuali](https://openai.com/policies/eu-terms-of-use/), versione indicata 16 gennaio 2026, sezione Content/Accuracy.
+- **O4:** [Dati aziendali](https://openai.com/business-data/), controlli distinti per piano, residenza e condizioni di idoneità.
+- **O5:** [Services Agreement](https://openai.com/policies/services-agreement/) e [DPA](https://openai.com/policies/data-processing-addendum/), rapporto fra cliente, servizio coperto, configurazione e trattamento; DPA efficace dal 1 gennaio 2026.
+- **O6:** [Enterprise privacy](https://openai.com/enterprise-privacy/), versione indicata 8 gennaio 2026.
+- **O7:** [Controlli dati API](https://developers.openai.com/api/docs/guides/your-data), approvazione, limiti per endpoint e funzionalità, eventuali regimi di conservazione specifici.
+- **O8:** [Autenticazione Codex](https://learn.chatgpt.com/docs/auth#openai-authentication), politiche ChatGPT e API distinte.
+- **O9:** [Configurazione HIPAA di Codex](https://learn.chatgpt.com/docs/hipaa-configuration#whos-this-for), perimetro dei servizi e responsabilità condivise.
+- **G-IT:** [Garante, chiarimenti del 7 marzo 2019](https://www.garanteprivacy.it/home/docweb/-/docweb-display/docweb/9091942), finalità di cura e trattamenti ulteriori.
+
+La pagina della [Commissione sull'AI Act](https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai)
+è stata riletta; non è stata prodotta una nuova classificazione di MediFlow.
+Il tentativo di accesso al testo GDPR EUR-Lex non ha restituito il contenuto
+dell'atto: non è conteggiato come nuova lettura completa. Le matrici normative
+sottostanti mantengono data, fonti e limiti della ricerca originaria.
+
 ### Raccordo del 23 settembre 2026: due contesti professionali sul Mac
 
 Il perimetro ora dichiarato comprende **uso professionale individuale sul Mac**,
