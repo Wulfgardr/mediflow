@@ -71,6 +71,12 @@ pubblico, mentre il [gemello web navigabile e confronto visuale](./design/2026-0
 le prove sintetiche WUL-676 precedenti alla promozione UI: nessuno dei due
 sostituisce il runtime.
 
+## Trasparenza sullo sviluppo
+
+[Disclosure e consumi](./development-usage.md) conserva lo storico pubblico dei
+token per provider, modello ed effort registrato, con fonti, dati aggregati e
+limiti di attribuzione. Non descrive i consumi del runtime clinico.
+
 ## Preferenze modello per esperienza
 
 La scelta utile non è «quale AI per tutto», ma quale strumento ammesso usare

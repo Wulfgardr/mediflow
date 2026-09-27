@@ -144,6 +144,7 @@ limiti.
 | [docs/adr/0072-voice-visit-capture-fluid-boundary.md](./adr/0072-voice-visit-capture-fluid-boundary.md) | Proposta storica `WUL-419` per visite registrabili Fluid-style: prima slice senza raw audio/schema/API/UI runtime, transcript/draft PHI e provider esterni solo opt-in; il percorso Apple successivo è governato da ADR 0113. | Quando si lavora su visite registrabili, trascrizione visita, UI web recording-aware, benchmark transcript o sidecar macOS audio. |
 | [CHANGELOG.md](../CHANGELOG.md) | Storico release e cambiamenti rilevanti. | Al bisogno, per contesto versioni. |
 | [CREDITS.md](../CREDITS.md) | Attribuzioni per ispirazioni, modelli, librerie e runtime usati dal progetto. | Quando si verifica provenienza, licenze o uso corretto di contributi esterni. |
+| [Sviluppo assistito e consumi](./development-usage.md) | Disclosure pubblica, storico token e limiti delle fonti. | Per leggere o riprodurre grafici, aggregati e conteggi per provider, modello ed effort. |
 
 ## 🧱 Architettura, flussi e parity
 

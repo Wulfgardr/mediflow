@@ -213,7 +213,10 @@
     "test:anydoc-desktop-ocr": "node scripts/run-strip-types.mjs --test --test-concurrency=1 scripts/anydoc-desktop-ocr-real.test.ts",
     "test:anydoc-local-only": "node --test scripts/check-anydoc-local-only.test.mjs",
     "check:api-error-leak": "node scripts/check-api-error-leak.mjs",
-    "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test"
+    "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test",
+    "build:usage-dashboard": "node scripts/build-usage-dashboard.mjs",
+    "check:usage-dashboard": "node scripts/build-usage-dashboard.mjs --check",
+    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs"
   },
   "dependencies": {
     "@firecrawl/anydoc": "0.2.4",
