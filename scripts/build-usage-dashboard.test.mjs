@@ -6,10 +6,11 @@ import { chartSeries, renderSvg, renderTables, replaceBlock, validate } from './
 function fixture() {
   const row = (date, environment, provider, model, effort, tokens) => ({ date, environment, provider, model, effort, tokens });
   return {
-    schemaVersion: 1, snapshotDate: '2026-09-27', scope: 'all-local-projects', historySource: 'CodexBar 0.60.3', historyDaysRequested: 365,
+    schemaVersion: 2, snapshotDate: '2026-09-27', scope: 'mediflow',
+    attribution: { method: 'verified-repository-checkout', unattributedUsage: 'excluded' },
     environments: [
-      { environment: 'codex', from: '2026-07-01', to: '2026-09-01', historyCoverageEstablished: false, totalTokens: 900, cacheReadTokens: 800 },
-      { environment: 'claude', from: '2026-07-01', to: '2026-07-01', historyCoverageEstablished: true, totalTokens: 100, cacheReadTokens: 70 },
+      { environment: 'codex', source: 'CodexBar 0.60.3', from: '2026-07-01', to: '2026-09-01', historyCoverageEstablished: false, totalTokens: 900, cacheReadTokens: 800 },
+      { environment: 'claude', source: 'Claude Code local response records', from: '2026-07-01', to: '2026-07-01', historyCoverageEstablished: false, totalTokens: 100, cacheReadTokens: 70 },
     ],
     effortSource: { method: 'unique-codex-response-usage-with-matching-turn-context', timezone: 'Europe/Rome', from: '2026-09-01', to: '2026-09-01', totalTokens: 80, responseRecords: 1, missingFiles: 2, completeHistory: false },
     history: [
@@ -24,12 +25,23 @@ function fixture() {
 test('cross-environment model provider is retained; independent effort is not added to history', () => {
   const d = fixture(); validate(d);
   const svg = renderSvg(d), tables = renderTables(d);
-  assert.match(svg, /1\.000 token CodexBar/);
-  assert.doesNotMatch(svg, /1\.080 token CodexBar/);
+  assert.match(svg, /MediFlow: 1\.000 token/);
+  assert.doesNotMatch(svg, /MediFlow: 1\.080 token/);
   assert.match(tables, /Serie separata/);
   const s = chartSeries(d.history, 'provider');
   assert.deepEqual(s.categories, ['OpenAI']);
   assert.equal(s.groups.get('2026-07').get('OpenAI'), 700);
+});
+
+test('unscoped snapshots, estimated attribution and full-history claims are rejected', () => {
+  for (const mutate of [
+    (d) => { d.scope = 'all-local-projects'; },
+    (d) => { d.attribution.method = 'proportional-estimate'; },
+    (d) => { d.attribution.unattributedUsage = 'included'; },
+    (d) => { d.environments[1].historyCoverageEstablished = true; },
+  ]) {
+    const d = fixture(); mutate(d); assert.throws(() => validate(d));
+  }
 });
 
 test('monthly gaps stay visible and top-model remainder retains all tokens', () => {
