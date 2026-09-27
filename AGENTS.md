@@ -70,8 +70,9 @@ La decisione e il suo perimetro sono documentati in
 ## Disciplina operativa
 
 - Ogni filone di implementazione usa una issue, un branch
-  `codex/<issue>-<slug>` e un worktree dedicato. Non creare issue o PR senza
-  autorizzazione; dichiarare un collegamento mancante, senza inventarlo.
+  `codex/<issue>-<slug>` e un worktree dedicato. Riusare la issue pertinente;
+  dichiarare un collegamento mancante, senza inventarlo. La PR fa parte della
+  consegna tecnica autorizzata; non creare nuove issue per ogni file o agente.
 - La checkout primaria serve al coordinamento, non allo sviluppo runtime.
   Ispezioni e correzioni solo documentali non richiedono nuovi worktree quando
   siano esplicitamente richieste e isolate dalle modifiche altrui.
@@ -83,7 +84,47 @@ La decisione e il suo perimetro sono documentati in
 - Prima del commit verificare branch corrente, perimetro del diff e stato del
   worktree.
 
-## Organizzazione del lavoro: pilota 0.8.6
+## Contratto e unità di consegna
+
+Per filoni con più fasi o contributi, applicare `issue-delivery-manager`:
+la issue Linear governa risultato e criteri, il parent governa sequenza e
+dipendenze, il checkpoint locale conserva esecuzione e ricevute. I contratti
+del prodotto restano nei documenti canonici del repository. Individuare il
+programma corrente da `docs/README.md`, senza riaprire roadmap storiche.
+
+Mantenere nel checkpoint esistente l'orizzonte operativo della richiesta:
+risultato di prodotto, stato finale atteso e lavoro necessario ancora aperto.
+Una coorte organizza la consegna di un comportamento completo, eventualmente
+attraverso più issue accoppiate; non sostituisce l'orizzonte né costituisce uno
+stop automatico. Mappare criteri coperti e residui, integrare i contributi e
+proseguire finché l'obiettivo affidato è raggiunto. Una richiesta esplicitamente
+limitata a una sola coorte resta limitata, ma ne comprende la consegna operativa.
+Suddividere per risultati indipendenti, non per file, test o numero di agenti.
+
+Per le richieste operative di sviluppo, Leonardo autorizza stabilmente commit,
+push, PR, CI, merge, pubblicazione pertinente e installazione/aggiornamento
+nell'ambiente già identificato, seguiti dalla verifica del percorso operativo.
+I precedenti limiti di sola candidata locale nelle fotografie di pianificazione
+non revocano questa autorizzazione. Una richiesta di sola analisi o pianificazione
+resta tale. Conservare i controlli richiesti, backup e recuperabilità; la consegna
+tecnica non sostituisce una decisione clinica o l'autorizzazione a usare dati reali.
+
+Un'app aperta, installata o in attesa di collegamento non dimostra un percorso
+funzionante. Diagnosticare e risolvere avvio, configurazione e collegamento
+necessari al risultato. Se un intervento personale, come lo sblocco del
+Portachiavi, impedisce di proseguire, mantenere owner e punto di ripresa; dopo
+la conferma utente riprendere l'intera consegna. Nel coordinamento già
+autorizzato tra chat, trasmettere lo sblocco all'owner tecnico e verificare
+che sia stato preso in carico. Aggiornare Linear da solo non chiude il lavoro.
+
+Usare un solo checkpoint esistente e il controllo locale della skill all'avvio,
+quando cambia il contratto e prima dell'accettazione. Il controllo rileva
+incoerenze nei metadati; Astra verifica significato, prove e autorizzazioni.
+Se la skill non è disponibile, applicare questi criteri e dichiarare il
+controllo non eseguito. Il monitor Git in `CONTRIBUTING.md` conserva un ruolo
+distinto e non attesta la Definition of Done.
+
+## Organizzazione del lavoro
 
 Il coordinamento ordinario è affidato ad **Astra Medium, senza Fast**,
 perché visione del progetto, obiettivo di consegna, priorità, contratti,
@@ -102,17 +143,13 @@ scelti esplicitamente dall'utente.
   Usare `mediflow-luna`; il ruolo personale
   `luna` puo avere impostazioni diverse. Preferire piu incarichi indipendenti
   utili, senza spezzare artificialmente un problema accoppiato per affidarlo a Luna.
-- **Terra Medium** implementa interventi circoscritti quando specifica, ownership,
-  invarianti e criteri di accettazione sono gia espliciti. Puo risolvere difetti
-  ordinari e aggiungere verifiche mirate entro il contratto; non ridefinisce
-  semantica, autorita o protezioni per far passare i test. Le ambiguita emerse
-  tornano ad Astra. Usare `mediflow-terra` quando disponibile.
-- **Sol, al massimo Medium**, copre incarichi delimitati con maggiori ambiguità
-  o dipendenze, quando il coordinatore preveda che Luna o Terra richiederebbero
-  troppe correzioni. Non è un passaggio obbligatorio dopo Terra. Se occorre
-  ragionamento superiore, il compito torna ad Astra: non aumentare automaticamente
-  Sol a High, Extra High, Max o Ultra.
-- Luna, Terra e Sol sono esecutori finali: non coordinano altri agenti e non
+- **Sol, al massimo Medium**, implementa incarichi delimitati con specifica,
+  ownership, invarianti e criteri espliciti; gestisce le dipendenze che rendono
+  inadeguata una trasformazione meccanica affidata a Luna. Usare `mediflow-sol`.
+  Non ridefinisce semantica, autorità o protezioni per far passare i test.
+  Le ambiguità di contratto e il ragionamento superiore tornano ad Astra:
+  non aumentare automaticamente Sol a High, Extra High, Max o Ultra.
+- Luna e Sol sono esecutori finali: non coordinano altri agenti e non
   delegano ulteriormente. Scegliere direttamente il profilo adeguato, senza
   attraversare ogni livello. Dopo fallimenti ripetuti, correggere brief o
   approccio e riassegnare solo una volta identificato il limite; non consumare
@@ -148,7 +185,7 @@ Prima di un incarico non banale, valutare insieme:
 - conseguenze di una conclusione erroneamente positiva e contenimento dell'errore;
 - costo di preparazione, verifica, integrazione ed eventuale rifacimento.
 
-Affidare l'esecuzione a Luna, Terra o Sol solo con perimetro e output espliciti,
+Affidare l'esecuzione a Luna o Sol solo con perimetro e output espliciti,
 verifica economica, errore contenibile e nessuna necessita di ridefinire il
 significato del compito. Scegliere direttamente il livello adatto; non provare
 prima Luna per principio. Astra mantiene diagnosi causali ambigue, decisioni
@@ -199,7 +236,7 @@ producono risultati indipendenti. Non c'è una quota di agenti da riempire.
   azioni esterne o modifiche fuori scope. Le scelte di prodotto riservate
   all'utente restano al coordinatore per la decisione pertinente.
 
-## Consegna e consumi del pilota
+## Consegna e consumi
 
 - Un fix o un intervento sulle prestazioni conserva comportamento e interfaccia
   esistenti, salvo un cambiamento richiesto. Per la UI, confrontare il percorso
