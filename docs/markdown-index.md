@@ -99,6 +99,7 @@ dalla consegna della 0.8.6.
 | [ADR 0122](./adr/0122-local-provider-host-setup.md) | Ammissione esplicita Ollama nel processo host. | Per la CLI host; ADR 0136 governa il comando Web dedicato. |
 | [ADR 0129](./adr/0129-function-model-catalog-preferences.md) | Preferenze per esperienza e override da catalogo host sigillato. | Per CAS, preset e dispatch senza ammissione UI. |
 | [ADR 0130](./adr/0130-node-test-data-dir-preflight.md) | Data-dir esplicito per i test Node. | Per preflight, subprocess e cleanup delle fixture. |
+| [ADR 0138](./adr/0138-explicit-data-directory-bootstrap.md) | Nessuna adozione legacy implicita nella cartella dati scelta. | Per bootstrap, isolamento dei nuovi archivi e primo avvio nativo. |
 | [docs/analysis/2026-09-05-mediflow-086-baseline.md](./analysis/2026-09-05-mediflow-086-baseline.md) | Baseline WUL-670, prove sintetiche e recuperi selettivi. | Prima delle tranche 0.8.6; limiti runtime espliciti. |
 | [docs/analysis/2026-09-05-086-who-decision.md](./analysis/2026-09-05-086-who-decision.md) | Decisione utente per il sidecar WHO locale e analisi storica delle alternative. | Contesto WUL-672; implementazione corrente governata da ADR 0115 e setup, non prova live. |
 | [docs/roadmap-086-consolidamento.md](./roadmap-086-consolidamento.md) | Piano e issue Linear per OCR, WHO, UI/design arena, onboarding, deslop, GDPR/AI Act e recupero branch. | Prima di avviare le tranche 0.8.6; non è evidenza runtime o attestazione di conformità. |
