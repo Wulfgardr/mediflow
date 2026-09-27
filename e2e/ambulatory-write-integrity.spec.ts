@@ -15,31 +15,49 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const originalList = await page.request.get('/api/ambulatories');
+    expect(originalList.status()).toBe(200);
+    const originalRoster = (await originalList.json() as Array<{ id: string }>).map(item => item.id).sort();
     const name = `Ambulatorio di prova ${Date.now()}`;
     const created = await page.request.post('/api/ambulatories', { data: { name, type: 'test' } });
     expect(created.status()).toBe(201);
     const { id } = await created.json() as { id: string };
-    const list = await page.request.get('/api/ambulatories');
-    expect(list.status()).toBe(200);
-    const live = (await list.json() as Array<{ id: string; type: string }>).find(item => item.type === 'live');
-    expect(live).toBeTruthy();
+    type OriginalPatientDestination = {
+        ambulatoryId: string | null;
+        memberships: Array<{ patient_id: string; ambulatory_id: string; assigned_at: number | null }>;
+    };
     const patientIds: string[] = [];
-    for (const lastName of ['SoloProva', 'Condiviso']) {
-        const patientId = randomUUID();
-        // @Codex: create through the authenticated Web route; its destination is
-        // the active/default ambulatory, then scope these synthetic IDs below.
-        const response = await page.request.post('/api/patients', { data: {
-            id: patientId, firstName: 'Sintetico', lastName,
-            taxCode: `AMB${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
-            isAdi: false,
-        } });
-        expect(response.status()).toBe(201);
-        expect((await response.json() as { id: string }).id).toBe(patientId);
-        expect((await page.request.get(`/api/patients/${patientId}`)).status()).toBe(200);
-        patientIds.push(patientId);
-    }
-    const sql = new Database(join(dir, 'medical.db'), { fileMustExist: true });
+    const originalDestinations = new Map<string, OriginalPatientDestination>();
+    let cleanupConnection: InstanceType<typeof Database> | undefined;
+    let primaryError: unknown;
     try {
+        const sql = new Database(join(dir, 'medical.db'), { fileMustExist: true });
+        cleanupConnection = sql;
+        const list = await page.request.get('/api/ambulatories');
+        expect(list.status()).toBe(200);
+        const live = (await list.json() as Array<{ id: string; type: string }>).find(item => item.type === 'live');
+        expect(live).toBeTruthy();
+        for (const lastName of ['SoloProva', 'Condiviso']) {
+            const patientId = randomUUID();
+            patientIds.push(patientId);
+            // @Codex: create through the authenticated Web route; its destination is
+            // the active/default ambulatory, then scope these synthetic IDs below.
+            const response = await page.request.post('/api/patients', { data: {
+                id: patientId, firstName: 'Sintetico', lastName,
+                taxCode: `AMB${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
+                isAdi: false,
+            } });
+            const originalPatient = sql.prepare('SELECT ambulatory_id FROM patients WHERE id=?')
+                .get(patientId) as { ambulatory_id: string | null } | undefined;
+            if (originalPatient) originalDestinations.set(patientId, {
+                ambulatoryId: originalPatient.ambulatory_id,
+                memberships: sql.prepare('SELECT * FROM patients_to_ambulatories WHERE patient_id=? ORDER BY ambulatory_id')
+                    .all(patientId) as OriginalPatientDestination['memberships'],
+            });
+            expect(response.status()).toBe(201);
+            expect((await response.json() as { id: string }).id).toBe(patientId);
+            expect((await page.request.get(`/api/patients/${patientId}`)).status()).toBe(200);
+        }
         // @Codex: fixture-only alignment; the Web legacy route selected the
         // default/active destination. Keep versions at their create value.
         sql.transaction(() => {
@@ -111,5 +129,61 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         expect(pageErrors).toEqual([]);
         await page.screenshot({ path: testInfo.outputPath('clear-completed.png') });
         await testInfo.attach('clear-readback.json', { contentType: 'application/json', body: JSON.stringify({ actions, after }) });
-    } finally { sql.exec('DROP TRIGGER IF EXISTS synthetic_ambulatory_ui_audit'); sql.close(); }
+    } catch (error) {
+        primaryError = error;
+        throw error;
+    } finally {
+        try {
+            // Restore only this test's two synthetic patients, including
+            // original membership timestamps. Keep their tested versions and audit.
+            const cleanupSql = cleanupConnection ?? new Database(join(dir, 'medical.db'), { fileMustExist: true });
+            try {
+                cleanupSql.exec('DROP TRIGGER IF EXISTS synthetic_ambulatory_ui_audit');
+                cleanupSql.transaction(() => {
+                    for (const patientId of patientIds) {
+                        const current = cleanupSql.prepare('SELECT id FROM patients WHERE id=?').get(patientId);
+                        if (!current) continue;
+                        const original = originalDestinations.get(patientId);
+                        if (!original) throw new Error(`Missing original destination for synthetic patient ${patientId}`);
+                        cleanupSql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=?').run(patientId);
+                        for (const membership of original.memberships) {
+                            cleanupSql.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at) VALUES (?, ?, ?)')
+                                .run(membership.patient_id, membership.ambulatory_id, membership.assigned_at);
+                        }
+                        expect(cleanupSql.prepare('UPDATE patients SET ambulatory_id=? WHERE id=?')
+                            .run(original.ambulatoryId, patientId).changes).toBe(1);
+                        expect(cleanupSql.prepare('SELECT * FROM patients_to_ambulatories WHERE patient_id=? ORDER BY ambulatory_id')
+                            .all(patientId)).toEqual(original.memberships);
+                    }
+                    expect(cleanupSql.prepare('SELECT COUNT(*) AS count FROM patients_to_ambulatories WHERE ambulatory_id=?')
+                        .get(id)).toEqual({ count: 0 });
+                })();
+            } finally {
+                cleanupSql.close();
+            }
+            const currentList = await page.request.get('/api/ambulatories');
+            expect(currentList.status()).toBe(200);
+            const currentAmbulatory = (await currentList.json() as Array<{ id: string; version: number }>).find(item => item.id === id);
+            expect(currentAmbulatory).toBeTruthy();
+            const deleted = await page.request.delete(`/api/ambulatories/${id}`, { data: { version: currentAmbulatory!.version } });
+            expect(deleted.status()).toBe(200);
+            const finalList = await page.request.get('/api/ambulatories');
+            expect(finalList.status()).toBe(200);
+            const finalRoster = (await finalList.json() as Array<{ id: string }>).map(item => item.id).sort();
+            expect(finalRoster).toEqual(originalRoster);
+            await testInfo.attach('ambulatory-fixture-cleanup.json', {
+                contentType: 'application/json',
+                body: JSON.stringify({ removedAmbulatoryId: id, restoredPatientIds: patientIds, originalRoster, finalRoster }),
+            });
+        } catch (cleanupError) {
+            try {
+                await testInfo.attach('ambulatory-fixture-cleanup-error.txt', {
+                    contentType: 'text/plain', body: String(cleanupError),
+                });
+            } catch {
+                console.error('Ambulatory fixture cleanup failed:', cleanupError);
+            }
+            if (!primaryError) throw cleanupError;
+        }
+    }
 });
