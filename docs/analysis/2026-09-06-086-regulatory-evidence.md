@@ -101,6 +101,16 @@ configurazione autorizzata. Le prove storiche WUL-689 vanno riusate nei limiti
 del loro candidato; qui non è stato avviato il runtime, letto un archivio
 reale, cambiata un'impostazione o contattato un provider con dati clinici.
 
+Controllo locale del 27 settembre, ore 10:07 UTC: nella directory predefinita
+macOS `MediFlow/ai/rollout-readiness/redaction` non risultano la directory,
+`runtime.json`, `latest.json` o `latest.md`. Sono state controllate soltanto
+esistenza e metadati dei percorsi ricavati dal sorgente, senza aprire database
+o impostazioni. Su tale percorso manca quindi la prova di installazione e
+readiness richiesta dal gate; non è un collaudo del blocco durante l'esecuzione
+né una ricerca in eventuali directory dati alternative. Prima di qualificare
+il deployment occorre identificare il runtime scelto e produrre le prove sul
+suo effettivo archivio di configurazione, usando fixture sintetiche.
+
 #### Decisione candidata e condizioni che restano aperte
 
 | Uso valutato | Esito sostenuto dalle evidenze attuali | Condizione necessaria per l'ammissione |
