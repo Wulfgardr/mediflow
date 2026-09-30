@@ -421,3 +421,8 @@ confondere i suoi dati con quelli dell’applicazione.
 di copiare un database legacy nella cartella dati scelta esplicitamente.
 Copre anche il primo avvio nativo; non qualifica da solo la separazione
 tra archivi, sessioni e copie di sicurezza.
+
+[ADR 0140](./adr/0140-synthetic-plugin-feasibility.md) documenta la fattibilità
+WUL-756 di un plugin con soli esempi inventati. Il
+[pacchetto sintetico](../plugins/mediflow-synthetic/README.md) conserva setup,
+prove e limiti: non qualifica host reale, accesso clinico o distribuzione.
