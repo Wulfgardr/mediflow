@@ -1,8 +1,12 @@
 import { Bundle } from 'fhir/r4';
 import { db } from '../db';
-import { buildFhirBundleFromRecords } from './bundle-mapper';
+import { prepareFhirBundleFromRecords, type ConfirmFhirDiagnosisWarnings } from './export-precheck';
+export { buildFhirDiagnosisWarningMessage } from './export-precheck';
 
-export async function generatePatientBundle(patientId: string): Promise<Bundle> {
+export async function generatePatientBundle(
+    patientId: string,
+    confirmWarnings?: ConfirmFhirDiagnosisWarnings,
+): Promise<Bundle | null> {
     const patient = await db.patients.get(patientId);
     if (!patient) throw new Error("Patient not found");
 
@@ -15,12 +19,12 @@ export async function generatePatientBundle(patientId: string): Promise<Bundle> 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const observations = await db.observations.filter((o: any) => o.patientId === patientId).toArray();
 
-    return buildFhirBundleFromRecords({
+    return prepareFhirBundleFromRecords({
         generatedAt: new Date(),
         patient,
         entries,
         therapies,
         checkups,
         observations,
-    });
+    }, confirmWarnings);
 }
