@@ -1,0 +1,36 @@
+name: Synthetic plugin feasibility
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/mediflow-synthetic/**'
+      - 'packages/mcp/src/contracts.ts'
+      - '.github/workflows/synthetic-plugin.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/mediflow-synthetic/**'
+      - 'packages/mcp/src/contracts.ts'
+      - '.github/workflows/synthetic-plugin.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/mediflow-synthetic
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: plugins/mediflow-synthetic/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
+      - run: npx --no-install playwright install --with-deps chromium
+      - run: npm run test:browser

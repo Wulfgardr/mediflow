@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MediFlow — esempi inventati</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:var(--color-background-primary,#f5f7f8);color:var(--color-text-primary,#172c35);font:15px/1.6 system-ui,sans-serif}main{max-width:760px;margin:auto;padding:28px}h1{font-size:26px;line-height:1.2;margin:12px 0 16px}.badge{font-size:12px;font-weight:650;color:var(--color-text-secondary,#52656e)}.notice{border-left:3px solid #287a80;padding-left:15px;color:var(--color-text-secondary,#52656e)}fieldset{border:0;padding:0;margin:28px 0}legend{font-weight:650;margin-bottom:12px}.example{display:flex;gap:12px;align-items:center;padding:16px;margin:10px 0;border:1px solid var(--color-border-primary,#d6e0e4);border-radius:12px;background:var(--color-background-secondary,#fff);cursor:pointer}.example:has(input:checked){outline:2px solid #287a80}input{accent-color:#287a80}#excerpt{padding:18px;border-radius:12px;background:var(--color-background-secondary,#fff);min-height:88px}button{font:inherit;padding:10px 16px;border-radius:9px;border:1px solid #287a80;background:#287a80;color:white;cursor:pointer;margin:6px 8px 6px 0}button:disabled{opacity:.45;cursor:default}button.secondary{background:transparent;color:var(--color-text-primary,#172c35)}button:focus-visible,input:focus-visible{outline:3px solid #75b5bb;outline-offset:3px}#confirmation{border:1px solid var(--color-border-primary,#d6e0e4);border-radius:12px;padding:18px;margin:16px 0}#status{font-size:14px;color:var(--color-text-secondary,#52656e)}@media(max-width:450px){main{padding:18px}h1{font-size:23px}button{width:100%}}
+</style></head><body><main>
+<div class="badge">DIMOSTRAZIONE · SOLO ESEMPI INVENTATI</div>
+<h1 id="heading">MediFlow — esempi inventati</h1>
+<p class="notice">Questi esempi non provengono da cartelle cliniche. Non vengono salvati controlli, appuntamenti o modifiche ai pazienti.</p>
+<fieldset><legend>Scegli un esempio da revisionare</legend><div id="examples"></div></fieldset>
+<p id="excerpt">Seleziona un esempio per leggerlo.</p>
+<button id="attach" disabled>Aggiungi l’esempio alla conversazione</button>
+<section id="confirmation" hidden aria-label="Conferma aggiunta dell’esempio">
+<p>Il testo selezionato sarà inviato al modello della conversazione. Un server locale non garantisce che il modello elabori il testo sul dispositivo.</p>
+<button id="confirm">Conferma aggiunta</button><button id="cancel" class="secondary">Annulla</button></section>
+<p id="status" role="status" aria-live="polite">In attesa del collegamento all’host.</p>
+</main><!-- APP_SCRIPT --></body></html>
