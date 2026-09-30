@@ -1,3 +1,4 @@
+import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -74,7 +75,9 @@ export async function PUT(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const envelope = await readCheckupJsonObject(request);
+        if (!envelope.ok) return envelope.response;
+        const body = envelope.body;
         // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
         const expectedVersion = parseCheckupExpectedVersion(body.version);
         if (expectedVersion === null) {

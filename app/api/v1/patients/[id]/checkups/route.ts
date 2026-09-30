@@ -1,3 +1,4 @@
+import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -100,7 +101,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const envelope = await readCheckupJsonObject(request);
+        if (!envelope.ok) return envelope.response;
+        const body = envelope.body;
         /* @Codex */
         const auditBody = body;
         const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();

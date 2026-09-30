@@ -38,6 +38,16 @@ info:
     The reader bounds consumed bytes, not global memory. Only attachment POST
     also limits admission to one operation per module instance and body reading
     to a total 30-second deadline (ADR 0124).
+    ADR 0141 proposes a NEW inclusive 4194304-byte UTF-8 JSON body limit for
+    ordinary local POST /api/v1/patients/{id}/checkups and PUT
+    /api/v1/patients/{id}/checkups/{checkupId}, after existing token/admission
+    gates. Malformed, null, array, scalar, failed stream or body-read abort
+    returns 400 with error "Invalid JSON body"; oversize returns 413 with error
+    "JSON payload too large" and code JSON_BODY_TOO_LARGE. Request.json UTF-8
+    replacement and last duplicate key semantics are retained. No field is
+    truncated; this restricts historically unbounded local bodies. These two
+    operations remain outside the stable published slice under contract-policy;
+    local DELETE and paired checkup POST/PUT are unchanged.
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.
