@@ -40,9 +40,10 @@ scalare, stream fallito o abort prima/durante la lettura restituiscono 400
 L'abort usa il segnale della richiesta; nessun timer, timeout o limite inflight
 viene introdotto. Un abort dopo la lettura non interrompe il servizio sincrono.
 
-I gate esistenti di sessione/token e risoluzione attore precedono lettura di
-header e corpo. `Content-Length` decimale valido oltre cap consente un rifiuto
-anticipato; header assente, falso o invalido non elude il contatore sui chunk.
+I gate esistenti di sessione/token e risoluzione attore precedono l’accesso
+dell’helper a `Content-Length` e corpo; l’autenticazione puo leggere i propri
+header prima di quel punto. `Content-Length` decimale valido oltre cap consente
+un rifiuto anticipato; header assente, falso o invalido non elude il contatore sui chunk.
 Il limite conta byte effettivi prima della decodifica. La cancellazione del
 reader e best-effort e non limita allocazioni di trasporto, Next, proxy o RSS.
 
@@ -60,9 +61,9 @@ nuovo duplicato introdurrebbe drift. Il reader canonico mantiene il contatore
 comune senza modificare il default strict degli altri consumer.
 
 La proposta cambia il contratto locale v1: massimo, 400 e 413 devono essere
-allineati nella specifica OpenAPI prima della promozione. La patch OpenAPI e
-coordinata separatamente per evitare sovrapposizione con PR372; non dichiarare
-`no contract impact`.
+allineati nella specifica OpenAPI prima della promozione. Il companion OpenAPI e
+le note di `contract-policy.json` accompagnano questa slice, coordinati con
+PR372 senza portarne i cambi nel branch; non dichiarare `no contract impact`.
 
 ## Verifica e residui
 
