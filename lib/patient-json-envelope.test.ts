@@ -35,7 +35,8 @@ const network = shim('network.cjs', `const s=globalThis[Symbol.for(${JSON.string
 exports.authenticateNetworkPairedClient=async()=>s.network?({clientId:'c05-client',grantedCapabilities:['network.replica.write-patient-profile']}):null;
 exports.getNetworkIdentitySummary=async()=>({scope:{effectiveAmbulatoryId:'c05-a'}});`);
 const mode = shim('mode.cjs', `exports.getNetworkModeGateResponse=async()=>null;
-exports.requireNetworkCapabilityContext=async()=>({ok:false,response:Response.json({error:'Forbidden'},{status:403})});`);
+const s=globalThis[Symbol.for(${JSON.stringify(`c05-auth-${dataDir}`)})];
+exports.requireNetworkCapabilityContext=async(request)=>s.network?({ok:true,context:{request,scopeAmbulatoryId:'c05-a',pairedClient:{clientId:'c05-client'},session:{userId:'c05-user',role:'admin'}}}):({ok:false,response:Response.json({error:'Unauthorized'},{status:401})});`);
 const paired = shim('paired.cjs', `exports.requireAccountSession=async()=>({userId:'c05-user',role:'admin'});`);
 const headers = shim('headers.cjs', `exports.cookies=async()=>({get:()=>undefined});`);
 const { registerHooks } = load('node:module') as {
@@ -164,12 +165,67 @@ test('network JSON over its existing 4 MiB limit stays 413 before mutation', asy
     assert.deepEqual(snapshot(), before);
 });
 
-test('non-syntax body-read failure is not reclassified as malformed JSON', async () => {
-    reset();
-    const before = snapshot();
-    const request = requestFor(web, '{"version":3,"firstName":"Ada"}');
-    Object.defineProperty(request, 'json', { value: async () => { throw new TypeError('synthetic read failure'); } });
-    const response = await put(web, request);
-    assert.equal(response.status, 500);
-    assert.deepEqual(snapshot(), before);
-});
+
+const webCreate = load('../app/api/patients/route.ts');
+const v1Create = load('../app/api/v1/patients/route.ts');
+const nativeCreate = load('../app/api/v1/network/patients/route.ts');
+const cap = 4_194_304;
+const fullSnapshot = () => ({ patients: sql.prepare('SELECT * FROM patients ORDER BY id').all(),
+    memberships: sql.prepare('SELECT * FROM patients_to_ambulatories ORDER BY patient_id').all(),
+    audit: sql.prepare('SELECT * FROM audit_events ORDER BY event_id').all() });
+for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Create], ['network', native, nativeCreate]] as const) {
+    for (const method of ['POST', 'PUT', 'DELETE'] as const) {
+        const invoke = (request: Request) => method === 'POST' ? collection.POST(request)
+            : item[method](request, { params: Promise.resolve({ id: 'c05-patient' }) });
+        test(`${name} ${method} admission precedes poisoned body access`, async () => {
+            reset(); const before = fullSnapshot(); state[name === 'network' ? 'network' : name] = false;
+            const request = new Request('http://localhost/api/patients', { method, body:'{}' });
+            Object.defineProperty(request, 'body', { get() { throw new Error('poison-stream-read'); } });
+            assert.equal((await invoke(request)).status, 401); assert.deepEqual(fullSnapshot(), before);
+        });
+        test(`${name} ${method} failed stream is bounded 400 with zero effects`, async () => {
+            reset(); const before = fullSnapshot();
+            const body = new ReadableStream<Uint8Array>({ start(c) { c.error(new TypeError('synthetic-stream-failure')); } });
+            const response = await invoke(new Request('http://localhost/api/patients', { method, body, duplex:'half' } as RequestInit));
+            assert.equal(response.status, 400); assert.deepEqual(fullSnapshot(), before);
+        });
+        test(`${name} ${method} pre-aborted body has zero effects`, async () => {
+            reset(); const before = fullSnapshot(); const controller = new AbortController(); controller.abort();
+            const response = await invoke(new Request('http://localhost/api/patients', { method, body:'{}', signal:controller.signal }));
+            assert.equal(response.status, 400); assert.deepEqual(fullSnapshot(), before);
+        });
+        for (const raw of ['null', '[]', '{', '"scalar"', '']) test(`${name} ${method} malformed denied without effects: ${raw}`, async () => {
+            reset(); const before = fullSnapshot();
+            const response = await invoke(new Request('http://localhost/api/patients', { method, body: raw }));
+            assert.equal(response.status, 400); assert.deepEqual(fullSnapshot(), before);
+        });
+        for (const declared of [undefined, '1', 'nonsense', String(cap+1)]) test(`${name} ${method} chunked oversize (${declared}) has zero effects`, async () => {
+            reset(); const before = fullSnapshot(); let cancelled = false;
+            const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new TextEncoder().encode(' '.repeat(cap))); c.enqueue(new Uint8Array([32])); }, cancel() { cancelled = true; } });
+            const response = await invoke(new Request('http://localhost/api/patients', { method, body,
+                headers: declared === undefined ? {} : { 'content-length': declared }, duplex: 'half' } as RequestInit));
+            assert.equal(response.status, 413); assert.equal(cancelled, true);
+            assert.deepEqual(await response.json(), { error: 'JSON payload too large', code: 'JSON_BODY_TOO_LARGE' });
+            assert.deepEqual(fullSnapshot(), before);
+        });
+        test(`${name} ${method} abort cancels pending read without effects`, async () => {
+            reset(); const before = fullSnapshot(); const controller = new AbortController(); let cancelled = false;
+            const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
+            const request = new Request('http://localhost/api/patients', { method, body, signal: controller.signal, duplex: 'half' } as RequestInit);
+            const signal = request.signal;
+            const pending = invoke(request);
+            setTimeout(() => { controller.abort(); assert.equal(signal.aborted, true); }, 10);
+            assert.equal((await pending).status, 400); assert.equal(cancelled, true); assert.deepEqual(fullSnapshot(), before);
+        });
+        for (const size of [cap-1, cap]) test(`${name} ${method} accepts ${size} bytes and preserves sealed values`, async () => {
+            reset();
+            const value = method === 'POST' ? { id:'c05-created', firstName:'Ada', lastName:'Sintetica', taxCode:'SYNTHETIC-CREATE', notes:'ENC:iv:ciphertext' }
+                : method === 'PUT' ? { version:3, notes:'ENC:iv:ciphertext' } : {version:3, deletionReason:'ENC:iv:reason'};
+            const json = JSON.stringify(value); const raw = json + ' '.repeat(size - new TextEncoder().encode(json).byteLength);
+            const response = await invoke(new Request('http://localhost/api/patients', { method, body:raw }));
+            assert.equal(response.status, method === 'POST' ? 201 : 200);
+            const row = sql.prepare('SELECT * FROM patients WHERE id=?').get(method === 'POST' ? 'c05-created' : 'c05-patient') as Record<string,unknown>;
+            assert.equal(row[method === 'DELETE' ? 'deletion_reason' : 'notes'], method === 'DELETE' ? 'ENC:iv:reason' : 'ENC:iv:ciphertext');
+        });
+    }
+}

@@ -1,3 +1,4 @@
+import { readPatientJsonObject } from '@/lib/patient-json-object';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -72,7 +73,9 @@ export async function POST(request: Request) {
     if (authError) return authError;
 
     try {
-        const body = await request.json() as Record<string, unknown>;
+        const parsed = await readPatientJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
+        const body = parsed.body;
         const newId = body.id || uuidv4();
 
         const normalized = normalizePatientCreateInput(body, {
