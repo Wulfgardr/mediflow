@@ -227,6 +227,16 @@ function boundedReaderInventory(source, filename) {
         if (ts.isAwaitExpression(node)) {
             const expression = node.expression;
             if (boundedAwait(expression)) readers++;
+            if (callNamed(expression, 'readPatientJsonObject')) {
+                assert.ok(expression.arguments.length === 1 && named(expression.arguments[0], 'request'));
+                assert.match(source, /import\s*\{\s*readPatientJsonObject\s*\}\s*from\s*['"]@\/lib\/patient-json-object['"]/u);
+                const helper = fs.readFileSync(path.join(root, 'lib/patient-json-object.ts'), 'utf8');
+                assert.match(helper, /readBoundedJsonBody\(request, PATIENT_JSON_MAX_BYTES, 'request-json'/u);
+                assert.match(helper, /PATIENT_JSON_MAX_BYTES = 4_194_304/u);
+                assert.match(helper, /signal: request.signal/u);
+                assert.doesNotMatch(helper, /request\.(json|text|arrayBuffer|blob)\(/u);
+                readers++;
+            }
             if (callNamed(expression, 'parsePatientJsonObject')) {
                 const reader = expression.arguments[0];
                 assert.ok(expression.arguments.length === 1 && ts.isArrowFunction(reader) && reader.parameters.length === 0

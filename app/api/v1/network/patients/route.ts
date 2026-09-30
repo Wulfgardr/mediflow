@@ -1,5 +1,6 @@
+import { readPatientJsonObject } from '@/lib/patient-json-object';
 /* @Codex */
-import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 /* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
@@ -67,7 +68,9 @@ export async function POST(request: Request) {
         const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        const parsed = await readPatientJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
+        const body = parsed.body;
         const result = await createNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
