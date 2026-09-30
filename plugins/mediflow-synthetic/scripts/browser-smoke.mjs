@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import { viewModel } from '../src/fixture.mjs';
+import { examples, viewModel } from '../src/fixture.mjs';
 
 // A simulated host exercises the released App/Extensions postMessage bridge.
 // This is browser evidence, not installation or actual Codex host qualification.
@@ -18,10 +18,18 @@ try {
     await page.evaluate(({ html, supported, fixture }) => {
       const iframe = document.querySelector('iframe');
       window.updates = [];
+      window.holdUpdates = true;
+      function send(value) { iframe.contentWindow.postMessage({ jsonrpc: '2.0', ...value }, '*'); }
+      window.repeatToolResult = () => send({ method: 'ui/notifications/tool-result',
+        params: { content: [], structuredContent: fixture } });
+      window.finishUpdate = () => {
+        send({ id: window.pendingUpdateId, result: {
+          _meta: { 'openai/modelContext': { updateId: `synthetic-browser-update-${window.updates.length}` } } } });
+        window.holdUpdates = false;
+      };
       window.addEventListener('message', (event) => {
         if (event.source !== iframe.contentWindow) return;
         const message = event.data;
-        function send(value) { iframe.contentWindow.postMessage({ jsonrpc: '2.0', ...value }, '*'); }
         if (message.method === 'ui/initialize') {
           send({ id: message.id, result: { protocolVersion: message.params.protocolVersion,
             hostInfo: { name: 'synthetic-browser-test-host', version: '1' },
@@ -31,7 +39,8 @@ try {
           send({ method: 'ui/notifications/tool-result', params: { content: [], structuredContent: fixture } });
         } else if (message.method === 'ui/update-model-context') {
           window.updates.push(message.params);
-          send({ id: message.id, result: { _meta: { 'openai/modelContext': { updateId: 'synthetic-browser-update-1' } } } });
+          window.pendingUpdateId = message.id;
+          if (!window.holdUpdates) window.finishUpdate();
         } else if (message.id !== undefined) {
           send({ id: message.id, error: { code: -32601, message: 'Not supported by synthetic test host' } });
         }
@@ -46,11 +55,30 @@ try {
       await attach.click(); await frame.getByRole('button', { name: 'Annulla', exact: true }).click();
       assert.equal(await page.evaluate(() => window.updates.length), 0);
       await attach.click(); await frame.getByRole('button', { name: 'Conferma aggiunta', exact: true }).click();
+      await page.waitForFunction(() => window.updates.length === 1);
+      await page.evaluate(() => window.repeatToolResult());
+      const first = frame.getByLabel(examples[0].title, { exact: true });
+      const second = frame.getByLabel(examples[1].title, { exact: true });
+      assert.equal(await first.isChecked(), true);
+      assert.equal(await first.isDisabled(), true);
+      assert.equal(await second.isDisabled(), true);
+      assert.equal(await attach.isDisabled(), true);
+      assert.equal(await frame.locator('#excerpt').textContent(), examples[0].excerpt);
+      assert.equal(await page.evaluate(() => window.updates[0].content[0].text), examples[0].excerpt);
+      await page.evaluate(() => window.finishUpdate());
       await frame.getByRole('status').filter({ hasText: 'Esempio aggiunto' }).waitFor();
       assert.equal(await page.evaluate(() => window.updates.length), 1);
+      await second.check();
+      assert.equal(await frame.locator('#excerpt').textContent(), examples[1].excerpt);
+      await attach.click(); await frame.getByRole('button', { name: 'Conferma aggiunta', exact: true }).click();
+      await page.waitForFunction(() => window.updates.length === 2);
+      await frame.getByRole('status').filter({ hasText: 'Esempio aggiunto' }).waitFor();
+      assert.equal(await second.isChecked(), true);
+      assert.equal(await page.evaluate(() => window.updates[1].content[0].text), examples[1].excerpt);
+      assert.equal(await page.evaluate(() => window.updates[1].structuredContent.exampleId), examples[1].id);
       await attach.click(); await frame.getByRole('button', { name: 'Conferma aggiunta', exact: true }).click();
       await frame.getByRole('status').filter({ hasText: 'già stato aggiunto' }).waitFor();
-      assert.equal(await page.evaluate(() => window.updates.length), 1);
+      assert.equal(await page.evaluate(() => window.updates.length), 2);
       await page.screenshot({ path: new URL('../dist/synthetic-review.png', import.meta.url).pathname });
     } else {
       assert.equal(await attach.isDisabled(), true);
@@ -62,5 +90,5 @@ try {
     assert.deepEqual(errors, []); assert.deepEqual(requests, []);
     await page.close();
   }
-  console.log('Browser bridge smoke passed: confirmation, cancellation, repeat, unsupported host, narrow layout, no network requests. Simulated host only.');
+  console.log('Browser bridge smoke passed: confirmation, cancellation, in-flight repeated result and payload identity, repeat, unsupported host, narrow layout, no network requests. Simulated host only.');
 } finally { await browser.close(); }

@@ -8,6 +8,7 @@ export function createReviewController(getModelContext) {
   let inFlight = false;
   let attached = null;
   return Object.freeze({
+    state() { return { selectedId: selected?.id ?? null, inFlight }; },
     select(id) {
       if (inFlight) return false;
       selected = examples.find((example) => example.id === id) ?? null;

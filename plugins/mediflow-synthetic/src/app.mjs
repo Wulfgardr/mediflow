@@ -9,11 +9,23 @@ export async function mountReview(document, app, extensions) {
   const confirmation = document.querySelector('#confirmation');
   const status = document.querySelector('#status');
   const attach = document.querySelector('#attach');
+  let available = false;
+  function syncSelection() {
+    const { selectedId, inFlight } = controller.state();
+    for (const input of list.querySelectorAll('input')) {
+      input.checked = input.value === selectedId;
+      input.disabled = inFlight;
+    }
+    const example = examples.find((candidate) => candidate.id === selectedId);
+    document.querySelector('#excerpt').textContent = example?.excerpt ?? 'Seleziona un esempio per leggerlo.';
+    attach.disabled = !available || !example || inFlight || extensions.modelContext == null;
+  }
   function render(result) {
     const data = result?.structuredContent;
-    if (data?.schemaVersion !== 'mediflow.synthetic.review.v1' || data.synthetic !== true) {
+    available = data?.schemaVersion === 'mediflow.synthetic.review.v1' && data.synthetic === true;
+    if (!available) {
       list.replaceChildren();
-      attach.disabled = true;
+      syncSelection();
       status.textContent = 'Esempi non disponibili.';
       return;
     }
@@ -27,15 +39,16 @@ export async function mountReview(document, app, extensions) {
       const radio = document.createElement('input');
       radio.type = 'radio'; radio.name = 'example'; radio.value = example.id;
       radio.addEventListener('change', () => {
-        controller.select(example.id);
+        const selected = controller.select(example.id);
+        syncSelection();
+        if (!selected) return;
         confirmation.hidden = true;
-        document.querySelector('#excerpt').textContent = example.excerpt;
-        attach.disabled = extensions.modelContext == null;
         status.textContent = 'Esempio selezionato. Nessun testo aggiunto alla conversazione.';
       });
       const title = document.createElement('span'); title.textContent = example.title;
       label.append(radio, title); list.append(label);
     }
+    syncSelection();
   }
   function updateHost(context) {
     if (context?.theme) applyDocumentTheme(context.theme);
@@ -53,9 +66,9 @@ export async function mountReview(document, app, extensions) {
   });
   document.querySelector('#confirm').addEventListener('click', async () => {
     confirmation.hidden = true;
-    attach.disabled = true;
-    for (const input of list.querySelectorAll('input')) input.disabled = true;
-    const outcome = await controller.confirm();
+    const pending = controller.confirm();
+    syncSelection();
+    const outcome = await pending;
     const messages = {
       attached: 'Esempio aggiunto al contesto della conversazione.',
       already_attached: 'Questo esempio è già stato aggiunto durante questa apertura del pannello.',
@@ -66,8 +79,7 @@ export async function mountReview(document, app, extensions) {
       busy: 'Aggiunta in corso.',
     };
     status.textContent = messages[outcome];
-    attach.disabled = extensions.modelContext == null;
-    for (const input of list.querySelectorAll('input')) input.disabled = false;
+    syncSelection();
   });
   await app.connect();
   updateHost(app.getHostContext());

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { readFile } from 'node:fs/promises';
 import { mountReview } from '../src/app.mjs';
-import { viewModel } from '../src/fixture.mjs';
+import { examples, viewModel } from '../src/fixture.mjs';
 
 async function setup(supported = true, update = async () => ({ updateId: 'synthetic-context-1' })) {
   const dom = new JSDOM(await readFile(new URL('../src/app.html', import.meta.url), 'utf8'));
@@ -57,6 +57,47 @@ test('unsupported host renders useful review and disables context attachment', a
     assert.equal(document.querySelector('#attach').disabled, true);
     assert.match(document.querySelector('#excerpt').textContent, /ESEMPIO INVENTATO/);
     assert.equal(calls.length, 0);
+  } finally { dom.window.close(); }
+});
+
+test('repeated tool result during attachment preserves selection and payload identity', async () => {
+  let finish;
+  const { dom, document, calls, app } = await setup(true,
+    () => new Promise((resolve) => { finish = resolve; }));
+  const attach = document.querySelector('#attach');
+  const confirm = document.querySelector('#confirm');
+  function assertSelection(example) {
+    assert.equal(document.querySelector('input:checked')?.value, example.id);
+    assert.equal(document.querySelector('#excerpt').textContent, example.excerpt);
+  }
+  try {
+    select(document); attach.click(); confirm.click();
+    assert.equal(calls.length, 1);
+    app.ontoolresult({ structuredContent: viewModel('review') });
+    assertSelection(examples[0]);
+    assert.equal(attach.disabled, true);
+    assert.equal([...document.querySelectorAll('input')].every((input) => input.disabled), true);
+    // Even an externally dispatched change must respect the controller's rejection.
+    const second = document.querySelectorAll('input')[1];
+    second.checked = true;
+    second.dispatchEvent(new document.defaultView.Event('change'));
+    assertSelection(examples[0]);
+    assert.equal(attach.disabled, true);
+    assert.deepEqual(calls[0].structuredContent, { synthetic: true, exampleId: examples[0].id });
+    assert.equal(calls[0].content[0].text, document.querySelector('#excerpt').textContent);
+    finish({ updateId: 'synthetic-context-a' }); await settle();
+    assertSelection(examples[0]);
+    assert.equal(second.disabled, false);
+    second.checked = true;
+    second.dispatchEvent(new document.defaultView.Event('change'));
+    assertSelection(examples[1]);
+    attach.click(); confirm.click();
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls[1].structuredContent, { synthetic: true, exampleId: examples[1].id });
+    assert.equal(calls[1].content[0].text, document.querySelector('#excerpt').textContent);
+    finish({ updateId: 'synthetic-context-b' }); await settle();
+    assertSelection(examples[1]);
+    assert.match(document.querySelector('#status').textContent, /^Esempio aggiunto/);
   } finally { dom.window.close(); }
 });
 
