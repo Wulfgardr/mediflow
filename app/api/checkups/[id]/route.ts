@@ -1,3 +1,4 @@
+import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups, patients } from '@/lib/schema';
@@ -33,7 +34,9 @@ export async function PUT(
 
     try {
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const envelope = await readCheckupJsonObject(request);
+        if (!envelope.ok) return envelope.response;
+        const body = envelope.body;
         const expectedVersion = parseCheckupExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });

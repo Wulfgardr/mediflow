@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- [0141-local-checkup-json-body-bound.md](./0141-local-checkup-json-body-bound.md): Proposed; nuovo cap locale 4 MiB e involucro oggetto per i quattro POST/PUT checkup, con DELETE e paired esclusi.
 - [0137-rust-boundary-pilot-proposal.md](./0137-rust-boundary-pilot-proposal.md): proposta WUL-706 subordinata al pilota 0.9.1; confronto IPC/FFI, codec isolato e rollback, senza adozione runtime o cambio UI.
 
 - [0125-explicit-aifa-catalog-download.md](./0125-explicit-aifa-catalog-download.md): propone un aggiornamento AIFA richiesto esplicitamente e basato sulla fonte ufficiale.
