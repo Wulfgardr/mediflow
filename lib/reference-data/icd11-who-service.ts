@@ -1,18 +1,19 @@
 /* @Codex */
 import { types as nodeUtilTypes } from 'node:util';
+import { WHO_CLOUD_REFERENCE, parseWhoCloudEntry, type WhoCloudEntry, type WhoCloudReceipt } from './icd11-who-cloud-contract.ts';
 
-export const ICD11_WHO_SEARCH_OPERATION = 'mediflow.reference_data.icd11.search.v1' as const;
+export const ICD11_WHO_SEARCH_OPERATION = 'mediflow.reference_data.icd11.search.v3' as const;
 export const ICD11_WHO_TRANSPORT_TARGET = 'who.icd-api.v2.official' as const;
 export const ICD11_WHO_BINDING = Object.freeze({
-    apiVersion: 'v2' as const, releaseId: '2026-01' as const, linearization: 'mms' as const,
-    language: 'en' as const, queryMaxBytes: 160, resultLimit: 25, maxResponseBytes: 65_536,
+    apiVersion: WHO_CLOUD_REFERENCE.apiVersion, releaseId: WHO_CLOUD_REFERENCE.releaseId,
+    linearization: WHO_CLOUD_REFERENCE.linearization, language: WHO_CLOUD_REFERENCE.language, queryMaxBytes: 160, resultLimit: 25, maxResponseBytes: 65_536,
     timeoutMs: 5_000, auditTimeoutMs: 1_000, cacheTtlMs: 86_400_000,
 });
 
 const RUNTIME_KEYS = ['schemaVersion', 'network', 'egress', 'credential'] as const;
 const DEPENDENCY_KEYS = ['readRuntimeState', 'now', 'audit', 'transport'] as const;
-const RESULT_KEYS = ['schemaVersion', 'releaseId', 'language', 'entries'] as const;
-const ENTRY_KEYS = ['code', 'description'] as const;
+const RESULT_KEYS = ['schemaVersion', 'releaseId', 'language', 'bindingId', 'entries'] as const;
+const ENTRY_KEYS = ['code', 'description', 'canonicalUri'] as const;
 const ISO_DATE_MAX_MS = 8_640_000_000_000_000;
 const encoder = new TextEncoder();
 
@@ -26,14 +27,9 @@ export type Icd11WhoTransportRequest = Readonly<{
     linearization: typeof ICD11_WHO_BINDING.linearization; language: typeof ICD11_WHO_BINDING.language;
     query: string; limit: number; maxResponseBytes: number; signal: AbortSignal;
 }>;
-export type Icd11WhoSearchReceipt = Readonly<{
-    schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1';
-    operation: typeof ICD11_WHO_SEARCH_OPERATION; releaseId: typeof ICD11_WHO_BINDING.releaseId;
-    language: typeof ICD11_WHO_BINDING.language; source: 'live' | 'cache'; resultCount: number;
-    latencyMs: number; completedAt: string;
-}>;
+export type Icd11WhoSearchReceipt = WhoCloudReceipt;
 export type Icd11WhoSearchResult = Readonly<{
-    entries: ReadonlyArray<Readonly<{ code: string; description: string; system: 'ICD-11' }>>;
+    entries: ReadonlyArray<WhoCloudEntry>;
     receipt: Icd11WhoSearchReceipt;
 }>;
 type Dependencies = Readonly<{
@@ -127,24 +123,21 @@ function nativePromise(value: unknown): value is Promise<unknown> {
 
 function transportResult(value: unknown) {
     const result = record(value, RESULT_KEYS);
-    if (!result || result.schemaVersion !== 'mediflow.reference-data.icd11-who-transport-result.v1'
+    if (!result || result.schemaVersion !== 'mediflow.reference-data.icd11-who-transport-result.v2'
+        || result.bindingId !== WHO_CLOUD_REFERENCE.bindingId
         || result.releaseId !== ICD11_WHO_BINDING.releaseId || result.language !== ICD11_WHO_BINDING.language
     ) return null;
     const rawEntries = arrayValues(result.entries, ICD11_WHO_BINDING.resultLimit); if (!rawEntries) return null;
-    const seen = new Set<string>(); const entries: Array<Readonly<{ code: string; description: string; system: 'ICD-11' }>> = [];
+    const seen = new Set<string>(); const entries: WhoCloudEntry[] = [];
     let bytes = 0;
     for (const rawEntry of rawEntries) {
         const entry = record(rawEntry, ENTRY_KEYS);
-        const normalizedDescription = typeof entry?.description === 'string'
-            ? entry.description.trim().replace(/\s+/g, ' ')
-            : '';
-        if (!entry || typeof entry.code !== 'string' || !/^[A-Z0-9][A-Z0-9.&/-]{0,31}$/.test(entry.code)
-            || typeof entry.description !== 'string' || !normalizedDescription || entry.description !== normalizedDescription
-            || /[\u0000-\u001f\u007f<>\u202a-\u202e\u2066-\u2069]/i.test(entry.description)
-            || seen.has(entry.code)) return null;
-        bytes += encoder.encode(entry.code).byteLength + encoder.encode(entry.description).byteLength;
+        const parsed = entry ? parseWhoCloudEntry({ ...entry, system: 'ICD-11' }) : null;
+        if (!parsed || seen.has(parsed.code)) return null;
+        bytes += encoder.encode(parsed.code).byteLength + encoder.encode(parsed.description).byteLength
+            + encoder.encode(parsed.canonicalUri).byteLength;
         if (bytes > ICD11_WHO_BINDING.maxResponseBytes) return null;
-        seen.add(entry.code); entries.push(Object.freeze({ code: entry.code, description: entry.description, system: 'ICD-11' as const }));
+        seen.add(parsed.code); entries.push(parsed);
     }
     return Object.freeze(entries);
 }
@@ -165,7 +158,7 @@ export function createIcd11WhoReferenceDataService(dependencies: Dependencies) {
     const publish = async (entries: Icd11WhoSearchResult['entries'], source: 'live' | 'cache',
         startedAt: number, completedAtMs: number): Promise<Icd11WhoSearchResult> => {
         requireActive();
-        const receipt = Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1' as const,
+        const receipt = Object.freeze({ ...WHO_CLOUD_REFERENCE, schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v3' as const,
             operation: ICD11_WHO_SEARCH_OPERATION, releaseId: ICD11_WHO_BINDING.releaseId,
             language: ICD11_WHO_BINDING.language, source, resultCount: entries.length,
             latencyMs: completedAtMs - startedAt, completedAt: new Date(completedAtMs).toISOString() });

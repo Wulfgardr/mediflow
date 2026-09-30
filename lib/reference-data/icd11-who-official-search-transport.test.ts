@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { WHO_CLOUD_REFERENCE } from './icd11-who-cloud-contract.ts';
 import test from 'node:test';
 import {
     ICD11_WHO_BINDING,
@@ -65,7 +66,7 @@ function transportRequest(overrides: Record<string, unknown> = {}): Icd11WhoTran
     }) as Icd11WhoTransportRequest;
 }
 
-function bodyWith(entries: unknown[] = [{ theCode: 'BA00', title: 'Essential hypertension' }],
+function bodyWith(entries: unknown[] = [{ theCode: 'BA00', title: 'Essential hypertension', id: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }],
     overrides: Record<string, unknown> = {}) {
     return JSON.stringify({ destinationEntities: entries, error: false, errorMessage: null,
         resultChopped: false, ...overrides });
@@ -137,7 +138,7 @@ test('compone lease e binding Search WHO host-owned nel transport-result esisten
                     + '&flatResults=true&highlightingEnabled=false&medicalCodingMode=true&includeKeywordResult=false',
                 redirected: false,
                 body: JSON.stringify({
-                    destinationEntities: [{ theCode: 'BA00', title: 'Essential hypertension' }],
+                    destinationEntities: [{ theCode: 'BA00', title: 'Essential hypertension', id: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }],
                     error: false, errorMessage: null, resultChopped: false,
                 }),
             });
@@ -145,9 +146,9 @@ test('compone lease e binding Search WHO host-owned nel transport-result esisten
     });
 
     assert.deepEqual(await transport(transportRequest()), {
-        schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
         releaseId: '2026-01', language: 'en',
-        entries: [{ code: 'BA00', description: 'Essential hypertension' }],
+        entries: [{ code: 'BA00', description: 'Essential hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }],
     });
     const settled = captured as unknown as Icd11WhoOfficialHttpsClientRequest;
     assert.equal(settled.target, ICD11_WHO_TRANSPORT_TARGET);
@@ -159,7 +160,7 @@ test('compone lease e binding Search WHO host-owned nel transport-result esisten
 test('accetta i soli campi opzionali data-only documentati dallo Swagger WHO', async () => {
     const body = JSON.stringify({
         destinationEntities: [{
-            id: 'urn:synthetic:who:mms:108368987',
+            id: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001',
             title: 'Essential hypertension', stemId: null, isLeaf: true,
             postcoordinationAvailability: 0, hasCodingNote: false,
             hasMaternalChapterLink: false, hasPerinatalChapterLink: false,
@@ -184,7 +185,7 @@ test('accetta i soli campi opzionali data-only documentati dallo Swagger WHO', a
     });
 
     assert.deepEqual((await transport(transportRequest())).entries,
-        [{ code: 'BA00', description: 'Essential hypertension' }]);
+        [{ code: 'BA00', description: 'Essential hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }]);
 });
 
 test('accetta errorMessage omesso quando i campi semantici dichiarano successo', async () => {
