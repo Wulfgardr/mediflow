@@ -292,23 +292,44 @@ test('nega envelope non data-only, body oversized e failure HTTP senza assimilar
 });
 
 test('nega payload Search con cap superato, duplicati, highlighting, nesting o schema ostile', async () => {
+    const validEntity = { theCode: 'BA00', title: 'Essential hypertension',
+        id: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' };
     const many = Array.from({ length: 26 }, (_value, index) => ({
         theCode: `B${String(index).padStart(2, '0')}`, title: `Synthetic title ${index}`,
+        id: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/' + String(900000001 + index),
     }));
+    // Each negative has an admitted URI, so missing identity cannot mask its named rejection.
+    const positiveBodies = [
+        bodyWith([validEntity]),
+        bodyWith(many.slice(0, 25)),
+        bodyWith([{ ...validEntity, title: 'One' },
+            { ...validEntity, theCode: 'BA01', title: 'Two', id: many[1]!.id }]),
+        bodyWith([{ ...validEntity, descendants: [] }]),
+        bodyWith([{ ...validEntity, matchingPVs: [{ label: validEntity.title }] }]),
+        bodyWith(undefined, { words: [], guessType: 2,
+            uniqueSearchId: '123e4567-e89b-12d3-a456-426614174000', wordSuggestionsChopped: false }),
+        bodyWith([]),
+    ];
+    for (const body of positiveBodies) {
+        const result = await transportWith(async () => envelope(body))(transportRequest());
+        const entities = JSON.parse(body).destinationEntities as typeof validEntity[];
+        assert.deepEqual(result.entries, entities.map(item => ({
+            code: item.theCode, description: item.title, canonicalUri: item.id,
+        })));
+    }
     const hostileBodies = [
         bodyWith(many),
-        bodyWith([{ theCode: 'BA00', title: 'One' }, { theCode: 'BA00', title: 'Two' }]),
-        bodyWith([{ theCode: 'bad code', title: 'Essential hypertension' }]),
-        bodyWith([{ theCode: 'BA00', title: '<em>Essential</em> hypertension' }]),
-        bodyWith([{ theCode: 'BA00', title: 'Essential\u202ehypertension' }]),
-        bodyWith([{ theCode: 'BA00', title: 'Essential\u200fhypertension' }]),
-        bodyWith([{ theCode: 'BA00', title: 'Essential \ud800 hypertension' }]),
-        bodyWith([{ theCode: 'BA00', title: ' Essential  hypertension ' }]),
-        bodyWith([{ theCode: 'BA00', title: 'Essential hypertension',
-            descendants: [{ theCode: 'BA01', title: 'Nested' }] }]),
-        bodyWith([{ theCode: 'BA00', title: 'Essential hypertension', admin: true }]),
-        bodyWith([{ theCode: 'BA00', title: 'Essential hypertension',
-            matchingPVs: [{ label: '<em>Essential</em> hypertension' }] }]),
+        bodyWith([{ ...validEntity, title: 'One' }, { ...validEntity, title: 'Two' }]),
+        bodyWith([{ ...validEntity, theCode: 'bad code' }]),
+        bodyWith([{ ...validEntity, title: '<em>Essential</em> hypertension' }]),
+        bodyWith([{ ...validEntity, title: 'Essential\u202ehypertension' }]),
+        bodyWith([{ ...validEntity, title: 'Essential\u200fhypertension' }]),
+        bodyWith([{ ...validEntity, title: 'Essential \ud800 hypertension' }]),
+        bodyWith([{ ...validEntity, title: ' Essential  hypertension ' }]),
+        bodyWith([{ ...validEntity, descendants: [{ ...validEntity, theCode: 'BA01',
+            title: 'Nested', id: many[1]!.id }] }]),
+        bodyWith([{ ...validEntity, admin: true }]),
+        bodyWith([{ ...validEntity, matchingPVs: [{ label: '<em>Essential</em> hypertension' }] }]),
         bodyWith(undefined, { error: true, errorMessage: 'SYNTHETIC_VENDOR_ERROR' }),
         bodyWith(undefined, { words: [{ label: 'suggestion', dontChangeResult: false }] }),
         bodyWith(undefined, { guessType: 3 }),
