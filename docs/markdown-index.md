@@ -15,7 +15,7 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-09-26. Le voci storiche conservano date, conteggi, revisioni e limiti:
+2026-09-30. Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
 ## Preparazione indipendente delle future 0.9.x
@@ -392,6 +392,12 @@ un’autorizzazione aggiuntiva né un’attestazione di runtime.
 | [docs/privacy-and-ai-governance.md](./privacy-and-ai-governance.md) | Introduzione progressiva a responsabilità, GDPR, AI Act, provider e offuscamento; rinvia alle policy e ai contratti canonici. |
 
 ## ✅ Checklist manutenzione indice
+
+| File | Scopo |
+| --- | --- |
+| [ADR 0140](./adr/0140-synthetic-plugin-feasibility.md) | WUL-756: plugin isolato con fixture inventate, contesto esplicito e gate clinici/distribuzione distinti. |
+| [Plugin sintetico](../plugins/mediflow-synthetic/README.md) | Setup Node 24, dipendenze fissate, prove MCP/DOM/browser simulato e limiti di installazione. |
+| [Skill synthetic-review](../plugins/mediflow-synthetic/skills/synthetic-review/SKILL.md) | Workflow medico limitato a esempi inventati, senza accesso a cartelle cliniche o applicazione. |
 
 Il confronto con `rg --files -g '*.md' | sort` permette di verificare
 l’inventario. Ogni file deve comparire con una descrizione, la data «Ultimo

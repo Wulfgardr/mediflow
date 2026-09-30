@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mediflow-synthetic": {
+      "command": "node",
+      "args": [
+        "${PLUGIN_ROOT}/src/stdio.mjs"
+      ],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}
