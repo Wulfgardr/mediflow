@@ -79,7 +79,8 @@ export async function DELETE(
         const { id } = await params;
         const parsedBody = await parseClinicalDeleteBody(request, 'web-delete');
         if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+            return NextResponse.json({ error: parsedBody.error,
+                ...(parsedBody.code ? { code: parsedBody.code } : {}) }, { status: parsedBody.status ?? 400 });
         }
         const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
         if (expectedVersion === null) {
