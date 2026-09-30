@@ -8,8 +8,6 @@
 Un gestionale aperto e gratuito per il lavoro in ambulatorio.<br>
 Cartelle, documenti e attività da seguire, anche senza intelligenza artificiale.
 
-<a href="https://claude.com/claude-code"><img src="https://img.shields.io/badge/built%20with-Claude%20Code-D97757?style=flat&amp;logo=claudecode&amp;logoColor=white" alt="Built with Claude Code"></a>
-<a href="https://openai.com/codex"><img src="https://img.shields.io/badge/built%20with-Codex-1f2937?style=flat" alt="Built with Codex"></a>
 
 [![Versione sorgente](https://img.shields.io/badge/sorgente-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
@@ -326,7 +324,7 @@ autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
 Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
 *grant*, senza trasferirla all’agente.
 
-![Demo Codex dell’accesso headless con worklist, polifarmacia, fonti nominate e composer Astra Low](./docs/images/getmediflow-086/headless-agent.png)
+![Demo dell’accesso headless con worklist, polifarmacia e fonti nominate](./docs/images/getmediflow-086/headless-agent.png)
 
 La schermata racconta una richiesta che non si risolve consultando una singola
 pagina: il client verifica le capacità concesse, scandisce una worklist,
@@ -362,30 +360,24 @@ la parità FHIRv2 resta da verificare.
 
 ## Sviluppo assistito
 
+MediFlow è sviluppato con l’assistenza di **Codex e Claude Code** per
+progettazione, implementazione, revisione e verifica. Direzione e
+responsabilità del progetto rimangono dell’autore.
+
 <details>
-<summary><strong>Uso dei modelli: conteggi locali e limiti di attribuzione</strong></summary>
+<summary><strong>Disclosure e storico dei token per provider, modello ed effort</strong></summary>
 
-<!-- usage-dashboard:start -->
+![Storico dei token attribuiti a MediFlow, per provider e modello; effort su una serie Codex distinta e parziale](./screenshots/token-models.svg)
 
-| Snapshot | Periodo dei log disponibili | Token di sessione | Ripartizione | Cache letta | Copertura storica |
-| :-- | :-- | --: | :-- | --: | :-- |
-| **21 settembre 2026** | 2026-02-01 → 2026-09-21 | **50.285.467.538** | Codex 44.247.914.783 · Claude Code 6.037.552.755 | 48.123.937.197 (95,7%) | Codex attestata · Claude Code attestata |
+Lo storico include solo registrazioni associate alle **checkout verificate di
+MediFlow**, cache inclusa. Altri progetti e attribuzioni incerte sono esclusi:
+la copertura è parziale e i token non misurano costo o qualità del codice.
+Il provider è dedotto dall’identificatore del modello e resta distinto
+dall’ambiente che registra l’uso. L’effort compare solo dove è registrato,
+in una serie con copertura propria che non si somma ai totali storici.
 
-<img src="./screenshots/token-models.svg" alt="Snapshot 21 settembre 2026: 50,29 Mld token di sessione, 44,25 Mld in Codex e 6,04 Mld in Claude Code; 48,12 Mld da cache letta." width="720" loading="lazy"/>
-
-La fonte è **CodexBar 0.60.3**, comando locale `cost --refresh`, con una finestra massima di 365 giorni. Il conteggio usa gli aggregati disponibili per Codex e Claude Code e non è filtrato per repository. CodexBar attribuisce ogni token al processo che lo registra. Un worker OpenAI avviato da Claude Code compare quindi nel totale Claude Code. Il grafico indica lo strumento che registra i token, non il fornitore del modello.
-
-**ATTESTATO:** i valori sono le somme esatte dei log disponibili nel periodo indicato. **STIMATO:** nessun valore. **UNKNOWN:** la completezza storica resta sconosciuta quando CodexBar non la attesta. L'attribuzione a MediFlow, a una release, a una PR o a un commit è sempre sconosciuta.
-
-Rigenera il grafico con `npm run build:usage-dashboard`. Usa `CODEXBAR_BIN` per scegliere un eseguibile diverso e `USAGE_DASHBOARD_DAYS` per impostare una finestra da 1 a 365 giorni.
-
-Le barre sono divise per modello e usano la stessa scala. La cache letta è una parte dell'input Codex, mentre CodexBar la espone come categoria separata per Claude Code: per questo il grafico non impila categorie di token con semantiche diverse. Sono pubblicati soltanto aggregati. Nessun prompt, contenuto di sessione, costo o percorso locale entra nel README o nell'SVG.
-
-Il dato misura contesto elaborato. Non misura righe di codice, costo o qualità.
-
-La responsabilità del progetto resta mia.
-
-<!-- usage-dashboard:end -->
+[Fonti, copertura, tabelle complete e dati riproducibili](./docs/development-usage.md)
+· [Crediti degli strumenti](./CREDITS.md#sviluppo-assistito).
 
 </details>
 

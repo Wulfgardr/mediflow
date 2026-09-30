@@ -13,8 +13,6 @@ Run ID: `MFP-IF-COS-20260729-01`
 
 Data: 2026-07-29
 
-Controller: CoS Claude Fable 5 + UltraCode; lane delegate GPT-5.6 (Sol/Terra/Luna)
-
 Baseline immutabile: `v0.8.0` (`0cef4f4ae`), branch manager
 `codex/WUL-522-intelligence-fabric`
 
@@ -66,30 +64,30 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 
 ## 4. DAG del programma
 
-| Wave | Contenuto | Lane | Stato |
-| --- | --- | --- | --- |
-| W0 | Consolidamento stack 269/418/502 + audit WUL-499 + verifica | manager | DONE |
-| W1 | ADR 0089 + contratto congelato | manager (Fable) | DONE |
-| W2a | F1 resolver + catalogo generativo | Sol high, worktree `mediflow-if-f1-wt` | DONE (integrata in `e3ccf2514`) |
-| W2a | F2 catalogo deterministico | Terra high, worktree `mediflow-if-f2-wt` | DONE (integrata via ff a `175b565cf`) |
-| W2b | F3 catalogo unificato + route stato `/api/ai/fabric/status` | Terra high, worktree `mediflow-if-f3-wt` | DONE (integrata via ff a `76225116c`) |
-| W3 | Docs di programma + battery completa su branch manager | manager | DONE |
-| W4 | Verifica terminale indipendente | Sol xhigh/high, 5 passaggi a contesto fresco | DONE: `GO` al quinto passaggio su `4f17232b8` |
+| Wave | Contenuto | Stato |
+| --- | --- | --- |
+| W0 | Consolidamento stack 269/418/502 + audit WUL-499 + verifica | DONE |
+| W1 | ADR 0089 + contratto congelato | DONE |
+| W2a | F1 resolver + catalogo generativo | DONE (integrata in `e3ccf2514`) |
+| W2a | F2 catalogo deterministico | DONE (integrata via ff a `175b565cf`) |
+| W2b | F3 catalogo unificato + route stato `/api/ai/fabric/status` | DONE (integrata via ff a `76225116c`) |
+| W3 | Docs di programma + battery completa su branch manager | DONE |
+| W4 | Verifica terminale indipendente | DONE: `GO` al quinto passaggio su `4f17232b8` |
 
 ## 5. Ledger lane
 
-| Lane | Modello/effort | Esito | Note |
-| --- | --- | --- | --- |
-| R1 inventario deterministico | Luna low, read-only | OK | 11 capability reali; registro attese ADR 0082 ASSENTE come runtime |
-| R2 inventario superfici | Luna low, read-only | OK | Auth: `requireSession`/`requireSessionOrLocalToken`; client paired senza adapter provider |
-| F1 resolver | Sol high | OK dopo sblocco | Implementazione completa e prove verdi (7/7, typecheck, lint, riverificate dal controller); la lane si e' fermata senza commit per un glob errato nella spec di prova del controller e ha rifiutato correttamente di modificare un quinto file; commit eseguito dal controller |
-| F2 catalogo deterministico | Terra high | OK | 5/5 test riverificati dal controller; deviazione dichiarata e accettata: entryPoint AIFA corretto a `lib/aifa-catalog.ts` dove vive lo schema letterale |
-| F3 catalogo unificato + stato | Terra high | OK | 17/17 test fabric riverificati dal controller; route sottile su `requireSessionOrLocalToken` come `/api/ai/models`; snapshot con allowlist congelata senza endpoint o impostazioni; edge dichiarato: nessun test HTTP di integrazione della route |
-| W4 verifica terminale | Sol xhigh, contesto fresco | HOLD_FIX al primo passaggio | Battery tutta verde (932/932); falsificatori contrattuali reali: descriptor fabbricato accettato (P1), ricevuta `treatment_reasoning` con provider discordante da `athena_mlx` (P1), etichette provenance non validate (P2), overclaim docs conseguente (P2), matrice con decisioni gia' chiuse (P3) |
-| W4 secondo passaggio | Sol xhigh, contesto fresco | HOLD_FIX | P1 confermati chiusi dai falsificatori; residui: policy non validata integralmente a runtime (P2: `retention`/`consentRef`/`allowedVenues`), pattern snake_case aggirabile con semantica clinica (P2: `diagnosi_diabete_tipo_2`), riga rischi stale (P3), eccezione ATHENA non documentata in ADR (P3) |
-| W4 terzo passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Correzioni A-D confermate chiuse dai falsificatori; battery verde (935/935); nuovi P2 dalla caccia avversariale: vocabolario `as const` non congelato a runtime (mutabile prima del load del resolver) e array sparso che aggira `every()` su `allowedVenues` |
-| W4 quarto passaggio | Sol high, contesto fresco, focalizzato | HOLD_FIX | Congelamento e fix sparse-array confermati chiusi; battery verde (936/936); nuovi P2 classe TOCTOU: `includes` ridefinito dal chiamante amplia le venue; doppia iterazione della provenance permette a un iteratore stateful di cambiare valori tra check e uso |
-| W4 quinto passaggio | Sol high, contesto fresco, terminale | GO | Falsificatori TOCTOU chiusi (snapshot-unico confermato); 21/21 fabric, 936/936 unit, typecheck/claims/never-regress PASS; nessun P1/P2; 3 residui P3 fuori dal threat model dichiarato (getter stateful su `request.venue` e `resolution.receipt`, RegExp esportata non congelata usata solo nei test) |
+| Lane | Esito | Note |
+| --- | --- | --- |
+| R1 inventario deterministico | OK | 11 capability reali; registro attese ADR 0082 ASSENTE come runtime |
+| R2 inventario superfici | OK | Auth: `requireSession`/`requireSessionOrLocalToken`; client paired senza adapter provider |
+| F1 resolver | OK dopo sblocco | Implementazione completa e prove verdi (7/7, typecheck, lint, riverificate dal controller) |
+| F2 catalogo deterministico | OK | 5/5 test riverificati dal controller; deviazione dichiarata e accettata: entryPoint AIFA corretto a `lib/aifa-catalog.ts` dove vive lo schema letterale |
+| F3 catalogo unificato + stato | OK | 17/17 test fabric riverificati dal controller; route sottile su `requireSessionOrLocalToken` come `/api/ai/models`; snapshot con allowlist congelata senza endpoint o impostazioni; edge dichiarato: nessun test HTTP di integrazione della route |
+| W4 verifica terminale | HOLD_FIX | Battery tutta verde (932/932); falsificatori contrattuali reali: descriptor fabbricato accettato (P1), ricevuta `treatment_reasoning` con provider discordante da `athena_mlx` (P1), etichette provenance non validate (P2), overclaim docs conseguente (P2), matrice con decisioni gia' chiuse (P3) |
+| W4 secondo passaggio | HOLD_FIX | P1 confermati chiusi dai falsificatori; residui: policy non validata integralmente a runtime (P2: `retention`/`consentRef`/`allowedVenues`), pattern snake_case aggirabile con semantica clinica (P2: `diagnosi_diabete_tipo_2`), riga rischi stale (P3), eccezione ATHENA non documentata in ADR (P3) |
+| W4 terzo passaggio | HOLD_FIX | Correzioni A-D confermate chiuse dai falsificatori; battery verde (935/935); nuovi P2 dalla caccia avversariale: vocabolario `as const` non congelato a runtime (mutabile prima del load del resolver) e array sparso che aggira `every()` su `allowedVenues` |
+| W4 quarto passaggio | HOLD_FIX | Congelamento e fix sparse-array confermati chiusi; battery verde (936/936); nuovi P2 classe TOCTOU: `includes` ridefinito dal chiamante amplia le venue; doppia iterazione della provenance permette a un iteratore stateful di cambiare valori tra check e uso |
+| W4 quinto passaggio | GO | Falsificatori TOCTOU chiusi (snapshot-unico confermato); 21/21 fabric, 936/936 unit, typecheck/claims/never-regress PASS; nessun P1/P2; 3 residui P3 fuori dal threat model dichiarato (getter stateful su `request.venue` e `resolution.receipt`, RegExp esportata non congelata usata solo nei test) |
 
 ## 6. Decision audit (aggiornato in corso d'opera)
 
@@ -109,7 +107,6 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 | `every()` su array del chiamante | Corretta dopo il terzo passaggio W4: normalizzazione con `Array.from` (i buchi diventano `undefined` e falliscono la validazione) | Un array sparso che produca una ricevuta |
 | Metodi e iteratori del chiamante tra check e uso (TOCTOU) | Corretta dopo il quarto passaggio W4: pattern snapshot-unico; validazione e membership/materializzazione usano la STESSA copia reale interna, mai metodi o iteratori dell'oggetto originale | Un oggetto del chiamante che menta tra validazione e uso producendo ricevuta o record difformi |
 | Nessuna modifica ai client nativi in questo programma | Accettata | Un requisito di parity che imponga adozione Swift immediata |
-| Meter Fable non esposto in sessione | Registrata `CAPACITY_UNKNOWN` solo per eventuali lane Fable aggiuntive; nessuna avviata | |
 
 ## 7. Rischi residui e ledger errori
 
@@ -127,15 +124,15 @@ i 69 fallimenti erano tutti attribuibili alla toolchain, non al merge.
 Aperta dopo il GO del nucleo. Contratto: ADR 0090 (`aac129164`). Nucleo ADR
 0089 accettato e non ridisegnato.
 
-| Wave | Contenuto | Lane | Stato |
-| --- | --- | --- | --- |
-| S0 | Ricognizione R3 (pairing/trust) e R4 (incertezza/review) | 2x Luna high read-only | DONE |
-| S1 | ADR 0090: semantica, invarianti, falsificatori, DAG, ownership | manager (Fable) | DONE |
-| S2 | P1 trust+revoca, P2 onboarding, P3 routing osservabile, P4 interazione clinica | Sol/Terra/Sol/Sol high, worktree f1-f4 | DONE: tutte integrate (`a8b38d29a`) |
-| S3 | Integrazione + docs + battery | manager | DONE |
-| S4 | Verifica terminale indipendente | lane fresca | DONE: `GO` su `54040f2e8` |
+| Wave | Contenuto | Stato |
+| --- | --- | --- |
+| S0 | Ricognizione R3 (pairing/trust) e R4 (incertezza/review) | DONE |
+| S1 | ADR 0090: semantica, invarianti, falsificatori, DAG, ownership | DONE |
+| S2 | P1 trust+revoca, P2 onboarding, P3 routing osservabile, P4 interazione clinica | DONE: tutte integrate (`a8b38d29a`) |
+| S3 | Integrazione + docs + battery | DONE |
+| S4 | Verifica terminale indipendente | DONE: `GO` su `54040f2e8` |
 
-Primo passaggio S4 (Sol xhigh, contesto fresco) e correzioni del controller:
+Primo passaggio S4 (verifica automatizzata indipendente) e correzioni del controller:
 
 | Finding | Severita | Correzione |
 | --- | --- | --- |
@@ -146,7 +143,7 @@ Primo passaggio S4 (Sol xhigh, contesto fresco) e correzioni del controller:
 | Semantica `clearsLockout` ambigua per `admin_reset` | P3 | Commento normativo: il campo indica azzeramento in-place per un utente che sopravvive |
 | Wording stale "revoca host-side assente" nel run record | P3 | Riformulato come fotografia pre-S2 |
 
-Secondo passaggio S4 (Sol high, contesto fresco): P1-1/P1-2/P1-3/P2-1
+Secondo passaggio S4 (verifica automatizzata indipendente): P1-1/P1-2/P1-3/P2-1
 confermati chiusi (30/30 gare DELETE senza violazioni); nuovo P1 dalla caccia:
 la conferma pairing concorrente, ancora load->modify->upsert, poteva
 resuscitare un client revocato (34/50 gare). Correzione del controller:
@@ -158,7 +155,7 @@ concorrente permanente deterministica in
 scenario resurrezione, percorso reale intent+conferma). Residui P2/P3
 documentali corretti (ledger, wording upsert, baseline README OpenAPI).
 
-Closeout S4 (Sol high, contesto fresco): `GO` su `54040f2e8`. Il verificatore
+Closeout S4 (verifica automatizzata indipendente): `GO` su `54040f2e8`. Il verificatore
 ha confermato la CAS unificata e tutti i writer dello stato pairing. Le gare
 DELETE + conferma non hanno prodotto resurrezioni in 50/50 esecuzioni. La
 battery finale ha prodotto 17/17 test pairing e 974/974 test unitari. Sono
@@ -176,10 +173,10 @@ Ledger lane fase 2:
 
 | Lane | Esito | Note |
 | --- | --- | --- |
-| P2 onboarding (Terra high) | OK | 28/28 riverificati dal controller; gate egress reale consultato a `attest_local` e `enable`; nessuna stringa `verified`/`ready`/`qualified` |
-| P4 interazione clinica (Sol high) | OK + hardening | 29/29 riverificati; gap auto-dichiarato (ref provenienza vuoto) chiuso dal controller in `f814a3204` insieme all'attore fuori vocabolario; deroga LOC dichiarata e accettata |
-| P3 routing osservabile (Sol high) | OK | 29/29 riverificati; sonda solo su base loopback validata con `redirect: 'error'` e timeout 1500ms; deroga LOC dichiarata e accettata |
-| P1 trust+revoca (Sol high) | OK dopo correzioni S4 | 30/30 riverificati; il gate di modalita si applica anche alla discovery (verificato dal controller su `network-discovery-auth.ts:52`); ADR 0090 corretto di conseguenza; la persistenza della revoca, prima upsert non atomico, e' stata portata dalla verifica S4 alla primitiva CAS condivisa |
+| P2 onboarding | OK | 28/28 riverificati dal controller; gate egress reale consultato a `attest_local` e `enable`; nessuna stringa `verified`/`ready`/`qualified` |
+| P4 interazione clinica | OK + hardening | 29/29 riverificati; gap auto-dichiarato (ref provenienza vuoto) chiuso dal controller in `f814a3204` insieme all'attore fuori vocabolario |
+| P3 routing osservabile | OK | 29/29 riverificati; sonda solo su base loopback validata con `redirect: 'error'` e timeout 1500ms |
+| P1 trust+revoca | OK dopo correzioni S4 | 30/30 riverificati; il gate di modalita si applica anche alla discovery (verificato dal controller su `network-discovery-auth.ts:52`); ADR 0090 corretto di conseguenza; la persistenza della revoca, prima upsert non atomico, e' stata portata dalla verifica S4 alla primitiva CAS condivisa |
 
 Decisioni di fase (aggiunte):
 
@@ -237,9 +234,6 @@ autorizzata durante il completamento tecnico.
 
 Run ID: `MFP-IF-COS-20260729-02`
 
-Controller: Codex GPT-5.6 Sol Ultra. Fable resta sospeso e non viene
-modificato.
-
 Branch controller: `codex/WUL-522-intelligence-fabric-cos-local`.
 Base codice: `54040f2e8`. Closeout S4 documentale: `31c506c25`.
 
@@ -252,15 +246,9 @@ Base codice: `54040f2e8`. Closeout S4 documentale: `31c506c25`.
 - Il controller lavora in un worktree isolato, derivato da `54040f2e8`.
 - Ref sorgente e worktree Fable avevano ancestry `0/0`.
 
-### Lane read-only
+### Ricognizione in sola lettura
 
-| Lane | Modello/effort | Prompt bounded | Esito |
-| --- | --- | --- | --- |
-| R1 inventario | Luna high | Classificare implementato, contrattuale, mock/shadow, assente e bloccato | DONE |
-| R2 architettura e sicurezza | Sol xhigh | Trovare gap, ADR richiesti, packet, falsificatori e stop-rule | DONE |
-| R3 harness e verifica | Terra high | Mappare test, client sintetici, toolchain e gate reali | DONE |
-
-Nessuna lane ha scritto file o avviato provider esterni.
+Sono stati classificati stato implementativo, confini, test e gate. Nessuna ricognizione ha scritto file o avviato provider esterni.
 
 ### Mappa prima dei writer
 
@@ -284,11 +272,11 @@ P1 provider admission ──┐
 P2 status paired/Swift ─┘
 ```
 
-| Packet | Writer | Ownership | Falsificatore terminale |
-| --- | --- | --- | --- |
-| P1 admissione e continuita | Terra high | moduli Fabric nuovi, routing osservabile e test | provider revocato/degradato o venue unknown produce una ricevuta |
-| P2 proiezione status | Sol xhigh | network AI, tipi API, OpenAPI, modello/test Swift | il paired ottiene grant AI, fallback locale o segreti |
-| P3 harness sintetico | controller | harness/test nuovi dopo P1+P2 | review senza medico/provenienza, fallback o blocco core non-AI |
+| Packet | Ownership | Falsificatore terminale |
+| --- | --- | --- |
+| P1 admissione e continuita | moduli Fabric nuovi, routing osservabile e test | provider revocato/degradato o venue unknown produce una ricevuta |
+| P2 proiezione status | network AI, tipi API, OpenAPI, modello/test Swift | il paired ottiene grant AI, fallback locale o segreti |
+| P3 harness sintetico | harness/test nuovi dopo P1+P2 | review senza medico/provenienza, fallback o blocco core non-AI |
 
 ADR 0091 congela il confine: host-local, fail-closed, paired solo status,
 nessuna scrittura clinica e nessun claim su cloud, on-device o readiness
@@ -298,13 +286,13 @@ qualificata.
 
 Stato del checkpoint: `CANDIDATE_BUILT / V1_HOLD_FIX / CORRECTED`.
 
-| Packet | Lane e worktree | Commit candidato | Commit integrati | Esito controller |
-| --- | --- | --- | --- | --- |
-| P1 admissione e continuita | Terra high, `if-p1-provider-admission` | `15dc671e4`, hardening `b6e4d5f7e` | `5937b71b9`, `5d5a729a7`, `925235463`, `951055a71`, `91ae0f481` | lifecycle, revoca, degrado, snapshot e routing fail-closed verificati |
-| P2 status paired e Swift | Sol xhigh, `if-p2-status-projection` | `0cebf7e2b` | `77bc69854` | proiezione PHI-safe, paired senza grant, OpenAPI e decode Swift condiviso |
-| P3 harness sintetico | controller | non applicabile | `d860e6103`, `22b8dd94e`, `0b8469753` | receipt, provenance, review medica, zero write e core non-AI verificati |
-| Hardening gate egress | controller | non applicabile | `7e5321bb3` | rimossa dalla fixture una URL remota; `never-regress` verde |
-| Hardening V1 | controller | non applicabile | `3b3500be5`, `afacefcb9` | snapshot lifecycle unico e diff-check del range pulito |
+| Packet | Commit candidato | Commit integrati | Esito controller |
+| --- | --- | --- | --- |
+| P1 admissione e continuita | `15dc671e4`, hardening `b6e4d5f7e` | `5937b71b9`, `5d5a729a7`, `925235463`, `951055a71`, `91ae0f481` | lifecycle, revoca, degrado, snapshot e routing fail-closed verificati |
+| P2 status paired e Swift | `0cebf7e2b` | `77bc69854` | proiezione PHI-safe, paired senza grant, OpenAPI e decode Swift condiviso |
+| P3 harness sintetico | non applicabile | `d860e6103`, `22b8dd94e`, `0b8469753` | receipt, provenance, review medica, zero write e core non-AI verificati |
+| Hardening gate egress | non applicabile | `7e5321bb3` | rimossa dalla fixture una URL remota; `never-regress` verde |
+| Hardening V1 | non applicabile | `3b3500be5`, `afacefcb9` | snapshot lifecycle unico e diff-check del range pulito |
 
 I worktree packet restano disponibili e non sono stati cancellati.
 
@@ -363,7 +351,7 @@ certificazione o autorita di promozione.
 
 ### V1: finding riprodotti
 
-La lane Sol high a contesto fresco ha verificato `44595c6f5` e ha emesso
+Una verifica automatizzata indipendente ha verificato `44595c6f5` e ha emesso
 `HOLD_FIX`.
 
 - P1: `routeCandidateCapability()` rileggeva il lifecycle tre volte. Un getter
@@ -410,17 +398,9 @@ Report V2: `/private/tmp/mediflow-if-cos-fresh-verifier-v2.md`.
 SHA-256:
 `c1652387e226c62bb9a530470adbcdda55f1294dc626d90f9d73c7270fbc8f50`.
 
-### Ledger finale delle lane
+### Esito delle verifiche
 
-| Lane | Sessione | Modello/effort | Stato | Output promosso |
-| --- | --- | --- | --- | --- |
-| R1 inventario | `<inventory-session-id>` | Luna high | DONE | mappa implementato/contrattuale/mock/assente/bloccato |
-| R2 architettura + P2 | `<architecture-session-id>` | Sol xhigh | DONE | confine status-only, OpenAPI e decode Swift |
-| R3 verifica + P1 | `<verification-session-id>` | Terra high | DONE | lifecycle, admissione, continuita e test |
-| V1/V2 verifier | `/root/fresh_verifier` | Sol high | HOLD_FIX, poi GO | finding TOCTOU/EOF chiusi e battery terminale |
-
-P3 e le correzioni del controller non hanno aperto una quinta lane. Nessuna
-lane e fallita o e rimasta attiva.
+Le verifiche automatizzate indipendenti hanno prima registrato `HOLD_FIX`, poi `GO` dopo la chiusura dei finding TOCTOU/EOF e la battery terminale.
 
 ### Decision audit terminale
 
@@ -466,22 +446,8 @@ Il closeout documentale successivo a `afacefcb9` non modifica runtime,
 contratti o test. Non sono autorizzati push, PR, merge, tag, release o
 mutazioni Linear.
 
-### Packet per il checkpoint Fable
-
-- Run ID: `MFP-IF-COS-20260729-02`.
-- Branch locale:
-  `codex/WUL-522-intelligence-fabric-cos-local`.
-- Baseline immutabile: `54040f2e8`; release 0.8 invariata.
-- Snapshot candidato verificato: `afacefcb9`.
-- Contratto: ADR 0091.
-- Evidenza: questo run record e il report V2 con SHA-256 sopra.
-- Stato: candidato locale pronto; promozione remota in `HOLD`.
-- Limiti: nessun provider reale, cloud, on-device, AI paired, writer clinico o
-  test runtime Apple.
-- Autorita: sola valutazione del packet; nessuna mutazione o promozione.
-
 ### Unica next permitted action
 
-Quando la quota Fable torna disponibile, eseguire un solo checkpoint di
-giudizio sul packet sopra, senza modificare il worktree sospeso e senza
+Il seguito richiede una verifica di
+giudizio sul candidato documentato sopra, senza modificare il worktree sospeso e senza
 promozione remota.

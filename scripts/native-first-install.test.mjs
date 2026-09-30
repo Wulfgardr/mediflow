@@ -14,9 +14,9 @@ function withDirectory(run) {
     try { run(directory); } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 
-function reserve(directory) {
+function reserve(directory, cwd = root) {
     return spawnSync(process.execPath, [helper, '--create-empty-only'], {
-        cwd: root,
+        cwd,
         env: { ...process.env, MEDIFLOW_DATA_DIR: directory, MEDIFLOW_DB_PATH: path.join(directory, 'medical.db') },
         encoding: 'utf8',
         timeout: 5_000,
@@ -85,5 +85,27 @@ test('packaged first install never overwrites an existing database file', () => 
 
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(fs.readFileSync(database), original);
+    });
+});
+
+test('a legacy file in cwd cannot bypass the selected native directory checks', () => {
+    withDirectory((sandbox) => {
+        const legacy = path.join(sandbox, 'medical.db');
+        const original = Buffer.from('synthetic-unselected-legacy');
+        fs.writeFileSync(legacy, original);
+        const fresh = path.join(sandbox, 'fresh');
+        const result = reserve(fresh, sandbox);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(fs.statSync(path.join(fresh, 'medical.db')).size, 0);
+
+        const incomplete = path.join(sandbox, 'incomplete');
+        fs.mkdirSync(incomplete);
+        fs.writeFileSync(path.join(incomplete, 'recovery-marker'), 'synthetic-recovery');
+        const refused = reserve(incomplete, sandbox);
+        assert.notEqual(refused.status, 0);
+        assert.match(refused.stderr, /NATIVE_DATA_DIRECTORY_NOT_EMPTY_WITHOUT_DATABASE/u);
+        assert.deepEqual(fs.readdirSync(incomplete), ['recovery-marker']);
+        assert.equal(fs.readFileSync(path.join(incomplete, 'recovery-marker'), 'utf8'), 'synthetic-recovery');
+        assert.deepEqual(fs.readFileSync(legacy), original);
     });
 });

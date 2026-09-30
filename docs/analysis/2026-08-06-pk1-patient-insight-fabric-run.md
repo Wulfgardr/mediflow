@@ -13,15 +13,10 @@ Run ID: `MFP-IF-PK1-20260806-01`
 
 Data: 2026-08-06
 
-Controller: Fable 5 + UltraCode (giudizio, adjudicazioni, fix terminale, closeout);
-lane delegate GPT-5.6 pinnate per modello ed effort. Meter quota Fable non
-esposto nell'harness: registrato `CAPACITY_UNKNOWN` come dato, sessione avviata
-su mandato esplicito dell'utente.
-
 ## 1. Mandato e selezione
 
-Ingresso: `NEXT_PERMITTED_ACTION` dell'handoff terminale Fable
-(`2026-07-30-intelligence-fabric-horizon-run.md`, §15). CoS Sol high read-only:
+Ingresso: `NEXT_PERMITTED_ACTION` del verbale Horizon
+(`2026-07-30-intelligence-fabric-horizon-run.md`, §13). Ricognizione in sola lettura:
 
 - identita' verificata (base `ad54655ed`, runtime `aa3de4c46` antenato);
 - branch `codex/WUL-522-if-provider-admission` e `codex/WUL-522-if-status-projection`
@@ -39,16 +34,16 @@ Ownership esclusiva: `lib/ai-summary-fabric.ts` (nuovo),
 
 | Round | Esito | Contenuto |
 |---|---|---|
-| W1 (Terra high) | STOP legittimo | `source_hierarchy` fuori dal vocabolario chiuso `FABRIC_PREPROCESSING_LABELS`; correzione avrebbe toccato il contratto (fuori ownership). |
-| Emendamento (Fable) | Packet emendato | Preprocessing = `['context_minimization','envelope_validation']`; vocabolario invariato; parita' col pattern document_synthesis. Falsificatore futuro: un consumer reale che richieda la distinzione gerarchica apre un ADR di vocabolario. |
-| W1r (Terra, resume) | `34b59b1aa` | Adapter + seam + test; gate verdi. |
-| V1 (Sol fresco) | HOLD_FIX | P1 health-throw oltre il fail-closed; P2 lifecycle (adjudicato: parita' col pattern, chiusura reale = PK-5); P2 receipt parziale; P2 provenance (nullo: verificatore senza emendamento); P3 attach su info frozen. |
-| W2 (Terra, resume) | `61883c488` | Health-throw fail-closed; receipt hardening; test confine lifecycle; attach anticipato pre-side-effect. Incidente: resume dalla cwd errata, commit recuperato via fast-forward, branch spurio eliminato. |
-| V2 (Sol fresco) | HOLD_FIX | P2 residuo: validazione receipt incompleta (`authorityPlane`, `runtimeReadiness`, `class`, `fallbackCount`, nested schema, identita' decision/resolution). |
-| W3 (Terra, resume) | `fdbf7c7e5` | Validazione integrale `ProviderSelectionReceipt`; identita' referenziale decision/resolution; `runtimeReadiness='required'` confermato dal registry. |
-| V3 (Sol fresco) | HOLD_FIX | P2 finale: receipt root non snapshotted (getter stateful oltre l'ammissione; `egressProfile` null -> TypeError). |
-| W4 (Fable diretto) | `88744fd86` | Snapshot strutturale unico (una lettura per campo, copia congelata); decision/resolution/provenance ricostruite attorno allo snapshot (raw mai nel metadato); shape malformate -> denial, mai throw. Regola applicata: dopo due round delegati falliti il controller esegue direttamente. |
-| V4 (Sol fresco) | **GO — VERIFIED** | Probe indipendente 6/6 (prima-lettura coerente, conteggio 1 per campo, denial su divergenza/shape); regressione falsificatori 12/12; gate verdi. |
+| W1 | STOP legittimo | `source_hierarchy` fuori dal vocabolario chiuso `FABRIC_PREPROCESSING_LABELS`; correzione avrebbe toccato il contratto (fuori ownership). |
+| Emendamento | Packet emendato | Preprocessing = `['context_minimization','envelope_validation']`; vocabolario invariato; parita' col pattern document_synthesis. Falsificatore futuro: un consumer reale che richieda la distinzione gerarchica apre un ADR di vocabolario. |
+| W1r | `34b59b1aa` | Adapter + seam + test; gate verdi. |
+| V1 | HOLD_FIX | P1 health-throw oltre il fail-closed; P2 lifecycle (adjudicato: parita' col pattern, chiusura reale = PK-5); P2 receipt parziale; P2 provenance (nullo: verificatore senza emendamento); P3 attach su info frozen. |
+| W2 | `61883c488` | Health-throw fail-closed; receipt hardening; test confine lifecycle; attach anticipato pre-side-effect. Incidente: resume dalla cwd errata, commit recuperato via fast-forward, branch spurio eliminato. |
+| V2 | HOLD_FIX | P2 residuo: validazione receipt incompleta (`authorityPlane`, `runtimeReadiness`, `class`, `fallbackCount`, nested schema, identita' decision/resolution). |
+| W3 | `fdbf7c7e5` | Validazione integrale `ProviderSelectionReceipt`; identita' referenziale decision/resolution; `runtimeReadiness='required'` confermato dal registry. |
+| V3 | HOLD_FIX | P2 finale: receipt root non snapshotted (getter stateful oltre l'ammissione; `egressProfile` null -> TypeError). |
+| W4 | `88744fd86` | Snapshot strutturale unico (una lettura per campo, copia congelata); decision/resolution/provenance ricostruite attorno allo snapshot (raw mai nel metadato); shape malformate -> denial, mai throw.  |
+| V4 | **GO — VERIFIED** | Probe indipendente 6/6 (prima-lettura coerente, conteggio 1 per campo, denial su divergenza/shape); regressione falsificatori 12/12; gate verdi. |
 
 ## 3. Gate finali (V4 su `88744fd86`)
 

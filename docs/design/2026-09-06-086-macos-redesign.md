@@ -55,7 +55,7 @@ Il volume Xcode è montato, senza modificare il selettore globale.
 | Bozza sintetica | Apertura, titolo digitato, passaggio alle terapie, ritorno al diario e ripresa con titolo conservato. Nessun salvataggio clinico. |
 | Tema scuro e accessibilità | Cattura con override locale `accessibility1` e riduzione del movimento; gruppi su una colonna. Non equivale a una sessione VoiceOver completa o a tutte le preferenze assistive. |
 | Navigazione e inspector | Menu delle altre aree, apertura Impostazioni, ritorno alla cartella; apertura dello sheet compatibile e chiusura da tastiera. |
-| Revisione indipendente Astra | Nessun P1/P2 concreto nel diff finale esaminato; review statica, non prova visiva indipendente. |
+| Revisione automatizzata indipendente | Nessun P1/P2 concreto nel diff finale esaminato; review statica, non prova visiva indipendente. |
 
 Le prime build hanno mostrato che il materiale della toolbar si sovrapponeva
 alla testata nel `NavigationSplitView` annidato. La disposizione finale usa

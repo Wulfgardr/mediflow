@@ -13,14 +13,9 @@ Run ID: `MFP-IF-HORIZON-20260730-01`
 
 Data: 2026-07-30
 
-Controller: Fable 5 (giudizio, integrazione, closeout); lane delegate GPT-5.6.
-
-Quota Fable: 18% residua, fornita come dato operativo dal controller umano;
-spesa prioritaria su giudizio, confini e closeout; esecuzione delegata.
-
 ## 1. Evidenza acquisita dal checkpoint precedente
 
-- Verdetto Fable: `CONFIRM_LOCAL_CANDIDATE`; stato confermato:
+- Verdetto del checkpoint: `CONFIRM_LOCAL_CANDIDATE`; stato confermato:
   `INTELLIGENCE_FABRIC_LOCAL_CANDIDATE_READY / HOLD_REMOTE_PROMOTION`.
 - Branch sorgente: `codex/WUL-522-intelligence-fabric-cos-local`;
   baseline `54040f2e8`; snapshot verificato `afacefcb9`; HEAD documentale
@@ -32,7 +27,7 @@ spesa prioritaria su giudizio, confini e closeout; esecuzione delegata.
   worktree Horizon liberi; worktree Fable congelato intatto a `54040f2e8`.
 - 82% base tecnica e 54% prodotto restano indicatori narrativi.
 
-## 2. Mappa di stato (ricognizione H-R1, Luna high read-only)
+## 2. Mappa di stato (ricognizione in sola lettura)
 
 | Area | Classificazione |
 | --- | --- |
@@ -58,7 +53,7 @@ risultato, contratto applicativo invariato e core non-AI intatto.
 (`lib/domain/documents/document-synthesis-service.ts`,
 `analyzeDocumentContent()`).
 
-Motivi (raccomandazione H-R2, Sol high, adottata dal controller):
+Motivi della selezione:
 `analyzeDocumentContent` non persiste dati; descrittore gia a catalogo;
 binding `reasoning -> Ollama loopback` gia derivato dalle impostazioni; i
 consumer (pdf-importer, create-flow diario) assorbono gia l'errore AI senza
@@ -102,7 +97,7 @@ bloccare il core; un solo confine architetturale; test sintetici esistenti.
 
 ```text
 H-R1 (DONE) ─┐
-             ├─ giudizio congelato ─ H-W1 (writer unico) ─ integrazione Fable ─ gate ─ H-V1 (verifica fresca) ─ closeout
+             ├─ giudizio congelato ─ H-W1 (writer unico) ─ integrazione locale ─ gate ─ H-V1 (verifica fresca) ─ closeout
 H-R2 (DONE) ─┘
 ```
 
@@ -110,20 +105,7 @@ DAG successivo (post-Horizon, non promesso in questa sessione): migrazione
 degli altri call path (insight, smart import, OCR, treatment reasoning),
 lifecycle persistito, persistenza review, superfici paired oltre lo status.
 
-## 5. Lane e ownership
-
-| Lane | Modello/effort | Modalita | Ownership esatta |
-| --- | --- | --- | --- |
-| H-R1 inventario | Luna high | read-only | nessuna (DONE) |
-| H-R2 giudizio | Sol high | read-only | nessuna (DONE) |
-| H-W1 writer unico | Terra high | worktree dedicato | SOLO: `lib/domain/documents/document-synthesis-fabric.ts` (nuovo), `lib/domain/documents/document-synthesis-service.ts`, `lib/domain/documents/document-synthesis-service.test.ts`, `lib/ai-context.test.ts` |
-| H-V1 verifica | Sol high | contesto fresco read-only | nessuna |
-
-Fable possiede i documenti Horizon e l'integrazione locale. Ogni correzione
-runtime torna a H-W1 dentro l'ownership congelata. Nessun nesting; nessun Sol
-Ultra in questa sessione.
-
-## 6. Falsificatori della slice (da provare in H-W1 e H-V1)
+## 5. Falsificatori della slice (da provare in H-W1 e H-V1)
 
 1. Lifecycle `revoked` o `degraded` produce receipt o invoca il modello.
 2. Venue offline/unknown cambia venue o invoca il modello.
@@ -143,7 +125,7 @@ Ultra in questa sessione.
 11. Endpoint non loopback o egress diverso da `none` ammessi.
 12. Tentativo di scrittura clinica autonoma dal percorso adottato.
 
-## 7. Regole di arresto della wave
+## 6. Regole di arresto della wave
 
 Interrompere se: serve persistenza di revoca/receipt/review; serve una nuova
 impostazione, migrazione, UI, API o client Apple; serve un fallback
@@ -153,7 +135,7 @@ contrattuale si apre; la verifica indipendente non puo essere completata.
 In caso di arresto: commit locali piccoli, worktree puliti, nessuna
 cancellazione, packet residuo coeso.
 
-## 8. Controlli di accettazione e promozione
+## 7. Controlli di accettazione e promozione
 
 Gate della wave: test mirati document-synthesis + fabric; suite unit
 completa; typecheck; lint; build; claims; never-regress; OpenAPI drift (non
@@ -163,7 +145,7 @@ chiamate esterne (solo loopback). Poi H-V1 a contesto fresco: un P0-P2
 produce `HOLD_FIX` e torna a H-W1. Promozione locale solo dopo GO di H-V1.
 Promozione remota: sempre `HOLD` (fuori autorita di questa sessione).
 
-## 9. Decision audit
+## 8. Decision audit
 
 | Decisione | Stato | Falsificatore |
 | --- | --- | --- |
@@ -177,26 +159,19 @@ Nessuna decisione contrattuale aperta blocca la slice. Restano aperte fuori
 contratto (non bloccanti, non promesse): lifecycle persistito, review
 persistita, altri call path, cloud/on-device/paired, runtime Apple.
 
-## 10. Blocker esterni
+## 9. Blocker esterni
 
 - SwiftPM/XCBuild `BLOCKED_TOOLCHAIN` (CommandLineTools; serve Xcode
   funzionante): nessuna prova runtime Apple in questa sessione.
 - Cloud e provider reali: egress chiuso per contratto; fuori scope.
 
-## 11. Criterio di handoff
-
-Se la quota Fable si esaurisce realmente: interrompere nuove lane, conservare
-commit locali, worktree puliti, stato esatto in questo run record, verdetto
-`FABLE_CAPACITY_BLOCKED`; solo dopo, il residuo puo passare a un unico CoS
-Sol Ultra esterno. Nessun avvio autonomo del CoS successivo.
-
-## 12. Verdetto intermedio
+## 10. Verdetto intermedio
 
 `HORIZON_PLAN_FROZEN / WAVE_1_AUTHORIZED`: margine sufficiente per una sola
-wave bounded (H-W1 Terra high) con verifica H-V1, entro le quattro lane
+wave bounded (H-W1) con verifica H-V1, entro le quattro lane
 complessive.
 
-## 13. Esito della wave
+## 11. Esito della wave
 
 Wave H-W1 consegnata e verificata.
 
@@ -206,7 +181,7 @@ Wave H-W1 consegnata e verificata.
 - Battery del controller sul branch integrato: typecheck, lint, claims,
   never-regress, OpenAPI drift, schema drift, `git diff --check
   ee22399a4..HEAD` tutti PASS; suite unit `999/999`.
-- H-V1 (Sol high, contesto fresco): `GO`. Falsificatori a-j tutti chiusi con
+- H-V1 (verifica automatizzata indipendente): `GO`. Falsificatori a-j tutti chiusi con
   prove live (lifecycle degraded/revoked, venue offline, receipt divergente,
   getter stateful, metadato non enumerabile, review pending/zero write,
   negazione senza update db e senza recupero deterministico, nessun nuovo IO,
@@ -223,7 +198,7 @@ Wave H-W1 consegnata e verificata.
 Verdetto intermedio della wave:
 `HORIZON_LOCAL_SLICE_READY / HOLD_REMOTE_PROMOTION`.
 
-## 14. Micro-wave di chiusura del P3
+## 12. Micro-wave di chiusura del P3
 
 Autorizzata dal controller umano dopo la verifica indipendente Codex del
 checkpoint (46/46, 60/60, 64/64, 999/999, build e standalone bundle verdi
@@ -231,14 +206,14 @@ su `af0a4c303`). Condizioni rispettate: solo adapter + test, contratto
 Horizon invariato, nessun payload o dato persistito toccato, nessuna
 dipendenza nuova.
 
-- Writer H-W1b (Terra high, stesso worktree e ownership della wave): commit
+- Writer H-W1b (stessa ownership della wave): commit
   `aa3de4c46`; lo snapshot di `modelInfo` conserva le copie primitive
   `receiptProvider`/`receiptModel` catturate alla validazione e il confronto
   usa solo quelle; regressione stateful dedicata nel test.
 - Battery del controller sul branch integrato: claims, never-regress, lint,
   `git diff --check ee22399a4..HEAD`, suite unit `1000/1000`, build
   production PASS.
-- H-V1b (Sol high, contesto fresco): `GO — VERIFIED`. Probe reali: una
+- H-V1b (verifica automatizzata indipendente): `GO — VERIFIED`. Probe reali: una
   lettura per proprieta, ammissione coerente con la prima lettura,
   divergenza -> `provider_receipt_mismatch` e zero generazioni; diff limitato
   ai due file autorizzati; sei simboli esportati identici; nessun finding.
@@ -248,23 +223,14 @@ Il P3 della wave e' chiuso. Nessun residuo P0-P3 noto sul candidato Horizon.
 Verdetto terminale della sessione:
 `HORIZON_HARDENED_LOCAL_CANDIDATE_READY / HOLD_REMOTE_PROMOTION`.
 
-Next permitted action: restituire il packet a Codex per verifica e closeout;
+Stato: il packet resta in attesa di verifica e closeout;
 nessun push, PR, merge remoto, tag, release o mutazione Linear.
 
-## 15. Handoff terminale Fable
+## 13. Verdetto terminale del checkpoint
 
-Stato controller: `FABLE_PACKET_RECEIVED`.
+### Verdetto del checkpoint
 
-Il 2026-07-30 il controller ha acquisito dalla sessione Fable il
-`FABLE_TERMINAL_HANDOFF_PACKET`. Il dato operativo riferito dall'utente resta
-`circa 6% remaining`: etichetta e direzione `remaining`, ora locale non
-fornita, nessuna conversione. Questo packet e' un giudizio terminale e un
-handoff di pianificazione. Non costituisce una nuova esecuzione dei gate
-runtime da parte del controller.
-
-### Verdetto Fable
-
-Fable conferma:
+Il checkpoint conferma:
 
 `HORIZON_HARDENED_LOCAL_CANDIDATE_READY / HOLD_REMOTE_PROMOTION`
 
@@ -278,7 +244,7 @@ Identita giudicata:
 
 Base dichiarata: H-V1 `GO`, H-V1b `GO — VERIFIED`, verifica Codex
 indipendente, suite unitaria `1000/1000`, build production e standalone
-bundle verdi, guard verdi e probe stateful del P3. Fable non identifica
+bundle verdi, guard verdi e probe stateful del P3. La revisione non identifica
 ragioni tecniche concrete per riaprire i finding chiusi.
 
 ### Assunzioni e limiti dichiarati
@@ -321,20 +287,18 @@ review `pending`, TOCTOU, CAS, invarianza del contratto e indipendenza del
 core non-AI. Non possono sostituire prove su daemon, Apple, device, cloud,
 provider o latenze reali.
 
-### Ownership e routing post-Fable
+### Packet residui e ownership
 
-| Packet | Ownership disgiunta | Esecuzione consigliata | Verifica |
-| --- | --- | --- | --- |
-| PK-1 patient insight | nuovo adapter, `lib/ai-summary-service.ts`, test relativi | Terra high | Sol high fresco |
-| PK-2 Smart Import | nuovo adapter, `patient-smart-import-service.ts`, test relativi | Terra high | Sol high fresco |
-| PK-3 OCR | ADR; route OCR, `ocr-service.ts`, test | Sol high per ADR; Terra high per meccanica | Sol high fresco |
-| PK-4 treatment reasoning | ADR; `treatment-reasoning-service.ts`, test | Sol high per ADR; Terra high per meccanica | Sol high fresco |
-| PK-5 lifecycle persistito | ADR; store, migrazione, test | Sol high per ADR e integrazione; Terra high per meccanica | Sol high fresco |
-| PK-6 review persistita | ADR; writer, route e test | Sol high per ADR e integrazione; Terra high per meccanica | Sol high fresco |
+| Packet | Ownership disgiunta |
+| --- | --- |
+| PK-1 patient insight | nuovo adapter, `lib/ai-summary-service.ts`, test relativi |
+| PK-2 Smart Import | nuovo adapter, `patient-smart-import-service.ts`, test relativi |
+| PK-3 OCR | ADR; route OCR, `ocr-service.ts`, test |
+| PK-4 treatment reasoning | ADR; `treatment-reasoning-service.ts`, test |
+| PK-5 lifecycle persistito | ADR; store, migrazione, test |
+| PK-6 review persistita | ADR; writer, route e test |
 
-Luna high e' ammessa solo per inventari read-only. Sol Ultra e' ammesso solo
-se il CoS successivo ha almeno tre filoni difficili e materialmente
-indipendenti. Nessun nesting. Ogni output worker resta candidato fino alla
+Ogni candidato resta tale fino alla
 lettura del diff, ai gate reali e a una verifica fresca.
 
 ### Stop-rule, falsificatori e confini
@@ -373,8 +337,7 @@ Accepted:
 - ordinare patient insight e Smart Import come prime slice locali;
 - richiedere ADR prima di OCR, treatment reasoning, lifecycle persistito e
   review persistita;
-- passare il residuo a un solo CoS Sol post-Fable, con worker disgiunti solo
-  quando giustificati.
+- mantenere il residuo in `HOLD_REMOTE_PROMOTION` fino a nuova verifica.
 
 Corrected: nessuna decisione del checkpoint.
 
@@ -389,6 +352,5 @@ reali; PHI/PII; claim Apple, device o cloud senza prova reale; espansione
 della release 0.8; modifiche estetiche arbitrarie; push, PR, merge remoto,
 tag, release, mutazioni Linear e promozione remota.
 
-`NEXT_PERMITTED_ACTION`: consegnare questo run record al CoS Sol post-Fable,
-che seleziona una sola prima slice tra PK-1 e PK-2, riconcilia l'ownership sul
-HEAD documentale corrente e mantiene `HOLD_REMOTE_PROMOTION`.
+`NEXT_PERMITTED_ACTION`: selezionare una slice tra PK-1 e PK-2 dopo riconciliazione con il
+HEAD documentale corrente, mantenendo `HOLD_REMOTE_PROMOTION`.
