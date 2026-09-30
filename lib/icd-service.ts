@@ -1,4 +1,5 @@
 /* @Codex */
+import { parseWhoCloudSearchResponse, WHO_CLOUD_REFERENCE, type WhoCloudReference, type WhoCloudReceipt } from './reference-data/icd11-who-cloud-contract';
 import type { ICDCode } from './icd-codes';
 import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
     type WhoLocalReadiness, type WhoLocalReceipt, type WhoLocalReference } from './reference-data/icd11-who-local-contract';
@@ -6,15 +7,8 @@ import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
 const ICD_PROXY_URL = '/api/icd/proxy';
 const QUERY_MAX_BYTES = 160;
 const BODY_MAX_BYTES = 131_072;
-const RESULT_LIMIT = 25;
 const encoder = new TextEncoder();
 
-const SEARCH_ROOT_KEYS = ['schemaVersion', 'entries', 'receipt'] as const;
-const ENTRY_KEYS = ['code', 'description', 'system'] as const;
-const RECEIPT_KEYS = [
-    'schemaVersion', 'operation', 'releaseId', 'language', 'source',
-    'resultCount', 'latencyMs', 'completedAt',
-] as const;
 const READINESS_KEYS = ['schemaVersion', 'status', 'releaseId', 'language'] as const;
 
 export interface ICDSearchResult extends ICDCode {
@@ -22,6 +16,7 @@ export interface ICDSearchResult extends ICDCode {
     canonicalUri?: string;
     partial?: boolean;
     reference?: WhoLocalReference;
+    sourceReference?: WhoCloudReference;
 }
 
 export type ICDReadinessStatus = 'disabled' | 'credentials_absent' | 'offline'
@@ -36,18 +31,7 @@ type LegacyICDReadiness = Readonly<{
 
 export type ICDReadiness = LegacyICDReadiness | WhoLocalReadiness;
 
-type LegacyICDSearchReceipt = Readonly<{
-    schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1';
-    operation: 'mediflow.reference_data.icd11.search.v1';
-    releaseId: '2026-01';
-    language: 'en';
-    source: 'live' | 'cache';
-    resultCount: number;
-    latencyMs: number;
-    completedAt: string;
-}>;
-
-export type ICDSearchReceipt = LegacyICDSearchReceipt | WhoLocalReceipt;
+export type ICDSearchReceipt = WhoCloudReceipt | WhoLocalReceipt;
 
 export type ICDClientErrorCode = 'unauthorized' | 'request_invalid' | 'service_unavailable'
     | 'upstream_response_invalid' | 'upstream_timeout' | 'response_invalid' | 'transport_unavailable';
@@ -95,23 +79,6 @@ function normalizedQuery(value: string): string {
     return normalized;
 }
 
-function receipt(value: unknown, resultCount: number): ICDSearchReceipt | null {
-    const candidate = exactRecord(value, RECEIPT_KEYS);
-    if (!candidate
-        || candidate.schemaVersion !== 'mediflow.reference-data.icd11-search-receipt.v1'
-        || candidate.operation !== 'mediflow.reference_data.icd11.search.v1'
-        || candidate.releaseId !== '2026-01' || candidate.language !== 'en'
-        || (candidate.source !== 'live' && candidate.source !== 'cache')
-        || candidate.resultCount !== resultCount
-        || !Number.isSafeInteger(candidate.latencyMs) || (candidate.latencyMs as number) < 0
-        || typeof candidate.completedAt !== 'string') return null;
-    let canonicalTimestamp: string;
-    try { canonicalTimestamp = new Date(candidate.completedAt).toISOString(); }
-    catch { return null; }
-    if (canonicalTimestamp !== candidate.completedAt) return null;
-    return Object.freeze(candidate) as ICDSearchReceipt;
-}
-
 function searchResponse(value: unknown): Readonly<{
     entries: ICDSearchResult[];
     receipt: ICDSearchReceipt;
@@ -124,29 +91,12 @@ function searchResponse(value: unknown): Readonly<{
                 imageDigest: local.receipt.imageDigest, datasetSnapshotId: local.receipt.datasetSnapshotId }) })),
         receipt: local.receipt,
     });
-    const root = exactRecord(value, SEARCH_ROOT_KEYS);
-    if (!root || root.schemaVersion !== 'mediflow.reference-data.icd11-search-response.v1'
-        || !Array.isArray(root.entries) || root.entries.length > RESULT_LIMIT) return null;
-    const entries: ICDSearchResult[] = [];
-    const seen = new Set<string>();
-    for (const rawEntry of root.entries) {
-        const entry = exactRecord(rawEntry, ENTRY_KEYS);
-        if (!entry || typeof entry.code !== 'string' || !/^[A-Z0-9][A-Z0-9.&/-]{0,31}$/u.test(entry.code)
-            || entry.code === 'N/A' || typeof entry.description !== 'string'
-            || !entry.description || entry.description.length > 4_096
-            || entry.description.trim() !== entry.description
-            || /[\u0000-\u001f\u007f<>\u202a-\u202e\u2066-\u2069]/u.test(entry.description)
-            || entry.system !== 'ICD-11' || seen.has(entry.code)) return null;
-        seen.add(entry.code);
-        entries.push(Object.freeze({
-            code: entry.code,
-            description: entry.description,
-            system: 'ICD-11',
-            isLegacy: false,
-        }));
-    }
-    const parsedReceipt = receipt(root.receipt, entries.length);
-    return parsedReceipt ? Object.freeze({ entries, receipt: parsedReceipt }) : null;
+    const cloud = parseWhoCloudSearchResponse(value);
+    return cloud ? Object.freeze({
+        entries: cloud.entries.map(entry => Object.freeze({ ...entry, isLegacy: false as const,
+            sourceReference: WHO_CLOUD_REFERENCE })),
+        receipt: cloud.receipt,
+    }) : null;
 }
 
 function readiness(value: unknown): ICDReadiness | null {

@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { WHO_CLOUD_REFERENCE } from './reference-data/icd11-who-cloud-contract.ts';
 import test from 'node:test';
 
 import {
@@ -11,8 +12,8 @@ import {
 } from './icd-service.ts';
 
 const RECEIPT = Object.freeze({
-    schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1',
-    operation: 'mediflow.reference_data.icd11.search.v1',
+    ...WHO_CLOUD_REFERENCE, schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v3',
+    operation: 'mediflow.reference_data.icd11.search.v3',
     releaseId: '2026-01',
     language: 'en',
     source: 'live',
@@ -30,15 +31,15 @@ test('parses only the strict MediFlow search response and preserves its PHI-safe
     const client = createICDReferenceDataClient(async (input) => {
         requests.push(String(input));
         return json({
-            schemaVersion: 'mediflow.reference-data.icd11-search-response.v1',
-            entries: [{ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11' }],
+            schemaVersion: 'mediflow.reference-data.icd11-search-response.v3',
+            entries: [{ code: 'BA00', description: 'Essential hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' }],
             receipt: RECEIPT,
         });
     });
     const result = await client.search(' synthetic  hypertension ');
     assert.deepEqual(requests, ['/api/icd/proxy?q=synthetic%20hypertension']);
     assert.deepEqual(result, [{
-        code: 'BA00', description: 'Essential hypertension', system: 'ICD-11', isLegacy: false,
+        code: 'BA00', description: 'Essential hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11', isLegacy: false, sourceReference: WHO_CLOUD_REFERENCE,
     }]);
     assert.deepEqual(client.lastReceipt(), RECEIPT);
 });
@@ -47,18 +48,18 @@ test('rejects raw WHO, HTML-bearing, fallback and extra-key payloads', async () 
     const payloads = [
         { destinationEntities: [{ theCode: 'BA00', title: 'Hypertension' }] },
         {
-            schemaVersion: 'mediflow.reference-data.icd11-search-response.v1',
-            entries: [{ code: 'BA00', description: '<em>Hypertension</em>', system: 'ICD-11' }],
+            schemaVersion: 'mediflow.reference-data.icd11-search-response.v3',
+            entries: [{ code: 'BA00', description: '<em>Hypertension</em>', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' }],
             receipt: RECEIPT,
         },
         {
-            schemaVersion: 'mediflow.reference-data.icd11-search-response.v1',
-            entries: [{ code: 'N/A', description: 'Unknown', system: 'ICD-11' }],
+            schemaVersion: 'mediflow.reference-data.icd11-search-response.v3',
+            entries: [{ code: 'N/A', description: 'Unknown', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' }],
             receipt: RECEIPT,
         },
         {
-            schemaVersion: 'mediflow.reference-data.icd11-search-response.v1',
-            entries: [{ code: 'BA00', description: 'Hypertension', system: 'ICD-11', vendor: 'WHO' }],
+            schemaVersion: 'mediflow.reference-data.icd11-search-response.v3',
+            entries: [{ code: 'BA00', description: 'Hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11', vendor: 'WHO' }],
             receipt: RECEIPT,
         },
     ];

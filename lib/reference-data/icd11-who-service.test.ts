@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { WHO_CLOUD_REFERENCE } from './icd11-who-cloud-contract.ts';
 import test from 'node:test';
 import { createIcd11WhoReferenceDataService, ICD11_WHO_BINDING,
     Icd11WhoServiceError } from './icd11-who-service.ts';
@@ -27,11 +28,11 @@ test('cerca ICD-11 sul target WHO opaco con binding host-owned e audit PHI-safe'
             assert.equal(request.limit, 25);
             assert.equal(request.maxResponseBytes, 65_536);
             return Object.freeze({
-                schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+                schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
                 releaseId: '2026-01', language: 'en',
                 entries: Object.freeze([
-                    Object.freeze({ code: '5A11', description: 'Type 2 diabetes mellitus' }),
-                    Object.freeze({ code: '5A11.0', description: 'Type 2 diabetes mellitus without complications' }),
+                    Object.freeze({ code: '5A11', description: 'Type 2 diabetes mellitus', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }),
+                    Object.freeze({ code: '5A11.0', description: 'Type 2 diabetes mellitus without complications', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }),
                 ]),
             });
         },
@@ -39,12 +40,12 @@ test('cerca ICD-11 sul target WHO opaco con binding host-owned e audit PHI-safe'
 
     const result = await service.search({ query: '  type   2 diabetes mellitus  ' });
     assert.deepEqual(result.entries, [
-        { code: '5A11', description: 'Type 2 diabetes mellitus', system: 'ICD-11' },
-        { code: '5A11.0', description: 'Type 2 diabetes mellitus without complications', system: 'ICD-11' },
+        { code: '5A11', description: 'Type 2 diabetes mellitus', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' },
+        { code: '5A11.0', description: 'Type 2 diabetes mellitus without complications', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' },
     ]);
     assert.deepEqual(result.receipt, {
-        schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1',
-        operation: 'mediflow.reference_data.icd11.search.v1', releaseId: '2026-01', language: 'en',
+        ...WHO_CLOUD_REFERENCE, schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v3',
+        operation: 'mediflow.reference_data.icd11.search.v3', releaseId: '2026-01', language: 'en',
         source: 'live', resultCount: 2, latencyMs: 25, completedAt: '1970-01-01T00:00:01.025Z',
     });
     assert.deepEqual(audits, [result.receipt]);
@@ -58,9 +59,9 @@ test('riusa solo la cache RAM fresca quando rete, egress e credenziale sono chiu
         readRuntimeState: () => state, now: () => ticks.shift(), audit: async () => undefined,
         transport: async () => {
             calls += 1;
-            return { schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            return { schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
                 releaseId: '2026-01', language: 'en',
-                entries: [{ code: '1A00', description: 'Cholera' }] };
+                entries: [{ code: '1A00', description: 'Cholera', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }] };
         },
     });
     const live = await service.search({ query: 'cholera' });
@@ -110,7 +111,7 @@ test('dispose cancella le ricerche in corso e scarta completamenti tardivi', asy
     await Promise.resolve();
     service.dispose();
     assert.equal(signal?.aborted, true);
-    complete?.({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+    complete?.({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
         releaseId: '2026-01', language: 'en', entries: [] });
     await assert.rejects(pending,
         (error: unknown) => error instanceof Icd11WhoServiceError && error.code === 'request_cancelled');
@@ -138,7 +139,7 @@ test('nega dependency accessor senza invocare il getter ostile', () => {
     let getterCalls = 0;
     const dependencies = { readRuntimeState: () => ENABLED, now: () => 0, audit: async () => undefined } as Record<string, unknown>;
     Object.defineProperty(dependencies, 'transport', { enumerable: true, get() {
-        getterCalls += 1; return async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        getterCalls += 1; return async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [] });
     } });
     assert.throws(() => createIcd11WhoReferenceDataService(dependencies as never),
@@ -150,12 +151,12 @@ test('nega array e record transport ostili senza materializzare accessor', async
     let getterCalls = 0;
     const entries: unknown[] = [];
     Object.defineProperty(entries, '0', { enumerable: true, get() {
-        getterCalls += 1; return { code: '1A00', description: 'Cholera' };
+        getterCalls += 1; return { code: '1A00', description: 'Cholera', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' };
     } });
     Object.defineProperty(entries, 'length', { value: 1 });
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => 6_000, audit: async () => assert.fail('invalid response is not audited'),
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries }),
     });
     await assert.rejects(service.search({ query: 'synthetic hostile response' }),
@@ -166,8 +167,8 @@ test('nega array e record transport ostili senza materializzare accessor', async
 test('nega testo WHO non normalizzato prima di UI, audit e cache', async () => {
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => 7_000, audit: async () => assert.fail('invalid text is not audited'),
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
-            releaseId: '2026-01', language: 'en', entries: [{ code: '1A00', description: ' Cholera ' }] }),
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
+            releaseId: '2026-01', language: 'en', entries: [{ code: '1A00', description: ' Cholera ', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }] }),
     });
     await assert.rejects(service.search({ query: 'cholera' }),
         (error: unknown) => error instanceof Icd11WhoServiceError && error.code === 'response_invalid');
@@ -198,7 +199,7 @@ test('nega un runtime state Proxy revocato con il codice chiuso runtime_state_in
 });
 
 test('nega una risposta transport Proxy con il codice chiuso response_invalid', async () => {
-    const hostile = new Proxy({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+    const hostile = new Proxy({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
         releaseId: '2026-01', language: 'en', entries: [] }, {});
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => 7_750,
@@ -209,11 +210,11 @@ test('nega una risposta transport Proxy con il codice chiuso response_invalid', 
 });
 
 test('nega un array transport Proxy revocato con il codice chiuso response_invalid', async () => {
-    const hostile = Proxy.revocable([{ code: '1A00', description: 'Cholera' }], {}); hostile.revoke();
+    const hostile = Proxy.revocable([{ code: '1A00', description: 'Cholera', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }], {}); hostile.revoke();
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => 8_000,
         audit: async () => assert.fail('invalid response is not audited'),
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: hostile.proxy }),
     });
     await assert.rejects(service.search({ query: 'synthetic term' }),
@@ -227,7 +228,7 @@ test('dispose reentrant dal clock ferma la ricerca prima di runtime, transport e
         now: () => { service.dispose(); return 9_000; },
         audit: async () => { audits += 1; },
         transport: async () => { transportCalls += 1; return {
-            schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [],
         }; },
     });
@@ -242,7 +243,7 @@ test('dispose reentrant dal runtime state ferma la ricerca prima di transport e 
         readRuntimeState: () => { service.dispose(); return ENABLED; }, now: () => 10_000,
         audit: async () => { audits += 1; },
         transport: async () => { transportCalls += 1; return {
-            schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [],
         }; },
     });
@@ -257,7 +258,7 @@ test('dispose reentrant dal clock di completamento ferma audit e risultato', asy
         readRuntimeState: () => ENABLED,
         now: () => { clockReads += 1; if (clockReads === 2) service.dispose(); return 10_500 + clockReads; },
         audit: async () => { audits += 1; },
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [] }),
     });
     await assert.rejects(service.search({ query: 'synthetic term' }),
@@ -270,8 +271,8 @@ test('dispose reentrant da audit nega la pubblicazione del risultato', async () 
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => ticks.shift(),
         audit: async () => { audits += 1; await Promise.resolve(); service.dispose(); },
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
-            releaseId: '2026-01', language: 'en', entries: [{ code: '1A00', description: 'Cholera' }] }),
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
+            releaseId: '2026-01', language: 'en', entries: [{ code: '1A00', description: 'Cholera', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }] }),
     });
     await assert.rejects(service.search({ query: 'synthetic term' }),
         (error: unknown) => error instanceof Icd11WhoServiceError && error.code === 'service_disposed');
@@ -284,7 +285,7 @@ test('dispose reentrant dal transport nega audit e risultato senza rejection sfu
         readRuntimeState: () => ENABLED, now: () => 11_500,
         audit: async () => { audits += 1; },
         transport: () => { service.dispose(); return {
-            schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [],
         }; },
     });
@@ -315,7 +316,7 @@ test('nega bounded un audit che non completa', async (context) => {
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => 13_000,
         audit: async () => { enteredAudit(); await new Promise(() => undefined); },
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [] }),
     });
     const pending = service.search({ query: 'synthetic term' });
@@ -334,7 +335,7 @@ test('dispose durante un audit pending nega subito la pubblicazione', async () =
     const service = createIcd11WhoReferenceDataService({
         readRuntimeState: () => ENABLED, now: () => 13_500,
         audit: async () => { enteredAudit(); await new Promise(() => undefined); },
-        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+        transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
             releaseId: '2026-01', language: 'en', entries: [] }),
     });
     const pending = service.search({ query: 'synthetic term' });
@@ -358,7 +359,7 @@ test('nega risultati audit sync, async e thenable non conformi senza osservare a
         const service = createIcd11WhoReferenceDataService({
             readRuntimeState: () => ENABLED, now: () => 14_000,
             audit: (() => auditResult) as unknown as () => void,
-            transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1',
+            transport: async () => ({ schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2', bindingId: WHO_CLOUD_REFERENCE.bindingId,
                 releaseId: '2026-01', language: 'en', entries: [] }),
         });
         await assert.rejects(service.search({ query: 'synthetic term' }),

@@ -5,6 +5,50 @@ Status: Accepted
 
 Amendment: 2026-09-06, WUL-672, candidato locale da `07725c7`.
 
+## Amendment WUL-631 — identità nel DTO Search cloud, source-only (2026-09-30)
+
+Owner: [WUL-631](https://linear.app/wulfgardr/issue/WUL-631), con input
+WUL-744/WUL-738 e riuso delle issue GitHub #306/#337. Questo incremento non
+chiude i journey provider o la migrazione runtime: il factory canonico resta
+locale, senza nuova attivazione, OAuth, credenziale, egress o chiamata WHO.
+
+Il vecchio parser cloud scartava `ISimpleEntity.id` e il servizio ammetteva
+solo codice/descrizione. Il transport result cloud v2 ora richiede
+`canonicalUri` e `bindingId`; risposta e receipt Search cloud v3 conservano
+codice, titolo originale in `description`, URI e attribuzione. Il consumer
+aggiunge a ogni risultato una `sourceReference` data-only con API version, release,
+linearizzazione, lingua, binding e attribuzione. Il DTO locale v2, readiness
+cloud v1 e le API native paired restano invariati (`no contract impact` su
+`/api/v1`). Le risposte cloud v1 prive di identità sono incompatibili e vengono
+rifiutate; produttore HTTP e consumer v3 vanno distribuiti insieme. Non si
+retrocede automaticamente a v1 e non si fabbrica un URI da codice/titolo.
+
+Il binding descrive la richiesta host-owned già fissata (`v2`, `2026-01`,
+`mms`, `en`), non una dichiarazione indipendente di release/lingua restituita
+dal corpo Search. Lo Swagger WHO identifica `id` come URI, `title` come titolo
+e `theCode` come codice: si conserva il valore originale, con highlighting
+già disabilitato dal transport. Questo non prova stabilità del titolo tra
+release, traduzione italiana, qualità clinica o disponibilità live.
+URI mancanti, malformati, estranei a WHO/MMS o di altra release falliscono
+chiusi prima di audit/cache/output. Identità postcoordinate non espresse come
+un singolo URI valido non vengono ricostruite: la qualifica Search/CodeInfo
+completa resta un incremento separato.
+
+La `sourceReference` rende disponibili fonte, versione e attribuzione insieme al
+risultato originale per i consumer; gli incrementi di UI/native/packaging
+restano separati. Nessuna selezione, scrittura clinica, mutazione di pazienti
+o applicazione retroattiva degli aggiornamenti dei cataloghi è introdotta.
+La reference clinica locale con digest non viene estesa al cloud: questo
+incremento non ammette il DTO Search cloud nel writer di diagnosi.
+Le fixture sono inventate e il trasporto è simulato, senza account WHO.
+
+Fonti primarie rilette il 2026-09-30:
+[Swagger WHO v2](https://id.who.int/swagger/v2/swagger.json), schemi
+`ISimpleEntity`/`ISearchResult`, e
+[licenza WHO](https://icd.who.int/en/docs/icd11-license.pdf), §§1.2.2–1.2.3
+e 1.3 (codice/titolo/URI e attribuzione). Questo emendamento documenta il
+contratto tecnico, senza attestare accettazione legale o qualifica clinica.
+
 ## Amendment WUL-673 — consultazione WHO paired nell'app Mac (2026-09-12)
 
 Run `e25d456b66df489786a4e27d63f1966b`, base

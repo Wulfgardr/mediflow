@@ -1,6 +1,6 @@
 /* @Codex */
 import { ICD11_WHO_BINDING, Icd11WhoServiceError, type Icd11WhoServiceErrorCode } from './icd11-who-service.ts';
-import { parseIcd11WhoOfficialSearchBody } from './icd11-who-official-search-parser.ts';
+import { parseIcd11WhoOfficialSearchFields } from './icd11-who-official-search-parser.ts';
 import { isWhoArtifactDigest, resolveWhoSearchReference, WHO_LOCAL_BINDING_ID, WHO_LOCAL_TTL_MS,
     type WhoLocalEntry, type WhoLocalReceipt, type WhoLocalReadiness, type WhoLocalSearchResult } from './icd11-who-local-contract.ts';
 import { isWhoCheckCode, parseWhoCodeCheckResult, WHO_CODE_CHECK_SCHEMA, type WhoCodeCheckReceipt, type WhoCodeCheckResult } from './icd11-who-code-check-contract';
@@ -51,7 +51,7 @@ function parseResponse(response: Awaited<ReturnType<WhoLocalTransport>>) {
     // omitted entries, without widening the historical parser's output contract.
     for (let offset = 0; offset < Math.max(raw.destinationEntities.length, 1); offset += ICD11_WHO_BINDING.resultLimit) {
         const batch = raw.destinationEntities.slice(offset, offset + ICD11_WHO_BINDING.resultLimit);
-        const checked = parseIcd11WhoOfficialSearchBody(JSON.stringify({ ...raw, destinationEntities: batch }));
+        const checked = parseIcd11WhoOfficialSearchFields(JSON.stringify({ ...raw, destinationEntities: batch }));
         if (!checked) throw new Icd11WhoServiceError('response_invalid');
         for (const [index, entry] of checked.entries.entries()) {
             const uri = resolveWhoSearchReference(batch[index]?.id, entry.code);
