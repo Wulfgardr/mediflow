@@ -1,3 +1,4 @@
+import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
@@ -79,7 +80,9 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const rawBody = await request.json();
+        const envelope = await readCheckupJsonObject(request);
+        if (!envelope.ok) return envelope.response;
+        const rawBody = envelope.body;
         const parsedBody = parseApiBody(checkupCreateSchema, rawBody);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
