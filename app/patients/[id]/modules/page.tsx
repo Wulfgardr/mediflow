@@ -583,8 +583,16 @@ export default function PatientDetailPage() {
             if (!confirmed) return null;
         }
 
-        const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
-        const bundle = await generatePatientBundle(id);
+        const { generatePatientBundle, buildFhirDiagnosisWarningMessage } = await import('@/lib/fhir/bundle-generator');
+        const bundle = await generatePatientBundle(id, async (warnings) => {
+            const { confirmed } = await confirm({
+                title: 'Diagnosi esportate senza codifica',
+                message: buildFhirDiagnosisWarningMessage(warnings),
+                confirmLabel: 'Esporta comunque',
+            });
+            return confirmed;
+        });
+        if (!bundle) return null;
         const jsonString = JSON.stringify(bundle, null, 2);
         const fileName = `patient-${patient.lastName}-${patient.firstName}-fhir.json`;
         return { file: new File([jsonString], fileName, { type: 'application/json' }) };
