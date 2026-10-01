@@ -150,7 +150,7 @@ rilevato un solo conflitto testuale in:
 
 - `lib/patient-json-envelope.test.ts`
 
-La risoluzione conserva tutte le 12 dichiarazioni di test e le 22 assertion di
+La risoluzione conserva tutte le 12 dichiarazioni di test e tutte le assertion di
 PR 372, aggiunge autorità di rete sintetica reale ai casi paired e inoltra gli
 header soltanto alle richieste network. Il primo run ha isolato sei casi validi
 al limite privi dell’autorità richiesta; il run corretto ha chiuso 286/286.
