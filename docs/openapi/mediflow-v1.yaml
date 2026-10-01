@@ -39,15 +39,19 @@ info:
     also limits admission to one operation per module instance and body reading
     to a total 30-second deadline (ADR 0124).
     ADR 0141 proposes a NEW inclusive 4194304-byte UTF-8 JSON body limit for
-    ordinary local POST /api/v1/patients/{id}/checkups and PUT
+    ordinary local POST /api/v1/patients/{id}/checkups and PUT/DELETE
     /api/v1/patients/{id}/checkups/{checkupId}, after existing token/admission
-    gates. Malformed, null, array, scalar, failed stream or body-read abort
+    gates. Malformed, null, array, scalar, failed/locked stream or body-read abort
     returns 400 with error "Invalid JSON body"; oversize returns 413 with error
     "JSON payload too large" and code JSON_BODY_TOO_LARGE. Request.json UTF-8
     replacement and last duplicate key semantics are retained. No field is
     truncated; this restricts historically unbounded local bodies. These two
-    operations remain outside the stable published slice under contract-policy;
-    local DELETE and paired checkup POST/PUT are unchanged.
+    operations remain outside the stable published slice under contract-policy.
+    DELETE retains its optional-body contract: absent/zero-byte/trim-whitespace
+    bodies become an empty object and return 400 "Version is required".
+    Existing tombstone fields/defaults, validation order, CAS and required audit
+    remain unchanged. POST/PUT still reject empty bodies. Paired checkup
+    POST/PUT are unchanged; this does not complete WUL-720.
 servers:
   - url: https://127.0.0.1:3443
     description: Local HTTPS endpoint for native clients via TLS proxy.

@@ -51,14 +51,14 @@ test.after(() => {
 });
 
 type Surface = 'web' | 'v1';
-type Operation = 'POST' | 'PUT';
+type Operation = 'POST' | 'PUT' | 'DELETE';
 const ids = { patientId: 'synthetic-envelope-patient', checkupId: 'synthetic-envelope-checkup' };
 function reset(operation: Operation) {
     sql.exec('DELETE FROM checkups; DELETE FROM patients_to_ambulatories; DELETE FROM patients; DELETE FROM ambulatories;');
     dbServer.insert(ambulatories).values({ id: 'synthetic-envelope-ambulatory', name: 'Synthetic', type: 'live' }).run();
     dbServer.insert(patients).values({ id: ids.patientId, firstName: 'Synthetic', lastName: 'Patient', taxCode: 'SYNTHETICENVELOPE', version: 7 }).run();
     dbServer.insert(patientsToAmbulatories).values({ patientId: ids.patientId, ambulatoryId: 'synthetic-envelope-ambulatory' }).run();
-    if (operation === 'PUT') dbServer.insert(checkups).values({ id: ids.checkupId, patientId: ids.patientId,
+    if (operation !== 'POST') dbServer.insert(checkups).values({ id: ids.checkupId, patientId: ids.patientId,
         date: new Date('2026-01-01T00:00:00Z'), title: 'Before', notes: 'ENC:synthetic:before', status: 'pending', source: 'manual', version: 3 }).run();
     state.web = true; state.v1 = true; state.events = [];
 }
@@ -73,7 +73,8 @@ function validBody(surface: Surface, operation: Operation) {
     return operation === 'POST'
         ? { id: ids.checkupId, ...(surface === 'web' ? { patientId: ids.patientId } : {}), date: '2026-05-02T09:00:00.000Z',
             title: 'Synthetic checkup', notes: 'ENC:synthetic:notes', status: 'pending', source: 'manual' }
-        : { version: 3, title: 'Synthetic update', notes: 'ENC:synthetic:notes' };
+        : operation === 'DELETE' ? { version: 3 }
+            : { version: 3, title: 'Synthetic update', notes: 'ENC:synthetic:notes' };
 }
 function request(operation: Operation, body?: string | Uint8Array | ReadableStream<Uint8Array>, headers: Record<string, string> = {}, signal?: AbortSignal) {
     const init = { method: operation, body, signal, headers: { 'content-type': 'application/json', ...headers },
@@ -82,9 +83,9 @@ function request(operation: Operation, body?: string | Uint8Array | ReadableStre
 }
 async function invoke(surface: Surface, operation: Operation, req: Request, missing = false) {
     if (surface === 'web') return operation === 'POST' ? webCreate.POST(req)
-        : webItem.PUT(req, { params: Promise.resolve({ id: missing ? 'synthetic-missing' : ids.checkupId }) });
+        : webItem[operation](req, { params: Promise.resolve({ id: missing ? 'synthetic-missing' : ids.checkupId }) });
     return operation === 'POST' ? v1Create.POST(req, { params: Promise.resolve({ id: ids.patientId }) })
-        : v1Item.PUT(req, { params: Promise.resolve({ id: ids.patientId, checkupId: missing ? 'synthetic-missing' : ids.checkupId }) });
+        : v1Item[operation](req, { params: Promise.resolve({ id: ids.patientId, checkupId: missing ? 'synthetic-missing' : ids.checkupId }) });
 }
 const invalidResponse = { error: 'Invalid JSON body' };
 const largeResponse = { error: 'JSON payload too large', code: 'JSON_BODY_TOO_LARGE' };
@@ -115,13 +116,17 @@ function padded(body: Record<string, unknown>, size: number, multibyte: boolean)
     return { text, notes };
 }
 
-for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', 'PUT'] as const) {
-    for (const [name, raw] of [['malformed', '{'], ['empty', ''], ['null', 'null'], ['array', '[]'],
+for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', 'PUT', 'DELETE'] as const) {
+    for (const [name, raw] of [['malformed', '{'], ...(operation === 'DELETE' ? [] : [['empty', '']]), ['null', 'null'], ['array', '[]'],
         ['string', '"x"'], ['number', '42'], ['boolean', 'true']] as const) test(`${surface} ${operation}: ${name} is 400 without SQLite effects`, async () => {
         reset(operation); await denied(surface, operation, name, request(operation, raw));
     });
     test(`${surface} ${operation}: no body is 400 without effects`, async () => {
-        reset(operation); await denied(surface, operation, 'absent-body', request(operation));
+        reset(operation);
+        if (operation !== 'DELETE') return denied(surface, operation, 'absent-body', request(operation));
+        const before = snapshot(); const response = await invoke(surface, operation, request(operation));
+        assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: 'Version is required' });
+        assert.deepEqual(snapshot(), before);
     });
     for (const multibyte of [false, true]) for (const size of [CAP - 1, CAP]) test(`${surface} ${operation}: ${multibyte ? 'multibyte' : 'ASCII'} ${size} bytes admitted unchanged`, async () => {
         reset(operation);
@@ -131,11 +136,18 @@ for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', '
         const response = await invoke(surface, operation, request(operation, stream.body, { 'content-length': 'invalid' }));
         assert.equal(response.status, operation === 'POST' ? 201 : 200);
         const after = snapshot();
-        assert.equal(after.checkups[0].notes, notes);
+        assert.equal(after.checkups[0].notes, operation === 'DELETE' ? before.checkups[0].notes : notes);
         assert.equal(after.checkups[0].version, operation === 'POST' ? 1 : 4);
         assert.equal(after.checkups[0].status, 'pending');
         assert.equal(after.checkups[0].date, operation === 'POST' ? Date.parse('2026-05-02T09:00:00.000Z') / 1000 : before.checkups[0].date);
         assert.equal(after.audit_events.length, before.audit_events.length + 1);
+        if (operation === 'DELETE') {
+            assert.deepEqual(await response.json(), { success: true });
+            assert.equal(after.checkups[0].title, before.checkups[0].title);
+            assert.equal(after.checkups[0].deletion_reason, surface === 'web' ? 'web-delete' : 'api-v1-delete');
+            assert.ok(after.checkups[0].deleted_at);
+            assert.equal(after.audit_events.at(-1)!.event_type, 'checkup.deleted');
+        }
         assert.deepEqual(after.patients, before.patients); assert.deepEqual(after.patients_to_ambulatories, before.patients_to_ambulatories);
         assert.equal(stream.body.locked, false); assert.equal(stream.counts().cancels, 0);
         records.push({ name: `${surface}-${operation}-${size}-${multibyte}`, status: response.status, unchanged: false });
@@ -194,7 +206,8 @@ for (const surface of ['web', 'v1'] as const) for (const operation of ['POST', '
         const bytes = new TextEncoder().encode(raw); bytes[raw.indexOf('replacement-X') + 'replacement-'.length] = 0xff;
         const response = await invoke(surface, operation, request(operation, bytes));
         assert.equal(response.status, operation === 'POST' ? 201 : 200);
-        const after = snapshot(); assert.equal(after.checkups[0].title, 'last'); assert.equal(after.checkups[0].notes, 'ENC:replacement-�');
+        const after = snapshot(); assert.equal(after.checkups[0].title, operation === 'DELETE' ? 'Before' : 'last');
+        assert.equal(after.checkups[0].notes, operation === 'DELETE' ? 'ENC:synthetic:before' : 'ENC:replacement-�');
         assert.equal(after.audit_events.length, before.audit_events.length + 1);
     });
 }
@@ -207,6 +220,52 @@ for (const surface of ['web', 'v1'] as const) test(`${surface} PUT preserves ver
     assert.equal(conflict.status, 409); assert.equal((await conflict.json()).code, 'VERSION_CONFLICT');
     assert.deepEqual(snapshot(), before);
 });
+for (const surface of ['web', 'v1'] as const) {
+    test(`${surface} DELETE empty/trim whitespace reaches missing-version validation with zero effects`, async () => {
+        reset('DELETE'); const before = snapshot();
+        for (const raw of ['', ' \r\n\t', '\u00a0\uFEFF']) {
+            const response = await invoke(surface, 'DELETE', request('DELETE', raw));
+            assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: 'Version is required' });
+            assert.deepEqual(snapshot(), before);
+        }
+    });
+    test(`${surface} DELETE retains tombstone/field/version/404/CAS precedence`, async () => {
+        reset('DELETE'); const before = snapshot();
+        for (const [raw, missing, status, error] of [
+            ['{"deletedAt":null,"deletionReason":123}', true, 400, 'Invalid deletedAt'],
+            ['{"deletionReason":"  "}', true, 400, 'Invalid deletionReason'],
+            ['{"deletedAt":"not-a-date"}', true, 400, 'Version is required'],
+            ['{"version":3,"deletedAt":"not-a-date"}', true, 400, 'Invalid deletedAt'],
+            ['{"version":3}', true, 404, 'Not found'],
+            ['{"version":2}', false, 409, 'Conflict'],
+        ] as const) {
+            const response = await invoke(surface, 'DELETE', request('DELETE', raw), missing);
+            assert.equal(response.status, status); const json = await response.json(); assert.equal(json.error, error);
+            if (status === 409) assert.equal(json.code, 'VERSION_CONFLICT');
+            assert.deepEqual(snapshot(), before);
+        }
+    });
+    test(`${surface} DELETE preserves custom tombstone, replacement UTF8 and last duplicate values`, async () => {
+        reset('DELETE'); const before = snapshot();
+        const raw = '{"version":2,"version":3,"deletedAt":"2026-05-02T12:00:00.000Z",'
+            + '"deletionReason":"first","deletionReason":"  replacement-X  ","future":true,'
+            + '"__proto__":{"deletedAt":null}}';
+        const bytes = new TextEncoder().encode(raw); bytes[raw.indexOf('replacement-X') + 'replacement-'.length] = 0xff;
+        const response = await invoke(surface, 'DELETE', request('DELETE', bytes));
+        assert.equal(response.status, 200); assert.deepEqual(await response.json(), { success: true });
+        const after = snapshot(); assert.equal(after.checkups[0].deleted_at, Date.parse('2026-05-02T12:00:00.000Z') / 1000);
+        assert.equal(after.checkups[0].deletion_reason, 'replacement-�'); assert.equal(after.checkups[0].version, 4);
+        assert.equal(after.checkups[0].title, before.checkups[0].title); assert.equal(after.checkups[0].notes, before.checkups[0].notes);
+        assert.deepEqual(after.patients, before.patients); assert.deepEqual(after.patients_to_ambulatories, before.patients_to_ambulatories);
+        assert.equal(after.audit_events.length, before.audit_events.length + 1);
+    });
+    test(`${surface} DELETE counts ignored escaped fields and whitespace toward the cap`, async () => {
+        reset('DELETE');
+        const escaped = '{"version":3,"future":"' + '\\u0061'.repeat(Math.ceil(CAP / 6)) + '"}';
+        await denied(surface, 'DELETE', 'escaped-overflow', request('DELETE', escaped), 413);
+        await denied(surface, 'DELETE', 'whitespace-overflow', request('DELETE', ' '.repeat(CAP + 1)), 413);
+    });
+}
 test('helper returns an object with own __proto__ and unknown keys without whitelist/repair', async () => {
     const result = await readCheckupJsonObject(request('POST', '{"__proto__":{"synthetic":true},"future":2}'));
     assert.equal(result.ok, true);

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
@@ -45,7 +46,7 @@ async function send(method, url, headers, raw, chunked = false) {
     return { response, json };
 }
 
-test('four local checkup POST/PUT paths enforce the new object/byte boundary over HTTP', async () => {
+test('six local checkup POST/PUT/DELETE paths enforce their object/byte contracts over HTTP', async () => {
     const login = await loginWithWebAuthControl(base, { username: process.env.E2E_USERNAME || 'admin', password: process.env.E2E_PIN || '1234' });
     assert.equal(login.response.status, 200);
     const ambResponse = await fetch(`${base}/api/v1/ambulatories`, { headers: localHeaders });
@@ -98,5 +99,62 @@ test('four local checkup POST/PUT paths enforce the new object/byte boundary ove
                 assert.equal(snapshot(), before);
             }
         }
+        for (const [name, raw, expected, error, chunked] of [
+            ['absent', undefined, 400, 'Version is required', false],
+            ['empty', '', 400, 'Version is required', false],
+            ['trim-whitespace', '\u00a0\uFEFF \r\n', 400, 'Version is required', false],
+            ['malformed', '{', 400, 'Invalid JSON body', false],
+            ['null', 'null', 400, 'Invalid JSON body', false],
+            ['array', '[]', 400, 'Invalid JSON body', false],
+            ['scalar', '42', 400, 'Invalid JSON body', false],
+            ['oversize-declared', notesBody({ version: 2 }, cap + 1), 413, 'JSON payload too large', false],
+            ['oversize-chunked', notesBody({ version: 2 }, cap + 1), 413, 'JSON payload too large', true],
+            ['invalid-tombstone', '{"deletedAt":null}', 400, 'Invalid deletedAt', false],
+            ['stale-version', '{"version":1}', 409, 'Conflict', false],
+        ]) {
+            const before = snapshot();
+            const { response, json } = await send('DELETE', item, headers, raw, chunked);
+            assert.equal(response.status, expected, `${surface} DELETE ${name}`);
+            if (expected === 413) assert.deepEqual(json, { error, code: 'JSON_BODY_TOO_LARGE' });
+            else if (expected === 409) assert.equal(json.code, 'VERSION_CONFLICT');
+            else assert.deepEqual(json, { error });
+            assert.equal(snapshot(), before, `${surface} DELETE ${name}: independent SQLite unchanged`);
+            records.push({ surface, operation: 'DELETE', name, status: response.status, unchanged: true });
+        }
+        const beforeUnauthorized = snapshot();
+        assert.equal((await send('DELETE', item, { 'Content-Type': 'application/json' }, notesBody({ version: 2 }, cap + 1))).response.status, 401);
+        assert.equal(snapshot(), beforeUnauthorized);
+
+        // A client disconnect has no observable HTTP response. Assert SQLite after
+        // the pending body read is interrupted; route-level tests assert its 400.
+        const beforeAbort = snapshot();
+        await new Promise((resolve, reject) => {
+            const req = http.request(new URL(`${base}${item}`), { method: 'DELETE', headers: { ...headers, 'Transfer-Encoding': 'chunked' } }, () => reject(new Error('incomplete body responded before disconnect')));
+            req.on('error', error => { if (error.code !== 'ECONNRESET') reject(error); });
+            req.on('close', resolve);
+            req.flushHeaders(); req.write('{"version":2,');
+            setTimeout(() => req.destroy(), 150);
+        });
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const afterAbort = await fetch(`${base}/api/v1/patients/${patientId}/checkups/${checkupId}`, { headers: localHeaders });
+        assert.equal(afterAbort.status, 200); assert.equal((await afterAbort.json()).version, 2);
+        assert.equal(snapshot(), beforeAbort);
+        records.push({ surface, operation: 'DELETE', name: 'pending-body-client-disconnect', responseObservable: false, unchanged: true });
+
+        const beforeDelete = snapshot();
+        const acceptedDelete = await send('DELETE', item, headers, notesBody({ version: 2 }, cap), true);
+        assert.equal(acceptedDelete.response.status, 200); assert.deepEqual(acceptedDelete.json, { success: true });
+        const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true });
+        try {
+            const row = db.prepare('SELECT * FROM checkups WHERE id=?').get(checkupId);
+            assert.equal(row.version, 3); assert.ok(row.deleted_at);
+            assert.equal(row.deletion_reason, surface === 'web' ? 'web-delete' : 'api-v1-delete');
+            assert.equal(row.title, 'Synthetic update');
+            assert.equal(row.notes, JSON.parse(notesBody({ version: 1, title: 'Synthetic update', notes: 'ENC:synthetic:notes' }, cap)).notes);
+            const events = db.prepare("SELECT * FROM audit_events WHERE subject_type='checkup' AND subject_ref=? AND event_type='checkup.deleted'").all(checkupId);
+            assert.equal(events.length, 1);
+        } finally { db.close(); }
+        assert.notEqual(snapshot(), beforeDelete);
+        records.push({ surface, operation: 'DELETE', name: 'inclusive-cap-multibyte-chunked', status: 200, auditCount: 1 });
     }
 });
