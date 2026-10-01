@@ -1,7 +1,9 @@
 # Local review proposal only. No workflow has been published or dispatched.
 name: PR383 first Windows PDF render diagnostic
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - diagnostic/pr383-windows-first-cold-render-20261001
 permissions:
   contents: read
 concurrency:
