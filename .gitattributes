@@ -6,3 +6,5 @@ scripts/apple-vision-ocr.swift text eol=lf
 
 scripts/anydoc-tesseract-artifacts.json text eol=lf
 scripts/anydoc-pdf-renderer-profiles.json text eol=lf
+
+.diagnostics/pr365/*.mjs text eol=lf
