@@ -70,7 +70,7 @@
         "POST"
       ],
       "trackingIssue": "WUL-40",
-      "reason": "Checkup endpoints are intentionally excluded from the current stable OpenAPI slice while parity work is still open. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted."
+      "reason": "Checkup endpoints are intentionally excluded from the current stable OpenAPI slice while parity work is still open. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted. ADR0141 / WUL-720: ordinary local POST introduces a NEW inclusive 4194304-byte serialized UTF-8 JSON body cap (413 JSON_BODY_TOO_LARGE); malformed/null/array/scalar/failed-stream/body-read-abort envelopes return 400 Invalid JSON body after admission. Request.json replacement UTF-8 and last duplicate key semantics, fields and atomic audit remain unchanged."
     },
     {
       "path": "/api/v1/patients/{id}/checkups/{checkupId}",
@@ -80,7 +80,7 @@
         "DELETE"
       ],
       "trackingIssue": "WUL-40",
-      "reason": "Checkup detail mutations remain outside the stable documented slice pending follow-up contract expansion. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting."
+      "reason": "Checkup detail mutations remain outside the stable documented slice pending follow-up contract expansion. WUL-308: PUT and DELETE require version and return 409 VERSION_CONFLICT on stale versions; DELETE soft-deletes via deletedAt/deletionReason instead of hard-deleting. ADR0141 / WUL-720: ordinary local PUT introduces a NEW inclusive 4194304-byte serialized UTF-8 JSON body cap (413 JSON_BODY_TOO_LARGE); malformed/null/array/scalar/failed-stream/body-read-abort envelopes return 400 Invalid JSON body after admission. Existing version/404-before-field-validation ordering, normalizers and atomic audit remain unchanged. Ordinary local DELETE now shares the cap/413 and invalid-envelope 400 contract, with explicit empty-object opt-in: absent/zero-byte/trim-whitespace bodies still reach 400 Version is required. DELETE preserves parser-field then version then tombstone-normalization then lookup/404 order, fresh date and web/v1 reason defaults, trimming/own-property handling, replacement UTF-8 and last-duplicate-key semantics. POST/PUT empty rejection and paired controls remain unchanged; the cap is a new compatibility restriction, not WUL-720 closure."
     },
     {
       "path": "/api/v1/patients/{id}/therapies",
