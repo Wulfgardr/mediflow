@@ -127,7 +127,8 @@ export async function DELETE(
         // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
         const parsedBody = await parseClinicalDeleteBody(request);
         if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+            return NextResponse.json({ error: parsedBody.error,
+                ...(parsedBody.code ? { code: parsedBody.code } : {}) }, { status: parsedBody.status ?? 400 });
         }
         const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
         if (expectedVersion === null) {
