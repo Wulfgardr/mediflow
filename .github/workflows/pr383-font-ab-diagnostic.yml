@@ -1,0 +1,130 @@
+name: PR383 Windows font A/B diagnostic (nonqualifying)
+on:
+  push:
+    branches:
+      - diagnostic/pr383-windows-font-ab-20261001
+permissions:
+  contents: read
+concurrency:
+  group: pr383-windows-font-ab-20261001
+  cancel-in-progress: false
+jobs:
+  diagnostic:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/diagnostic/pr383-windows-font-ab-20261001' && github.event.created == true && github.run_attempt == 1 }}
+    runs-on: windows-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      MEDIFLOW_NEXT_DIST_DIR: .next
+    steps:
+      - name: Check out this exact diagnostic push
+        timeout-minutes: 2
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: diagnostic-source
+      - name: Check out the frozen PR383 merge candidate
+        timeout-minutes: 2
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: eb701348f3a01ccf5051fe3d8a51de1082ef751d
+          persist-credentials: false
+          fetch-depth: 1
+          path: candidate
+      - name: Select exact supported Node
+        timeout-minutes: 3
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+      - name: Guard creation push, source pins, candidate and fresh output
+        timeout-minutes: 1
+        run: |
+          node diagnostic-source/.diagnostics/font-ab-activation/activation.mjs prepare candidate receipts
+          if ($LASTEXITCODE -ne 0) { throw 'Activation preflight failed' }
+          $fontSyntheticDir = Join-Path $env:RUNNER_TEMP 'mediflow-pr383-font-ab-synthetic'
+          if (Test-Path $fontSyntheticDir) { throw 'Synthetic data directory already exists' }
+          New-Item -ItemType Directory $fontSyntheticDir | Out-Null
+          "MEDIFLOW_DATA_DIR=$fontSyntheticDir" >> $env:GITHUB_ENV
+      - name: Install the exact lockfile without browser downloads
+        timeout-minutes: 8
+        working-directory: candidate
+        run: |
+          npm ci
+          $fontInstallExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs record ../receipts install $fontInstallExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain install exit' }
+          exit $fontInstallExit
+      - name: Claim and compile once without a postbuild renderer
+        timeout-minutes: 12
+        working-directory: candidate
+        run: |
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs begin-compile . ../receipts
+          if ($LASTEXITCODE -ne 0) { throw 'Fresh compilation claim failed' }
+          npm run prebuild
+          $fontPrebuildExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs record ../receipts prebuild $fontPrebuildExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain prebuild exit' }
+          if ($fontPrebuildExit -ne 0) { exit $fontPrebuildExit }
+          npm --ignore-scripts run build
+          $fontCompileExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs record ../receipts compile $fontCompileExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain compilation exit' }
+          exit $fontCompileExit
+      - name: Write original runtime manifest and seal the selected compiled output
+        timeout-minutes: 2
+        working-directory: candidate
+        run: |
+          node scripts/node-runtime-contract.mjs write-standalone-manifest
+          $fontManifestExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs record ../receipts manifest $fontManifestExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain manifest exit' }
+          if ($fontManifestExit -ne 0) { exit $fontManifestExit }
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs seal . ../receipts
+          $fontSealExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/font-ab-activation/activation.mjs record ../receipts seal $fontSealExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain seal exit' }
+          exit $fontSealExit
+      - name: Observe exactly the bounded sixteen fresh renders
+        timeout-minutes: 14
+        run: |
+          node diagnostic-source/.diagnostics/font-ab-activation/activation.mjs claim candidate receipts
+          if ($LASTEXITCODE -ne 0) { throw 'Observation claim failed' }
+          node diagnostic-source/.diagnostics/font-ab/run-ab.mjs observe-windows candidate candidate/.next/standalone/scripts/anydoc-pdf-page-worker.mjs receipts/observation
+          $fontObservationExit = $LASTEXITCODE
+          node diagnostic-source/.diagnostics/font-ab-activation/activation.mjs record receipts observation $fontObservationExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain observation exit' }
+          # The reviewed harness always exits 1; diagnostics never green a gate.
+          exit 1
+      - name: Collect bounded raw and partial receipts after any outcome
+        if: ${{ always() }}
+        timeout-minutes: 1
+        run: |
+          if (Test-Path diagnostic-source/.diagnostics/font-ab-activation/activation.mjs) {
+            node diagnostic-source/.diagnostics/font-ab-activation/activation.mjs collect receipts upload
+            exit $LASTEXITCODE
+          }
+          New-Item -ItemType Directory -Force upload | Out-Null
+          @{ state = 'activation-source-unavailable'; evidenceLoss = $true; releaseQualified = $false; originalSmokePassed = $false } | ConvertTo-Json | Set-Content upload/retention.json
+          exit 1
+      - name: Retain synthetic raw output and receipts
+        if: ${{ always() }}
+        timeout-minutes: 3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr383-font-ab-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: upload/**
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: false
+      - name: Enforce nonqualification even after collection
+        if: ${{ always() }}
+        timeout-minutes: 1
+        run: exit 1

@@ -1,0 +1,5 @@
+# Frozen assets and probe hashes must survive Windows checkouts byte for byte.
+* -text
+fixtures/*.pdf binary
+fonts/*.ttf binary
+oracles/*.png binary

@@ -8,3 +8,5 @@ scripts/anydoc-tesseract-artifacts.json text eol=lf
 scripts/anydoc-pdf-renderer-profiles.json text eol=lf
 
 .diagnostics/cold-pdf/*.mjs text eol=lf
+
+.github/workflows/pr383-font-ab-diagnostic.yml text eol=lf

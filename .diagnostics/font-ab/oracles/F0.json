@@ -1,0 +1,20 @@
+{
+  "id": "F0",
+  "width": 144,
+  "height": 72,
+  "referenceKind": "exact blank source",
+  "engine": "MuPDF 1.28.4; independent from PDF.js/canvas",
+  "referencePngSHA256": "1489a6b970be5e0f9ef25b800efc4f5de59fc3e00f0325a42733f05a91c64d5e",
+  "referenceRGBASHA256": "f540aa309321b35c96510d662730bec7cb5fe814b970474178c30d9de889c291",
+  "glyphs": [],
+  "thresholds": {
+    "inkLuminance": 128,
+    "dilationRadiusPx": 1,
+    "minimumPrecision": 0.96,
+    "minimumRecall": 0.96,
+    "minimumAreaRatio": 0.8,
+    "maximumAreaRatio": 1.25,
+    "bboxTolerancePx": 2
+  },
+  "releaseQualifying": false
+}
