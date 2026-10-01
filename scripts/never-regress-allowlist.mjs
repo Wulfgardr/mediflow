@@ -277,6 +277,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^const stemUri = 'http://id\\.who\\.int/icd/release/11/2026-01/mms/123456789';$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
+        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^            codeInfoResourceUri: `http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/\\$\\{encodeURIComponent\\(code\\)\\}`,$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
+        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['foundation namespace', \\{ stemId: 'http://id\\.who\\.int/icd/entity/123456789' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
+        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['fabricated CodeInfo @id', \\{ '@id': 'http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/AA00%26XY01' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
+        {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['request URI mismatch', \\{ codeInfoResourceUri: 'http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/BB01' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
         /* @Codex: scoped ordinary integration test peer. */
         {"path": "lib/chatgpt-execution/ordinary-integration.test.ts", "pattern": "^\\ \\ \\ \\ \\ \\ \\ \\ if\\ \\(method\\ ===\\ 'account/login/start'\\)\\ return\\ \\{\\ type:\\ 'chatgptDeviceCode',\\ loginId:\\ 'fixture\\-login',\\ userCode:\\ 'FAKE\\-ONLY',\\ verificationUrl:\\ 'https://auth\\.openai\\.com/fixture\\-never\\-navigate'\\ \\};$", "reason": "WUL-689/691: exact inert device-login response in the synthetic ordinary integration peer; never navigated or fetched."},
         /* @Codex: exact WUL-673 reference and fixture lines. */
