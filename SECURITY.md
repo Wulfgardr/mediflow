@@ -19,6 +19,7 @@ requisiti minimi debba rispettare chi contribuisce.
 - [docs/topologia-dati-flussi.md](./docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
 - [docs/walkthrough.md](./docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
+- [docs/security-audits/](./docs/security-audits/README.md) (rapporti pubblici sanitizzati, legati a revisioni esatte; non sostituiscono questa policy)
 - [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)
 
 ---
@@ -493,3 +494,8 @@ dati reali, token o payload decifrati.
 
 La segnalazione deve sempre indicare versione o commit interessato, scenario
 d’attacco e differenza tra comportamento atteso e osservato.
+
+I rapporti pubblici sanitizzati già coordinati sono elencati in
+[docs/security-audits/](./docs/security-audits/README.md). L’archivio non deve
+contenere materiale di riproduzione sensibile né anticipare la pubblicazione di
+una correzione non ancora distribuita.
