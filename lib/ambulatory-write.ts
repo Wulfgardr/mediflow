@@ -5,15 +5,56 @@ import { ambulatories, patients, patientsToAmbulatories } from './schema';
 import { activePatients } from './patient-lifecycle';
 import { clearTestContainerByMembership, TEST_CONTAINER_CLEAR_REASON } from './test-container-clear';
 import { buildAmbulatoryVersionConflictPayload, parseExpectedVersion } from './ambulatory-concurrency';
-import { safeWriteAuditEventFromRequest } from './security/audit';
+/* @Codex */
+import {
+    auditContextFromSession, listChangedFields, requestIdFromRequest,
+    withAuditContextMetadata, writeAuditEventInTransaction,
+    type AuditEventType, type AuditRedactedMetadata, type AuditSubjectType,
+} from './security/audit';
+import type { NetworkWriteContext } from './network-write-context';
 import type { ServerSession } from './security/server-session';
 
 export type AmbulatoryMutationValue = Record<string, unknown>;
 export type AmbulatoryMutationResponse = { status: 200 | 201 | 400 | 403 | 404 | 409; value: AmbulatoryMutationValue };
 
 export type HostAmbulatoryContext = { request: Request; session: ServerSession };
+type AmbulatoryWriteContext = HostAmbulatoryContext | NetworkWriteContext;
+type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 
 type AmbulatoryRow = typeof ambulatories.$inferSelect;
+
+/* @Codex: only admitted session and paired context choose audit actor and surface. */
+function ambulatoryAuditInput(
+    context: AmbulatoryWriteContext,
+    surface: 'host' | 'network',
+    eventType: AuditEventType,
+    subjectType: AuditSubjectType,
+    subjectRef: string,
+    metadata?: AuditRedactedMetadata | null,
+) {
+    const actor = auditContextFromSession(context.session);
+    const flags = surface === 'network'
+        ? [...(metadata?.flags ?? []), 'auth:paired-client',
+            `paired-client:${(context as NetworkWriteContext).pairedClient.clientId}`, 'scope:ambulatory']
+        : metadata?.flags;
+    return {
+        eventType, outcome: 'success' as const,
+        actorType: surface === 'network' ? 'user' as const : actor.actorType,
+        actorRef: surface === 'network' ? context.session.userId : actor.actorRef,
+        subjectType, subjectRef,
+        sourceSurface: surface === 'network' ? 'native' as const : actor.sourceSurface,
+        requestId: requestIdFromRequest(context.request),
+        redactedMetadata: surface === 'network'
+            ? { ...(metadata ?? {}), flags }
+            : withAuditContextMetadata(actor, metadata),
+    };
+}
+
+/* @Codex: every indirect default change is a durable versioned mutation. */
+function auditDefaultChange(tx: Tx, context: AmbulatoryWriteContext, surface: 'host' | 'network', id: string, version: number) {
+    writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.updated', 'ambulatory', id,
+        { changedFields: ['isDefault'], resourceVersion: version }));
+}
 
 function hasOwn(body: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(body, key);
@@ -54,7 +95,8 @@ function validateParent(
     return null;
 }
 
-export function createAmbulatory(rawBody: Record<string, unknown>): AmbulatoryMutationResponse {
+/* @Codex */
+export function createAmbulatory(context: AmbulatoryWriteContext, rawBody: Record<string, unknown>, surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
     const name = typeof rawBody.name === 'string' ? rawBody.name.trim() : '';
     if (!name) return { status: 400, value: { error: 'Ambulatory name is required' } };
     const type = normalizeType(rawBody.type, false);
@@ -78,20 +120,26 @@ export function createAmbulatory(rawBody: Record<string, unknown>): AmbulatoryMu
         const affectedRows: Array<{ id: string; version: number }> = [];
         if (shouldBeDefault) {
             for (const currentDefault of currentDefaults) {
-                tx.update(ambulatories).set({ isDefault: false, version: currentDefault.version + 1 })
+                const demoted = tx.update(ambulatories).set({ isDefault: false, version: currentDefault.version + 1 })
                     .where(and(eq(ambulatories.id, currentDefault.id), eq(ambulatories.version, currentDefault.version))).run();
+                if (demoted.changes !== 1) throw new Error('Ambulatory default demotion did not update exactly one row');
+                auditDefaultChange(tx, context, surface, currentDefault.id, currentDefault.version + 1);
                 affectedRows.push({ id: currentDefault.id, version: currentDefault.version + 1 });
             }
         }
-        tx.insert(ambulatories).values({
+        const inserted = tx.insert(ambulatories).values({
             id, name, address: addressValue.value, parentId: parentValue.value, type,
             description: descriptionValue.value, isDefault: shouldBeDefault, version: 1, createdAt,
         }).run();
+        if (inserted.changes !== 1) throw new Error('Ambulatory create did not write exactly one row');
+        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.created', 'ambulatory', id,
+            { changedFields: listChangedFields(rawBody, ['id']), resourceVersion: 1 }));
         return { status: 201, value: { success: true, id, version: 1, affectedAmbulatories: [...affectedRows, { id, version: 1 }] } };
-    });
+    }, { behavior: 'immediate' });
 }
 
-export function updateAmbulatory(id: string, rawBody: Record<string, unknown>): AmbulatoryMutationResponse {
+/* @Codex */
+export function updateAmbulatory(context: AmbulatoryWriteContext, id: string, rawBody: Record<string, unknown>, surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
     const expectedVersion = parseExpectedVersion(rawBody.version);
     if (expectedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     return dbServer.transaction((tx): AmbulatoryMutationResponse => {
@@ -134,22 +182,25 @@ export function updateAmbulatory(id: string, rawBody: Record<string, unknown>): 
             const currentDefaults = tx.select().from(ambulatories)
                 .where(and(eq(ambulatories.isDefault, true), ne(ambulatories.id, id))).all();
             for (const currentDefault of currentDefaults) {
-                tx.update(ambulatories).set({ isDefault: false, version: currentDefault.version + 1 })
+                const demoted = tx.update(ambulatories).set({ isDefault: false, version: currentDefault.version + 1 })
                     .where(and(eq(ambulatories.id, currentDefault.id), eq(ambulatories.version, currentDefault.version))).run();
+                if (demoted.changes !== 1) throw new Error('Ambulatory default demotion did not update exactly one row');
+                auditDefaultChange(tx, context, surface, currentDefault.id, currentDefault.version + 1);
                 affectedRows.push({ id: currentDefault.id, version: currentDefault.version + 1 });
             }
         }
         const nextVersion = expectedVersion + 1;
         const committed = tx.update(ambulatories).set({ ...updateData, version: nextVersion })
             .where(and(eq(ambulatories.id, id), eq(ambulatories.version, expectedVersion))).run();
-        if (committed.changes !== 1) {
-            return { status: 409, value: buildAmbulatoryVersionConflictPayload(expectedVersion, id, conflictSnapshot(selectAmbulatory(tx, id))) };
-        }
+        if (committed.changes !== 1) throw new Error('Ambulatory update did not write exactly one row');
+        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.updated', 'ambulatory', id,
+            { changedFields: listChangedFields(rawBody, ['version']), resourceVersion: nextVersion }));
         return { status: 200, value: { success: true, version: nextVersion, affectedAmbulatories: [...affectedRows, { id, version: nextVersion }] } };
-    });
+    }, { behavior: 'immediate' });
 }
 
-export function deleteAmbulatory(id: string, expectedVersion: unknown): AmbulatoryMutationResponse {
+/* @Codex */
+export function deleteAmbulatory(context: AmbulatoryWriteContext, id: string, expectedVersion: unknown, surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     return dbServer.transaction((tx): AmbulatoryMutationResponse => {
@@ -170,29 +221,45 @@ export function deleteAmbulatory(id: string, expectedVersion: unknown): Ambulato
         }
         const affectedRows: Array<{ id: string; version: number }> = [];
         if (fallback) {
-            tx.update(ambulatories).set({ isDefault: true, version: fallback.version + 1 })
+            const promoted = tx.update(ambulatories).set({ isDefault: true, version: fallback.version + 1 })
                 .where(and(eq(ambulatories.id, fallback.id), eq(ambulatories.version, fallback.version))).run();
+            if (promoted.changes !== 1) throw new Error('Ambulatory fallback promotion did not update exactly one row');
+            auditDefaultChange(tx, context, surface, fallback.id, fallback.version + 1);
             affectedRows.push({ id: fallback.id, version: fallback.version + 1 });
         }
         const deleted = tx.delete(ambulatories).where(and(eq(ambulatories.id, id), eq(ambulatories.version, parsedVersion))).run();
-        if (deleted.changes !== 1) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, id, conflictSnapshot(selectAmbulatory(tx, id))) };
+        if (deleted.changes !== 1) throw new Error('Ambulatory delete did not remove exactly one row');
+        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.deleted', 'ambulatory', id,
+            { resourceVersion: parsedVersion }));
         return { status: 200, value: { success: true, affectedAmbulatories: affectedRows } };
-    });
+    }, { behavior: 'immediate' });
 }
 
-export async function clearAmbulatory(context: HostAmbulatoryContext, ambulatoryId: string, expectedVersion: unknown): Promise<AmbulatoryMutationResponse> {
+/* @Codex */
+export async function clearAmbulatory(
+    context: AmbulatoryWriteContext,
+    ambulatoryId: string,
+    expectedVersion: unknown,
+    surface: 'host' | 'network' = 'host',
+): Promise<AmbulatoryMutationResponse> {
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     if (context.session.role !== 'admin') return { status: 403, value: { error: 'Forbidden' } };
-    const commit = dbServer.transaction((tx): AmbulatoryMutationResponse => {
+    return dbServer.transaction((tx): AmbulatoryMutationResponse => {
         const target = selectAmbulatory(tx, ambulatoryId);
         if (!target) return { status: 404, value: { error: 'Ambulatory not found' } };
         if (target.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
         if (target.type !== 'test') return { status: 403, value: { error: 'Safety Check: Cannot clear a LIVE ambulatory' } };
         const guarded = tx.update(ambulatories).set({ version: target.version + 1 })
             .where(and(eq(ambulatories.id, ambulatoryId), eq(ambulatories.version, parsedVersion))).run();
-        if (guarded.changes !== 1) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(selectAmbulatory(tx, ambulatoryId))) };
+        if (guarded.changes !== 1) throw new Error('Test-container version guard did not update exactly one row');
         const result = clearTestContainerByMembership(tx, ambulatoryId);
+        for (const patient of result.clearedPatients) {
+            writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.deleted', 'patient', patient.id,
+                { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version }));
+        }
+        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.cleared', 'ambulatory', ambulatoryId,
+            { resourceVersion: target.version + 1 }));
         return {
             status: 200,
             value: {
@@ -200,21 +267,7 @@ export async function clearAmbulatory(context: HostAmbulatoryContext, ambulatory
                 clearedPatients: result.clearedPatients.length,
                 preservedLivePatients: result.preservedLivePatientIds.length,
                 removedMembershipRows: result.removedMembershipRows,
-                clearedPatientVersions: result.clearedPatients,
             },
         };
-    });
-    if (commit.status !== 200) return commit;
-    const cleared = Array.isArray(commit.value.clearedPatientVersions) ? commit.value.clearedPatientVersions : [];
-    for (const item of cleared) {
-        if (!item || typeof item !== 'object') continue;
-        const patient = item as { id?: unknown; version?: unknown };
-        if (typeof patient.id !== 'string' || typeof patient.version !== 'number') continue;
-        await safeWriteAuditEventFromRequest(context.request, context.session, {
-            eventType: 'patient.deleted', subjectType: 'patient', subjectRef: patient.id,
-            redactedMetadata: { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version },
-        }, '[MediFlow] Test-container clear audit write failed:');
-    }
-    delete commit.value.clearedPatientVersions;
-    return commit;
+    }, { behavior: 'immediate' });
 }
