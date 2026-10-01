@@ -1,0 +1,96 @@
+# Review-only proposal. Not installed in the repository or published.
+name: PR365 isolated Windows PDF diagnostic
+on:
+  push:
+    branches: [diagnostic/pr365-windows-dd47-probe-v2]
+    paths:
+      - .github/workflows/pr365-windows-diagnostic.yml
+      - .diagnostics/pr365/**
+permissions:
+  contents: read
+concurrency:
+  group: pr365-windows-dd47-probe-v2
+  cancel-in-progress: false
+jobs:
+  diagnostic:
+    name: isolated diagnostic only (not a required gate)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      MEDIFLOW_DATA_DIR: ${{ runner.temp }}/mediflow-pr365-synthetic
+    steps:
+      - name: Check out reviewed diagnostic files
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          path: diagnostic-source
+      - name: Check out exact unchanged candidate
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: dd47f1df3dfec979b9f17473618ae47dfc7bcbc2
+          persist-credentials: false
+          path: candidate
+      - name: Use the failed job's exact supported Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+      - name: Verify candidate tree and reviewed probe hashes
+        run: |
+          New-Item -ItemType Directory -Force receipts | Out-Null
+          $pdfCandidateHead = git -C candidate rev-parse HEAD
+          $pdfCandidateTree = git -C candidate rev-parse 'HEAD^{tree}'
+          if ($pdfCandidateHead -ne 'dd47f1df3dfec979b9f17473618ae47dfc7bcbc2' -or $pdfCandidateTree -ne '40b73381d930fbd5f03dbe4afbb3466f46a511da') { throw 'Candidate identity mismatch' }
+          $pdfExpectedHashes = @{
+            'pdf-phase-preload.mjs' = '3ee154b1832b6c2ffea51ffd82efdeab06312f094a5d5e09b910965d4349cdec'
+            'pdf-phase-records.mjs' = 'fbdfd30256a581d2650139b7695f54688f0a948a8efa5ddf8b8345091cee4460'
+            'run-pdf-phase-probe.mjs' = 'cb74df0b0d5162a5b60df974f55fb4875bc1c9933db391c878196d8320af0873'
+          }
+          foreach ($pdfName in $pdfExpectedHashes.Keys) {
+            $pdfActual = (Get-FileHash "diagnostic-source/.diagnostics/pr365/$pdfName" -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($pdfActual -ne $pdfExpectedHashes[$pdfName]) { throw 'Reviewed probe hash mismatch' }
+          }
+          @{ candidateHead = $pdfCandidateHead; candidateTree = $pdfCandidateTree; probeHashes = $pdfExpectedHashes; imageOS = $env:ImageOS; imageVersion = $env:ImageVersion; qualification = 'diagnostic only; cannot replace required Windows check' } | ConvertTo-Json -Depth 4 | Set-Content receipts/identity.json
+      - name: Exact lockfile install without browser installation
+        id: install
+        working-directory: candidate
+        run: |
+          npm ci *> ../receipts/install.log
+          $pdfInstallExit = $LASTEXITCODE
+          @{ exitCode = $pdfInstallExit } | ConvertTo-Json | Set-Content ../receipts/install-exit.json
+          exit $pdfInstallExit
+      - name: Build exact candidate including unchanged postbuild smoke
+        id: build
+        working-directory: candidate
+        run: |
+          npm run build *> ../receipts/build.log
+          $pdfBuildExit = $LASTEXITCODE
+          @{ exitCode = $pdfBuildExit } | ConvertTo-Json | Set-Content ../receipts/build-exit.json
+          exit $pdfBuildExit
+      - name: One bounded phase probe even if original postbuild failed
+        if: ${{ always() && steps.install.outcome == 'success' && !cancelled() }}
+        run: |
+          $pdfWorker = 'candidate/.next/standalone/scripts/anydoc-pdf-page-worker.mjs'
+          if (!(Test-Path -LiteralPath $pdfWorker -PathType Leaf)) {
+            @{ outcome = 'no standalone worker; diagnostic not run'; qualification = 'not qualified' } | ConvertTo-Json | Set-Content receipts/probe-unavailable.json
+            exit 1
+          }
+          $pdfOS = Get-CimInstance Win32_OperatingSystem
+          @{ physicalFreeKiB = $pdfOS.FreePhysicalMemory; physicalTotalKiB = $pdfOS.TotalVisibleMemorySize } | ConvertTo-Json | Set-Content receipts/pre-probe-memory.json
+          node diagnostic-source/.diagnostics/pr365/run-pdf-phase-probe.mjs candidate $pdfWorker > receipts/phase-probe.json 2> receipts/probe-host-stderr.log
+          $pdfProbeExit = $LASTEXITCODE
+          @{ exitCode = $pdfProbeExit } | ConvertTo-Json | Set-Content receipts/probe-exit.json
+          exit $pdfProbeExit
+      - name: Keep small public synthetic receipts only
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pr365-windows-pdf-diagnostic
+          path: receipts/
+          retention-days: 3
+          if-no-files-found: error
