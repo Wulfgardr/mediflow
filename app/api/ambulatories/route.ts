@@ -20,7 +20,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     try {
-        const result = createAmbulatory(await request.json() as Record<string, unknown>);
+        /* @Codex: writer derives its required audit actor from this admitted session. */
+        const result = createAmbulatory({ request, session }, await request.json() as Record<string, unknown>);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /ambulatories error:', error);
