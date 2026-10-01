@@ -149,6 +149,10 @@ non un accesso remoto generale. Restano valide le seguenti condizioni:
   paired
 - il primo data plane remoto (`/api/v1/network/patients*`) richiede sempre
   device paired + sessione operatore
+- create, profilo, delete e restore del paziente rivalidano device, modalità,
+  capability, sessione, operatore e scope nella transazione clinica `IMMEDIATE`.
+  L'ammissione del body non garantisce il commit: una revoca già completata
+  prima della transazione impedisce la scrittura e il relativo audit di successo.
 - `PUT /api/v1/network/patients/{id}` richiede inoltre capability
   `network.replica.write-patient-profile` e `version`
 - `/api/v1/network/patients/{id}/entries*` richiede capability diary dedicate,

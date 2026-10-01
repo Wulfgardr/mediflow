@@ -10,6 +10,7 @@ import {
     type RequiredAuditContext,
 } from './security/audit';
 import { patients, patientsToAmbulatories } from './schema';
+import type { NetworkPatientCommitGuard, NetworkPatientCommitDenial } from './network-patient-commit-authority';
 
 type PatientUpdateValues = Partial<typeof patients.$inferInsert>;
 
@@ -21,17 +22,21 @@ type PatientUpdateOperationInput = {
     // Present only after the network adapter has authorized the effective scope.
     scopeAmbulatoryId?: string;
     audit: RequiredAuditContext;
+    authorizeCommit?: NetworkPatientCommitGuard;
 };
 
 export type PatientUpdateOperationResult =
     | { status: 200; value: { success: true }; existing: typeof patients.$inferSelect }
-    | { status: 404 | 409; value: Record<string, unknown> };
+    | { status: 404 | 409; value: Record<string, unknown> }
+    | NetworkPatientCommitDenial;
 
 /* @Codex */
 export function updatePatientOperation(input: PatientUpdateOperationInput): PatientUpdateOperationResult {
     // better-sqlite3/Drizzle callback stays synchronous. Patient, membership and
     // required audit either commit together or all roll back; no second writer.
     return dbServer.transaction((tx): PatientUpdateOperationResult => {
+        const denied = input.authorizeCommit?.(tx);
+        if (denied) return denied;
         const condition = and(
             eq(patients.id, input.patientId),
             activePatients(),

@@ -16,6 +16,7 @@ import { parseExpectedVersion } from './patient-concurrency';
 import { updatePatientOperation } from './patient-update-operation';
 /* @Codex */
 import { normalizePatientUpdateInput } from './patient-write-normalization';
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 /* @Codex */
 /* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
@@ -25,7 +26,18 @@ import type { ServerSession } from './security/server-session';
 /* @Codex */
 export const NETWORK_PATIENT_WRITE_CAPABILITY = 'network.replica.write-patient-profile';
 /* @Codex */
-export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set(['aiSummary', 'documentInsights']);
+export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set([
+    'aiSummary', 'aiSummaryGeneratedAt', 'aiSummaryContextHash', 'documentInsights',
+]);
+
+// Only these profile/status fields can reach the shared local-write normalizer.
+// Unknown extension fields remain ignored; newly added local derived fields
+// cannot silently expand paired-client authority.
+const NETWORK_PATIENT_PROFILE_FIELDS = [
+    'firstName', 'lastName', 'taxCode', 'birthDate', 'address', 'phone', 'caregiver',
+    'exemptions', 'diagnoses', 'notes', 'monitoringProfile', 'statusReason',
+    'archiveReason', 'archiveNote', 'isAdi', 'isArchived', 'ambulatoryId',
+] as const;
 
 // I campi sensibili arrivano sigillati dal client (ENC:); l'host non li
 // decodifica e non deve accettarli in chiaro da un client paired.
@@ -43,7 +55,7 @@ export const NETWORK_UPDATE_SEALED_PATIENT_FIELDS = [
 
 type NetworkPatientMutationResponse =
     | { status: 200; value: { success: true } }
-    | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
+    | { status: 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 
 type NetworkPatientMutationContext = {
     request: Request;
@@ -138,12 +150,16 @@ export async function updateNetworkScopedPatient(
     const boundaryError = validateNetworkPatientMutationBoundary(body, context.scopeAmbulatoryId);
     if (boundaryError) return boundaryError;
 
-    const normalized = normalizePatientUpdateInput(body, { expectedVersion });
+    const profile = Object.fromEntries(NETWORK_PATIENT_PROFILE_FIELDS
+        .filter((field) => hasOwn(body, field)).map((field) => [field, body[field]]));
+    const normalized = normalizePatientUpdateInput(profile, { expectedVersion });
     if (!normalized.ok) {
         return { status: 400, value: { error: normalized.error } };
     }
 
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_PATIENT_WRITE_CAPABILITY);
     const commit = updatePatientOperation({
+        authorizeCommit,
         patientId: context.patientId,
         expectedVersion,
         values: normalized.values,

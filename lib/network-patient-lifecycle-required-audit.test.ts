@@ -6,32 +6,29 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
 import { ambulatories, entries, patients, patientsToAmbulatories } from './schema';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-network-lifecycle-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'c05-network-a']]) });
 const lifecycle = load('./network-patient-lifecycle.ts') as typeof import('./network-patient-lifecycle.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
 const sealed = 'ENC:aQ==:ZGF0YQ==';
 
 test.after(() => {
+    cleanupCookies();
     sql.close();
     dbServer.$client.close();
     rmSync(dataDir, { recursive: true, force: true });
 });
 
 function context(patientId: string) {
-    return {
-        request: new Request(`http://127.0.0.1/api/v1/network/patients/${patientId}`, {
-            headers: { 'x-request-id': 'c05-network-synthetic-request' },
-        }),
-        patientId,
-        scopeAmbulatoryId: 'c05-network-a',
-        pairedClient: { clientId: 'c05-network-client' },
-        session: { id: 'c05-network-session', userId: 'c05-network-user' },
-    } as unknown as Parameters<typeof lifecycle.deleteNetworkScopedPatient>[0];
+    return { ...syntheticNetworkPatientAuthority(dbServer, 'c05-network-a', {
+        clientId: 'c05-network-client', userId: 'c05-network-user', requestId: 'c05-network-synthetic-request',
+    }), patientId };
 }
 
 function setup(id: string, state: 'absent' | 'active' | 'deleted') {
@@ -154,7 +151,7 @@ test('wrong scope, stale version and invalid sealed boundary do not write patien
         const denied = operation === 'delete'
             ? await lifecycle.deleteNetworkScopedPatient(wrongScope, { version: 3 })
             : await lifecycle.restoreNetworkScopedPatient(wrongScope, { version: 3 });
-        assert.equal(denied.status, 404);
+        assert.equal(denied.status, 403);
         const stale = operation === 'delete'
             ? await lifecycle.deleteNetworkScopedPatient(context(id), { version: 2 })
             : await lifecycle.restoreNetworkScopedPatient(context(id), { version: 2 });

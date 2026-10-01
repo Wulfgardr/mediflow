@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
 import { ambulatories, patients, patientsToAmbulatories } from './schema';
 
 const load = createRequire(import.meta.url);
@@ -37,10 +38,12 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'c03-a']]) });
 const { updateNetworkScopedPatient } = load('./network-patient-write.ts') as typeof import('./network-patient-write.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
 
 test.after(() => {
+    cleanupCookies();
     sql.close();
     dbServer.$client.close();
     hooks.deregister();
@@ -80,12 +83,7 @@ function snapshot() {
 }
 
 function networkContext(scopeAmbulatoryId = 'c03-a') {
-    return {
-        request: new Request('http://127.0.0.1/api/v1/network/patients/c03-patient'),
-        patientId: 'c03-patient', scopeAmbulatoryId,
-        pairedClient: { clientId: 'synthetic-client' } as never,
-        session: { userId: 'synthetic-user' } as never,
-    };
+    return { ...syntheticNetworkPatientAuthority(dbServer, scopeAmbulatoryId), patientId: 'c03-patient' };
 }
 
 for (const [name, route] of [['web', web], ['v1', v1]] as const) {
@@ -203,7 +201,7 @@ db.exec('COMMIT');db.close();`;
 
 test('network scope, seal boundary and membership failure retain shared commit semantics', async () => {
     reset();
-    assert.equal((await updateNetworkScopedPatient(networkContext('c03-b'), { version: 3, firstName: 'Out' })).status, 404);
+    assert.equal((await updateNetworkScopedPatient(networkContext('c03-b'), { version: 3, firstName: 'Out' })).status, 403);
     assert.equal((await updateNetworkScopedPatient(networkContext(), { version: 3, notes: 'plaintext' })).status, 400);
     assert.equal((await updateNetworkScopedPatient(networkContext(), { version: 3, ambulatoryId: 'c03-b' })).status, 403);
     assert.deepEqual(snapshot(), { firstName: 'Ada', version: 3, ambulatoryId: 'c03-a', memberships: ['c03-a'] });

@@ -2080,7 +2080,8 @@ paths:
         contract. The route requires a paired client with
         `network.replica.write-patient-profile`, an active operator session,
         and the effective ambulatory scope resolved by the home-base node.
-        AI/document-derived fields, child clinical CRUD, remote delete, and
+        AI/document-derived fields (including aiSummaryGeneratedAt and
+        aiSummaryContextHash), child clinical CRUD, remote delete, and
         sync queues remain outside this first write boundary.
       security:
         - pairedClientId: []
