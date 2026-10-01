@@ -300,6 +300,19 @@ receipt clinica e non autorizza altre operazioni.
 
 #### Revoca e stop rule
 
+Chiarimento login Web, 2026-10-01: prima dell'inizio dell'acquisizione della
+cattura H1a, il controller Intelligent Host e `idle` e non possiede authority
+clinica. Lock e logout mantengono integralmente il retirement canonico Web P3
+e il control fence, ma non disconnettono quel controller mai attivato. Come
+la prima selezione, non sono ancora una revoca della sessione Intelligent Host.
+Il Web resta disponibile per un nuovo gesto PIN esplicito; questa disponibilita
+non autorizza letture cliniche, catture, capability o operazioni agent.
+Appena inizia l'acquisizione, anche prima dell'ACK di attivazione, valgono tutte
+le stop rule terminali sotto. Il dispose `explicit`, l'uscita di un figlio e
+lo shutdown restano terminali anche prima dell'acquisizione. Una sessione
+Intelligent Host terminale non puo essere riattivata: richiede un nuovo
+Supervisor. Il chiarimento non modifica credenziali, cookie, scope o lease.
+
 Logout, application lock e reselection revocano prima la risorsa Web e poi
 inviano `revoke_all`. La risposta finale attende un ACK per al massimo un
 secondo. Se l'ACK non arriva, il Web disconnette il canale parentale e risponde
