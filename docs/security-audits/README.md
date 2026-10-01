@@ -38,7 +38,7 @@ indicata. Non implica merge, distribuzione o verifica del tree composto.
 
 | Data | Rapporto | Revisione esaminata | Stato |
 | --- | --- | --- | --- |
-| 2026-10-01 | [Correzione dell’autorità nelle scritture paziente di rete](./2026-10-01-network-patient-authority-fix.md) | `c6feccb8962cecf8826ec375b09a9c37b26b87fc` | `FIX_VERIFIED`; `HOLD_COMPOSITION_AND_PUBLICATION` |
+| 2026-10-01 | [Correzione dell’autorità nelle scritture paziente di rete](./2026-10-01-network-patient-authority-fix.md) | `9f522a872af93711daa98a0c20bc6fe38d47390d` | `FIX_VERIFIED`; `LOCAL_COMPOSITION_VERIFIED`; `HOLD_PUBLICATION` |
 
 ## Rapporti storici collegati
 
