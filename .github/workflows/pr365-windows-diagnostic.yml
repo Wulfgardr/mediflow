@@ -23,7 +23,6 @@ jobs:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
       PUPPETEER_SKIP_DOWNLOAD: 'true'
       NEXT_TELEMETRY_DISABLED: '1'
-      MEDIFLOW_DATA_DIR: ${{ runner.temp }}/mediflow-pr365-synthetic
     steps:
       - name: Check out reviewed diagnostic files
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -43,6 +42,8 @@ jobs:
       - name: Verify candidate tree and reviewed probe hashes
         run: |
           New-Item -ItemType Directory -Force receipts | Out-Null
+          $pdfSyntheticDirectory = Join-Path $env:RUNNER_TEMP 'mediflow-pr365-synthetic'
+          "MEDIFLOW_DATA_DIR=$pdfSyntheticDirectory" >> $env:GITHUB_ENV
           $pdfCandidateHead = git -C candidate rev-parse HEAD
           $pdfCandidateTree = git -C candidate rev-parse 'HEAD^{tree}'
           if ($pdfCandidateHead -ne 'dd47f1df3dfec979b9f17473618ae47dfc7bcbc2' -or $pdfCandidateTree -ne '40b73381d930fbd5f03dbe4afbb3466f46a511da') { throw 'Candidate identity mismatch' }
