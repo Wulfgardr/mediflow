@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "purpose": "Preserve reviewed diagnostic script LF bytes on Windows checkout",
+  "production_checkout": "dd47f1df3dfec979b9f17473618ae47dfc7bcbc2",
+  "diagnostic_scripts_eol": "lf"
+}
