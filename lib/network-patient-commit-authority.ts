@@ -1,4 +1,3 @@
-/* @Codex: patient admission is not authority to commit after a body-read await. */
 import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
 import type { dbServer } from './db-server';

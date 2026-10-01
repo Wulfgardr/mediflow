@@ -1,4 +1,3 @@
-/* @Codex: real HTTP handlers, auth owner, services and synthetic SQLite only. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';

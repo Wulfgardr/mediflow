@@ -1,4 +1,3 @@
-/* @Codex: invented authority only, without login/PIN or production data. */
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
