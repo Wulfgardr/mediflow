@@ -2,7 +2,7 @@
 summary: "Rapporto pubblico sanitizzato sulla correzione dell’autorità nelle scritture paziente di rete."
 read_when:
   - "Valutare i finding F-01 e F-02 e la loro correzione."
-  - "Comporre la correzione con PR 372 o verificarne la futura distribuzione."
+  - "Verificare la composizione locale della correzione con PR 372."
 ---
 
 # Correzione dell’autorità nelle scritture paziente di rete
@@ -17,26 +17,40 @@ candidata locale descritta sotto:
 - F-01, severità High: correzione verificata;
 - F-02, severità Medium: correzione verificata.
 
-La candidata riceve un `BOUNDED_PASS` tecnico nel perimetro esaminato. La
-consegna resta `HOLD_COMPOSITION_AND_PUBLICATION`: il commit non è stato
-pubblicato e la composizione con PR 372 deve ancora essere completata e
-verificata.
+La candidata composta riceve un `BOUNDED_PASS` tecnico nel perimetro
+esaminato. La composizione con PR 372 è stata completata e riesaminata
+indipendentemente in locale. La consegna resta `HOLD_PUBLICATION`: nessun
+commit è stato pubblicato e questa review non ha verificato PR live, CI
+richiesta o stato remoto.
 
 Questo rapporto non certifica la sicurezza generale del prodotto.
 
-## Identità esatta della candidata
+## Identità esatta della candidata composta
 
 - repository: `Wulfgardr/mediflow`
+- parent esatto di PR 372:
+  `902666c53cf5c6c5f321e623bfba4f84bf24ab6d`
+- commit sorgente composto dopo la review di governance:
+  `9f522a872af93711daa98a0c20bc6fe38d47390d`
+- tree sorgente composto: `9be1a7a260b9cbe19af61b0293d9335af7b8ebf6`
+- SHA-256 della patch parent-to-composed-source:
+  `fcc3915c373bbfcda16f61ac4c8f69f7225e4ecb7fa0a5aeb0839cc0d7ac04c9`
+- stato osservato: locale, committato, non inviato, non pubblicato
+
+Il commit documentale successivo a questa identità sorgente aggiorna soltanto
+questo rapporto sanitizzato e il relativo indice. La sua ricevuta esatta è
+conservata privatamente con le evidenze di review.
+
+## Identità della candidata originale congelata
+
 - base: `a238b47fccce09db9a0a7b3977355266962216ca`
 - head: `c6feccb8962cecf8826ec375b09a9c37b26b87fc`
 - tree: `9c4744668243ed351dd8d09e22d6389d10305e76`
 - SHA-256 della patch base-to-head:
   `3c6c316ae050f654e1ac95d8c9f3187c4641032013be5e0ac5af42bd5b4592fe`
-- stato osservato: candidata locale, non pubblicata
 
-Questa identità deve restare nel rapporto anche se la correzione viene
-successivamente composta in un commit differente. Il futuro commit distribuito
-dovrà essere registrato separatamente.
+Questa identità conserva la storia della prima validazione. L’identità composta
+sopra è la candidata locale corrente e non implica merge o distribuzione.
 
 ## Perimetro
 
@@ -66,7 +80,7 @@ Il lavoro ha combinato:
 - prove sintetiche con dati inventati e database temporanei;
 - suite focalizzate e indipendenti;
 - lint globale, build di produzione e verifica del pacchetto standalone;
-- analisi di composizione a tre vie con PR 372.
+- composizione a tre vie e review indipendente del tree risultante.
 
 Le prove sintetiche attestano il comportamento del controllo esaminato, non un
 deployment reale.
@@ -87,73 +101,70 @@ obbligatorio continua a causare il rollback della mutazione.
 
 | Verifica | Esito |
 | --- | --- |
-| Suite focalizzata route/service/transazione | 167/167 passati |
-| Sottoinsieme di review indipendente | 152/152 passati; modello ed effort del reviewer non verificati |
-| Typecheck, lint dei file modificati e gate audit/schema/OpenAPI/claims | Passati |
-| Lint globale | Passato |
+| Suite focalizzata finale sulla composizione | 286/286 passati |
+| Suite di commit-authority dopo la pulizia di governance | 78/78 passati |
+| Review indipendente del tree composto | Nessuna vulnerabilità runtime High, Medium o Low; pass condizionato per la pubblicazione |
+| Typecheck, lint e gate OpenAPI/claims/audit/AI/schema/never-regress | Passati |
 | Build canonica di produzione | Passata su Node 24.21.0, ABI 137 |
 | Guard del pacchetto standalone | Passata su Node 24.21.0, ABI 137 |
-| Dipendenze della build | Dipendenze fisiche fissate e compatibili con ABI 137; nessuna ricompilazione SQLite |
-| Aggregato completo | 5.489 passati, 2 falliti, 12 saltati, totale 5.503 |
+| Pagine statiche della build | 127/127 generate |
+| Aggregato completo composto | 5.622 passati, 3 falliti, 12 saltati, totale 5.637 |
+| Rerun seriale dei percorsi Apple Vision interessati | 35/35 passati in 5,1 secondi |
 
-I due fallimenti dell’aggregato dipendono dall’indisponibilità delle fixture
-congelate Mac config-schema e C1 receipt. Non sono stati osservati fallimenti
-del sorgente nel perimetro della patch di audit. L’aggregato complessivo non va
-tuttavia descritto come interamente verde.
+I tre fallimenti dell’aggregato composto sono timeout fail-closed di circa 30
+secondi in percorsi locali Apple Vision offline non modificati. Gli stessi tre
+percorsi sono passati nel rerun seriale. Questa è controprova ambientale
+circoscritta: l’aggregato resta rosso e non deve essere descritto come
+interamente verde.
 
 ## Runtime della verifica
 
-Un primo replay della review finale configurata per Daybreak è stato avviato
-con Node 26, ABI 147, mentre la dipendenza SQLite conservata era costruita per
-ABI 137. Nessun corpo di test è stato eseguito in quel tentativo.
+La candidata composta è stata qualificata con Node 24.21.0, ABI 137, usando le
+dipendenze fisiche fissate. La build di produzione ha completato compilazione,
+typecheck, 127/127 pagine statiche, validazione post-build e guard del bundle
+standalone.
 
-La patch esatta è stata poi qualificata esplicitamente con Node 24.21.0,
-ABI 137, usando le dipendenze fisiche fissate.
+Il reviewer indipendente del tree composto ha esaminato in sola lettura la
+patch esatta e le ricevute disponibili. Non ha rieseguito test e non ha
+modificato la candidata.
 
 ## Provenienza dei modelli
 
 - Il report avversariale originario non registra un’identità modello ed effort
   attestabile nelle fonti pubbliche.
-- Un primo tentativo di validazione nel percorso Sol è stato bloccato e non ha
-  prodotto una disposizione; non viene contato come review Daybreak.
-- Il reviewer indipendente riavviato ha eseguito il sottoinsieme 152/152, ma
-  la sua interfaccia non esponeva modello ed effort: la sua identità resta non
-  verificata.
-- Per la review finale l’orchestratore ha richiesto Daybreak Blue,
-  `gpt-daybreak-blue-latest`, effort `xhigh`. L’interfaccia del reviewer non
-  esponeva l’identità effettivamente servita né la telemetria dell’effort: la
-  configurazione richiesta è registrata, la provenienza runtime non è
+- Le review della candidata congelata mantengono ricevute proprie e non
+  attestano il tree composto.
+- Per la review indipendente del tree composto l’orchestratore ha richiesto
+  Daybreak Blue, `gpt-daybreak-blue-latest`, effort `xhigh`. L’interfaccia
+  non esponeva l’identità effettivamente servita né la telemetria dell’effort:
+  la configurazione richiesta è registrata, la provenienza runtime non è
   attestata.
-- La proposta di questo rapporto è stata prodotta in una task avviata
-  esplicitamente con `gpt-daybreak-blue-latest`, effort `xhigh`; anche in
-  questo caso la selezione dell’orchestratore non equivale a telemetria del
-  serving model.
 - La review Daybreak del 2026-09-07 riguarda una revisione e un audit separati;
   la sua provenienza non viene trasferita a questo lavoro.
 
 ## Composizione con PR 372
 
-La composizione con PR 372 è ancora pendente. L’analisi a tre vie ha rilevato
-un conflitto testuale in:
+La composizione locale parte dall’head esatto di PR 372
+`902666c53cf5c6c5f321e623bfba4f84bf24ab6d`. L’applicazione a tre vie ha
+rilevato un solo conflitto testuale in:
 
 - `lib/patient-json-envelope.test.ts`
 
-Le modifiche di produzione operano su livelli complementari, ma il tree
-composto deve essere riesaminato. La risoluzione deve conservare sia la matrice
-completa dei limiti e dell’involucro JSON di PR 372 sia le fixture reali
-dell’autorità introdotte da questa correzione.
+La risoluzione conserva tutte le 12 dichiarazioni di test e le 22 assertion di
+PR 372, aggiunge autorità di rete sintetica reale ai casi paired e inoltra gli
+header soltanto alle richieste network. Il primo run ha isolato sei casi validi
+al limite privi dell’autorità richiesta; il run corretto ha chiuso 286/286.
 
-Sul commit composto devono essere rieseguiti almeno:
+La composizione OpenAPI conserva versione `1.30.0`, limite corpo di 4 MiB e
+risposte `413` insieme all’esclusione dei campi derivati di provenienza AI.
+Il reviewer indipendente non ha trovato regressioni di sicurezza runtime nel
+delta composto. Ha richiesto l’aggiornamento di questo rapporto e la rimozione
+di tre marcatori dello strumento di review; entrambe le condizioni sono
+soddisfatte nella candidata locale registrata sopra.
 
-- suite di autorità e body-bound;
-- typecheck e lint;
-- gate audit e sicurezza;
-- controllo di drift OpenAPI;
-- build di produzione e guard standalone;
-- controlli richiesti per il merge.
-
-Qualunque modifica al sorgente, rebase o risoluzione del conflitto produce una
-nuova identità e richiede una nuova ricevuta.
+La PR remota non è stata modificata né interrogata da questa review. Identità
+PR live, CI richiesta e stato di pubblicazione devono essere verificati prima
+di qualunque transizione da `HOLD_PUBLICATION`.
 
 ## Limiti
 
@@ -164,6 +175,7 @@ Non sono attestati:
 - login, PIN, credenziali o provider reali;
 - comportamento multipiattaforma;
 - merge, release o installazione;
+- stato corrente della PR live o CI remota richiesta;
 - sicurezza generale di altre route o future integrazioni.
 
 Sono intenzionalmente esclusi log grezzi, probe eseguibili, percorsi locali,
