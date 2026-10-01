@@ -1,0 +1,28 @@
+{
+  "name": "mediflow-synthetic",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "start": "node src/stdio.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:codex": "node scripts/codex-agent-smoke.mjs"
+  },
+  "dependencies": {
+    "@openai/mcp-extensions": "0.1.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "ajv": "8.17.1",
+    "jsdom": "26.1.0",
+    "@playwright/test": "1.58.2"
+  }
+}

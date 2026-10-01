@@ -1,3 +1,4 @@
+import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { checkups, patients } from '@/lib/schema';
@@ -33,7 +34,9 @@ export async function PUT(
 
     try {
         const { id } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const envelope = await readCheckupJsonObject(request);
+        if (!envelope.ok) return envelope.response;
+        const body = envelope.body;
         const expectedVersion = parseCheckupExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -76,7 +79,8 @@ export async function DELETE(
         const { id } = await params;
         const parsedBody = await parseClinicalDeleteBody(request, 'web-delete');
         if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+            return NextResponse.json({ error: parsedBody.error,
+                ...(parsedBody.code ? { code: parsedBody.code } : {}) }, { status: parsedBody.status ?? 400 });
         }
         const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
         if (expectedVersion === null) {

@@ -1,0 +1,23 @@
+{
+  "name": "mediflow-synthetic",
+  "version": "0.1.0",
+  "description": "Dimostrazione MediFlow per medici: revisionare esempi inventati senza accedere a cartelle cliniche.",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "MediFlow — esempi inventati",
+    "shortDescription": "Revisiona esempi inventati, senza cartelle cliniche",
+    "developerName": "MediFlow",
+    "category": "Productivity",
+    "defaultPrompt": [
+      "Mostrami gli esempi inventati di MediFlow da revisionare."
+    ],
+    "longDescription": "Esplora due esempi inventati da revisionare e scegli se aggiungerne il testo alla conversazione. Il prototipo non accede a cartelle cliniche e non salva modifiche.",
+    "capabilities": [
+      "Read"
+    ]
+  },
+  "author": {
+    "name": "MediFlow"
+  }
+}

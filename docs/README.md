@@ -183,6 +183,7 @@ il documento o la prova nominati, non l’intero prodotto.
 - Run record recovery UI/parity 0.8: [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md)
 - Contratto OpenAPI `/api/v1`: [docs/openapi/mediflow-v1.yaml](./openapi/mediflow-v1.yaml), [docs/openapi/README.md](./openapi/README.md), [docs/adr/0010-openapi-spec-first-for-api-v1.md](./adr/0010-openapi-spec-first-for-api-v1.md), [docs/adr/0052-network-patient-profile-write-boundary.md](./adr/0052-network-patient-profile-write-boundary.md), [docs/adr/0053-network-diary-entry-write-boundary.md](./adr/0053-network-diary-entry-write-boundary.md), [docs/adr/0054-network-therapy-write-boundary.md](./adr/0054-network-therapy-write-boundary.md), [docs/adr/0055-network-checkup-write-boundary.md](./adr/0055-network-checkup-write-boundary.md), [docs/adr/0056-network-observation-write-boundary.md](./adr/0056-network-observation-write-boundary.md)
 - Limiti JSON native/network e risposta 413: [ADR 0124](./adr/0124-bounded-native-network-json.md).
+- Limite proposto POST/PUT checkup locali: [ADR 0141](./adr/0141-local-checkup-json-body-bound.md).
 - Aggiornamento AIFA con un clic, proposta da implementare e verificare: [ADR 0125](./adr/0125-explicit-aifa-catalog-download.md).
 - Import locale esenzioni, contratto candidato WUL-690: [ADR 0127](./adr/0127-atomic-local-exemption-import.md).
 - Repertorio protesica locale, contratto candidato WUL-693: [ADR 0133](./adr/0133-local-prosthetics-catalog-import.md).
@@ -421,3 +422,8 @@ confondere i suoi dati con quelli dell’applicazione.
 di copiare un database legacy nella cartella dati scelta esplicitamente.
 Copre anche il primo avvio nativo; non qualifica da solo la separazione
 tra archivi, sessioni e copie di sicurezza.
+
+[ADR 0140](./adr/0140-synthetic-plugin-feasibility.md) documenta la fattibilità
+WUL-756 di un plugin con soli esempi inventati. Il
+[pacchetto sintetico](../plugins/mediflow-synthetic/README.md) conserva setup,
+prove e limiti: non qualifica host reale, accesso clinico o distribuzione.

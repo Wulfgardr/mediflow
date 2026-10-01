@@ -15,7 +15,7 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-09-26. Le voci storiche conservano date, conteggi, revisioni e limiti:
+2026-09-30. Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
 ## Preparazione indipendente delle future 0.9.x
@@ -82,6 +82,7 @@ dalla consegna della 0.8.6.
 | --- | --- | --- |
 | [ADR 0123](./adr/0123-official-web-ui-navigation-compositions.md) | UI web ufficiale B/A con confronto sintetico separato. | Per promuovere il design scelto senza flag di anteprima nel prodotto. |
 | [ADR 0124](./adr/0124-bounded-native-network-json.md) | Limiti byte per JSON native/network e risposta 413. | Per valutare budget, compatibilità e confini del lettore. |
+| [ADR 0141](./adr/0141-local-checkup-json-body-bound.md) | Proposta di limite JSON locale e involucro oggetto per quattro POST/PUT checkup. | Per valutare la nuova restrizione, prove e residui DELETE/paired. |
 | [ADR 0126](./adr/0126-chatgpt-account-control-plane.md) | Controllo account ChatGPT isolato, senza inferenza. | Contratti API, sessione, cleanup e limiti WUL-689. |
 | [ADR 0134](./adr/0134-chatgpt-subscription-synthesis-execution.md) | Contratto di esecuzione ChatGPT confinata, distinto dall’account, con successive decisioni candidate per le quattro funzioni ordinarie. | Confine OS, fonti, lifecycle e gate sintetico separati dall'account. |
 | [ADR 0128](./adr/0128-local-desktop-ocr.md) | OCR locale desktop Tesseract WASM e renderer per piattaforma. | Per prerequisiti, digest e limiti della candidatura Windows/Linux. |
@@ -392,6 +393,12 @@ un’autorizzazione aggiuntiva né un’attestazione di runtime.
 | [docs/privacy-and-ai-governance.md](./privacy-and-ai-governance.md) | Introduzione progressiva a responsabilità, GDPR, AI Act, provider e offuscamento; rinvia alle policy e ai contratti canonici. |
 
 ## ✅ Checklist manutenzione indice
+
+| File | Scopo |
+| --- | --- |
+| [ADR 0140](./adr/0140-synthetic-plugin-feasibility.md) | WUL-756: plugin isolato con fixture inventate, contesto esplicito e gate clinici/distribuzione distinti. |
+| [Plugin sintetico](../plugins/mediflow-synthetic/README.md) | Setup Node 24, dipendenze fissate, prove MCP/DOM/browser simulato e limiti di installazione. |
+| [Skill synthetic-review](../plugins/mediflow-synthetic/skills/synthetic-review/SKILL.md) | Workflow medico limitato a esempi inventati, senza accesso a cartelle cliniche o applicazione. |
 
 Il confronto con `rg --files -g '*.md' | sort` permette di verificare
 l’inventario. Ogni file deve comparire con una descrizione, la data «Ultimo

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mediflow-synthetic",
+  "version": "0.1.0",
+  "description": "Dimostrazione MediFlow per medici: revisionare esempi inventati senza accedere a cartelle cliniche.",
+  "repository": "https://github.com/Wulfgardr/mediflow",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "MediFlow — esempi inventati",
+        "shortDescription": "Revisiona esempi inventati, senza cartelle cliniche",
+        "developerName": "MediFlow",
+        "category": "Productivity",
+        "defaultPrompt": [
+          "Mostrami gli esempi inventati di MediFlow da revisionare."
+        ],
+        "longDescription": "Esplora due esempi inventati da revisionare e scegli se aggiungerne il testo alla conversazione. Il prototipo non accede a cartelle cliniche e non salva modifiche.",
+        "capabilities": [
+          "Read"
+        ]
+      }
+    }
+  },
+  "author": {
+    "name": "MediFlow"
+  }
+}

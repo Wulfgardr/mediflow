@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "allowImportingTsExtensions": false,
     "outDir": "./tmp-audit-test",
     "module": "commonjs",
     "moduleResolution": "node",
