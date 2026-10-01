@@ -105,6 +105,7 @@ export async function readBoundedJsonBody(
     maximumBytes: number,
     semantics: 'strict' | 'request-json' = 'strict',
     control?: BoundedJsonReadControl,
+    emptyBody: 'reject' | 'empty-object' = 'reject',
 ): Promise<BoundedJsonBody> {
     if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) throw new RangeError('Invalid JSON byte budget');
     const interrupted = () => control !== undefined && (control.signal.aborted || performance.now() >= control.deadline);
@@ -114,10 +115,12 @@ export async function readBoundedJsonBody(
         cancelBody(request.body);
         return objectFreeze({ ok: false, status: 413 });
     }
-    if (!request.body) return objectFreeze({ ok: false, status: 400 });
+    if (!request.body) return emptyBody === 'empty-object'
+        ? objectFreeze({ ok: true, value: {}, byteLength: 0 })
+        : objectFreeze({ ok: false, status: 400 });
 
     const reader = request.body.getReader();
-    // Only attachment reads opt in. Cancel settles the pending read without racing the consumer.
+    // Controlled reads opt in. Cancel settles the pending read without racing the consumer.
     const abort = () => cancel(reader);
     control?.signal.addEventListener('abort', abort, { once: true });
     const chunks: Uint8Array[] = [];
@@ -155,7 +158,8 @@ export async function readBoundedJsonBody(
             bytes.set(chunk, offset); offset += chunk.byteLength;
         }
         const source = semantics === 'request-json' ? decodeRequestUtf8(bytes) : decodeUtf8(bytes);
-        const value = semantics === 'strict' ? parseStrictJson(source) : jsonParse(source);
+        const value = emptyBody === 'empty-object' && source.trim().length === 0
+            ? {} : semantics === 'strict' ? parseStrictJson(source) : jsonParse(source);
         return objectFreeze({ ok: true, value, byteLength });
     } catch {
         return objectFreeze({ ok: false, status: 400 });

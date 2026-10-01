@@ -70,3 +70,29 @@ test('parseClinicalDeleteBody rejects malformed deletionReason and JSON bodies',
         { ok: false, error: 'Invalid JSON body' },
     );
 });
+
+test('DELETE rejects a declared body above 4 MiB with the exact oversize contract', async () => {
+    const result = await parseClinicalDeleteBody(new Request('http://127.0.0.1', {
+        method: 'DELETE', body: '{"version":3}', headers: { 'content-length': '4194305' },
+    }));
+    assert.deepEqual(result, { ok: false, error: 'JSON payload too large', status: 413, code: 'JSON_BODY_TOO_LARGE' });
+});
+
+test('DELETE keeps optional whitespace, own-property, duplicate-key and ignored-field semantics', async () => {
+    for (const body of ['', ' \r\n\t', '\u00a0\uFEFF']) {
+        const result = await parseClinicalDeleteBody(new Request('http://127.0.0.1', { method: 'DELETE', body }), 'web-delete');
+        assert.equal(result.ok, true);
+        if (result.ok) {
+            assert.equal(result.values.version, undefined);
+            assert.ok(result.values.deletedAt instanceof Date);
+            assert.equal(result.values.deletionReason, 'web-delete');
+        }
+    }
+    const result = await parseClinicalDeleteBody(new Request('http://127.0.0.1', { method: 'DELETE',
+        body: '{"version":1,"version":3,"__proto__":{"deletedAt":null,"deletionReason":"inherited"},"future":true}' }));
+    assert.equal(result.ok, true);
+    if (result.ok) {
+        assert.equal(result.values.version, 3); assert.ok(result.values.deletedAt instanceof Date);
+        assert.equal(result.values.deletionReason, 'api-v1-delete');
+    }
+});
