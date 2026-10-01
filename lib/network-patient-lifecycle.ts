@@ -24,6 +24,7 @@ import {
 import { requestIdFromRequest, writeAuditEventInTransaction } from './security/audit';
 /* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
+import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 
 /* @Codex */
 export const NETWORK_PATIENT_LIFECYCLE_CAPABILITY = 'network.replica.write-patient-lifecycle';
@@ -34,7 +35,7 @@ type NetworkPatientLifecycleContext = NetworkWriteContext & {
 
 type NetworkPatientLifecycleResponse =
     | { status: 200 | 201; value: { id: string; version: number } }
-    | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
+    | { status: 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 
 type PatientLifecycleSnapshot = {
     id: string;
@@ -232,7 +233,10 @@ export async function createNetworkScopedPatient(
         return { status: 400, value: { error: normalized.error } };
     }
 
-    dbServer.transaction((tx) => {
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
+    const denied = dbServer.transaction((tx) => {
+        const denied = authorizeCommit(tx);
+        if (denied) return denied;
         tx.insert(patients).values(normalized.values).run();
         tx.insert(patientsToAmbulatories)
             .values({
@@ -243,6 +247,7 @@ export async function createNetworkScopedPatient(
             .run();
         writeNetworkLifecycleAudit(tx, context, normalized.values.id, 'patient.created', 1);
     }, { behavior: 'immediate' });
+    if (denied) return denied;
 
     return { status: 201, value: { id: normalized.values.id, version: 1 } };
 }
@@ -263,7 +268,10 @@ export async function deleteNetworkScopedPatient(
     const deletionReason = typeof body.deletionReason === 'string' ? body.deletionReason : 'paired-delete';
     const nextVersion = expectedVersion + 1;
 
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
     const commit = dbServer.transaction((tx): NetworkPatientLifecycleResponse => {
+        const denied = authorizeCommit(tx);
+        if (denied) return denied;
         const existing = tx
             .select({ patient: patients })
             .from(patients)
@@ -316,7 +324,10 @@ export async function restoreNetworkScopedPatient(
     }
 
     const nextVersion = expectedVersion + 1;
+    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
     const commit = dbServer.transaction((tx): NetworkPatientLifecycleResponse => {
+        const denied = authorizeCommit(tx);
+        if (denied) return denied;
         const existing = tx
             .select({ patient: patients })
             .from(patients)

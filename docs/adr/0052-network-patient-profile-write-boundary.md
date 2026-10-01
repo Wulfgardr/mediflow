@@ -47,7 +47,9 @@ Restano esplicitamente fuori:
 - remote delete
 - create paziente remoto
 - diary/therapies/checkups/observations/catalog writes
-- campi AI/document-derived (`aiSummary`, `documentInsights`)
+- campi AI/document-derived (`aiSummary`, `aiSummaryGeneratedAt`,
+  `aiSummaryContextHash`, `documentInsights`); la normalizzazione paired usa
+  una allowlist dei soli campi profilo/status
 - coda offline, sync record-level e merge automatico
 
 ## First Thin Slice
