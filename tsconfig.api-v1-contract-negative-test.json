@@ -2,6 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "allowImportingTsExtensions": false,
     "outDir": "./tmp-api-v1-contract-negative-test",
     "module": "commonjs",
     "moduleResolution": "node",

@@ -1,3 +1,4 @@
+import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -74,7 +75,9 @@ export async function PUT(
         /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
         const { id, checkupId } = await params;
-        const body = await request.json() as Record<string, unknown>;
+        const envelope = await readCheckupJsonObject(request);
+        if (!envelope.ok) return envelope.response;
+        const body = envelope.body;
         // WUL-308: child PUTs require optimistic concurrency like the patient PUT.
         const expectedVersion = parseCheckupExpectedVersion(body.version);
         if (expectedVersion === null) {
@@ -124,7 +127,8 @@ export async function DELETE(
         // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
         const parsedBody = await parseClinicalDeleteBody(request);
         if (!parsedBody.ok) {
-            return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+            return NextResponse.json({ error: parsedBody.error,
+                ...(parsedBody.code ? { code: parsedBody.code } : {}) }, { status: parsedBody.status ?? 400 });
         }
         const expectedVersion = parseCheckupExpectedVersion(parsedBody.values.version);
         if (expectedVersion === null) {

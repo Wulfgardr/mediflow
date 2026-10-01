@@ -10,7 +10,8 @@
     "build": "node scripts/build.mjs",
     "test": "node --test test/*.test.mjs",
     "start": "node src/stdio.mjs",
-    "test:browser": "node scripts/browser-smoke.mjs"
+    "test:browser": "node scripts/browser-smoke.mjs",
+    "test:codex": "node scripts/codex-agent-smoke.mjs"
   },
   "dependencies": {
     "@openai/mcp-extensions": "0.1.0",
