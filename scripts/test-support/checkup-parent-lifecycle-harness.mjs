@@ -16,7 +16,8 @@ const Database = nativeRequire('better-sqlite3');
 const { drizzle } = nativeRequire('drizzle-orm/better-sqlite3');
 
 export function createHarness() {
-    const sqlite = new Database(':memory:');
+    const audit = [], statements = [];
+    const sqlite = new Database(':memory:', { verbose: query => statements.push(query) });
     sqlite.exec(`CREATE TABLE patients(id TEXT PRIMARY KEY, deleted_at INTEGER, is_archived INTEGER);
         CREATE TABLE checkups(id TEXT PRIMARY KEY, patient_id TEXT, version INTEGER, date INTEGER,
         title TEXT, notes TEXT, status TEXT, source TEXT, created_at INTEGER, updated_at INTEGER,
@@ -26,7 +27,6 @@ export function createHarness() {
         INSERT INTO checkups VALUES ('synthetic-checkup', 'synthetic-patient', 5, 1893542400,
         'Before', NULL, 'pending', 'manual', 1893456000, 1893456000, NULL, NULL);`);
     let beforeUpdate;
-    const audit = [], statements = [];
     const dbServer = drizzle(sqlite, { logger: {
         logQuery(query) {
             statements.push(query);
@@ -42,12 +42,23 @@ export function createHarness() {
         'app/api/checkups/[id]/route.ts', 'lib/patient-edit-session.ts', 'lib/schema.ts',
         'lib/patient-lifecycle.ts', 'lib/checkup-concurrency.ts', 'lib/version-concurrency.ts',
         'lib/api-v1-clinical-lifecycle.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
+        'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',
     ]);
+    const auditDouble = {
+        listChangedFields: (body, excluded) => Object.keys(body).filter(k => !excluded.includes(k)),
+        auditContextFromSession: () => ({ actorType: 'user', actorRef: 'synthetic-review', sourceSurface: 'web', authContext: 'synthetic' }),
+        requestIdFromRequest: () => 'synthetic-request',
+        writeAuditEventInTransaction: (tx, event) => {
+            assert.equal(tx.session.client, sqlite);
+            assert.equal(sqlite.inTransaction, true, 'required audit must use the fixture transaction');
+            audit.push(event);
+        },
+    };
     const doubles = {
         'next/server': { NextResponse: { json: (data, init) => Response.json(data, init) } },
         '@/lib/db-server': { dbServer },
         '@/lib/security/server-auth': { requireSession: async () => ({ userId: 'synthetic-review' }), unauthorizedResponse: () => Response.json({}, {status: 401}) },
-        '@/lib/security/audit': { listChangedFields: (body, excluded) => Object.keys(body).filter(k => !excluded.includes(k)), safeWriteAuditEventFromRequest: async (_r, _s, event) => { audit.push(event); } },
+        '@/lib/security/audit': auditDouble,
     };
     function load(relative) {
         assert.ok(allowed.has(relative), `unexpected production import: ${relative}`);
@@ -59,16 +70,27 @@ export function createHarness() {
             if (Object.hasOwn(doubles, name)) return doubles[name];
             if (name.startsWith('node:') || name === 'drizzle-orm' || name === 'drizzle-orm/sqlite-core') return nativeRequire(name);
             const resolved = name.startsWith('@/') ? name.slice(2) : path.posix.normalize(path.posix.join(path.posix.dirname(relative), name));
-            return load(resolved.endsWith('.ts') ? resolved : `${resolved}.ts`);
+            const target = resolved.endsWith('.ts') ? resolved : `${resolved}.ts`;
+            // The mutation operation uses relative imports for these same fixture seams.
+            if (target === 'lib/db-server.ts') return { dbServer };
+            if (target === 'lib/security/audit.ts') return auditDouble;
+            return load(target);
         };
         new Function('require', 'module', 'exports', result.outputText)(require, loadedModule, loadedModule.exports);
         return loadedModule.exports;
     }
     // lib/schema.ts is loaded unchanged: real column names and timestamp codecs.
     // The physical tables above intentionally cover only this synthetic fixture.
-    const route = load('app/api/checkups/[id]/route.ts');
+    let route, Session;
+    try {
+        route = load('app/api/checkups/[id]/route.ts');
+        Session = load('lib/patient-edit-session.ts').PatientEditSession;
+    } catch (error) {
+        sqlite.close();
+        throw error;
+    }
     return {
-        sqlite, audit, statements, Session: load('lib/patient-edit-session.ts').PatientEditSession,
+        sqlite, audit, statements, Session,
         beforeUpdate(callback) { beforeUpdate = callback; },
         deleteParent() { sqlite.exec("UPDATE patients SET deleted_at = 1893456001 WHERE id = 'synthetic-patient'"); },
         row() { return { ...sqlite.prepare("SELECT * FROM checkups WHERE id = 'synthetic-checkup'").get() }; },
