@@ -332,6 +332,10 @@ test('main checks the real direct and transactional writer contracts and rejects
         ...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bownerFile:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bbridgeFile:\s*'([^']+)'/g).map((match) => match[1]),
+        /* @Codex: include the paired adapter and clear cardinality helper in the isolated gate fixture. */
+        ...gateSource.matchAll(/\badapterFile:\s*'([^']+)'/g).map((match) => match[1]),
+        'lib/network-ambulatory-write.ts',
+        'lib/test-container-clear.ts',
         'lib/security/audit-db.ts',
         'lib/security/audit.ts',
         'lib/siss-audit.ts',

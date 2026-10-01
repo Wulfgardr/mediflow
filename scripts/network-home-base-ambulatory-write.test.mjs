@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
@@ -47,6 +48,64 @@ test('paired ambulatory write preserves capability, concurrency, default, delete
         const clearLive = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookieHeader, { ambulatoryId: live.json.id, version: 1 }); assert.equal(clearLive.response.status, 403);
         scenarioResults.push({ name: 'paired ambulatory write', deniedStatus: denied.response.status, missingSessionStatus: missingSession.response.status, staleStatus: stale.response.status, unsetDefaultStatus: unsetDefault.response.status, linkedDeleteStatus: linkedDelete.response.status, freeDeleteStatus: freeDelete.response.status, clearTestStatus: clearTest.response.status, clearLiveStatus: clearLive.response.status });
     } finally { if (linkedPatientId) await cleanupPatient(linkedPatientId); for (const id of createdIds.reverse()) await cleanupAmbulatory(id, writer, cookieHeader, intentionallyGuardedIds); }
+});
+
+/* @Codex: admitted paired HTTP must roll back both default changes and clear batches. */
+test('paired ambulatory audit failures roll back indirect defaults and patient clear before explicit retry',
+    { skip: process.env.MF085_SYNTHETIC_E2E !== '1' }, async () => {
+    const dataDir = process.env.MEDIFLOW_DATA_DIR;
+    const url = new URL(BASE_URL);
+    assert.ok(dataDir && path.isAbsolute(dataDir) && url.hostname === '127.0.0.1' && url.port && url.port !== '3000', 'Dedicated synthetic server required');
+    await enableHomeBaseMode();
+    const writer = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Synthetic ambulatory integrity');
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
+    assert.equal(login.response.status, 200);
+    const cookie = login.cookieHeader;
+    const sql = new Database(path.join(dataDir, 'medical.db'), { fileMustExist: true });
+    const snapshot = () => ({
+        ambulatories: sql.prepare('SELECT * FROM ambulatories ORDER BY id').all(),
+        patients: sql.prepare('SELECT id, version, deleted_at FROM patients ORDER BY id').all(),
+        memberships: sql.prepare('SELECT * FROM patients_to_ambulatories ORDER BY patient_id, ambulatory_id').all(),
+        events: sql.prepare("SELECT event_type, subject_ref, actor_ref, source_surface, redacted_metadata FROM audit_events WHERE event_type LIKE 'ambulatory.%' OR event_type='patient.deleted' ORDER BY rowid").all(),
+    });
+    try {
+        const before = snapshot();
+        sql.exec("CREATE TRIGGER synthetic_paired_ambulatory_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='ambulatory.created' BEGIN SELECT RAISE(IGNORE); END");
+        const rejected = await create(writer, cookie, { name: 'Synthetic rollback default', type: 'test', isDefault: true });
+        assert.equal(rejected.response.status, 500); assert.deepEqual(snapshot(), before);
+        sql.exec('DROP TRIGGER synthetic_paired_ambulatory_audit');
+        const accepted = await create(writer, cookie, { name: 'Synthetic accepted default', type: 'test', isDefault: true });
+        assert.equal(accepted.response.status, 201);
+        const id = accepted.json.id;
+        const afterCreate = snapshot();
+        const createEvents = afterCreate.events.slice(before.events.length);
+        assert.deepEqual(createEvents.map(event => event.event_type).sort(), ['ambulatory.created', 'ambulatory.updated']);
+        assert.equal(afterCreate.ambulatories.filter(row => row.is_default === 1).length, 1);
+        assert.equal(afterCreate.ambulatories.find(row => row.is_default === 1).id, id);
+        const firstPatient = await createLocalPatient(id);
+        const secondPatient = await createLocalPatient(id);
+        const beforeClear = snapshot();
+        sql.exec("CREATE TRIGGER synthetic_paired_ambulatory_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='ambulatory.cleared' BEGIN SELECT RAISE(FAIL, 'synthetic final audit failure'); END");
+        const failedClear = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
+        assert.equal(failedClear.response.status, 500); assert.deepEqual(snapshot(), beforeClear);
+        sql.exec('DROP TRIGGER synthetic_paired_ambulatory_audit');
+        const acceptedClear = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
+        assert.equal(acceptedClear.response.status, 200); assert.equal(acceptedClear.json.version, 2);
+        const afterClear = snapshot();
+        for (const patientId of [firstPatient, secondPatient]) {
+            const row = afterClear.patients.find(patient => patient.id === patientId);
+            assert.ok(row.deleted_at); assert.equal(row.version, 2);
+        }
+        assert.equal(afterClear.memberships.some(row => row.ambulatory_id === id), false);
+        const clearEvents = afterClear.events.slice(beforeClear.events.length);
+        assert.deepEqual(clearEvents.map(event => event.event_type).sort(), ['ambulatory.cleared', 'patient.deleted', 'patient.deleted']);
+        assert.ok([...createEvents, ...clearEvents].every(event => event.source_surface === 'native'));
+        const stale = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
+        assert.equal(stale.response.status, 409); assert.deepEqual(snapshot(), afterClear);
+        const reread = await list(writer, cookie); assert.equal(reread.response.status, 200);
+        assert.equal(reread.json.find(row => row.id === id).version, 2);
+        scenarioResults.push({ name: 'paired atomic default and clear', createFailure: rejected.response.status, clearFailure: failedClear.response.status, retry: acceptedClear.response.status, stale: stale.response.status, createEvents, clearEvents });
+    } finally { sql.exec('DROP TRIGGER IF EXISTS synthetic_paired_ambulatory_audit'); sql.close(); }
 });
 
 async function assertServerReady() { const result = await request('GET', '/api/v1/ambulatories', { headers: localApiHeaders() }); assert.equal(result.response.status, 200); }

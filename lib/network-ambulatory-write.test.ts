@@ -70,12 +70,13 @@ async function seed(modules: LoadedModules, id: string, isDefault: boolean, vers
     modules.dbServer.insert(modules.schema.ambulatories).values({ id, name: id, isDefault, version, type, createdAt: new Date() }).run();
 }
 
+/* @Codex: direct writer fixtures now pass an admitted synthetic host context. */
 test('ambulatory writes return a version conflict and prohibit direct default removal', async () => {
     const modules = await loadModules();
     await resetDatabase(modules);
     await seed(modules, 'amb-default', true, 3);
 
-    const stale = modules.updateAmbulatory('amb-default', { name: 'Changed', version: 2 });
+    const stale = modules.updateAmbulatory({ request: request(), session: adminSession() }, 'amb-default', { name: 'Changed', version: 2 });
     assert.equal(stale.status, 409);
     assert.deepEqual(stale.value, {
         error: 'Conflict', code: 'VERSION_CONFLICT', entity: 'ambulatory', recordId: 'amb-default',
@@ -83,7 +84,7 @@ test('ambulatory writes return a version conflict and prohibit direct default re
         currentSnapshot: { id: 'amb-default', version: 3, isDefault: true, type: 'live' },
     });
 
-    const directUnset = modules.updateAmbulatory('amb-default', { isDefault: false, version: 3 });
+    const directUnset = modules.updateAmbulatory({ request: request(), session: adminSession() }, 'amb-default', { isDefault: false, version: 3 });
     assert.equal(directUnset.status, 409);
     assert.equal(directUnset.value.error, 'Cannot unset default directly. Set another ambulatory as default first.');
 });
@@ -94,14 +95,14 @@ test('default promotion and fallback deletion bump every surviving ambulatory ve
     await seed(modules, 'amb-a', true, 2);
     await seed(modules, 'amb-b', false, 5);
 
-    const promote = modules.updateAmbulatory('amb-b', { isDefault: true, version: 5 });
+    const promote = modules.updateAmbulatory({ request: request(), session: adminSession() }, 'amb-b', { isDefault: true, version: 5 });
     assert.equal(promote.status, 200);
     assert.deepEqual(promote.value.affectedAmbulatories, [{ id: 'amb-a', version: 3 }, { id: 'amb-b', version: 6 }]);
     const demoted = modules.dbServer.select().from(modules.schema.ambulatories).where(eq(modules.schema.ambulatories.id, 'amb-a')).get();
     assert.equal(demoted?.version, 3);
     assert.equal(demoted?.isDefault, false);
 
-    const deleted = modules.deleteAmbulatory('amb-b', 6);
+    const deleted = modules.deleteAmbulatory({ request: request(), session: adminSession() }, 'amb-b', 6);
     assert.equal(deleted.status, 200);
     assert.deepEqual(deleted.value.affectedAmbulatories, [{ id: 'amb-a', version: 4 }]);
     const fallback = modules.dbServer.select().from(modules.schema.ambulatories).where(eq(modules.schema.ambulatories.id, 'amb-a')).get();
@@ -113,13 +114,13 @@ test('ambulatory deletion preserves the asymmetric last, primary-patient, and me
     const modules = await loadModules();
     await resetDatabase(modules);
     await seed(modules, 'amb-last', true);
-    assert.equal(modules.deleteAmbulatory('amb-last', 1).value.error, 'Cannot delete the last ambulatory');
+    assert.equal(modules.deleteAmbulatory({ request: request(), session: adminSession() }, 'amb-last', 1).value.error, 'Cannot delete the last ambulatory');
     await seed(modules, 'amb-other', false);
     modules.dbServer.insert(modules.schema.patients).values({ id: 'patient-primary', firstName: 'Test', lastName: 'Primary', taxCode: 'PRIMARYXXXXXXXXX', ambulatoryId: 'amb-last', version: 1 }).run();
-    assert.equal(modules.deleteAmbulatory('amb-last', 1).value.error, 'Ambulatory still has linked patients. Move/unassign patients before deletion.');
+    assert.equal(modules.deleteAmbulatory({ request: request(), session: adminSession() }, 'amb-last', 1).value.error, 'Ambulatory still has linked patients. Move/unassign patients before deletion.');
     modules.dbServer.update(modules.schema.patients).set({ ambulatoryId: null }).where(eq(modules.schema.patients.id, 'patient-primary')).run();
     modules.dbServer.insert(modules.schema.patientsToAmbulatories).values({ patientId: 'patient-primary', ambulatoryId: 'amb-last', assignedAt: new Date() }).run();
-    assert.equal(modules.deleteAmbulatory('amb-last', 1).value.error, 'Ambulatory still has linked patients. Move/unassign patients before deletion.');
+    assert.equal(modules.deleteAmbulatory({ request: request(), session: adminSession() }, 'amb-last', 1).value.error, 'Ambulatory still has linked patients. Move/unassign patients before deletion.');
 });
 
 test('test-container clear is admin-only, test-only, version-guarded, and bumps its version after tombstoning', async () => {
