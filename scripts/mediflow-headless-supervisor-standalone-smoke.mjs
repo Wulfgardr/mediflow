@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* @Codex */
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -260,6 +260,67 @@ async function activateSyntheticSelection() {
   return Object.freeze({ cookieHeader: login.cookieHeader, checkupRef, uiBindingRef,
     resourceTitle, resourceRevision });
 }
+// @Codex: exercise the initial no-session lock through the real standalone Web
+// child, then prove login availability grants neither Web nor agent authority.
+async function prebindAuthLifecycle(rpc) {
+  const check = await fetch(new URL('/api/auth/check', BASE_URL));
+  assert.equal(check.status, 200);
+  assert.equal((await check.json()).hasSession, false);
+  const control = check.headers.getSetCookie().find(value => value.startsWith('mediflow_auth_control='));
+  assert.ok(control);
+  const cookie = control.split(';')[0];
+  let etag = check.headers.get('etag');
+  assert.ok(etag);
+  const unauthenticated = async () => {
+    assert.equal((await fetch(new URL('/api/patients', BASE_URL))).status, 401);
+    const activation = await fetch(new URL(`/api/patients/${PATIENT_ID}/intelligent-host/activate`, BASE_URL), {
+      method: 'POST', headers: webMutationHeaders(cookie), body: JSON.stringify({ selectionEpoch: 1 }),
+    });
+    assert.equal(activation.status, 401);
+    const denied = await rpc.send('tools/call', tool('mediflow.patient.open_loops.read.v1'));
+    assert.equal(denied.result.isError, true);
+    assert.equal(denied.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+  };
+  await unauthenticated();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const headers = { ...webMutationHeaders(cookie, false), 'If-Match': etag, 'Idempotency-Key': randomUUID() };
+    const locked = await fetch(new URL('/api/auth/lock', BASE_URL), { method: 'POST', headers });
+    assert.equal(locked.status, 200);
+    assert.equal((await locked.json()).state, 'server_invalidation_confirmed');
+    const replay = await fetch(new URL('/api/auth/lock', BASE_URL), { method: 'POST', headers });
+    assert.equal(replay.status, 200);
+    const stale = await fetch(new URL('/api/auth/login', BASE_URL), {
+      method: 'POST', headers: { ...webMutationHeaders(cookie), 'If-Match': etag, 'Idempotency-Key': randomUUID() },
+      body: JSON.stringify({ username: USERNAME, password: '1234' }),
+    });
+    assert.equal(stale.status, 503);
+    assert.equal((await stale.json()).code, 'AUTH_LOGIN_UNAVAILABLE');
+    assert.equal(stale.headers.getSetCookie().some(value => value.startsWith('mediflow_session=')), false);
+    etag = locked.headers.get('etag');
+    assert.ok(etag);
+    // Beyond the old terminal ACK drain: cached lock receipts cannot mask shutdown.
+    await new Promise(resolve => setTimeout(resolve, 300));
+    assert.equal((await fetch(new URL('/api/auth/check', BASE_URL), { headers: { Cookie: cookie } })).status, 200);
+    await unauthenticated();
+  }
+  const invalid = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: '9999' });
+  assert.equal(invalid.response.status, 401);
+  assert.equal(invalid.sessionCookie, null);
+  for (const reason of ['application_lock', 'logout']) {
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: '1234' });
+    assert.equal(login.response.status, 200);
+    assert.equal((await fetch(new URL('/api/patients', BASE_URL), { headers: { Cookie: login.cookieHeader } })).status, 200);
+    const denied = await rpc.send('tools/call', tool('mediflow.patient.open_loops.read.v1'));
+    assert.equal(denied.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+    const retired = await fetch(new URL(reason === 'logout' ? '/api/auth/logout' : '/api/auth/lock', BASE_URL), {
+      method: 'POST', headers: { ...webMutationHeaders(login.cookieHeader, false),
+        'If-Match': login.controlEtag, 'Idempotency-Key': randomUUID() },
+    });
+    assert.equal(retired.status, reason === 'logout' ? 204 : 200);
+    assert.equal((await fetch(new URL('/api/patients', BASE_URL), { headers: { Cookie: login.cookieHeader } })).status, 401);
+    await unauthenticated();
+  }
+}
 function verifyCommittedTransition(dataDir, receipt) {
   const database = new Database(path.join(dataDir, 'medical.db'), { readonly: true, fileMustExist: true });
   try {
@@ -295,6 +356,7 @@ async function main() {
     const prebind = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
     assert.equal(prebind.result.isError, true);
     assert.equal(prebind.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+    await prebindAuthLifecycle(rpc);
     const selection = await activateSyntheticSelection();
     const { cookieHeader, checkupRef, uiBindingRef, resourceTitle, resourceRevision } = selection;
     const jsonHeaders = webMutationHeaders(cookieHeader);
@@ -422,7 +484,7 @@ async function main() {
       await checkHeadlessRuntime(APP);
       assert.deepEqual(snapshotApp(), before, 'The extracted app changed during smoke');
     }
-    process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
+    process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: prebind lock/login/logout and authority denial, five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
   } catch (error) {
     if (stderr) process.stderr.write(stderr);
     throw error;
