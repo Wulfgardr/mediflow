@@ -84,6 +84,21 @@ test('missing, empty, malformed and failed streams preserve parse failure', asyn
     assert.equal(nonBytes.locked, false);
 });
 
+test('empty-object opt-in preserves DELETE trim semantics without changing reader defaults', async () => {
+    for (const raw of [undefined, '', ' \r\n\t', '\u00a0\uFEFF']) {
+        const request = () => new Request('http://127.0.0.1', { method: 'DELETE', body: raw });
+        for (const semantics of ['strict', 'request-json'] as const) {
+            assert.deepEqual(await readBoundedJsonBody(request(), 32, semantics), { ok: false, status: 400 });
+        }
+        assert.deepEqual(await readBoundedJsonBody(request(), 32, 'request-json', undefined, 'empty-object'),
+            { ok: true, value: {}, byteLength: raw === undefined ? 0 : encoder.encode(raw).length });
+    }
+    assert.deepEqual(await readBoundedJsonBody(fixture([encoder.encode(' '.repeat(33))]).request,
+        32, 'request-json', undefined, 'empty-object'), { ok: false, status: 413 });
+    assert.deepEqual(await readBoundedJsonBody(fixture([encoder.encode('{')]).request,
+        32, 'request-json', undefined, 'empty-object'), { ok: false, status: 400 });
+});
+
 test('Request.json semantics are opt-in; existing strict duplicate/UTF-8 rejection stays', async () => {
     const samples = [
         encoder.encode('{"x":1,"x":2}'),
