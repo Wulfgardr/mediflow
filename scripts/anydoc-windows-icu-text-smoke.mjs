@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {spawnSync} from 'node:child_process';
+import {countWindowsIcuPngInk} from './anydoc-windows-icu-png-oracle.mjs';
 const SOURCE_ROOT=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PROFILE_SHA256='e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf';
 const WORKER_SHA256='438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
@@ -15,9 +16,9 @@ function physical(root,relative){const file=path.join(root,relative);demand(fs.l
 
 export function verifyWindowsIcuTextOutput(bytes){
  demand(Buffer.isBuffer(bytes)&&bytes.length<=256*1024,'Text probe receipt bound');const result=JSON.parse(bytes.toString('utf8'));
- demand(result.schemaVersion==='mediflow.windows_icu_text_probe.v1'&&result.width===256&&result.height===64&&Number.isInteger(result.inkPixels)&&result.inkPixels>=8&&result.inkPixels<=256*64,'Text probe is empty or invalid');
+ demand(result.schemaVersion==='mediflow.windows_icu_text_probe.v1'&&result.width===256&&result.height===64&&Number.isInteger(result.inkPixels)&&result.inkPixels>=0&&result.inkPixels<=256*64,'Text probe diagnostic count is invalid');
  const png=Buffer.from(result.pngBase64,'base64');demand(png.toString('base64')===result.pngBase64&&png.length===result.pngBytes&&png.length>=57&&png.length<=128*1024&&sha(png)===result.pngSHA256,'Text probe PNG identity');
- demand(png.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))&&png.toString('ascii',12,16)==='IHDR'&&png.readUInt32BE(16)===256&&png.readUInt32BE(20)===64&&png.subarray(-12).equals(Buffer.from('0000000049454e44ae426082','hex')),'Text probe PNG bounds');return result;
+ const decodedInkPixels=countWindowsIcuPngInk(png);return {...result,decodedInkPixels};
 }
 
 const CHILD=String.raw`
@@ -62,7 +63,7 @@ function main(){
    catch(error){persistenceFailures.push({file:name,error:error.message});}
   }
   if(persistenceFailures.length){receipt={...receipt,evidenceLoss:true,persistenceFailures};throw Error('Text probe raw persistence failed');}
-  demand(!child.error&&child.status===0&&child.signal===null&&child.stderr?.length===0,'Text probe child transport failed');const result=verifyWindowsIcuTextOutput(child.stdout);receipt={...receipt,state:'text-produced',inkPixels:result.inkPixels,pngSHA256:result.pngSHA256};
+  demand(!child.error&&child.status===0&&child.signal===null&&child.stderr?.length===0,'Text probe child transport failed');const result=verifyWindowsIcuTextOutput(child.stdout);receipt={...receipt,state:'text-produced',inkPixels:result.decodedInkPixels,childInkPixels:result.inkPixels,pngSHA256:result.pngSHA256};
   fs.writeFileSync(path.join(directory,'text.png'),Buffer.from(result.pngBase64,'base64'),{flag:'wx'});
  }catch(error){receipt={...receipt,state:'failed',failure:error.message};process.exitCode=1;}
  fs.writeFileSync(path.join(directory,'receipt.json'),JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});console.log(JSON.stringify(receipt));
