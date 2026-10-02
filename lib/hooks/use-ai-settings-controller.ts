@@ -93,6 +93,7 @@ export function useAiSettingsController() {
         manualConfig: { ...DEFAULT_AI_INSIGHT_MANUAL_CONFIG },
     });
     const [isSavingAi, setIsSavingAi] = useState(false);
+    const [aiSettingsLoadState, setAiSettingsLoadState] = useState<'loading' | 'ready' | 'failed'>('loading');
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [aiHealth, setAiHealth] = useState<AIHealthState | null>(null);
     const [patientInsightEnabled, setPatientInsightEnabled] = useState(true);
@@ -113,7 +114,7 @@ export function useAiSettingsController() {
         return () => { generation.value++; };
     }, [aiConfig]);
 
-    async function loadAiConfig() {
+    async function loadAiConfig(isCurrent: () => boolean) {
         try {
             await ensureTextModelDefaultsUpgraded();
             const safeGet = async (key: string) => {
@@ -141,6 +142,7 @@ export function useAiSettingsController() {
             if (!currentUrl || currentUrl.includes(':8080')) currentUrl = 'http://127.0.0.1:11434/v1';
 
             const insightSettings = await loadAIInsightStoredSettings();
+            if (!isCurrent()) return;
             setHardwareProfile((hardware?.value as HardwareProfile) || 'custom');
             setAiConfig({
                 provider: 'ollama',
@@ -157,13 +159,18 @@ export function useAiSettingsController() {
             setSmartImportEnabled(isAiSmartImportEnabledValue(smartImportKillSwitch?.value));
             setTreatmentReasoningEnabled(isAiTreatmentReasoningEnabledValue(treatmentReasoningKillSwitch?.value));
             setDocumentRouterControlFlowMode(parseDocumentRouterControlFlowMode(documentRouterControlFlow?.value));
+            setAiSettingsLoadState('ready');
         } catch (e) {
+            if (!isCurrent()) return;
             console.error('Failed to load AI config:', e);
+            setAiSettingsLoadState('failed');
         }
     }
 
     useEffect(() => {
-        void loadAiConfig();
+        let current = true;
+        void loadAiConfig(() => current);
+        return () => { current = false; };
     }, []);
 
     const applyHardwareProfile = (profile: Exclude<HardwareProfile, 'custom'>) => {
@@ -200,6 +207,7 @@ export function useAiSettingsController() {
     };
 
     const saveAiConfig = async () => {
+        if (aiSettingsLoadState !== 'ready') return;
         setIsSavingAi(true);
         try {
             await db.settings.put({ key: 'hardwareProfile', value: hardwareProfile });
@@ -324,6 +332,7 @@ export function useAiSettingsController() {
         aiInsightSettings,
         setAiInsightSettings,
         isSavingAi,
+        aiSettingsLoadState,
         aiTestStatus,
         aiHealth,
         patientInsightEnabled,
