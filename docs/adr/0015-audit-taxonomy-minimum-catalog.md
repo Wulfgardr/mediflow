@@ -749,6 +749,19 @@ Create produce checkup.created; update e restore checkup.updated; un deletedAt
 non nullo effettivamente applicato produce checkup.deleted, come gia previsto.
 Omissione, null esplicito e tombstone sono distinti.
 
+Riconciliazione documentale della sola coorte checkup: questa decisione Accepted,
+integrata in `34719db232801ae29bba72ed9aad2c0533041901` il 26 settembre 2026,
+supersedes l'esito race-specifico 409 con snapshot mancante descritto in
+`docs/web-patient-edit-and-analytics-085.md`, sezione «Seconda revisione combinata:
+disponibilità del genitore», integrata in
+`4f2aa312c9404a3f2b5118bde165851c379a28cc` il 5 settembre 2026. La spiegazione
+storica resta conservata in quel documento. Una cancellazione gia committata
+al riesame transazionale del padre restituisce 404 senza effetti sul figlio o
+sul suo audit; una connessione concorrente non puo committare durante il writer
+lock IMMEDIATE. Il conflitto di versione del figlio disponibile rimane 409.
+La riconciliazione adegua documenti e fixture al comportamento corrente, senza
+modificare produzione, schema, locking o contratti di altre coorti.
+
 Questa tranche non introduce una migrazione degli input. Restano invariati i
 normalizzatori condivisi e le differenze osservate tra superfici: Web POST
 ammette date numerica zero e source testuale libera; v1/rete conservano le
