@@ -24,7 +24,7 @@ const recommended = [
 ];
 
 export default function SettingsAiModelsPage() {
-    const { hardwareProfile, aiConfig, setAiConfig, isSavingAi, aiTestStatus, aiHealth,
+    const { hardwareProfile, aiConfig, setAiConfig, isSavingAi, aiSettingsLoadState, aiTestStatus, aiHealth,
         applyHardwareProfile, saveAiConfig, testAiConnection } = useAiSettingsController();
 
     return (
@@ -34,6 +34,14 @@ export default function SettingsAiModelsPage() {
 
             {/* @Codex: account control is separate from function/model preferences. */}
             <ChatGptAccountPanel />
+
+            {aiSettingsLoadState !== 'ready' && <p role="status">
+                {aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…'
+                    : 'Impossibile leggere le impostazioni. Ricarica questa pagina prima di modificarle.'}
+            </p>}
+            <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
+                aria-label="Impostazioni dei modelli locali" data-testid="ai-settings-controls"
+                className={`min-w-0 border-0 p-0 ${styles.surface}`}>
 
             {/* @Codex: presets remain explicit draft changes through the existing controller. */}
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
@@ -127,6 +135,7 @@ export default function SettingsAiModelsPage() {
                 <p className={styles.hint}>I risultati restano proposte da rivedere prima dell’uso. Salvare il modello non equivale ad ammettere il provider o a verificare una funzione clinica.</p>
             </div>
 
+            </fieldset>
             <LocalProviderOnboardingPanel />
         </section>
     );
