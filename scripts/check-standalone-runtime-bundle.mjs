@@ -15,7 +15,7 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '31fce8c00c25edd20f7f4442edc9fe00d659599e436cc5166b4be4950f7f3a67';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
 const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
@@ -145,14 +145,35 @@ function bundledPdfPageWorkerFailure(standaloneDir) {
     const profileManifestPath = path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json');
     if (!fs.lstatSync(profileManifestPath).isFile()
         || createHash('sha256').update(fs.readFileSync(profileManifestPath)).digest('hex')
-          !== '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41') return 'Standalone renderer manifest digest does not match the pinned child.';
+          !== 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf') return 'Standalone renderer manifest digest does not match the pinned child.';
     // @Codex: required even when the optional OCR model is not provisioned.
     const manifestPath = path.join(root, 'scripts', 'anydoc-tesseract-artifacts.json');
     if (!fs.lstatSync(manifestPath).isFile()
         || createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex')
           !== '0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978') return 'Standalone OCR artifact manifest digest does not match the pinned child.';
+    const icuFailure = standaloneWindowsIcuDataFailure(root);
+    if (icuFailure) return icuFailure;
   } catch {
     return 'Standalone runtime does not contain the PDF page worker.';
+  }
+  return null;
+}
+
+function standaloneWindowsIcuDataFailure(standaloneDir, platform = process.platform, arch = process.arch) {
+  if (platform !== 'win32' || arch !== 'x64') return null;
+  try {
+    const root = fs.realpathSync(standaloneDir);
+    const profiles = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+    const profile = profiles.find((entry) => entry.platform === platform && entry.arch === arch);
+    const asset = profile?.icuData;
+    if (profile?.package !== '@napi-rs/canvas-win32-x64-msvc' || asset?.file !== 'icudtl.dat') throw new Error();
+    const file = path.join(root, 'node_modules', profile.package, asset.file);
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.isSymbolicLink() || fs.realpathSync(file) !== file
+        || stat.size !== asset.byteLength
+        || createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== asset.sha256) throw new Error();
+  } catch {
+    return 'Standalone Windows renderer ICU data is missing, nonphysical or does not match its pinned bytes.';
   }
   return null;
 }
@@ -699,6 +720,42 @@ function runWebAuthOwnerSelfTest() {
   }
 }
 
+function runWindowsIcuSelfTest() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-windows-icu-checker-'));
+  const backend = path.join(root, 'node_modules', '@napi-rs', 'canvas-win32-x64-msvc');
+  const file = path.join(backend, 'icudtl.dat');
+  const bytes = Buffer.from('Synthetic ICU asset: checker fixture, never native-loaded.');
+  const profiles = [{ platform: 'win32', arch: 'x64', package: '@napi-rs/canvas-win32-x64-msvc',
+    icuData: { file: 'icudtl.dat', byteLength: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex') } }];
+  const check = () => standaloneWindowsIcuDataFailure(root, 'win32', 'x64');
+  try {
+    fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
+    fs.mkdirSync(backend, { recursive: true });
+    fs.writeFileSync(path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json'), JSON.stringify(profiles));
+    fs.writeFileSync(file, bytes);
+    if (check() !== null) throw new Error('valid physical ICU fixture rejected');
+    fs.rmSync(file);
+    if (!check()) throw new Error('missing Windows ICU passed');
+    fs.writeFileSync(file, Buffer.alloc(bytes.length, 1));
+    if (!check()) throw new Error('same-size corrupt Windows ICU passed');
+    fs.writeFileSync(file, bytes.subarray(1));
+    if (!check()) throw new Error('truncated Windows ICU passed');
+    fs.writeFileSync(file, bytes);
+    fs.renameSync(file, file + '.real');
+    fs.symlinkSync(file + '.real', file);
+    if (!check()) throw new Error('symlinked Windows ICU passed');
+    fs.rmSync(file);
+    fs.renameSync(file + '.real', file);
+    fs.renameSync(backend, backend + '-real');
+    fs.symlinkSync(backend + '-real', backend, process.platform === 'win32' ? 'junction' : 'dir');
+    if (!check()) throw new Error('symlinked Windows ICU package passed');
+    for (const [platform, arch] of [['darwin', 'arm64'], ['linux', 'x64'], ['win32', 'arm64']]) {
+      if (standaloneWindowsIcuDataFailure(root, platform, arch) !== null) throw new Error('ICU widened target scope');
+    }
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+}
+
 function runSelfTest() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-checker-self-test-'));
   const scriptsDir = path.join(root, 'scripts');
@@ -928,6 +985,9 @@ function runPdfRetirementSelfTest() {
 }
 
 
+if (process.argv[2] === '--self-test=windows-icu') {
+  runWindowsIcuSelfTest(); process.exit(0);
+}
 if (process.argv[2] === '--self-test=treatment-portable') {
   console.log(JSON.stringify(runTreatmentPortableSelfTest())); process.exit(0);
 }

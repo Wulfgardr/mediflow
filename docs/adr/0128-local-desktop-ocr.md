@@ -41,7 +41,8 @@ questa selezione non applicabile. La smoke Tesseract sul Mac richiede
 su Mac: non va usata per il pacchetto firmato/ricollocato. Il renderer Mac
 e i suoi guard di packaging/versione restano invariati.
 Il tracing Next seleziona dal manifest il profilo Windows/Linux del build
-host e include esplicitamente package.json, binario e README, senza wildcard
+host e include esplicitamente package.json, binario, README e il sidecar ICU
+Windows descritto sotto, senza wildcard
 su tutti i backend. La configurazione non prova la presenza nel bundle
 costruito: i controlli del pacchetto target restano necessari.
 Windows ARM con Node x64 emulato appartiene al profilo x64 e richiede prova
@@ -85,6 +86,34 @@ le route OCR legacy restano ritirate. La UI deve validare la provenienza prima
 di usare i conteggi OCR; non puo chiamare un successo desktop «su questo Mac».
 
 ## Qualifica e arresto
+
+### Asset ICU del renderer Windows
+
+Il package ufficiale `@napi-rs/canvas-win32-x64-msvc@0.1.100` include
+`icudtl.dat`: 10.468.208 byte, SHA-256
+`9ae98c06cbb0ea43c5cd6b5725310c008c65e46072421a1118cb88e1de9a8b92`.
+La provenienza e il tarball gia fissato nel profilo, SHA-256
+`a918366995d85d6989bd85c1c82f21eae90479cb1df40c2d6867ccb00338595b`;
+il [manifest upstream della versione](https://raw.githubusercontent.com/Brooooooklyn/canvas/db337893b9b53483050ca7b24c6d306e4da06741/npm/win32-x64-msvc/package.json)
+elenca il sidecar insieme al binary. Il tracing Windows x64 conserva entrambi.
+Worker, controllo standalone e preflight desktop verificano il file fisico,
+la dimensione e il digest prima dell'ingresso nel renderer native. Un asset
+mancante, alterato o risolto tramite symlink nega la disponibilita; nessun
+recupero, download o ricerca di dati ICU nella directory di Node.
+
+La prova distinta `scripts/anydoc-windows-icu-text-smoke.mjs STANDALONE NEW_RECEIPTS`
+va eseguita su Windows x64/Node 24.21.0 soltanto dopo review della candidata
+e autorizzazione dell'esperimento. Esegue un solo child: registra esplicitamente
+il font Liberation Sans gia pinned in `pdfjs-dist@4.10.38`, chiama `fillText`
+e richiede un PNG 256x64 non vuoto. Il parent verifica chunk/CRC, decodifica
+IDAT con un limite pari all'immagine e conta almeno otto pixel scuri dopo la
+composizione su bianco; il conteggio del child resta solo diagnostico.
+Mantiene 30 secondi, heap 256 MiB,
+maxBuffer 4 MiB e l'ambiente originale; salva entrambi i raw prima della
+valutazione, senza retry. Il probe non e importato dal prodotto e non e un
+rerun del corpus font A/B. I test simulati del preflight non dimostrano
+l'esito di questa prova native Windows. Questa chiusura non qualifica OCR,
+font mancanti, il precedente timeout PDF o errori Chromium `ERR_ABORTED`.
 
 Test di protocollo con fakes provano solo contratti e recupero. La prova OCR
 richiede raster interamente sintetici e il motore reale con digest registrati.
