@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join, parse, resolve, sep } from 'node:path';
 import type { Page, Request as BrowserRequest } from '@playwright/test';
+import { installProductResponseDiagnostic, productDiagnosticHeaders } from './chatgpt-product-response-diagnostic.ts';
 
 export const CONTRACT_DIAGNOSTIC_MAX_EVENTS = 64;
 export const CONTRACT_DIAGNOSTIC_MAX_FILE_BYTES = 32 * 1024;
@@ -13,7 +14,7 @@ type DiagnosticHost = typeof globalThis & { __mfContractDiagnostic?: {
     snapshot(): RendererCapture;
 } };
 
-/** Installed only in the synthetic HTTP contract page. No fetch/reader wrapper. */
+/** Bounded recorder for synthetic pages. No fetch/reader wrapper. */
 export function installContractDiagnostic() {
     const events: Event[] = [], bytes: number[] = [];
     let dropped = 0, byteCount = 0, observerErrors = 0;
@@ -37,6 +38,11 @@ export function installContractDiagnostic() {
         },
         snapshot() { return { events: events.slice(), dropped, byteCount, bytes: bytes.slice(), observerErrors }; },
     }) });
+}
+
+/** One init script guarantees recorder-before-observer order, even under Playwright. */
+export function productDiagnosticInitScript() {
+    return { content: `(${installContractDiagnostic.toString()})();(${installProductResponseDiagnostic.toString()})();` };
 }
 
 /** Original sole consumer, including its unconditional finally cancel. */
@@ -78,6 +84,9 @@ async function deadline<T>(work: Promise<T>): Promise<T> {
 /** Bounded forensic side channel. Its data never participates in oracle success. */
 export function createContractDiagnostic(mode: string, outputDirectory: string) {
     if (!/^[a-z][a-z0-9-]{0,40}$/u.test(mode)) throw new Error('DIAGNOSTIC_CASE_INVALID');
+    const describeFailure = (error: unknown) => mode.startsWith('product-')
+        ? { name: 'ProductDiagnosticFailure', message: error instanceof Error && /^ORACLE_[A-Z_]+(?:: net::ERR_ABORTED)?$/u.test(error.message) ? error.message : 'product-observation-failed' }
+        : failureText(error);
     const events: Event[] = [];
     let dropped = 0, observerErrors = 0, oracleFailure: ReturnType<typeof failureText> | null = null;
     let testFailure: ReturnType<typeof failureText> | null = null, renderer: RendererCapture | null = null;
@@ -93,13 +102,14 @@ export function createContractDiagnostic(mode: string, outputDirectory: string) 
     }
     return {
         record,
-        attach(page: Page, url: string) {
+        attach(page: Page, url: string, operation?: 'consent' | 'login/complete') {
             let selected: BrowserRequest | undefined, requests = 0;
-            const onRequest = (request: BrowserRequest) => { if (request.url() === url && request.method() === 'POST') { selected ??= request; record('request', { number: ++requests, navigation: request.isNavigationRequest() }); } };
-            const onResponse = (response: import('@playwright/test').Response) => { if (response.request() === selected) { const headers = response.headers(); record('response', { status: response.status(), headers: ['content-type', 'content-length', 'cache-control'].map(name => [name, headers[name]?.slice(0, 128) ?? null]) }); } };
-            const onFinished = (request: BrowserRequest) => { if (request === selected) record('requestfinished'); };
-            const onFailed = (request: BrowserRequest) => { if (request === selected) record('requestfailed', { error: request.failure()?.errorText.slice(0, 256) ?? null }); };
-            const onNavigation = (frame: import('@playwright/test').Frame) => { if (frame === page.mainFrame()) record('navigation', { url: frame.url().slice(0, 256) }); };
+            const identity = operation ? { operation, request: `${operation}:1` } : {};
+            const onRequest = (request: BrowserRequest) => { if (request.url() === url && request.method() === 'POST') { selected ??= request; record('request', { ...identity, number: ++requests, navigation: request.isNavigationRequest() }); } };
+            const onResponse = (response: import('@playwright/test').Response) => { if (response.request() === selected) { const headers = response.headers(); record('response', { ...identity, status: response.status(), headers: operation ? productDiagnosticHeaders(name => headers[name]) : ['content-type', 'content-length', 'cache-control'].map(name => [name, headers[name]?.slice(0, 128) ?? null]) }); } };
+            const onFinished = (request: BrowserRequest) => { if (request === selected) record('requestfinished', operation ? identity : null); };
+            const onFailed = (request: BrowserRequest) => { if (request === selected) record('requestfailed', { ...identity, error: operation ? (request.failure()?.errorText === 'net::ERR_ABORTED' ? 'net::ERR_ABORTED' : 'other') : request.failure()?.errorText.slice(0, 256) ?? null }); };
+            const onNavigation = (frame: import('@playwright/test').Frame) => { if (frame === page.mainFrame()) record('navigation', operation ? { operation } : { url: frame.url().slice(0, 256) }); };
             const onClose = () => record('page.close'), onCrash = () => record('page.crash');
             page.on('request', onRequest); page.on('response', onResponse); page.on('requestfinished', onFinished); page.on('requestfailed', onFailed);
             page.on('framenavigated', onNavigation); page.on('close', onClose); page.on('crash', onCrash);
@@ -111,20 +121,20 @@ export function createContractDiagnostic(mode: string, outputDirectory: string) 
                 const renderer = await deadline(page.evaluate(() => performance.timeOrigin + performance.now()));
                 const nodeAfter = clock();
                 calibration = { nodeBefore, renderer, nodeAfter, offsetLower: nodeBefore - renderer, offsetUpper: nodeAfter - renderer };
-            } catch (error) { captureError = failureText(error); }
+            } catch (error) { captureError = describeFailure(error); }
         },
         observe<T>(result: Promise<T>): Promise<T> {
-            return result.catch(error => { oracleFailure = failureText(error); record('oracle.failure', oracleFailure); throw error; });
+            return result.catch(error => { oracleFailure = describeFailure(error); record('oracle.failure', oracleFailure); throw error; });
         },
         async run<T>(page: Page, consumer: () => Promise<unknown> | undefined, work: () => Promise<T>): Promise<T> {
             try { return await work(); }
-            catch (error) { testFailure = failureText(error); record('test.failure', testFailure); throw error; }
+            catch (error) { testFailure = describeFailure(error); record('test.failure', testFailure); throw error; }
             finally {
                 if (oracleFailure || testFailure) {
                     try { const current = consumer(); if (current) await deadline(current.then(() => undefined, () => undefined)); }
-                    catch (error) { captureError = failureText(error); }
+                    catch (error) { captureError = describeFailure(error); }
                     try { renderer = await deadline(page.evaluate(() => (globalThis as DiagnosticHost).__mfContractDiagnostic?.snapshot() ?? null)); }
-                    catch (error) { captureError = failureText(error); }
+                    catch (error) { captureError = describeFailure(error); }
                 }
             }
         },
