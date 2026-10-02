@@ -9,7 +9,7 @@ import rendererProfiles from '../../../scripts/anydoc-pdf-renderer-profiles.json
 import tesseractArtifacts from '../../../scripts/anydoc-tesseract-artifacts.json' with { type: 'json' };
 
 export const ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1' as const;
-export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '31fce8c00c25edd20f7f4442edc9fe00d659599e436cc5166b4be4950f7f3a67' as const;
+export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae' as const;
 export const ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS = 30_000;
 export const ANYDOC_PDF_CHILD_MAX_HEADER_BYTES = 64 * 1024;
 export const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
@@ -123,7 +123,7 @@ function resolveOwnedWorker(): { path: string; directory: string; root: string }
                 const profileManifest = path.join(root, 'scripts', 'anydoc-pdf-renderer-profiles.json');
                 if (!lstatSync(profileManifest).isFile() || !inside(root, realpathSync(profileManifest))
                     || createHash('sha256').update(readFileSync(profileManifest)).digest('hex')
-                    !== '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41') return null;
+                    !== 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf') return null;
                 const artifactManifest = path.join(root, 'scripts', 'anydoc-tesseract-artifacts.json');
                 if (!lstatSync(artifactManifest).isFile() || !inside(root, realpathSync(artifactManifest))
                     || createHash('sha256').update(readFileSync(artifactManifest)).digest('hex')
@@ -477,6 +477,15 @@ export function inspectAnyDocDesktopOcrCapability(options: Readonly<{ developmen
         if (!lstatSync(binaryPath).isFile() || !inside(worker.root, realpathSync(binaryPath))
             || statSync(binaryPath).size !== profile.binaryByteLength
             || createHash('sha256').update(readFileSync(binaryPath)).digest('hex') !== profile.binarySha256) throw new Error();
+        if (process.platform === 'win32') {
+            const asset = profile.icuData;
+            if (asset?.file !== 'icudtl.dat') throw new Error();
+            const assetPath = path.join(path.dirname(binaryPath), asset.file);
+            if (!lstatSync(assetPath).isFile() || lstatSync(assetPath).isSymbolicLink()
+                || realpathSync(assetPath) !== assetPath || !inside(worker.root, assetPath)
+                || statSync(assetPath).size !== asset.byteLength
+                || createHash('sha256').update(readFileSync(assetPath)).digest('hex') !== asset.sha256) throw new Error();
+        }
         return Object.freeze({ ...artifacts, rendererProfile: profile.package });
     } catch {
         return Object.freeze({ ...artifacts, status: 'unavailable' as const, reason: 'renderer_unavailable',

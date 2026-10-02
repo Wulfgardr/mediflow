@@ -22,8 +22,8 @@ const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrenc
 // Aliases and owner delivery stay guarded independently of standalone tracing additions.
 const NEXT_RESOLVER_AST_SHA256 = '6f82f937e84472448200761daf22e3629b9d4683f2fd9161c5bf30979160cf70';
 const REVIEWED_TRACE_FILES = {
-    'scripts/anydoc-desktop-renderer-trace.mjs': 'd1e117793f872ceae0eab22dcc7e222830dba6f44ffd3f5228f13095941c6b5f',
-    'scripts/anydoc-pdf-renderer-profiles.json': '41355c1e4360acdc293aa383a07ba2c8216a8a018b0a38ac2a9ec5cc0fe37e41',
+    'scripts/anydoc-desktop-renderer-trace.mjs': '786ff72eaa6d8e35cf108e58fd23a675cba4e40b28dd5d2343ab831a41782723',
+    'scripts/anydoc-pdf-renderer-profiles.json': 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf',
 };
 const OWNER_DELIVERY_GLOB = `./node_modules/${PACKAGE}/**/*`;
 const EXPECTED_TSCONFIG_RESOLVER = {
