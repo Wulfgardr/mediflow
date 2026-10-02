@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "candidateHead": "9eed9141c3094fced548222d5c547b55fda61181",
+  "candidateTree": "938baa343a19ea438d562fcf92650c523709b2a5",
+  "candidateParents": [
+    "32c9e94dff73daa94b08f1a5ff09d404d51f4914"
+  ],
+  "files": [
+    {
+      "file": "docs/adr/0128-local-desktop-ocr.md",
+      "bytes": 8471,
+      "sha256": "65b3c66758ddd143cc913f1baba1eb5d1c9f99f93fa3c3c19482df28b07d20f2"
+    },
+    {
+      "file": "lib/domain/documents/anydoc-pdf-child-process-owner.ts",
+      "bytes": 31996,
+      "sha256": "7f9b8092e63a2366be47e97f7cd936ee14d924e2eaaf240df602e46b1bf7e0cf"
+    },
+    {
+      "file": "lib/domain/documents/anydoc-pdf-page-renderer.test.ts",
+      "bytes": 19441,
+      "sha256": "6e05f60256053ca9ae56c26745474f052dc655baec1190e65a2a43594731b4f7"
+    },
+    {
+      "file": "lib/security/web-auth-lifecycle-owner-resolver-boundary.test.ts",
+      "bytes": 16449,
+      "sha256": "c87ff54e0e3364b35598606cb2a152fb4c3c6020fd9c701c585e9b6fbca2abb5"
+    },
+    {
+      "file": "scripts/anydoc-desktop-renderer-trace.mjs",
+      "bytes": 649,
+      "sha256": "786ff72eaa6d8e35cf108e58fd23a675cba4e40b28dd5d2343ab831a41782723"
+    },
+    {
+      "file": "scripts/anydoc-desktop-renderer-trace.test.mjs",
+      "bytes": 1793,
+      "sha256": "f59fed885bd9a27e9f24399a61e9e47d3d51e2dfe0afb3853581ad0ee0751c33"
+    },
+    {
+      "file": "scripts/anydoc-pdf-page-worker.mjs",
+      "bytes": 23922,
+      "sha256": "438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae"
+    },
+    {
+      "file": "scripts/anydoc-pdf-renderer-profiles.json",
+      "bytes": 2231,
+      "sha256": "e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf"
+    },
+    {
+      "file": "scripts/anydoc-pdf-smoke-diagnostics.test.mjs",
+      "bytes": 10264,
+      "sha256": "9736b01c362590246ab51165b9c0438e85e81a449f6141cada0b90568919f647"
+    },
+    {
+      "file": "scripts/anydoc-windows-icu-png-oracle.mjs",
+      "bytes": 2931,
+      "sha256": "4cb8ce5a84ae76f87c8f940598fdb8f95d5d41cdcc5801248a2f11330bacdfdb"
+    },
+    {
+      "file": "scripts/anydoc-windows-icu-preflight.test.mjs",
+      "bytes": 5089,
+      "sha256": "3a32e4e2e2829caf5f965778e166ace4cb06515bf6eb3591ecf735253dec8c9d"
+    },
+    {
+      "file": "scripts/anydoc-windows-icu-text-smoke.mjs",
+      "bytes": 8291,
+      "sha256": "8bcb3145511647cecd37dcd5340ff09a3ea02fc25b5193f1108d71f548cbd1c9"
+    },
+    {
+      "file": "scripts/anydoc-windows-icu-text-smoke.test.mjs",
+      "bytes": 5209,
+      "sha256": "bbd924b14134c4da8affd8efd26b3dcacbfdadade619b0c1ddd67df93e236706"
+    },
+    {
+      "file": "scripts/check-standalone-runtime-bundle.mjs",
+      "bytes": 63878,
+      "sha256": "6356aecddd8ddc0aa5b1d6f16bba981bfc9c7a5828f8a4d6372e798e0dc80b8c"
+    },
+    {
+      "file": "scripts/check-standalone-runtime-bundle.test.mjs",
+      "bytes": 14220,
+      "sha256": "ecebca7880b237c43702deeb028cbad31e8f1094bb4e323927b6ecd99820b9f8"
+    },
+    {
+      "file": "package.json",
+      "bytes": 25928,
+      "sha256": "812bfe8363e21f899d9b319a3f7a18bd8de712023979de1b723a560cbe45e61f"
+    },
+    {
+      "file": "package-lock.json",
+      "bytes": 389582,
+      "sha256": "7b589bc317aa501fc5d121d121061af8a305e8e2cc661b3b162b9a7c6f0aa2d3"
+    },
+    {
+      "file": "scripts/node-runtime-contract.mjs",
+      "bytes": 3276,
+      "sha256": "55638610b2445124751f1bb4381ce84afac3bf4be405e5e5ee07474b0a96488b"
+    },
+    {
+      "file": "scripts/inventory-first-party-code.mjs",
+      "bytes": 11969,
+      "sha256": "1fe6fc4818b886924ee3955a08d8db2163660ba7eb0ddfd63c5b42d62f9b38c8"
+    },
+    {
+      "file": "scripts/inventory-first-party-code.test.mjs",
+      "bytes": 13360,
+      "sha256": "60ed9cbabaad6f133093e4dab991a32e91ed8c4ef0b59dac3e2af052c24d65af"
+    },
+    {
+      "file": "scripts/run-unit-suite.mjs",
+      "bytes": 1957,
+      "sha256": "82a06fb5722c5751b4b4b1dd8d317a38d518aa684648ac2bc87f09f298c57aa3"
+    }
+  ]
+}

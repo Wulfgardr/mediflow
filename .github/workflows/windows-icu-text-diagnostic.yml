@@ -1,0 +1,134 @@
+name: Windows ICU text diagnostic (nonqualifying)
+on:
+  push:
+    branches:
+      - diagnostic/windows-icu-text-20261002
+permissions:
+  contents: read
+concurrency:
+  group: windows-icu-text-20261002
+  cancel-in-progress: false
+jobs:
+  diagnostic:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/diagnostic/windows-icu-text-20261002' && github.event.created == true && github.run_attempt == 1 }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      MEDIFLOW_NEXT_DIST_DIR: .next
+    steps:
+      - name: Checkout exact diagnostic creation push
+        timeout-minutes: 2
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: diagnostic-source
+      - name: Checkout exact composed runtime candidate
+        timeout-minutes: 2
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.autocrlf
+          GIT_CONFIG_VALUE_0: 'false'
+        with:
+          ref: 9eed9141c3094fced548222d5c547b55fda61181
+          persist-credentials: false
+          fetch-depth: 1
+          path: candidate
+      - name: Select pinned Node
+        timeout-minutes: 3
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+      - name: Guard context, exact sources and fresh output
+        timeout-minutes: 1
+        run: |
+          node diagnostic-source/.diagnostics/windows-icu-text/activate.mjs prepare candidate receipts
+          if ($LASTEXITCODE -ne 0) { throw 'Activation prepare failed' }
+          $icuDataDir = Join-Path $env:RUNNER_TEMP 'mediflow-windows-icu-text-synthetic'
+          if (Test-Path $icuDataDir) { throw 'Synthetic data directory already exists' }
+          New-Item -ItemType Directory $icuDataDir | Out-Null
+          "MEDIFLOW_DATA_DIR=$icuDataDir" >> $env:GITHUB_ENV
+      - name: Install frozen lock once
+        timeout-minutes: 8
+        working-directory: candidate
+        run: |
+          npm ci
+          $icuExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/windows-icu-text/activate.mjs record ../receipts install $icuExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain install exit' }
+          exit $icuExit
+      - name: Claim one fresh compilation without the postbuild PDF renderer
+        timeout-minutes: 12
+        working-directory: candidate
+        run: |
+          node ../diagnostic-source/.diagnostics/windows-icu-text/activate.mjs begin . ../receipts
+          if ($LASTEXITCODE -ne 0) { throw 'Compile claim failed' }
+          npm run prebuild
+          $icuExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/windows-icu-text/activate.mjs record ../receipts prebuild $icuExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain prebuild exit' }
+          if ($icuExit -ne 0) { exit $icuExit }
+          npm --ignore-scripts run build
+          $icuExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/windows-icu-text/activate.mjs record ../receipts compile $icuExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain compile exit' }
+          exit $icuExit
+      - name: Write original runtime manifest and seal exact bundle
+        timeout-minutes: 2
+        working-directory: candidate
+        run: |
+          node scripts/node-runtime-contract.mjs write-standalone-manifest
+          $icuExit = $LASTEXITCODE
+          node ../diagnostic-source/.diagnostics/windows-icu-text/activate.mjs record ../receipts manifest $icuExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain manifest exit' }
+          if ($icuExit -ne 0) { exit $icuExit }
+          node ../diagnostic-source/.diagnostics/windows-icu-text/activate.mjs seal . ../receipts
+          exit $LASTEXITCODE
+      - name: Claim and observe the single bounded text child
+        timeout-minutes: 2
+        run: |
+          node diagnostic-source/.diagnostics/windows-icu-text/activate.mjs claim candidate receipts
+          if ($LASTEXITCODE -ne 0) { throw 'Observation claim failed' }
+          node candidate/scripts/anydoc-windows-icu-text-smoke.mjs candidate/.next/standalone receipts/observation
+          $icuExit = $LASTEXITCODE
+          node diagnostic-source/.diagnostics/windows-icu-text/activate.mjs record receipts observation $icuExit
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot retain observation exit' }
+          exit 1
+      - name: Collect closed synthetic receipt roster after any outcome
+        if: ${{ always() }}
+        timeout-minutes: 1
+        run: |
+          if (Test-Path diagnostic-source/.diagnostics/windows-icu-text/activate.mjs) {
+            node diagnostic-source/.diagnostics/windows-icu-text/activate.mjs collect receipts upload
+            exit $LASTEXITCODE
+          }
+          New-Item -ItemType Directory upload | Out-Null
+          @{ evidenceLoss = $true; releaseQualified = $false; failure = 'Activation source unavailable' } | ConvertTo-Json | Set-Content upload/retention.json
+          exit 1
+      - name: Retain synthetic evidence once
+        if: ${{ always() }}
+        timeout-minutes: 3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-icu-text-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: upload/**
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: false
+      - name: Enforce nonqualification
+        if: ${{ always() }}
+        timeout-minutes: 1
+        run: exit 1
