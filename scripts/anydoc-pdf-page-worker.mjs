@@ -216,6 +216,19 @@ async function loadRenderer() {
             const binary = readFileSync(binaryPath);
             if (binary.byteLength !== profile.binaryByteLength
                 || createHash('sha256').update(binary).digest('hex') !== profile.binarySha256) throw new EngineUnavailable();
+            // Windows Skia text initializes Unicode from its package-local ICU sidecar.
+            // Verify it before either renderer import can enter native initialization.
+            if (process.platform === 'win32') {
+                const asset = profile.icuData;
+                if (asset?.file !== 'icudtl.dat') throw new EngineUnavailable();
+                const assetPath = path.join(path.dirname(binaryPath), asset.file);
+                const assetStat = lstatSync(assetPath);
+                if (!assetStat.isFile() || assetStat.isSymbolicLink() || assetStat.size !== asset.byteLength
+                    || realpathSync(assetPath) !== assetPath) throw new EngineUnavailable();
+                const bytes = readFileSync(assetPath);
+                if (bytes.byteLength !== asset.byteLength
+                    || createHash('sha256').update(bytes).digest('hex') !== asset.sha256) throw new EngineUnavailable();
+            }
         }
     } catch { throw new EngineUnavailable(); }
     if (installedPdfJs !== PDFJS_VERSION || installedCanvas !== CANVAS_VERSION

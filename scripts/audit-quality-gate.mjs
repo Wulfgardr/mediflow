@@ -140,6 +140,19 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [serviceAuditContract('POST', 'network', 'create', 'item')] },
     { route: 'app/api/v1/network/service-prescription-items/[id]/route.ts', events: ['service.prescription_item.updated'],
         writerContracts: [serviceAuditContract('PUT', 'network', 'update', 'item')] },
+    /* @Codex: eight ordinary ambulatory writers, including test-container clear. */
+    { route: 'app/api/ambulatories/route.ts', events: ['ambulatory.created'],
+        writerContracts: [ambulatoryAuditContract('POST', 'host', 'create')] },
+    { route: 'app/api/ambulatories/[id]/route.ts', events: ['ambulatory.updated', 'ambulatory.deleted'],
+        writerContracts: [ambulatoryAuditContract('PUT', 'host', 'update'), ambulatoryAuditContract('DELETE', 'host', 'delete')] },
+    { route: 'app/api/ambulatories/clear/route.ts', events: ['ambulatory.cleared', 'patient.deleted'],
+        writerContracts: [ambulatoryAuditContract('POST', 'host', 'clear')] },
+    { route: 'app/api/v1/network/ambulatories/route.ts', events: ['ambulatory.created'],
+        writerContracts: [ambulatoryAuditContract('POST', 'network', 'create')] },
+    { route: 'app/api/v1/network/ambulatories/[id]/route.ts', events: ['ambulatory.updated', 'ambulatory.deleted'],
+        writerContracts: [ambulatoryAuditContract('PUT', 'network', 'update'), ambulatoryAuditContract('DELETE', 'network', 'delete')] },
+    { route: 'app/api/v1/network/ambulatories/clear/route.ts', events: ['ambulatory.cleared', 'patient.deleted'],
+        writerContracts: [ambulatoryAuditContract('POST', 'network', 'clear')] },
     { route: 'app/api/siss-handoffs/route.ts', events: ['siss.handoff.created'], reason: 'SISS handoff creation must stay PHI-safe auditable' },
     { route: 'app/api/siss-handoffs/[id]/route.ts', events: ['siss.handoff.updated', 'siss.handoff.deleted'], reason: 'SISS handoff update/delete must stay PHI-safe auditable' },
     { route: 'app/api/siss/context/route.ts', events: ['patient.siss.prescription.launch'], reason: 'prescription handoff launch must stay PHI-safe auditable' },
@@ -754,6 +767,121 @@ export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) 
         problems.push('service DML cardinality must be checked before audit');
     if (statements.length !== auditIndex + 2 || !ts.isReturnStatement(statements[auditIndex + 1]))
         problems.push('service success must directly follow mandatory audit');
+    return problems;
+}
+
+/* @Codex: explicit host and paired adapter roster for the eight ambulatory writes. */
+export function ambulatoryAuditContract(handler, mode, operation) {
+    const coreName = `${operation}Ambulatory`;
+    const serviceExport = mode === 'network' ? `${operation}NetworkAmbulatory` : coreName;
+    return {
+        handler, serviceModule: mode === 'network' ? '@/lib/network-ambulatory-write' : '@/lib/ambulatory-write',
+        serviceExport, ownerFile: 'lib/ambulatory-write.ts', ownerName: serviceExport,
+        adapterFile: mode === 'network' ? 'lib/network-ambulatory-write.ts' : null,
+        coreName, mode, operation, eventType: `ambulatory.${operation === 'clear' ? 'cleared' : `${operation}d`}`,
+        target: `ambulatory.${mode}.${operation}`, transactionalAmbulatory: true,
+    };
+}
+
+/* @Codex: source order and delegation guard; SQLite tests establish actual rollback. */
+export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource, adapterSource = null, clearSource = null }) {
+    const problems = validateDelegatedRouteAudit({
+        spec, routeSource, serviceSource: spec.mode === 'network' ? adapterSource ?? '' : coreSource,
+    });
+    if (spec.mode === 'network') {
+        const adapter = checkedSource(spec.adapterFile, adapterSource ?? '');
+        const entry = namedFunction(adapter.sourceFile, spec.serviceExport, true);
+        const binding = importedBinding(adapter.sourceFile, adapter.checker, './ambulatory-write', spec.coreName);
+        const calls = entry && binding ? bindingCalls(entry, adapter.checker, binding.symbol) : [];
+        const call = calls[0];
+        const mode = call?.arguments.at(-1);
+        if (!entry || !binding || calls.length !== 1 || !isReachableCall(call, entry)
+            || !ts.isStringLiteral(mode) || mode.text !== 'network'
+            || !ts.isReturnStatement(call.parent) || call.parent.parent !== entry.body) {
+            problems.push('paired adapter must directly return one admitted core call with network mode');
+        }
+    }
+    const core = checkedSource(spec.ownerFile, coreSource);
+    const owner = namedFunction(core.sourceFile, spec.coreName, true);
+    const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
+    const writer = importedBinding(core.sourceFile, core.checker, './security/audit', 'writeAuditEventInTransaction');
+    const table = importedBinding(core.sourceFile, core.checker, './schema', 'ambulatories');
+    if (!owner || !db || !writer || !table) return [...problems, 'ambulatory owner/imports missing'];
+    const calls = []; const visit = (node) => { if (ts.isCallExpression(node)) calls.push(node); ts.forEachChild(node, visit); }; visit(owner);
+    const transactions = calls.filter((node) => {
+        const callee = unwrap(node.expression);
+        return ts.isPropertyAccessExpression(callee) && callee.name.text === 'transaction'
+            && ts.isIdentifier(callee.expression) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(callee.expression), db.symbol);
+    });
+    const transaction = transactions.length === 1 ? transactions[0] : null;
+    const callback = transaction?.arguments[0] && unwrap(transaction.arguments[0]);
+    const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
+    const behavior = options && ts.isObjectLiteralExpression(options)
+        ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
+    if (!transaction || transaction.arguments.length !== 2 || !ts.isReturnStatement(transaction.parent)
+        || transaction.parent.parent !== owner.body || !isReachableCall(transaction, owner)
+        || !callback || !ts.isArrowFunction(callback) || !ts.isBlock(callback.body)
+        || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
+        || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
+        return [...problems, 'ambulatory owner must directly return one synchronous immediate transaction'];
+    }
+    const txName = callback.parameters[0].name.text;
+    const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
+    const expectedAudits = spec.operation === 'clear' ? 2 : 1;
+    if (auditCalls.length !== expectedAudits || auditCalls.some((call) =>
+        call.arguments.length !== 2 || !ts.isIdentifier(unwrap(call.arguments[0]))
+        || unwrap(call.arguments[0]).text !== txName
+        || call.pos < callback.body.pos || call.end > callback.body.end)) {
+        problems.push('ambulatory owner must write every required audit on the same transaction');
+    }
+    const ownerText = owner.getText(core.sourceFile);
+    const mainEvent = auditCalls.find((call) => call.getText(core.sourceFile).includes(`'${spec.eventType}'`));
+    if (!mainEvent || !mainEvent.getText(core.sourceFile).includes("'ambulatory'"))
+        problems.push('ambulatory main event and subject must be exact');
+    const statements = [...callback.body.statements];
+    if (!mainEvent || !ts.isExpressionStatement(mainEvent.parent)
+        || statements.at(-2) !== mainEvent.parent
+        || !ts.isReturnStatement(statements.at(-1)))
+        problems.push('ambulatory success must directly follow its mandatory audit');
+    const domainCalls = calls.filter((node) => {
+        const callee = unwrap(node.expression); const target = node.arguments[0] && unwrap(node.arguments[0]);
+        return ts.isPropertyAccessExpression(callee) && ['insert', 'update', 'delete'].includes(callee.name.text)
+            && ts.isIdentifier(callee.expression) && callee.expression.text === txName
+            && target && ts.isIdentifier(target) && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(target), table.symbol);
+    });
+    const expectedDml = spec.operation === 'clear' ? 1 : 2;
+    const guards = [...ownerText.matchAll(/\.changes\s*!==\s*1/gu)].length;
+    if (domainCalls.length !== expectedDml || guards < expectedDml
+        || domainCalls.some((call) => call.pos < callback.body.pos || call.end > mainEvent?.pos)) {
+        problems.push('ambulatory DML must be guarded before mandatory audit');
+    }
+    if (spec.operation === 'clear') {
+        const patientAudit = auditCalls.find((call) => call.getText(core.sourceFile).includes("'patient.deleted'"));
+        if (!patientAudit || patientAudit.pos > mainEvent?.pos
+            || !ts.isExpressionStatement(patientAudit.parent)
+            || !ownerText.includes('clearTestContainerByMembership(tx, ambulatoryId)')
+            || !ownerText.includes('for (const patient of result.clearedPatients)'))
+            problems.push('clear must audit each tombstoned patient before the ambulatory event');
+        const clear = clearSource ?? '';
+        if (!/tombstone\.changes\s*!==\s*1/u.test(clear)
+            || !/removedMembershipRows\s*!==\s*memberIds\.length/u.test(clear))
+            problems.push('clear helper must guard every patient and membership DML');
+    } else {
+        const helper = namedFunction(core.sourceFile, 'auditDefaultChange');
+        const helperText = helper?.getText(core.sourceFile) ?? '';
+        if (!ownerText.includes('auditDefaultChange(tx, context, surface,')
+            || !helperText.includes('writeAuditEventInTransaction(tx,')
+            || !helperText.includes("'ambulatory.updated'")
+            || !helperText.includes("changedFields: ['isDefault']"))
+            problems.push('indirect default change must have its own versioned audit');
+    }
+    const input = namedFunction(core.sourceFile, 'ambulatoryAuditInput');
+    const inputText = input?.getText(core.sourceFile) ?? '';
+    if (!inputText.includes('auditContextFromSession(context.session)')
+        || !inputText.includes('withAuditContextMetadata(actor, metadata)')
+        || !inputText.includes("'auth:paired-client'")
+        || inputText.includes('auditSourceSurfaceFromRequest'))
+        problems.push('ambulatory actor and surface must derive from admitted context');
     return problems;
 }
 
@@ -2250,7 +2378,7 @@ function checkAuditWriterControlFlow(findings) {
     const contracts = REQUIRED_ROUTE_AUDIT.flatMap((entry) =>
         (entry.writerContracts ?? []).filter((contract) => !contract.modes
             && !contract.transactionalPatientUpdate && !contract.transactionalPatientDelete
-            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup && !contract.transactionalProsthetic && !contract.transactionalService)
+            && !contract.transactionalDiary && !contract.transactionalTherapy && !contract.transactionalObservation && !contract.transactionalCheckup && !contract.transactionalProsthetic && !contract.transactionalService && !contract.transactionalAmbulatory)
             .map((contract) => ({ ...contract, route: entry.route })));
     const parsedFiles = new Map();
     for (const contract of contracts) {
@@ -2359,6 +2487,12 @@ function checkRouteCoverage(findings) {
                         ? validateRequiredCheckupAudit({
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             bridgeSource: exists(contract.bridgeFile) ? read(contract.bridgeFile) : null,
+                        })
+                    : contract.transactionalAmbulatory
+                        ? validateRequiredAmbulatoryAudit({
+                            spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
+                            adapterSource: contract.adapterFile ? read(contract.adapterFile) : null,
+                            clearSource: read('lib/test-container-clear.ts'),
                         })
                     : contract.transactionalService
                         ? validateRequiredServiceAudit({ spec: contract, routeSource: source, coreSource: read(contract.ownerFile) })

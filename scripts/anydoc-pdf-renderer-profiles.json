@@ -21,7 +21,12 @@
     "tarballSha256": "a918366995d85d6989bd85c1c82f21eae90479cb1df40c2d6867ccb00338595b",
     "binary": "skia.win32-x64-msvc.node",
     "binaryByteLength": 27294720,
-    "binarySha256": "0f76fb0648fbff832856f6ce202059fc3fa38be7ad925300e96935906ea11132"
+    "binarySha256": "0f76fb0648fbff832856f6ce202059fc3fa38be7ad925300e96935906ea11132",
+    "icuData": {
+      "file": "icudtl.dat",
+      "byteLength": 10468208,
+      "sha256": "9ae98c06cbb0ea43c5cd6b5725310c008c65e46072421a1118cb88e1de9a8b92"
+    }
   },
   {
     "platform": "linux",

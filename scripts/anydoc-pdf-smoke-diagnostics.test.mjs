@@ -11,7 +11,7 @@ import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '31fce8c00c25edd20f7f4442edc9fe00d659599e436cc5166b4be4950f7f3a67';
+const WORKER_HASH = '438a8a5c417abbdc7268888a4202c4bad112089425cf5dfda952e9981844d9ae';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {
@@ -168,8 +168,18 @@ test('real checker still exits 1 on an intentionally incomplete physical package
     'check-standalone-runtime-bundle.mjs', 'anydoc-pdf-smoke-diagnostics.mjs',
     'node-runtime-contract.mjs', 'anydoc-pdf-page-worker.mjs',
     'anydoc-pdf-renderer-profiles.json', 'anydoc-tesseract-artifacts.json',
+    'treatment-reasoning-portable-setup.mjs',
   ]) {
     fs.copyFileSync(path.join(root, 'scripts', name), path.join(directory, 'scripts', name));
+  }
+  // Preserve the checker's existing import closure so this fixture reaches PDF smoke.
+  for (const relative of [
+    'lib/ai-providers/fabric/treatment-reasoning-portable-provisioning.ts',
+    'lib/athena-model-identity.ts',
+  ]) {
+    const target = path.join(directory, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(root, relative), target);
   }
   const copiedWorker = fs.readFileSync(path.join(directory, 'scripts', 'anydoc-pdf-page-worker.mjs'));
   assert.equal(createHash('sha256').update(copiedWorker).digest('hex'), WORKER_HASH);

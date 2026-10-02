@@ -841,3 +841,46 @@ audit FAIL/IGNORE e DML ignorata per le dieci mutazioni, cascata, concorrenza,
 negazioni e rilettura. Adapter HTTP reali e percorso Web sintetico completano
 la prova; review indipendente e CI sono richieste prima del merge. Questa
 coorte non chiude WUL-720 e non qualifica la release o il deployment clinico.
+
+
+### WUL-720 — ambulatori e svuotamento del contenitore di prova (27 settembre 2026)
+
+Le otto operazioni esistenti di creazione, modifica, cancellazione e svuotamento
+ambulatorio, su Web host e client paired, adottano lo stesso confine sincrono
+`IMMEDIATE` per lettura della versione, modifiche e audit obbligatorio. Non sono
+introdotte operazioni Headless o capability; i controlli delle route restano
+invariati, incluso il vincolo amministratore per lo svuotamento. La capability
+paired mantiene la sua autorità sugli ambulatori, senza trasformarla nello scope
+paziente della singola cartella.
+
+- L'evento `ambulatory.created`, `ambulatory.updated`, `ambulatory.deleted` o
+  `ambulatory.cleared` deve essere persistito prima del commit. Le modifiche
+  indirette del predefinito producono `ambulatory.updated` per ogni ambulatorio
+  superstite interessato, con la versione risultante e il solo campo
+  `isDefault`; il fallimento di qualsiasi evento annulla l'intera operazione.
+- Ogni DML ammesso verifica la cardinalità attesa. Un comando ignorato dopo una
+  modifica precedente causa rollback, non un conflitto restituito dopo un
+  commit parziale. Le richieste già obsolete conservano il risultato 409 senza
+  modifiche. Formati, normalizzazione e payload di risposta restano invariati.
+- Lo svuotamento conserva il contratto di ADR 0066: solo ambulatori di prova,
+  selezione dalla membership, preservazione di ogni paziente con appartenenza
+  anche a un ambulatorio operativo (tipo nullo incluso), tombstone dei soli
+  pazienti attivi esclusivamente di prova, figli intatti e cancellazioni
+  pregresse inalterate. La colonna legacy non seleziona i pazienti.
+- Versione dell'ambulatorio, tombstone, rimozione delle membership, un
+  `patient.deleted` per paziente effettivamente cancellato e l'evento
+  `ambulatory.cleared` appartengono alla stessa transazione. La cardinalità
+  della rimozione delle membership deve corrispondere alle righe selezionate.
+  Un errore sul secondo paziente o sul suo audit annulla anche il primo.
+- L'audit deriva attore e superficie dal contesto autenticato; conserva i flag
+  paired, non accetta la superficie dichiarata dal chiamante e non include
+  nomi, indirizzi, descrizioni o dati clinici. La versione di un elemento
+  rimosso è quella precedente; per aggiornamenti e svuotamento è quella
+  risultante. Il tombstone paziente conserva la versione pre-rimozione già
+  prevista dalla tassonomia.
+
+Le prove di accettazione usano SQLite reale e dati sintetici: guasti audit
+`FAIL`/`IGNORE`, DML ignorato su righe principali e secondarie, versioni obsolete,
+retry deliberato, predefinito e fallback, casi di membership e percorsi Web e
+paired. Questa coorte non completa gli altri domini o la normalizzazione
+complessiva degli errori richiesta da WUL-720.
