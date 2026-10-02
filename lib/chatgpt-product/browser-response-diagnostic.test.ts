@@ -303,3 +303,46 @@ test('successful real product consumption still needs EOF and requestfinished an
     assert.equal(existsSync(join(directory, 'artifact')), false); assert.equal(page.fetches, 1);
     await page.disposeObservation(); oracle.dispose(); assert.equal(page.eventNames().length, 0);
 });
+
+test('two product POSTs keep browser, renderer and gateway evidence exclusively on the first request', async t => {
+    const page = new ProductPage('login/complete'), d = createContractDiagnostic('product-two-posts', join(ownedDirectory(t), 'artifact'));
+    const wire = createProductWireDiagnostic(d.record), requests: Array<typeof page.request> = [];
+    wire.activate();
+    page.context.fetch = (_input: unknown, init?: RequestInit) => {
+        assert.equal(init?.method, 'POST'); page.fetches++;
+        const first = requests.length === 0, request = { ...page.request, failure: () => first && page.failed ? { errorText: 'net::ERR_ABORTED' } : null };
+        requests.push(request);
+        const response = new Response(bytes, { status: first ? 409 : 200, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json' } });
+        Object.defineProperty(response, 'url', { value: url }); Object.defineProperty(response, 'type', { value: 'basic' });
+        const trace = wire.select('login/complete', 'POST');
+        trace?.('server.request'); trace?.('server.response', { status: response.status }); trace?.('server.finish', { writableFinished: true });
+        page.emit('request', request);
+        page.emit('response', { request: () => request, status: () => response.status, headers: () => Object.fromEntries(response.headers.entries()) });
+        return Promise.resolve(response);
+    };
+    runInContext(productDiagnosticInitScript().content, page.context); d.attach(page.asPage(), url, 'login/complete');
+    const consumer = page.evaluate(async () => {
+        for (let index = 0; index < 2; index++) {
+            const controller = new AbortController(), response = await fetch('/api/settings/ai/chatgpt/synthesis/login/complete', { method: 'POST', signal: controller.signal });
+            await (globalThis as typeof globalThis & { readResponse(response: Response, signal: AbortSignal): Promise<unknown> }).readResponse(response, controller.signal);
+        }
+    });
+    const primary = new Error('ORACLE_NETWORK_FAILED: net::ERR_ABORTED');
+    await assert.rejects(d.run(page.asPage(), () => consumer, async () => {
+        await consumer;
+        assert.equal(requests.length, 2); assert.notStrictEqual(requests[0], requests[1]);
+        page.failed = true; page.emit('requestfailed', requests[0]); page.emit('requestfinished', requests[1]);
+        return await d.observe(Promise.reject(primary));
+    }), error => error === primary);
+    const file = d.persist(); assert.ok(file); const saved = JSON.parse(readFileSync(file, 'utf8'));
+    type SavedEvent = { kind: string; detail: { request?: string; number?: number; status?: number } };
+    const node: SavedEvent[] = saved.node.events, renderer: SavedEvent[] = saved.renderer.events;
+    assert.deepEqual(node.filter(e => e.kind === 'request').map(e => [e.detail.request, e.detail.number]), [['login/complete:1', 1]]);
+    assert.deepEqual(node.filter(e => e.kind === 'response').map(e => e.detail.status), [409]);
+    assert.deepEqual(node.filter(e => e.kind === 'requestfailed').map(e => e.detail.request), ['login/complete:1']);
+    assert.equal(node.filter(e => e.kind === 'requestfinished').length, 0);
+    assert.deepEqual(node.filter(e => e.kind === 'server.response').map(e => e.detail.status), [409]);
+    assert.deepEqual(renderer.filter(e => e.kind === 'controller.fetch').map(e => e.detail.request), ['login/complete:1']);
+    assert.deepEqual(renderer.filter(e => e.kind === 'renderer.response').map(e => e.detail.status), [409]);
+    assert.equal(page.fetches, 2); await page.disposeObservation(); assert.equal(page.eventNames().length, 0);
+});
