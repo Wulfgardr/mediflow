@@ -105,7 +105,11 @@ export function createContractDiagnostic(mode: string, outputDirectory: string) 
         attach(page: Page, url: string, operation?: 'consent' | 'login/complete') {
             let selected: BrowserRequest | undefined, requests = 0;
             const identity = operation ? { operation, request: `${operation}:1` } : {};
-            const onRequest = (request: BrowserRequest) => { if (request.url() === url && request.method() === 'POST') { selected ??= request; record('request', { ...identity, number: ++requests, navigation: request.isNavigationRequest() }); } };
+            const onRequest = (request: BrowserRequest) => {
+                if (request.url() !== url || request.method() !== 'POST' || operation && selected) return;
+                selected ??= request;
+                record('request', { ...identity, number: ++requests, navigation: request.isNavigationRequest() });
+            };
             const onResponse = (response: import('@playwright/test').Response) => { if (response.request() === selected) { const headers = response.headers(); record('response', { ...identity, status: response.status(), headers: operation ? productDiagnosticHeaders(name => headers[name]) : ['content-type', 'content-length', 'cache-control'].map(name => [name, headers[name]?.slice(0, 128) ?? null]) }); } };
             const onFinished = (request: BrowserRequest) => { if (request === selected) record('requestfinished', operation ? identity : null); };
             const onFailed = (request: BrowserRequest) => { if (request === selected) record('requestfailed', { ...identity, error: operation ? (request.failure()?.errorText === 'net::ERR_ABORTED' ? 'net::ERR_ABORTED' : 'other') : request.failure()?.errorText.slice(0, 256) ?? null }); };
