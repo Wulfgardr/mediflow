@@ -17,6 +17,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { createBrowserResponseOracle, type BrowserResponseOracle, type SameResponseTicket } from './chatgpt-browser-response.ts';
 import { checkBrowserResponseContract } from './chatgpt-browser-response.contract.ts';
+import { createContractDiagnostic, productDiagnosticInitScript } from './chatgpt-browser-response-diagnostic.ts';
+import { createProductWireDiagnostic, productDiagnosticHeaders } from './chatgpt-product-response-diagnostic.ts';
 import type { ProductOperation } from '../lib/chatgpt-product/product-contract';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dataDir = process.env.MEDIFLOW_DATA_DIR;
@@ -135,7 +137,8 @@ async function replyBytes(response: Response): Promise<Buffer> {
     finally { reader.releaseLock(); }
 }
 async function startWireGateway(nextPort: number, f: ProductFixture, failures: string[],
-    observe: (operation: ProductOperation, url: string, response: Response, body: Buffer, headers: Headers) => void) {
+    observe: (operation: ProductOperation, url: string, response: Response, body: Buffer, headers: Headers) => void,
+    diagnostic?: ReturnType<typeof createProductWireDiagnostic>) {
     assert.ok(Number.isInteger(nextPort) && nextPort > 0 && nextPort <= 65535);
     const sockets = new Set<Duplex>(), socketClosures = new Set<Promise<void>>();
     const upstreams = new Set<ClientRequest>(), controllers = new Set<AbortController>(), tasks = new Set<Promise<void>>();
@@ -178,8 +181,21 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
     async function handle(input: IncomingMessage, output: ServerResponse) {
         const url = target(input);
         if (closing || !url || controllers.size >= WIRE_REQUEST_LIMIT) { output.writeHead(400); output.end(); return; }
+        const trace = url.pathname.startsWith(PRODUCT_NAMESPACE) && !url.search
+            ? diagnostic?.select(url.pathname.slice(PRODUCT_NAMESPACE.length), input.method) : undefined;
+        trace?.('server.request');
+        if (trace) {
+            output.once('finish', () => trace('server.finish', { status: output.statusCode, writableFinished: output.writableFinished }));
+            output.once('close', () => trace('server.close', { status: output.statusCode, writableFinished: output.writableFinished }));
+        }
         const abort = new AbortController(); controllers.add(abort);
-        const disconnect = () => { if (!abort.signal.aborted) { aborted++; abort.abort(); } };
+        const requestAborted = () => trace?.('server.request.aborted', { complete: input.complete });
+        const signalAborted = () => trace?.('server.signal.abort');
+        if (trace) {
+            input.once('aborted', requestAborted); input.once('close', () => input.off('aborted', requestAborted));
+            abort.signal.addEventListener('abort', signalAborted, { once: true });
+        }
+        const disconnect = () => { if (!abort.signal.aborted) { trace?.('server.abort', { requestComplete: input.complete, writableFinished: output.writableFinished }); aborted++; abort.abort(); } };
         const responseClosed = () => { if (!output.writableFinished) disconnect(); };
         const deadline = setTimeout(() => { failure('WIRE_REQUEST_DEADLINE'); disconnect(); output.destroy(); }, WIRE_LIFETIME_MS);
         input.once('aborted', disconnect); input.on('error', disconnect); output.on('error', disconnect);
@@ -201,6 +217,7 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
                 // call f.call/f.request/f.browser: those unit helpers add headers.
                 const response = await f.root.handle(request, operation as ProductOperation);
                 const bytes = await replyBytes(response); f.responses.push(response.status);
+                trace?.('server.response', { status: response.status, bodyBytes: bytes.byteLength, headers: productDiagnosticHeaders(name => response.headers.get(name)) });
                 observe(operation as ProductOperation, url.href, response, bytes, observed);
                 if (abort.signal.aborted) return;
                 // Preserve the genuine root status, headers and bytes (incl. 403/409).
@@ -219,6 +236,7 @@ async function startWireGateway(nextPort: number, f: ProductFixture, failures: s
             if (!abort.signal.aborted) failure('WIRE_REQUEST_FAILED');
             disconnect(); output.destroy(); input.destroy();
         } finally {
+            abort.signal.removeEventListener('abort', signalAborted);
             clearTimeout(deadline); input.off('aborted', disconnect); output.off('close', responseClosed);
             controllers.delete(abort);
         }
@@ -376,6 +394,8 @@ export default function Page(){const [active,setActive]=useState(true);return <m
     const oracles = new WeakMap<Page, BrowserResponseOracle>();
     async function scenario(name: string, run: (page: Page, f: ReturnType<typeof createProductFixture>) => Promise<void>, width = 1280, held = false) {
         const f = createProductFixture(); if (held) f.setQualification({ platform: 'test-unqualified', state: 'unqualified', revision: 'not-admitted', missing: ['fixture-held-test'] });
+        const diagnostic = name.startsWith('login-pending-') ? createContractDiagnostic(`product-${name}`, join(root, 'test-results/chatgpt-browser-oracle')) : undefined;
+        const wireDiagnostic = diagnostic ? createProductWireDiagnostic(diagnostic.record) : undefined;
         const failures: string[] = [], expectedRootDenials = new Set<string>();
         let gateway: WireGateway;
         try { gateway = await startWireGateway(port, f, failures, (operation, url, response, body, observedHeaders) => {
@@ -391,12 +411,12 @@ export default function Page(){const [active,setActive]=useState(true);return <m
             } else if (response.status === 401 && name === 'owner-lock' && ['cancel', 'status'].includes(operation)) {
                 expectedRootDenials.add(`${url}|${response.status}`);
             }
-        }); } catch (error) { f.dispose(); throw error; }
+        }, wireDiagnostic); } catch (error) { f.dispose(); throw error; }
         resources.gateways.add(gateway);
         const base = gateway.base;
         let context: BrowserContext | undefined, tearingDown = false;
         let oracle: BrowserResponseOracle | undefined;
-        await withCleanup(async () => {
+        const scenarioWork = withCleanup(async () => {
             // No invented Fetch Metadata even in the negative probes. A Node HTTP
             // client sends neither Origin nor Sec-Fetch-Site: the ORIGINAL root
             // must return its genuine 403, with no owner/process/protocol work.
@@ -431,6 +451,7 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 assert.equal(gateway.stats().forwarded, beforeAbort.forwarded, 'Partial body must never reach the real root');
                 assert.equal(f.created(), 0); assert.equal(f.transport.calls.length, 0);
             }, async () => { partial.destroy(); await within(partialClosed, WIRE_CLOSE_MS, 'PARTIAL_PROBE_CLOSE_UNCONFIRMED'); partial.removeAllListeners(); }, `${name}/partial-probe`);
+            wireDiagnostic?.activate();
             context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block', acceptDownloads: false });
             // The callback only denies egress: no fulfillment or header override.
             // Playwright may still enable protocol interception globally; excluding
@@ -446,6 +467,10 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 else { if (!tearingDown) failures.push('unexpected-websocket'); route.close(); }
             });
             const page = await context.newPage();
+            if (diagnostic) {
+                await page.addInitScript(productDiagnosticInitScript());
+                for (const operation of ['consent', 'login/complete'] as const) diagnostic.attach(page, base + PRODUCT_NAMESPACE + operation, operation);
+            }
             oracle = await createBrowserResponseOracle(page, base); oracles.set(page, oracle);
             page.on('pageerror', error => { if (!tearingDown) failures.push(error.message); });
             page.on('console', message => {
@@ -462,13 +487,19 @@ export default function Page(){const [active,setActive]=useState(true);return <m
             await expect(page.getByTestId('chatgpt-synthesis-panel')).toBeVisible();
             await expect(page.getByTestId('synthesis-state')).toContainText(held ? 'Prova sospesa' : 'In attesa del tuo consenso');
             assert.equal(f.created(), 0); assert.equal(f.transport.calls.length, 0);
-            await run(page, f); await oracle.check(); assert.deepEqual(failures, []);
+            const work = async () => { await run(page, f); await oracle!.check(); assert.deepEqual(failures, []); };
+            if (diagnostic) {
+                await diagnostic.calibrate(page);
+                await diagnostic.run(page, () => page.evaluate(() => (globalThis as typeof globalThis & {
+                    __mfProductDiagnostic?: { settled(): Promise<void> } }).__mfProductDiagnostic?.settled()), work);
+            } else await work();
             if (process.env.MEDIFLOW_UI_EVIDENCE_DIR) {
                 await mkdir(process.env.MEDIFLOW_UI_EVIDENCE_DIR, { recursive: true });
                 await page.screenshot({ path: join(process.env.MEDIFLOW_UI_EVIDENCE_DIR, `${name}.png`), fullPage: true });
             }
         }, async () => {
             tearingDown = true; oracle?.dispose();
+            diagnostic?.record('scenario.cleanup');
             // Add a genuinely idle owned connection: server.close alone would not
             // prove that peers (including upgrades/partial requests) were drained.
             const idle = connectTcp({ host: '127.0.0.1', port: Number(new URL(base).port) });
@@ -505,6 +536,8 @@ export default function Page(){const [active,setActive]=useState(true);return <m
                 throwStepFailures(cleanupFailures);
             }, `${name}/idle-probe`);
         }, `${name}/scenario`);
+        try { await (diagnostic ? diagnostic.observe(scenarioWork) : scenarioWork); }
+        finally { diagnostic?.persist(); }
     }
     async function consentResponse(page: Page) {
         const oracle = oracles.get(page); assert.ok(oracle, 'ORACLE_OWNER_MISSING');

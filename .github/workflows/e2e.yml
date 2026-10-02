@@ -122,6 +122,7 @@ jobs:
           exit 1
 
       - name: Run Playwright suite
+        id: playwright
         # @Codex: the preceding steps seed and start an isolated synthetic DB.
         env:
           MF085_SYNTHETIC_E2E: "1"
@@ -134,6 +135,7 @@ jobs:
       # collectable by Playwright. Keep it in its canonical runner with an
       # independent marked synthetic directory.
       - name: Run ChatGPT product browser harness
+        if: ${{ !cancelled() && (steps.playwright.outcome == 'success' || steps.playwright.outcome == 'failure') }}
         run: |
           CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"
           MEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \
