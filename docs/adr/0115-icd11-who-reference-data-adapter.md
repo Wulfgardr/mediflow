@@ -574,3 +574,71 @@ secret/token generation-bound, issuer OAuth e transport Search ufficiali
 ICD-11 WHO verificati con client HTTP fake; nessun client HTTP live, OAuth o
 Search end-to-end, caller migrato, Docker rimosso dal runtime o smoke WHO
 consegnato**.
+
+## Prerequisito CodeInfo cloud su fixture (2026-10-01)
+
+Il contratto additivo `icd11-who-cloud-code-check-contract.ts` non e collegato
+al runtime. Conserva i contratti locali, la factory, le route e i decoder
+paired. `no contract impact` sulla API v1. Search cloud e una slice separata.
+Il profilo cloud CodeInfo usa lo stesso binding fissato per Search; finche
+quel contratto non e integrato, i suoi metadati sono dichiarati nel nuovo
+modulo data-only, senza ricreare il parser o il trasporto Search.
+
+Fonte verificata: [Swagger WHO v2](https://id.who.int/swagger/v2/swagger.json),
+versione `v2.6.0`, SHA-256
+`431eefb7df8a3e835574db5bb6edf9f54eb516003116e5984080a1dbf910e73e`.
+`CodeInfo` dichiara 69 proprieta, `additionalProperties: false`, nessun `@id`
+e nessun titolo. `code` e il codice interrogato; `stemCode` e il primo stem;
+`stemId` ne identifica l'entita. Il parser locale richiede invece `@id`:
+questa differenza non dimostra un guasto del servizio live e non ne modifica
+le regole. Le fixture cloud sono inventate e non aggiungono `@id` a CodeInfo.
+
+Decisioni del profilo bounded:
+
+- Si richiedono `code` esattamente uguale al codice completo richiesto,
+  `stemCode` uguale al primo componente e `stemId` nel namespace MMS della
+  release `2026-01`. I campi nullable/assenti necessari all'identita negano
+  la qualificazione; non provano che il codice non esista. Alias HTTPS,
+  foundation URI e release diverse non sono qualificati da questa slice.
+- `codeInfoResourceUri` e costruito dal codice completo e ha provenienza
+  `request`. Non e un URI restituito dal body, ne una prova indipendente
+  della relazione fra ogni codice della combinazione e la rispettiva entita.
+- Lo stem richiede anche una risposta `LinearizationEntity` con `@id` e
+  `code` coincidenti. `stemUriProvenance` dichiara entrambe le fonti.
+  `stemTitle` e solo il titolo inglese di quella entita: nessun titolo
+  dell'intera combinazione viene costruito. Il controllo rifiuta lingua,
+  formato o binding incoerenti; non puo scoprire un titolo semanticamente
+  falso in un body che dichiara identita e lingua coerenti.
+- `simplifiedCode` e `simplifiedStemCode` restano separati dal codice
+  richiesto e dallo stem originale. Assenza/null diventano null; i valori
+  presenti devono rispettare la grammatica bounded. Se entrambi sono
+  presenti, il primo componente della semplificazione deve coincidere con
+  lo stem semplificato. Nessuno dei due viene dedotto dall'altro.
+- Il parser upstream proietta i soli campi di identita e semplificazione;
+  ignora gli assi aggiuntivi, non valida l'intero schema WHO o la validita
+  clinica della combinazione. Identita e semplificazioni devono essere
+  proprieta dati proprie: getter e chiavi `__proto__` vengono rifiutati,
+  e la copia interna non ha prototipo. Un `@id` aggiunto a CodeInfo viene
+  rifiutato. Il helper condiviso dei contratti locali non viene modificato.
+  La validazione dell'envelope controlla coerenza interna, non autentica
+  le risposte upstream. La receipt cloud descrive il profilo della richiesta,
+  con attribuzione, esito, tempo e latenza; non usa digest di immagini locali.
+- `found` richiede entry e receipt coerenti. `not_found` richiede un esito
+  esplicito dell'host, entry null e receipt `found=false`. Body assente,
+  mancata risposta dello stem, auth, rate limit, timeout ed errori negano
+  il parsing; non sono tradotti in `not_found`. L'interpretazione HTTP del
+  solo 404 CodeInfo resta alla successiva slice transport. Prima di invocare
+  questo parser, quel trasporto deve ammettere separatamente entrambe le
+  risposte HTTP 200 complete, con budget e cancellazione validi; un body di
+  errore non e riabilitato da campi di identita apparentemente validi. I campi
+  `error`, `errors`, `status`, `partial` e `resultChopped` in uno dei due body
+  vengono rifiutati anche se falsy o apparentemente favorevoli. Non sono
+  proprieta dei due schemi WHO. Questo controllo difensivo non prova da solo
+  il successo HTTP: envelope o codici errore vendor sconosciuti restano
+  responsabilita del trasporto, non possono essere ignorati prima del parser.
+
+Le prove positive/negative usano solo fixture sintetiche. Il nuovo test e
+registrato dal glob `lib/**/*.test.ts` di `scripts/run-unit-suite.mjs`.
+Nessun OAuth, chiamata autenticata WHO, attivazione del trasporto, cutover,
+cache o writer e introdotto. La qualifica live e la consegna Docker-free
+restano verifiche successive distinte.

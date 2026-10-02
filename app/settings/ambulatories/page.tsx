@@ -77,7 +77,7 @@ export default function AmbulatoryManagerPage() {
         const target = ambulatoryById.get(id);
         const { confirmed } = await confirm({
             title: `Svuotare "${target?.name || 'ambiente di test'}"?`,
-            message: 'Verranno eliminati tutti i pazienti di questo ambiente di test.',
+            message: 'Tutti i pazienti verranno rimossi da questo ambiente. Quelli presenti solo in ambienti di prova saranno spostati nel Cestino; quelli presenti anche in sedi operative resteranno disponibili.',
             confirmLabel: 'Svuota',
             tone: 'danger'
         });
@@ -94,6 +94,13 @@ export default function AmbulatoryManagerPage() {
                 body: JSON.stringify({ ambulatoryId: id, version: target.version })
             });
             if (!res.ok) throw new Error("Failed to clear");
+            // @Codex: preserve accepted currentness even when the following read fails.
+            const accepted = await res.json() as { version?: number };
+            if (!Number.isSafeInteger(accepted.version) || accepted.version! <= target.version) {
+                throw new Error('Missing accepted ambulatory version');
+            }
+            setAmbulatories(current => current.map(item => item.id === id ? { ...item, version: accepted.version! } : item));
+            await loadAmbulatories();
             showToast('Ambiente di test svuotato', 'success');
         } catch (e) {
             console.error(e);

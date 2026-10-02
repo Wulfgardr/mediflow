@@ -31,6 +31,7 @@ export default function SettingsAiFunctionsPage() {
         aiInsightSettings,
         setAiInsightSettings,
         isSavingAi,
+        aiSettingsLoadState,
         setPatientInsightEnabled,
         setDocumentSynthesisEnabled,
         setSmartImportEnabled,
@@ -66,6 +67,13 @@ export default function SettingsAiFunctionsPage() {
                 <p>Le preferenze locali restano sul computer. Per usare OpenAI, scegli il canale nella funzione e prepara una proposta: servono consenso sul contesto redatto, accesso dedicato e verifica dei modelli disponibili per quel tentativo.</p>
                 <Link href="/settings/ai/chatgpt" className="underline">Gestisci OpenAI · ChatGPT</Link>
             </aside>
+            {aiSettingsLoadState !== 'ready' && <p role="status">
+                {aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…'
+                    : 'Impossibile leggere le impostazioni. Ricarica questa pagina prima di modificarle.'}
+            </p>}
+            <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
+                aria-label="Impostazioni delle funzioni locali" data-testid="ai-settings-controls"
+                className="min-w-0 space-y-4 border-0 p-0">
             <FunctionPreferencesPanel onRead={syncPreferences} />
 
             <div className="space-y-6">
@@ -255,6 +263,7 @@ export default function SettingsAiFunctionsPage() {
                 </div>
 
             </div>
+            </fieldset>
         </section>
     );
 }

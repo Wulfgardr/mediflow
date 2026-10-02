@@ -192,21 +192,20 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
 }
 
 /* @Codex */
+async function openAiSettingsPage(page: Page, route: 'funzioni' | 'modelli'): Promise<void> {
+  await page.goto(`/settings/ai/${route}`);
+  await expect(page).toHaveURL(new RegExp(`/settings/ai/${route}$`));
+  // Controls become available only after the stored draft has been applied.
+  await expect(page.getByTestId('ai-settings-controls')
+    .getByRole('button', { name: 'Salva Configurazione', exact: true })).toBeEnabled();
+}
+
 export async function openAiFunzioniSettings(page: Page): Promise<void> {
-  // The funzioni page loads the stored kill-switch values asynchronously on mount and
-  // overwrites the optimistic switch defaults once the read lands (loadAiConfig in
-  // lib/hooks/use-ai-settings-controller.ts). A toggle clicked before that reset gets
-  // silently undone. Wait for the last settings read of the load (aiInsightManualConfig,
-  // fetched in the final Promise.all) plus a short stabilization delay before letting
-  // the caller interact with the switches.
-  const settingsSettled = page.waitForResponse((response) =>
-    response.url().includes('/api/settings/aiInsightManualConfig')
-    && response.request().method() === 'GET'
-  );
-  await page.goto('/settings/ai/funzioni');
-  await expect(page).toHaveURL(/\/settings\/ai\/funzioni$/);
-  await settingsSettled;
-  await page.waitForTimeout(250);
+  await openAiSettingsPage(page, 'funzioni');
+}
+
+export async function openAiModelsSettings(page: Page): Promise<void> {
+  await openAiSettingsPage(page, 'modelli');
 }
 
 /* @Codex */

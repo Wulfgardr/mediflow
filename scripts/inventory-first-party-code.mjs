@@ -96,11 +96,57 @@ const EXCLUDED_PREFIXES = ['.next-', 'tmp-', 'tmp_'];
 const TEST_SEGMENTS = new Set(['e2e', 'test', 'tests', '__tests__']);
 const TESTS_ROOTED_IN_OTHER_SEGMENTS = new Set(['Tests']);
 
-function git(args) {
-  return execFileSync('git', ['-C', ROOT, ...args], {
-    encoding: 'utf8',
+function gitBytes(args, ignoreReplacements = false) {
+  return execFileSync('git', [...(ignoreReplacements ? ['--no-replace-objects'] : []), '-C', ROOT, ...args], {
     maxBuffer: 16 * 1024 * 1024,
-  }).trim();
+  });
+}
+
+function git(args) {
+  return gitBytes(args).toString('utf8').trim();
+}
+
+// --ref <commit-ish> pins both path selection and bytes to Git objects. Without
+// it, retain the legacy index/checkout census and its worktree status metadata.
+function requestedRef(args) {
+  const indexes = args.flatMap((arg, index) => arg === '--ref' || arg.startsWith('--ref=') ? [index] : []);
+  if (indexes.length === 0) return null;
+  const flag = args[indexes[0]];
+  const ref = flag === '--ref' ? args[indexes[0] + 1] : flag.slice('--ref='.length);
+  if (indexes.length !== 1 || !ref || ref.startsWith('-')) {
+    throw new Error('Usage: inventory-first-party-code.mjs [--json] [--ref <commit-ish>]');
+  }
+  return ref;
+}
+
+function revisionSource(ref) {
+  // Replacement refs are mutable local overlays, not the pinned Git objects.
+  const objectBytes = (args) => gitBytes(args, true);
+  const objectText = (args) => objectBytes(args).toString('utf8').trim();
+  const commit = objectText(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`]);
+  const tree = objectText(['rev-parse', `${commit}^{tree}`]);
+  const treeBytes = objectBytes(['ls-tree', '-r', '-z', '--full-tree', tree]);
+  let treeText;
+  // JSON paths must be lossless UTF-8. Reject raw names rather than silently
+  // merging different byte sequences into a fabricated replacement-character path.
+  try { treeText = new TextDecoder('utf-8', { fatal: true }).decode(treeBytes); }
+  catch { throw new Error('Git revision paths are not valid UTF-8; refusing lossy census'); }
+  // NUL framing preserves tabs/newlines in paths; never trim paths or blob bytes.
+  const entries = treeText.split('\0').filter(Boolean).map((entry) => {
+      const separator = entry.indexOf('\t');
+      const [, type, oid] = entry.slice(0, separator).split(' ');
+      return [entry.slice(separator + 1), { type, oid }];
+    });
+  const objects = new Map(entries);
+  return {
+    revision: { commit, tree },
+    trackedPaths: [...objects.keys()].sort(),
+    read: (relativePath) => {
+      const object = objects.get(relativePath);
+      if (object.type !== 'blob') throw new Error(`Cannot inventory non-blob path: ${relativePath}`);
+      return objectBytes(['cat-file', 'blob', object.oid]);
+    },
+  };
 }
 
 function isExcluded(relativePath) {
@@ -196,8 +242,9 @@ function summarizeExtensions(records) {
   return Object.fromEntries(Object.entries(result).sort(([left], [right]) => left.localeCompare(right)));
 }
 
-function buildInventory() {
-  const trackedPaths = git(['ls-files', '-z']).split('\0').filter(Boolean).sort();
+function buildInventory(ref) {
+  const source = ref === null ? null : revisionSource(ref);
+  const trackedPaths = source?.trackedPaths ?? git(['ls-files', '-z']).split('\0').filter(Boolean).sort();
   const candidates = trackedPaths.filter(isCandidatePath);
   const excluded = {};
   const excludedPaths = {};
@@ -216,7 +263,7 @@ function buildInventory() {
   }
 
   const records = candidates.map((relativePath) => {
-    const content = readFileSync(path.join(ROOT, relativePath));
+    const content = source ? source.read(relativePath) : readFileSync(path.join(ROOT, relativePath));
     return {
       path: relativePath,
       category: categoryFor(relativePath),
@@ -239,12 +286,13 @@ function buildInventory() {
     .map(([sha256, paths]) => ({ sha256, paths: paths.sort() }))
     .sort((left, right) => left.paths[0].localeCompare(right.paths[0]));
 
-  const status = git(['status', '--porcelain=v1']);
   return {
     schema: 'mediflow.first-party-code-inventory.v1',
     root: ROOT,
-    head: git(['rev-parse', 'HEAD']),
-    worktreeClean: status === '',
+    head: source ? source.revision.commit : git(['rev-parse', 'HEAD']),
+    ...(source
+      ? { source: 'git-ref', revision: source.revision }
+      : { worktreeClean: git(['status', '--porcelain=v1']) === '' }),
     trackedFiles: trackedPaths.length,
     candidateFiles: candidates.length,
     excludedCandidateFiles: excludedCandidates.length,
@@ -264,8 +312,13 @@ function buildInventory() {
 
 function printSummary(inventory) {
   console.log(inventory.schema);
-  console.log(`HEAD ${inventory.head}`);
-  console.log(`Worktree ${inventory.worktreeClean ? 'clean' : 'dirty'}; tracked files ${inventory.trackedFiles}`);
+  if (inventory.source === 'git-ref') {
+    console.log(`Revision ${inventory.revision.commit} tree ${inventory.revision.tree}`);
+    console.log(`Tracked files ${inventory.trackedFiles}`);
+  } else {
+    console.log(`HEAD ${inventory.head}`);
+    console.log(`Worktree ${inventory.worktreeClean ? 'clean' : 'dirty'}; tracked files ${inventory.trackedFiles}`);
+  }
   console.log(`Included first-party source/config/migration files ${inventory.candidateFiles}`);
   console.log(`Excluded scoped candidate files ${inventory.excludedCandidateFiles}`);
   console.log('Categories:');
@@ -283,7 +336,7 @@ function printSummary(inventory) {
   console.log(`Excluded by filter: ${JSON.stringify(inventory.excluded)}`);
 }
 
-const inventory = buildInventory();
+const inventory = buildInventory(requestedRef(process.argv.slice(2)));
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify(inventory, null, 2));
 } else {

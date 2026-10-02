@@ -6,5 +6,6 @@ export function anyDocDesktopRendererTrace(platform, arch) {
     const profile = profiles.find((entry) => entry.platform === platform && entry.arch === arch);
     if (!profile) return [];
     const root = `./node_modules/${profile.package}`;
-    return [`${root}/package.json`, `${root}/${profile.binary}`, `${root}/README.md`];
+    return [`${root}/package.json`, `${root}/${profile.binary}`, `${root}/README.md`,
+        ...(platform === 'win32' ? [`${root}/${profile.icuData.file}`] : [])];
 }
