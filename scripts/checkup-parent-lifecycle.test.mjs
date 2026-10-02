@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHarness } from './test-support/checkup-parent-lifecycle-harness.mjs';
+import { assertChildFirst, assertDeletionFirst } from './test-support/checkup-parent-lifecycle-assertions.mjs';
 
 for (const method of ['PUT', 'DELETE']) {
     const payload = method === 'PUT' ? { version: 5, title: 'After' } : { version: 5 };
@@ -10,12 +11,13 @@ for (const method of ['PUT', 'DELETE']) {
         const response = await h.request(method, payload);
         assert.equal(response.status, 404); assert.deepEqual(h.row(), before); assert.equal(h.audit.length, 0);
     });
-    test(`${method}: parent deleted after read is checked atomically with the child CAS`, async t => {
-        const h = createHarness(); t.after(() => h.close()); const before = h.row();
-        h.beforeUpdate(() => h.deleteParent());
-        const response = await h.request(method, payload);
-        assert.equal(response.status, 409); assert.deepEqual(h.row(), before); assert.equal(h.audit.length, 0);
-        const conflict = await response.json(); assert.equal(conflict.code, 'VERSION_CONFLICT'); assert.equal(conflict.currentState, 'missing');
+    test(`${method}: independent parent deletion committed after preflight denies child transaction without effects`, async t => {
+        const h = createHarness({ sharedWal: true }); t.after(() => h.close());
+        await assertDeletionFirst(h, method, payload);
+    });
+    test(`${method}: child IMMEDIATE transaction excludes parent deletion until commit and later denies writes`, async t => {
+        const h = createHarness({ sharedWal: true }); t.after(() => h.close());
+        await assertChildFirst(h, method, payload);
     });
     test(`${method}: archived but not deleted parents remain writable`, async t => {
         const h = createHarness(); t.after(() => h.close()); h.sqlite.exec('UPDATE patients SET is_archived = 1');
