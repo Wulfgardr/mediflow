@@ -112,6 +112,11 @@ test('standalone checker pins and smokes the isolated PDF page worker', () => {
   assert.match(source, /symlinked PDF page worker passed/u);
 });
 
+test('standalone Windows ICU preflight rejects missing/corrupt/nonphysical data before native entry', () => {
+  const result = runSelfTest('--self-test=windows-icu');
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('digest-pinned text workers retain exact LF bytes on every checkout', () => {
   const attributes = fs.readFileSync(path.join(root, '.gitattributes'), 'utf8');
   for (const worker of [
