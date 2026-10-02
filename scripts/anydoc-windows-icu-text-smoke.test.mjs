@@ -46,3 +46,10 @@ test('rejects truncated PNG chunk despite matching digest',()=>assert.throws(()=
 test('rejects wrong decoded dimensions even when receipt claims 256x64',()=>assert.throws(()=>verifyWindowsIcuTextOutput(envelope(fixture({wrongWidth:true}))),/dimensions/));
 test('rejects unsupported scanline filter',()=>assert.throws(()=>verifyWindowsIcuTextOutput(envelope(fixture({filter:5}))),/PNG filter/));
 test('rejects compressed trailing bytes within a valid IDAT chunk',()=>assert.throws(()=>verifyWindowsIcuTextOutput(envelope(fixture({compressedTail:true}))),/trailing compressed/));
+for(const name of ['IHDR','IDAT'])test(`rejects high-bit ${name} alias with recomputed CRC and digest`,()=>{
+ const png=fixture();let cursor=8;
+ while(png.toString('latin1',cursor+4,cursor+8)!==name)cursor+=png.readUInt32BE(cursor)+12;
+ const end=cursor+12+png.readUInt32BE(cursor),type=Buffer.from(name);type[0]|=0x80;
+ const malformed=Buffer.concat([png.subarray(0,cursor),chunk(type,png.subarray(cursor+8,end-4)),png.subarray(end)]);
+ assert.throws(()=>verifyWindowsIcuTextOutput(envelope(malformed)),/PNG chunk bound\/type/);
+});

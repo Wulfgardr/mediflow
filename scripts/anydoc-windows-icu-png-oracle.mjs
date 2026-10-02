@@ -15,7 +15,7 @@ export function countWindowsIcuPngInk(png){
  let cursor=8,channels=0,ended=false,dataEnded=false;const parts=[];
  while(cursor<png.length){
   demand(cursor+12<=png.length,'PNG truncated chunk');
-  const length=png.readUInt32BE(cursor),type=png.toString('ascii',cursor+4,cursor+8),end=cursor+12+length;
+  const length=png.readUInt32BE(cursor),type=png.toString('latin1',cursor+4,cursor+8),end=cursor+12+length;
   demand(end<=png.length&&/^[A-Za-z]{2}[A-Z][A-Za-z]$/.test(type),'PNG chunk bound/type');
   demand(crc32(png.subarray(cursor+4,end-4))===png.readUInt32BE(end-4),'PNG CRC');
   const data=png.subarray(cursor+8,end-4);
