@@ -4,7 +4,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { anyDocDesktopRendererTrace } from './anydoc-desktop-renderer-trace.mjs';
 
-test('desktop tracing selects only the explicit target package manifest and native binary', () => {
+test('desktop tracing selects the target binary and only Windows ICU data', () => {
     for (const [platform, arch, suffix, binary] of [
         ['win32', 'x64', 'win32-x64-msvc', 'skia.win32-x64-msvc.node'],
         ['linux', 'x64', 'linux-x64-gnu', 'skia.linux-x64-gnu.node'],
@@ -12,7 +12,8 @@ test('desktop tracing selects only the explicit target package manifest and nati
     ]) {
         const root = `./node_modules/@napi-rs/canvas-${suffix}`;
         assert.deepEqual(anyDocDesktopRendererTrace(platform, arch),
-            [`${root}/package.json`, `${root}/${binary}`, `${root}/README.md`]);
+            [`${root}/package.json`, `${root}/${binary}`, `${root}/README.md`,
+                ...(platform === 'win32' ? [`${root}/icudtl.dat`] : [])]);
     }
     for (const [platform, arch] of [['darwin', 'arm64'], ['win32', 'arm64'], ['linux', 'ia32'], ['freebsd', 'x64']]) {
         assert.deepEqual(anyDocDesktopRendererTrace(platform, arch), []);
