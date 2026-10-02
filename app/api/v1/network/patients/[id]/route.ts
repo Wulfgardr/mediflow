@@ -1,7 +1,7 @@
 /* @Codex */
-import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 /* @Codex */
-import { parsePatientJsonObject } from '@/lib/patient-json-object';
+import { readPatientJsonObject } from '@/lib/patient-json-object';
 /* @Codex */
 import { cookies } from 'next/headers';
 /* @Codex */
@@ -121,8 +121,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const resolved = await requireNetworkPatientWriteContext(request, id);
         if (!resolved.ok) return resolved.response;
 
-        const parsed = await parsePatientJsonObject(() => readNativeNetworkJson(request));
-        if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+        const parsed = await readPatientJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
         const result = await updateNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
@@ -142,7 +142,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        const parsed = await readPatientJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
+        const body = parsed.body;
         const result = await deleteNetworkScopedPatient(
             {
                 ...resolved.context,

@@ -15,3 +15,17 @@ export async function parsePatientJsonObject(read: () => Promise<unknown>): Prom
         ? { ok: true, body: value as Record<string, unknown> }
         : { ok: false };
 }
+
+/* @Codex: WUL-720 patient-only bounded transport, after existing admission gates. */
+import { readBoundedJsonBody } from './bounded-request-body';
+export const PATIENT_JSON_MAX_BYTES = 4_194_304;
+
+export async function readPatientJsonObject(request: Request) {
+    const parsed = await readBoundedJsonBody(request, PATIENT_JSON_MAX_BYTES, 'request-json',
+        { signal: request.signal, deadline: Infinity });
+    if (!parsed.ok) return parsed.status === 413
+        ? { ok: false as const, status: 413 as const, error: 'JSON payload too large', code: 'JSON_BODY_TOO_LARGE' }
+        : { ok: false as const, status: 400 as const, error: 'Richiesta non valida.' };
+    const object = await parsePatientJsonObject(async () => parsed.value);
+    return object.ok ? object : { ok: false as const, status: 400 as const, error: 'Richiesta non valida.' };
+}
