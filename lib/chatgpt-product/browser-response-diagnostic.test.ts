@@ -4,10 +4,12 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import ts from 'typescript';
 import { createContext, runInContext, type Context } from 'node:vm';
 import type { Page } from '@playwright/test';
 import { createBrowserResponseOracle } from '../../e2e/chatgpt-browser-response.ts';
-import { consumeContractResponse, CONTRACT_DIAGNOSTIC_MAX_FILE_BYTES, createContractDiagnostic, installContractDiagnostic } from '../../e2e/chatgpt-browser-response-diagnostic.ts';
+import { consumeContractResponse, CONTRACT_DIAGNOSTIC_MAX_FILE_BYTES, createContractDiagnostic, installContractDiagnostic, productDiagnosticInitScript } from '../../e2e/chatgpt-browser-response-diagnostic.ts';
+import { createProductWireDiagnostic, productDiagnosticHeaders } from '../../e2e/chatgpt-product-response-diagnostic.ts';
 
 const base = 'http://127.0.0.1:4000', url = base + '/api/settings/ai/chatgpt/synthesis/login/complete';
 const expected = { error: 'login_pending', clinicalAdmission: 'held' };
@@ -142,4 +144,162 @@ test('unavailable renderer capture and rejected artifact destination cannot mask
     const page = { evaluate: async () => { throw new Error('synthetic closed page'); } } as unknown as Page;
     await assert.rejects(d.run(page, () => undefined, () => d.observe(Promise.reject(primary))), error => error === primary);
     assert.equal(d.persist(), null); assert.equal(existsSync(join(directory, 'artifact')), false);
+});
+
+class ProductPage extends SyntheticPage {
+    nativePromise: Promise<Response>;
+    nativeResponse: Response;
+    nativeReader?: ReadableStreamDefaultReader<Uint8Array>;
+    nativeRead?: Promise<ReadableStreamReadResult<Uint8Array>>;
+    nativeCancel?: Promise<void>;
+    controllerSource: string;
+    blockedRead: Promise<void>;
+    constructor(operation: 'consent' | 'login/complete', open = false) {
+        super();
+        const selectedUrl = base + '/api/settings/ai/chatgpt/synthesis/' + operation;
+        this.request.url = () => selectedUrl;
+        const body = open ? new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); } }) : bytes;
+        this.nativeResponse = new Response(body, { status: operation === 'consent' ? 200 : 409,
+            headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json', 'Content-Length': String(bytes.byteLength),
+                'X-Secret': 'PRIVATE_HEADER_SENTINEL', Connection: 'PRIVATE_CONNECTION_SENTINEL' } });
+        Object.defineProperty(this.nativeResponse, 'url', { value: selectedUrl }); Object.defineProperty(this.nativeResponse, 'type', { value: 'basic' });
+        const stream = this.nativeResponse.body!, getReader = stream.getReader as () => ReadableStreamDefaultReader<Uint8Array>;
+        let blocked!: () => void, reads = 0;
+        this.blockedRead = new Promise<void>(resolve => { blocked = resolve; });
+        // Independently retain native identities to detect replacement, extra reads or readers.
+        stream.getReader = (() => {
+            assert.equal(this.nativeReader, undefined);
+            const reader = getReader.call(stream); this.nativeReader = reader;
+            const read = reader.read, cancel = reader.cancel;
+            reader.read = () => { const result = read.call(reader); this.nativeRead = result; if (open && ++reads === 2) blocked(); return result; };
+            reader.cancel = reason => { const result = cancel.call(reader, reason); this.nativeCancel = result; return result; };
+            return reader;
+        }) as typeof stream.getReader;
+        this.nativePromise = Promise.resolve(this.nativeResponse);
+        class OwnedAbortController extends AbortController { abort(reason?: unknown) { super.abort(reason); } }
+        this.context = createContext({ URL, Request, Uint8Array, AbortController: OwnedAbortController, performance, Error,
+            setTimeout, clearTimeout, TextDecoder, location: { href: base, origin: base }, PRODUCT_NAMESPACE: '/api/settings/ai/chatgpt/synthesis/',
+            fetch: (_input: unknown, init?: RequestInit) => {
+                assert.equal(init?.method, 'POST'); this.fetches++;
+                this.emit('request', this.request);
+                this.emit('response', { request: () => this.request, status: () => this.nativeResponse.status, url: () => selectedUrl,
+                    fromServiceWorker: () => false, headers: () => Object.fromEntries(this.nativeResponse.headers.entries()) });
+                return this.nativePromise;
+            } });
+        // Execute the unchanged real controller/readResponse; only module syntax is removed for the VM.
+        const source = readFileSync(new URL('./product-browser.ts', import.meta.url), 'utf8')
+            .replace(/^import[\s\S]*?;\n/gmu, '').replace('export function createProductBrowser', 'function createProductBrowser');
+        this.controllerSource = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText.replace(/^export \{\};\s*$/gmu, '');
+        runInContext(this.controllerSource, this.context);
+    }
+    async disposeObservation() {
+        await this.evaluate(() => (globalThis as typeof globalThis & { __mfProductDiagnostic: { dispose(): void } }).__mfProductDiagnostic.dispose());
+    }
+}
+
+for (const operation of ['consent', 'login/complete'] as const) test(`product failure identifies ${operation} across browser/gateway/real reader without body or secret fields`, async t => {
+    const directory = ownedDirectory(t), page = new ProductPage(operation);
+    const d = createContractDiagnostic('product-login-pending-1280', join(directory, 'artifact'));
+    const wire = createProductWireDiagnostic(d.record);
+    assert.equal(wire.select(operation, 'POST'), undefined); wire.activate();
+    const trace = wire.select(operation, 'POST'); assert.ok(trace);
+    assert.equal(wire.select(operation, 'POST'), undefined); assert.equal(wire.select('status', 'GET'), undefined);
+    if (operation === 'consent') runInContext(productDiagnosticInitScript().content, page.context);
+    for (const op of ['consent', 'login/complete'] as const) d.attach(page.asPage(), base + '/api/settings/ai/chatgpt/synthesis/' + op, op);
+    const oracle = await createBrowserResponseOracle(page.asPage(), base);
+    if (operation === 'login/complete') runInContext(productDiagnosticInitScript().content, page.context);
+    await d.calibrate(page.asPage());
+    const ticket = await oracle.arm(operation);
+    trace('server.request'); trace('server.response', { status: page.nativeResponse.status, bodyBytes: bytes.byteLength,
+        headers: productDiagnosticHeaders(name => page.nativeResponse.headers.get(name)) });
+    const actualConsumer = page.evaluate(async (arg: { operation: string }) => {
+        if (arg.operation === 'consent') {
+            const controller = new AbortController();
+            const response = await fetch('/api/settings/ai/chatgpt/synthesis/consent', { method: 'POST', signal: controller.signal });
+            return await (globalThis as typeof globalThis & { readResponse(response: Response, signal: AbortSignal): Promise<unknown> }).readResponse(response, controller.signal);
+        }
+        const client = (globalThis as typeof globalThis & { createProductBrowser(): { setActive(active: boolean): void; run(operation: string): Promise<void> } }).createProductBrowser();
+        client.setActive(true); await client.run('login/complete');
+    }, { operation });
+    void actualConsumer.then(() => { page.failed = true; page.emit('requestfailed', page.request); });
+    const primary: unknown[] = [];
+    await assert.rejects(d.run(page.asPage(), () => actualConsumer, () => d.observe(ticket.json()).catch(error => { primary.push(error); throw error; })), error => error === primary[0]);
+    trace('server.finish', { writableFinished: true }); trace('server.close', { writableFinished: true }); page.emit('close');
+    const file = d.persist(); assert.ok(file); const raw = readFileSync(file, 'utf8'), saved = JSON.parse(raw);
+    assert.equal(saved.oracleFailure.message, 'ORACLE_NETWORK_FAILED: net::ERR_ABORTED');
+    assert.ok(saved.node.events.some((e: { kind: string; detail: { request?: string } }) => e.kind === 'requestfailed' && e.detail.request === `${operation}:1`));
+    assert.ok(saved.node.events.some((e: { kind: string; detail: { request?: string } }) => e.kind === 'server.close' && e.detail.request === `${operation}:1`));
+    assert.ok(saved.renderer.events.some((e: { kind: string; detail: { done?: boolean } }) => e.kind === 'read.result' && e.detail.done));
+    assert.ok(saved.renderer.events.some((e: { kind: string; detail: { eof?: boolean } }) => e.kind === 'cancel.call' && e.detail.eof));
+    assert.deepEqual(saved.renderer.bytes, []); assert.doesNotMatch(raw, /PRIVATE_|login_pending|X-Secret/iu);
+    assert.equal(page.fetches, 1); assert.ok(Buffer.byteLength(raw) <= CONTRACT_DIAGNOSTIC_MAX_FILE_BYTES);
+    assert.equal(saved.node.dropped, 0); assert.equal(saved.renderer.dropped, 0);
+    await page.disposeObservation(); oracle.dispose(); assert.equal(page.eventNames().length, 0);
+});
+
+test('real product controller deactivation before EOF stays rejected and records abort before cancel/done', async t => {
+    const page = new ProductPage('login/complete', true), d = createContractDiagnostic('product-abort', join(ownedDirectory(t), 'artifact'));
+    runInContext(productDiagnosticInitScript().content, page.context);
+    d.attach(page.asPage(), url, 'login/complete'); const oracle = await createBrowserResponseOracle(page.asPage(), base);
+    const ticket = await oracle.arm('login/complete');
+    const consumer = page.evaluate(async () => {
+        const host = globalThis as typeof globalThis & { client: { setActive(active: boolean): void; run(operation: string): Promise<void> }; createProductBrowser(): typeof host.client };
+        host.client = host.createProductBrowser(); host.client.setActive(true); await host.client.run('login/complete');
+    });
+    await page.blockedRead;
+    await page.evaluate(() => (globalThis as typeof globalThis & { client: { setActive(active: boolean): void } }).client.setActive(false));
+    await consumer; page.emit('requestfinished', page.request);
+    await assert.rejects(d.run(page.asPage(), () => consumer, () => d.observe(ticket.json())), /ORACLE_SIGNAL_ABORTED/u);
+    const file = d.persist(); assert.ok(file); const saved = JSON.parse(readFileSync(file, 'utf8'));
+    const kinds = saved.renderer.events.map((e: { kind: string }) => e.kind);
+    assert.ok(kinds.indexOf('controller.abort') < kinds.indexOf('signal.abort'));
+    assert.ok(kinds.indexOf('signal.abort') < kinds.indexOf('cancel.call'));
+    assert.ok(saved.renderer.events.some((e: { kind: string; detail: { eof?: boolean } }) => e.kind === 'cancel.call' && !e.detail.eof));
+    assert.equal(page.fetches, 1); await page.disposeObservation(); oracle.dispose(); assert.equal(page.eventNames().length, 0);
+});
+
+test('product observation preserves native fetch/response/reader/read/cancel identities and restores owned abort hook', async () => {
+    const page = new ProductPage('login/complete');
+    const abort = runInContext('AbortController.prototype.abort', page.context);
+    runInContext(productDiagnosticInitScript().content, page.context);
+    const promise = runInContext("fetch('/api/settings/ai/chatgpt/synthesis/login/complete', {method:'POST'})", page.context);
+    assert.strictEqual(promise, page.nativePromise);
+    const response = await promise; assert.strictEqual(response, page.nativeResponse);
+    const reader = response.body!.getReader(); assert.strictEqual(reader, page.nativeReader);
+    const read = reader.read(); assert.strictEqual(read, page.nativeRead); await read;
+    const eof = reader.read(); assert.strictEqual(eof, page.nativeRead); assert.equal((await eof).done, true);
+    const cancel = reader.cancel(); assert.strictEqual(cancel, page.nativeCancel); await cancel;
+    await page.disposeObservation(); assert.strictEqual(runInContext('AbortController.prototype.abort', page.context), abort);
+    assert.equal(page.fetches, 1);
+});
+
+test('product failure fields redact arbitrary messages; both event rings and persisted file retain existing limits', async t => {
+    const page = new ProductPage('login/complete'), d = createContractDiagnostic('product-budget', join(ownedDirectory(t), 'artifact'));
+    runInContext(productDiagnosticInitScript().content, page.context);
+    await page.evaluate(() => {
+        const capture = (globalThis as typeof globalThis & { __mfContractDiagnostic: { record(kind: string, detail: unknown): void } }).__mfContractDiagnostic;
+        for (let i = 0; i < 80; i++) capture.record('read.result', { request: 'login/complete:1', done: false, length: 1 });
+    });
+    for (let i = 0; i < 80; i++) d.record('server.response', { request: 'login/complete:1', headerBudget: 'x'.repeat(950) });
+    const primary = new Error('PRIVATE_ERROR_SENTINEL');
+    await assert.rejects(d.run(page.asPage(), () => undefined, () => d.observe(Promise.reject(primary))), error => error === primary);
+    const file = d.persist(); assert.ok(file); const raw = readFileSync(file), saved = JSON.parse(raw.toString());
+    assert.ok(raw.byteLength <= CONTRACT_DIAGNOSTIC_MAX_FILE_BYTES); assert.ok(saved.node.events.length <= 64); assert.ok(saved.renderer.events.length <= 64);
+    assert.ok(saved.node.dropped > 0); assert.ok(saved.renderer.dropped > 0); assert.deepEqual(saved.renderer.bytes, []);
+    assert.doesNotMatch(raw.toString(), /PRIVATE_ERROR_SENTINEL/u); await page.disposeObservation(); assert.equal(page.eventNames().length, 0);
+});
+
+test('successful real product consumption still needs EOF and requestfinished and leaves no receipt or page listeners', async t => {
+    const page = new ProductPage('login/complete'), directory = ownedDirectory(t), d = createContractDiagnostic('product-success', join(directory, 'artifact'));
+    runInContext(productDiagnosticInitScript().content, page.context); d.attach(page.asPage(), url, 'login/complete');
+    const oracle = await createBrowserResponseOracle(page.asPage(), base), ticket = await oracle.arm('login/complete');
+    const consumer = page.evaluate(async () => {
+        const client = (globalThis as typeof globalThis & { createProductBrowser(): { setActive(active: boolean): void; run(operation: string): Promise<void> } }).createProductBrowser();
+        client.setActive(true); await client.run('login/complete');
+    });
+    void consumer.then(() => page.emit('requestfinished', page.request));
+    const result = await d.run(page.asPage(), () => consumer, () => ticket.json());
+    assert.deepEqual(result, expected); await consumer; await oracle.check(); assert.equal(d.persist(), null);
+    assert.equal(existsSync(join(directory, 'artifact')), false); assert.equal(page.fetches, 1);
+    await page.disposeObservation(); oracle.dispose(); assert.equal(page.eventNames().length, 0);
 });
