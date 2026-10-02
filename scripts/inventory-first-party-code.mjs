@@ -96,8 +96,8 @@ const EXCLUDED_PREFIXES = ['.next-', 'tmp-', 'tmp_'];
 const TEST_SEGMENTS = new Set(['e2e', 'test', 'tests', '__tests__']);
 const TESTS_ROOTED_IN_OTHER_SEGMENTS = new Set(['Tests']);
 
-function gitBytes(args) {
-  return execFileSync('git', ['-C', ROOT, ...args], {
+function gitBytes(args, ignoreReplacements = false) {
+  return execFileSync('git', [...(ignoreReplacements ? ['--no-replace-objects'] : []), '-C', ROOT, ...args], {
     maxBuffer: 16 * 1024 * 1024,
   });
 }
@@ -120,11 +120,19 @@ function requestedRef(args) {
 }
 
 function revisionSource(ref) {
-  const commit = git(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`]);
-  const tree = git(['rev-parse', `${commit}^{tree}`]);
+  // Replacement refs are mutable local overlays, not the pinned Git objects.
+  const objectBytes = (args) => gitBytes(args, true);
+  const objectText = (args) => objectBytes(args).toString('utf8').trim();
+  const commit = objectText(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`]);
+  const tree = objectText(['rev-parse', `${commit}^{tree}`]);
+  const treeBytes = objectBytes(['ls-tree', '-r', '-z', '--full-tree', tree]);
+  let treeText;
+  // JSON paths must be lossless UTF-8. Reject raw names rather than silently
+  // merging different byte sequences into a fabricated replacement-character path.
+  try { treeText = new TextDecoder('utf-8', { fatal: true }).decode(treeBytes); }
+  catch { throw new Error('Git revision paths are not valid UTF-8; refusing lossy census'); }
   // NUL framing preserves tabs/newlines in paths; never trim paths or blob bytes.
-  const entries = gitBytes(['ls-tree', '-r', '-z', '--full-tree', tree])
-    .toString('utf8').split('\0').filter(Boolean).map((entry) => {
+  const entries = treeText.split('\0').filter(Boolean).map((entry) => {
       const separator = entry.indexOf('\t');
       const [, type, oid] = entry.slice(0, separator).split(' ');
       return [entry.slice(separator + 1), { type, oid }];
@@ -136,7 +144,7 @@ function revisionSource(ref) {
     read: (relativePath) => {
       const object = objects.get(relativePath);
       if (object.type !== 'blob') throw new Error(`Cannot inventory non-blob path: ${relativePath}`);
-      return gitBytes(['cat-file', 'blob', object.oid]);
+      return objectBytes(['cat-file', 'blob', object.oid]);
     },
   };
 }

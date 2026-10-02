@@ -202,6 +202,50 @@ test('a scoped gitlink fails explicitly instead of reading checkout bytes', (t) 
   assert.match(result.stderr, /Cannot inventory non-blob path: lib\/submodule\.ts/);
 });
 
+test('ref mode ignores commit and tree replacements while retaining exact object identity', (t) => {
+  const f = fixture(t);
+  f.write('lib/value.ts', 'original\n');
+  const first = f.commit();
+  const expected = f.inventory('--ref', first);
+  f.write('lib/value.ts', 'replacement\n');
+  f.write('lib/added.ts', 'replacement path\n');
+  const second = f.commit();
+  const replacementTree = f.git('rev-parse', `${second}^{tree}`);
+  f.git('replace', first, second);
+  assert.deepEqual(f.inventory('--ref', first), expected);
+  f.git('replace', '-d', first);
+  f.git('replace', expected.revision.tree, replacementTree);
+  assert.deepEqual(f.inventory('--ref', first), expected);
+});
+
+test('ref mode ignores blob replacements with unchanged reported commit and tree', (t) => {
+  const f = fixture(t);
+  f.write('lib/value.ts', 'original\n');
+  const pin = f.commit();
+  const expected = f.inventory('--ref', pin);
+  const originalBlob = f.git('rev-parse', `${pin}:lib/value.ts`);
+  f.write('lib/value.ts', 'replacement\n');
+  const replacementBlob = f.git('hash-object', '-w', 'lib/value.ts');
+  f.git('replace', originalBlob, replacementBlob);
+  assert.deepEqual(f.inventory('--ref', pin), expected);
+});
+
+test('ref mode rejects invalid UTF-8 Git paths before lossy decoding can merge distinct entries', (t) => {
+  const f = fixture(t);
+  f.write('lib/value.ts', 'synthetic\n');
+  f.commit();
+  const oid = f.git('rev-parse', 'HEAD:lib/value.ts');
+  const entries = [0xfe, 0xff].map((byte) => Buffer.concat([
+    Buffer.from(`100644 ${oid}\tlib/bad`), Buffer.from([byte]), Buffer.from('.ts\0'),
+  ]));
+  execFileSync('git', ['-C', f.root, 'update-index', '-z', '--index-info'], { input: Buffer.concat(entries) });
+  f.git('commit', '-qm', 'synthetic raw Git path bytes');
+  const result = f.run('--json', '--ref', 'HEAD');
+  assert.notEqual(result.status, 0);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /Git revision paths are not valid UTF-8/);
+});
+
 test('legacy mode still uses index paths and checkout bytes, reports dirtiness, and fails on missing files', (t) => {
   const f = fixture(t);
   f.write('lib/value.ts', 'committed\n');
