@@ -105,7 +105,10 @@ La prova distinta `scripts/anydoc-windows-icu-text-smoke.mjs STANDALONE NEW_RECE
 va eseguita su Windows x64/Node 24.21.0 soltanto dopo review della candidata
 e autorizzazione dell'esperimento. Esegue un solo child: registra esplicitamente
 il font Liberation Sans gia pinned in `pdfjs-dist@4.10.38`, chiama `fillText`
-e richiede un PNG 256x64 non vuoto. Mantiene 30 secondi, heap 256 MiB,
+e richiede un PNG 256x64 non vuoto. Il parent verifica chunk/CRC, decodifica
+IDAT con un limite pari all'immagine e conta almeno otto pixel scuri dopo la
+composizione su bianco; il conteggio del child resta solo diagnostico.
+Mantiene 30 secondi, heap 256 MiB,
 maxBuffer 4 MiB e l'ambiente originale; salva entrambi i raw prima della
 valutazione, senza retry. Il probe non e importato dal prodotto e non e un
 rerun del corpus font A/B. I test simulati del preflight non dimostrano
