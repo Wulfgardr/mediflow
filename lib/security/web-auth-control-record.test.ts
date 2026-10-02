@@ -92,7 +92,7 @@ const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
         diagnostics: ['reserved-loader-identity:*', 'protected-loader-unsupported:*'],
     }],
     ['e2e/chatgpt-synthesis-product.spec.ts', {
-        sha256: '0e6becbbbb03ab64cce0c64f22805b8e99014c5082d9dd6f6583c00a3b53d706',
+        sha256: '9ce0ff63a0bda9c2204e5e011d0b47298b833218cdd96a9767cd5e916840cbdb',
         diagnostics: ['reserved-loader-identity:*'],
     }],
     ['components/function-models/ordinary-ui.test.ts', {
