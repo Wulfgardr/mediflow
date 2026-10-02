@@ -1371,7 +1371,7 @@ export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSour
     const route = checkedSource('route.ts', routeSource);
     const routeHandler = namedFunction(route.sourceFile, 'DELETE', true);
     const routeDelegate = importedBinding(route.sourceFile, route.checker, spec.serviceModule, spec.serviceExport);
-    const jsonParser = importedBinding(route.sourceFile, route.checker, '@/lib/patient-json-object', 'parsePatientJsonObject');
+    const jsonParser = importedBinding(route.sourceFile, route.checker, '@/lib/patient-json-object', 'readPatientJsonObject');
     const versionParser = importedBinding(route.sourceFile, route.checker, '@/lib/patient-concurrency', 'parseExpectedVersion');
     const contextExport = spec.deletionReason === 'web-delete' ? 'auditContextFromSession' : 'auditContextFromRequest';
     const auditContext = importedBinding(route.sourceFile, route.checker, '@/lib/security/audit', contextExport);
@@ -1404,7 +1404,8 @@ export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSour
         return denied && statement.pos > parserCalls[0].pos && statement.pos < routeCall?.pos
             && callee && ts.isPropertyAccessExpression(callee) && callee.name.text === 'json'
             && ts.isIdentifier(callee.expression) && callee.expression.text === 'NextResponse'
-            && status && ts.isNumericLiteral(status) && status.text === '400';
+            && status && ts.isPropertyAccessExpression(status) && ts.isIdentifier(status.expression)
+            && status.expression.text === parsedName.text && status.name.text === 'status';
     });
     const reasonFallback = reasonCalls[0]?.arguments[1];
     if (route.sourceFile.parseDiagnostics.length || !routeHandler || !routeDelegate || !jsonParser

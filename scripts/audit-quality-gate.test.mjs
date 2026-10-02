@@ -1138,8 +1138,8 @@ test('patient-delete audit guard binds both DELETE routes to one tombstone and r
         assert.notDeepEqual(validate(mutateDelete('deletePatientOperation({', 'missingDeleteOperation({'), core, audit, contract), [],
             `${routePath}: missing delegate`);
         assert.notDeepEqual(validate(mutateDelete(
-            "if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });",
-            "if (!parsed.ok) void NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });"),
+            "if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });",
+            "if (!parsed.ok) void NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });"),
         core, audit, contract), [], `${routePath}: body-class denial must return`);
     }
     const route = fs.readFileSync(path.join(process.cwd(), routes[0]), 'utf8');
