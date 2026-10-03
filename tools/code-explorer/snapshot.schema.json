@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Wulfgardr/mediflow/tools/code-explorer/snapshot.schema.json",
+  "title": "MediFlow curated source snapshot",
+  "type": "object",
+  "required": ["schemaVersion", "repository", "sourceCommit", "scope", "limits", "nodes", "edges", "provenance"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "repository": { "const": "https://github.com/Wulfgardr/mediflow" },
+    "sourceCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "scope": { "type": "string", "minLength": 1 },
+    "limits": { "type": "array", "minItems": 3, "items": { "type": "string", "minLength": 1 } },
+    "nodes": { "type": "array", "minItems": 8, "maxItems": 15, "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "items": { "$ref": "#/$defs/edge" } },
+    "provenance": {
+      "type": "object", "required": ["generator", "curatedSha256", "sourceTree", "proofKind", "executionVerified"],
+      "properties": {
+        "generator": { "const": "tools/code-explorer/generate.mjs" },
+        "curatedSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceTree": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "proofKind": { "const": "curated_source_relationships" },
+        "executionVerified": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["path", "anchor", "line", "endLine", "blob", "sha256", "url"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^(app|components|lib|packages|scripts)/" },
+          "anchor": { "type": "string", "minLength": 1 },
+          "line": { "type": "integer", "minimum": 1 }, "endLine": { "type": "integer", "minimum": 1 },
+          "blob": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "url": { "type": "string", "pattern": "^https://github.com/Wulfgardr/mediflow/blob/[a-f0-9]{40}/" }
+        }
+      }
+    },
+    "node": {
+      "type": "object", "required": ["id", "label", "group", "x", "y", "summary", "questions", "knownUnknown", "evidence"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "group": { "enum": ["surface", "transport", "host", "policy", "service", "storage"] },
+        "x": { "type": "number", "minimum": 90, "maximum": 890 }, "y": { "type": "number", "minimum": 50, "maximum": 640 },
+        "summary": { "type": "string", "minLength": 1 }, "knownUnknown": { "type": "string", "minLength": 1 },
+        "questions": { "type": "object", "required": ["data", "authority", "evidence"], "properties": {
+          "data": { "type": "string", "minLength": 1 }, "authority": { "type": "string", "minLength": 1 }, "evidence": { "type": "string", "minLength": 1 }
+        } },
+        "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "edge": {
+      "type": "object", "required": ["id", "source", "target", "kind", "label", "evidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 }, "source": { "type": "string", "minLength": 1 }, "target": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["import", "call", "composition", "contract", "http"] },
+        "label": { "type": "string", "minLength": 1 }, "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    }
+  }
+}
