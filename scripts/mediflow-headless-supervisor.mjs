@@ -35,7 +35,7 @@ export async function runHeadlessSupervisorV1(childOptions = {}) {
   }
   const agentKind = args[0] === '--mini' ? 'mini' : 'mcp';
   assertNodeRuntime(readNodeContract(root));
-  verifyNativeBinding(root);
+  verifyNativeBinding(childOptions.webDirectory ?? root);
   prepareDataDirectory();
 
   // Any parent-process diagnostics must share stderr; stdout belongs exclusively to the selected agent protocol.
