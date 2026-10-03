@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Una mappa curata del codice MediFlow, con relazioni e fonti fissate a una revisione Git.">
+  <title>Esplora il codice · MediFlow</title>
+  <link rel="stylesheet" href="explorer.css">
+  <script src="explorer.js" defer></script>
+</head>
+<body>
+<header><a href="https://getmediflow.dev/#cofano">MediFlow · Come funziona</a><a href="https://github.com/Wulfgardr/mediflow">Repository pubblica</a></header>
+<main>
+  <h1>Esplora il codice</h1>
+  <p class="intro">Segui una lettura delle attività e una conferma di modifica al checkup. Scegli un elemento per capire il suo ruolo e risalire alle fonti.</p>
+  <p class="revision">Fotografia storica del sorgente · <a href="https://github.com/Wulfgardr/mediflow/tree/<!-- COMMIT -->"><code><!-- COMMIT --></code></a></p>
+  <p class="boundary">Le linee descrivono relazioni nel codice. Non mostrano traffico, dati clinici o servizi attivi. La mappa copre due esempi, non tutta l’applicazione.</p>
+  <div class="controls" hidden id="controls">
+    <label>Cerca un elemento <input id="search" type="search" placeholder="Per esempio: permessi, SQLite" autocomplete="off"></label>
+    <button id="reset" type="button">Mostra tutte le relazioni</button>
+    <a href="#source-list">Leggi come elenco</a>
+  </div>
+  <p id="search-status" class="status" role="status"></p>
+  <div class="workspace" id="workspace" hidden>
+    <section aria-label="Mappa delle relazioni documentate" class="map-panel">
+      <div class="map" id="map"><svg viewBox="0 0 990 710" aria-hidden="true" id="edges"></svg><div id="nodes"></div></div>
+      <details class="legend"><summary>Come leggere la mappa</summary>
+        <p>Selezione: le linee collegate rimangono in evidenza. Il passaggio del puntatore o del focus anticipa i collegamenti; la spiegazione cambia soltanto con la selezione.</p>
+        <ul><li><span class="sample import"></span>Import: il sorgente importa un modulo.</li><li><span class="sample call"></span>Chiamata: invoca un metodo nominato.</li><li><span class="sample composition"></span>Composizione: l’host collega una funzione o un servizio.</li><li><span class="sample contract"></span>Contratto: due estremi usano lo stesso schema di messaggio.</li><li><span class="sample http"></span>HTTP: il browser prepara una richiesta alla route.</li></ul>
+        <p>Direzione: dall’elemento che usa o collega a quello usato. La stessa linea non prova esecuzione, autorizzazione o raggiungibilità. Un collegamento assente non dimostra isolamento.</p>
+      </details>
+    </section>
+    <aside id="inspector" aria-label="Spiegazione dell’elemento" aria-live="polite" aria-atomic="true"></aside>
+  </div>
+  <section id="source-list" aria-labelledby="list-heading">
+    <h2 id="list-heading">Elementi e fonti</h2>
+    <p>Tutte le spiegazioni e le relazioni sono disponibili anche in questo elenco, senza usare la mappa.</p>
+    <div id="list-picker" hidden aria-label="Seleziona dall’elenco"></div>
+    <div id="fallback"><!-- FALLBACK --></div>
+  </section>
+  <details class="provenance"><summary>Provenienza e limiti della fotografia</summary>
+    <p>Quindici nodi scelti manualmente dal codice pubblico alla revisione indicata. Il generatore legge i file con Git, verifica gli ancoraggi e conserva hash dei file e dell’albero sorgente nel <a href="snapshot.json">JSON della fotografia</a>.</p>
+    <p>Un inventario dei file alla stessa revisione attesta soltanto la presenza dei file. Non prova import eseguiti, operazioni ammesse o correttezza delle protezioni. Questa pagina non contiene un modello AI e non è collegata a una cartella.</p>
+    <p>Restano fuori dalla vista Fabric, tutti i writer, le altre funzioni cliniche e la qualifica di installazione. Il codice disponibile e la decisione di usarlo clinicamente sono valutazioni distinte.</p>
+  </details>
+</main>
+<script type="application/json" id="snapshot"><!-- SNAPSHOT --></script>
+</body>
+</html>

@@ -78,6 +78,45 @@ modelli spiegano un principio, non aggiungono combinazioni ammesse dal sistema.
 
 ## Pubblicazione
 
+### Esplora il codice
+
+La [prima mappa curata](../tools/code-explorer/index.html) presenta due esempi:
+lettura headless delle attività e conferma Web di una transizione checkup.
+Quindici nodi e relazioni tipizzate hanno fonti nel codice pubblico, fissate al
+commit `90fa7771fc0822475611c9affb9c22e212939399`. È una fotografia storica,
+non la revisione disponibile in ogni installazione. Selezione, ricerca,
+spiegazioni e un elenco consultabile anche senza JavaScript accompagnano le
+domande «dove passa il dato?», «chi può modificarlo?» e «quali prove abbiamo?».
+
+Import, chiamata, composizione, contratto e richiesta HTTP sono relazioni
+distinte. Le curve non mostrano traffico clinico; il collegamento non attesta
+esecuzione, autorizzazione o raggiungibilità. Non coprono tutta l’applicazione,
+tutti i writer o una verifica delle protezioni. La pagina non è collegata al
+runtime, non contiene dati clinici e non usa un modello AI.
+
+Il [JSON generato](../tools/code-explorer/snapshot.json) conserva albero Git,
+hash dei file, righe e limiti. La mappa manuale resta in
+`tools/code-explorer/curated-map.json`; il generatore legge esclusivamente
+blob Git al pin, senza importare il runtime:
+
+```bash
+node tools/code-explorer/generate.mjs
+node tools/code-explorer/generate.mjs --check
+node --test tools/code-explorer/generate.test.mjs
+python3 -m http.server 8765 --bind 127.0.0.1 --directory tools/code-explorer
+```
+
+Aprire `http://127.0.0.1:8765` per consultarla localmente. Per aggiornare il
+pin, riesaminare anche il significato delle relazioni e i limiti, poi rigenerare
+e verificare lo [schema](../tools/code-explorer/snapshot.schema.json), i target
+e le fonti. L’inventario `--ref` attesta presenza dei file, non import eseguiti.
+
+L’artefatto documentale è predisposto per la sezione «Come funziona» del sito,
+con carta, grafite e blu minerale. La consegna nella repository non attesta
+integrazione o pubblicazione su Get MediFlow: richiedono i sorgenti correnti
+del sito, navigazione coerente e una ricevuta Sites separata. Per la vista
+mobile l’elenco sostituisce il diagramma e conserva tutte le spiegazioni.
+
 Il sito e la repository hanno compiti diversi: il primo presenta il prodotto,
 la seconda permette di studiarne il codice, ricostruire le decisioni e
 contribuire allo sviluppo. Il sito personale rimanda a Get MediFlow per
