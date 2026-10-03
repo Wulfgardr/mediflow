@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { buildFileTopology, fileFallbackHtml } from './extract-files.mjs';
 
 const directory = fileURLToPath(new URL('.', import.meta.url));
 const root = resolve(directory, '../..');
@@ -69,11 +70,16 @@ export function fallbackHtml(snapshot) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const curated = JSON.parse(readFileSync(resolve(directory, 'curated-map.json'), 'utf8'));
   const snapshot = buildSnapshot(curated);
+  const topology = buildFileTopology(snapshot);
   const html = readFileSync(resolve(directory, 'index.template.html'), 'utf8')
     .replace('<!-- SNAPSHOT -->', JSON.stringify(snapshot).replaceAll('<', '\\u003c'))
     .replace('<!-- FALLBACK -->', fallbackHtml(snapshot))
+    .replace('<!-- FILE_TOPOLOGY -->', JSON.stringify(topology).replaceAll('<', '\\u003c'))
+    .replace('<!-- FILE_FALLBACK -->', fileFallbackHtml(topology))
+    .replace('<!-- FILE_COVERAGE -->', `${topology.coverage.selectedFiles} file citati come prova su ${topology.coverage.trackedFiles} file tracciati. ${topology.coverage.declarations} dichiarazioni statiche: ${topology.coverage.counts.included} interne alla selezione, ${topology.coverage.counts['outside-selection']} verso file fuori selezione, ${topology.coverage.counts.builtin} moduli Node, ${topology.coverage.counts['external-package']} pacchetti esterni, ${topology.coverage.counts.unresolved} non risolte. ${topology.coverage.omittedConstructs} costrutti esclusi rilevati. Nessuna espansione ricorsiva.`)
     .replaceAll('<!-- COMMIT -->', snapshot.sourceCommit);
-  const outputs = { 'snapshot.json': `${JSON.stringify(snapshot, null, 2)}\n`, 'index.html': html };
+  const outputs = { 'snapshot.json': `${JSON.stringify(snapshot, null, 2)}\n`,
+    'file-topology.json': `${JSON.stringify(topology, null, 2)}\n`, 'index.html': html };
   if (process.argv.includes('--check')) {
     for (const [name, content] of Object.entries(outputs)) {
       if (readFileSync(resolve(directory, name), 'utf8') !== content) throw new Error(`Stale output: ${name}`);
