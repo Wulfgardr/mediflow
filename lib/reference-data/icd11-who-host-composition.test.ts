@@ -78,7 +78,7 @@ function sources(overrides: Record<string, unknown> = {}) {
                     + '&flatResults=true&highlightingEnabled=false&medicalCodingMode=true&includeKeywordResult=false',
                 redirected: false,
                 body: JSON.stringify({
-                    destinationEntities: [{ theCode: 'BA00', title: 'Essential hypertension' }],
+                    destinationEntities: [{ theCode: 'BA00', title: 'Essential hypertension', id: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }],
                     error: false,
                     resultChopped: false,
                 }),
@@ -108,7 +108,7 @@ test('starts OFF and denies before secret resolution, audit or network', async (
         network: 'offline',
         egress: 'disabled',
         credential: 'absent',
-        operation: 'mediflow.reference_data.icd11.search.v1',
+        operation: 'mediflow.reference_data.icd11.search.v3',
         releaseId: '2026-01',
         language: 'en',
     }));
@@ -125,7 +125,7 @@ test('composes logical secret, OAuth, Search, audit and PHI-safe receipt after e
 
     const result = await host.search({ query: 'synthetic hypertension' });
 
-    assert.deepEqual(result.entries, [{ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11' }]);
+    assert.deepEqual(result.entries, [{ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }]);
     assert.equal(result.receipt.source, 'live');
     assert.equal(fixture.secretCalls(), 1);
     assert.deepEqual(fixture.clientCalls.map((request) => request.target), [
@@ -202,7 +202,7 @@ test('rejects config replay, mismatches, extra keys and stale use after restart 
     assert.equal(host.restart(), true);
     assert.equal(host.status().restartGeneration, 1);
     assert.deepEqual((await host.search({ query: 'synthetic hypertension' })).entries,
-        [{ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11' }]);
+        [{ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001' }]);
     assert.equal(host.dispose(), true);
     assert.equal(host.dispose(), false);
     await assert.rejects(host.search({ query: 'synthetic hypertension' }), isHostError('host_disposed'));

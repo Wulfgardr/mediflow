@@ -106,7 +106,7 @@ export function createIcd11WhoHttpRoute(dependencies: Dependencies) {
                 entries: result.entries, partial: result.partial, receipt: result.receipt,
             }), 200);
             return json(Object.freeze({
-                schemaVersion: 'mediflow.reference-data.icd11-search-response.v1' as const,
+                schemaVersion: 'mediflow.reference-data.icd11-search-response.v3' as const,
                 entries: result.entries,
                 receipt: result.receipt,
             }), 200);
