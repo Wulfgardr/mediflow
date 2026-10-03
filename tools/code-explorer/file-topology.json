@@ -1,0 +1,2872 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/Wulfgardr/mediflow",
+  "sourceCommit": "90fa7771fc0822475611c9affb9c22e212939399",
+  "modules": [
+    {
+      "id": "mcp",
+      "label": "Ingresso agenti · MCP"
+    },
+    {
+      "id": "mini",
+      "label": "Terminale · Mini"
+    },
+    {
+      "id": "client",
+      "label": "Canale verso l’host"
+    },
+    {
+      "id": "composition",
+      "label": "Composizione dell’host"
+    },
+    {
+      "id": "launcher",
+      "label": "Sessione e operazioni"
+    },
+    {
+      "id": "broker",
+      "label": "Regole e permessi · AIP"
+    },
+    {
+      "id": "rpc",
+      "label": "Operazioni RPC nominate"
+    },
+    {
+      "id": "openloops",
+      "label": "Regole della lettura"
+    },
+    {
+      "id": "reader",
+      "label": "Lettore dati dell’host"
+    },
+    {
+      "id": "db",
+      "label": "Database locale · SQLite"
+    },
+    {
+      "id": "ui",
+      "label": "Conferma nel Web"
+    },
+    {
+      "id": "route",
+      "label": "Route della proposta"
+    },
+    {
+      "id": "webowner",
+      "label": "Revisione e gesto esplicito"
+    },
+    {
+      "id": "writer",
+      "label": "Servizio di transizione"
+    },
+    {
+      "id": "storage",
+      "label": "Scrittura e ricevuta"
+    }
+  ],
+  "files": [
+    {
+      "id": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "blob": "7b19b96991abd8af876ca0b12595b4568ba5e53f",
+      "sha256": "98432ef989b7e3d4caa315fab6018de7cad1cc03c022036941719592979883f7",
+      "lineCount": 21,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts"
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx",
+      "path": "components/intelligent-host-checkup-action.tsx",
+      "blob": "5256d0612354afed5fd803366840ca19c3bbbb3f",
+      "sha256": "b292069331453ab0af2e57e82093b385dbc0fad2736a38abb426c2351a3e2c67",
+      "lineCount": 211,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx"
+    },
+    {
+      "id": "lib/db-server.ts",
+      "path": "lib/db-server.ts",
+      "blob": "b63b006fe04d0930d2fb413c3121b07c6c0f02e4",
+      "sha256": "38a102f2bf25a03727123bbffee10254e124759b276e8327ff379483e2ce0db8",
+      "lineCount": 1103,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts",
+      "path": "lib/headless/authenticated-agent-launcher.ts",
+      "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+      "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+      "lineCount": 457,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts"
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "blob": "983449748589715459db56070f36d9aa7187907e",
+      "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+      "lineCount": 141,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts",
+      "path": "lib/security/headless-checkup-status-transition-production.ts",
+      "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+      "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+      "lineCount": 194,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts",
+      "path": "lib/security/headless-checkup-status-transition-storage.ts",
+      "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+      "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+      "lineCount": 306,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "blob": "987ebed9759616664b6e0bde805d361794a65245",
+      "sha256": "13fd9b7430def7936009d35515abe9f56295463cf8250af0067b630e726055a7",
+      "lineCount": 248,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "path": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "blob": "976be212cb20eff8f44264169ed297de64da193c",
+      "sha256": "4d1dc08895d8575014cdc146a882c7adf53d0a57bbb5174819a69314e69ef160",
+      "lineCount": 271,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts"
+    },
+    {
+      "id": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "blob": "accf7885e41cfe9e2f51b728daaa11de17994bd6",
+      "sha256": "a0610a264e4b9d87d7002ec578841b450881da359147398a61152a4fc665b405",
+      "lineCount": 215,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts"
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts",
+      "path": "lib/security/patient-open-loops-read-production.ts",
+      "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+      "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+      "lineCount": 324,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts",
+      "path": "lib/security/portable-supervisor-production.ts",
+      "blob": "74c51e3424f15517257e4ad0d7bff4f25ec2cbf7",
+      "sha256": "f3752cebc4a18416ef2bad3e5ee5b7f95ca16ede760d0524be41756b9067547c",
+      "lineCount": 260,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts"
+    },
+    {
+      "id": "packages/aip/src/operation-rpc.ts",
+      "path": "packages/aip/src/operation-rpc.ts",
+      "blob": "9a53cdacf36c1208f1913fa51aeb7214c92ff1f0",
+      "sha256": "2dcfc7a53075f4055da2e97f3a66197818ca95214b7833ab76ba87f172df2e72",
+      "lineCount": 328,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts"
+    },
+    {
+      "id": "packages/aip/src/owner-broker.ts",
+      "path": "packages/aip/src/owner-broker.ts",
+      "blob": "a8957021eadb089c6c3b6ad6dd229df4d91d8354",
+      "sha256": "1175c76d54f5fb8e91e0c4ba37f942a61a93b8334bfc5163ec55a7b7ad0215d3",
+      "lineCount": 301,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts"
+    },
+    {
+      "id": "packages/aip/src/patient-open-loops.ts",
+      "path": "packages/aip/src/patient-open-loops.ts",
+      "blob": "5d212aaaf97cc6c09ecd3e56cf644900eb9351bf",
+      "sha256": "c3f3c4193e628b8619d22ee35a92a556ae0b875668b6b69593049edddf6ee5b5",
+      "lineCount": 269,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts"
+    },
+    {
+      "id": "packages/mcp/src/contracts.ts",
+      "path": "packages/mcp/src/contracts.ts",
+      "blob": "89bd32740daa0547642790991b78ff8a0cc4ecf5",
+      "sha256": "28f97bd823593e80c6218ce2065dc7ed3b271fa46cfa9f1847cdfba830bd093c",
+      "lineCount": 282,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts"
+    },
+    {
+      "id": "packages/mcp/src/operation-client.ts",
+      "path": "packages/mcp/src/operation-client.ts",
+      "blob": "992a2f59fc288fe9e1fb763a2421431c89c74080",
+      "sha256": "c7504ec6c30905c93e88e9a5fbb3fdbedab04dfa820779d1cd8c9364bba2e7d6",
+      "lineCount": 276,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts"
+    },
+    {
+      "id": "packages/mcp/src/server.ts",
+      "path": "packages/mcp/src/server.ts",
+      "blob": "61aece520d34f48a2b0932b716e08cdd1e6ddd7c",
+      "sha256": "f025712ca33e502f4462540fc1d71824fc5484e3594e51d61dc5bcde860a8c31",
+      "lineCount": 128,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts"
+    },
+    {
+      "id": "packages/mini/src/protocol.ts",
+      "path": "packages/mini/src/protocol.ts",
+      "blob": "976046842f8162ad8aa3ea03f287315105ff15fe",
+      "sha256": "de2816cc62b4dcfb306c9aad7ffbad33a33cacfba06e69dfab80b16a34ac4e5b",
+      "lineCount": 96,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts"
+    }
+  ],
+  "memberships": [
+    {
+      "moduleId": "mcp",
+      "fileId": "packages/mcp/src/server.ts",
+      "basis": "node-evidence",
+      "evidenceId": "mcp",
+      "reference": {
+        "path": "packages/mcp/src/server.ts",
+        "anchor": "export async function createUsefulMcpServer()",
+        "line": 25,
+        "endLine": 25,
+        "blob": "61aece520d34f48a2b0932b716e08cdd1e6ddd7c",
+        "sha256": "f025712ca33e502f4462540fc1d71824fc5484e3594e51d61dc5bcde860a8c31",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L25-L25"
+      }
+    },
+    {
+      "moduleId": "mini",
+      "fileId": "packages/mini/src/protocol.ts",
+      "basis": "node-evidence",
+      "evidenceId": "mini",
+      "reference": {
+        "path": "packages/mini/src/protocol.ts",
+        "anchor": "export function executeMiniRequest(",
+        "line": 37,
+        "endLine": 37,
+        "blob": "976046842f8162ad8aa3ea03f287315105ff15fe",
+        "sha256": "de2816cc62b4dcfb306c9aad7ffbad33a33cacfba06e69dfab80b16a34ac4e5b",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L37-L37"
+      }
+    },
+    {
+      "moduleId": "client",
+      "fileId": "packages/mcp/src/operation-client.ts",
+      "basis": "node-evidence",
+      "evidenceId": "client",
+      "reference": {
+        "path": "packages/mcp/src/operation-client.ts",
+        "anchor": "export function createOperationClient()",
+        "line": 38,
+        "endLine": 38,
+        "blob": "992a2f59fc288fe9e1fb763a2421431c89c74080",
+        "sha256": "c7504ec6c30905c93e88e9a5fbb3fdbedab04dfa820779d1cd8c9364bba2e7d6",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L38-L38"
+      }
+    },
+    {
+      "moduleId": "composition",
+      "fileId": "lib/security/portable-supervisor-production.ts",
+      "basis": "node-evidence",
+      "evidenceId": "composition",
+      "reference": {
+        "path": "lib/security/portable-supervisor-production.ts",
+        "anchor": "export function createPortableSupervisorProductionRuntimeV1(",
+        "line": 70,
+        "endLine": 70,
+        "blob": "74c51e3424f15517257e4ad0d7bff4f25ec2cbf7",
+        "sha256": "f3752cebc4a18416ef2bad3e5ee5b7f95ca16ede760d0524be41756b9067547c",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L70-L70"
+      }
+    },
+    {
+      "moduleId": "composition",
+      "fileId": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "basis": "node-evidence",
+      "evidenceId": "composition",
+      "reference": {
+        "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+        "anchor": "function createProductionLauncher(",
+        "line": 75,
+        "endLine": 75,
+        "blob": "983449748589715459db56070f36d9aa7187907e",
+        "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L75-L75"
+      }
+    },
+    {
+      "moduleId": "launcher",
+      "fileId": "lib/headless/authenticated-agent-launcher.ts",
+      "basis": "node-evidence",
+      "evidenceId": "launcher",
+      "reference": {
+        "path": "lib/headless/authenticated-agent-launcher.ts",
+        "anchor": "export function createAuthenticatedAgentLauncherV1(",
+        "line": 52,
+        "endLine": 52,
+        "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+        "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L52-L52"
+      }
+    },
+    {
+      "moduleId": "broker",
+      "fileId": "packages/aip/src/owner-broker.ts",
+      "basis": "node-evidence",
+      "evidenceId": "broker",
+      "reference": {
+        "path": "packages/aip/src/owner-broker.ts",
+        "anchor": "export type AipOwnerBrokerV1ErrorCode",
+        "line": 18,
+        "endLine": 18,
+        "blob": "a8957021eadb089c6c3b6ad6dd229df4d91d8354",
+        "sha256": "1175c76d54f5fb8e91e0c4ba37f942a61a93b8334bfc5163ec55a7b7ad0215d3",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts#L18-L18"
+      }
+    },
+    {
+      "moduleId": "rpc",
+      "fileId": "packages/aip/src/operation-rpc.ts",
+      "basis": "node-evidence",
+      "evidenceId": "rpc",
+      "reference": {
+        "path": "packages/aip/src/operation-rpc.ts",
+        "anchor": "type Metadata = Readonly<",
+        "line": 32,
+        "endLine": 32,
+        "blob": "9a53cdacf36c1208f1913fa51aeb7214c92ff1f0",
+        "sha256": "2dcfc7a53075f4055da2e97f3a66197818ca95214b7833ab76ba87f172df2e72",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L32-L32"
+      }
+    },
+    {
+      "moduleId": "openloops",
+      "fileId": "packages/aip/src/patient-open-loops.ts",
+      "basis": "node-evidence",
+      "evidenceId": "openloops",
+      "reference": {
+        "path": "packages/aip/src/patient-open-loops.ts",
+        "anchor": "export function createPatientOpenLoopsReadServiceV1(",
+        "line": 31,
+        "endLine": 31,
+        "blob": "5d212aaaf97cc6c09ecd3e56cf644900eb9351bf",
+        "sha256": "c3f3c4193e628b8619d22ee35a92a556ae0b875668b6b69593049edddf6ee5b5",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L31-L31"
+      }
+    },
+    {
+      "moduleId": "openloops",
+      "fileId": "packages/aip/src/patient-open-loops.ts",
+      "basis": "node-evidence",
+      "evidenceId": "openloops",
+      "reference": {
+        "path": "packages/aip/src/patient-open-loops.ts",
+        "anchor": "writesPerformed: 0 as const",
+        "line": 104,
+        "endLine": 104,
+        "blob": "5d212aaaf97cc6c09ecd3e56cf644900eb9351bf",
+        "sha256": "c3f3c4193e628b8619d22ee35a92a556ae0b875668b6b69593049edddf6ee5b5",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L104-L104"
+      }
+    },
+    {
+      "moduleId": "reader",
+      "fileId": "lib/security/patient-open-loops-read-production.ts",
+      "basis": "node-evidence",
+      "evidenceId": "reader",
+      "reference": {
+        "path": "lib/security/patient-open-loops-read-production.ts",
+        "anchor": "export function createPatientOpenLoopsReadInternalCandidateV1(",
+        "line": 203,
+        "endLine": 203,
+        "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+        "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L203-L203"
+      }
+    },
+    {
+      "moduleId": "db",
+      "fileId": "lib/db-server.ts",
+      "basis": "node-evidence",
+      "evidenceId": "db",
+      "reference": {
+        "path": "lib/db-server.ts",
+        "anchor": "let sqlite = new Database(dbPath);",
+        "line": 88,
+        "endLine": 88,
+        "blob": "b63b006fe04d0930d2fb413c3121b07c6c0f02e4",
+        "sha256": "38a102f2bf25a03727123bbffee10254e124759b276e8327ff379483e2ce0db8",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L88-L88"
+      }
+    },
+    {
+      "moduleId": "db",
+      "fileId": "lib/db-server.ts",
+      "basis": "node-evidence",
+      "evidenceId": "db",
+      "reference": {
+        "path": "lib/db-server.ts",
+        "anchor": "const dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');",
+        "line": 21,
+        "endLine": 21,
+        "blob": "b63b006fe04d0930d2fb413c3121b07c6c0f02e4",
+        "sha256": "38a102f2bf25a03727123bbffee10254e124759b276e8327ff379483e2ce0db8",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L21-L21"
+      }
+    },
+    {
+      "moduleId": "ui",
+      "fileId": "components/intelligent-host-checkup-action.tsx",
+      "basis": "node-evidence",
+      "evidenceId": "ui",
+      "reference": {
+        "path": "components/intelligent-host-checkup-action.tsx",
+        "anchor": "export function IntelligentHostCheckupAction(",
+        "line": 37,
+        "endLine": 37,
+        "blob": "5256d0612354afed5fd803366840ca19c3bbbb3f",
+        "sha256": "b292069331453ab0af2e57e82093b385dbc0fad2736a38abb426c2351a3e2c67",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L37-L37"
+      }
+    },
+    {
+      "moduleId": "ui",
+      "fileId": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "basis": "node-evidence",
+      "evidenceId": "ui",
+      "reference": {
+        "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+        "anchor": "candidatePin",
+        "line": 120,
+        "endLine": 120,
+        "blob": "accf7885e41cfe9e2f51b728daaa11de17994bd6",
+        "sha256": "a0610a264e4b9d87d7002ec578841b450881da359147398a61152a4fc665b405",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts#L120-L120"
+      }
+    },
+    {
+      "moduleId": "route",
+      "fileId": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "basis": "node-evidence",
+      "evidenceId": "route",
+      "reference": {
+        "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+        "anchor": "export const POST = handlers.confirm;",
+        "line": 20,
+        "endLine": 20,
+        "blob": "7b19b96991abd8af876ca0b12595b4568ba5e53f",
+        "sha256": "98432ef989b7e3d4caa315fab6018de7cad1cc03c022036941719592979883f7",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L20-L20"
+      }
+    },
+    {
+      "moduleId": "webowner",
+      "fileId": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "basis": "node-evidence",
+      "evidenceId": "webowner",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-web-production.ts",
+        "anchor": "export async function confirmCheckupStatusTransitionProposalV1(",
+        "line": 235,
+        "endLine": 235,
+        "blob": "976be212cb20eff8f44264169ed297de64da193c",
+        "sha256": "4d1dc08895d8575014cdc146a882c7adf53d0a57bbb5174819a69314e69ef160",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L235-L235"
+      }
+    },
+    {
+      "moduleId": "webowner",
+      "fileId": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "basis": "node-evidence",
+      "evidenceId": "webowner",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+        "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1",
+        "line": 10,
+        "endLine": 10,
+        "blob": "987ebed9759616664b6e0bde805d361794a65245",
+        "sha256": "13fd9b7430def7936009d35515abe9f56295463cf8250af0067b630e726055a7",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L10-L10"
+      }
+    },
+    {
+      "moduleId": "writer",
+      "fileId": "lib/security/headless-checkup-status-transition-production.ts",
+      "basis": "node-evidence",
+      "evidenceId": "writer",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-production.ts",
+        "anchor": "const PROOF_TTL_MS = 30_000;",
+        "line": 18,
+        "endLine": 18,
+        "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+        "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L18-L18"
+      }
+    },
+    {
+      "moduleId": "writer",
+      "fileId": "lib/security/headless-checkup-status-transition-production.ts",
+      "basis": "node-evidence",
+      "evidenceId": "writer",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-production.ts",
+        "anchor": "createHeadlessCheckupStatusTransitionStorageV1",
+        "line": 12,
+        "endLine": 12,
+        "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+        "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L12-L12"
+      }
+    },
+    {
+      "moduleId": "storage",
+      "fileId": "lib/security/headless-checkup-status-transition-storage.ts",
+      "basis": "node-evidence",
+      "evidenceId": "storage",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-storage.ts",
+        "anchor": "UPDATE checkups SET status = ?, version = version + 1, updated_at = ?",
+        "line": 279,
+        "endLine": 279,
+        "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+        "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L279-L279"
+      }
+    },
+    {
+      "moduleId": "storage",
+      "fileId": "lib/security/headless-checkup-status-transition-storage.ts",
+      "basis": "node-evidence",
+      "evidenceId": "storage",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-storage.ts",
+        "anchor": "runDbServerImmediateTransaction(",
+        "line": 260,
+        "endLine": 260,
+        "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+        "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L260-L260"
+      }
+    },
+    {
+      "moduleId": "mcp",
+      "fileId": "packages/mcp/src/server.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "mcp--client",
+      "reference": {
+        "path": "packages/mcp/src/server.ts",
+        "anchor": "from './operation-client.ts'",
+        "line": 12,
+        "endLine": 12,
+        "blob": "61aece520d34f48a2b0932b716e08cdd1e6ddd7c",
+        "sha256": "f025712ca33e502f4462540fc1d71824fc5484e3594e51d61dc5bcde860a8c31",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L12-L12"
+      }
+    },
+    {
+      "moduleId": "client",
+      "fileId": "packages/mcp/src/server.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "mcp--client",
+      "reference": {
+        "path": "packages/mcp/src/server.ts",
+        "anchor": "from './operation-client.ts'",
+        "line": 12,
+        "endLine": 12,
+        "blob": "61aece520d34f48a2b0932b716e08cdd1e6ddd7c",
+        "sha256": "f025712ca33e502f4462540fc1d71824fc5484e3594e51d61dc5bcde860a8c31",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L12-L12"
+      }
+    },
+    {
+      "moduleId": "mini",
+      "fileId": "packages/mini/src/protocol.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "mini--client",
+      "reference": {
+        "path": "packages/mini/src/protocol.ts",
+        "anchor": "case 'open-loops': return client.readOpenLoops();",
+        "line": 42,
+        "endLine": 42,
+        "blob": "976046842f8162ad8aa3ea03f287315105ff15fe",
+        "sha256": "de2816cc62b4dcfb306c9aad7ffbad33a33cacfba06e69dfab80b16a34ac4e5b",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L42-L42"
+      }
+    },
+    {
+      "moduleId": "client",
+      "fileId": "packages/mini/src/protocol.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "mini--client",
+      "reference": {
+        "path": "packages/mini/src/protocol.ts",
+        "anchor": "case 'open-loops': return client.readOpenLoops();",
+        "line": 42,
+        "endLine": 42,
+        "blob": "976046842f8162ad8aa3ea03f287315105ff15fe",
+        "sha256": "de2816cc62b4dcfb306c9aad7ffbad33a33cacfba06e69dfab80b16a34ac4e5b",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L42-L42"
+      }
+    },
+    {
+      "moduleId": "client",
+      "fileId": "packages/mcp/src/contracts.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "client--rpc",
+      "reference": {
+        "path": "packages/mcp/src/contracts.ts",
+        "anchor": "export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1'",
+        "line": 11,
+        "endLine": 11,
+        "blob": "89bd32740daa0547642790991b78ff8a0cc4ecf5",
+        "sha256": "28f97bd823593e80c6218ce2065dc7ed3b271fa46cfa9f1847cdfba830bd093c",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts#L11-L11"
+      }
+    },
+    {
+      "moduleId": "rpc",
+      "fileId": "packages/mcp/src/contracts.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "client--rpc",
+      "reference": {
+        "path": "packages/mcp/src/contracts.ts",
+        "anchor": "export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1'",
+        "line": 11,
+        "endLine": 11,
+        "blob": "89bd32740daa0547642790991b78ff8a0cc4ecf5",
+        "sha256": "28f97bd823593e80c6218ce2065dc7ed3b271fa46cfa9f1847cdfba830bd093c",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts#L11-L11"
+      }
+    },
+    {
+      "moduleId": "client",
+      "fileId": "packages/aip/src/operation-rpc.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "client--rpc",
+      "reference": {
+        "path": "packages/aip/src/operation-rpc.ts",
+        "anchor": "export const AIP_OPERATION_RPC_REQUEST_SCHEMA_V1 = 'mediflow.aip.operation.request.v1'",
+        "line": 9,
+        "endLine": 9,
+        "blob": "9a53cdacf36c1208f1913fa51aeb7214c92ff1f0",
+        "sha256": "2dcfc7a53075f4055da2e97f3a66197818ca95214b7833ab76ba87f172df2e72",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L9-L9"
+      }
+    },
+    {
+      "moduleId": "rpc",
+      "fileId": "packages/aip/src/operation-rpc.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "client--rpc",
+      "reference": {
+        "path": "packages/aip/src/operation-rpc.ts",
+        "anchor": "export const AIP_OPERATION_RPC_REQUEST_SCHEMA_V1 = 'mediflow.aip.operation.request.v1'",
+        "line": 9,
+        "endLine": 9,
+        "blob": "9a53cdacf36c1208f1913fa51aeb7214c92ff1f0",
+        "sha256": "2dcfc7a53075f4055da2e97f3a66197818ca95214b7833ab76ba87f172df2e72",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L9-L9"
+      }
+    },
+    {
+      "moduleId": "client",
+      "fileId": "packages/mcp/src/operation-client.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "client--rpc",
+      "reference": {
+        "path": "packages/mcp/src/operation-client.ts",
+        "anchor": "publish({ schemaVersion: RPC_REQUEST_SCHEMA, ...frame, requestId });",
+        "line": 151,
+        "endLine": 151,
+        "blob": "992a2f59fc288fe9e1fb763a2421431c89c74080",
+        "sha256": "c7504ec6c30905c93e88e9a5fbb3fdbedab04dfa820779d1cd8c9364bba2e7d6",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L151-L151"
+      }
+    },
+    {
+      "moduleId": "rpc",
+      "fileId": "packages/mcp/src/operation-client.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "client--rpc",
+      "reference": {
+        "path": "packages/mcp/src/operation-client.ts",
+        "anchor": "publish({ schemaVersion: RPC_REQUEST_SCHEMA, ...frame, requestId });",
+        "line": 151,
+        "endLine": 151,
+        "blob": "992a2f59fc288fe9e1fb763a2421431c89c74080",
+        "sha256": "c7504ec6c30905c93e88e9a5fbb3fdbedab04dfa820779d1cd8c9364bba2e7d6",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L151-L151"
+      }
+    },
+    {
+      "moduleId": "composition",
+      "fileId": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "composition--launcher",
+      "reference": {
+        "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+        "anchor": "return createAuthenticatedAgentLauncherV1({",
+        "line": 79,
+        "endLine": 79,
+        "blob": "983449748589715459db56070f36d9aa7187907e",
+        "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L79-L79"
+      }
+    },
+    {
+      "moduleId": "launcher",
+      "fileId": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "composition--launcher",
+      "reference": {
+        "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+        "anchor": "return createAuthenticatedAgentLauncherV1({",
+        "line": 79,
+        "endLine": 79,
+        "blob": "983449748589715459db56070f36d9aa7187907e",
+        "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L79-L79"
+      }
+    },
+    {
+      "moduleId": "launcher",
+      "fileId": "lib/headless/authenticated-agent-launcher.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "launcher--broker",
+      "reference": {
+        "path": "lib/headless/authenticated-agent-launcher.ts",
+        "anchor": "broker.authorize(broker.issueLease(state.owner)",
+        "line": 231,
+        "endLine": 231,
+        "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+        "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L231-L231"
+      }
+    },
+    {
+      "moduleId": "broker",
+      "fileId": "lib/headless/authenticated-agent-launcher.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "launcher--broker",
+      "reference": {
+        "path": "lib/headless/authenticated-agent-launcher.ts",
+        "anchor": "broker.authorize(broker.issueLease(state.owner)",
+        "line": 231,
+        "endLine": 231,
+        "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+        "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L231-L231"
+      }
+    },
+    {
+      "moduleId": "launcher",
+      "fileId": "lib/headless/authenticated-agent-launcher.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "launcher--rpc",
+      "reference": {
+        "path": "lib/headless/authenticated-agent-launcher.ts",
+        "anchor": "rpcHost = createAipOperationRpcHostV1({",
+        "line": 338,
+        "endLine": 338,
+        "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+        "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L338-L338"
+      }
+    },
+    {
+      "moduleId": "rpc",
+      "fileId": "lib/headless/authenticated-agent-launcher.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "launcher--rpc",
+      "reference": {
+        "path": "lib/headless/authenticated-agent-launcher.ts",
+        "anchor": "rpcHost = createAipOperationRpcHostV1({",
+        "line": 338,
+        "endLine": 338,
+        "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+        "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L338-L338"
+      }
+    },
+    {
+      "moduleId": "launcher",
+      "fileId": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "launcher--reader",
+      "reference": {
+        "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+        "anchor": "createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,",
+        "line": 95,
+        "endLine": 95,
+        "blob": "983449748589715459db56070f36d9aa7187907e",
+        "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L95-L95"
+      }
+    },
+    {
+      "moduleId": "reader",
+      "fileId": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "launcher--reader",
+      "reference": {
+        "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+        "anchor": "createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,",
+        "line": 95,
+        "endLine": 95,
+        "blob": "983449748589715459db56070f36d9aa7187907e",
+        "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L95-L95"
+      }
+    },
+    {
+      "moduleId": "reader",
+      "fileId": "lib/security/patient-open-loops-read-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "reader--openloops",
+      "reference": {
+        "path": "lib/security/patient-open-loops-read-production.ts",
+        "anchor": "const core = createPatientOpenLoopsReadServiceV1(",
+        "line": 255,
+        "endLine": 255,
+        "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+        "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L255-L255"
+      }
+    },
+    {
+      "moduleId": "openloops",
+      "fileId": "lib/security/patient-open-loops-read-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "reader--openloops",
+      "reference": {
+        "path": "lib/security/patient-open-loops-read-production.ts",
+        "anchor": "const core = createPatientOpenLoopsReadServiceV1(",
+        "line": 255,
+        "endLine": 255,
+        "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+        "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L255-L255"
+      }
+    },
+    {
+      "moduleId": "reader",
+      "fileId": "lib/security/patient-open-loops-read-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "reader--db",
+      "reference": {
+        "path": "lib/security/patient-open-loops-read-production.ts",
+        "anchor": "import { dbServer } from '../db-server';",
+        "line": 13,
+        "endLine": 13,
+        "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+        "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L13-L13"
+      }
+    },
+    {
+      "moduleId": "db",
+      "fileId": "lib/security/patient-open-loops-read-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "reader--db",
+      "reference": {
+        "path": "lib/security/patient-open-loops-read-production.ts",
+        "anchor": "import { dbServer } from '../db-server';",
+        "line": 13,
+        "endLine": 13,
+        "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+        "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L13-L13"
+      }
+    },
+    {
+      "moduleId": "ui",
+      "fileId": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "ui--route",
+      "reference": {
+        "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+        "anchor": "encodeURIComponent(accepted.proposalRef)",
+        "line": 192,
+        "endLine": 192,
+        "blob": "accf7885e41cfe9e2f51b728daaa11de17994bd6",
+        "sha256": "a0610a264e4b9d87d7002ec578841b450881da359147398a61152a4fc665b405",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts#L192-L192"
+      }
+    },
+    {
+      "moduleId": "route",
+      "fileId": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "ui--route",
+      "reference": {
+        "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+        "anchor": "encodeURIComponent(accepted.proposalRef)",
+        "line": 192,
+        "endLine": 192,
+        "blob": "accf7885e41cfe9e2f51b728daaa11de17994bd6",
+        "sha256": "a0610a264e4b9d87d7002ec578841b450881da359147398a61152a4fc665b405",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts#L192-L192"
+      }
+    },
+    {
+      "moduleId": "route",
+      "fileId": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "route--webowner",
+      "reference": {
+        "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+        "anchor": "confirm: confirmCheckupStatusTransitionProposalV1,",
+        "line": 16,
+        "endLine": 16,
+        "blob": "7b19b96991abd8af876ca0b12595b4568ba5e53f",
+        "sha256": "98432ef989b7e3d4caa315fab6018de7cad1cc03c022036941719592979883f7",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L16-L16"
+      }
+    },
+    {
+      "moduleId": "webowner",
+      "fileId": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "route--webowner",
+      "reference": {
+        "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+        "anchor": "confirm: confirmCheckupStatusTransitionProposalV1,",
+        "line": 16,
+        "endLine": 16,
+        "blob": "7b19b96991abd8af876ca0b12595b4568ba5e53f",
+        "sha256": "98432ef989b7e3d4caa315fab6018de7cad1cc03c022036941719592979883f7",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L16-L16"
+      }
+    },
+    {
+      "moduleId": "webowner",
+      "fileId": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "webowner--writer",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+        "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1(",
+        "line": 79,
+        "endLine": 79,
+        "blob": "987ebed9759616664b6e0bde805d361794a65245",
+        "sha256": "13fd9b7430def7936009d35515abe9f56295463cf8250af0067b630e726055a7",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L79-L79"
+      }
+    },
+    {
+      "moduleId": "writer",
+      "fileId": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "webowner--writer",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+        "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1(",
+        "line": 79,
+        "endLine": 79,
+        "blob": "987ebed9759616664b6e0bde805d361794a65245",
+        "sha256": "13fd9b7430def7936009d35515abe9f56295463cf8250af0067b630e726055a7",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L79-L79"
+      }
+    },
+    {
+      "moduleId": "writer",
+      "fileId": "lib/security/headless-checkup-status-transition-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "writer--storage",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-production.ts",
+        "anchor": "createHeadlessCheckupStatusTransitionStorageV1(",
+        "line": 97,
+        "endLine": 97,
+        "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+        "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L97-L97"
+      }
+    },
+    {
+      "moduleId": "storage",
+      "fileId": "lib/security/headless-checkup-status-transition-production.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "writer--storage",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-production.ts",
+        "anchor": "createHeadlessCheckupStatusTransitionStorageV1(",
+        "line": 97,
+        "endLine": 97,
+        "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+        "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L97-L97"
+      }
+    },
+    {
+      "moduleId": "storage",
+      "fileId": "lib/security/headless-checkup-status-transition-storage.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "storage--db",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-storage.ts",
+        "anchor": "import { dbServer, runDbServerImmediateTransaction } from '../db-server';",
+        "line": 11,
+        "endLine": 11,
+        "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+        "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L11-L11"
+      }
+    },
+    {
+      "moduleId": "db",
+      "fileId": "lib/security/headless-checkup-status-transition-storage.ts",
+      "basis": "edge-evidence",
+      "evidenceId": "storage--db",
+      "reference": {
+        "path": "lib/security/headless-checkup-status-transition-storage.ts",
+        "anchor": "import { dbServer, runDbServerImmediateTransaction } from '../db-server';",
+        "line": 11,
+        "endLine": 11,
+        "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+        "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+        "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L11-L11"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "id": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts:0",
+      "source": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "specifier": "@/lib/security/headless-checkup-status-transition-web-http",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 3,
+      "anchor": "import { createHeadlessCheckupStatusTransitionWebHttpHandlersV1 } from\n  '@/lib/security/headless-checkup-status-transition-web-http';",
+      "resolution": "outside-selection",
+      "target": "lib/security/headless-checkup-status-transition-web-http.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L2-L3",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-http.ts"
+    },
+    {
+      "id": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts:1",
+      "source": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "specifier": "@/lib/security/headless-checkup-status-transition-web-production",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 6,
+      "anchor": "import { revokeCheckupStatusTransitionForHostV1, selectCheckupStatusTransitionForHostV1,\n  readCheckupStatusTransitionProposalV1, confirmCheckupStatusTransitionProposalV1 } from\n  '@/lib/security/headless-checkup-status-transition-web-production';",
+      "resolution": "included",
+      "target": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L4-L6",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts"
+    },
+    {
+      "id": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts:2",
+      "source": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "specifier": "@/lib/security/server-auth",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 7,
+      "anchor": "import { readAuthenticatedWebSession } from '@/lib/security/server-auth';",
+      "resolution": "outside-selection",
+      "target": "lib/security/server-auth.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L7-L7",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/server-auth.ts"
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx:0",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "specifier": "lucide-react",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import { Clipboard, ShieldCheck } from 'lucide-react';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx:1",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "specifier": "react",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 6,
+      "endLine": 6,
+      "anchor": "import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L6-L6",
+      "targetUrl": null
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx:2",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "specifier": "@/components/kree8/kree8-workspace-shell.module.css",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 8,
+      "endLine": 8,
+      "anchor": "import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';",
+      "resolution": "outside-selection",
+      "target": "components/kree8/kree8-workspace-shell.module.css",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L8-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/kree8/kree8-workspace-shell.module.css"
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx:3",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "specifier": "@/lib/live-query",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 9,
+      "endLine": 9,
+      "anchor": "import { notifyDbChange } from '@/lib/live-query';",
+      "resolution": "outside-selection",
+      "target": "lib/live-query.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L9-L9",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/live-query.ts"
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx:4",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "specifier": "@/lib/security/intelligent-host-checkup-browser-adapter",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 10,
+      "endLine": 11,
+      "anchor": "import { IntelligentHostCheckupBrowserAdapterError,\n  createIntelligentHostCheckupBrowserAdapter } from '@/lib/security/intelligent-host-checkup-browser-adapter';",
+      "resolution": "included",
+      "target": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L10-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts"
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx:5",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "specifier": "./intelligent-host-checkup-action.module.css",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 13,
+      "endLine": 13,
+      "anchor": "import popoverStyles from './intelligent-host-checkup-action.module.css';",
+      "resolution": "outside-selection",
+      "target": "components/intelligent-host-checkup-action.module.css",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L13-L13",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.module.css"
+    },
+    {
+      "id": "lib/db-server.ts:0",
+      "source": "lib/db-server.ts",
+      "specifier": "drizzle-orm/better-sqlite3",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 1,
+      "endLine": 1,
+      "anchor": "import { drizzle } from 'drizzle-orm/better-sqlite3';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L1-L1",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/db-server.ts:1",
+      "source": "lib/db-server.ts",
+      "specifier": "better-sqlite3",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import Database from 'better-sqlite3';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/db-server.ts:2",
+      "source": "lib/db-server.ts",
+      "specifier": "fs",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import fs from 'fs';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/db-server.ts:3",
+      "source": "lib/db-server.ts",
+      "specifier": "path",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import path from 'path';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/db-server.ts:4",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/aifa-catalog",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 6,
+      "endLine": 6,
+      "anchor": "import { normalizeAifaSearchText } from '@/lib/aifa-catalog';",
+      "resolution": "outside-selection",
+      "target": "lib/aifa-catalog.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L6-L6",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/aifa-catalog.ts"
+    },
+    {
+      "id": "lib/db-server.ts:5",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/security/audit-db",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 7,
+      "anchor": "import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';",
+      "resolution": "outside-selection",
+      "target": "lib/security/audit-db.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L7-L7",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/audit-db.ts"
+    },
+    {
+      "id": "lib/db-server.ts:6",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/data-dir",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 8,
+      "endLine": 8,
+      "anchor": "import { resolveDataPath } from '@/lib/data-dir';",
+      "resolution": "outside-selection",
+      "target": "lib/data-dir.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L8-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/data-dir.ts"
+    },
+    {
+      "id": "lib/db-server.ts:7",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/sqlite-repair",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 9,
+      "endLine": 9,
+      "anchor": "import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';",
+      "resolution": "outside-selection",
+      "target": "lib/sqlite-repair.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L9-L9",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/sqlite-repair.ts"
+    },
+    {
+      "id": "lib/db-server.ts:8",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/sqlite-new-database-bootstrap",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 10,
+      "endLine": 10,
+      "anchor": "import { bootstrapEmptySqliteDatabase } from '@/lib/sqlite-new-database-bootstrap';",
+      "resolution": "outside-selection",
+      "target": "lib/sqlite-new-database-bootstrap.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L10-L10",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/sqlite-new-database-bootstrap.ts"
+    },
+    {
+      "id": "lib/db-server.ts:9",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/sqlite-pragmas",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 11,
+      "endLine": 11,
+      "anchor": "import { initSqlitePragmas } from '@/lib/sqlite-pragmas';",
+      "resolution": "outside-selection",
+      "target": "lib/sqlite-pragmas.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L11-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/sqlite-pragmas.ts"
+    },
+    {
+      "id": "lib/db-server.ts:10",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/exemption-catalog-schema",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 13,
+      "endLine": 13,
+      "anchor": "import { ensureExemptionImportSchema } from '@/lib/exemption-catalog-schema';",
+      "resolution": "outside-selection",
+      "target": "lib/exemption-catalog-schema.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L13-L13",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/exemption-catalog-schema.ts"
+    },
+    {
+      "id": "lib/db-server.ts:11",
+      "source": "lib/db-server.ts",
+      "specifier": "@/lib/reference-data/prosthetics-catalog-schema",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 15,
+      "endLine": 15,
+      "anchor": "import { ensureProstheticsCatalogSchema } from '@/lib/reference-data/prosthetics-catalog-schema';",
+      "resolution": "outside-selection",
+      "target": "lib/reference-data/prosthetics-catalog-schema.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L15-L15",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/reference-data/prosthetics-catalog-schema.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:0",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:1",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/authenticated-ipc.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 6,
+      "anchor": "import {\n  createAipAuthenticatedIpcHostV1,\n} from '../../packages/aip/src/authenticated-ipc.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/authenticated-ipc.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L4-L6",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/authenticated-ipc.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:2",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/operation-rpc.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 10,
+      "anchor": "import {\n  createAipAuthenticatedOperationRpcChildEnvironmentV1,\n  createAipOperationRpcHostV1,\n} from '../../packages/aip/src/operation-rpc.ts';",
+      "resolution": "included",
+      "target": "packages/aip/src/operation-rpc.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L7-L10",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:3",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/owner-broker.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 11,
+      "endLine": 11,
+      "anchor": "import { createAipOwnerBrokerV1 } from '../../packages/aip/src/owner-broker.ts';",
+      "resolution": "included",
+      "target": "packages/aip/src/owner-broker.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L11-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:4",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 12,
+      "endLine": 13,
+      "anchor": "import { HEADLESS_CHECKUP_STATUS_OPERATION_V1 } from\n  '../../packages/aip/src/checkup-status-transition.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L12-L13",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:5",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition-ipc.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 14,
+      "endLine": 15,
+      "anchor": "import { decodeCheckupStatusTransitionIpcFrameV1, encodeCheckupStatusTransitionIpcFrameV1 } from\n  '../../packages/aip/src/checkup-status-transition-ipc.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition-ipc.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L14-L15",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition-ipc.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:6",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/patient-open-loops-follow-up-proposal.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 16,
+      "endLine": 20,
+      "anchor": "import {\n  PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_APPLICATION_SERVICE_V1,\n  PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_OPERATION_V1,\n  createPatientOpenLoopsFollowUpProposalServiceV1,\n} from '../../packages/aip/src/patient-open-loops-follow-up-proposal.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/patient-open-loops-follow-up-proposal.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L16-L20",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops-follow-up-proposal.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:7",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/patient-open-loops.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 21,
+      "endLine": 24,
+      "anchor": "import {\n  PATIENT_OPEN_LOOPS_READ_APPLICATION_SERVICE_V1,\n  PATIENT_OPEN_LOOPS_READ_OPERATION_V1,\n} from '../../packages/aip/src/patient-open-loops.ts';",
+      "resolution": "included",
+      "target": "packages/aip/src/patient-open-loops.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L21-L24",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:8",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/terminology-search.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 25,
+      "endLine": 28,
+      "anchor": "import {\n  AIP_TERMINOLOGY_SEARCH_CONTRACT_V1,\n  createLocalAipTerminologySearchServiceV1,\n} from '../../packages/aip/src/terminology-search.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/terminology-search.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L25-L28",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/terminology-search.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:9",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/semantic-query-operation.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 29,
+      "endLine": 33,
+      "anchor": "import {\n  SEMANTIC_QUERY_ALLOWED_READS_V1,\n  SEMANTIC_QUERY_OPERATION_CONTRACT_V1,\n  createSemanticQueryOperationServiceV1,\n} from '../../packages/aip/src/semantic-query-operation.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/semantic-query-operation.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L29-L33",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/semantic-query-operation.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:10",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "../../packages/aip/src/semantic-query-operation-contract.ts",
+      "syntax": "import",
+      "typeUsage": "type-only",
+      "line": 34,
+      "endLine": 35,
+      "anchor": "import type { SemanticQueryOperationTerminalAuditCommitV1 } from\n  '../../packages/aip/src/semantic-query-operation-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/semantic-query-operation-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L34-L35",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/semantic-query-operation-contract.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:11",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "./authenticated-agent-launcher-contract.ts",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 36,
+      "endLine": 40,
+      "anchor": "import {\n  BOOTSTRAP, CHILD_KEYS, CONTEXT_KEYS, DIGEST, REF, SOURCE_KEYS, TOKEN,\n  AuthenticatedAgentLauncherV1Error, exact, hostId, integer, record,\n  type AuthenticatedAgentLauncherV1ErrorCode, type Child, type Context, type OperationState,\n} from './authenticated-agent-launcher-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/headless/authenticated-agent-launcher-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L36-L40",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher-contract.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:12",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "./authenticated-session-scope-registry.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 41,
+      "endLine": 41,
+      "anchor": "import { createAuthenticatedSessionScopeRegistryV1 } from './authenticated-session-scope-registry.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/headless/authenticated-session-scope-registry.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L41-L41",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-session-scope-registry.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:13",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "./authenticated-agent-launcher-contract.ts",
+      "syntax": "re-export",
+      "typeUsage": "value",
+      "line": 49,
+      "endLine": 49,
+      "anchor": "export { AuthenticatedAgentLauncherV1Error } from './authenticated-agent-launcher-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/headless/authenticated-agent-launcher-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L49-L49",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher-contract.ts"
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts:14",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "specifier": "./authenticated-agent-launcher-contract.ts",
+      "syntax": "re-export",
+      "typeUsage": "type-only",
+      "line": 50,
+      "endLine": 50,
+      "anchor": "export type { AuthenticatedAgentLauncherV1ErrorCode } from './authenticated-agent-launcher-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/headless/authenticated-agent-launcher-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L50-L50",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher-contract.ts"
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:0",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "node:child_process",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { spawn, type ChildProcess } from 'node:child_process';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:1",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "node:crypto",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 3,
+      "endLine": 3,
+      "anchor": "import { createHash, randomBytes } from 'node:crypto';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L3-L3",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:2",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "node:url",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { fileURLToPath } from 'node:url';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:3",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:4",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "../../packages/aip/src/semantic-query-operation-contract.ts",
+      "syntax": "import",
+      "typeUsage": "type-only",
+      "line": 7,
+      "endLine": 8,
+      "anchor": "import type { SemanticQueryOperationTerminalAuditCommitV1 } from\n  '../../packages/aip/src/semantic-query-operation-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/semantic-query-operation-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L7-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/semantic-query-operation-contract.ts"
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:5",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "../headless/authenticated-agent-launcher.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 9,
+      "endLine": 11,
+      "anchor": "import {\n  AuthenticatedAgentLauncherV1Error, createAuthenticatedAgentLauncherV1,\n} from '../headless/authenticated-agent-launcher.ts';",
+      "resolution": "included",
+      "target": "lib/headless/authenticated-agent-launcher.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L9-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts"
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:6",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "./authenticated-headless-agent-pre-spawned-mcp-child.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 12,
+      "endLine": 12,
+      "anchor": "import { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/authenticated-headless-agent-pre-spawned-mcp-child.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L12-L12",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-pre-spawned-mcp-child.ts"
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:7",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "./patient-open-loops-read-production.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 13,
+      "endLine": 13,
+      "anchor": "import { createPatientOpenLoopsReadInternalCandidateV1 } from './patient-open-loops-read-production.ts';",
+      "resolution": "included",
+      "target": "lib/security/patient-open-loops-read-production.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L13-L13",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts"
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts:8",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "specifier": "./authenticated-headless-agent-pre-spawned-mcp-child.ts",
+      "syntax": "re-export",
+      "typeUsage": "value",
+      "line": 15,
+      "endLine": 15,
+      "anchor": "export { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/authenticated-headless-agent-pre-spawned-mcp-child.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L15-L15",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-pre-spawned-mcp-child.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts:0",
+      "source": "lib/security/headless-checkup-status-transition-production.ts",
+      "specifier": "server-only",
+      "syntax": "import",
+      "typeUsage": "side-effect",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import 'server-only';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts:1",
+      "source": "lib/security/headless-checkup-status-transition-production.ts",
+      "specifier": "node:crypto",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { createHash, randomBytes } from 'node:crypto';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts:2",
+      "source": "lib/security/headless-checkup-status-transition-production.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts:3",
+      "source": "lib/security/headless-checkup-status-transition-production.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 11,
+      "anchor": "import {\n    createHeadlessCheckupStatusTransitionServiceV1,\n    HEADLESS_CHECKUP_STATUS_OPERATION_V1 as OPERATION_ID,\n    HeadlessCheckupStatusTransitionV1Error,\n} from '../../packages/aip/src/checkup-status-transition';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L7-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts:4",
+      "source": "lib/security/headless-checkup-status-transition-production.ts",
+      "specifier": "./headless-checkup-status-transition-storage",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 12,
+      "endLine": 12,
+      "anchor": "import { createHeadlessCheckupStatusTransitionStorageV1 } from './headless-checkup-status-transition-storage';",
+      "resolution": "included",
+      "target": "lib/security/headless-checkup-status-transition-storage.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L12-L12",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts:0",
+      "source": "lib/security/headless-checkup-status-transition-storage.ts",
+      "specifier": "server-only",
+      "syntax": "import",
+      "typeUsage": "side-effect",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import 'server-only';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts:1",
+      "source": "lib/security/headless-checkup-status-transition-storage.ts",
+      "specifier": "node:crypto",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { createHash, randomBytes } from 'node:crypto';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts:2",
+      "source": "lib/security/headless-checkup-status-transition-storage.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts:3",
+      "source": "lib/security/headless-checkup-status-transition-storage.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 7,
+      "endLine": 10,
+      "anchor": "import {\n    HEADLESS_CHECKUP_STATUS_OPERATION_V1 as OPERATION_ID,\n    type HeadlessCheckupStatusReceiptV1,\n} from '../../packages/aip/src/checkup-status-transition';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L7-L10",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts:4",
+      "source": "lib/security/headless-checkup-status-transition-storage.ts",
+      "specifier": "../db-server",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 11,
+      "endLine": 11,
+      "anchor": "import { dbServer, runDbServerImmediateTransaction } from '../db-server';",
+      "resolution": "included",
+      "target": "lib/db-server.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L11-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts:0",
+      "source": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "specifier": "server-only",
+      "syntax": "import",
+      "typeUsage": "side-effect",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import 'server-only';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts:1",
+      "source": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts:2",
+      "source": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition-ipc.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 6,
+      "endLine": 7,
+      "anchor": "import { decodeCheckupStatusTransitionIpcFrameV1, encodeCheckupStatusTransitionIpcFrameV1,\n  CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1 } from '../../packages/aip/src/checkup-status-transition-ipc.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition-ipc.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L6-L7",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition-ipc.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts:3",
+      "source": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition.ts",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 8,
+      "endLine": 9,
+      "anchor": "import { HeadlessCheckupStatusTransitionV1Error, type HeadlessCheckupStatusReceiptV1 } from\n  '../../packages/aip/src/checkup-status-transition.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L8-L9",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts:4",
+      "source": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "specifier": "./headless-checkup-status-transition-production.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 10,
+      "endLine": 11,
+      "anchor": "import { createHeadlessCheckupStatusTransitionInternalCandidateV1 } from\n  './headless-checkup-status-transition-production.ts';",
+      "resolution": "included",
+      "target": "lib/security/headless-checkup-status-transition-production.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L10-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:0",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "server-only",
+      "syntax": "import",
+      "typeUsage": "side-effect",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import 'server-only';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:1",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "node:crypto",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { randomBytes } from 'node:crypto';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:2",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:3",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition-ipc.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 8,
+      "anchor": "import { CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1, decodeCheckupStatusTransitionIpcFrameV1,\n  encodeCheckupStatusTransitionIpcFrameV1 } from '../../packages/aip/src/checkup-status-transition-ipc.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition-ipc.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L7-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition-ipc.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:4",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "../../packages/aip/src/checkup-status-transition.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 9,
+      "endLine": 9,
+      "anchor": "import { HeadlessCheckupStatusTransitionV1Error } from '../../packages/aip/src/checkup-status-transition.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/checkup-status-transition.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L9-L9",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/checkup-status-transition.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:5",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./audit",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 10,
+      "endLine": 10,
+      "anchor": "import { hashAuditRef, writeAuditEvent } from './audit';",
+      "resolution": "outside-selection",
+      "target": "lib/security/audit.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L10-L10",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/audit.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:6",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./checkup-status-transition-web-parent-channel",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 11,
+      "endLine": 11,
+      "anchor": "import { createCheckupStatusTransitionWebParentChannelV1 } from './checkup-status-transition-web-parent-channel';",
+      "resolution": "outside-selection",
+      "target": "lib/security/checkup-status-transition-web-parent-channel.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L11-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/checkup-status-transition-web-parent-channel.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:7",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./fresh-review-pin-uniqueness",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 12,
+      "endLine": 12,
+      "anchor": "import { verifyFreshReviewPin } from './fresh-review-pin-uniqueness';",
+      "resolution": "outside-selection",
+      "target": "lib/security/fresh-review-pin-uniqueness.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L12-L12",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/fresh-review-pin-uniqueness.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:8",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./headless-checkup-active-role-session-grant-production",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 13,
+      "endLine": 14,
+      "anchor": "import { headlessCheckupActiveRoleSessionGrant } from\n  './headless-checkup-active-role-session-grant-production';",
+      "resolution": "outside-selection",
+      "target": "lib/security/headless-checkup-active-role-session-grant-production.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L13-L14",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-active-role-session-grant-production.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:9",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./headless-checkup-active-role-session-grant",
+      "syntax": "import",
+      "typeUsage": "type-only",
+      "line": 15,
+      "endLine": 16,
+      "anchor": "import type { HeadlessCheckupActiveRoleCurrentBindingV1,\n  HeadlessCheckupActiveRoleSessionGrantV1 } from './headless-checkup-active-role-session-grant';",
+      "resolution": "outside-selection",
+      "target": "lib/security/headless-checkup-active-role-session-grant.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L15-L16",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-active-role-session-grant.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:10",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./headless-checkup-status-transition-web-owner",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 17,
+      "endLine": 18,
+      "anchor": "import { createHeadlessCheckupStatusTransitionWebOwnerV1 } from\n  './headless-checkup-status-transition-web-owner';",
+      "resolution": "included",
+      "target": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L17-L18",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:11",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./server-auth",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 19,
+      "endLine": 20,
+      "anchor": "import { acquireAuthenticatedWebSessionProjectionOwnerContext,\n  type AuthenticatedWebSessionProjectionOwnerContext } from './server-auth';",
+      "resolution": "outside-selection",
+      "target": "lib/security/server-auth.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L19-L20",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/server-auth.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:12",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./portable-supervisor-checkup-web-session-port",
+      "syntax": "import",
+      "typeUsage": "type-only",
+      "line": 21,
+      "endLine": 22,
+      "anchor": "import type { PortableSupervisorCheckupWebSessionBindingV1 } from\n  './portable-supervisor-checkup-web-session-port';",
+      "resolution": "outside-selection",
+      "target": "lib/security/portable-supervisor-checkup-web-session-port.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L21-L22",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-checkup-web-session-port.ts"
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts:13",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "specifier": "./portable-supervisor-web-session-controller",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 23,
+      "endLine": 23,
+      "anchor": "import { portableSupervisorCheckupWebSessionPortV1 } from './portable-supervisor-web-session-controller';",
+      "resolution": "outside-selection",
+      "target": "lib/security/portable-supervisor-web-session-controller.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L23-L23",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-web-session-controller.ts"
+    },
+    {
+      "id": "lib/security/intelligent-host-checkup-browser-adapter.ts:0",
+      "source": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "specifier": "./smart-import-selection-browser-adapter",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 6,
+      "anchor": "import { SmartImportSelectionBrowserAdapterError,\n  createSmartImportSelectionBrowserAdapter } from './smart-import-selection-browser-adapter';",
+      "resolution": "outside-selection",
+      "target": "lib/security/smart-import-selection-browser-adapter.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts#L5-L6",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/smart-import-selection-browser-adapter.ts"
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:0",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "server-only",
+      "syntax": "import",
+      "typeUsage": "side-effect",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import 'server-only';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:1",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "node:buffer",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { Buffer } from 'node:buffer';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:2",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "node:crypto",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import { createHash, randomBytes } from 'node:crypto';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:3",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 6,
+      "endLine": 6,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L6-L6",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:4",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "drizzle-orm",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 7,
+      "anchor": "import { and, asc, eq } from 'drizzle-orm';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L7-L7",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:5",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "../../packages/aip/src/patient-open-loops",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 9,
+      "endLine": 12,
+      "anchor": "import {\n    createPatientOpenLoopsReadServiceV1,\n    PatientOpenLoopsReadV1Error,\n} from '../../packages/aip/src/patient-open-loops';",
+      "resolution": "included",
+      "target": "packages/aip/src/patient-open-loops.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L9-L12",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts"
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:6",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "../db-server",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 13,
+      "endLine": 13,
+      "anchor": "import { dbServer } from '../db-server';",
+      "resolution": "included",
+      "target": "lib/db-server.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L13-L13",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts"
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:7",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "../patient-open-loops",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 14,
+      "endLine": 20,
+      "anchor": "import {\n    deriveOpenLoops,\n    RESULTS_PENDING_AFTER_DAYS,\n    STALL_FACTOR,\n    type OpenLoopObservation,\n    type OpenLoopServicePrescriptionItem,\n} from '../patient-open-loops';",
+      "resolution": "outside-selection",
+      "target": "lib/patient-open-loops.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L14-L20",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/patient-open-loops.ts"
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts:8",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "specifier": "../schema",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 21,
+      "endLine": 21,
+      "anchor": "import { observations, patientsToAmbulatories, servicePrescriptionItems } from '../schema';",
+      "resolution": "outside-selection",
+      "target": "lib/schema.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L21-L21",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/schema.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:0",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "server-only",
+      "syntax": "import",
+      "typeUsage": "side-effect",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import 'server-only';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:1",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "node:crypto",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "import { createHash, randomBytes } from 'node:crypto';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L4-L4",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:2",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "node:path",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 5,
+      "endLine": 5,
+      "anchor": "import path from 'node:path';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L5-L5",
+      "targetUrl": null
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:3",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "../../packages/aip/src/portable-supervisor-context-mirror.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 7,
+      "endLine": 8,
+      "anchor": "import { createPortableSupervisorContextMirrorV1 } from\n  '../../packages/aip/src/portable-supervisor-context-mirror.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/portable-supervisor-context-mirror.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L7-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/portable-supervisor-context-mirror.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:4",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "../../packages/aip/src/portable-supervisor-web-control.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 9,
+      "endLine": 11,
+      "anchor": "import {\n  createPortableSupervisorWebControlV1,\n} from '../../packages/aip/src/portable-supervisor-web-control.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/portable-supervisor-web-control.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L9-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/portable-supervisor-web-control.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:5",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "../../packages/aip/src/portable-supervisor-web-ipc-contract.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 12,
+      "endLine": 13,
+      "anchor": "import { decodePortableSupervisorWebIpcFrameV1 } from\n  '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/portable-supervisor-web-ipc-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L12-L13",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/portable-supervisor-web-ipc-contract.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:6",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "../data-dir",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 14,
+      "endLine": 14,
+      "anchor": "import { getDataDir } from '../data-dir';",
+      "resolution": "outside-selection",
+      "target": "lib/data-dir.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L14-L14",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/data-dir.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:7",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "../athena-mlx-launcher-config.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 15,
+      "endLine": 15,
+      "anchor": "import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/athena-mlx-launcher-config.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L15-L15",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/athena-mlx-launcher-config.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:8",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "./checkup-status-transition-supervisor-port.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 16,
+      "endLine": 17,
+      "anchor": "import { createCheckupStatusTransitionSupervisorPortV1 } from\n  './checkup-status-transition-supervisor-port.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/checkup-status-transition-supervisor-port.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L16-L17",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/checkup-status-transition-supervisor-port.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:9",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "./authenticated-headless-agent-launcher-production.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 18,
+      "endLine": 20,
+      "anchor": "import { createProductionMcpAgentLauncherWithPreSpawnedChildV1,\n  createProductionMiniAgentLauncherWithPreSpawnedChildV1 } from\n  './authenticated-headless-agent-launcher-production.ts';",
+      "resolution": "included",
+      "target": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L18-L20",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:10",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "./portable-supervisor-aip-audit-port.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 21,
+      "endLine": 21,
+      "anchor": "import { createPortableSupervisorAipAuditPortV1 } from './portable-supervisor-aip-audit-port.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/portable-supervisor-aip-audit-port.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L21-L21",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-aip-audit-port.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:11",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "./portable-supervisor-child-processes.ts",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 22,
+      "endLine": 26,
+      "anchor": "import {\n  createPortableSupervisorProductionChildProcessesV1,\n  type PortableSupervisorChildProcessesOptionsV1,\n  type PortableSupervisorProductionChildProcessesV1,\n} from './portable-supervisor-child-processes.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/portable-supervisor-child-processes.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L22-L26",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-child-processes.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:12",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "./portable-supervisor-patient-version-production.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 27,
+      "endLine": 28,
+      "anchor": "import { createPortableSupervisorPatientVersionProductionV1 } from\n  './portable-supervisor-patient-version-production.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/portable-supervisor-patient-version-production.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L27-L28",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-patient-version-production.ts"
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts:13",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "specifier": "./portable-supervisor-semantic-audit-port.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 29,
+      "endLine": 30,
+      "anchor": "import { createPortableSupervisorSemanticAuditPortV1 } from\n  './portable-supervisor-semantic-audit-port.ts';",
+      "resolution": "outside-selection",
+      "target": "lib/security/portable-supervisor-semantic-audit-port.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L29-L30",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-semantic-audit-port.ts"
+    },
+    {
+      "id": "packages/aip/src/operation-rpc.ts:0",
+      "source": "packages/aip/src/operation-rpc.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/aip/src/operation-rpc.ts:1",
+      "source": "packages/aip/src/operation-rpc.ts",
+      "specifier": "./child-ipc-contract.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 3,
+      "endLine": 5,
+      "anchor": "import {\n    AIP_BOOTSTRAP_ENV_KEY_V1, AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,\n} from './child-ipc-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/child-ipc-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L3-L5",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/child-ipc-contract.ts"
+    },
+    {
+      "id": "packages/aip/src/operation-rpc.ts:2",
+      "source": "packages/aip/src/operation-rpc.ts",
+      "specifier": "./child-ipc-contract.ts",
+      "syntax": "re-export",
+      "typeUsage": "value",
+      "line": 6,
+      "endLine": 8,
+      "anchor": "export {\n    AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1,\n} from './child-ipc-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/child-ipc-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L6-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/child-ipc-contract.ts"
+    },
+    {
+      "id": "packages/aip/src/owner-broker.ts:0",
+      "source": "packages/aip/src/owner-broker.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/aip/src/owner-broker.ts:1",
+      "source": "packages/aip/src/owner-broker.ts",
+      "specifier": "./permit-execution-owner.ts",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 3,
+      "endLine": 3,
+      "anchor": "import { createAipPermitExecutionOwnerV1, type AipAuthorizationPermitV1, type AipBoundPermitExecutionV1, type AipPermitExecutionV1 } from './permit-execution-owner.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/permit-execution-owner.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts#L3-L3",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/permit-execution-owner.ts"
+    },
+    {
+      "id": "packages/aip/src/owner-broker.ts:2",
+      "source": "packages/aip/src/owner-broker.ts",
+      "specifier": "./permit-execution-owner.ts",
+      "syntax": "re-export",
+      "typeUsage": "type-only",
+      "line": 4,
+      "endLine": 4,
+      "anchor": "export type { AipAuthorizationPermitV1, AipBoundPermitExecutionV1, AipPermitExecutionV1 } from './permit-execution-owner.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/permit-execution-owner.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts#L4-L4",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/permit-execution-owner.ts"
+    },
+    {
+      "id": "packages/aip/src/patient-open-loops.ts:0",
+      "source": "packages/aip/src/patient-open-loops.ts",
+      "specifier": "node:util",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { types } from 'node:util';",
+      "resolution": "builtin",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/aip/src/patient-open-loops.ts:1",
+      "source": "packages/aip/src/patient-open-loops.ts",
+      "specifier": "./patient-open-loops-contract.ts",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 3,
+      "endLine": 8,
+      "anchor": "import {\n    CURRENT_KEYS, DIGEST, INPUT_KEYS, LEASE_KEYS, PATIENT_OPEN_LOOPS_READ_MAX_ITEMS_V1,\n    PATIENT_OPEN_LOOPS_READ_OPERATION_V1, PATIENT_OPEN_LOOPS_READ_PURPOSE_V1, RECEIPT_REF, REF,\n    SNAPSHOT_KEYS, PatientOpenLoopsReadV1Error, exact, fail, integer, matches, opaque, parseItems, record,\n    type PatientOpenLoopsReadResultV1, type PatientOpenLoopsReadV1ErrorCode,\n} from './patient-open-loops-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/patient-open-loops-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L3-L8",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops-contract.ts"
+    },
+    {
+      "id": "packages/aip/src/patient-open-loops.ts:2",
+      "source": "packages/aip/src/patient-open-loops.ts",
+      "specifier": "./patient-open-loops-contract.ts",
+      "syntax": "re-export",
+      "typeUsage": "value",
+      "line": 10,
+      "endLine": 15,
+      "anchor": "export {\n    PATIENT_OPEN_LOOPS_READ_APPLICATION_SERVICE_V1, PATIENT_OPEN_LOOPS_READ_MAX_ITEMS_V1,\n    PATIENT_OPEN_LOOPS_READ_OPERATION_V1,\n    PATIENT_OPEN_LOOPS_READ_PURPOSE_V1, PATIENT_OPEN_LOOPS_READ_TIMEOUT_MODE_V1,\n    PatientOpenLoopsReadV1Error,\n} from './patient-open-loops-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/patient-open-loops-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L10-L15",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops-contract.ts"
+    },
+    {
+      "id": "packages/aip/src/patient-open-loops.ts:3",
+      "source": "packages/aip/src/patient-open-loops.ts",
+      "specifier": "./patient-open-loops-contract.ts",
+      "syntax": "re-export",
+      "typeUsage": "type-only",
+      "line": 16,
+      "endLine": 18,
+      "anchor": "export type {\n    PatientOpenLoopItemV1, PatientOpenLoopsReadResultV1, PatientOpenLoopsReadV1ErrorCode,\n} from './patient-open-loops-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/patient-open-loops-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L16-L18",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops-contract.ts"
+    },
+    {
+      "id": "packages/mcp/src/contracts.ts:0",
+      "source": "packages/mcp/src/contracts.ts",
+      "specifier": "zod",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { z } from 'zod';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/mcp/src/operation-client.ts:0",
+      "source": "packages/mcp/src/operation-client.ts",
+      "specifier": "zod",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { z } from 'zod';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/mcp/src/operation-client.ts:1",
+      "source": "packages/mcp/src/operation-client.ts",
+      "specifier": "../../aip/src/child-ipc-contract.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 3,
+      "endLine": 7,
+      "anchor": "import {\n  AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1, AIP_BOOTSTRAP_BIND_SCHEMA_V1, AIP_BOOTSTRAP_ENV_KEY_V1,\n  AIP_BOOTSTRAP_REQUEST_SCHEMA_V1, AIP_BOOTSTRAP_RESULT_SCHEMA_V1,\n  AIP_OPERATION_RPC_AUTHENTICATED_ENV_V1, AIP_OPERATION_RPC_ENV_KEY_V1, AIP_OPERATION_RPC_LATE_BIND_ENV_V1,\n} from '../../aip/src/child-ipc-contract.ts';",
+      "resolution": "outside-selection",
+      "target": "packages/aip/src/child-ipc-contract.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L3-L7",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/child-ipc-contract.ts"
+    },
+    {
+      "id": "packages/mcp/src/operation-client.ts:2",
+      "source": "packages/mcp/src/operation-client.ts",
+      "specifier": "./contracts.ts",
+      "syntax": "import",
+      "typeUsage": "mixed",
+      "line": 8,
+      "endLine": 17,
+      "anchor": "import {\n  CHECKUP_STATUS_TRANSITION_OPERATION_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID, HEADLESS_STATUS,\n  OPEN_LOOPS_OPERATION_ID, OPERATION_DESCRIPTORS,\n  RPC_REQUEST_SCHEMA, RPC_RESULT_SCHEMA, TERMINOLOGY_OPERATION_ID, followUpProposalArgumentsSchema,\n  followUpProposalOutputSchema, openLoopsOutputSchema, publicCatalog, rpcOperationSchema,\n  SEMANTIC_QUERY_OPERATION_ID, selectBoundOperations, semanticQueryArgumentsSchema, semanticQueryOutputSchema,\n  terminologyArgumentsSchema, terminologyOutputSchema,\n  checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,\n  type OperationDescriptor,\n} from './contracts.ts';",
+      "resolution": "included",
+      "target": "packages/mcp/src/contracts.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L8-L17",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts"
+    },
+    {
+      "id": "packages/mcp/src/server.ts:0",
+      "source": "packages/mcp/src/server.ts",
+      "specifier": "@modelcontextprotocol/server",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { McpServer } from '@modelcontextprotocol/server';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/mcp/src/server.ts:1",
+      "source": "packages/mcp/src/server.ts",
+      "specifier": "./contracts.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 3,
+      "endLine": 11,
+      "anchor": "import {\n  CAPABILITIES_TOOL_ID, CHECKUP_STATUS_TRANSITION_OPERATION_ID, FOLLOW_UP_PROPOSAL_OPERATION_ID,\n  HEADLESS_STATUS_TOOL_ID, OPEN_LOOPS_OPERATION_ID,\n  SEMANTIC_QUERY_OPERATION_ID, TERMINOLOGY_OPERATION_ID, capabilitiesOutputSchema, followUpProposalArgumentsSchema,\n  followUpProposalOutputSchema, headlessStatusOutputSchema, openLoopsArgumentsSchema, openLoopsOutputSchema,\n  semanticQueryArgumentsSchema, semanticQueryOutputSchema, systemArgumentsSchema, terminologyArgumentsSchema,\n  terminologyOutputSchema,\n  checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,\n} from './contracts.ts';",
+      "resolution": "included",
+      "target": "packages/mcp/src/contracts.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L3-L11",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts"
+    },
+    {
+      "id": "packages/mcp/src/server.ts:2",
+      "source": "packages/mcp/src/server.ts",
+      "specifier": "./operation-client.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 12,
+      "endLine": 12,
+      "anchor": "import { OperationClientError, createOperationClient } from './operation-client.ts';",
+      "resolution": "included",
+      "target": "packages/mcp/src/operation-client.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L12-L12",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts"
+    },
+    {
+      "id": "packages/mini/src/protocol.ts:0",
+      "source": "packages/mini/src/protocol.ts",
+      "specifier": "zod",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 2,
+      "endLine": 2,
+      "anchor": "import { z } from 'zod';",
+      "resolution": "external-package",
+      "target": null,
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L2-L2",
+      "targetUrl": null
+    },
+    {
+      "id": "packages/mini/src/protocol.ts:1",
+      "source": "packages/mini/src/protocol.ts",
+      "specifier": "../../mcp/src/contracts.ts",
+      "syntax": "import",
+      "typeUsage": "value",
+      "line": 3,
+      "endLine": 6,
+      "anchor": "import {\n  followUpProposalArgumentsSchema, openLoopsArgumentsSchema, semanticQueryArgumentsSchema,\n  terminologyArgumentsSchema,\n} from '../../mcp/src/contracts.ts';",
+      "resolution": "included",
+      "target": "packages/mcp/src/contracts.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L3-L6",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts"
+    },
+    {
+      "id": "packages/mini/src/protocol.ts:2",
+      "source": "packages/mini/src/protocol.ts",
+      "specifier": "../../mcp/src/operation-client.ts",
+      "syntax": "import",
+      "typeUsage": "type-only",
+      "line": 7,
+      "endLine": 7,
+      "anchor": "import type { createOperationClient } from '../../mcp/src/operation-client.ts';",
+      "resolution": "included",
+      "target": "packages/mcp/src/operation-client.ts",
+      "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L7-L7",
+      "targetUrl": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts"
+    }
+  ],
+  "edges": [
+    {
+      "id": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts→lib/security/headless-checkup-status-transition-web-production.ts",
+      "source": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+      "target": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "declarationIds": [
+        "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts:1"
+      ]
+    },
+    {
+      "id": "components/intelligent-host-checkup-action.tsx→lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "source": "components/intelligent-host-checkup-action.tsx",
+      "target": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+      "declarationIds": [
+        "components/intelligent-host-checkup-action.tsx:4"
+      ]
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts→packages/aip/src/operation-rpc.ts",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "target": "packages/aip/src/operation-rpc.ts",
+      "declarationIds": [
+        "lib/headless/authenticated-agent-launcher.ts:2"
+      ]
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts→packages/aip/src/owner-broker.ts",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "target": "packages/aip/src/owner-broker.ts",
+      "declarationIds": [
+        "lib/headless/authenticated-agent-launcher.ts:3"
+      ]
+    },
+    {
+      "id": "lib/headless/authenticated-agent-launcher.ts→packages/aip/src/patient-open-loops.ts",
+      "source": "lib/headless/authenticated-agent-launcher.ts",
+      "target": "packages/aip/src/patient-open-loops.ts",
+      "declarationIds": [
+        "lib/headless/authenticated-agent-launcher.ts:7"
+      ]
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts→lib/headless/authenticated-agent-launcher.ts",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "target": "lib/headless/authenticated-agent-launcher.ts",
+      "declarationIds": [
+        "lib/security/authenticated-headless-agent-launcher-production.ts:5"
+      ]
+    },
+    {
+      "id": "lib/security/authenticated-headless-agent-launcher-production.ts→lib/security/patient-open-loops-read-production.ts",
+      "source": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "target": "lib/security/patient-open-loops-read-production.ts",
+      "declarationIds": [
+        "lib/security/authenticated-headless-agent-launcher-production.ts:7"
+      ]
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-production.ts→lib/security/headless-checkup-status-transition-storage.ts",
+      "source": "lib/security/headless-checkup-status-transition-production.ts",
+      "target": "lib/security/headless-checkup-status-transition-storage.ts",
+      "declarationIds": [
+        "lib/security/headless-checkup-status-transition-production.ts:4"
+      ]
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-storage.ts→lib/db-server.ts",
+      "source": "lib/security/headless-checkup-status-transition-storage.ts",
+      "target": "lib/db-server.ts",
+      "declarationIds": [
+        "lib/security/headless-checkup-status-transition-storage.ts:4"
+      ]
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-owner.ts→lib/security/headless-checkup-status-transition-production.ts",
+      "source": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "target": "lib/security/headless-checkup-status-transition-production.ts",
+      "declarationIds": [
+        "lib/security/headless-checkup-status-transition-web-owner.ts:4"
+      ]
+    },
+    {
+      "id": "lib/security/headless-checkup-status-transition-web-production.ts→lib/security/headless-checkup-status-transition-web-owner.ts",
+      "source": "lib/security/headless-checkup-status-transition-web-production.ts",
+      "target": "lib/security/headless-checkup-status-transition-web-owner.ts",
+      "declarationIds": [
+        "lib/security/headless-checkup-status-transition-web-production.ts:10"
+      ]
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts→packages/aip/src/patient-open-loops.ts",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "target": "packages/aip/src/patient-open-loops.ts",
+      "declarationIds": [
+        "lib/security/patient-open-loops-read-production.ts:5"
+      ]
+    },
+    {
+      "id": "lib/security/patient-open-loops-read-production.ts→lib/db-server.ts",
+      "source": "lib/security/patient-open-loops-read-production.ts",
+      "target": "lib/db-server.ts",
+      "declarationIds": [
+        "lib/security/patient-open-loops-read-production.ts:6"
+      ]
+    },
+    {
+      "id": "lib/security/portable-supervisor-production.ts→lib/security/authenticated-headless-agent-launcher-production.ts",
+      "source": "lib/security/portable-supervisor-production.ts",
+      "target": "lib/security/authenticated-headless-agent-launcher-production.ts",
+      "declarationIds": [
+        "lib/security/portable-supervisor-production.ts:9"
+      ]
+    },
+    {
+      "id": "packages/mcp/src/operation-client.ts→packages/mcp/src/contracts.ts",
+      "source": "packages/mcp/src/operation-client.ts",
+      "target": "packages/mcp/src/contracts.ts",
+      "declarationIds": [
+        "packages/mcp/src/operation-client.ts:2"
+      ]
+    },
+    {
+      "id": "packages/mcp/src/server.ts→packages/mcp/src/contracts.ts",
+      "source": "packages/mcp/src/server.ts",
+      "target": "packages/mcp/src/contracts.ts",
+      "declarationIds": [
+        "packages/mcp/src/server.ts:1"
+      ]
+    },
+    {
+      "id": "packages/mcp/src/server.ts→packages/mcp/src/operation-client.ts",
+      "source": "packages/mcp/src/server.ts",
+      "target": "packages/mcp/src/operation-client.ts",
+      "declarationIds": [
+        "packages/mcp/src/server.ts:2"
+      ]
+    },
+    {
+      "id": "packages/mini/src/protocol.ts→packages/mcp/src/contracts.ts",
+      "source": "packages/mini/src/protocol.ts",
+      "target": "packages/mcp/src/contracts.ts",
+      "declarationIds": [
+        "packages/mini/src/protocol.ts:1"
+      ]
+    },
+    {
+      "id": "packages/mini/src/protocol.ts→packages/mcp/src/operation-client.ts",
+      "source": "packages/mini/src/protocol.ts",
+      "target": "packages/mcp/src/operation-client.ts",
+      "declarationIds": [
+        "packages/mini/src/protocol.ts:2"
+      ]
+    }
+  ],
+  "omitted": [],
+  "coverage": {
+    "selectedFiles": 19,
+    "trackedFiles": 2987,
+    "declarations": 118,
+    "counts": {
+      "included": 19,
+      "outside-selection": 62,
+      "builtin": 22,
+      "external-package": 15,
+      "unresolved": 0
+    },
+    "omittedConstructs": 0,
+    "recursiveExpansion": false
+  },
+  "limits": [
+    "I moduli sono i 15 elementi curati; file citato come prova non significa proprietà o responsabilità esclusiva.",
+    "Le relazioni tra file sono dichiarazioni statiche, comprese quelle di soli tipi; non dimostrano chiamate, flussi di dati o esecuzione.",
+    "Sono analizzati soltanto i file citati dai nodi e dalle relazioni; i target esterni alla selezione non vengono analizzati ricorsivamente.",
+    "Import dinamici, chiamate denominate require e import come espressioni di tipo sono segnalati ma esclusi dalle relazioni. Non sono analizzati i linguaggi nativi, gli asset o il runtime."
+  ],
+  "provenance": {
+    "generator": "tools/code-explorer/extract-files.mjs",
+    "parser": "typescript 5.9.3",
+    "curatedSnapshotSha256": "c41a26d8f6bf8ac42ca743cc00a1dbcf117152adfcc47f383b9221bbc6cb53ac",
+    "sourceTree": "cde457594ff6c2cffd427e8a42c5ed3bfb3b86c8",
+    "tsconfigBlob": "e9e497f567f07c3fd391bc3eea15f45a2aba3e3a",
+    "tsconfigSha256": "1711ebc1f3c7f79c3923f744d9c99ae150f7b9a861ccc344f716788d97d73120",
+    "proofKind": "pinned_static_declarations",
+    "executionVerified": false
+  }
+}
