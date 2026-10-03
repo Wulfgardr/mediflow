@@ -13,6 +13,75 @@ const node = process.execPath;
 const detectLibcTracePattern = './node_modules/detect-libc/**/*';
 const pnpmNestedSharpSemverTracePattern = './node_modules/.pnpm/node_modules/semver/**/*';
 const npmNestedSharpSemverTracePattern = './node_modules/sharp/node_modules/semver/**/*';
+
+function checkSyntheticRuntimeManifest(manifest) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-runtime-manifest-'));
+  try {
+    const standalone = path.join(directory, '.next', 'standalone');
+    fs.mkdirSync(standalone, { recursive: true });
+    fs.writeFileSync(path.join(directory, '.nvmrc'), '24\n');
+    fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ engines: { node: '>=24 <25' } }));
+    fs.writeFileSync(path.join(standalone, 'server.js'), 'throw new Error("synthetic server must not execute");\n');
+    fs.writeFileSync(path.join(standalone, 'mediflow-runtime-contract.json'), JSON.stringify(manifest));
+    return spawnSync(node, [checker], {
+      cwd: directory,
+      env: { NODE_ENV: 'production' },
+      encoding: 'utf8',
+      timeout: 10_000,
+    });
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function syntheticRuntimeManifest() {
+  return {
+    schemaVersion: 1,
+    node: { major: 24, version: process.versions.node, moduleVersion: process.versions.modules },
+    platform: process.platform,
+    arch: process.arch,
+    betterSqlite3Version: 'synthetic-not-loaded',
+  };
+}
+
+test('standalone manifest preflight admits the supported major and ABI across Node patches', () => {
+  for (const version of [process.versions.node, '24.0.0']) {
+    const manifest = syntheticRuntimeManifest();
+    manifest.node.version = version;
+    const result = checkSyntheticRuntimeManifest(manifest);
+    assert.equal(result.error, undefined);
+    assert.equal(result.signal, null);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Standalone Treatment portable closure missing, non-physical, or contains model\/runtime\/private data\./);
+    assert.doesNotMatch(result.stderr, /Standalone runtime ABI\/platform mismatch/);
+  }
+});
+
+test('standalone manifest preflight rejects unsupported schema and Node before dependency checks', async (t) => {
+  const cases = [
+    ['unsupported schema', (value) => { value.schemaVersion = 99; }],
+    ['missing schema', (value) => { delete value.schemaVersion; }],
+    ['string schema', (value) => { value.schemaVersion = '1'; }],
+    ['wrong Node major', (value) => { value.node.major = 20; }],
+    ['missing Node major', (value) => { delete value.node.major; }],
+    ['string Node major', (value) => { value.node.major = '24'; }],
+    ['wrong ABI', (value) => { value.node.moduleVersion = 'synthetic-wrong-abi'; }],
+    ['wrong platform', (value) => { value.platform = 'synthetic-wrong-platform'; }],
+    ['wrong architecture', (value) => { value.arch = 'synthetic-wrong-architecture'; }],
+  ];
+  for (const [name, mutate] of cases) {
+    await t.test(name, () => {
+      const manifest = syntheticRuntimeManifest();
+      mutate(manifest);
+      const result = checkSyntheticRuntimeManifest(manifest);
+      assert.equal(result.error, undefined);
+      assert.equal(result.signal, null);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /Standalone runtime ABI\/platform mismatch/);
+      assert.doesNotMatch(result.stderr, /Standalone Treatment portable/);
+    });
+  }
+});
 const sharpTracePattern = './node_modules/sharp/**/*';
 const anyDocPdfWorkerTracePattern = './scripts/anydoc-pdf-page-worker.mjs';
 const pdfLibTracePattern = './node_modules/pdf-lib/**/*';
