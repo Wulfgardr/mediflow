@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Wulfgardr/mediflow/tools/code-explorer/file-topology.schema.json",
+  "title": "MediFlow bounded pinned file topology",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "sourceCommit", "modules", "files", "memberships", "declarations", "edges", "omitted", "coverage", "limits", "provenance"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "repository": {"const": "https://github.com/Wulfgardr/mediflow"},
+    "sourceCommit": {"$ref": "#/$defs/sha"},
+    "modules": {"type": "array", "minItems": 8, "maxItems": 15, "items": {
+      "type": "object", "additionalProperties": false, "required": ["id", "label"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "label": {"type": "string", "minLength": 1}}
+    }},
+    "files": {"type": "array", "minItems": 1, "items": {
+      "type": "object", "additionalProperties": false, "required": ["id", "path", "blob", "sha256", "lineCount", "url"],
+      "properties": {"id": {"$ref": "#/$defs/path"}, "path": {"$ref": "#/$defs/path"}, "blob": {"$ref": "#/$defs/sha"}, "sha256": {"$ref": "#/$defs/digest"}, "lineCount": {"type": "integer", "minimum": 1}, "url": {"$ref": "#/$defs/url"}}
+    }},
+    "memberships": {"type": "array", "minItems": 1, "items": {
+      "type": "object", "additionalProperties": false, "required": ["moduleId", "fileId", "basis", "evidenceId", "reference"],
+      "properties": {"moduleId": {"type": "string", "minLength": 1}, "fileId": {"$ref": "#/$defs/path"}, "basis": {"enum": ["node-evidence", "edge-evidence"]}, "evidenceId": {"type": "string", "minLength": 1}, "reference": {"$ref": "#/$defs/reference"}}
+    }},
+    "declarations": {"type": "array", "items": {"$ref": "#/$defs/declaration"}},
+    "edges": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["id", "source", "target", "declarationIds"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "source": {"$ref": "#/$defs/path"}, "target": {"$ref": "#/$defs/path"}, "declarationIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}
+    }},
+    "omitted": {"type": "array", "items": {
+      "type": "object", "additionalProperties": false, "required": ["source", "syntax", "specifier", "reason", "line", "endLine", "anchor", "url"],
+      "properties": {"source": {"$ref": "#/$defs/path"}, "syntax": {"enum": ["dynamic-import", "require-call", "import-type-expression"]}, "specifier": {"type": ["string", "null"]}, "reason": {"const": "excluded-syntax"}, "line": {"type": "integer", "minimum": 1}, "endLine": {"type": "integer", "minimum": 1}, "anchor": {"type": "string", "minLength": 1}, "url": {"$ref": "#/$defs/url"}}
+    }},
+    "coverage": {
+      "type": "object", "additionalProperties": false, "required": ["selectedFiles", "trackedFiles", "declarations", "counts", "omittedConstructs", "recursiveExpansion"],
+      "properties": {"selectedFiles": {"type": "integer", "minimum": 1}, "trackedFiles": {"type": "integer", "minimum": 1}, "declarations": {"type": "integer", "minimum": 0}, "omittedConstructs": {"type": "integer", "minimum": 0}, "recursiveExpansion": {"const": false}, "counts": {
+        "type": "object", "additionalProperties": false, "required": ["included", "outside-selection", "builtin", "external-package", "unresolved"],
+        "properties": {"included": {"type": "integer", "minimum": 0}, "outside-selection": {"type": "integer", "minimum": 0}, "builtin": {"type": "integer", "minimum": 0}, "external-package": {"type": "integer", "minimum": 0}, "unresolved": {"type": "integer", "minimum": 0}}
+      }}
+    },
+    "limits": {"type": "array", "minItems": 4, "items": {"type": "string", "minLength": 1}},
+    "provenance": {
+      "type": "object", "additionalProperties": false, "required": ["generator", "parser", "curatedSnapshotSha256", "sourceTree", "tsconfigBlob", "tsconfigSha256", "proofKind", "executionVerified"],
+      "properties": {"generator": {"const": "tools/code-explorer/extract-files.mjs"}, "parser": {"type": "string", "pattern": "^typescript [0-9]+\\.[0-9]+\\.[0-9]+$"}, "curatedSnapshotSha256": {"$ref": "#/$defs/digest"}, "sourceTree": {"$ref": "#/$defs/sha"}, "tsconfigBlob": {"$ref": "#/$defs/sha"}, "tsconfigSha256": {"$ref": "#/$defs/digest"}, "proofKind": {"const": "pinned_static_declarations"}, "executionVerified": {"const": false}}
+    }
+  },
+  "$defs": {
+    "sha": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "path": {"type": "string", "pattern": "^(app|components|lib|packages|scripts)/"},
+    "url": {"type": "string", "pattern": "^https://github.com/Wulfgardr/mediflow/blob/[a-f0-9]{40}/"},
+    "reference": {
+      "type": "object", "additionalProperties": false, "required": ["path", "anchor", "line", "endLine", "blob", "sha256", "url"],
+      "properties": {"path": {"$ref": "#/$defs/path"}, "anchor": {"type": "string", "minLength": 1}, "line": {"type": "integer", "minimum": 1}, "endLine": {"type": "integer", "minimum": 1}, "blob": {"$ref": "#/$defs/sha"}, "sha256": {"$ref": "#/$defs/digest"}, "url": {"$ref": "#/$defs/url"}}
+    },
+    "declaration": {
+      "type": "object", "additionalProperties": false, "required": ["id", "source", "specifier", "syntax", "typeUsage", "line", "endLine", "anchor", "resolution", "target", "url", "targetUrl"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "source": {"$ref": "#/$defs/path"}, "specifier": {"type": "string", "minLength": 1}, "syntax": {"enum": ["import", "re-export", "import-equals"]}, "typeUsage": {"enum": ["type-only", "mixed", "value", "side-effect"]}, "line": {"type": "integer", "minimum": 1}, "endLine": {"type": "integer", "minimum": 1}, "anchor": {"type": "string", "minLength": 1}, "resolution": {"enum": ["included", "outside-selection", "builtin", "external-package", "unresolved"]}, "target": {"type": ["string", "null"]}, "url": {"$ref": "#/$defs/url"}, "targetUrl": {"anyOf": [{"$ref": "#/$defs/url"}, {"type": "null"}]}}
+    }
+  }
+}

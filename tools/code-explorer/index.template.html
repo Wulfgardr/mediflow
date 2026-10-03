@@ -7,6 +7,7 @@
   <title>Esplora il codice · MediFlow</title>
   <link rel="stylesheet" href="explorer.css">
   <script src="explorer.js" defer></script>
+  <script src="files.js" defer></script>
 </head>
 <body>
 <header><a href="https://getmediflow.dev/#cofano">MediFlow · Come funziona</a><a href="https://github.com/Wulfgardr/mediflow">Repository pubblica</a></header>
@@ -15,6 +16,10 @@
   <p class="intro">Segui una lettura delle attività e una conferma di modifica al checkup. Scegli un elemento per capire il suo ruolo e risalire alle fonti.</p>
   <p class="revision">Fotografia storica del sorgente · <a href="https://github.com/Wulfgardr/mediflow/tree/<!-- COMMIT -->"><code><!-- COMMIT --></code></a></p>
   <p class="boundary">Le linee descrivono relazioni nel codice. Non mostrano traffico, dati clinici o servizi attivi. La mappa copre due esempi, non tutta l’applicazione.</p>
+  <div id="view-controls" class="view-controls" hidden aria-label="Scegli la vista">
+    <button id="architecture-view" type="button" aria-pressed="true" aria-controls="workspace source-list">Relazioni tra moduli</button>
+    <button id="files-view" type="button" aria-pressed="false" aria-controls="file-section">Moduli e file citati</button>
+  </div>
   <div class="controls" hidden id="controls">
     <label>Cerca un elemento <input id="search" type="search" placeholder="Per esempio: permessi, SQLite" autocomplete="off"></label>
     <button id="reset" type="button">Mostra tutte le relazioni</button>
@@ -38,6 +43,43 @@
     <div id="list-picker" hidden aria-label="Seleziona dall’elenco"></div>
     <div id="fallback"><!-- FALLBACK --></div>
   </section>
+  <section id="file-section" aria-labelledby="file-heading">
+    <h2 id="file-heading">Moduli e file citati</h2>
+    <p>Dal modulo alla sua prova nel sorgente. «File citato come prova» comprende le fonti del modulo e dei suoi collegamenti documentati; un file può comparire sotto più moduli.</p>
+    <p id="file-coverage" class="boundary"><!-- FILE_COVERAGE --></p>
+    <div id="file-controls" class="controls" hidden>
+      <label>File citati per <select id="module-filter"><option value="">Tutti i moduli</option></select></label>
+      <label>Cerca un file o una dichiarazione <input id="file-search" type="search" placeholder="Nome, percorso o import" autocomplete="off"></label>
+      <label>Dichiarazioni mostrate <select id="declaration-filter"><option value="all">Tutte</option><option value="type-only">Solo di tipi</option><option value="re-export">Re-export</option><option value="included">Tra file selezionati</option><option value="outside-selection">Verso file fuori selezione</option><option value="unresolved">Non risolte</option></select></label>
+      <button id="file-reset" type="button">Azzera i filtri</button>
+      <a href="#file-list">Leggi i file come elenco</a>
+    </div>
+    <p id="file-status" class="status" role="status"></p>
+    <div id="file-workspace" class="workspace" hidden>
+      <section class="map-panel" aria-label="File citati e dichiarazioni statiche">
+        <div class="map file-map"><svg viewBox="0 0 990 710" preserveAspectRatio="none" aria-hidden="true" id="file-edges"></svg><div id="file-nodes"></div></div>
+        <details class="legend"><summary>Come leggere i collegamenti tra file</summary>
+          <p>La selezione di un modulo mostra i file citati come prove dei suoi elementi e collegamenti. I tratteggi grigi collegano il modulo a queste prove.</p>
+          <p>Le linee blu tra file rappresentano import o re-export statici; il tratteggio blu indica dichiarazioni soltanto di tipi. Una coppia può avere più dichiarazioni, conservate nella spiegazione.</p>
+          <p>Direzione: dal file che contiene la dichiarazione al file citato. La spiegazione distingue le dichiarazioni in uscita dalle citazioni ricevute.</p>
+          <p>Queste linee hanno un significato diverso dalle relazioni tra moduli. Non provano chiamate, esecuzione, autorizzazione o passaggio di dati. I file non collegati nella selezione possono avere altre dipendenze.</p>
+        </details>
+      </section>
+      <aside id="file-inspector" aria-label="Fonti e dichiarazioni del file" aria-live="polite" aria-atomic="true"></aside>
+    </div>
+    <section id="file-list" aria-labelledby="file-list-heading">
+      <h3 id="file-list-heading">File e dichiarazioni</h3>
+      <p>L’elenco conserva tutte le dichiarazioni dei file mostrati, anche quelle escluse dal diagramma dai filtri. Le fonti restano consultabili senza JavaScript.</p>
+      <div id="file-picker" hidden aria-label="Seleziona un file"></div>
+      <div id="file-fallback"><!-- FILE_FALLBACK --></div>
+    </section>
+    <details class="provenance"><summary>Copertura ed esclusioni dei file</summary>
+      <p>La selezione comprende soltanto l’unione dei file citati dai 15 moduli e dalle loro relazioni. I target fuori selezione sono collegati al sorgente, ma non vengono analizzati a loro volta. Non è una misura della copertura dei test o del prodotto.</p>
+      <p>L’extractor usa l’AST TypeScript e il resolver con l’albero Git e il tsconfig fissati al pin. Non legge i target dalla checkout corrente o dai pacchetti installati. I moduli Node e i pacchetti esterni rimangono distinti.</p>
+      <p>Import dinamici, chiamate denominate require e import come espressioni di tipo sono segnalati, ma esclusi dal grafo. Le forme calcolate non hanno un target attestato. Asset e linguaggi nativi non vengono analizzati. Non si deduce isolamento dall’assenza di una linea.</p>
+      <p>La <a href="file-topology.json">fotografia dei file</a> conserva dichiarazioni, righe, classificazione, esclusioni, hash e versione del parser. <a href="file-topology.schema.json">Schema dei dati</a>.</p>
+    </details>
+  </section>
   <details class="provenance"><summary>Provenienza e limiti della fotografia</summary>
     <p>Quindici nodi scelti manualmente dal codice pubblico alla revisione indicata. Il generatore legge i file con Git, verifica gli ancoraggi e conserva hash dei file e dell’albero sorgente nel <a href="snapshot.json">JSON della fotografia</a>.</p>
     <p>Un inventario dei file alla stessa revisione attesta soltanto la presenza dei file. Non prova import eseguiti, operazioni ammesse o correttezza delle protezioni. Questa pagina non contiene un modello AI e non è collegata a una cartella.</p>
@@ -45,5 +87,6 @@
   </details>
 </main>
 <script type="application/json" id="snapshot"><!-- SNAPSHOT --></script>
+<script type="application/json" id="file-topology"><!-- FILE_TOPOLOGY --></script>
 </body>
 </html>
