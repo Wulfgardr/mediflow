@@ -2,6 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Page, Response } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
+import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 // This is the original Linux reproduction, not process.env.E2E_PIN.
 const ALPHANUMERIC_PIN = 'demo086086';
@@ -114,6 +115,7 @@ for (const { name, pin } of [
       expect(check.status()).toBe(200);
       expect(check.headers().etag).toMatch(CONTROL_ETAG);
       const locked = await page.request.post('/api/auth/lock', { headers: {
+        ...trustedWebRequestHeaders(baseURL),
         'If-Match': check.headers().etag, 'Idempotency-Key': randomUUID(),
       } });
       expect(locked.status()).toBe(200);
