@@ -4041,6 +4041,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /* @Codex */
     private func invalidateLoginIfChanged(_ oldValue: String, _ newValue: String) {
         guard oldValue != newValue else { return }
+        if sessionCookie != nil {
+            // Remove transport authority before synchronous invalidation observers run.
+            sessionCookie = nil
+            clearOperatorSessionPresentation()
+            return
+        }
         discardCachedPatientPresentation() // @Codex
         invalidateLoginGeneration()
     }
