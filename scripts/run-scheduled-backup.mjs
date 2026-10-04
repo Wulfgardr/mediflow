@@ -98,6 +98,7 @@ function readState(db) {
       config: {
         ...getDefaultState().config,
         ...(parsed.config || {}),
+        enabled: parsed.config?.enabled === true,
       },
       run: {
         ...getDefaultState().run,
