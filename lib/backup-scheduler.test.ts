@@ -5,6 +5,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import Database from 'better-sqlite3';
 import {
     applyBackupRetention,
     applyRetentionResultToState,
@@ -30,6 +32,95 @@ test('reads default backup scheduler state when setting is missing', () => {
     assert.equal(state.config.minute, 0);
     assert.match(state.config.destinationDir, /backups$/);
     assert.equal(state.config.retentionKeepArtifacts, DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS);
+});
+
+test('persisted scheduler enablement accepts only the boolean true', () => {
+    assert.equal(readBackupSchedulerStateFromValue(JSON.stringify({ config: { enabled: true } })).config.enabled, true);
+    for (const enabled of [false, undefined, null, 0, 1, 'false', 'true', [], {}]) {
+        const state = readBackupSchedulerStateFromValue(JSON.stringify({ config: { enabled } }));
+        assert.equal(state.config.enabled, false, JSON.stringify(enabled));
+    }
+});
+
+function withScheduledBackupFixture(check: (fixture: {
+    destinationDir: string;
+    setEnabled: (enabled: unknown) => void;
+    run: (force?: boolean) => { status: number | null; result: { ok: boolean; artifactPath?: string; message?: string } };
+}) => void) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'msb-'));
+    const dataDir = path.join(root, 'data');
+    const destinationDir = path.join(root, 'out');
+    fs.mkdirSync(dataDir);
+    const dbPath = path.join(dataDir, 'medical.db');
+    const setEnabled = (enabled: unknown) => {
+        const db = new Database(dbPath);
+        try {
+            db.exec('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+            db.prepare('INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+                .run('backupScheduler', JSON.stringify({ version: 1, config: { enabled, destinationDir, retentionKeepArtifacts: 1 }, run: {} }));
+        } finally {
+            db.close();
+        }
+    };
+    const run = (force = false) => {
+        const child = spawnSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
+            cwd: fileURLToPath(new URL('..', import.meta.url)),
+            encoding: 'utf8',
+            env: {
+                ...process.env,
+                MEDIFLOW_DATA_DIR: dataDir,
+                MEDIFLOW_E2E_DATA_DIR: dataDir,
+                MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
+                MEDIFLOW_BACKUP_DEST_DIR: destinationDir,
+                MEDIFLOW_BACKUP_FORCE: force ? '1' : '0',
+            },
+        });
+        assert.ifError(child.error);
+        return { status: child.status, result: JSON.parse(child.stdout) as { ok: boolean; artifactPath?: string; message?: string } };
+    };
+    try {
+        check({ destinationDir, setEnabled, run });
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+}
+
+for (const [label, enabled] of [
+    ['false', false], ['absent', undefined], ['null', null], ['zero', 0],
+    ['string false', 'false'], ['string true', 'true'], ['one', 1], ['array', []], ['object', {}],
+] as const) {
+    test(`scheduled CLI with ${label} enablement preserves the existing artifact without retention`, () => {
+        withScheduledBackupFixture(({ destinationDir, setEnabled, run }) => {
+            setEnabled(true);
+            const control = run();
+            assert.equal(control.status, 0);
+            assert.equal(control.result.ok, true);
+            assert.ok(control.result.artifactPath);
+            const artifactPath = control.result.artifactPath;
+            const artifactBytes = fs.readFileSync(artifactPath);
+            const filesBefore = fs.readdirSync(destinationDir).sort();
+            setEnabled(enabled);
+            const disabled = run();
+            assert.equal(disabled.status, 1);
+            assert.equal(disabled.result.ok, false);
+            assert.match(disabled.result.message ?? '', /disabilitato/);
+            assert.deepEqual(fs.readdirSync(destinationDir).sort(), filesBefore);
+            assert.deepEqual(fs.readFileSync(artifactPath), artifactBytes);
+        });
+    });
+}
+
+test('explicit manual force still creates a backup while automatic enablement is false or malformed', () => {
+    for (const enabled of [false, 'false']) {
+        withScheduledBackupFixture(({ setEnabled, run }) => {
+            setEnabled(enabled);
+            const forced = run(true);
+            assert.equal(forced.status, 0);
+            assert.equal(forced.result.ok, true);
+            assert.ok(forced.result.artifactPath);
+            assert.equal(JSON.parse(fs.readFileSync(forced.result.artifactPath, 'utf8')).format, 'mediflow-backup');
+        });
+    }
 });
 
 test('merges and sanitizes backup scheduler config', () => {
