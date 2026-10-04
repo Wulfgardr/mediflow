@@ -14,6 +14,53 @@ function assertSyntheticFixture(env) {
     throw new Error('ANYDOC_HTTP_DIAGNOSTIC_REQUIRES_SYNTHETIC_FIXTURE');
 }
 
+function diagnosticMetadata(record) {
+  if (record === null || typeof record !== 'object' || Array.isArray(record)) return null;
+  const { event, request, source, action, at, status, headersSent, writableFinished } = record;
+  if (!Number.isSafeInteger(at) || at < 0) return null;
+  if (event === 'diagnostic_limit') return { event: 'diagnostic_limit', at };
+  const ordinal = value => Number.isInteger(value) && value >= 1 && value <= 128;
+  if (!['request', 'request_aborted', 'response_finish', 'response_close'].includes(event)
+    || !ordinal(request) || !ordinal(source) || (action !== 'project' && action !== 'release')
+    || !Number.isInteger(status) || status < 0 || status > 999
+    || typeof headersSent !== 'boolean' || typeof writableFinished !== 'boolean') return null;
+  return { event, request, source, action, at, status, headersSent, writableFinished };
+}
+
+function openDiagnosticFile(env) {
+  assertSyntheticFixture(env);
+  // A fresh, dedicated file cannot inherit or overwrite ordinary server output.
+  const fd = fs.openSync(path.join(env.MEDIFLOW_DATA_DIR, 'anydoc-http-diagnostic.jsonl'), 'wx', 0o600);
+  return {
+    write(record) {
+      const metadata = diagnosticMetadata(record);
+      if (metadata) fs.writeSync(fd, `${JSON.stringify(metadata)}\n`);
+    },
+    close() { fs.closeSync(fd); },
+  };
+}
+
+function exportDiagnosticFile(env, destination) {
+  assertSyntheticFixture(env);
+  const source = path.join(env.MEDIFLOW_DATA_DIR, 'anydoc-http-diagnostic.jsonl');
+  const stat = fs.lstatSync(source);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 513 * 256 || !path.isAbsolute(destination))
+    throw new Error('ANYDOC_HTTP_DIAGNOSTIC_INVALID_ARTIFACT');
+  const text = fs.readFileSync(source, 'utf8');
+  const lines = text === '' ? [] : text.trimEnd().split('\n');
+  if (lines.length > 513) throw new Error('ANYDOC_HTTP_DIAGNOSTIC_INVALID_ARTIFACT');
+  const records = lines.map(line => {
+    const record = JSON.parse(line);
+    const metadata = diagnosticMetadata(record);
+    if (!metadata || Object.keys(record).length !== Object.keys(metadata).length
+      || Object.keys(record).some(key => !Object.hasOwn(metadata, key)))
+      throw new Error('ANYDOC_HTTP_DIAGNOSTIC_INVALID_ARTIFACT');
+    return JSON.stringify(metadata);
+  });
+  // Re-serialize approved primitives; never copy raw lines or overwrite an older artifact.
+  fs.writeFileSync(destination, records.length ? `${records.join('\n')}\n` : '', { flag: 'wx', mode: 0o600 });
+}
+
 function installHttpDiagnostic(prototype, write) {
   const original = prototype.emit;
   // Bounded synthetic route-to-ordinal map; paths are never emitted. This
@@ -58,10 +105,16 @@ function installHttpDiagnostic(prototype, write) {
   return () => { if (prototype.emit === wrapped) prototype.emit = original; };
 }
 
-module.exports = { assertSyntheticFixture, installHttpDiagnostic };
-if (process.env.MEDIFLOW_ANYDOC_HTTP_DIAGNOSTIC === '1') {
-  assertSyntheticFixture(process.env);
-  installHttpDiagnostic(http.Server.prototype, event => {
-    process.stdout.write(`ANYDOC_HTTP_DIAGNOSTIC ${JSON.stringify(event)}\n`);
-  });
+module.exports = { assertSyntheticFixture, installHttpDiagnostic, openDiagnosticFile, exportDiagnosticFile };
+if (require.main === module) {
+  try {
+    if (process.argv.length !== 4 || process.argv[2] !== '--export') throw new Error();
+    exportDiagnosticFile(process.env, process.argv[3]);
+  } catch {
+    process.stderr.write('ANYDOC_HTTP_DIAGNOSTIC_EXPORT_FAILED\n');
+    process.exitCode = 1;
+  }
+} else if (process.env.MEDIFLOW_ANYDOC_HTTP_DIAGNOSTIC === '1') {
+  const sink = openDiagnosticFile(process.env);
+  installHttpDiagnostic(http.Server.prototype, sink.write);
 }
