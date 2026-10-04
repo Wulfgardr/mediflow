@@ -102,6 +102,26 @@ test('diagnostic ignores other requests and bounds repeated observation metadata
   f.api.dispose();
 });
 
+test('release observation preserves the request and Promise without reading or retaining its body', async () => {
+  const f = fixture();
+  const originalGetReader = f.body.getReader;
+  const input = '/api/attachments/SYN/local-extraction';
+  const controller = new AbortController();
+  const init = { method: 'DELETE', keepalive: true, signal: controller.signal,
+    headers: { 'x-mediflow-extraction-grant': 'PRIVATE-GRANT' } };
+  assert.strictEqual(f.context.fetch(input, init), f.fetchPromise);
+  assert.strictEqual(f.called().args[0], input);
+  assert.strictEqual(f.called().args[1], init);
+  await tick();
+  controller.abort();
+  assert.strictEqual(f.body.getReader, originalGetReader);
+  assert.deepEqual(f.counts(), { reads: 0, cancels: 0, releases: 0 });
+  assert.deepEqual(Array.from(f.api.snapshot().events, event => event.event),
+    ['armed', 'release_start', 'release_response', 'release_signal_abort']);
+  assert.doesNotMatch(JSON.stringify(f.api.snapshot()), /PRIVATE|attachments|SYN/);
+  f.api.dispose();
+});
+
 test('natural stream close records done after chunks without cancel or abort', async () => {
   const f = streamFixture();
   const reader = (await f.fetch()).body.getReader();

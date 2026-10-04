@@ -17,7 +17,7 @@ export function installAnyDocConsumerDiagnostic(pathname: string) {
   const originalFetch = host.fetch;
   const events: Event[] = [];
   const removers: Array<() => void> = [];
-  let attempt = 0, dropped = 0, disposed = false, requests = 0;
+  let attempt = 0, dropped = 0, disposed = false, requests = 0, releases = 0;
   const emit = (event: string, owner = attempt, value?: number) => {
     if (disposed) return;
     if (events.length >= 128) { dropped = Math.min(65535, dropped + 1); return; }
@@ -27,32 +27,37 @@ export function installAnyDocConsumerDiagnostic(pathname: string) {
   const show = () => emit('pageshow');
   addEventListener('pagehide', hide); addEventListener('pageshow', show);
   const wrappedFetch: typeof fetch = function(this: unknown, input, init) {
-    let selected = false;
+    let selected = false, releasing = false;
     try {
-      selected = new URL(input instanceof Request ? input.url : String(input), location.href).href === target
-        && (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase() === 'POST'
+      const matches = new URL(input instanceof Request ? input.url : String(input), location.href).href === target;
+      const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      releasing = matches && method === 'DELETE';
+      selected = releasing || (matches && method === 'POST'
         && new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
-          .get('x-mediflow-extraction-action') === 'project';
+          .get('x-mediflow-extraction-action') === 'project');
     } catch { emit('selection_probe_error'); }
     const owner = attempt;
-    const observe = selected && !disposed && ++requests <= 4;
-    if (selected && !observe) emit('request_probe_limit', owner);
+    const observe = selected && !disposed && (releasing ? ++releases : ++requests) <= 4;
+    if (selected && !observe) emit(releasing ? 'release_probe_limit' : 'request_probe_limit', owner);
     if (observe) {
-      emit('fetch_start', owner);
+      emit(releasing ? 'release_start' : 'fetch_start', owner);
       const signal = init?.signal ?? (input instanceof Request ? input.signal : null);
       if (signal) {
-        const abort = () => emit('signal_abort', owner);
+        const abort = () => emit(releasing ? 'release_signal_abort' : 'signal_abort', owner);
         signal.addEventListener('abort', abort, { once: true });
         removers.push(() => signal.removeEventListener('abort', abort));
-        if (signal.aborted) emit('signal_already_aborted', owner);
+        if (signal.aborted) emit(releasing ? 'release_signal_already_aborted' : 'signal_already_aborted', owner);
       }
     }
     let promise: Promise<Response>;
     try { promise = Reflect.apply(originalFetch, this, [input, init]); }
-    catch (error) { if (observe) emit('fetch_throw', owner); throw error; }
+    catch (error) { if (observe) emit(releasing ? 'release_throw' : 'fetch_throw', owner); throw error; }
     if (observe) void promise.then(response => {
       if (disposed) return;
       try {
+        // Observe the existing cleanup request without reading its body or
+        // delaying it. Its ordering is evidence, never a success criterion.
+        if (releasing) { emit('release_response', owner, response.status); return; }
         emit('fetch_response', owner, response.status);
         const stream = response.body;
         if (!stream) { emit('body_absent', owner); return; }
@@ -90,7 +95,7 @@ export function installAnyDocConsumerDiagnostic(pathname: string) {
           return reader;
         } });
       } catch { emit('response_probe_error', owner); }
-    }, () => emit('fetch_rejected', owner));
+    }, () => emit(releasing ? 'release_rejected' : 'fetch_rejected', owner));
     return promise;
   };
   host.fetch = wrappedFetch;
@@ -113,18 +118,23 @@ export async function createAnyDocConsumerDiagnostic(page: Page, attachmentId: s
   await page.evaluate(installAnyDocConsumerDiagnostic, pathname);
   let attempt = 0, dropped = 0;
   const events: Event[] = [];
-  const owners = new WeakMap<BrowserRequest, number>();
+  const owners = new WeakMap<BrowserRequest, { attempt: number; releasing: boolean }>();
   const emit = (event: string, owner = attempt) => {
     if (events.length >= 128) { dropped = Math.min(65535, dropped + 1); return; }
     events.push({ event, attempt: owner, at: Date.now() });
   };
   const request = (value: BrowserRequest) => {
-    if (value.url() === url && value.method() === 'POST' && value.headers()['x-mediflow-extraction-action'] === 'project') {
-      owners.set(value, attempt); emit('request', attempt);
+    const releasing = value.method() === 'DELETE';
+    if (value.url() === url && (releasing || (value.method() === 'POST' && value.headers()['x-mediflow-extraction-action'] === 'project'))) {
+      owners.set(value, { attempt, releasing }); emit(releasing ? 'release_request' : 'request', attempt);
     }
   };
-  const finished = (value: BrowserRequest) => { const owner = owners.get(value); if (owner !== undefined) emit('requestfinished', owner); };
-  const failed = (value: BrowserRequest) => { const owner = owners.get(value); if (owner !== undefined) emit('requestfailed', owner); };
+  const finished = (value: BrowserRequest) => {
+    const owner = owners.get(value); if (owner) emit(owner.releasing ? 'release_requestfinished' : 'requestfinished', owner.attempt);
+  };
+  const failed = (value: BrowserRequest) => {
+    const owner = owners.get(value); if (owner) emit(owner.releasing ? 'release_requestfailed' : 'requestfailed', owner.attempt);
+  };
   const navigation = (frame: import('@playwright/test').Frame) => { if (frame === page.mainFrame()) emit('navigation'); };
   const close = () => emit('page_closed');
   const crash = () => emit('page_crashed');
