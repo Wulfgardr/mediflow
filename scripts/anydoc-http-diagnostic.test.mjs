@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import diagnostic from './anydoc-http-diagnostic.cjs';
 
+const ID = 'ad1-0123456789abcdef0123456789abcdef-1-1';
 const { assertSyntheticFixture, installHttpDiagnostic, openDiagnosticFile, exportDiagnosticFile } = diagnostic;
 
 function syntheticDirectory() {
@@ -23,10 +24,11 @@ function fixture(write) {
   const restore = installHttpDiagnostic(Server.prototype, write ?? (value => records.push(value)));
   const request = Object.assign(new EventEmitter(), {
     method: 'POST', url: '/api/attachments/PRIVATE-ID/local-extraction',
-    headers: { cookie: 'PRIVATE-COOKIE', 'x-mediflow-extraction-action': 'project', 'x-mediflow-extraction-grant': 'PRIVATE-GRANT' },
+    headers: { 'x-mediflow-anydoc-diagnostic': ID, cookie: 'PRIVATE-COOKIE', 'x-mediflow-extraction-action': 'project', 'x-mediflow-extraction-grant': 'PRIVATE-GRANT' },
   });
   const response = Object.assign(new EventEmitter(), { statusCode: 200, headersSent: false, writableFinished: false });
-  return { server: new Server(), request, response, records, restore };
+  return { server: new Server(), request, response, raw: records,
+    get records() { return records.filter(record => ['request', 'request_aborted', 'response_finish', 'response_close'].includes(record.event)); }, restore };
 }
 
 test('observes server finish and close without changing request objects, handlers or return value', () => {
@@ -53,7 +55,7 @@ test('distinguishes aborted upload and premature response close from completed H
   f.restore();
 });
 
-test('release receives its own ordinal; unrelated routes and acquire remain unobserved', () => {
+test('release preserves its own diagnostic identity; unrelated routes and acquire remain unobserved', () => {
   const f = fixture();
   f.request.headers['x-mediflow-extraction-action'] = 'acquire';
   f.server.emit('request', f.request, f.response);
@@ -63,7 +65,7 @@ test('release receives its own ordinal; unrelated routes and acquire remain unob
   f.request.url = '/api/attachments/PRIVATE-ID/local-extraction';
   f.server.emit('request', f.request, f.response);
   assert.equal(f.records[0].action, 'release');
-  assert.equal(f.records[0].request, 1);
+  assert.equal(f.records[0].id, ID);
   f.restore();
 });
 
@@ -76,16 +78,17 @@ test('diagnostic sink failure cannot block the application handler', () => {
   f.restore();
 });
 
-test('groups source operations with local ordinals without logging routes or grant identifiers', () => {
+test('same-source requests keep distinct diagnostic identities without route or grant identifiers', () => {
   const f = fixture();
   f.server.emit('request', f.request, f.response);
   f.request.method = 'DELETE';
+  f.request.headers['x-mediflow-anydoc-diagnostic'] = ID.replace('-1-1', '-1-2');
   f.server.emit('request', f.request, f.response);
-  f.request.url = '/api/attachments/OTHER-PRIVATE-ID/local-extraction';
   f.request.method = 'POST';
+  f.request.headers['x-mediflow-anydoc-diagnostic'] = ID.replace('-1-1', '-2-3');
   f.server.emit('request', f.request, f.response);
-  assert.deepEqual(f.records.map(r => [r.request, r.source, r.action]),
-    [[1, 1, 'project'], [2, 1, 'release'], [3, 2, 'project']]);
+  assert.deepEqual(f.records.map(r => [r.id, r.action]),
+    [[ID, 'project'], [ID.replace('-1-1', '-1-2'), 'release'], [ID.replace('-1-1', '-2-3'), 'project']]);
   assert.doesNotMatch(JSON.stringify(f.records), /PRIVATE|attachments|cookie|grant/i);
   f.restore();
 });
@@ -100,8 +103,9 @@ test('bounded request observation marks omitted evidence explicitly', () => {
     f.server.emit('request', request, response); response.emit('finish'); response.emit('close');
   }
   assert.equal(f.records.filter(r => r.event === 'request').length, 128);
-  assert.equal(f.records.filter(r => r.event === 'diagnostic_limit').length, 1);
   f.restore();
+  assert.equal(f.raw.at(-1).limited, 12);
+  assert.equal(f.raw.at(-1).requests, 140);
 });
 
 test('preload requires an explicitly marked independent synthetic fixture with legacy copying disabled', () => {
@@ -124,20 +128,20 @@ test('dedicated file projects allowed primitive fields and rejects free text in 
   let sink;
   try {
     sink = openDiagnosticFile(env);
-    const record = { event: 'request', request: 1, source: 1, action: 'project', at: 123,
+    const record = { event: 'request', seq: 1, id: ID, action: 'project', at: 123,
       status: 200, headersSent: false, writableFinished: false };
     sink.write({ ...record, payload: excluded, message: excluded, url: `/private?token=${excluded}`,
       headers: { authorization: excluded }, toJSON: () => ({ payload: excluded }) });
-    sink.write({ event: 'diagnostic_limit', at: 124, message: excluded, payload: excluded });
+    sink.write({ event: 'collector_start', seq: 2, at: 124, message: excluded, payload: excluded });
     for (const key of Object.keys(record)) sink.write({ ...record, [key]: excluded });
-    sink.write({ ...record, request: 129 });
-    sink.write({ ...record, source: 0 });
+    sink.write({ ...record, id: 'not-a-diagnostic-id' });
+    sink.write({ ...record, seq: 0 });
     sink.write({ ...record, at: Number.NaN });
     sink.write({ ...record, status: Number.POSITIVE_INFINITY });
     sink.close(); sink = null;
     const text = fs.readFileSync(path.join(directory, 'anydoc-http-diagnostic.jsonl'), 'utf8');
     assert.deepEqual(text.trim().split('\n').map(line => JSON.parse(line)),
-      [record, { event: 'diagnostic_limit', at: 124 }]);
+      [record, { event: 'collector_start', seq: 2, at: 124 }]);
     assert.equal(text.includes(excluded), false);
     assert.doesNotMatch(text, /"(?:payload|message|url|headers|authorization|toJSON)":/);
   } finally { sink?.close(); fs.rmSync(directory, { recursive: true, force: true }); }
@@ -188,7 +192,8 @@ test('real preload and exporter write only metadata to the exact uploaded file, 
         const req = Object.assign(new EventEmitter(), { method,
           url: '/api/attachments/' + id + '/local-extraction' + suffix, body,
           headers: { authorization: header, cookie: header, 'x-mediflow-extraction-grant': header,
-            'x-mediflow-extraction-action': 'project' } });
+            'x-mediflow-extraction-action': 'project',
+            'x-mediflow-anydoc-diagnostic': 'ad1-0123456789abcdef0123456789abcdef-1-' + (method === 'DELETE' ? '2' : '1') } });
         const res = Object.assign(new EventEmitter(), { statusCode: method === 'DELETE' ? 204 : 200,
           headersSent: false, writableFinished: false });
         server.emit('request', req, res);
@@ -210,13 +215,17 @@ test('real preload and exporter write only metadata to the exact uploaded file, 
     const text = fs.readFileSync(uploadedFile, 'utf8');
     for (const sentinel of sentinels) assert.equal(text.includes(sentinel), false);
     const records = text.trim().split('\n').map(line => JSON.parse(line));
-    assert.equal(records.length, 6);
-    assert.deepEqual(records.map(record => record.event), ['request', 'response_finish', 'response_close',
+    assert.equal(records.length, 9);
+    assert.equal(records[0].event, 'collector_start');
+    assert.equal(records.at(-2).event, 'collector_end');
+    assert.deepEqual(records.at(-1), { event: 'collection_status', complete: true, retained: 8 });
+    const lifecycle = records.slice(1, -2);
+    assert.deepEqual(lifecycle.map(record => record.event), ['request', 'response_finish', 'response_close',
       'request', 'response_finish', 'response_close']);
-    assert.deepEqual(records.map(record => record.action), ['project', 'project', 'project', 'release', 'release', 'release']);
-    for (const record of records) {
-      assert.deepEqual(Object.keys(record).sort(), ['action', 'at', 'event', 'headersSent', 'request', 'source', 'status', 'writableFinished'].sort());
-      for (const key of ['at', 'request', 'source', 'status']) assert.equal(Number.isSafeInteger(record[key]), true);
+    assert.deepEqual(lifecycle.map(record => record.action), ['project', 'project', 'project', 'release', 'release', 'release']);
+    for (const record of lifecycle) {
+      assert.deepEqual(Object.keys(record).sort(), ['action', 'at', 'event', 'headersSent', 'id', 'seq', 'status', 'writableFinished'].sort());
+      for (const key of ['at', 'seq', 'status']) assert.equal(Number.isSafeInteger(record[key]), true);
       assert.equal(typeof record.headersSent, 'boolean'); assert.equal(typeof record.writableFinished, 'boolean');
     }
     assert.doesNotMatch(text, /SYNTHETIC_|payload|authorization|cookie|grant|token|attachments/);
@@ -229,10 +238,10 @@ test('export refuses preexisting unapproved source bytes and returns failure wit
   try {
     const source = path.join(directory, 'anydoc-http-diagnostic.jsonl');
     const destination = path.join(directory, 'upload.jsonl');
-    const record = { event: 'request', request: 1, source: 1, action: 'project', at: 123,
+    const record = { event: 'request', seq: 1, id: ID, action: 'project', at: 123,
       status: 200, headersSent: false, writableFinished: false };
     for (const text of [excluded, JSON.stringify({ ...record, payload: excluded }), JSON.stringify({ ...record, event: excluded }),
-      JSON.stringify(null), excluded.repeat(4000), `${JSON.stringify(record)}\n`.repeat(514)]) {
+      JSON.stringify(null), excluded.repeat(4000), `${JSON.stringify(record)}\n`.repeat(515)]) {
       fs.writeFileSync(source, text);
       assert.throws(() => openDiagnosticFile(env), { code: 'EEXIST' });
       const exported = spawnSync(process.execPath,
@@ -249,4 +258,42 @@ test('export refuses preexisting unapproved source bytes and returns failure wit
     assert.throws(() => exportDiagnosticFile(env, destination), { code: 'EEXIST' });
     assert.equal(fs.readFileSync(destination, 'utf8'), excluded);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('export retains valid partial evidence but reports missing, duplicate or unsealed records as incomplete', () => {
+  const { directory, env } = syntheticDirectory();
+  try {
+    const sink = openDiagnosticFile(env);
+    const f = fixture(record => sink.write(record));
+    f.server.emit('request', f.request, f.response);
+    f.response.headersSent = true; f.response.writableFinished = true;
+    f.response.emit('finish'); f.response.emit('close');
+    f.restore(); sink.close();
+    const source = path.join(directory, 'anydoc-http-diagnostic.jsonl');
+    const complete = fs.readFileSync(source, 'utf8').trim().split('\n');
+    assert.equal(complete.length, 5);
+    const variants = [complete, ...complete.map((_, index) => complete.filter((_, i) => index !== i)),
+      [complete[0], ...complete], []];
+    for (const [index, lines] of variants.entries()) {
+      fs.writeFileSync(source, lines.length ? lines.join('\n') + '\n' : '');
+      const destination = path.join(directory, `export-${index}.jsonl`);
+      exportDiagnosticFile(env, destination);
+      const exported = fs.readFileSync(destination, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      assert.equal(exported.at(-1).event, 'collection_status');
+      assert.equal(exported.at(-1).complete, index === 0);
+      assert.equal(exported.at(-1).retained, lines.length);
+    }
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('invalid diagnostic header text is counted without being logged or changing the handler', () => {
+  const f = fixture();
+  f.request.headers['x-mediflow-anydoc-diagnostic'] = 'SYNTHETIC_EXCLUDED_DIAGNOSTIC_HEADER';
+  let called = 0;
+  f.server.on('request', () => { called++; });
+  assert.equal(f.server.emit('request', f.request, f.response), true);
+  f.restore();
+  assert.equal(called, 1);
+  assert.equal(f.raw.at(-1).invalid, 1);
+  assert.doesNotMatch(JSON.stringify(f.raw), /SYNTHETIC_EXCLUDED|PRIVATE/u);
 });

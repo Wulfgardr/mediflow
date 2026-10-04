@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import ts from 'typescript';
 
 // Evaluate only the test helper in a separate realm; no application/DB imports.
 const source = fs.readFileSync(new URL('../e2e/anydoc-consumer-diagnostic.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
 function fixture() {
   const chunk = { done: false, value: new Uint8Array([83, 69, 67, 82, 69, 84]) };
   const readPromise = Promise.resolve(chunk);
@@ -23,7 +25,7 @@ function fixture() {
   let called;
   const nativeFetch = function(...args) { called = { receiver: this, args }; return fetchPromise; };
   const listeners = new Map();
-  const context = vm.createContext({ exports: {}, URL, Request, Headers, Uint8Array,
+  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
     location: { href: 'http://127.0.0.1:3000/synthetic' }, fetch: nativeFetch,
     addEventListener(name, fn) { listeners.set(name, fn); },
     removeEventListener(name) { listeners.delete(name); },
@@ -43,7 +45,7 @@ function streamFixture({ delayedResponse = false } = {}) {
   const response = new Response(stream);
   let resolveResponse;
   const responsePromise = delayedResponse ? new Promise(resolve => { resolveResponse = resolve; }) : Promise.resolve(response);
-  const context = vm.createContext({ exports: {}, URL, Request, Headers, Uint8Array,
+  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
     location: { href: 'http://synthetic.invalid/' }, fetch: () => responsePromise,
     addEventListener() {}, removeEventListener() {},
   });
