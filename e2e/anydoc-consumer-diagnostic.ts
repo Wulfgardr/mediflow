@@ -10,7 +10,7 @@ type DiagnosticGlobal = typeof globalThis & { __mfAnyDocDiagnostic?: Api };
 /** Test-only metadata probe. Does not retain Response, stream, reader or body bytes.
  * Correlation adds ONE reserved header only in the explicitly marked synthetic run.
  * Input/body/signal, return values and native read/fetch Promise identities are preserved.
- * The original init/Headers are not mutated; the header-bearing init is a shallow copy.
+ * The original init/Headers are not mutated; all other init properties are forwarded.
  * Observation reactions can perturb scheduling: this is diagnosis, never an oracle.
  * read_done records done=true, including cancellation; it is natural EOF evidence
  * only without preceding abort/cancel events and with a complete, error-free probe.
@@ -54,7 +54,12 @@ export function installAnyDocConsumerDiagnostic(config: string | { pathname: str
         id = `ad1-${scope}-${owner}-${++sequence}`;
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         headers.set('x-mediflow-anydoc-diagnostic', id);
-        diagnosticInit = { ...init, headers };
+        // Fetch reads dictionary properties, including inherited/non-enumerable
+        // values. Preserve their receiver; an empty target also avoids proxy
+        // invariants for non-configurable properties on the original init.
+        diagnosticInit = new Proxy({}, { get(_target, key) {
+          return key === 'headers' ? headers : init == null ? undefined : Reflect.get(init, key, init);
+        } });
       } else emit('correlation_probe_error', owner);
     }
     const report = (event: string, value?: number) => emit(event, owner, value, id);
