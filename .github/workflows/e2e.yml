@@ -47,6 +47,9 @@ jobs:
       # npm ci rebuilds better-sqlite3 for the Node 24 ABI so the server can boot.
       - run: npm ci
 
+      - name: Test AnyDoc diagnostic artifact boundary
+        run: node --test scripts/anydoc-http-diagnostic.test.mjs
+
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium
 
@@ -163,6 +166,11 @@ jobs:
             kill "$(cat "${RUNNER_TEMP}/next-standalone.pid")" 2>/dev/null || true
           fi
 
+      - name: Export AnyDoc diagnostic metadata
+        id: anydoc_diagnostic_export
+        if: always()
+        run: node scripts/anydoc-http-diagnostic.cjs --export "${RUNNER_TEMP}/anydoc-http-diagnostic.jsonl"
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -171,6 +179,14 @@ jobs:
           path: |
             playwright-report
             test-results
-            ${{ runner.temp }}/next-standalone.log
           if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload AnyDoc diagnostic metadata
+        if: always() && steps.anydoc_diagnostic_export.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: anydoc-http-diagnostic
+          path: ${{ runner.temp }}/anydoc-http-diagnostic.jsonl
+          if-no-files-found: error
           retention-days: 7
