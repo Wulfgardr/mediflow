@@ -21,12 +21,13 @@ import { decryptData, encryptData, generateMasterKey } from './security/security
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
-const NON_BACKUP_TABLES = new Set(['audit_events', 'settings', 'users']);
+const NON_BACKUP_TABLES = new Set(['settings', 'users']);
 /* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
 const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations']);
 /* @Codex Command replay remains empty until append-only audit restore has a separate contract. */
 const AUDIT_DEPENDENT_EMPTY_TABLES = new Set(['durable_review_command_operations', 'durable_review_command_states']);
 const BACKUP_TABLES = {
+    auditEvents: 'audit_events',
     ambulatories: 'ambulatories',
     attachments: 'attachments',
     conversations: 'conversations',
@@ -93,7 +94,7 @@ function clearBackupTables(db: Database.Database, tables: string[]): void {
     db.pragma('foreign_keys = OFF');
     try {
         db.transaction(() => {
-            for (const table of tables) {
+            for (const table of tables.filter(table => table !== 'audit_events')) {
                 db.prepare(`DELETE FROM ${quoteIdentifier(table)}`).run();
             }
         })();
@@ -567,6 +568,7 @@ function headlessSoapRestoreFixture(): {
         entryId, auditEventId, receiptRef,
         bindingSnapshot, bindingDigest, entryDigest, auditSnapshot, auditDigest, receiptSnapshot, receiptDigest, committedAt,
     }];
+    payload.auditEvents = [audit];
     return { payload, audit };
 }
 
