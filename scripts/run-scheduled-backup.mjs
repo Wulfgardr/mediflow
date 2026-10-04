@@ -4,6 +4,7 @@ import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receip
 /* @Codex */
 import { assertProstheticsCatalogBackup } from '../lib/reference-data/prosthetics-catalog-backup.ts';
 
+import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -55,6 +56,7 @@ const BACKUP_TABLES = {
   sissHandoffs: 'siss_handoff_events',
   checkups: 'checkups',
   therapies: 'therapies',
+  auditEvents: 'audit_events',
 };
 
 function getDefaultDataDir() {
@@ -159,10 +161,15 @@ export async function serializeBackupArtifact(payload, createdAt = new Date()) {
     prostheticsCatalogReceipts: payload.prostheticsCatalogReceipts ?? [],
     exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => a.id - b.id),
   };
+  if (Object.hasOwn(payload, 'auditEvents')) {
+    canonicalPayload.auditEvents = canonicalizeBackupAuditRows(payload.auditEvents);
+    assertBackupAuditSnapshots(canonicalPayload.auditEvents, (payload.headlessSoapEntryCommits ?? []).map(row => row.auditSnapshot));
+  }
+  const collections = Object.keys(BACKUP_TABLES).filter(collection => collection !== 'auditEvents' || Object.hasOwn(payload, 'auditEvents'));
   const payloadSnapshot = normalizeJson(canonicalPayload);
   const checksum = await sha256Hex(stableStringify(payloadSnapshot));
   const recordCounts = Object.fromEntries(
-    Object.keys(BACKUP_TABLES).map((collection) => [collection, canonicalPayload[collection]?.length ?? 0]),
+    collections.map((collection) => [collection, canonicalPayload[collection]?.length ?? 0]),
   );
   const artifact = {
     format: BACKUP_ARTIFACT_FORMAT,
@@ -172,7 +179,7 @@ export async function serializeBackupArtifact(payload, createdAt = new Date()) {
       createdAt: createdAt.toISOString(),
       checksumAlgorithm: 'sha256',
       checksum,
-      collections: Object.keys(BACKUP_TABLES),
+      collections,
       recordCounts,
     },
     payload: canonicalPayload,
@@ -419,10 +426,11 @@ function buildAssignedAmbulatoryMemberships(patient, rows) {
 function buildDataset(db, backupCollections) {
   return db.transaction(() => {
     const dataset = Object.fromEntries(
-      backupCollections.map((collection) => [
+      backupCollections.filter(collection => collection !== 'auditEvents' || hasTable(db, 'audit_events')).map((collection) => [
         collection,
         hasTable(db, BACKUP_TABLES[collection])
-          ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
+          ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) =>
+            collection === 'auditEvents' ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
           : [],
       ]),
     );
