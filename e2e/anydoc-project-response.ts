@@ -38,6 +38,7 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
   void complete.promise.catch(() => {}); // Preserve an earlier acquire/UI failure.
   let requestId: string | undefined;
   let grant: string | undefined;
+  let diagnosticId: string | undefined;
   let status: number | undefined;
   let matches = 0;
   let prefix: Buffer | undefined;
@@ -76,6 +77,8 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
     if (matches !== 1 || event.redirectResponse) { fail('ambiguous project request'); return; }
     requestId = event.requestId;
     grant = header(event.request.headers, GRANT);
+    const diagnostic = header(event.request.headers, 'x-mediflow-anydoc-diagnostic');
+    if (diagnostic && /^ad1-[a-f0-9]{32}-[12]-[1-8]$/u.test(diagnostic)) diagnosticId = diagnostic;
     if (!grant) { fail('missing project grant'); return; }
     // No pause/continue handshake. The application proceeds independently.
     void session.send('Network.streamResourceContent', { requestId }).then(({ bufferedData }) => {
@@ -112,7 +115,8 @@ export async function observeAnyDocProjectResponse(page: Page, attachmentId: str
       const canceled = event.canceled === undefined ? 'absent' : String(event.canceled);
       const terminal = `status=${status ?? 'null'} received=${receivedBytes} streamed=${streamedBytes} prefix=${prefix?.length ?? 0}`
         + ` finished=${finished} canceled=${canceled} error=${safeNetworkError(event.errorText)}`
-        + ` type=${safeTerminalValue(event.type, SAFE_RESOURCE_TYPES)} blocked=${safeTerminalValue(event.blockedReason, SAFE_BLOCKED_REASONS)}`;
+        + ` type=${safeTerminalValue(event.type, SAFE_RESOURCE_TYPES)} blocked=${safeTerminalValue(event.blockedReason, SAFE_BLOCKED_REASONS)}`
+        + (diagnosticId ? ` diagnosticId=${diagnosticId}` : '');
       fail(`project did not finish (${terminal})`);
     }
   };
