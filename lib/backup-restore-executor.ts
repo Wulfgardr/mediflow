@@ -37,7 +37,9 @@ import {
     sissHandoffEvents,
     therapies,
 } from './schema';
-import type { BackupArtifact, BackupCollectionName } from './backup-artifact';
+import { backupArtifactInputChecksum, type BackupArtifact, type BackupCollectionName } from './backup-artifact';
+import { assertBackupAuditSnapshots, backupAuditCoverage, backupAuditsEqual, canonicalizeBackupAuditRows, snapshotBackupAudit,
+    type BackupAuditCoverage, type BackupAuditRow } from './backup-audit';
 import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links';
 import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
 
@@ -103,6 +105,7 @@ const INSERT_ORDER: BackupCollectionName[] = [
 ];
 
 const TABLE_LOOKUP = {
+    auditEvents,
     ambulatories,
     headlessSoapEntryCommits,
     attachments,
@@ -319,17 +322,52 @@ function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void 
     insertRows(dbServer, headlessSoapEntryCommits, rows);
 }
 
+export type BackupRestoreResult = {
+    sourceChecksum: string;
+    audit: { coverage: BackupAuditCoverage; inserted: number; reused: number };
+};
+
+type AuditRestorePlan = Array<{ row: BackupAuditRow; reused: boolean }>;
+
+function planBackupAuditRestore(rows: BackupAuditRow[]): AuditRestorePlan {
+    return rows.map(row => {
+        const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, row.eventId)).get();
+        if (existing && !backupAuditsEqual(snapshotBackupAudit(existing), row)) {
+            throw new Error('Restore blocked: audit collision.');
+        }
+        return { row, reused: !!existing };
+    });
+}
+
+function insertBackupAudits(plan: AuditRestorePlan): void {
+    for (const { row, reused } of plan) {
+        if (reused) continue;
+        const result = dbServer.insert(auditEvents).values({
+            ...row,
+            occurredAt: new Date(row.occurredAt * 1000),
+            createdAt: row.createdAt === null ? null : new Date(row.createdAt * 1000),
+        }).run();
+        if (result.changes !== 1) throw new Error('Restore blocked: audit insertion did not persist.');
+    }
+}
+
 export function restoreBackupArtifact(
     artifact: BackupArtifact,
     beforeMutation: BackupRestoreMutationFence,
-): void {
+): BackupRestoreResult {
     assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
     assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? []);
+    const coverage = backupAuditCoverage(artifact.payload);
+    let audit: BackupRestoreResult['audit'] = { coverage, inserted: 0, reused: 0 };
     revokeAttachmentExtractionLocatorGeneration();
     runDbServerImmediateTransaction(() => {
         assertCommandRecoveryIsRepresentable();
         const headlessSoapRows = artifact.payload.headlessSoapEntryCommits ?? [];
         preflightHeadlessSoapAuditCollisions(headlessSoapRows);
+        const rows = canonicalizeBackupAuditRows(coverage === 'included' ? artifact.payload.auditEvents
+            : headlessSoapRows.map(row => parseHeadlessSoapAuditSnapshot(row.auditSnapshot)));
+        if (coverage === 'included') assertBackupAuditSnapshots(rows, headlessSoapRows.map(row => row.auditSnapshot));
+        const plan = planBackupAuditRestore(rows);
         runMutationFence(beforeMutation);
         for (const collection of CLEAR_ORDER) {
             dbServer.delete(TABLE_LOOKUP[collection]).run();
@@ -341,6 +379,9 @@ export function restoreBackupArtifact(
         }
 
         insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
+        if (coverage === 'included') insertBackupAudits(plan);
         restoreHeadlessSoapEntryCommits(headlessSoapRows);
+        audit = { coverage, inserted: plan.filter(item => !item.reused).length, reused: plan.filter(item => item.reused).length };
     });
+    return { sourceChecksum: backupArtifactInputChecksum(artifact), audit };
 }

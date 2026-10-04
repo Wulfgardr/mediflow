@@ -126,7 +126,7 @@ test('creates a stable backup artifact with checksum and manifest', async () => 
     assert.equal(artifact.format, BACKUP_ARTIFACT_FORMAT);
     assert.equal(artifact.version, BACKUP_ARTIFACT_VERSION);
     assert.equal(artifact.manifest.scope, 'mediflow-web-local-backup');
-    assert.deepEqual(artifact.manifest.collections, BACKUP_COLLECTIONS);
+    assert.deepEqual(artifact.manifest.collections, BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents'));
     assert.equal(artifact.manifest.recordCounts.patients, 1);
     assert.equal(artifact.manifest.recordCounts.messages, 1);
 
@@ -179,7 +179,7 @@ test('includes durable review records and replay operations in the authenticated
 
     const artifact = await createBackupArtifact(payload);
 
-    assert.deepEqual(artifact.manifest.collections, BACKUP_COLLECTIONS);
+    assert.deepEqual(artifact.manifest.collections, BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents'));
     assert.equal(artifact.manifest.recordCounts.durableReviewRecords, 0);
     assert.equal(artifact.manifest.recordCounts.durableReviewOperations, 0);
     assert.equal(artifact.manifest.recordCounts.durableReviewCommandStates, 0);
@@ -204,7 +204,7 @@ test('normalizes an authenticated pre-H7b artifact to an empty SOAP commit ledge
 
     assert.deepEqual(parsed.payload.headlessSoapEntryCommits, []);
     assert.equal(parsed.manifest.recordCounts.headlessSoapEntryCommits, 0);
-    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
+    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents'));
 });
 
 /* @Codex */
@@ -389,6 +389,22 @@ test('accepts an embedded exact H7b audit snapshot without a global audit collec
     assert.equal('auditEvents' in parsed.payload, false);
     assert.equal(parsed.payload.headlessSoapEntryCommits?.[0]?.auditSnapshot, fixture.row.auditSnapshot);
     assert.equal(parsed.payload.headlessSoapEntryCommits?.[0]?.entryId, fixture.entry.id);
+});
+
+test('included general audit contains every H7b snapshot field-exactly', async () => {
+    const fixture = await headlessSoapCommitFixture();
+    const snapshot = JSON.parse(fixture.row.auditSnapshot as string);
+    const payload = { ...basePayload, entries: [fixture.entry], headlessSoapEntryCommits: [fixture.row], auditEvents: [snapshot] };
+    const parsed = await parseBackupArtifact(JSON.parse(await serializeBackupArtifact(payload)));
+    assert.deepEqual(parsed.payload.auditEvents, [snapshot]);
+    for (const auditEvents of [[], [{ ...snapshot, requestId: '' }]]) {
+        await assert.rejects(() => createBackupArtifact({ ...payload, auditEvents }), /audit/i);
+        const tampered = JSON.parse(await serializeBackupArtifact(payload));
+        tampered.payload.auditEvents = auditEvents;
+        tampered.manifest.recordCounts.auditEvents = auditEvents.length;
+        tampered.manifest.checksum = await sha256(stableStringify(tampered.payload));
+        await assert.rejects(() => parseBackupArtifact(tampered), /audit/i);
+    }
 });
 
 /* @Codex Recomputed digests and the outer checksum cannot legitimize semantically forged H7b evidence. */
@@ -1059,7 +1075,7 @@ test('accepts an authentic legacy v1 artifact and normalizes missing optional co
     assert.equal(parsed.manifest.recordCounts.durableReviewPatientLinks, 0);
     assert.equal(parsed.manifest.recordCounts.physicianReviewAttestations, 0);
     assert.equal(parsed.manifest.recordCounts.headlessSoapActiveRoleAttestations, 0);
-    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
+    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents'));
     assert.equal(parsed.manifest.checksum, normalizedChecksum);
 });
 
@@ -1108,7 +1124,7 @@ test('normalizes only an authenticated pre-H2 artifact with the SOAP attestation
     const parsed = await parseBackupArtifact(artifact);
     assert.deepEqual(parsed.payload.headlessSoapActiveRoleAttestations, []);
     assert.equal(parsed.manifest.recordCounts.headlessSoapActiveRoleAttestations, 0);
-    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS);
+    assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents'));
 });
 
 test('accepts an authority-era artifact without command ledger collections', async () => {
