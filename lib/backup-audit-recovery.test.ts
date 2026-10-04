@@ -36,7 +36,8 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { backupArtifactInputChecksum, stableStringify } from './backup-artifact';
 import { runBackupRestorePreflight } from './backup-restore-preflight';
-import type { BackupAuditRow } from './backup-audit';
+import { canonicalizeBackupAuditRows, type BackupAuditRow } from './backup-audit';
+import { serializeBackupArtifact as serializeScheduledBackupArtifact } from '../scripts/run-scheduled-backup.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
@@ -80,7 +81,7 @@ const restoreScript = [
     "const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR; if (evidence) { fs.mkdirSync(evidence, {recursive:true}); await db.backup(path.join(evidence, process.env.AUDIT_RESTORE_MODE + '-before-initialized.db')); }",
     "const mode = process.env.AUDIT_RESTORE_MODE;",
     "if (mode === 'abort' || mode === 'ignore') db.exec(\"CREATE TRIGGER audit_recovery_owned_fault BEFORE INSERT ON audit_events WHEN NEW.event_id = 'synthetic-history-1' BEGIN SELECT RAISE(\" + (mode === 'abort' ? \"ABORT, 'SYNTHETIC_AUDIT_ABORT'\" : 'IGNORE') + \"); END\");",
-    "try { const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(process.env.AUDIT_ARTIFACT_PATH, 'utf8'))); result = restoreBackupArtifact(artifact, () => { fence++; return false; }); } catch (caught) { error = caught.message; }",
+    "try { const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(process.env.AUDIT_ARTIFACT_PATH, 'utf8'))); if (mode === 'negative-zero-occurredAt' || mode === 'negative-zero-createdAt') artifact.payload.auditEvents[0][mode.slice('negative-zero-'.length)] = -0; result = restoreBackupArtifact(artifact, () => { fence++; return false; }); } catch (caught) { error = caught.message; }",
     "const after = snapshot();",
     "if (mode === 'abort' || mode === 'ignore') db.exec('DROP TRIGGER audit_recovery_owned_fault');",
     "let appendOnly = false; try { db.prepare('UPDATE audit_events SET event_type = event_type').run(); } catch (caught) { appendOnly = String(caught).includes('append-only'); }",
@@ -114,6 +115,85 @@ test('rejects duplicate IDs, lossy seconds and incomplete or non-data audit reco
         await assert.rejects(() => parseBackupArtifact(raw), /audit/i);
     }
 });
+
+test('rejects signed zero audit seconds before JSON or SQLite can erase the sign', async () => {
+    for (const field of ['occurredAt', 'createdAt'] as const) {
+        const row = { ...originalAudit, [field]: -0 };
+        assert.throws(() => canonicalizeBackupAuditRows([row]), /audit.*invalid/i);
+        await assert.rejects(() => createBackupArtifact({ ...createEmptyDataset(), auditEvents: [row] }), /audit/i);
+        await assert.rejects(() => serializeScheduledBackupArtifact({ ...createEmptyDataset(), auditEvents: [row] }), /audit/i);
+        const raw = JSON.parse(await serializeBackupArtifact({ ...createEmptyDataset(), auditEvents: [originalAudit] }));
+        raw.payload.auditEvents = [row]; raw.manifest.checksum = checksum(raw.payload);
+        await assert.rejects(() => parseBackupArtifact(raw), /audit/i);
+        const wire = JSON.stringify(raw).replace(`"${field}":0`, `"${field}":-0`);
+        assert.ok(Object.is(JSON.parse(wire).payload.auditEvents[0][field], -0));
+        await assert.rejects(() => parseBackupArtifact(JSON.parse(wire)), /audit/i);
+    }
+});
+
+test('constructed signed zero is rejected before mutation while zero seconds support repeated restore', async () => {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-zero-'));
+    try {
+        const dir = path.join(work, 'target'); prepare(dir);
+        const db = new Database(path.join(dir, 'medical.db'));
+        try { seedAudit(db, { ...originalAudit, eventId: 'zero-target-history' }); }
+        finally { db.close(); }
+        const zero = { ...originalAudit, eventId: 'zero-source-history', occurredAt: 0, createdAt: 0 };
+        const artifactPath = path.join(work, 'zero.mediflow');
+        fs.writeFileSync(artifactPath, await serializeBackupArtifact({ ...createEmptyDataset(), auditEvents: [zero] }));
+        const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR;
+        if (evidence) { fs.mkdirSync(evidence, { recursive: true }); fs.copyFileSync(artifactPath, path.join(evidence, 'zero.mediflow')); }
+        for (const field of ['occurredAt', 'createdAt']) {
+            const rejected = restore(dir, artifactPath, 'negative-zero-' + field);
+            assert.match(rejected.error ?? '', /audit row.*invalid/i);
+            assert.equal(rejected.fence, 0);
+            assert.deepEqual(rejected.after, rejected.before);
+        }
+        const first = restore(dir, artifactPath, 'zero-first');
+        assert.equal(first.error, null);
+        assert.deepEqual(first.result?.audit, { coverage: 'included', inserted: 1, reused: 0 });
+        const repeated = restore(dir, artifactPath, 'zero-repeat');
+        assert.equal(repeated.error, null);
+        assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 1 });
+        assert.deepEqual(repeated.after, repeated.before);
+        assert.equal((repeated.after.audit_events as { occurred_at: number; created_at: number | null }[])
+            .filter(row => row.occurred_at === 0 && row.created_at === 0).length, 1);
+    } finally { fs.rmSync(work, { recursive: true, force: true }); }
+});
+
+for (const coverage of ['omitted', 'included'] as const) {
+    test(`${coverage} empty audit restore preserves preexisting target history and coverage`, async () => {
+        const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-coverage-'));
+        try {
+            const dir = path.join(work, 'target'); prepare(dir);
+            const db = new Database(path.join(dir, 'medical.db'));
+            try {
+                seedAudit(db, { ...originalAudit, eventId: 'coverage-target-history' });
+                db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('coverage-before','Synthetic before','synthetic')").run();
+            } finally { db.close(); }
+            const payload = createEmptyDataset();
+            if (coverage === 'omitted') delete payload.auditEvents;
+            payload.ambulatories = [{ id: 'coverage-after', name: 'Synthetic after', type: 'synthetic', createdAt: '2026-07-02T12:00:00.000Z' }];
+            const artifactPath = path.join(work, 'coverage.mediflow');
+            fs.writeFileSync(artifactPath, await serializeBackupArtifact(payload));
+            const raw = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+            const mode = 'coverage-' + coverage;
+            const first = restore(dir, artifactPath, mode + '-first');
+            assert.equal(first.error, null); assert.equal(first.fence, 1); assert.equal(first.appendOnly, true);
+            assert.deepEqual(first.result?.audit, { coverage, inserted: 0, reused: 0 });
+            assert.equal(first.result?.sourceChecksum, raw.manifest.checksum);
+            assert.deepEqual(first.after.audit_events, first.before.audit_events);
+            assert.equal(first.after.audit_events.length, 1);
+            assert.deepEqual(first.after.ambulatories.map(row => (row as { id: string }).id), ['coverage-after']);
+            const repeated = restore(dir, artifactPath, mode + '-repeat');
+            assert.equal(repeated.error, null);
+            assert.deepEqual(repeated.result?.audit, { coverage, inserted: 0, reused: 0 });
+            assert.deepEqual(repeated.after, repeated.before);
+            const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR;
+            if (evidence) fs.copyFileSync(artifactPath, path.join(evidence, mode + '.mediflow'));
+        } finally { fs.rmSync(work, { recursive: true, force: true }); }
+    });
+}
 
 test('legacy normalization retains original checksum and omitted coverage in preflight', async () => {
     const payload = createEmptyDataset(); delete payload.auditEvents;

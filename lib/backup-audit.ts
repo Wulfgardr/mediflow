@@ -19,7 +19,8 @@ export function backupAuditCoverage(payload: object): BackupAuditCoverage {
 }
 
 function isSqliteSecond(value: unknown): value is number {
-    return typeof value === 'number' && Number.isSafeInteger(value)
+    // Signed zero cannot survive Date/SQLite; reject it while ordinary zero remains valid.
+    return typeof value === 'number' && Number.isSafeInteger(value) && !Object.is(value, -0)
         && Number.isFinite(new Date(value * 1000).getTime());
 }
 
