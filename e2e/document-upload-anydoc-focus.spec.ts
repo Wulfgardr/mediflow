@@ -78,6 +78,7 @@ test.describe.configure({ retries: 0 });
 
 test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti', async ({ page }, testInfo) => {
   const consoleErrors: string[] = [];
+  const browserMessages: { type: string; text: string }[] = [];
   await page.setViewportSize({ width: 1440, height: 900 });
   await establishSyntheticSession(page);
 
@@ -85,8 +86,14 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   // and receives one expected 409. Observe only the AnyDoc surface under test.
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
+    if (['warning', 'error'].includes(message.type()) && browserMessages.length < 20) {
+      browserMessages.push({ type: message.type(), text: message.text().slice(0, 1000) });
+    }
   });
-  page.on('pageerror', (error) => consoleErrors.push(error.message));
+  page.on('pageerror', (error) => {
+    consoleErrors.push(error.message);
+    if (browserMessages.length < 20) browserMessages.push({ type: 'pageerror', text: error.message.slice(0, 1000) });
+  });
 
   const patientId = await createSyntheticFixture(page);
   await openDocumentArchive(page, patientId);
@@ -130,7 +137,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
       decision = keyboardChooserDecision(afterEnter);
       // Commit the discriminator before a native-event timeout can close the page.
       await testInfo.attach('anydoc-keyboard-activation', {
-        body: Buffer.from(JSON.stringify({ decision, keyboardSnapshot })), contentType: 'application/json',
+        body: Buffer.from(JSON.stringify({ decision, keyboardSnapshot, browserMessages })), contentType: 'application/json',
       });
       expect(decision, 'AnyDoc keyboard activation chain').toBe('AWAIT_NATIVE_CHOOSER');
     })();
@@ -153,7 +160,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   try { await observation.dispose(); } catch (error) { failures.push(error); }
   try {
     await testInfo.attach('anydoc-keyboard-chooser', {
-      body: Buffer.from(JSON.stringify({ decision, nativeEvent, nativeInputMatches, keyboardSnapshot })),
+      body: Buffer.from(JSON.stringify({ decision, nativeEvent, nativeInputMatches, keyboardSnapshot, browserMessages })),
       contentType: 'application/json',
     });
   } catch (error) { failures.push(error); }
