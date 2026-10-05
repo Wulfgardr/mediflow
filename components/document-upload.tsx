@@ -24,6 +24,7 @@ import { createDocumentUploadQueue, readDocumentDataUrl, type DocumentUploadResu
 import { useLiveQueryState } from '@/lib/live-query';
 import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
 import { cn } from '@/lib/utils';
+import { ocrProbeBegin, ocrProbeEnd, ocrProbeRecord } from '@/lib/domain/documents/ocr-causal-probe';
 
 interface DocumentUploadProps {
     patientId: string;
@@ -54,7 +55,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const summaryHeading = useRef<HTMLHeadingElement>(null);
     const [extractingId, setExtractingId] = useState<string | null>(null);
     const [localExtraction, setLocalExtraction] = useState<LocalExtractionState | null>(null);
-    const activeExtraction = useRef<{ attachmentId: string; sourceSnapshot: readonly Attachment[] | undefined; controller: AbortController } | null>(null);
+    const activeExtraction = useRef<{ attachmentId: string; sourceSnapshot: readonly Attachment[] | undefined; controller: AbortController; probeOp: number } | null>(null);
     const activeDelete = useRef<object | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [deleteErrorId, setDeleteErrorId] = useState<string | null>(null);
@@ -73,6 +74,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         // Retire unsubmitted work and transient document views, not durable writes.
         const retireDocument = () => {
             uploadQueue.cancel();
+            if (activeExtraction.current) ocrProbeRecord(activeExtraction.current.probeOp, 'abort_pagehide', 'ui', 0, activeExtraction.current.controller.signal.aborted ? 1 : 0);
             activeExtraction.current?.controller.abort();
             activeExtraction.current = null;
             activeDelete.current = null;
@@ -85,6 +87,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             window.removeEventListener('pagehide', retireDocument);
             generation.current += 1;
             uploadQueue.cancel();
+            if (activeExtraction.current) ocrProbeRecord(activeExtraction.current.probeOp, 'abort_effect_cleanup', 'ui', 0, activeExtraction.current.controller.signal.aborted ? 1 : 0);
             activeExtraction.current?.controller.abort();
             activeExtraction.current = null;
             activeDelete.current = null;
@@ -143,6 +146,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             await db.attachments.delete(file.id);
             if (activeDelete.current !== operation) return;
             if (activeExtraction.current?.attachmentId === file.id) {
+                ocrProbeRecord(activeExtraction.current.probeOp, 'abort_delete', 'ui', 0, activeExtraction.current.controller.signal.aborted ? 1 : 0);
                 activeExtraction.current.controller.abort(); activeExtraction.current = null; setExtractingId(null);
             }
             setLocalExtraction((value) => value?.attachmentId === file.id ? null : value);
@@ -158,24 +162,30 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
 
     /* @Codex: extraction-only lifecycle; upload/delete/synthesis ownership is unchanged. */
     const extractionSessionSignal = db.getSessionReadSignal();
-    const retireExtraction = useCallback(() => {
+    const retireExtraction = useCallback((cause: 'abort_session_listener' | 'abort_view_cleanup') => {
+        if (activeExtraction.current) ocrProbeRecord(activeExtraction.current.probeOp, cause, 'ui', 0, activeExtraction.current.controller.signal.aborted ? 1 : 0);
         activeExtraction.current?.controller.abort(); activeExtraction.current = null;
         setExtractingId(null); setLocalExtraction(null);
     }, []);
     useEffect(() => {
-        extractionSessionSignal.addEventListener('abort', retireExtraction, { once: true });
-        return () => extractionSessionSignal.removeEventListener('abort', retireExtraction);
+        const retire = () => retireExtraction('abort_session_listener');
+        extractionSessionSignal.addEventListener('abort', retire, { once: true });
+        return () => extractionSessionSignal.removeEventListener('abort', retire);
     }, [extractionSessionSignal, retireExtraction]);
     useEffect(() => {
         // A source/view choice retires only transient extraction work.
-        return () => retireExtraction();
+        return () => retireExtraction('abort_view_cleanup');
     }, [selectedId, viewingId, retireExtraction]);
     useEffect(() => {
         const pending = activeExtraction.current;
         // Any refresh of the attachment view retires transient extraction. The ordinary
         // list intentionally has no host currentness tuple, so do not invent one here.
-        if (pending && (listError || listLoading || attachments !== pending.sourceSnapshot))
+        if (pending && (listError || listLoading || attachments !== pending.sourceSnapshot)) {
+            // Bits: 1=error, 2=loading, 4=snapshot reference changed, 8=already aborted.
+            ocrProbeRecord(pending.probeOp, 'abort_list_refresh', 'ui', 0,
+                (listError ? 1 : 0) | (listLoading ? 2 : 0) | (attachments !== pending.sourceSnapshot ? 4 : 0) | (pending.controller.signal.aborted ? 8 : 0));
             pending.controller.abort();
+        }
     }, [attachments, listError, listLoading]);
     if (localExtraction && (listError || listLoading || attachments !== localExtraction.sourceSnapshot))
         setLocalExtraction(null);
@@ -183,14 +193,16 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     const interruptLocalExtraction = () => {
         const operation = activeExtraction.current;
         if (!operation) return;
+        ocrProbeRecord(operation.probeOp, 'abort_user_interrupt', 'ui', 0, operation.controller.signal.aborted ? 1 : 0);
         operation.controller.abort(); activeExtraction.current = null; setExtractingId(null);
         setLocalExtraction({ attachmentId: operation.attachmentId, sourceSnapshot: operation.sourceSnapshot, status: 'interrupted' });
     };
 
     const handleLocalExtractionPreview = async (file: Attachment) => {
         if (activeExtraction.current || listLoading || listError || deletingId === file.id || extractionSessionSignal.aborted) return;
-        const operation = { attachmentId: file.id, sourceSnapshot: attachments, controller: new AbortController() };
+        const operation = { attachmentId: file.id, sourceSnapshot: attachments, controller: new AbortController(), probeOp: 0 };
         const signal = AbortSignal.any([operation.controller.signal, extractionSessionSignal]);
+        operation.probeOp = ocrProbeBegin(operation.controller.signal, extractionSessionSignal, signal);
         activeExtraction.current = operation; setExtractingId(file.id); setLocalExtraction(null);
         try {
             const preview = await requestAnyDocDecryptedLocalExtractionPreview(file.id, async () => {
@@ -198,10 +210,15 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 const source = await db.attachments.get(file.id, { signal });
                 return !signal.aborted && source?.patientId === patientId ? source : null;
             }, globalThis.fetch, signal);
-            if (activeExtraction.current !== operation || signal.aborted) return;
+            ocrProbeRecord(operation.probeOp, 'ui_preview_return', 'ui', preview ? 1 : 0, signal.aborted ? 1 : 0);
+            if (activeExtraction.current !== operation || signal.aborted) {
+                ocrProbeRecord(operation.probeOp, 'ui_result_discarded', 'ui', 0, (activeExtraction.current !== operation ? 1 : 0) | (signal.aborted ? 2 : 0));
+                return;
+            }
             setLocalExtraction(preview ? { attachmentId: file.id, sourceSnapshot: operation.sourceSnapshot, ...preview }
                 : { attachmentId: file.id, sourceSnapshot: operation.sourceSnapshot, status: 'review_required' });
         } finally {
+            ocrProbeEnd(operation.probeOp);
             if (activeExtraction.current === operation) { activeExtraction.current = null; setExtractingId(null); }
         }
     };

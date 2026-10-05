@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
+import { beginOcrCausalCapture } from './ocr-causal-capture';
 
 const NATIVE_TEXT = 'PRIMA PAGINA TESTUALE - DOCUMENTO SINTETICO';
 const SCANNED_TEXT = 'ULTIMA PAGINA SCANSIONATA';
@@ -86,8 +87,13 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const bytes = await syntheticDocument(scenario);
     const attachment = await openSyntheticAttachment(page, scenario, bytes);
+    // Separate owner-approved LOCAL diagnostic invocation only. Existing fixture,
+    // observer, streaming, assertions, trace policy and retry count are unchanged.
     const observed = await observeAnyDocProjectResponse(page, attachment.id);
+    let diagnostic: Awaited<ReturnType<typeof beginOcrCausalCapture>> | null = null;
     try {
+      if (scenario === 'image' && process.env.MEDIFLOW_OCR_CAUSAL_CAPTURE === '1')
+        diagnostic = await beginOcrCausalCapture(page, attachment.id);
       const acquirePromise = page.waitForResponse(response => response.request().method() === 'POST'
         && response.url().endsWith(`/api/attachments/${attachment.id}/local-extraction`)
         && response.request().headers()['x-mediflow-extraction-action'] === 'acquire');
@@ -152,7 +158,17 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
       expect(await after.json()).toEqual(attachment.persisted); // Extraction performs no clinical writes.
       await page.screenshot({ path: testInfo.outputPath(`${scenario}-synthetic.png`), fullPage: true });
       observed.assertSameResponse(response);
-    } finally { await observed.dispose(); }
+    } finally {
+      // Metadata cannot replace a failure from the original oracle. Capture errors
+      // are represented by a constant marker; owner must reject missing coverage.
+      // Preserve the original observer-disposal frontier. The probe remains
+      // active through disposal; records after it include teardown effects.
+      try { await observed.dispose(); }
+      finally {
+        try { await diagnostic?.attachAndSeal(testInfo); }
+        catch { await testInfo.attach('ocr-causal-capture-unavailable', { body: Buffer.from('INCOMPLETE'), contentType: 'text/plain' }).catch(() => {}); }
+      }
+    }
   });
 }
 

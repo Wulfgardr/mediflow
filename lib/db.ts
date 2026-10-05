@@ -4,6 +4,7 @@
 import { encryptData, decryptData } from './security/security';
 import type { WhoLocalReference } from './reference-data/icd11-who-local-contract'; // @Codex
 import { notifyDbChange } from './live-query';
+import { ocrProbeSessionRetire } from './domain/documents/ocr-causal-probe';
 import {
     LOCKED_DATA_PLACEHOLDER,
     isLockedDataPlaceholder,
@@ -908,6 +909,7 @@ class MedicalApiClient {
         this.masterKey = key;
         this.sessionReads = key ? new AbortController() : null;
         // @Codex: runs synchronously before SecurityProvider sends the lock request.
+        ocrProbeSessionRetire(previousReads?.signal, key !== null);
         previousReads?.abort();
     }
 
