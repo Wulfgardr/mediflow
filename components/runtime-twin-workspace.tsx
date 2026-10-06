@@ -4,7 +4,7 @@
    unlocked React session. The SecurityProvider unmounts this frame on lock. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Activity, BookOpen, CalendarDays, ChevronDown, ClipboardList, FolderOpen, LockKeyhole, PanelLeftClose, PanelLeftOpen, Plus, Settings2, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
@@ -119,14 +119,15 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
 /* @Codex: this menu reorganizes the existing canonical anchors, never drops a
    capability or treats an unloaded count as an empty record. */
 export function RuntimeTwinPatientNavigation({ items, active }: { items: readonly { href: string; label: string; meta?: string }[]; active: string }) {
+  const menu = useRef<HTMLDetailsElement>(null);
   const primary = items.filter(item => ['#quadro', '#diario'].includes(item.href)
     || (['#terapie', '#documenti', '#parametri'].includes(item.href) && item.meta !== undefined && Number(item.meta) > 0));
   const secondary = items.filter(item => !primary.includes(item));
-  return <nav className={styles.patientNavigation} aria-label="Sezioni della vista">
+  return <nav className={styles.patientNavigation} aria-label="Sezioni della vista" onClick={event => {
+    if (event.target instanceof Element && event.target.closest('a[href]') && menu.current) menu.current.open = false;
+  }}>
     {primary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{item.href === '#quadro' ? 'Riepilogo' : item.label}{item.meta && Number(item.meta) > 0 ? <span>{item.meta}</span> : null}</a>)}
-    <details className={styles.moreSections} onClick={event => {
-      if ((event.target as HTMLElement).closest('a')) event.currentTarget.open = false;
-    }} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
+    <details ref={menu} className={styles.moreSections} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
       <summary aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}>Altre sezioni <ChevronDown size={14} aria-hidden /></summary>
       <div className={styles.sectionMenu}>
         {secondary.map(item => <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}><span>{item.label}</span><small>{item.meta === '0' ? 'Nessun dato' : item.meta}</small></a>)}
