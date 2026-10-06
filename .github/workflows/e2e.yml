@@ -36,12 +36,16 @@ jobs:
       E2E_BASE_URL: http://127.0.0.1:3123
       E2E_PIN: "1234"
       MEDIFLOW_NEXT_DIST_DIR: .next-e2e
+      NEXT_PUBLIC_MEDIFLOW_OCR_CAUSAL_PROBE: "${{ github.event_name == 'pull_request' && github.head_ref == 'codex/WUL-729-ocr-causal-probe-20261006' && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}"
+      NEXT_PUBLIC_MEDIFLOW_OCR_CAUSAL_SYNTHETIC_ONLY: "${{ github.event_name == 'pull_request' && github.head_ref == 'codex/WUL-729-ocr-causal-probe-20261006' && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}"
+      MEDIFLOW_OCR_CAUSAL_CAPTURE: "${{ github.event_name == 'pull_request' && github.head_ref == 'codex/WUL-729-ocr-causal-probe-20261006' && github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}"
+      OCR_CAUSAL_REQUESTED_PR_HEAD: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.21.0
           cache: npm
 
       # npm ci rebuilds better-sqlite3 for the Node 24 ABI so the server can boot.
@@ -133,7 +137,17 @@ jobs:
           # @Codex: document-flow-real-route owns an empty standalone runtime and
           # runs only when this explicit synthetic-fixture opt-in is present.
           E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
-        run: npx playwright test --workers=1
+          OCR_CAUSAL_SUITE_EXPORT_DIR: ${{ runner.temp }}/ocr-causal-suite-export
+        run: |
+          if [ "${MEDIFLOW_OCR_CAUSAL_CAPTURE}" = "1" ]; then
+            test ! -e "${OCR_CAUSAL_SUITE_EXPORT_DIR}"
+            mkdir -m 700 "${OCR_CAUSAL_SUITE_EXPORT_DIR}"
+            PLAYWRIGHT_HTML_OUTPUT_DIR="${RUNNER_TEMP}/ocr-causal-suite-html" PLAYWRIGHT_HTML_OPEN=never \
+              npx playwright test --workers=1 --reporter=list,html,./scripts/ocr-causal-suite-reporter.mjs \
+              > "${RUNNER_TEMP}/ocr-causal-suite-stdout.log" 2> "${RUNNER_TEMP}/ocr-causal-suite-stderr.log"
+          else
+            npx playwright test --workers=1
+          fi
 
       # This browser harness uses node:test and top-level await, so it is not
       # collectable by Playwright. Keep it in its canonical runner with an
@@ -184,7 +198,7 @@ jobs:
         run: node scripts/anydoc-http-diagnostic.cjs --export "${RUNNER_TEMP}/anydoc-http-diagnostic.jsonl"
 
       - name: Upload Playwright report
-        if: always()
+        if: always() && env.MEDIFLOW_OCR_CAUSAL_CAPTURE != '1'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
@@ -192,6 +206,15 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload OCR causal suite metadata
+        if: always() && env.MEDIFLOW_OCR_CAUSAL_CAPTURE == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-causal-full-suite-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/ocr-causal-suite-export/*.json
+          if-no-files-found: error
           retention-days: 7
 
       - name: Upload AnyDoc diagnostic metadata
