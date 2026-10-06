@@ -128,7 +128,6 @@ jobs:
       - name: Run Playwright suite
         # @Codex: the preceding steps seed and start an isolated synthetic DB.
         env:
-          DEBUG: pw:channel,pw:protocol
           MF085_SYNTHETIC_E2E: "1"
           MEDIFLOW_ANYDOC_HTTP_DIAGNOSTIC: "1"
           # @Codex: document-flow-real-route owns an empty standalone runtime and

@@ -1,0 +1,79 @@
+name: OCR causal probe (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ocr-causal-probe-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ocr-causal-probe:
+    # A separate, non-required context; the normal full-suite E2E gate still runs.
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'codex/WUL-729-ocr-causal-probe-20261006'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      MEDIFLOW_NEXT_DIST_DIR: .next-ocr-causal
+      NEXT_PUBLIC_MEDIFLOW_OCR_CAUSAL_PROBE: '1'
+      NEXT_PUBLIC_MEDIFLOW_OCR_CAUSAL_SYNTHETIC_ONLY: '1'
+      OCR_CAUSAL_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+      OCR_CAUSAL_EXPORT_DIR: ${{ runner.temp }}/ocr-causal-export
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Install locked dependencies and Chromium
+        run: |
+          umask 077
+          mkdir -m 700 "${RUNNER_TEMP}/ocr-causal-setup" "${OCR_CAUSAL_EXPORT_DIR}"
+          unset DEBUG NODE_OPTIONS
+          npm ci > "${RUNNER_TEMP}/ocr-causal-setup/npm-ci.log" 2>&1
+          npx playwright install --with-deps chromium > "${RUNNER_TEMP}/ocr-causal-setup/browser-install.log" 2>&1
+
+      - name: Build synthetic standalone once
+        run: |
+          umask 077
+          unset DEBUG NODE_OPTIONS E2E_BASE_URL E2E_PIN MEDIFLOW_APP_SOURCE_FINGERPRINT MEDIFLOW_APP_FINGERPRINT
+          test "$(git rev-parse HEAD)" = "${OCR_CAUSAL_EXPECTED_HEAD}"
+          test -z "$(git status --porcelain)"
+          test ! -e "${MEDIFLOW_NEXT_DIST_DIR}"
+          printf '/.next-ocr-causal/\n' >> .git/info/exclude
+          export MEDIFLOW_APP_REVISION="$(git rev-parse --short=12 HEAD)"
+          export MEDIFLOW_APP_BRANCH=codex/WUL-729-ocr-causal-probe-20261006
+          export MEDIFLOW_APP_WORKTREE_HASH=clean
+          BUILD_DATA="$(mktemp -d "${RUNNER_TEMP}/ocr-build.XXXXXX")"
+          export MEDIFLOW_DATA_DIR="${BUILD_DATA}" MEDIFLOW_E2E_DATA_DIR="${BUILD_DATA}"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          npm run build > "${RUNNER_TEMP}/ocr-causal-setup/build.log" 2>&1
+          # Next may extend tsconfig include paths for this distinct dist directory.
+          git restore --source=HEAD -- tsconfig.json
+          test -z "$(git status --porcelain)"
+
+      - name: Run original image case and reduce private evidence
+        run: node scripts/ocr-causal-ci.mjs
+
+      - name: Publish validated technical metadata only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-causal-metadata-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/ocr-causal-export/*.json
+          if-no-files-found: error
+          retention-days: 7
