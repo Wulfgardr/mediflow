@@ -1,6 +1,7 @@
 /* @Codex LUME-104/68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { expectActionableTouchTarget } from './actionable-touch-target';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
 const CASES: SchedaCase[] = [
@@ -195,14 +196,7 @@ test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page
   const action = page.getByRole('link', { name: 'Aggiungi follow-up', exact: true });
   await expect(action).toBeVisible();
   await expect(action).toHaveAttribute('href', `/patients/${patient.id}/edit#pianificazione`);
-  const geometry = await action.evaluate((element) => {
-    const style = getComputedStyle(element);
-    const box = element.getBoundingClientRect();
-    return { width: box.width, height: box.height, radius: style.borderRadius };
-  });
-  expect(geometry.width).toBeGreaterThanOrEqual(44);
-  expect(geometry.height).toBeGreaterThanOrEqual(44);
-  expect(geometry.radius).toBe('12px');
+  await expectActionableTouchTarget(action);
 
   await action.click();
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/edit#pianificazione$`));
