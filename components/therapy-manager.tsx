@@ -151,11 +151,14 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         setIsReading(true);
         try {
             // The facade returns [] on expired auth. Require an authenticated
-            // parent read too, so an unavailable session never proves absence.
+            // parent and keep both completions inside the same live session.
+            const signal = db.getSessionReadSignal();
+            signal.throwIfAborted();
             const [items, parent] = await Promise.all([
                 db.therapies.query({ patientId: context.patientId }).toArray(),
-                db.patients.get(context.patientId),
+                db.patients.get(context.patientId, { signal }),
             ]);
+            signal.throwIfAborted();
             if (!isCurrentDraft(context)) return;
             const current = items.find(item => item.id === context.id) ?? null;
             if (!parent || parent.id !== context.patientId
