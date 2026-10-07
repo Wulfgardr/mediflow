@@ -55,7 +55,7 @@ test('preserves a non-empty explicit relative data-dir value for every child', (
   }
 });
 
-function defaultSelectionFixture() {
+function defaultSelectionFixture(testFile) {
   const value = fixture('', { preserveUnitArgs: true });
   // Keep the real wrapper and its default argv. Only the child suite is synthetic:
   // it executes physically present test files using Node's real test runner.
@@ -71,40 +71,42 @@ for (const key of Object.keys(env)) if (key.startsWith('NODE_TEST')) delete env[
 const result = spawnSync(process.execPath, ['--test', ...files], { env, stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `);
-  fs.writeFileSync(path.join(value.sandbox, 'scripts', 'run-unit-suite.test.mjs'), `
+  fs.writeFileSync(path.join(value.sandbox, 'scripts', testFile), `
 import fs from 'node:fs';
 import test from 'node:test';
-test('synthetic selected wrapper regression', () => {
+test('synthetic selected regression', () => {
   fs.appendFileSync('selected-test-ran', 'once\\n');
-  if (process.env.TEST_SELECTED_REGRESSION_FAIL === '1') throw new Error('seeded wrapper regression failure');
+  if (process.env.TEST_SELECTED_REGRESSION_FAIL === '1') throw new Error('seeded selected regression failure');
 });
 `);
   return value;
 }
 
-test('default unit selection executes the wrapper regressions exactly once', () => {
-  const value = defaultSelectionFixture();
-  try {
-    const result = execute(value);
-    assert.equal(result.status, 0, result.stderr + result.stdout);
-    assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
-    const selected = JSON.parse(fs.readFileSync(path.join(value.sandbox, 'selected-args.json'), 'utf8'));
-    assert.equal(selected.filter(arg => arg === 'scripts/run-unit-suite.test.mjs').length, 1);
-    assert.deepEqual(implicitDirs(value), []);
-  } finally {
-    fs.rmSync(value.sandbox, { recursive: true, force: true });
-  }
-});
+for (const testFile of ['run-unit-suite.test.mjs', 'run-strip-types.test.mjs', 'check-motion-budget.test.mjs']) {
+  test(`default unit selection executes ${testFile} exactly once`, () => {
+    const value = defaultSelectionFixture(testFile);
+    try {
+      const result = execute(value);
+      assert.equal(result.status, 0, result.stderr + result.stdout);
+      assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
+      const selected = JSON.parse(fs.readFileSync(path.join(value.sandbox, 'selected-args.json'), 'utf8'));
+      assert.equal(selected.filter(arg => arg === `scripts/${testFile}`).length, 1);
+      assert.deepEqual(implicitDirs(value), []);
+    } finally {
+      fs.rmSync(value.sandbox, { recursive: true, force: true });
+    }
+  });
 
-test('default unit selection propagates a failing wrapper regression and cleans its data', () => {
-  const value = defaultSelectionFixture();
-  try {
-    const result = execute(value, { TEST_SELECTED_REGRESSION_FAIL: '1' });
-    assert.equal(result.status, 1, result.stderr + result.stdout);
-    assert.match(result.stdout, /seeded wrapper regression failure/);
-    assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
-    assert.deepEqual(implicitDirs(value), []);
-  } finally {
-    fs.rmSync(value.sandbox, { recursive: true, force: true });
-  }
-});
+  test(`default unit selection propagates a failing ${testFile} and cleans its data`, () => {
+    const value = defaultSelectionFixture(testFile);
+    try {
+      const result = execute(value, { TEST_SELECTED_REGRESSION_FAIL: '1' });
+      assert.equal(result.status, 1, result.stderr + result.stdout);
+      assert.match(result.stdout, /seeded selected regression failure/);
+      assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
+      assert.deepEqual(implicitDirs(value), []);
+    } finally {
+      fs.rmSync(value.sandbox, { recursive: true, force: true });
+    }
+  });
+}
