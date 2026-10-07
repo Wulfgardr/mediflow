@@ -82,7 +82,7 @@ test('synthetic selected regression', () => {
   return value;
 }
 
-for (const testFile of ['run-unit-suite.test.mjs', 'run-strip-types.test.mjs', 'check-motion-budget.test.mjs']) {
+for (const testFile of ['run-unit-suite.test.mjs', 'run-strip-types.test.mjs', 'check-motion-budget.test.mjs', 'node-runtime-contract.test.mjs']) {
   test(`default unit selection executes ${testFile} exactly once`, () => {
     const value = defaultSelectionFixture(testFile);
     try {
