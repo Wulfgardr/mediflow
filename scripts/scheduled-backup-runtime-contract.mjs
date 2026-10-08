@@ -216,12 +216,16 @@ export async function assertScheduledBackupRuntime(runtimeRoot, { timeoutMs = 10
   }
 }
 
+// Keep the module graph synchronous: Next's transpiled config loads this ESM
+// module via require(). Even an unexecuted top-level await blocks that boundary.
+async function runCli() {
+  if (process.argv.length !== 4 || process.argv[2] !== '--runtime-root') fail('usage: --runtime-root PATH');
+  console.log(JSON.stringify(await assertScheduledBackupRuntime(process.argv[3])));
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    if (process.argv.length !== 4 || process.argv[2] !== '--runtime-root') fail('usage: --runtime-root PATH');
-    console.log(JSON.stringify(await assertScheduledBackupRuntime(process.argv[3])));
-  } catch (error) {
+  runCli().catch(error => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
-  }
+  });
 }
