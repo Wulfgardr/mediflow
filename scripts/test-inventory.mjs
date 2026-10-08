@@ -4,6 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
+import { collectExplicitNpmSelections } from './explicit-npm-test-selection.mjs';
 
 const defaultRoot = fileURLToPath(new URL('..', import.meta.url));
 const sourceExtension = /\.(?:[cm]?[jt]sx?|py|rs|swift|sh|bash|bats|ps1|command|c|h|m|mm)$/u;
@@ -148,7 +149,7 @@ function cli(args) {
   let unit;
   try { unit = { files: collectUnitTestFiles(root), errors: [] }; }
   catch (error) { unit = { files: [], errors: [error.message] }; }
-  const result = checkInventory(candidates, manifest, { unit });
+  const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);
@@ -159,6 +160,7 @@ function printReport(result) {
   console.log(`Selection completeness: ${result.selectionComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
   console.log(`Unresolved selection: ${result.unresolved.length}`);
   console.log('Execution evidence: NOT_ASSESSED');
+  console.log('Npm CI bindings: configured literal calls only; reachability and lifecycle effects NOT_ASSESSED');
   console.log('C14 acceptance: NOT_ASSESSED');
   console.log('Discovery: heuristic filename/source signals; not semantic completeness or C14 acceptance.');
 }

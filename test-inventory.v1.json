@@ -7035,8 +7035,10 @@
     {
       "path": "scripts/build-usage-dashboard.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:usage-dashboard"
+        ]
       }
     },
     {
@@ -7141,8 +7143,10 @@
     {
       "path": "scripts/check-fabric-generative-runtime-crosswalk.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:fabric-generative-runtime-crosswalk"
+        ]
       }
     },
     {
@@ -7169,8 +7173,10 @@
     {
       "path": "scripts/check-lume-tokens.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:lume-tokens"
+        ]
       }
     },
     {
@@ -7316,6 +7322,15 @@
       }
     },
     {
+      "path": "scripts/explicit-npm-test-selection.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "scripts/fabric-settings-view-test.sh",
       "selection": {
         "state": "unresolved",
@@ -7418,15 +7433,19 @@
     {
       "path": "scripts/launch-mediflow-mac.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:native-launcher"
+        ]
       }
     },
     {
       "path": "scripts/launcher-helpers.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:launcher-helpers"
+        ]
       }
     },
     {
