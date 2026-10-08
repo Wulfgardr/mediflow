@@ -128,8 +128,14 @@ Next.js non ispezionano né recuperano l'archivio persistente.
 
 Questo protocollo riguarda lo swap locale e non è un backup completo della
 directory dati: export v1, custodia delle chiavi e ripristino dell'autorità
-restano contratti distinti. Non recinta writer SQLite esterni al processo;
-la manutenzione richiede che siano fermati. Errori di sincronizzazione o file
+restano contratti distinti. Il protocollo di ammissione descritto in
+[ADR 0142](docs/adr/0142-sqlite-maintenance-admission.md) registra lo scheduler
+prima dell'apertura SQLite e conserva il lease fino alla chiusura nativa.
+Un intent impedisce nuovi partecipanti e attende quelli già ammessi prima di
+eseguire la callback di manutenzione. Non prova il drain di operazioni Web
+asincrone o di tool non ancora integrati: il collegamento al repair online e al
+recovery di startup resta una tranche successiva, con requisito operativo HOLD.
+Non si cancellano marker in base a mtime o PID. Errori di sincronizzazione o file
 bloccati non vengono ignorati. Le prove con terminazione di processo e guasti
 iniettati non qualificano perdita di alimentazione, filesystem o installazioni
 Windows/Linux, e non attestano RPO zero.

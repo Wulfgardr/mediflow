@@ -261,3 +261,125 @@ test('process exit after callback entry leaves intent and never grants a new own
         await assert.rejects(runWithSqliteMaintenance(f.target, {}, () => assert.fail()), /maintenance_pending/);
     } finally { f.cleanup(); }
 });
+
+function schedulerFixture() {
+    const f = fixture();
+    const db = new Database(f.target);
+    db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+    db.prepare('INSERT INTO settings VALUES (?, ?)').run('backupScheduler', JSON.stringify({
+        config: { enabled: true, destinationDir: path.join(f.dir, 'backups') }, run: { lastRunStatus: null },
+    }));
+    db.close();
+    return f;
+}
+
+const schedulerWorker = `
+    import fs from 'node:fs';
+    import path from 'node:path';
+    import Database from 'better-sqlite3';
+    const target = fs.realpathSync(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));
+    const seen = new Set(), closed = new Set();
+    const prepare = Database.prototype.prepare, close = Database.prototype.close;
+    Database.prototype.prepare = function(...args) { if (this.name === target) seen.add(this); return prepare.apply(this, args); };
+    Database.prototype.close = function(...args) { const result = close.apply(this, args); if (this.name === target) closed.add(this); return result; };
+    if (process.env.SCHEDULER_BARRIER === '1') {
+        const digest = globalThis.crypto.subtle.digest.bind(globalThis.crypto.subtle);
+        globalThis.crypto.subtle.digest = async (...args) => {
+            const go = new Promise(resolve => process.once('message', resolve));
+            process.send('SERIALIZING'); await go;
+            [...seen][0].prepare('INSERT INTO synthetic_values VALUES (1, ?)').run('scheduler-finished-before-snapshot');
+            if (process.env.SCHEDULER_FAIL === '1') throw new Error('synthetic serialization failure');
+            return digest(...args);
+        };
+    }
+    process.argv[1] = path.resolve('scripts/run-scheduled-backup.mjs');
+    await import('./scripts/run-scheduled-backup.mjs');
+    console.log('NATIVE_HANDLES:' + JSON.stringify({opened:seen.size,closed:closed.size,stillOpen:[...seen].filter(db => db.open).length}));
+    process.disconnect();
+`;
+function schedulerChild(dir: string, barrier = false, fail = false) {
+    return child(`process.env.SCHEDULER_BARRIER = '${barrier ? '1' : '0'}'; process.env.SCHEDULER_FAIL = '${fail ? '1' : '0'}';\n` + schedulerWorker, dir);
+}
+
+for (const fail of [false, true]) {
+    test(`real scheduler ${fail ? 'error' : 'success'} finishes and closes its only writer before maintenance snapshots`, async () => {
+        const f = schedulerFixture();
+        const w = schedulerChild(f.dir, true, fail);
+        try {
+            assert.equal(await message(w.worker), 'SERIALIZING');
+            let snapshotStarted = false;
+            const maintenance = runWithSqliteMaintenance(f.target, { timeoutMs: 5000 }, async () => {
+                snapshotStarted = true;
+                const db = new Database(f.target, { readonly: true });
+                try { await db.backup(path.join(f.dir, 'snapshot.db')); } finally { db.close(); }
+            });
+            await waitIntent(f.target);
+            assert.equal(snapshotStarted, false);
+            w.worker.send('COMPLETE');
+            assert.equal(await w.terminal, fail ? 1 : 0, w.output());
+            await maintenance;
+            assert.match(w.output(), /NATIVE_HANDLES:\{"opened":1,"closed":1,"stillOpen":0\}/);
+            const snapshot = new Database(path.join(f.dir, 'snapshot.db'), { readonly: true });
+            try {
+                const row = snapshot.prepare('SELECT value FROM settings WHERE key = ?').get('backupScheduler') as { value: string };
+                assert.equal(JSON.parse(row.value).run.lastRunStatus, fail ? 'error' : 'success');
+                assert.deepEqual(snapshot.prepare('SELECT value FROM synthetic_values').all(), [{ value: 'scheduler-finished-before-snapshot' }]);
+            } finally { snapshot.close(); }
+            assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+            const next = schedulerChild(f.dir);
+            assert.equal(await next.terminal, 0, next.output());
+        } finally {
+            if (w.worker.exitCode === null && w.worker.signalCode === null) { w.worker.kill(); await w.terminal; }
+            f.cleanup();
+        }
+    });
+}
+
+test('scheduler admission denial never reaches its error-path writer or changes scheduler state', async () => {
+    const f = schedulerFixture();
+    const before = fs.readFileSync(f.target);
+    try {
+        await runWithSqliteMaintenance(f.target, {}, async () => {
+            const w = schedulerChild(f.dir);
+            assert.equal(await w.terminal, 1, w.output());
+            assert.match(w.output(), /SQLITE_MAINTENANCE_HOLD: maintenance_pending/);
+            assert.match(w.output(), /NATIVE_HANDLES:\{"opened":0,"closed":0,"stillOpen":0\}/);
+            assert.deepEqual(fs.readFileSync(f.target), before);
+            assert.equal(fs.existsSync(path.join(f.dir, 'backups')), false);
+            assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+        });
+    } finally { f.cleanup(); }
+});
+
+for (const fault of ['destination-file', 'missing-settings']) {
+    test(`scheduler ${fault} closes the initial native handle without a second open`, async () => {
+        const f = schedulerFixture();
+        try {
+            if (fault === 'destination-file') fs.writeFileSync(path.join(f.dir, 'backups'), 'synthetic obstruction');
+            else { const db = new Database(f.target); db.exec('DROP TABLE settings'); db.close(); }
+            const w = schedulerChild(f.dir);
+            assert.equal(await w.terminal, 1, w.output());
+            assert.match(w.output(), /NATIVE_HANDLES:\{"opened":1,"closed":1,"stillOpen":0\}/);
+            assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+            await runWithSqliteMaintenance(f.target, {}, () => {});
+        } finally { f.cleanup(); }
+    });
+}
+
+test('scheduler drain timeout never snapshots and leaves the target unchanged until the scheduler resumes', async () => {
+    const f = schedulerFixture();
+    const w = schedulerChild(f.dir, true);
+    try {
+        assert.equal(await message(w.worker), 'SERIALIZING');
+        const before = fs.readFileSync(f.target);
+        await assert.rejects(runWithSqliteMaintenance(f.target, { timeoutMs: 20 }, () => assert.fail('no snapshot')), /drain_timeout/);
+        assert.deepEqual(fs.readFileSync(f.target), before);
+        assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), false);
+        w.worker.send('COMPLETE');
+        assert.equal(await w.terminal, 0, w.output());
+        await runWithSqliteMaintenance(f.target, {}, () => {});
+    } finally {
+        if (w.worker.exitCode === null && w.worker.signalCode === null) { w.worker.kill(); await w.terminal; }
+        f.cleanup();
+    }
+});
