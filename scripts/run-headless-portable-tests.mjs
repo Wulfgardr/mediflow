@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* @Codex */
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +18,11 @@ const scriptTests = [
 
 async function collect(root, current, output) {
     let entries;
-    try { entries = await readdir(path.join(root, current), { withFileTypes: true }); } catch { return; }
+    try {
+        entries = await readdir(path.join(root, current), { withFileTypes: true });
+    } catch (cause) {
+        throw new Error(`Cannot read required Headless test directory: ${current}`, { cause });
+    }
     for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
         const relative = path.posix.join(current.replaceAll('\\', '/'), entry.name);
         if (entry.isDirectory()) await collect(root, relative, output);
@@ -27,12 +32,20 @@ async function collect(root, current, output) {
 
 export async function collectHeadlessPortableTests(root = repoRoot) {
     const tests = [];
-    for (const directory of packageRoots) await collect(root, directory, tests);
+    for (const directory of packageRoots) {
+        const before = tests.length;
+        await collect(root, directory, tests);
+        if (tests.length === before) throw new Error(`No Headless tests found in required package: ${directory}`);
+    }
     for (const file of scriptTests) {
+        let metadata;
         try {
-            const entries = await readdir(path.dirname(path.join(root, file)));
-            if (entries.includes(path.basename(file))) tests.push(file);
-        } catch { /* Required count check below. */ }
+            metadata = await stat(path.join(root, file));
+        } catch (cause) {
+            throw new Error(`Cannot access required Headless test script: ${file}`, { cause });
+        }
+        if (!metadata.isFile()) throw new Error(`Required Headless test script is not a file: ${file}`);
+        tests.push(file);
     }
     return [...new Set(tests)].sort();
 }
@@ -42,7 +55,12 @@ export async function runHeadlessPortableTests({
     parentEnv = process.env,
     spawnSyncImpl = spawnSync,
 } = {}) {
-    const tests = await collectHeadlessPortableTests(root);
+    let tests;
+    try {
+        tests = await collectHeadlessPortableTests(root);
+    } catch (error) {
+        return { status: 1, signal: null, error };
+    }
     if (tests.length === 0) return { status: 1, signal: null, error: null, empty: true };
 
     const runner = path.join(root, 'scripts/run-strip-types.mjs');
@@ -62,7 +80,18 @@ export async function runHeadlessPortableTests({
     return { status: result.status ?? 1, signal: result.signal ?? null, error: null };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+function isCliEntrypoint() {
+    if (!process.argv[1]) return false;
+    try {
+        return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+    } catch (error) {
+        // stdin/eval importers may name no real file; filesystem access errors still fail.
+        if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
+        throw error;
+    }
+}
+
+if (isCliEntrypoint()) {
     const result = await runHeadlessPortableTests();
     process.exitCode = result.status;
     if (result.empty) {

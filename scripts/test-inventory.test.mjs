@@ -5,9 +5,10 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { discoverCandidates, checkInventory } from './test-inventory.mjs';
+import { discoverCandidates, checkInventory, collectHeadlessInventorySelection } from './test-inventory.mjs';
 import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
 import { EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
 const cli = fileURLToPath(new URL('./test-inventory.mjs', import.meta.url));
 const mapped = file => ({ path: file, selection: { state: 'mapped', suiteIds: ['unit'] } });
@@ -16,6 +17,12 @@ const candidates = files => files.map(file => ({ path: file, signals: ['syntheti
 const manifest = entries => ({ version: 1, entries });
 const selections = files => ({ unit: { files, errors: [] } });
 const check = (files, entries, selected = files) => checkInventory(candidates(files), manifest(entries), selections(selected));
+const headlessId = 'npm:test:headless-portable';
+const headlessFixtureFiles = [
+  'packages/aip/src/a.test.ts', 'packages/mini/src/m.test.mjs', 'packages/mcp/src/c.test.mts',
+  'scripts/check-headless-portable-imports.test.mjs', 'scripts/intelligent-host-mcp-stdio.test.mjs',
+  'scripts/mediflow-headless-supervisor-athena.test.mjs', 'scripts/run-headless-portable-tests.test.mjs',
+].sort();
 
 test('discovery sees new roots, plugins, unusual names and language signals without evaluating source', () => {
   const sources = {
@@ -90,6 +97,13 @@ function fixture(t, withDebt = false) {
     const job = workflow.jobs[suite.job] ??= { steps: [] };
     job.steps.push({ run: `npm run ${suite.script}`, ...(suite.stepIf ? { if: suite.stepIf } : {}) });
   }
+  for (const file of headlessFixtureFiles) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), 'throw new Error("Headless test must not execute");');
+    entries.push({ path: file, selection: { state: 'mapped', suiteIds: [headlessId] } });
+  }
+  pkg.scripts['test:headless-portable'] = 'node scripts/run-headless-portable-tests.mjs';
+  workflows['.github/workflows/cross-platform.yml'].jobs['headless-contracts'].steps.push({ run: 'npm run test:headless-portable' });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
   for (const [file, workflow] of Object.entries(workflows)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -101,6 +115,85 @@ function fixture(t, withDebt = false) {
 function run(root, mode = 'integrity', extra = []) {
   return spawnSync(process.execPath, [cli, mode, '--root', root, ...extra], { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, timeout: 10_000 });
 }
+
+test('Headless inventory uses the real sorted selector and ignores unrelated files without executing sources', async t => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'packages/aip/src/not-a-test.ts'), 'throw new Error("must not execute");');
+  const result = await collectHeadlessInventorySelection(root);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.files, headlessFixtureFiles);
+  assert.deepEqual(result.files, await collectHeadlessPortableTests(root));
+  assert.deepEqual(result.binding.commands, ['test:headless-portable']);
+  assert.equal(run(root, 'complete').status, 0);
+});
+
+test('Headless missing, empty and nonregular requirements fail the inventory without promoting survivors', async t => {
+  const mutations = [
+    ...['packages/aip', 'packages/mini', 'packages/mcp', ...headlessFixtureFiles.filter(file => file.startsWith('scripts/'))]
+      .map(file => root => fs.rmSync(path.join(root, file), { recursive: true })),
+    ...headlessFixtureFiles.filter(file => file.startsWith('packages/'))
+      .map(file => root => fs.unlinkSync(path.join(root, file))),
+    ...['packages/aip', 'packages/mini', 'packages/mcp']
+      .map(file => root => { fs.rmSync(path.join(root, file), { recursive: true }); fs.writeFileSync(path.join(root, file), 'synthetic non-directory'); }),
+    ...headlessFixtureFiles.filter(file => file.startsWith('scripts/'))
+      .map(file => root => { fs.unlinkSync(path.join(root, file)); fs.mkdirSync(path.join(root, file)); }),
+  ];
+  for (const mutate of mutations) {
+    const root = fixture(t); mutate(root);
+    const selection = await collectHeadlessInventorySelection(root);
+    assert.deepEqual(selection.files, []); assert.equal(selection.binding, null);
+    assert.match(selection.errors.join('\n'), /Headless/);
+    const result = checkInventory([], manifest([]), { [headlessId]: selection });
+    assert.equal(result.integrityPassed, false);
+    assert.match(result.errors.join('\n'), /INCOMPLETE_SELECTION: npm:test:headless-portable/);
+  }
+});
+
+test('Headless command and CI call drift fail the asynchronous CLI even with all selected files present', t => {
+  for (const mutate of [
+    root => { const p = path.join(root, 'package.json'); const pkg = JSON.parse(fs.readFileSync(p)); pkg.scripts['test:headless-portable'] += ' --filter=one'; fs.writeFileSync(p, JSON.stringify(pkg)); },
+    root => { const p = path.join(root, '.github/workflows/cross-platform.yml'); const w = JSON.parse(fs.readFileSync(p)); w.jobs['headless-contracts'].steps = w.jobs['headless-contracts'].steps.filter(s => s.run !== 'npm run test:headless-portable'); fs.writeFileSync(p, JSON.stringify(w)); },
+    root => fs.rmSync(path.join(root, 'packages/mcp'), { recursive: true }),
+  ]) {
+    const root = fixture(t); mutate(root);
+    const result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:headless-portable/);
+    assert.match(result.stdout, /C14 acceptance: NOT_ASSESSED/);
+  }
+});
+
+test('Headless selected additions and omissions cannot silently change the manifest coverage', t => {
+  const root = fixture(t);
+  fs.writeFileSync(path.join(root, 'packages/aip/src/new.test.ts'), 'throw 1;');
+  assert.match(run(root).stderr, /SELECTED_WITHOUT_ENTRY: npm:test:headless-portable: packages\/aip\/src\/new.test.ts/);
+  fs.renameSync(path.join(root, 'packages/aip/src/a.test.ts'), path.join(root, 'packages/aip/src/a.ts'));
+  assert.match(run(root).stderr, /MAPPED_NOT_SELECTED: npm:test:headless-portable: packages\/aip\/src\/a.test.ts/);
+});
+
+test('Headless import and inventory selection never launch children or acquire/clean data directories', t => {
+  const root = fixture(t);
+  const source = `
+import childProcess from 'node:child_process';
+import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
+const forbidden = () => { throw new Error('UNEXPECTED_PROCESS_OR_DATA_MUTATION'); };
+childProcess.spawnSync = forbidden; childProcess.spawn = forbidden; childProcess.execFileSync = forbidden;
+for (const name of ['mkdtempSync', 'mkdirSync', 'rmSync']) fs[name] = forbidden;
+for (const name of ['mkdtemp', 'mkdir', 'rm']) fsPromises[name] = forbidden;
+syncBuiltinESMExports();
+const { collectHeadlessInventorySelection } = await import(${JSON.stringify(new URL('./test-inventory.mjs', import.meta.url).href)});
+const result = await collectHeadlessInventorySelection(${JSON.stringify(root)});
+if (result.errors.length) throw new Error(result.errors.join('\\n'));
+console.log(JSON.stringify(result.files));`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-'], {
+    input: source, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '', MEDIFLOW_DATA_DIR: path.join(root, 'forbidden-data') }, timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), headlessFixtureFiles);
+  assert.equal(fs.existsSync(path.join(root, 'forbidden-data')), false);
+});
 
 test('CLI discovers untracked sources, never executes them, and separates debt from static completeness', t => {
   const root = fixture(t, true);

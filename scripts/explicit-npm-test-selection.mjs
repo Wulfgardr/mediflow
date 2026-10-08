@@ -122,6 +122,15 @@ function ciBinding(root, suite) {
   };
 }
 
+/** Verify a known runner entrypoint without launching npm or parsing its source. */
+export function collectNpmScriptBinding(root, suite, expectedCommand) {
+  const pkg = JSON.parse(readText(root, 'package.json'));
+  if (pkg.scripts?.[suite.script] !== expectedCommand) {
+    throw new Error(`Required npm command changed or missing: ${suite.script}`);
+  }
+  return ciBinding(root, suite);
+}
+
 /** Required suites stay present with errors; invalid bindings never promote files. */
 export function collectExplicitNpmSelections(root) {
   return Object.fromEntries(EXPLICIT_NPM_SUITES.map(suite => {

@@ -4,7 +4,19 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
-import { collectExplicitNpmSelections } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmSelections, collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
+import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
+
+const headlessSuite = Object.freeze({ script: 'test:headless-portable', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts' });
+
+export async function collectHeadlessInventorySelection(root) {
+  try {
+    const binding = collectNpmScriptBinding(root, headlessSuite, 'node scripts/run-headless-portable-tests.mjs');
+    return { files: await collectHeadlessPortableTests(root), errors: [], binding };
+  } catch (error) {
+    return { files: [], errors: [error.message], binding: null };
+  }
+}
 
 const defaultRoot = fileURLToPath(new URL('..', import.meta.url));
 const sourceExtension = /\.(?:[cm]?[jt]sx?|py|rs|swift|sh|bash|bats|ps1|command|c|h|m|mm)$/u;
@@ -120,7 +132,7 @@ export function checkInventory(candidates, manifest, selections) {
     selectionComplete: errors.length === 0 && unresolved.length === 0 };
 }
 
-function cli(args) {
+async function cli(args) {
   const mode = args.shift();
   if (!['integrity', 'complete'].includes(mode)) throw new Error('Usage: test-inventory.mjs integrity|complete [--root PATH] [--manifest PATH]');
   let root = defaultRoot;
@@ -149,7 +161,8 @@ function cli(args) {
   let unit;
   try { unit = { files: collectUnitTestFiles(root), errors: [] }; }
   catch (error) { unit = { files: [], errors: [error.message] }; }
-  const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root) });
+  const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
+    'npm:test:headless-portable': await collectHeadlessInventorySelection(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);
@@ -178,7 +191,7 @@ function isCliEntrypoint() {
 }
 
 if (isCliEntrypoint()) {
-  try { process.exitCode = cli(process.argv.slice(2)); }
+  try { process.exitCode = await cli(process.argv.slice(2)); }
   catch (error) {
     process.stderr.write(`INVENTORY_ERROR: ${error.message}\n`);
     console.log('Inventory integrity: FAIL\nSelection completeness: INCOMPLETE\nUnresolved selection: UNKNOWN\nExecution evidence: NOT_ASSESSED\nC14 acceptance: NOT_ASSESSED');

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { checkInventory } from './test-inventory.mjs';
 
@@ -206,4 +206,19 @@ test('module import performs no discovery, subprocess or test execution', t => {
   });
   assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout, ''); assert.equal(result.stderr, '');
   assert.deepEqual(collectExplicitNpmNodeTests(root, target), ['synthetic/test-0.test.mjs']);
+});
+
+test('known runner binding requires the exact npm command and the same CI guards', t => {
+  const root = fixture(t);
+  const suite = { script: target, workflow: workflowPath, job: 'headless-contracts' };
+  const expected = 'node scripts/known-runner.mjs';
+  change(root, 'package.json', pkg => { pkg.scripts[target] = expected; });
+  assert.deepEqual(collectNpmScriptBinding(root, suite, expected).commands, [target]);
+  for (const command of [undefined, '', expected + ' --filter=one', expected + ' || true', 'node scripts/other.mjs']) {
+    change(root, 'package.json', pkg => { pkg.scripts[target] = command; });
+    assert.throws(() => collectNpmScriptBinding(root, suite, expected), /command changed or missing/);
+  }
+  change(root, 'package.json', pkg => { pkg.scripts[target] = expected; });
+  bindingChange(root, (workflow, job, step) => { step.if = false; });
+  assert.throws(() => collectNpmScriptBinding(root, suite, expected), /Disabled step if/);
 });
