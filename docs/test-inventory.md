@@ -1,7 +1,8 @@
 # Test inventory
 
 The inventory detects changes to test discovery, the unit suite's selection, and
-five explicit npm test selections with configured CI calls.
+five explicit npm test selections, the Headless selector and the Claims guard
+self-test, each with configured CI calls.
 It does not certify that tests ran, that their assertions are sufficient, or that a
 release is qualified. Unresolved selections remain visible work; they are not
 approved exclusions or deferrals.
@@ -90,6 +91,21 @@ The Headless npm command must remain exactly
 npm models above. The inventory awaits selection and keeps the required suite
 present with errors and no selected files if either binding or selection fails.
 This adds static selector coverage, not proof of assertions or installed targets.
+
+The `npm:check:claims:self-test` model selects only
+`scripts/check-claims-guard.mjs`. It verifies that this is a regular file inside
+the repository, that `check:claims` has the exact command
+`node scripts/check-claims-guard.mjs`, and that the `repository-guards` job has
+one literal `npm run check:claims -- --self-test` call. The ordinary
+`npm run check:claims` scan alone does not satisfy the self-test binding.
+Only this declared argument sequence is admitted; other arguments, shell
+embedding or duplicate calls fail, with the same CI context guards as above.
+Collection does not read, import or execute the Claims guard. Its existing
+rules and self-test assertions remain unchanged; their execution and adequacy
+need separate evidence.
+The literal self-test argument also makes the adapter itself an inclusive
+discovery candidate. That helper retains an unresolved record pending semantic
+classification; it is not silently excluded to reduce the unresolved count.
 
 Tests outside these models retain `unresolved` selection records, including tests
 with separate existing commands or CI callers. `unresolved` means this guard has

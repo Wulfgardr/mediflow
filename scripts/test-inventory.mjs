@@ -4,7 +4,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
-import { collectExplicitNpmSelections, collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection } from './explicit-npm-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
 const headlessSuite = Object.freeze({ script: 'test:headless-portable', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts' });
@@ -162,7 +162,8 @@ async function cli(args) {
   try { unit = { files: collectUnitTestFiles(root), errors: [] }; }
   catch (error) { unit = { files: [], errors: [error.message] }; }
   const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
-    'npm:test:headless-portable': await collectHeadlessInventorySelection(root) });
+    'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
+    'npm:check:claims:self-test': collectClaimsSelfTestSelection(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);
