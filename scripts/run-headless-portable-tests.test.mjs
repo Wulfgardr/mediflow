@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -99,6 +99,24 @@ test('the CLI reports an incomplete selection without launching its surviving te
     assert.doesNotMatch(result.stderr, /UNEXPECTED_CHILD/u);
 });
 
+test('the CLI rejects an incomplete selection when invoked through a directory alias', async (t) => {
+    const root = await selectionFixture(t);
+    for (const file of ['run-headless-portable-tests.mjs', 'test-data-dir.mjs']) {
+        await writeFile(path.join(root, 'scripts', file), await readFile(path.join(import.meta.dirname, file)));
+    }
+    await rm(path.join(root, 'scripts/check-headless-portable-imports.test.mjs'));
+    const alias = path.join(root, 'cli-alias');
+    await symlink(root, alias, 'junction');
+    const result = spawnSync(process.execPath, [path.join(alias, 'scripts/run-headless-portable-tests.mjs')], {
+        encoding: 'utf8',
+        env: { ...process.env, MEDIFLOW_DATA_DIR: path.join(root, 'data') },
+        timeout: 10000,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    assert.match(result.stderr, /scripts\/check-headless-portable-imports\.test\.mjs/u);
+    assert.equal(existsSync(path.join(root, 'data')), false);
+});
+
 test('preserves a failing child status for a complete selection', async (t) => {
     const root = await selectionFixture(t);
     const result = await runHeadlessPortableTests({
@@ -108,6 +126,22 @@ test('preserves a failing child status for a complete selection', async (t) => {
     });
     assert.equal(result.status, 23);
     assert.equal(result.error, null);
+});
+
+test('can be imported from stdin without treating the importing program as the CLI', () => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-'], {
+        encoding: 'utf8',
+        input: `import childProcess from 'node:child_process';
+            import { syncBuiltinESMExports } from 'node:module';
+            childProcess.spawnSync = () => { process.stderr.write('UNEXPECTED_CHILD'); return { status: 99, signal: null }; };
+            syncBuiltinESMExports();
+            await import(${JSON.stringify(new URL('./run-headless-portable-tests.mjs', import.meta.url).href)});
+            console.log('IMPORTED');`,
+        timeout: 10000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'IMPORTED');
+    assert.doesNotMatch(result.stderr, /UNEXPECTED_CHILD/u);
 });
 
 test('collects only sorted AIP, Mini, MCP, stdio MCP and Supervisor composition tests', async () => {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /* @Codex */
 import { readdir, stat } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -79,7 +80,18 @@ export async function runHeadlessPortableTests({
     return { status: result.status ?? 1, signal: result.signal ?? null, error: null };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+function isCliEntrypoint() {
+    if (!process.argv[1]) return false;
+    try {
+        return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+    } catch (error) {
+        // stdin/eval importers may name no real file; filesystem access errors still fail.
+        if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return false;
+        throw error;
+    }
+}
+
+if (isCliEntrypoint()) {
     const result = await runHeadlessPortableTests();
     process.exitCode = result.status;
     if (result.empty) {
