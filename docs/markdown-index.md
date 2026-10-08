@@ -52,6 +52,18 @@ candidatura e una prova storica non sono tre modi per dire «funzione pronta».
 Quando si aggiunge, rimuove o rinomina un `.md`, questo inventario e
 [docs/README.md](./README.md) vanno aggiornati insieme.
 
+## Audit di sicurezza pubblici
+
+I rapporti seguenti sono evidenze sanitizzate legate a revisioni esatte.
+`SECURITY.md` resta la policy canonica; un `FIX_VERIFIED` non implica merge,
+distribuzione o sicurezza generale.
+
+| File | Scopo | Quando consultarlo |
+| --- | --- | --- |
+| [security-audits/README.md](./security-audits/README.md) | Indice e regole editoriali dei rapporti pubblici di sicurezza. | Per trovare un audit, interpretarne lo stato o aggiungere un nuovo rapporto sanitizzato. |
+| [security-audits/2026-10-01-network-patient-authority-fix.md](./security-audits/2026-10-01-network-patient-authority-fix.md) | Finding F-01/F-02, correzione, revisione esatta, prove, provenienza e limiti della candidata locale. | Prima della composizione con PR 372 o di qualunque claim di correzione distribuita. |
+| [analysis/2026-09-07-086-daybreak-security-review.md](./analysis/2026-09-07-086-daybreak-security-review.md) | Review Daybreak storica della 0.8.6 e addenda sanitizzati. | Solo per la revisione e il perimetro storici indicati nel rapporto. |
+
 <!-- @Codex -->
 ## Consegna 0.8.6
 

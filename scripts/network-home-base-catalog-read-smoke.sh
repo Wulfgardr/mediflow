@@ -70,7 +70,6 @@ cleanup() {
     kill "$DEV_PID" >/dev/null 2>&1 || true
     wait "$DEV_PID" >/dev/null 2>&1 || true
   fi
-  node "$ROOT_DIR/scripts/wait-next-dev-telemetry.mjs" "$WORKSPACE_DIR/.next-network-smoke/dev"
   rm -rf "$WORKSPACE_DIR"
 }
 

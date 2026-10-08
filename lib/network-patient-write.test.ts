@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 
 import { ambulatories, patients, patientsToAmbulatories } from './schema';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-network-patient-write-'));
@@ -34,6 +35,8 @@ function bootstrapDatabase(): void {
 
 bootstrapDatabase();
 
+const cleanupCookies = installNetworkPatientCookieFixture(DATA_DIR, { cookies: new Map([['ambulatory_id', 'amb-write-scope']]) });
+test.after(() => { cleanupCookies(); dbServer.$client.close(); fs.rmSync(DATA_DIR, { recursive: true, force: true }); });
 const { dbServer } = await import('./db-server.ts');
 const { updateNetworkScopedPatient } = await import('./network-patient-write.ts');
 
@@ -41,13 +44,7 @@ const SCOPE_AMBULATORY = 'amb-write-scope';
 const PATIENT_ID = 'patient-write-1';
 
 function makeContext() {
-    return {
-        request: new Request('https://localhost/api/v1/network/patients/' + PATIENT_ID),
-        patientId: PATIENT_ID,
-        scopeAmbulatoryId: SCOPE_AMBULATORY,
-        pairedClient: { clientId: 'client-test' } as never,
-        session: { userId: 'user-test' } as never,
-    };
+    return { ...syntheticNetworkPatientAuthority(dbServer, SCOPE_AMBULATORY), patientId: PATIENT_ID };
 }
 
 function resetDatabase(): void {

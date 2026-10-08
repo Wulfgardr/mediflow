@@ -187,7 +187,7 @@ export function readBackupSchedulerStateFromValue(value: string | null | undefin
         return {
             version: BACKUP_SCHEDULER_STATE_VERSION,
             config: {
-                enabled: Boolean(config.enabled),
+                enabled: config.enabled === true,
                 hour: clampInteger(config.hour, 2, 0, 23),
                 minute: clampInteger(config.minute, 0, 0, 59),
                 destinationDir: sanitizeDestinationDir(config.destinationDir),

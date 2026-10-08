@@ -1,4 +1,5 @@
 import { types } from 'node:util';
+import { assertBackupAuditSnapshots, backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 /* @Codex */
@@ -39,11 +40,12 @@ export const BACKUP_COLLECTIONS = [
     'sissHandoffs',
     'checkups',
     'therapies',
+    'auditEvents',
 ] as const;
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+type AdditiveBackupCollection = 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -97,11 +99,18 @@ const PRE_PROSTHETICS_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectio
     ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS.map((collections) => collections.filter((collection) => collection !== 'exemptionImportReceipts')),
 ];
 /* @Codex Both repertory collections form one additive generation; partial omission is invalid. */
-const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+const AUDIT_ERA_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS,
     ...[BACKUP_COLLECTIONS, ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS].map(collections => collections.filter(
         collection => collection !== 'prostheticsCatalogEntries' && collection !== 'prostheticsCatalogReceipts')),
 ];
+const PRE_AUDIT_COLLECTIONS = BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents');
+const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ...AUDIT_ERA_LEGACY_COLLECTION_SETS,
+    ...[BACKUP_COLLECTIONS, ...AUDIT_ERA_LEGACY_COLLECTION_SETS]
+        .map(collections => collections.filter(collection => collection !== 'auditEvents')),
+];
+
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'attachments',
     'checkups',
@@ -164,7 +173,8 @@ export interface BackupArtifactManifest {
     checksumAlgorithm: 'sha256';
     checksum: string;
     collections: readonly BackupCollectionName[];
-    recordCounts: Record<BackupCollectionName, number>;
+    recordCounts: Record<Exclude<BackupCollectionName, 'auditEvents'>, number>
+        & Partial<Record<'auditEvents', number>>;
 }
 
 export interface BackupArtifact {
@@ -172,6 +182,13 @@ export interface BackupArtifact {
     version: typeof BACKUP_ARTIFACT_VERSION;
     manifest: BackupArtifactManifest;
     payload: BackupDataset;
+}
+
+const inputChecksums = new WeakMap<BackupArtifact, string>();
+
+/** Original input payload checksum before additive normalization; no authentication claim. */
+export function backupArtifactInputChecksum(artifact: BackupArtifact): string {
+    return inputChecksums.get(artifact) ?? artifact.manifest.checksum;
 }
 
 export type BackupArtifactErrorCode =
@@ -230,8 +247,8 @@ export function stableStringify(value: unknown): string {
     return JSON.stringify(normalizeJson(value));
 }
 
-function createEmptyCounts(): Record<BackupCollectionName, number> {
-    return Object.fromEntries(BACKUP_COLLECTIONS.map((collection) => [collection, 0])) as Record<BackupCollectionName, number>;
+function createEmptyCounts(collections: readonly BackupCollectionName[] = BACKUP_COLLECTIONS): Record<BackupCollectionName, number> {
+    return Object.fromEntries(collections.map((collection) => [collection, 0])) as Record<BackupCollectionName, number>;
 }
 
 export function createEmptyDataset(): BackupDataset {
@@ -759,6 +776,14 @@ async function assertCollectionReferences(
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);
     assertHeadlessSoapActiveRoleAttestationRows(payload, serialized);
     await assertHeadlessSoapEntryCommitRows(payload, serialized);
+    if (backupAuditCoverage(payload) === 'included') {
+        try {
+            const audits = canonicalizeBackupAuditRows(payload.auditEvents);
+            assertBackupAuditSnapshots(audits, (payload.headlessSoapEntryCommits ?? []).map(row => row.auditSnapshot));
+        } catch {
+            throw new BackupArtifactError('invalid-manifest', 'Backup audit rows, identities or H7b snapshots are invalid.');
+        }
+    }
 }
 
 /* @Codex Backup producers canonicalize the H2a-S collection after exact-row validation. */
@@ -777,17 +802,25 @@ function sortHeadlessSoapEntryCommits(rows: BackupRecord[]): BackupRecord[] {
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
     /* @Codex Existing v1 producers add the audit-dependent collections as empty until audit restore is separately contracted. */
     const currentPayload = { ...createEmptyDataset(), ...payload } as BackupDataset;
-    assertCollectionSet(currentPayload as Record<string, unknown>);
+    const collections = backupAuditCoverage(payload) === 'included' ? BACKUP_COLLECTIONS : PRE_AUDIT_COLLECTIONS;
+    if (backupAuditCoverage(payload) === 'omitted') delete currentPayload.auditEvents;
+    else {
+        try { currentPayload.auditEvents = currentPayload.auditEvents!.map(snapshotBackupAudit); }
+        catch { throw new BackupArtifactError('invalid-manifest', 'Backup audit snapshot is invalid.'); }
+    }
+    assertCollectionSet(currentPayload as Record<string, unknown>, collections);
     await assertCollectionReferences(currentPayload);
     const canonicalPayload = {
         ...currentPayload,
         exemptionImportReceipts: [...(currentPayload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
         headlessSoapActiveRoleAttestations: sortHeadlessSoapActiveRoleAttestations(currentPayload.headlessSoapActiveRoleAttestations),
         headlessSoapEntryCommits: sortHeadlessSoapEntryCommits(currentPayload.headlessSoapEntryCommits ?? []),
+        ...(backupAuditCoverage(currentPayload) === 'included'
+            ? { auditEvents: canonicalizeBackupAuditRows(currentPayload.auditEvents) } : {}),
     } as BackupDataset;
 
-    const recordCounts = createEmptyCounts();
-    for (const collection of BACKUP_COLLECTIONS) {
+    const recordCounts = createEmptyCounts(collections);
+    for (const collection of collections) {
         recordCounts[collection] = canonicalPayload[collection]?.length ?? 0;
     }
 
@@ -802,7 +835,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
             createdAt: createdAt.toISOString(),
             checksumAlgorithm: 'sha256',
             checksum,
-            collections: [...BACKUP_COLLECTIONS],
+            collections: [...collections],
             recordCounts,
         },
         payload: canonicalPayload,
@@ -845,7 +878,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
     const legacyCollections = LEGACY_COLLECTION_SETS.find((collections) => hasCollectionSet(payload, collections));
     const expectedCollections = legacyCollections ?? BACKUP_COLLECTIONS;
     const missingLegacyCollections = legacyCollections
-        ? BACKUP_COLLECTIONS.filter((collection) => !legacyCollections.includes(collection))
+        ? BACKUP_COLLECTIONS.filter((collection) => collection !== 'auditEvents' && !legacyCollections.includes(collection))
         : [];
     const expectedPatientDependentCollections = PATIENT_DEPENDENT_COLLECTIONS.filter(
         (collection) => expectedCollections.includes(collection),
@@ -875,7 +908,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         throw new BackupArtifactError('checksum-mismatch', 'Backup checksum does not match the payload.');
     }
 
-    /* @Codex Legacy v1 artifacts are authenticated in their original form before this additive normalization. */
+    // Checksum verifies the original payload before normalization; it does not authenticate its source.
     const normalizedPayload = legacyCollections
         ? { ...payload, ...Object.fromEntries(missingLegacyCollections.map((collection) => [collection, []])) } as BackupDataset
         : payload as BackupDataset;
@@ -886,7 +919,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
         ? await sha256Hex(stableStringify(normalizeJson(normalizedPayload)))
         : manifest.checksum;
 
-    return {
+    const normalized: BackupArtifact = {
         format: BACKUP_ARTIFACT_FORMAT,
         version: BACKUP_ARTIFACT_VERSION,
         manifest: {
@@ -894,9 +927,11 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
             createdAt: manifest.createdAt,
             checksumAlgorithm: 'sha256',
             checksum: normalizedChecksum,
-            collections: [...BACKUP_COLLECTIONS],
+            collections: [...(backupAuditCoverage(payload) === 'included' ? BACKUP_COLLECTIONS : PRE_AUDIT_COLLECTIONS)],
             recordCounts: normalizedRecordCounts,
         },
         payload: normalizedPayload,
     };
+    inputChecksums.set(normalized, manifest.checksum);
+    return normalized;
 }
