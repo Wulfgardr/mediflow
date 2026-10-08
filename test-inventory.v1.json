@@ -6619,141 +6619,181 @@
     {
       "path": "packages/aip/src/authenticated-ipc.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/checkup-status-transition-ipc.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/checkup-status-transition.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/operation-rpc.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/owner-broker.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/patient-open-loops-follow-up-proposal.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/patient-open-loops.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/portable-supervisor-context-mirror.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/portable-supervisor-web-control.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/portable-supervisor-web-ipc-contract.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/semantic-query-executor.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/semantic-query-operation.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/semantic-query-plan.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/aip/src/terminology-search.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/mcp/src/contracts.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/mcp/src/import-boundary.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/mini/src/cli.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/mini/src/headless-referential-status.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/mini/src/protocol.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
       "path": "packages/mini/src/session.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
@@ -7159,8 +7199,10 @@
     {
       "path": "scripts/check-headless-portable-imports.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
@@ -7403,8 +7445,10 @@
     {
       "path": "scripts/intelligent-host-mcp-stdio.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
@@ -7479,8 +7523,10 @@
     {
       "path": "scripts/mediflow-headless-supervisor-athena.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {
@@ -7813,8 +7859,10 @@
     {
       "path": "scripts/run-headless-portable-tests.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:headless-portable"
+        ]
       }
     },
     {

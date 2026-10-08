@@ -75,6 +75,22 @@ A preceding step may fail, a condition
 may not hold, and assertions may still skip or be empty. Those require execution
 receipts and further review.
 
+The Headless model, `npm:test:headless-portable`, calls the real asynchronous
+`collectHeadlessPortableTests` selector shared with the portable runner. Each of
+the AIP, Mini and MCP package groups must contain tests; all four explicit script
+tests must be files. A missing, empty or unreadable required group fails before
+the runner acquires a data directory or launches a child. The inventory calls
+only the selector, preserving its ordering and avoiding a second path list.
+Importing the runner checks its CLI entrypoint with `realpath` reads but does not
+launch a suite or acquire/clean a data directory.
+
+The Headless npm command must remain exactly
+`node scripts/run-headless-portable-tests.mjs`, with one literal call in the
+`headless-contracts` CI job. It uses the same binding guards as the five explicit
+npm models above. The inventory awaits selection and keeps the required suite
+present with errors and no selected files if either binding or selection fails.
+This adds static selector coverage, not proof of assertions or installed targets.
+
 Tests outside these models retain `unresolved` selection records, including tests
 with separate existing commands or CI callers. `unresolved` means this guard has
 not verified a selector binding; it does not mean the file is orphaned or optional.
