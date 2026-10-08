@@ -211,6 +211,22 @@ test('configuration can import the contract without dependencies or persistent a
   } finally { f.cleanup(); }
 });
 
+test('CommonJS configuration can synchronously require the contract without running the CLI or probe', () => {
+  const f = fixture();
+  try {
+    const contract = path.join(f.dir, 'contract.mjs');
+    fs.copyFileSync(path.join(sourceRoot, 'scripts/scheduled-backup-runtime-contract.mjs'), contract);
+    const run = spawnSync(process.execPath, ['--permission', `--allow-fs-read=${f.dir}`,
+      '--input-type=commonjs', '-e',
+      `const m = require(${JSON.stringify(contract)}); console.log(JSON.stringify({ sources: m.SCHEDULED_BACKUP_RUNTIME_ROSTER.length, includes: m.SCHEDULED_BACKUP_TRACING_INCLUDES.length, check: typeof m.assertScheduledBackupRuntime }));`], {
+      cwd: f.dir, env: { NODE_ENV: 'test' }, encoding: 'utf8', timeout: 5000,
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.deepEqual(JSON.parse(run.stdout), { sources: 8, includes: 27, check: 'function' });
+    assert.deepEqual(fs.readdirSync(f.dir).sort(), ['contract.mjs', 'payload']);
+  } finally { f.cleanup(); }
+});
+
 test('scratch probe guard: timeout waits for its owned import process to close', async () => {
   const f = fixture();
   try {
