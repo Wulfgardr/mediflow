@@ -54,12 +54,18 @@ function checkYamlTree(value, ancestors = new Set()) {
   for (const child of Object.values(value)) checkYamlTree(child, next);
 }
 
-function npmRunBlock(run) {
+function npmRunBlock(run, selfTestCall) {
   if (typeof run !== 'string') return null;
   const commands = [];
   for (const raw of run.split(/\r?\n/u)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
+    // Only the declared self-test invocation may carry arguments. Other lines
+    // retain the closed no-arguments grammar used by existing bindings.
+    if (selfTestCall && line === `npm run ${selfTestCall}`) {
+      commands.push(selfTestCall);
+      continue;
+    }
     const match = /^npm run ([A-Za-z0-9_][A-Za-z0-9:_-]*)$/u.exec(line);
     if (!match) return null;
     commands.push(match[1]);
@@ -92,12 +98,14 @@ function ciBinding(root, suite) {
   const job = workflow?.jobs?.[suite.job];
   if (!object(workflow) || !object(job) || !Array.isArray(job.steps)) throw new Error(`Missing CI job: ${suite.job}`);
   const matches = [];
+  const selfTestCall = suite.selfTest === true ? `${suite.script} -- --self-test` : null;
+  const expectedCall = selfTestCall ?? suite.script;
   job.steps.forEach((step, index) => {
     if (!object(step)) return;
-    const commands = npmRunBlock(step.run);
-    for (const command of commands ?? []) if (command === suite.script) matches.push({ step, index, commands });
+    const commands = npmRunBlock(step.run, selfTestCall);
+    for (const command of commands ?? []) if (command === expectedCall) matches.push({ step, index, commands });
   });
-  if (matches.length !== 1) throw new Error(`Expected exactly one literal CI call: ${suite.script}; found ${matches.length}`);
+  if (matches.length !== 1) throw new Error(`Expected exactly one literal CI call: ${expectedCall}; found ${matches.length}`);
   const { step, index, commands } = matches[0];
   if (step.uses !== undefined) throw new Error('CI binding cannot combine uses and run');
   for (const [label, owner] of [['job', job], ['step', step]]) {
@@ -129,6 +137,21 @@ export function collectNpmScriptBinding(root, suite, expectedCommand) {
     throw new Error(`Required npm command changed or missing: ${suite.script}`);
   }
   return ciBinding(root, suite);
+}
+
+/** Model the Claims guard's declared self-test entrypoint without importing it. */
+export function collectClaimsSelfTestSelection(root) {
+  const file = 'scripts/check-claims-guard.mjs';
+  try {
+    regularFile(root, file);
+    const binding = collectNpmScriptBinding(root, {
+      script: 'check:claims', workflow: '.github/workflows/openapi-contract-guard.yml',
+      job: 'repository-guards', selfTest: true,
+    }, `node ${file}`);
+    return { files: [file], errors: [], binding };
+  } catch (error) {
+    return { files: [], errors: [error.message], binding: null };
+  }
 }
 
 /** Required suites stay present with errors; invalid bindings never promote files. */

@@ -7176,8 +7176,10 @@
     {
       "path": "scripts/check-claims-guard.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:check:claims:self-test"
+        ]
       }
     },
     {
@@ -7361,6 +7363,13 @@
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "scripts/explicit-npm-test-selection.mjs",
+      "selection": {
+        "state": "unresolved",
+        "reason": "Self-test argument literal is an inclusive discovery signal in this selector adapter. This helper candidate is not assigned an executable test suite; semantic classification and C14 acceptance remain unassessed."
       }
     },
     {

@@ -104,6 +104,10 @@ function fixture(t, withDebt = false) {
   }
   pkg.scripts['test:headless-portable'] = 'node scripts/run-headless-portable-tests.mjs';
   workflows['.github/workflows/cross-platform.yml'].jobs['headless-contracts'].steps.push({ run: 'npm run test:headless-portable' });
+  fs.writeFileSync(path.join(root, 'scripts/check-claims-guard.mjs'), 'throw new Error("Claims --self-test must not execute during inventory");');
+  entries.push({ path: 'scripts/check-claims-guard.mjs', selection: { state: 'mapped', suiteIds: ['npm:check:claims:self-test'] } });
+  pkg.scripts['check:claims'] = 'node scripts/check-claims-guard.mjs';
+  workflows['.github/workflows/openapi-contract-guard.yml'].jobs['repository-guards'].steps.push({ run: 'npm run check:claims\nnpm run check:claims -- --self-test' });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
   for (const [file, workflow] of Object.entries(workflows)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -255,6 +259,20 @@ test('required npm binding errors propagate through CLI without disappearing fro
   assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:launcher-helpers/);
   assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:native-launcher/);
   assert.match(result.stdout, /Inventory integrity: FAIL/);
+  assert.match(result.stdout, /C14 acceptance: NOT_ASSESSED/);
+});
+
+test('Claims self-test binding is required by the real inventory CLI independently of the ordinary scan', t => {
+  const root = fixture(t);
+  assert.equal(run(root, 'complete').status, 0);
+  const file = path.join(root, '.github/workflows/openapi-contract-guard.yml');
+  const workflow = JSON.parse(fs.readFileSync(file));
+  workflow.jobs['repository-guards'].steps.at(-1).run = 'npm run check:claims';
+  fs.writeFileSync(file, JSON.stringify(workflow));
+  const result = run(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:check:claims:self-test/);
+  assert.match(result.stderr, /MAPPED_NOT_SELECTED: npm:check:claims:self-test: scripts\/check-claims-guard.mjs/);
   assert.match(result.stdout, /C14 acceptance: NOT_ASSESSED/);
 });
 

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { checkInventory } from './test-inventory.mjs';
 
@@ -13,6 +13,9 @@ const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const target = 'test:launcher-helpers';
 const suiteId = `npm:${target}`;
 const workflowPath = '.github/workflows/cross-platform.yml';
+const claimsFile = 'scripts/check-claims-guard.mjs';
+const claimsWorkflow = '.github/workflows/openapi-contract-guard.yml';
+const claimsCall = 'npm run check:claims -- --self-test';
 
 function write(root, file, value) {
   fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -49,6 +52,113 @@ function rejected(root, pattern) {
   assert.equal(result[suiteId].binding, null);
   assert.match(result[suiteId].errors.join('\n'), pattern);
 }
+
+function claimsFixture(t) {
+  const root = fixture(t);
+  write(root, claimsFile, 'throw new Error("Claims guard must not execute");');
+  change(root, 'package.json', pkg => { pkg.scripts['check:claims'] = `node ${claimsFile}`; });
+  change(root, claimsWorkflow, workflow => {
+    workflow.jobs['repository-guards'].steps.push({ run: `npm run check:claims\n${claimsCall}` });
+  });
+  return root;
+}
+function claimsChange(root, mutate) {
+  change(root, claimsWorkflow, workflow => {
+    const job = workflow.jobs['repository-guards']; mutate(job, job.steps.at(-1));
+  });
+}
+function claimsRejected(root, pattern) {
+  const selection = collectClaimsSelfTestSelection(root);
+  assert.deepEqual(selection.files, []); assert.equal(selection.binding, null);
+  assert.match(selection.errors.join('\n'), pattern);
+}
+
+test('Claims self-test selects the actual guard and records the argument-bearing CI call separately', () => {
+  const selection = collectClaimsSelfTestSelection(sourceRoot);
+  assert.deepEqual(selection.files, [claimsFile]);
+  assert.deepEqual(selection.errors, []);
+  assert.deepEqual(selection.binding.commands, ['check:claims', 'check:claims -- --self-test']);
+  assert.equal(selection.binding.job, 'repository-guards');
+  assert.equal(selection.binding.stepIf, "${{ !cancelled() && steps.install.outcome == 'success' }}");
+});
+
+test('Claims self-test requires its exact arguments once and rejects ordinary scans or shell mentions', t => {
+  for (const run of [undefined, 'npm run check:claims', 'npm run check:claims --self-test',
+    'npm run check:claims -- --selftest', `${claimsCall} --filter=one`, `${claimsCall} || true`,
+    `# ${claimsCall}`, `echo ${claimsCall}`, `if true; then\n${claimsCall}\nfi`,
+    `cat <<EOF\n${claimsCall}\nEOF`, `${claimsCall}\nexit 0`, `${claimsCall}\n${claimsCall}`,
+    `${claimsCall}\nnpm run check:other -- --self-test`,
+  ]) {
+    const root = claimsFixture(t);
+    claimsChange(root, (job, step) => { step.run = run; });
+    claimsRejected(root, /exactly one literal CI call/);
+  }
+  const root = claimsFixture(t);
+  claimsChange(root, job => { job.steps.push({ run: claimsCall }); });
+  claimsRejected(root, /found 2/);
+});
+
+test('Claims self-test missing or changed npm entrypoint never promotes the guard file', t => {
+  for (const command of [undefined, '', `node ${claimsFile} --filter=one`, `node ${claimsFile} || true`]) {
+    const root = claimsFixture(t);
+    change(root, 'package.json', pkg => { pkg.scripts['check:claims'] = command; });
+    claimsRejected(root, /Required npm command changed or missing/);
+  }
+});
+
+test('Claims self-test rejects missing, nonregular or out-of-root guard paths', t => {
+  for (const mutate of [
+    root => fs.unlinkSync(path.join(root, claimsFile)),
+    root => { fs.unlinkSync(path.join(root, claimsFile)); fs.mkdirSync(path.join(root, claimsFile)); },
+    root => {
+      const outside = claimsFixture(t);
+      fs.rmSync(path.join(root, 'scripts'), { recursive: true });
+      fs.symlinkSync(path.join(outside, 'scripts'), path.join(root, 'scripts'), process.platform === 'win32' ? 'junction' : 'dir');
+    },
+  ]) {
+    const root = claimsFixture(t); mutate(root);
+    claimsRejected(root, /ENOENT|Not a regular file|Path escapes root/);
+  }
+});
+
+test('Claims argument-bearing call retains CI disabled, failure and execution-context guards', t => {
+  for (const level of ['job', 'step']) for (const [key, value] of [
+    ['if', false], ['continue-on-error', true], ['working-directory', 'other'], ['shell', 'python {0}'],
+  ]) {
+    const root = claimsFixture(t);
+    claimsChange(root, (job, step) => {
+      if (level === 'job' && ['working-directory', 'shell'].includes(key)) job.defaults = { run: { [key]: value } };
+      else (level === 'job' ? job : step)[key] = value;
+    });
+    claimsRejected(root, /Disabled|Unsupported|repository root/);
+  }
+});
+
+test('Claims collection neither reads or imports guard code nor scans directories or launches children', t => {
+  const root = claimsFixture(t);
+  const source = `
+import fs from 'node:fs';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+const forbidden = () => { throw new Error('UNEXPECTED_CLAIMS_EXECUTION_OR_SCAN'); };
+const read = fs.readFileSync;
+fs.readFileSync = (file, ...args) => {
+  if (String(file).endsWith('check-claims-guard.mjs')) forbidden();
+  return read(file, ...args);
+};
+fs.readdirSync = forbidden;
+for (const name of ['spawn', 'spawnSync', 'exec', 'execSync', 'execFile', 'execFileSync']) childProcess[name] = forbidden;
+syncBuiltinESMExports();
+const { collectClaimsSelfTestSelection } = await import(${JSON.stringify(new URL('./explicit-npm-test-selection.mjs', import.meta.url).href)});
+const result = collectClaimsSelfTestSelection(${JSON.stringify(root)});
+if (result.errors.length) throw new Error(result.errors.join('\\n'));
+console.log(JSON.stringify(result.files));`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-'], {
+    input: source, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), [claimsFile]);
+});
 
 test('five required npm script bodies and CI bindings select the actual independent expected paths', () => {
   const actual = collectExplicitNpmSelections(sourceRoot);
