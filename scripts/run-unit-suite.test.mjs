@@ -64,25 +64,37 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 const args = process.argv.slice(2);
 fs.writeFileSync('selected-args.json', JSON.stringify(args));
-const files = args.filter(arg => arg.endsWith('.test.mjs') && fs.existsSync(arg));
+const files = args.filter(arg => /\\.test\\.(?:mjs|ts)$/.test(arg) && fs.existsSync(arg));
 if (!files.length) process.exit(0);
 const env = { ...process.env };
 for (const key of Object.keys(env)) if (key.startsWith('NODE_TEST')) delete env[key];
-const result = spawnSync(process.execPath, ['--test', ...files], { env, stdio: 'inherit' });
+const result = spawnSync(process.execPath, ['--experimental-strip-types', '--test', ...files], { env, stdio: 'inherit' });
 process.exit(result.status ?? 1);
 `);
-  fs.writeFileSync(path.join(value.sandbox, 'scripts', testFile), `
+  const testPath = path.join(value.sandbox, 'scripts', testFile);
+  fs.mkdirSync(path.dirname(testPath), { recursive: true });
+  fs.writeFileSync(testPath, `
 import fs from 'node:fs';
 import test from 'node:test';
 test('synthetic selected regression', () => {
-  fs.appendFileSync('selected-test-ran', 'once\\n');
+  const marker${testFile.endsWith('.ts') ? ': string' : ''} = 'once\\n';
+  fs.appendFileSync('selected-test-ran', marker);
   if (process.env.TEST_SELECTED_REGRESSION_FAIL === '1') throw new Error('seeded selected regression failure');
 });
 `);
   return value;
 }
 
-for (const testFile of ['run-unit-suite.test.mjs', 'run-strip-types.test.mjs', 'check-motion-budget.test.mjs', 'node-runtime-contract.test.mjs']) {
+for (const testFile of [
+  'run-unit-suite.test.mjs',
+  'run-strip-types.test.mjs',
+  'check-motion-budget.test.mjs',
+  'node-runtime-contract.test.mjs',
+  'chatgpt-account/account-service.test.ts',
+  'chatgpt-account/account-browser.test.ts',
+  'chatgpt-account/account-session-http.test.ts',
+  'chatgpt-account/account-transport.test.ts',
+]) {
   test(`default unit selection executes ${testFile} exactly once`, () => {
     const value = defaultSelectionFixture(testFile);
     try {
