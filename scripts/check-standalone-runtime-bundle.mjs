@@ -1044,10 +1044,12 @@ if (!fs.existsSync(runtimeContractPath)) {
 }
 
 const runtimeContract = JSON.parse(fs.readFileSync(runtimeContractPath, 'utf8'));
-const currentRuntime = assertNodeRuntime(readNodeContract(root));
-if (runtimeContract.node?.moduleVersion !== currentRuntime.moduleVersion ||
+const nodeContract = readNodeContract(root);
+const currentRuntime = assertNodeRuntime(nodeContract);
+if (runtimeContract.schemaVersion !== 1 || runtimeContract.node?.major !== nodeContract.major ||
+    runtimeContract.node?.moduleVersion !== currentRuntime.moduleVersion ||
     runtimeContract.platform !== process.platform || runtimeContract.arch !== process.arch) {
-  console.error(`Standalone runtime ABI/platform mismatch: built ${runtimeContract.node?.version}/${runtimeContract.node?.moduleVersion} ${runtimeContract.platform}-${runtimeContract.arch}, checking ${process.versions.node}/${process.versions.modules} ${process.platform}-${process.arch}.`);
+  console.error(`Standalone runtime ABI/platform mismatch: schema ${runtimeContract.schemaVersion}, Node major ${runtimeContract.node?.major}; built ${runtimeContract.node?.version}/${runtimeContract.node?.moduleVersion} ${runtimeContract.platform}-${runtimeContract.arch}, checking schema 1, Node major ${nodeContract.major}, ${process.versions.node}/${process.versions.modules} ${process.platform}-${process.arch}.`);
   process.exit(1);
 }
 

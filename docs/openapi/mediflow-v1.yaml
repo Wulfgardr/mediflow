@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.29.0
+  version: 1.30.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -173,6 +173,7 @@ paths:
         '503':
           description: Configuration unavailable or corrupt; no fallback.
   /api/v1/patients:
+    # Existing POST remains outside the stable spec; patient body contract: ADR 0139.
     get:
       tags:
         - Patients
@@ -231,6 +232,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Patients
       operationId: updatePatient
@@ -281,9 +283,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
+      x-mediflow-json-max-bytes: 4194304
       tags:
         - Patients
       operationId: deletePatient
@@ -330,6 +335,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PatientVersionConflict'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/node:
@@ -2073,7 +2080,8 @@ paths:
         contract. The route requires a paired client with
         `network.replica.write-patient-profile`, an active operator session,
         and the effective ambulatory scope resolved by the home-base node.
-        AI/document-derived fields, child clinical CRUD, remote delete, and
+        AI/document-derived fields (including aiSummaryGeneratedAt and
+        aiSummaryContextHash), child clinical CRUD, remote delete, and
         sync queues remain outside this first write boundary.
       security:
         - pairedClientId: []

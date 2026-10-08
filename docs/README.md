@@ -77,6 +77,13 @@ sostituisce il runtime.
 token per provider, modello ed effort registrato, con fonti, dati aggregati e
 limiti di attribuzione. Non descrive i consumi del runtime clinico.
 
+## Audit di sicurezza pubblici
+
+L’[indice degli audit di sicurezza](./security-audits/README.md) raccoglie
+rapporti sanitizzati riferiti a revisioni esatte. `SECURITY.md` resta la policy
+canonica; un rapporto registra prove e limiti del proprio perimetro e non
+certifica la sicurezza generale, la distribuzione o l’idoneità clinica.
+
 ## Preferenze modello per esperienza
 
 La scelta utile non è «quale AI per tutto», ma quale strumento ammesso usare
@@ -272,6 +279,7 @@ installato, clinicamente qualificato o pubblicato.
 | Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Distingue la release sorgente 0.8.6 pubblicata, i contratti implementativi e le prove storiche con i propri SHA; mantiene aperta la decisione sul deployment clinico. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Spiega perché dati, interfacce e funzioni intelligenti abbiano responsabilità separate, fissando i principi stabili. |
 | Sicurezza e oscuramento dei dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Definisce minacce considerate, protezione dei dati, oscuramento degli identificativi e limiti di log e audit. |
+| Indice degli audit di sicurezza pubblici | [docs/security-audits/README.md](./security-audits/README.md) | `CANONICAL / INDEX` | Elenca rapporti sanitizzati legati a revisioni esatte. I rapporti sono evidenze secondarie e non prevalgono su SECURITY, ADR o contratti API. |
 | Lifecycle Web P3 per logout, PIN e setup | [docs/adr/0106-web-auth-logout-pin-setup-lifecycle.md](./adr/0106-web-auth-logout-pin-setup-lifecycle.md) | `CANONICAL / ACCEPTED` | Prevale sul lifecycle P3 incompatibile: logout esatto senza mutare cookie, retirement user-scoped dopo CAS PIN e setup commit-last; non prova runtime o reset PIN. |
 | Piano canonico Headless read-only 0.8.5 | [docs/adr/0108-piano-canonico-headless-read-only-085.md](./adr/0108-piano-canonico-headless-read-only-085.md) | `CANONICAL / ACCEPTED` | Interpreta `66/66` come 66 esiti terminali fail-closed; i 32 GET network restano evidence candidate e non operation grant. |
 | Integrita del processo per l'auth web H1a | [docs/adr/0105-web-auth-process-integrity-assumption.md](./adr/0105-web-auth-process-integrity-assumption.md) | `CANONICAL / ACCEPTED` | Fissa l'assunzione process-global, il residuo di disponibilita e i gate H1b/security; non prova la catena auth completa. |

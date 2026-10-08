@@ -1,0 +1,534 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/Wulfgardr/mediflow",
+  "sourceCommit": "90fa7771fc0822475611c9affb9c22e212939399",
+  "scope": "Due esempi del codice: lettura headless delle attività e conferma Web di una transizione checkup.",
+  "limits": [
+    "Mappa curata di relazioni nel sorgente, non tracciamento del runtime.",
+    "Un import attesta una dipendenza nel codice, non esecuzione, raggiungibilità o autorizzazione.",
+    "Nessun dato clinico, collegamento a MediFlow o modello AI in questa pagina.",
+    "Non copre Fabric, tutti i percorsi UI, tutti i writer o una valutazione delle protezioni."
+  ],
+  "nodes": [
+    {
+      "id": "mcp",
+      "label": "Ingresso agenti · MCP",
+      "group": "surface",
+      "x": 95,
+      "y": 70,
+      "summary": "Espone operazioni nominate a un client agente, attraverso un canale mediato.",
+      "questions": {
+        "data": "Le richieste passano al client RPC; questo ingresso non espone un database al client.",
+        "authority": "Il catalogo distingue letture e proposte. Il tool checkup prepara una transizione da confermare nel Web.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Compatibilità e collegamento con un host esterno non sono dimostrati dalla mappa.",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/server.ts",
+          "anchor": "export async function createUsefulMcpServer()"
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "label": "Terminale · Mini",
+      "group": "surface",
+      "x": 95,
+      "y": 200,
+      "summary": "Traduce comandi circoscritti del terminale negli stessi metodi del client RPC.",
+      "questions": {
+        "data": "I comandi raggiungono il client RPC, fra cui ricerca terminologica e lettura delle attività.",
+        "authority": "Il protocollo elenca i comandi ammessi. Un comando non concede accesso diretto a SQLite.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Mini è un percorso di sviluppo; la presenza del protocollo non qualifica una distribuzione.",
+      "evidence": [
+        {
+          "path": "packages/mini/src/protocol.ts",
+          "anchor": "export function executeMiniRequest("
+        }
+      ]
+    },
+    {
+      "id": "client",
+      "label": "Canale verso l’host",
+      "group": "transport",
+      "x": 290,
+      "y": 125,
+      "summary": "Invia richieste sul collegamento ereditato dal processo padre e ne controlla le risposte.",
+      "questions": {
+        "data": "Il codice usa messaggi IPC, con limiti di dimensione e scadenza delle richieste.",
+        "authority": "In assenza del collegamento previsto il client rifiuta la richiesta con host_unbound.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non è una cattura di messaggi reali né una prova della configurazione corrente.",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/operation-client.ts",
+          "anchor": "export function createOperationClient()"
+        }
+      ]
+    },
+    {
+      "id": "composition",
+      "label": "Composizione dell’host",
+      "group": "host",
+      "x": 290,
+      "y": 285,
+      "summary": "Coordina i processi e compone i servizi dell’host che li collega.",
+      "questions": {
+        "data": "Il Supervisor collega Web e processo agente su IPC ereditato.",
+        "authority": "La composizione fornisce contesto e servizi al launcher; la chiusura revoca il collegamento.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "La mappa non prova avvio, installazione o disponibilità dei servizi.",
+      "evidence": [
+        {
+          "path": "lib/security/portable-supervisor-production.ts",
+          "anchor": "export function createPortableSupervisorProductionRuntimeV1("
+        },
+        {
+          "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+          "anchor": "function createProductionLauncher("
+        }
+      ]
+    },
+    {
+      "id": "launcher",
+      "label": "Sessione e operazioni",
+      "group": "policy",
+      "x": 485,
+      "y": 125,
+      "summary": "Associa sessione, ambito e operazioni ai servizi nominati dell’host.",
+      "questions": {
+        "data": "Il catalogo RPC collega la lettura delle attività al servizio Open Loops.",
+        "authority": "Prima della lettura viene richiesto un permesso al broker. Il checkup headless resta proposal_only.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Le operazioni rappresentate sono un campione, non il catalogo completo.",
+      "evidence": [
+        {
+          "path": "lib/headless/authenticated-agent-launcher.ts",
+          "anchor": "export function createAuthenticatedAgentLauncherV1("
+        }
+      ]
+    },
+    {
+      "id": "broker",
+      "label": "Regole e permessi · AIP",
+      "group": "policy",
+      "x": 680,
+      "y": 60,
+      "summary": "Controlla ambito, durata, revoca e budget dei permessi dell’agente.",
+      "questions": {
+        "data": "Il broker lega i permessi a riferimenti e ambito della sessione.",
+        "authority": "Può rifiutare permessi scaduti, revocati, riusati o incoerenti. Un collegamento nella mappa non concede un permesso.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Questa vista del sorgente non è una verifica indipendente delle protezioni.",
+      "evidence": [
+        {
+          "path": "packages/aip/src/owner-broker.ts",
+          "anchor": "export type AipOwnerBrokerV1ErrorCode"
+        }
+      ]
+    },
+    {
+      "id": "rpc",
+      "label": "Operazioni RPC nominate",
+      "group": "transport",
+      "x": 680,
+      "y": 205,
+      "summary": "Riceve richieste per operazioni del catalogo, con uno stadio massimo dichiarato.",
+      "questions": {
+        "data": "Ogni definizione contiene un servizio nominato e una funzione execute.",
+        "authority": "Il tipo distingue read_only e proposal_only; il trasporto non attribuisce autorità clinica generale.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Una definizione nel catalogo non dimostra esecuzione o ammissione in produzione.",
+      "evidence": [
+        {
+          "path": "packages/aip/src/operation-rpc.ts",
+          "anchor": "type Metadata = Readonly<"
+        }
+      ]
+    },
+    {
+      "id": "openloops",
+      "label": "Regole della lettura",
+      "group": "service",
+      "x": 680,
+      "y": 340,
+      "summary": "Prepara una lettura circoscritta delle attività da seguire, con controlli e ricevuta.",
+      "questions": {
+        "data": "Legge attraverso le fonti fornite dall’host; controlla la validità del contesto e registra l’esito.",
+        "authority": "La ricevuta di questo percorso dichiara writesPerformed: 0.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Copre soltanto la lettura Open Loops rappresentata.",
+      "evidence": [
+        {
+          "path": "packages/aip/src/patient-open-loops.ts",
+          "anchor": "export function createPatientOpenLoopsReadServiceV1("
+        },
+        {
+          "path": "packages/aip/src/patient-open-loops.ts",
+          "anchor": "writesPerformed: 0 as const"
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "label": "Lettore dati dell’host",
+      "group": "host",
+      "x": 880,
+      "y": 335,
+      "summary": "Collega il servizio di lettura ai dati e alle regole locali dell’host.",
+      "questions": {
+        "data": "Legge osservazioni e prestazioni da SQLite e deriva una proiezione delle attività.",
+        "authority": "Fornisce al servizio contesto, permessi e audit; non trasferisce il database al client agente.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non descrive tutti i lettori e gli scrittori dell’app.",
+      "evidence": [
+        {
+          "path": "lib/security/patient-open-loops-read-production.ts",
+          "anchor": "export function createPatientOpenLoopsReadInternalCandidateV1("
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "label": "Database locale · SQLite",
+      "group": "storage",
+      "x": 880,
+      "y": 495,
+      "summary": "Apre SQLite sul server e lo espone attraverso il livello dati.",
+      "questions": {
+        "data": "Il percorso persistente usa medical.db; la raccolta dati della build usa memoria.",
+        "authority": "Avere un import del livello dati non equivale ad avere autorizzazione a una scrittura clinica.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "La mappa non prova cifratura dell’intero file, contenuto, backup o idoneità clinica.",
+      "evidence": [
+        {
+          "path": "lib/db-server.ts",
+          "anchor": "let sqlite = new Database(dbPath);"
+        },
+        {
+          "path": "lib/db-server.ts",
+          "anchor": "const dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');"
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "label": "Conferma nel Web",
+      "group": "surface",
+      "x": 95,
+      "y": 495,
+      "summary": "Permette al professionista di rileggere e confermare una proposta sul checkup.",
+      "questions": {
+        "data": "L’adapter del browser invia richieste alla route della proposta selezionata.",
+        "authority": "La conferma esplicita richiede il PIN e resta distinta dall’anteprima preparata dall’agente.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "È un esempio preciso: non descrive tutte le modifiche cliniche.",
+      "evidence": [
+        {
+          "path": "components/intelligent-host-checkup-action.tsx",
+          "anchor": "export function IntelligentHostCheckupAction("
+        },
+        {
+          "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+          "anchor": "candidatePin"
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "label": "Route della proposta",
+      "group": "transport",
+      "x": 290,
+      "y": 495,
+      "summary": "Collega lettura e conferma della proposta ai servizi Web autenticati.",
+      "questions": {
+        "data": "La route passa la conferma al servizio Web, senza implementare da sola la scrittura.",
+        "authority": "La composizione legge la sessione Web autenticata e usa un servizio nominato di conferma.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "La sola presenza della route non prova il percorso completo con un utente reale.",
+      "evidence": [
+        {
+          "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+          "anchor": "export const POST = handlers.confirm;"
+        }
+      ]
+    },
+    {
+      "id": "webowner",
+      "label": "Revisione e gesto esplicito",
+      "group": "policy",
+      "x": 485,
+      "y": 495,
+      "summary": "Rilegge contesto e proposta, poi lega la conferma al gesto specifico della UI.",
+      "questions": {
+        "data": "La conferma passa all’owner Web, che compone il servizio di transizione.",
+        "authority": "Contesto corrente, ruolo e PIN sono controllati prima della conferma; la proof resta nel server.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Questa mappa non valuta l’efficacia clinica della decisione.",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-web-production.ts",
+          "anchor": "export async function confirmCheckupStatusTransitionProposalV1("
+        },
+        {
+          "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1"
+        }
+      ]
+    },
+    {
+      "id": "writer",
+      "label": "Servizio di transizione",
+      "group": "service",
+      "x": 680,
+      "y": 495,
+      "summary": "Compone la transizione del checkup con una prova di conferma a durata limitata.",
+      "questions": {
+        "data": "Il servizio usa un adapter di persistenza distinto dal trasporto Web.",
+        "authority": "Le prove hanno durata e stato; il servizio collega il risultato alla persistenza controllata.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non conferisce all’agente un metodo di commit.",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-production.ts",
+          "anchor": "const PROOF_TTL_MS = 30_000;"
+        },
+        {
+          "path": "lib/security/headless-checkup-status-transition-production.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionStorageV1"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "label": "Scrittura e ricevuta",
+      "group": "storage",
+      "x": 880,
+      "y": 630,
+      "summary": "Aggiorna lo stato del checkup in una transazione, con controllo di versione, audit e ricevuta.",
+      "questions": {
+        "data": "Il livello di persistenza accede al database locale tramite dbServer.",
+        "authority": "La scrittura controlla la versione attesa e gestisce l’idempotenza; la mappa mostra questo solo writer.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non è una prova di esecuzione o di recuperabilità del database.",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-storage.ts",
+          "anchor": "UPDATE checkups SET status = ?, version = version + 1, updated_at = ?"
+        },
+        {
+          "path": "lib/security/headless-checkup-status-transition-storage.ts",
+          "anchor": "runDbServerImmediateTransaction("
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "mcp--client",
+      "source": "mcp",
+      "target": "client",
+      "kind": "import",
+      "label": "importa il client RPC",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/server.ts",
+          "anchor": "from './operation-client.ts'"
+        }
+      ]
+    },
+    {
+      "id": "mini--client",
+      "source": "mini",
+      "target": "client",
+      "kind": "call",
+      "label": "invoca i metodi del client",
+      "evidence": [
+        {
+          "path": "packages/mini/src/protocol.ts",
+          "anchor": "case 'open-loops': return client.readOpenLoops();"
+        }
+      ]
+    },
+    {
+      "id": "client--rpc",
+      "source": "client",
+      "target": "rpc",
+      "kind": "contract",
+      "label": "usa lo stesso identificatore di schema RPC",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/contracts.ts",
+          "anchor": "export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1'"
+        },
+        {
+          "path": "packages/aip/src/operation-rpc.ts",
+          "anchor": "export const AIP_OPERATION_RPC_REQUEST_SCHEMA_V1 = 'mediflow.aip.operation.request.v1'"
+        },
+        {
+          "path": "packages/mcp/src/operation-client.ts",
+          "anchor": "publish({ schemaVersion: RPC_REQUEST_SCHEMA, ...frame, requestId });"
+        }
+      ]
+    },
+    {
+      "id": "composition--launcher",
+      "source": "composition",
+      "target": "launcher",
+      "kind": "composition",
+      "label": "compone il launcher autenticato",
+      "evidence": [
+        {
+          "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+          "anchor": "return createAuthenticatedAgentLauncherV1({"
+        }
+      ]
+    },
+    {
+      "id": "launcher--broker",
+      "source": "launcher",
+      "target": "broker",
+      "kind": "call",
+      "label": "richiede un permesso",
+      "evidence": [
+        {
+          "path": "lib/headless/authenticated-agent-launcher.ts",
+          "anchor": "broker.authorize(broker.issueLease(state.owner)"
+        }
+      ]
+    },
+    {
+      "id": "launcher--rpc",
+      "source": "launcher",
+      "target": "rpc",
+      "kind": "composition",
+      "label": "compone il catalogo delle operazioni",
+      "evidence": [
+        {
+          "path": "lib/headless/authenticated-agent-launcher.ts",
+          "anchor": "rpcHost = createAipOperationRpcHostV1({"
+        }
+      ]
+    },
+    {
+      "id": "launcher--reader",
+      "source": "launcher",
+      "target": "reader",
+      "kind": "composition",
+      "label": "riceve il lettore dalla composizione host",
+      "evidence": [
+        {
+          "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+          "anchor": "createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,"
+        }
+      ]
+    },
+    {
+      "id": "reader--openloops",
+      "source": "reader",
+      "target": "openloops",
+      "kind": "composition",
+      "label": "compone le regole della lettura",
+      "evidence": [
+        {
+          "path": "lib/security/patient-open-loops-read-production.ts",
+          "anchor": "const core = createPatientOpenLoopsReadServiceV1("
+        }
+      ]
+    },
+    {
+      "id": "reader--db",
+      "source": "reader",
+      "target": "db",
+      "kind": "import",
+      "label": "importa il livello dati server",
+      "evidence": [
+        {
+          "path": "lib/security/patient-open-loops-read-production.ts",
+          "anchor": "import { dbServer } from '../db-server';"
+        }
+      ]
+    },
+    {
+      "id": "ui--route",
+      "source": "ui",
+      "target": "route",
+      "kind": "http",
+      "label": "richiede la conferma della proposta via HTTP",
+      "evidence": [
+        {
+          "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+          "anchor": "encodeURIComponent(accepted.proposalRef)"
+        }
+      ]
+    },
+    {
+      "id": "route--webowner",
+      "source": "route",
+      "target": "webowner",
+      "kind": "composition",
+      "label": "collega il gestore alla conferma Web",
+      "evidence": [
+        {
+          "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+          "anchor": "confirm: confirmCheckupStatusTransitionProposalV1,"
+        }
+      ]
+    },
+    {
+      "id": "webowner--writer",
+      "source": "webowner",
+      "target": "writer",
+      "kind": "composition",
+      "label": "compone il servizio di transizione",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1("
+        }
+      ]
+    },
+    {
+      "id": "writer--storage",
+      "source": "writer",
+      "target": "storage",
+      "kind": "composition",
+      "label": "compone la persistenza",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-production.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionStorageV1("
+        }
+      ]
+    },
+    {
+      "id": "storage--db",
+      "source": "storage",
+      "target": "db",
+      "kind": "import",
+      "label": "importa il database e la transazione",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-storage.ts",
+          "anchor": "import { dbServer, runDbServerImmediateTransaction } from '../db-server';"
+        }
+      ]
+    }
+  ]
+}
