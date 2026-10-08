@@ -91,17 +91,23 @@ base di un censimento incompleto. Non si presume approvata una nuova API,
 capability di autenticazione o rappresentazione delle credenziali.
 
 La distribuzione include esplicitamente la chiusura degli import del runner:
-otto sorgenti con SHA-256 fissati nel contratto
-`scripts/scheduled-backup-runtime-contract.mjs`, più i file di runtime di
-`better-sqlite3`, `bindings` e `file-uri-to-path`. Il contratto alimenta gli
+otto sorgenti e diciotto file JavaScript/JSON delle dipendenze con SHA-256
+fissati nel contratto `scripts/scheduled-backup-runtime-contract.mjs`, più il
+binario nativo SQLite. Le dipendenze sono `better-sqlite3`, `bindings` e
+`file-uri-to-path`. Il contratto alimenta gli
 include di Next e verifica il payload standalone e la copia `WebRuntime` del
-builder Mac, prima della rilocazione nativa. Ogni modifica ai sorgenti fissati
+builder Mac, prima della rilocazione nativa. Gli otto sorgenti hanno regole
+Git `eol=lf` esplicite, così la conversione CRLF del checkout non ne altera
+l'identità. Ogni modifica ai sorgenti fissati
 richiede un aggiornamento deliberato e revisionato dei relativi hash.
 
 La verifica importa il runner e le dipendenze ESM/CJS dal solo payload fisico
 in un processo Node 24 separato, senza avviare il job, senza permesso di
-scrittura o caricamento di addon nativi. File mancanti, hash discordi, link e
-risoluzione esterna impediscono il proseguimento del packaging. La presenza
+scrittura o caricamento di addon nativi. Prima di eseguire il codice, il
+processo proprietario verifica tutti gli hash fissati, indipendenti dai
+manifest e dall'output del payload. Nome/versione e una ricevuta stampata dal
+processo figlio non sostituiscono questa verifica. File mancanti, hash discordi,
+link e risoluzione esterna impediscono il proseguimento del packaging. La presenza
 del binario SQLite non ne dimostra l'ABI; i controlli nativi restano separati.
 Questa verifica non è una SBOM né una qualifica della firma o del funzionamento
 di un artefatto distribuito. La sua ricevuta vale per il payload effettivamente

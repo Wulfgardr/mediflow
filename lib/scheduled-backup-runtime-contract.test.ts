@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -30,6 +31,23 @@ function fixture() {
     assert.equal(fs.lstatSync(destination).isSymbolicLink(), false);
   }
   return { dir, payload, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+// Guard-only experiments need a deliberately changed dependency to reach the
+// import probe. Re-pin that ONE mutation in a disposable copy of the checker;
+// never add a bypass to the production API or count these as payload approval.
+async function scratchProbeChecker(f: ReturnType<typeof fixture>, relative: string): Promise<typeof assertScheduledBackupRuntime> {
+  assert.ok(relative.startsWith('node_modules/'));
+  const original = fs.readFileSync(path.join(dependencyRoot, relative.slice('node_modules/'.length)));
+  const originalHash = createHash('sha256').update(original).digest('hex');
+  const mutatedHash = createHash('sha256').update(fs.readFileSync(path.join(f.payload, relative))).digest('hex');
+  assert.notEqual(mutatedHash, originalHash);
+  const source = fs.readFileSync(path.join(sourceRoot, 'scripts/scheduled-backup-runtime-contract.mjs'), 'utf8');
+  assert.equal(source.split(`'${originalHash}'`).length, 2, 'exactly one test-only pin must be replaced');
+  const checker = path.join(f.dir, 'scratch-probe-contract.mjs');
+  fs.writeFileSync(checker, source.replace(`'${originalHash}'`, `'${mutatedHash}'`));
+  const scratch = await import(pathToFileURL(checker).href);
+  return scratch.assertScheduledBackupRuntime;
 }
 
 test('real isolated payload imports all eight approved sources and real ESM/CJS dependencies without a database', async () => {
@@ -77,6 +95,38 @@ test('altered admission source is rejected even if it still parses and imports',
   } finally { f.cleanup(); }
 });
 
+for (const relative of SCHEDULED_BACKUP_TRACING_INCLUDES
+  .map(file => file.slice(2)).filter(file => file.startsWith('node_modules/') && !file.endsWith('.node'))) {
+  test(`production gate rejects changed dependency bytes: ${relative}`, async () => {
+    const f = fixture();
+    try {
+      // Whitespace preserves valid JS/JSON: rejection must be byte identity,
+      // independent of package name/version, parse success or child output.
+      fs.appendFileSync(path.join(f.payload, relative), '\n');
+      await assert.rejects(assertScheduledBackupRuntime(f.payload), error => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, `scheduled backup runtime: dependency hash mismatch: ${relative}`);
+        return true;
+      });
+    } finally { f.cleanup(); }
+  });
+}
+
+test('production gate rejects a forged success receipt hiding a broken transitive dependency', async () => {
+  const f = fixture();
+  try {
+    const positive = await assertScheduledBackupRuntime(f.payload);
+    const broken = path.join(f.payload, 'node_modules/better-sqlite3/lib/methods/aggregate.js');
+    fs.writeFileSync(broken, 'this is deliberately invalid JavaScript !!!\n');
+    await assert.rejects(assertScheduledBackupRuntime(f.payload), /dependency hash mismatch:.*aggregate.js/);
+    const fake = { imported: true, databaseAccess: 'denied', resolvedFiles: positive.resolvedFiles };
+    const index = path.join(f.payload, 'node_modules/better-sqlite3/lib/index.js');
+    fs.writeFileSync(index, `process.stdout.write(${JSON.stringify(JSON.stringify(fake))}); process.exit(0);\n${fs.readFileSync(index, 'utf8')}`);
+    await assert.rejects(assertScheduledBackupRuntime(f.payload), /dependency hash mismatch:.*lib\/index.js/);
+    assert.match(fs.readFileSync(broken, 'utf8'), /invalid JavaScript/);
+  } finally { f.cleanup(); }
+});
+
 test('source symlink is rejected despite exact target bytes', async () => {
   const f = fixture();
   try {
@@ -117,30 +167,33 @@ test('ordinary Node parent node_modules fallback can import, but the payload gat
   } finally { f.cleanup(); }
 });
 
-test('real CJS transitive resolution cannot escape the approved closure inside the payload', async () => {
+test('scratch probe guard: real CJS transitive resolution cannot escape its approved closure', async () => {
   const f = fixture();
   try {
     fs.writeFileSync(path.join(f.payload, 'unexpected.cjs'), 'module.exports = 1;');
     fs.appendFileSync(path.join(f.payload, 'node_modules/bindings/bindings.js'), '\nrequire("../../unexpected.cjs");\n');
-    await assert.rejects(assertScheduledBackupRuntime(f.payload), /resolution outside approved payload closure/);
+    const checkProbe = await scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
+    await assert.rejects(checkProbe(f.payload), /resolution outside approved payload closure/);
   } finally { f.cleanup(); }
 });
 
-test('the real import process cannot write a database', async () => {
+test('scratch probe guard: real import process cannot write a database', async () => {
   const f = fixture();
   try {
     fs.appendFileSync(path.join(f.payload, 'node_modules/bindings/bindings.js'),
       '\nrequire("node:fs").writeFileSync(process.env.MEDIFLOW_DATA_DIR, "unexpected database");\n');
-    await assert.rejects(assertScheduledBackupRuntime(f.payload), /ERR_ACCESS_DENIED/);
+    const checkProbe = await scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
+    await assert.rejects(checkProbe(f.payload), /ERR_ACCESS_DENIED/);
   } finally { f.cleanup(); }
 });
 
-test('the real import process cannot construct even an in-memory SQLite database', async () => {
+test('scratch probe guard: real import process cannot construct even an in-memory SQLite database', async () => {
   const f = fixture();
   try {
     fs.appendFileSync(path.join(f.payload, 'node_modules/better-sqlite3/lib/index.js'),
       '\nmodule.exports(":memory:");\n');
-    await assert.rejects(assertScheduledBackupRuntime(f.payload), /Cannot load native addon|ERR_DLOPEN_DISABLED|ERR_ACCESS_DENIED/);
+    const checkProbe = await scratchProbeChecker(f, 'node_modules/better-sqlite3/lib/index.js');
+    await assert.rejects(checkProbe(f.payload), /Cannot load native addon|ERR_DLOPEN_DISABLED|ERR_ACCESS_DENIED/);
   } finally { f.cleanup(); }
 });
 
@@ -158,11 +211,12 @@ test('configuration can import the contract without dependencies or persistent a
   } finally { f.cleanup(); }
 });
 
-test('timeout fails closed and waits for its owned import process to close', async () => {
+test('scratch probe guard: timeout waits for its owned import process to close', async () => {
   const f = fixture();
   try {
     fs.appendFileSync(path.join(f.payload, 'node_modules/bindings/bindings.js'), '\nwhile (true) {}\n');
-    await assert.rejects(assertScheduledBackupRuntime(f.payload, { timeoutMs: 250 }), /import exceeded 250ms/);
+    const checkProbe = await scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
+    await assert.rejects(checkProbe(f.payload, { timeoutMs: 250 }), /import exceeded 250ms/);
     // Terminal close precedes return: removing the physical fixture is safe.
   } finally { f.cleanup(); }
 });
