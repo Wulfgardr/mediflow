@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { anyDocDesktopRendererTrace } from './scripts/anydoc-desktop-renderer-trace.mjs'; // @Codex
+import { SCHEDULED_BACKUP_TRACING_INCLUDES } from './scripts/scheduled-backup-runtime-contract.mjs'; // @Codex
 
 /* @Codex */
 const distDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
@@ -68,6 +69,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./package.json",
+      // @Codex: the OS scheduler imports raw files outside compiled Next chunks.
+      ...SCHEDULED_BACKUP_TRACING_INCLUDES,
       // @Codex: capability-local offline CLI/worker closure; no model/runtime payloads.
       "./scripts/treatment-reasoning-portable-worker.py",
       "./scripts/gliner-redaction-worker.py", // @Codex: code only; model stays outside the bundle.

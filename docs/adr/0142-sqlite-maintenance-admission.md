@@ -90,8 +90,24 @@ confine offline/sintetico verificato. Il modulo non autorizza uno swap sulla
 base di un censimento incompleto. Non si presume approvata una nuova API,
 capability di autenticazione o rappresentazione delle credenziali.
 
-La distribuzione deve includere il modulo MJS e verificare la stessa versione
-nel runner diretto e nel runtime compilato. Il successo del drain dello
+La distribuzione include esplicitamente la chiusura degli import del runner:
+otto sorgenti con SHA-256 fissati nel contratto
+`scripts/scheduled-backup-runtime-contract.mjs`, più i file di runtime di
+`better-sqlite3`, `bindings` e `file-uri-to-path`. Il contratto alimenta gli
+include di Next e verifica il payload standalone e la copia `WebRuntime` del
+builder Mac, prima della rilocazione nativa. Ogni modifica ai sorgenti fissati
+richiede un aggiornamento deliberato e revisionato dei relativi hash.
+
+La verifica importa il runner e le dipendenze ESM/CJS dal solo payload fisico
+in un processo Node 24 separato, senza avviare il job, senza permesso di
+scrittura o caricamento di addon nativi. File mancanti, hash discordi, link e
+risoluzione esterna impediscono il proseguimento del packaging. La presenza
+del binario SQLite non ne dimostra l'ABI; i controlli nativi restano separati.
+Questa verifica non è una SBOM né una qualifica della firma o del funzionamento
+di un artefatto distribuito. La sua ricevuta vale per il payload effettivamente
+fornito al controllo; fixture e import locali non qualificano altre build.
+
+Il successo del drain dello
 scheduler non chiude da solo il requisito del repair esposto. L'accettazione
 operativa richiede un repair autorizzato completo, riavvio riuscito, verifica
 del nuovo archivio e successivo backup programmato riuscito.
