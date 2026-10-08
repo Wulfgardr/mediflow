@@ -6,6 +6,13 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { collectUnitTestFiles, unitTestArguments, UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS } from './unit-test-selection.mjs';
 
+test('registration: behavior and private-loader suites each occur once in required units', () => {
+  const selection = collectUnitTestFiles(path.resolve(import.meta.dirname, '..'));
+  for (const filename of ['scripts/checkup-parent-lifecycle.test.mjs', 'scripts/checkup-parent-lifecycle-harness.test.mjs']) {
+    assert.equal(selection.filter(file => file === filename).length, 1, `${filename} must be selected exactly once`);
+  }
+});
+
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-unit-selection-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
