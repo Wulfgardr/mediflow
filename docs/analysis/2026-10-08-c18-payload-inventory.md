@@ -17,8 +17,8 @@ separate standalone/Headless checks.
 
 | Input | Exact identity |
 | --- | --- |
-| Selected source revision for corrected receipt | `c233d8135c112edf8881df1118d8f8644aa76efd` |
-| Selected source tree | `fbddf11df78dcb46eefa9d7fcd7ba5df59ebabd1` |
+| Selected source revision for reviewed receipt | `d07839ee44937806277bef4f14a7aa5695d1d3ff` |
+| Selected source tree | `545186fbddfea49d1d54efcfba5a38b671d0670f` |
 | Root manifest SHA256 | `812bfe8363e21f899d9b319a3f7a18bd8de712023979de1b723a560cbe45e61f` |
 | Lockfile SHA256 | `7b589bc317aa501fc5d121d121061af8a305e8e2cc661b3b162b9a7c6f0aa2d3` |
 | Observed package | `@mediflow/web-auth-lifecycle-owner@0.8.9-local.3f2e6f2a` |
@@ -31,9 +31,9 @@ separate standalone/Headless checks.
 | Sorted roster content SHA256 | `f4ff526b6cce1e5ed85fcb0831a794dbcc5e20d9419a79bd73138b7f2f1f55be` |
 
 The initial inventory used source `db7232d297bb81f6c2ad1d971dfcdedabf2fd88e`,
-tree `d28cc1fb8f18ec1e6077bd9c2af0a28800d93988`. The corrected receipt selects
-`c233d813`, whose runtime inputs are unchanged, and records `worktreeDirty=true`
-while the reviewed tooling repairs were being prepared. All 19 consumed source
+tree `d28cc1fb8f18ec1e6077bd9c2af0a28800d93988`. The reviewed receipt selects
+`d07839e`, whose runtime inputs are unchanged, and records `worktreeDirty=false`.
+All 19 consumed source
 identity files match regular tracked HEAD blobs. The manifest, lock, Node contract,
 archive/provenance and owner source inputs matched the selected tree.
 The archive's SRI matched both the root lock and the provenance. Private JSON
@@ -47,12 +47,15 @@ tarball dependency. It added one package. The corrected ledger returned
 `TRUSTED_ROSTER_BYTES_MATCH`. This proves the scoped archive installation and
 content identity, not application `npm ci` or a clean-machine install.
 
-The corrected receipt has SHA256
-`442db40d787d27f5a5b16492bf58d54fcf9cc2b0177ee1afb66da7929f8e728c`.
+The reviewed receipt has SHA256
+`5d7a8aa3f862aeea3fa54355930cd2eecf8488c9c40556694a71c513c9973813`.
 It separates archive digest/SRI matches, provenance membership/source hashes,
 and installed observed membership/bytes. It reports POSIX installed modes
 matching the declared roster on this Mac. The generator's independent
 `archiveRosterVerification` is `NOT_CHECKED`; it has not parsed tar members.
+The earlier repair receipt at `c233d813` had a dirty tooling worktree and SHA256
+`442db40d787d27f5a5b16492bf58d54fcf9cc2b0177ee1afb66da7929f8e728c`;
+it is retained as historical evidence, separately from the clean reviewed pin.
 
 ## Actual payload members
 
@@ -106,14 +109,108 @@ CVE-2026-94545, an affected range `>=16.2.0 <16.3.6`, and fixed version
 `16.3.6`. The root lock's `next@16.3.4` matches that range. Its trigger is the
 Node `next/og` ImageResponse path rendering attacker-controlled SVG values.
 
-A targeted coordinator search of `app`, `lib`, `components`, `scripts` and
-`next.config.*` found no `next/og`, `@vercel/og`, `ImageResponse` or
-`remotePatterns` matches at this pin. That search does not prove complete
-payload non-reachability. The scoped owner package excludes Next; the
-application profile remains unqualified pending the separate advisory
-disposition. No dependency was changed here. All other advisories and a
-comprehensive dependency scan remain `NOT_CHECKED`; neither the inventory nor
-this narrow check establishes zero vulnerabilities.
+The primary [SSRF advisory GHSA-cjq9-62q9-8jv4](https://github.com/advisories/GHSA-cjq9-62q9-8jv4),
+updated on 7 October, identifies CVE-2026-94483 and the affected 16.x range
+`>=16.0.0 <16.3.8`. The same locked `next@16.3.4` matches this range. The
+[vendor security release](https://nextjs.org/blog/september-2026-security-release)
+describes the remote image-optimization redirect path and lists `16.3.8` as
+the patched active-LTS version. [Release 16.3.8](https://github.com/vercel/next.js/releases/tag/v16.3.8)
+is the minimum selected candidate for both assigned advisories; `16.3.6` alone
+would leave this SSRF range unresolved. This disposition covers those two
+advisories, not every item in the vendor release or every locked dependency.
+
+A repeated targeted source search at `d07839e` of `app`, `lib`, `components`,
+`scripts` and `next.config.ts` found no `next/og`, `@vercel/og`, `ImageResponse`
+or `remotePatterns` matches (`rg` exit 1). The inspected config contains no
+remote-image configuration. The two observed production `next/image` import
+sites, the ChatGPT settings page and account card, use the static local
+`/brand/openai/chatgpt-mark.png` with `unoptimized`. The three inspected files
+match their selected commit blobs; the private source-scope receipt has SHA256
+`68ba9383713cef2651172daed3c345e6b2bb56c0776e24c12f9547056d81d6ae`.
+These observations reduce declared reachability; they do not prove complete
+payload non-reachability or an incident-free deployment. The observed owner
+payload has no Next dependency. No current complete application payload was
+inventoried, so its included Next bytes and runtime configuration remain open.
+
+The proposed dependency change is limited to `next@16.3.8`, matching
+`eslint-config-next@16.3.8` and their necessary Next environment, lint-plugin
+and platform SWC lock records. A registry CLI probe failed DNS resolution.
+One authorized standard npm lock-resolution attempt used only an owned copy
+of verified public cache metadata, with `--offline --package-lock-only
+--ignore-scripts`. It failed with `ENOTCACHED` for `eslint-config-next`; npm
+reported no usable cached response. That attempt used no online fallback.
+The observed failure does not establish tarball absence or an access denial.
+
+The metadata receipt preserves public origin, original cache timestamp and
+verified body digest for 12 package names. Target `16.3.8` metadata is present
+for Next, its lint config and lint plugin; it is absent from the cached
+`@next/env` and eight SWC packuments. Metadata SHA256:
+`c23f43aa656b4cb8d78dca60e5df78840093a852736227b26019513f70161ad4`.
+The failed resolution receipt has SHA256
+`ee7a8f3a1e9dd0d95cc3e0957a2b317dee4b5e4f3e55e36963a5deb0723b6034`;
+its log has SHA256
+`20793e74796bc5131658e7fa293dd13245b13f08475a9df5cec4e52ef503450e`.
+Manifest and lock retained the exact before/after hashes listed above.
+No dependency delta or package installation occurred during that attempt.
+
+A subsequent authorized public metadata request to the official npm registry
+succeeded. Normal npm lock resolution then completed with lifecycle scripts
+disabled and distinct owned empty user/global configs. The tracked project
+`.npmrc` retained its sole `engine-strict=true` setting. The earlier local
+double-loaded-config failure is retained separately; it occurred before npm
+resolved registry metadata. The successful resolution receipt has SHA256
+`27bc8bbefa481420b2faf3a82d6c17758880857df3754f40e4bb325a2fc9b4f5`.
+
+Separate dependency commit `284efa05b333f529285a2e313fa4637ff1379fb8`, tree
+`89fd9c95fa0c8f8eee51882066fe417723d07311`, updates only `package.json` and
+`package-lock.json`. Next and its lint config change from `16.3.4` to
+`16.3.8`; exactly 12 Next-family lock records change. The 750-record roster,
+eight Mac/Windows/Linux SWC targets, Node `>=24 <25` engine, `.nvmrc`, scripts,
+licenses and optional/platform constraints are preserved. No unrelated
+transitive version is changed, and no dependency is added or removed.
+
+| Updated source input | SHA256 |
+| --- | --- |
+| Manifest | `99c1435d30a130c05e9fa25c5a517000351309b34005e18cc3c377ab29fe04b7` |
+| Lock | `d31ed13e3a115dfbe5ebae3050b812c3ffdf25888e809906dc9dca11aa37a77f` |
+| Structured lock delta receipt | `7ccd5d81c24de3d76f254890d0a34b269ecc7f1cb6012689cfb5493774b1d1aa` |
+| Official target metadata receipt | `3d85f5bf9f3376a9f59b36841bea6972efc0e60496589857bbd3afae6ac3c62e` |
+
+All 12 target versions, tarball URLs and integrity values match freshly fetched
+official npm metadata whose cached body digests were verified. The metadata
+receipt preserves original cache times and body hashes. This is metadata and
+source-lock evidence; it does not establish registry-signature verification,
+an updated application payload or release admission.
+The new source version is outside the two assigned affected ranges. Compatible
+build, installed-artifact proof and independent review remain distinct gates.
+Other advisories and a comprehensive dependency scan remain `NOT_CHECKED`;
+neither this inventory nor the narrow disposition establishes zero
+vulnerabilities.
+
+Normal `npm ci` was subsequently attempted on Node 24.21.0 / ABI 137 on this
+Mac, from absent physical `node_modules` and a fresh owned npm cache. It failed
+with exit 1 at the original root postinstall runtime check because the
+`better-sqlite3@12.6.2` binding was missing. The preinstall Node check passed.
+Physical manifests for Next, its environment package, lint config, lint plugin
+and darwin-arm64 SWC were present at `16.3.8`. This is partial installation
+evidence; the command did not pass. Manifest and lock retained their updated
+hashes before and after the attempt. The ci receipt has SHA256
+`b9641c72eed2a1cebb3252cda9f9d3c55832e881c8ca9e35e1dd7ba080210f80`;
+its log has SHA256
+`7c7024deff0c5384b48ad50f7ab9e65fb629bec90b7be9b8a99f1ffc7f905c46`.
+
+Read-only inspection of the installed npm 12.1.0 docs and Arborist source
+shows its default `allowScripts` policy blocks unreviewed dependency install
+scripts. The project has no such policy. SQLite's pinned tarball was fetched,
+but its `prebuild-install || node-gyp rebuild --release` install script was
+not admitted by that default policy. No install policy was changed, no broad
+script override or runtime downgrade was used, and npm was not updated. The
+missing binding remains an installation gate; a targeted script-admission
+decision and fresh runtime proof would be separate work. No build or postbuild
+was executed. The canonical postbuild includes OCR/PDF worker checks that were
+outside this island's authorization; omitting them cannot establish canonical
+build success. A fresh project on an existing host would still not be a
+clean-machine or Windows/Linux qualification proof.
 
 ## Verification and remaining artifact gates
 
@@ -137,8 +234,14 @@ symlink refusal, trusted-roster comparison, mode changes, wrong declared Node
 major/version/ABI/platform/architecture, missing standalone identity members,
 stale build revision and CLI overwrite refusal. POSIX-mode cases are explicitly
 not Windows permission qualification. Synthetic standalone fixtures do not
-qualify a real standalone artifact. Independent review of the repaired exact
-candidate remains a separate gate.
+qualify a real standalone artifact. Independent review approved the repaired
+generator and documentation at exact pin `d07839e`; this later receipt/advisory
+documentation update requires its own review before publication.
+Independent source review also approved the isolated Next manifest/lock delta
+at `284efa05`. The combined synthetic payload and Node-contract suites passed
+30 of 31 tests with the same one set-ID fixture skip; their log has SHA256
+`c2064ee1ff93993be3819089c880c98409a12049b977c271f80b8db32f387928`.
+Those synthetic results do not repair or qualify the failed application install.
 
 The next application proof must identify and inventory an owned current
 standalone/Headless deliverable, carry C10's reviewed owner closure into it, and
