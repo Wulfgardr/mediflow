@@ -383,3 +383,53 @@ test('scheduler drain timeout never snapshots and leaves the target unchanged un
         f.cleanup();
     }
 });
+
+for (const [label, whitespace] of [['space', ' '], ['tab', '\t'], ['newline', '\n'], ['carriage-return', '\r'], ['nbsp', '\u00a0'], ['bom', '\ufeff']]) {
+    for (const position of ['leading', 'trailing']) {
+        test(`driver ${position} ${label} alias cannot acquire a separate participant or maintenance identity`, async () => {
+            const f = fixture();
+            const alias = position === 'leading' ? whitespace + f.target : f.target + whitespace;
+            try {
+                const before = fs.readdirSync(f.dir);
+                // Alias-first is rejected before native open or lease creation.
+                // It cannot establish an invisible live handle for a later owner.
+                assert.throws(() => openAdmittedSqlite(alias, { sqliteOptions: { fileMustExist: true } }), /invalid_target/);
+                assert.deepEqual(fs.readdirSync(f.dir), before);
+
+                const participant = openAdmittedSqlite(f.target);
+                try {
+                    // A canonical live handle also cannot be evaded by spelling
+                    // the maintenance target with driver-trimmed whitespace.
+                    await assert.rejects(runWithSqliteMaintenance(alias, {}, () => assert.fail('no callback while canonical handle is live')), /invalid_target/);
+                    assert.equal(participant.database.open, true);
+                    assert.equal(fs.readdirSync(path.join(store(f.target), 'leases')).length, 1);
+                } finally { await participant.close(); }
+
+                await runWithSqliteMaintenance(f.target, {}, () => {
+                    // Intent-first: an alias opener cannot write to this target.
+                    assert.throws(() => openAdmittedSqlite(alias, { sqliteOptions: { fileMustExist: true } }), /invalid_target/);
+                    assert.deepEqual(fs.readdirSync(path.join(store(f.target), 'leases')), []);
+                });
+                const inspect = new Database(f.target, { readonly: true });
+                try { assert.equal((inspect.prepare('SELECT count(*) AS n FROM synthetic_values').get() as { n: number }).n, 0); }
+                finally { inspect.close(); }
+            } finally { f.cleanup(); }
+        });
+    }
+}
+
+test('internal filename and directory whitespace retains its exact filesystem identity', async () => {
+    const f = fixture();
+    try {
+        const dir = path.join(f.dir, 'synthetic directory ');
+        fs.mkdirSync(dir);
+        const target = path.join(dir, 'synthetic database.db');
+        const participant = openAdmittedSqlite(target);
+        try {
+            const actual = (participant.database.pragma('database_list') as Array<{ file: string }>)[0].file;
+            assert.equal(actual, fs.realpathSync(target));
+        } finally { await participant.close(); }
+        assert.deepEqual(fs.readdirSync(f.dir).sort(), ['medical.db', 'synthetic directory ']);
+        await runWithSqliteMaintenance(target, {}, () => {});
+    } finally { f.cleanup(); }
+});
