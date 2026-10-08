@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import ts from 'typescript';
 import {
   SCHEDULED_BACKUP_RUNTIME_ROSTER,
   SCHEDULED_BACKUP_TRACING_INCLUDES,
@@ -36,7 +37,7 @@ function fixture() {
 // Guard-only experiments need a deliberately changed dependency to reach the
 // import probe. Re-pin that ONE mutation in a disposable copy of the checker;
 // never add a bypass to the production API or count these as payload approval.
-async function scratchProbeChecker(f: ReturnType<typeof fixture>, relative: string): Promise<typeof assertScheduledBackupRuntime> {
+function scratchProbeChecker(f: ReturnType<typeof fixture>, relative: string): typeof assertScheduledBackupRuntime {
   assert.ok(relative.startsWith('node_modules/'));
   const original = fs.readFileSync(path.join(dependencyRoot, relative.slice('node_modules/'.length)));
   const originalHash = createHash('sha256').update(original).digest('hex');
@@ -46,8 +47,78 @@ async function scratchProbeChecker(f: ReturnType<typeof fixture>, relative: stri
   assert.equal(source.split(`'${originalHash}'`).length, 2, 'exactly one test-only pin must be replaced');
   const checker = path.join(f.dir, 'scratch-probe-contract.mjs');
   fs.writeFileSync(checker, source.replace(`'${originalHash}'`, `'${mutatedHash}'`));
-  const scratch = await import(pathToFileURL(checker).href);
-  return scratch.assertScheduledBackupRuntime;
+  // This literal import belongs to a separate native ESM driver. The canonical
+  // TS test loader may emit CommonJS, so it must not rewrite a variable import
+  // of the scratch file into require(fileURL). No repository loader exception.
+  const driver = path.join(f.dir, 'scratch-probe-driver.mjs');
+  fs.writeFileSync(driver, `
+import { assertScheduledBackupRuntime } from './scratch-probe-contract.mjs';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+const originalSpawn = childProcess.spawn;
+const children = [];
+childProcess.spawn = (...args) => {
+  const child = originalSpawn(...args);
+  const state = { child, closed: false };
+  child.once('close', () => { state.closed = true; });
+  children.push(state);
+  return child;
+};
+syncBuiltinESMExports();
+let result;
+try {
+  result = { outcome: 'accepted', receipt: await assertScheduledBackupRuntime(process.argv[2], JSON.parse(process.argv[3])) };
+} catch (error) {
+  result = { outcome: 'rejected', message: error instanceof Error ? error.message : String(error) };
+}
+childProcess.spawn = originalSpawn;
+syncBuiltinESMExports();
+if (children.length !== 1 || children.some(state => !state.closed)) {
+  await Promise.all(children.filter(state => !state.closed).map(state => new Promise(resolve => {
+    state.child.once('close', resolve);
+    state.child.kill('SIGKILL');
+  })));
+  throw new Error('scratch probe returned before owned child terminal');
+}
+console.log(JSON.stringify(result));
+`);
+  return async (runtimeRoot, options = {}) => {
+    const run = spawnSync(process.execPath, [driver, runtimeRoot, JSON.stringify(options)], {
+      cwd: f.dir, env: { NODE_ENV: 'test', MEDIFLOW_DATA_DIR: path.join(f.dir, 'unused-driver-data') },
+      encoding: 'utf8', timeout: 15_000,
+    });
+    assert.equal(run.error, undefined, run.error?.message);
+    assert.equal(run.signal, null);
+    assert.equal(run.status, 0, run.stderr);
+    const result = JSON.parse(run.stdout);
+    if (result.outcome === 'rejected') throw new Error(result.message);
+    assert.equal(result.outcome, 'accepted');
+    return result.receipt;
+  };
+}
+
+function assertSchedulerTraceLiterals(source: string) {
+  const parsed = ts.createSourceFile('next.config.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const configurations = parsed.statements.filter(ts.isVariableStatement)
+    .flatMap(statement => [...statement.declarationList.declarations])
+    .filter(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === 'nextConfig');
+  assert.equal(configurations.length, 1);
+  const configuration = configurations[0].initializer;
+  assert.ok(configuration && ts.isObjectLiteralExpression(configuration));
+  const named = (object: ts.ObjectLiteralExpression, name: string) => {
+    const properties = object.properties.filter(ts.isPropertyAssignment)
+      .filter(property => (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) && property.name.text === name);
+    assert.equal(properties.length, 1, `exactly one ${name} property`);
+    return properties[0].initializer;
+  };
+  const includes = named(configuration, 'outputFileTracingIncludes');
+  assert.ok(ts.isObjectLiteralExpression(includes));
+  const route = named(includes, '/*');
+  assert.ok(ts.isArrayLiteralExpression(route));
+  const literals = route.elements.filter(ts.isStringLiteral).map(element => element.text);
+  for (const include of SCHEDULED_BACKUP_TRACING_INCLUDES) {
+    assert.equal(literals.filter(value => value === include).length, 1, `exactly one route /* literal: ${include}`);
+  }
 }
 
 test('real isolated payload imports all eight approved sources and real ESM/CJS dependencies without a database', async () => {
@@ -73,6 +144,15 @@ test('tracing roster contains every approved source and the explicit native/impo
     assert.ok(SCHEDULED_BACKUP_TRACING_INCLUDES.includes(`./${item.path}`));
   }
   assert.ok(SCHEDULED_BACKUP_TRACING_INCLUDES.includes('./node_modules/better-sqlite3/build/Release/better_sqlite3.node'));
+});
+
+test('Next config contains each canonical scheduler path exactly once as a route /* literal without executing it', () => {
+  const source = fs.readFileSync(path.join(sourceRoot, 'next.config.ts'), 'utf8');
+  assertSchedulerTraceLiterals(source);
+  const admissionLiteral = JSON.stringify('./lib/sqlite-maintenance-admission.mjs');
+  assert.throws(() => assertSchedulerTraceLiterals(source.replace(admissionLiteral, '"./omitted-admission.mjs"')), /exactly one route/);
+  assert.throws(() => assertSchedulerTraceLiterals(source.replace(admissionLiteral, `${admissionLiteral}, ${admissionLiteral}`)), /exactly one route/);
+  assert.throws(() => assertSchedulerTraceLiterals(source.replace('"/*": [', '"/unrelated": [')), /exactly one \/\* property/);
 });
 
 for (const relative of ['lib/sqlite-maintenance-admission.mjs', 'lib/exemption-import-contract.ts',
@@ -172,7 +252,7 @@ test('scratch probe guard: real CJS transitive resolution cannot escape its appr
   try {
     fs.writeFileSync(path.join(f.payload, 'unexpected.cjs'), 'module.exports = 1;');
     fs.appendFileSync(path.join(f.payload, 'node_modules/bindings/bindings.js'), '\nrequire("../../unexpected.cjs");\n');
-    const checkProbe = await scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
+    const checkProbe = scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
     await assert.rejects(checkProbe(f.payload), /resolution outside approved payload closure/);
   } finally { f.cleanup(); }
 });
@@ -182,7 +262,7 @@ test('scratch probe guard: real import process cannot write a database', async (
   try {
     fs.appendFileSync(path.join(f.payload, 'node_modules/bindings/bindings.js'),
       '\nrequire("node:fs").writeFileSync(process.env.MEDIFLOW_DATA_DIR, "unexpected database");\n');
-    const checkProbe = await scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
+    const checkProbe = scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
     await assert.rejects(checkProbe(f.payload), /ERR_ACCESS_DENIED/);
   } finally { f.cleanup(); }
 });
@@ -192,7 +272,7 @@ test('scratch probe guard: real import process cannot construct even an in-memor
   try {
     fs.appendFileSync(path.join(f.payload, 'node_modules/better-sqlite3/lib/index.js'),
       '\nmodule.exports(":memory:");\n');
-    const checkProbe = await scratchProbeChecker(f, 'node_modules/better-sqlite3/lib/index.js');
+    const checkProbe = scratchProbeChecker(f, 'node_modules/better-sqlite3/lib/index.js');
     await assert.rejects(checkProbe(f.payload), /Cannot load native addon|ERR_DLOPEN_DISABLED|ERR_ACCESS_DENIED/);
   } finally { f.cleanup(); }
 });
@@ -231,7 +311,7 @@ test('scratch probe guard: timeout waits for its owned import process to close',
   const f = fixture();
   try {
     fs.appendFileSync(path.join(f.payload, 'node_modules/bindings/bindings.js'), '\nwhile (true) {}\n');
-    const checkProbe = await scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
+    const checkProbe = scratchProbeChecker(f, 'node_modules/bindings/bindings.js');
     await assert.rejects(checkProbe(f.payload, { timeoutMs: 250 }), /import exceeded 250ms/);
     // Terminal close precedes return: removing the physical fixture is safe.
   } finally { f.cleanup(); }

@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import { anyDocDesktopRendererTrace } from './scripts/anydoc-desktop-renderer-trace.mjs'; // @Codex
-import { SCHEDULED_BACKUP_TRACING_INCLUDES } from './scripts/scheduled-backup-runtime-contract.mjs'; // @Codex
 
 /* @Codex */
 const distDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
@@ -69,8 +68,34 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./package.json",
-      // @Codex: the OS scheduler imports raw files outside compiled Next chunks.
-      ...SCHEDULED_BACKUP_TRACING_INCLUDES,
+      // Raw scheduler closure; checked against the canonical runtime roster in tests.
+      "./scripts/run-scheduled-backup.mjs",
+      "./scripts/scheduled-backup-date-fields.mjs",
+      "./lib/sqlite-maintenance-admission.mjs",
+      "./lib/backup-audit.ts",
+      "./lib/exemption-import-receipt.ts",
+      "./lib/exemption-import-contract.ts",
+      "./lib/reference-data/prosthetics-catalog-backup.ts",
+      "./lib/reference-data/prosthetics-catalog-contract.ts",
+      "./node_modules/better-sqlite3/package.json",
+      "./node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+      "./node_modules/better-sqlite3/lib/index.js",
+      "./node_modules/better-sqlite3/lib/database.js",
+      "./node_modules/better-sqlite3/lib/sqlite-error.js",
+      "./node_modules/better-sqlite3/lib/util.js",
+      "./node_modules/better-sqlite3/lib/methods/aggregate.js",
+      "./node_modules/better-sqlite3/lib/methods/backup.js",
+      "./node_modules/better-sqlite3/lib/methods/function.js",
+      "./node_modules/better-sqlite3/lib/methods/inspect.js",
+      "./node_modules/better-sqlite3/lib/methods/pragma.js",
+      "./node_modules/better-sqlite3/lib/methods/serialize.js",
+      "./node_modules/better-sqlite3/lib/methods/table.js",
+      "./node_modules/better-sqlite3/lib/methods/transaction.js",
+      "./node_modules/better-sqlite3/lib/methods/wrappers.js",
+      "./node_modules/bindings/package.json",
+      "./node_modules/bindings/bindings.js",
+      "./node_modules/file-uri-to-path/package.json",
+      "./node_modules/file-uri-to-path/index.js",
       // @Codex: capability-local offline CLI/worker closure; no model/runtime payloads.
       "./scripts/treatment-reasoning-portable-worker.py",
       "./scripts/gliner-redaction-worker.py", // @Codex: code only; model stays outside the bundle.
