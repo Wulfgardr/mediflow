@@ -19,18 +19,34 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['lib/reference-data/prosthetics-catalog-contract.ts', '2cca69ebd004209504aae0ee3605fb25634d73bc73080bad7aaa6ac1de0dc2b9'],
 ].map(([file, sha256]) => Object.freeze({ path: file, sha256 })));
 
-// Runtime import closure, not an SBOM. prebuild-install is installation tooling.
-// Presence of the native file is checked; its ABI is a separate runtime gate.
-const DEPENDENCY_FILES = Object.freeze([
-  'better-sqlite3/package.json',
-  'better-sqlite3/build/Release/better_sqlite3.node',
-  'better-sqlite3/lib/index.js', 'better-sqlite3/lib/database.js',
-  'better-sqlite3/lib/sqlite-error.js', 'better-sqlite3/lib/util.js',
-  ...['aggregate', 'backup', 'function', 'inspect', 'pragma', 'serialize', 'table', 'transaction', 'wrappers']
-    .map(name => `better-sqlite3/lib/methods/${name}.js`),
-  'bindings/package.json', 'bindings/bindings.js',
-  'file-uri-to-path/package.json', 'file-uri-to-path/index.js',
-].map(file => `node_modules/${file}`));
+// Import closure from lock-pinned better-sqlite3 12.6.2, bindings 1.5.0 and
+// file-uri-to-path 1.0.0. JS/JSON bytes were independently compared with the
+// integrity-verified installation. Never derive these pins from the payload:
+// dependency code could otherwise forge the child's success receipt and exit.
+// This is not an SBOM. prebuild-install is installation tooling; the native
+// file has a presence check only and retains its separate ABI gate.
+const DEPENDENCY_ROSTER = Object.freeze([
+  ['better-sqlite3/package.json', '2477bed8910fa9e3a842f20721f86927ef6d1424851f423539c644e48ec20e84'],
+  ['better-sqlite3/build/Release/better_sqlite3.node', null],
+  ['better-sqlite3/lib/index.js', '82db11c4ee43a41d859988c5db42c3771dff565371f94bacbd1e4d8d6ceb47cd'],
+  ['better-sqlite3/lib/database.js', '02ea23bdd23d7ac5de0675a2f32fc686e76d5c6a32bd3e3891f360e72e07f61f'],
+  ['better-sqlite3/lib/sqlite-error.js', '2582d61c27680dead168543f392eb102be621dfbef282a4ca4c7c21aa5e7c75d'],
+  ['better-sqlite3/lib/util.js', '92b2e39e2151b43a2252e10b6d6de876ecaf0008336a4fa1dfe1317b20f1916f'],
+  ['better-sqlite3/lib/methods/aggregate.js', 'e9f74eb919ec93fe089c95ddf25a98f1f631c80418fa34fb2346ca1bc29f1b82'],
+  ['better-sqlite3/lib/methods/backup.js', 'ea29d34992bb02e006d0fdeda9675ac5d2bb227aaf57468decd997e9fc9c7dbf'],
+  ['better-sqlite3/lib/methods/function.js', 'f431d49303b8bbdc044b1f1b455bdad21fc9b74b007de0acb22f08f25b4febd3'],
+  ['better-sqlite3/lib/methods/inspect.js', '4975a78daee850adee62ba98719d0f223819a0ec135a07c0e302994bd8dbff61'],
+  ['better-sqlite3/lib/methods/pragma.js', '8b1c54475bd4340b15e25c50d53d06308be65f8f919ecbe4aa9d285ca859ad5a'],
+  ['better-sqlite3/lib/methods/serialize.js', '7a10ee5c2735384b7f0c361811bc6d017db29f62b203fd3c68a35f667e2c2605'],
+  ['better-sqlite3/lib/methods/table.js', '97c42d9ded1aa96c7d916b5b92f96b4e59581d50eaf629cd2c7afb78ff26a9ea'],
+  ['better-sqlite3/lib/methods/transaction.js', 'bc8624a3ef689d8f78e5669020ad121e17acbc93b1d5ee5afe26860b1084c66c'],
+  ['better-sqlite3/lib/methods/wrappers.js', 'a150a6271d23f4e5f8953b129f370ff096c7cdc4b812afbf080a6cf4ab741bcf'],
+  ['bindings/package.json', 'a87721fe406e1f1798fef44d697b46ea1efe346fda118010334713346ee4207c'],
+  ['bindings/bindings.js', '8e32a0d37f20bd6f7d5bdbf99d041aa27be47cbbe5172ac13ebf7380a10b3bf6'],
+  ['file-uri-to-path/package.json', '71eb1e24bb9694f89c613fa0aa307f977dd43f41d11794c7b48fabf6c55f66b0'],
+  ['file-uri-to-path/index.js', 'e62293e871bdd5a7449ff3c7956c9536ec1d2ea7369461de77322b5256bb93e7'],
+].map(([file, sha256]) => Object.freeze({ path: `node_modules/${file}`, sha256 })));
+const DEPENDENCY_FILES = Object.freeze(DEPENDENCY_ROSTER.map(item => item.path));
 
 export const SCHEDULED_BACKUP_TRACING_INCLUDES = Object.freeze([
   ...SCHEDULED_BACKUP_RUNTIME_ROSTER.map(item => `./${item.path}`),
@@ -171,7 +187,12 @@ export async function assertScheduledBackupRuntime(runtimeRoot, { timeoutMs = 10
         fail(`source hash mismatch: ${item.path}`);
       }
     }
-    for (const file of DEPENDENCY_FILES) physicalFile(root, file);
+    for (const item of DEPENDENCY_ROSTER) {
+      const file = physicalFile(root, item.path);
+      if (item.sha256 !== null && createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== item.sha256) {
+        fail(`dependency hash mismatch: ${item.path}`);
+      }
+    }
     for (const [name, version] of [['better-sqlite3', '12.6.2'], ['bindings', '1.5.0'], ['file-uri-to-path', '1.0.0']]) {
       const manifest = JSON.parse(fs.readFileSync(path.join(root, 'node_modules', name, 'package.json'), 'utf8'));
       if (manifest.name !== name || manifest.version !== version) fail(`unexpected package identity: ${name}`);
