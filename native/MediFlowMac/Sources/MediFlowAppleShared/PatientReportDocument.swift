@@ -211,6 +211,7 @@ public enum PatientReportDocument {
             var details = ["Data: \(dateTimeLabel(item.date))"]
             if let score = safe(item.scoreLabel) { details.append("Punteggio: \(score)") }
             if let interpretation = safe(item.interpretation) { details.append("Interpretazione: \(interpretation)") }
+            if let version = item.interpretationVersion { details.append("Versione interpretazione: \(version)") }
             return PatientReportLine(primary: title, details: details)
         }
     }

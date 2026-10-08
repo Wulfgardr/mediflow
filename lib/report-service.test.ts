@@ -87,6 +87,24 @@ process.on('exit', () => {
     moduleWithLoad._load = originalLoad;
 });
 
+test('scale report preserves stored wording and shows only the recorded interpretation version', async () => {
+    const { prepareScaleSubmission } = await import('./scale-submission');
+    const submission = prepareScaleSubmission('gds', {
+        g1: 1, g2: 1, g3: 1, g4: 1, g5: 1, g6: 1, g7: 0, g8: 0,
+        g9: 0, g10: 0, g11: 0, g12: 0, g13: 0, g14: 0, g15: 0,
+    });
+    const current = { id: 'synthetic-current', patientId: 'synthetic', type: 'scale',
+        date: new Date('2026-10-08T00:00:00Z'), ...submission };
+    const legacy = { ...current, id: 'synthetic-legacy', content: 'Originale',
+        metadata: { title: 'GDS', score: 6, interpretation: 'Depressione Lieve (6-10)' } };
+    const before = JSON.stringify([current, legacy]);
+    const doc = await renderReport({ firstName: 'Synthetic', lastName: 'Scale', diagnoses: [] }, [], [current, legacy], [], []);
+    const rows = doc.autoTableCalls.find(call => call.head[0].includes('Interpretazione'))!.body;
+    assert.equal(rows[0][3], `${submission.metadata.interpretation}\nVersione interpretazione: mediflow.gds15.screening-limits.v1`);
+    assert.equal(rows[1][3], 'Depressione Lieve (6-10)');
+    assert.equal(JSON.stringify([current, legacy]), before);
+});
+
 async function renderReport(
     patient: unknown,
     entries: unknown[],
