@@ -94,8 +94,9 @@ La distribuzione include esplicitamente la chiusura degli import del runner:
 otto sorgenti e diciotto file JavaScript/JSON delle dipendenze con SHA-256
 fissati nel contratto `scripts/scheduled-backup-runtime-contract.mjs`, più il
 binario nativo SQLite. Le dipendenze sono `better-sqlite3`, `bindings` e
-`file-uri-to-path`. Il contratto alimenta gli
-include di Next e verifica il payload standalone e la copia `WebRuntime` del
+`file-uri-to-path`. I 27 include letterali di Next sono confrontati nei test
+con il roster canonico, senza aggiungere import alla superficie resolver
+protetta. Il contratto verifica il payload standalone e la copia `WebRuntime` del
 builder Mac, prima della rilocazione nativa. Gli otto sorgenti hanno regole
 Git `eol=lf` esplicite, così la conversione CRLF del checkout non ne altera
 l'identità. Ogni modifica ai sorgenti fissati
