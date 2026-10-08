@@ -402,7 +402,7 @@ test('crashing during restart recovery keeps the independent original and holds 
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-for (const fault of ['weakened-trigger', 'audit-index-failure']) {
+for (const fault of ['weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger']) {
     test(`production swap rejects ${fault} even when ordinary schema setup does not throw`, () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-swap-audit-schema-'));
         try {
@@ -417,7 +417,12 @@ for (const fault of ['weakened-trigger', 'audit-index-failure']) {
                 await live.backup(sourcePath); live.close();
                 const source = new Database(sourcePath);
                 if (process.env.AUDIT_FAULT === 'weakened-trigger') source.exec('DROP TRIGGER audit_events_no_update; CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events BEGIN SELECT 1; END');
-                else source.exec('DROP INDEX audit_events_actor_idx; CREATE TABLE audit_events_actor_idx (id INTEGER)');
+                else if (process.env.AUDIT_FAULT === 'audit-index-failure') source.exec('DROP INDEX audit_events_actor_idx; CREATE TABLE audit_events_actor_idx (id INTEGER)');
+                else if (process.env.AUDIT_FAULT === 'quoted-type') {
+                    const definitions = source.prepare("SELECT type, name, sql FROM sqlite_master WHERE tbl_name='audit_events' AND sql IS NOT NULL").all();
+                    source.exec('DROP TABLE audit_events');
+                    for (const item of definitions) source.exec(item.type === 'table' ? item.sql.replace('outcome TEXT NOT NULL', 'outcome "TEXT NOT NULL"') : item.sql);
+                } else source.exec('CREATE TRIGGER audit_events_skip BEFORE INSERT ON audit_events BEGIN SELECT RAISE(IGNORE); END');
                 source.close();
                 let error, closed = false;
                 try { await swapDatabaseFromFile(sourcePath, null); } catch(caught) { error = caught.message; }

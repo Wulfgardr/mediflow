@@ -1014,19 +1014,41 @@ function applySchemaGuardsSerially(): void {
 // Ordinary startup historically logs some audit-schema failures. A recovery
 // commit needs an explicit check against the shared canonical definition,
 // including same-name triggers that CREATE IF NOT EXISTS cannot repair.
+function recoveryAuditSqlTokens(sql: string | null, identifiers: ReadonlySet<string>): string[] | null {
+    if (sql === null) return null;
+    // Keep token boundaries and string literals: quoted "TEXT NOT NULL" is
+    // one declared type, not a TEXT column followed by a NOT NULL constraint.
+    const tokens = sql.match(/'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|--[^\n]*|\/\*[\s\S]*?\*\/|[A-Za-z_][A-Za-z_0-9]*|[0-9]+|[^\s]/g) ?? [];
+    return tokens.filter(token => !token.startsWith('--') && !token.startsWith('/*')).map(token => {
+        if (token.startsWith("'")) return token;
+        if (/^["`\[]/.test(token)) {
+            const identifier = token.slice(1, -1);
+            return identifiers.has(identifier.toLowerCase()) ? identifier.toLowerCase() : token;
+        }
+        return token.toLowerCase();
+    });
+}
+
+function recoveryAuditSchemaShape(connection: Database.Database): unknown {
+    const objects = connection.prepare("SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'audit_events' ORDER BY type, name")
+        .all() as Array<{ type: string; name: string; sql: string | null }>;
+    const columns = connection.pragma('table_xinfo(audit_events)') as Array<{ name: string }>;
+    const identifiers = new Set([...columns.map(column => column.name), ...objects.map(item => item.name)]);
+    return {
+        columns,
+        // This is a complete allowlist, including triggers and unique indexes.
+        // Extra INSERT triggers can silently discard mandatory audit events.
+        objects: objects.map(item => ({ type: item.type, name: item.name, sql: recoveryAuditSqlTokens(item.sql, identifiers) })),
+    };
+}
+
 function validateRecoveryAuditSchema(): void {
     ensureAuditSqliteSchema(sqlite);
     const canonical = new Database(':memory:');
     try {
         ensureAuditSqliteSchema(canonical);
-        const expected = canonical.prepare("SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'audit_events' AND sql IS NOT NULL")
-            .all() as Array<{ type: string; name: string; sql: string }>;
-        for (const item of expected) {
-            const actual = sqlite.prepare('SELECT sql FROM sqlite_master WHERE type = ? AND name = ? AND tbl_name = ?')
-                .get(item.type, item.name, 'audit_events') as { sql: string } | undefined;
-            if (!actual || normalizeSchemaSql(actual.sql) !== normalizeSchemaSql(item.sql)) {
-                throw new Error('SQLITE_SWAP_RECOVERY_REQUIRED: incompatible audit schema.');
-            }
+        if (JSON.stringify(recoveryAuditSchemaShape(sqlite)) !== JSON.stringify(recoveryAuditSchemaShape(canonical))) {
+            throw new Error('SQLITE_SWAP_RECOVERY_REQUIRED: incompatible audit schema.');
         }
     } finally { canonical.close(); }
 }
