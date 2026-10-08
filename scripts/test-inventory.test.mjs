@@ -1,0 +1,196 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import { discoverCandidates, checkInventory } from './test-inventory.mjs';
+import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
+
+const cli = fileURLToPath(new URL('./test-inventory.mjs', import.meta.url));
+const mapped = file => ({ path: file, selection: { state: 'mapped', suiteIds: ['unit'] } });
+const debt = file => ({ path: file, selection: { state: 'unresolved', reason: 'Selector not verified' } });
+const candidates = files => files.map(file => ({ path: file, signals: ['synthetic'] }));
+const manifest = entries => ({ version: 1, entries });
+const selections = files => ({ unit: { files, errors: [] } });
+const check = (files, entries, selected = files) => checkInventory(candidates(files), manifest(entries), selections(selected));
+
+test('discovery sees new roots, plugins, unusual names and language signals without evaluating source', () => {
+  const sources = {
+    'plugins/new/guard.test.mjs': 'throw new Error("must not execute");',
+    'new-root/custom.mjs': 'import test from "node:test";',
+    'fixtures/browser.js': 'import { test } from "@playwright/test";',
+    'native/Checks.swift': '@Test func contract() {}',
+    'tools/check.py': 'import unittest',
+    'crates/contracts.rs': '#[test]\nfn checks() {}',
+    'scripts/validate.sh': 'if [ "$1" = --self-test ]; then :; fi',
+    'scripts/contracts.bats': '@test "contract" { true; }',
+    'tools/unusual': '#!/usr/bin/env node\nimport assert from "node:assert/strict";',
+    'lib/plain.ts': 'export const value = 1;',
+    'docs/example.md': 'import test from "node:test";',
+  };
+  const found = discoverCandidates(Object.keys(sources), file => sources[file]);
+  assert.deepEqual(found.map(entry => entry.path).sort(), Object.keys(sources).filter(file => !['lib/plain.ts', 'docs/example.md'].includes(file)).sort());
+});
+
+test('discovery rejects duplicate, unsafe, unreadable and non-UTF8 source paths', () => {
+  for (const file of ['../escape.test.ts', '/absolute.test.ts', 'a//b.test.ts', 'a\\b.test.ts', 'x\0.test.ts', 'C:/x.test.ts']) {
+    assert.throws(() => discoverCandidates([file], () => ''), /Invalid inventory path/);
+  }
+  assert.throws(() => discoverCandidates(['a.test.ts', 'a.test.ts'], () => ''), /Duplicate discovery/);
+  assert.throws(() => discoverCandidates(['a.test.ts'], () => { throw new Error('unreadable-source'); }), /unreadable-source/);
+  assert.throws(() => discoverCandidates(['a.test.ts'], () => Buffer.from([0xff])), /Invalid UTF-8/);
+});
+
+test('new candidate, rename and delete cannot silently shrink the roster', () => {
+  assert.match(check(['old.test.ts', 'new/plugin.test.mjs'], [mapped('old.test.ts')], ['old.test.ts']).errors.join('\n'), /UNREGISTERED_CANDIDATE: new\/plugin/);
+  const renamed = check(['new.test.ts'], [mapped('old.test.ts')], ['new.test.ts']);
+  assert.match(renamed.errors.join('\n'), /STALE_ENTRY: old.test.ts/);
+  assert.match(renamed.errors.join('\n'), /UNREGISTERED_CANDIDATE: new.test.ts/);
+  assert.match(check([], [mapped('old.test.ts')], []).errors.join('\n'), /STALE_ENTRY/);
+});
+
+test('mapping removed from nonempty selection fails; source citation is not selection', () => {
+  const result = check(['a.test.ts', 'b.test.ts'], [mapped('a.test.ts'), mapped('b.test.ts')], ['a.test.ts']);
+  assert.equal(result.integrityPassed, false);
+  assert.match(result.errors.join('\n'), /MAPPED_NOT_SELECTED: unit: b.test.ts/);
+  assert.match(checkInventory(candidates(['a.test.ts']), manifest([{ path: 'a.test.ts', selection: { state: 'mapped', suiteIds: ['README-command'] } }]), selections(['a.test.ts'])).errors.join('\n'), /UNKNOWN_SUITE/);
+});
+
+test('invalid schema, duplicate entries and incomplete selectors fail closed without waiver fields', () => {
+  assert.match(check(['a.test.ts'], [mapped('a.test.ts'), mapped('a.test.ts')]).errors.join('\n'), /DUPLICATE_ENTRY/);
+  assert.match(check(['a.test.ts'], [{ ...mapped('a.test.ts'), optional: true }]).errors.join('\n'), /INVALID_ENTRY_FIELDS/);
+  assert.match(check(['a.test.ts'], [{ path: 'a.test.ts', selection: { state: 'deferred', reason: 'old debt' } }]).errors.join('\n'), /INVALID_SELECTION_STATE/);
+  assert.match(checkInventory(candidates(['a.test.ts']), manifest([mapped('a.test.ts')]), { unit: { files: ['a.test.ts'], errors: ['required group missing'] } }).errors.join('\n'), /INCOMPLETE_SELECTION/);
+  assert.match(check(['a.test.ts'], [mapped('a.test.ts')], ['a.test.ts', 'a.test.ts']).errors.join('\n'), /DUPLICATE_SELECTED_PATH/);
+  assert.match(check(['a.test.ts'], [], ['a.test.ts']).errors.join('\n'), /SELECTED_WITHOUT_ENTRY/);
+});
+
+function fixture(t, withDebt = false) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-fixture-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  execFileSync('git', ['init', '--quiet', root]);
+  const files = ['lib/a.test.ts', 'components/b.test.ts', ...UNIT_SCRIPT_TESTS];
+  if (withDebt) files.push('plugins/new/debt.test.mjs');
+  for (const file of files) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), 'throw new Error("Discovery must never run this test");\n');
+  }
+  fs.writeFileSync(path.join(root, 'test-inventory.v1.json'), JSON.stringify(manifest(files.map(file => file.startsWith('plugins/') ? debt(file) : mapped(file)))));
+  return root;
+}
+function run(root, mode = 'integrity', extra = []) {
+  return spawnSync(process.execPath, [cli, mode, '--root', root, ...extra], { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, timeout: 10_000 });
+}
+
+test('CLI discovers untracked sources, never executes them, and separates debt from static completeness', t => {
+  const root = fixture(t, true);
+  const integrity = run(root);
+  assert.equal(integrity.status, 0, integrity.stderr);
+  assert.match(integrity.stdout, /Inventory integrity: PASS/);
+  assert.match(integrity.stdout, /Selection completeness: INCOMPLETE/);
+  assert.match(integrity.stdout, /Unresolved selection: 1/);
+  assert.match(integrity.stdout, /Execution evidence: NOT_ASSESSED/);
+  assert.match(integrity.stdout, /C14 acceptance: NOT_ASSESSED/);
+  const complete = run(root, 'complete');
+  assert.equal(complete.status, 1, complete.stderr);
+  assert.doesNotMatch(complete.stderr, /Discovery must never run/);
+  fs.writeFileSync(path.join(root, 'plugins/new/added.test.mjs'), 'throw 1;');
+  const added = run(root);
+  assert.equal(added.status, 1);
+  assert.match(added.stderr, /UNREGISTERED_CANDIDATE: plugins\/new\/added.test.mjs/);
+});
+
+test('CLI static-complete result retains execution and C14 unknown; supports manifest override', t => {
+  const root = fixture(t);
+  fs.renameSync(path.join(root, 'test-inventory.v1.json'), path.join(root, 'roster.json'));
+  const result = run(root, 'complete', ['--manifest', 'roster.json']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Selection completeness: COMPLETE/);
+  assert.match(result.stdout, /C14 acceptance: NOT_ASSESSED/);
+});
+
+test('Git NUL discovery preserves spaces and Unicode paths', t => {
+  const root = fixture(t);
+  const filename = "new root/é space 'quote'.test.mjs";
+  fs.mkdirSync(path.join(root, 'new root'));
+  fs.writeFileSync(path.join(root, filename), 'throw 1;');
+  const result = run(root);
+  assert.equal(result.status, 1);
+  assert.ok(result.stderr.includes(`UNREGISTERED_CANDIDATE: ${filename}`));
+});
+
+test('actual selector missing or empty groups and missing literal propagate through CLI', t => {
+  for (const mutate of [
+    root => fs.rmSync(path.join(root, 'lib'), { recursive: true }),
+    root => fs.unlinkSync(path.join(root, 'components/b.test.ts')),
+    root => fs.unlinkSync(path.join(root, UNIT_SCRIPT_TESTS[0])),
+  ]) {
+    const root = fixture(t);
+    mutate(root);
+    assert.throws(() => collectUnitTestFiles(root), /required unit test|Required unit test/);
+    const result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /INCOMPLETE_SELECTION/);
+  }
+});
+
+test('import is inert and CLI read/Git/argument errors remain failures', t => {
+  const root = fixture(t);
+  const imported = spawnSync(process.execPath, ['--input-type=module', '--eval', `await import(${JSON.stringify(new URL('./test-inventory.mjs', import.meta.url).href)});`], { cwd: root, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' } });
+  assert.equal(imported.status, 0, imported.stderr);
+  assert.equal(imported.stdout, ''); assert.equal(imported.stderr, '');
+  assert.equal(run(root, 'unknown').status, 1);
+  fs.writeFileSync(path.join(root, 'test-inventory.v1.json'), '{');
+  assert.match(run(root).stderr, /INVENTORY_ERROR/);
+  fs.rmSync(path.join(root, '.git'), { recursive: true });
+  assert.equal(run(root).status, 1);
+});
+
+test('CLI invoked through a directory alias still reports unresolved debt and fails complete', t => {
+  const root = fixture(t, true);
+  const aliasRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-alias-'));
+  t.after(() => fs.rmSync(aliasRoot, { recursive: true, force: true }));
+  const alias = path.join(aliasRoot, 'scripts');
+  fs.symlinkSync(path.dirname(cli), alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const result = spawnSync(process.execPath, [path.join(alias, 'test-inventory.mjs'), 'complete', '--root', root], {
+    encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, timeout: 10_000,
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(result.stdout, /Inventory integrity: PASS/);
+  assert.match(result.stdout, /Selection completeness: INCOMPLETE/);
+  assert.match(result.stdout, /Unresolved selection: 1/);
+});
+
+test('import tolerates stdin, missing and non-directory argv without running CLI', t => {
+  const root = fixture(t);
+  for (const argv of ['-', path.join(root, 'missing-entry.mjs'), path.join(root, 'test-inventory.v1.json', 'child')]) {
+    const source = `process.argv[1] = ${JSON.stringify(argv)}; await import(${JSON.stringify(new URL('./test-inventory.mjs', import.meta.url).href)});`;
+    const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {
+      cwd: root, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, timeout: 10_000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, ''); assert.equal(result.stderr, '');
+  }
+});
+
+test('entrypoint canonicalization propagates filesystem errors other than missing path', () => {
+  const source = `
+import fs from 'node:fs';
+process.argv[1] = 'synthetic-denied-entry';
+const original = fs.realpathSync;
+fs.realpathSync = (...args) => {
+  if (args[0] === process.argv[1]) throw Object.assign(new Error('synthetic access denied'), { code: 'EACCES' });
+  return original(...args);
+};
+await import(${JSON.stringify(new URL('./test-inventory.mjs', import.meta.url).href)});
+`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', source], {
+    encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, timeout: 10_000,
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /synthetic access denied/);
+  assert.match(result.stderr, /EACCES/);
+  assert.equal(result.stdout, '');
+});
