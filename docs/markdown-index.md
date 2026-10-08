@@ -42,6 +42,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [design/2026-09-06-breccia-apple-reference.md](./design/2026-09-06-breccia-apple-reference.md) | Criteri ricavati da testo e fotogrammi Breccia, fonti e adattamenti Apple. | Prima di progettare o rifinire le app iPhone, iPad e Mac. |
 | [design/2026-09-06-086-macos-redesign.md](./design/2026-09-06-086-macos-redesign.md) | Proposta Mac con una sola lista laterale, gerarchia documentale e prove locali. | Revisione del redesign successivo alla prima rifinitura Apple 0.8.6. |
 | [analysis/2026-09-26-090-first-tranche.md](./analysis/2026-09-26-090-first-tranche.md) | Prima tranche locale 0.9.0: inventario, aggiornamento paziente atomico, audit pilota e riparazioni dei test. | Per distinguere candidati verificati, limiti e lavoro ancora aperto dalla release. |
+| [test-inventory.md](./test-inventory.md) | Inventario incrementale dei test, selettori verificati e omissioni; debito unresolved distinto dall’esecuzione e dall’accettazione C14. | Per aggiornare candidati e binding senza trasformare selezione statica o integrità in qualifica della release. |
 
 ## 📚 Come usare questo indice
 
