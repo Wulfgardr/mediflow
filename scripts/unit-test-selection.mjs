@@ -30,6 +30,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/node-runtime-contract.test.mjs',
   'scripts/unit-test-selection.test.mjs',
   'scripts/test-inventory.test.mjs',
+  'scripts/explicit-npm-test-selection.test.mjs',
   'scripts/chatgpt-account/account-service.test.ts',
   'scripts/chatgpt-account/account-browser.test.ts',
   'scripts/chatgpt-account/account-session-http.test.ts',

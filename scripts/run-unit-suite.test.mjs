@@ -103,6 +103,7 @@ for (const testFile of [
   'check-never-regress-tinetti-provenance.test.mjs',
   'unit-test-selection.test.mjs',
   'test-inventory.test.mjs',
+  'explicit-npm-test-selection.test.mjs',
   'chatgpt-account/account-service.test.ts',
   'chatgpt-account/account-browser.test.ts',
   'chatgpt-account/account-session-http.test.ts',

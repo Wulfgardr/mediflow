@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { discoverCandidates, checkInventory } from './test-inventory.mjs';
 import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
+import { EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
 
 const cli = fileURLToPath(new URL('./test-inventory.mjs', import.meta.url));
 const mapped = file => ({ path: file, selection: { state: 'mapped', suiteIds: ['unit'] } });
@@ -77,7 +78,24 @@ function fixture(t, withDebt = false) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), 'throw new Error("Discovery must never run this test");\n');
   }
-  fs.writeFileSync(path.join(root, 'test-inventory.v1.json'), JSON.stringify(manifest(files.map(file => file.startsWith('plugins/') ? debt(file) : mapped(file)))));
+  const entries = files.map(file => file.startsWith('plugins/') ? debt(file) : mapped(file));
+  const pkg = { scripts: {} };
+  const workflows = {};
+  for (const [i, suite] of EXPLICIT_NPM_SUITES.entries()) {
+    const file = `scripts/npm-fixture-${i}.test.mjs`;
+    fs.writeFileSync(path.join(root, file), 'throw new Error("Npm tests must not execute");');
+    pkg.scripts[suite.script] = `node --test ${file}`;
+    entries.push({ path: file, selection: { state: 'mapped', suiteIds: [suite.id] } });
+    const workflow = workflows[suite.workflow] ??= { jobs: {} };
+    const job = workflow.jobs[suite.job] ??= { steps: [] };
+    job.steps.push({ run: `npm run ${suite.script}`, ...(suite.stepIf ? { if: suite.stepIf } : {}) });
+  }
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
+  for (const [file, workflow] of Object.entries(workflows)) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), JSON.stringify(workflow));
+  }
+  fs.writeFileSync(path.join(root, 'test-inventory.v1.json'), JSON.stringify(manifest(entries)));
   return root;
 }
 function run(root, mode = 'integrity', extra = []) {
@@ -134,6 +152,17 @@ test('actual selector missing or empty groups and missing literal propagate thro
     assert.equal(result.status, 1);
     assert.match(result.stderr, /INCOMPLETE_SELECTION/);
   }
+});
+
+test('required npm binding errors propagate through CLI without disappearing from the report', t => {
+  const root = fixture(t);
+  fs.unlinkSync(path.join(root, '.github/workflows/cross-platform.yml'));
+  const result = run(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:launcher-helpers/);
+  assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:native-launcher/);
+  assert.match(result.stdout, /Inventory integrity: FAIL/);
+  assert.match(result.stdout, /C14 acceptance: NOT_ASSESSED/);
 });
 
 test('import is inert and CLI read/Git/argument errors remain failures', t => {

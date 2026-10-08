@@ -1,6 +1,7 @@
 # Test inventory
 
-The inventory detects changes to test discovery and to the unit suite's selection.
+The inventory detects changes to test discovery, the unit suite's selection, and
+five explicit npm test selections with configured CI calls.
 It does not certify that tests ran, that their assertions are sufficient, or that a
 release is qualified. Unresolved selections remain visible work; they are not
 approved exclusions or deferrals.
@@ -40,15 +41,41 @@ Discovery
 neither imports test code nor launches an application, database, browser or test
 suite. A source match is not proof that assertions execute.
 
-The initial executable selector model is the unit suite. The real runner and the
-inventory guard both use `scripts/unit-test-selection.mjs`. Its two recursive
+The real unit runner and the inventory guard both use
+`scripts/unit-test-selection.mjs`. Its two recursive
 groups and explicit script list preserve the unit suite's ordering and loader.
 Every required group must be readable and non-empty; every explicit test must be
 a file. Selection fails before database bootstrap or child launch if these
 conditions do not hold. The bootstrap, data-directory ownership, child error
 propagation and cleanup remain in `scripts/run-unit-suite.mjs`.
 
-Tests outside this model retain `unresolved` selection records, including tests
+The npm adapter reads the script bodies and CI configuration for
+`test:launcher-helpers`, `test:native-launcher`, `test:usage-dashboard`,
+`test:fabric-generative-runtime-crosswalk` and `test:lume-tokens`. Their suite IDs
+are prefixed with `npm:`. Each script must be exactly `node --test` followed by
+simple literal relative file paths. Missing files, duplicate paths (including
+directory aliases), flags, filters, shell syntax and expansions fail selection.
+
+Each required script must have one literal call in its designated CI job. The
+entire step's run block must consist of `npm run <script>` lines, blanks or
+standalone comments; a mention inside shell control flow or a heredoc is not a
+binding. The adapter rejects explicit false conditions, `continue-on-error`,
+shell failure-masking syntax and non-root working directories. It resolves working-directory and shell defaults
+from workflow to job to step; explicit shells are limited to `bash`, `sh` and
+`pwsh`. It preserves conditions, needs, runner and matrix metadata without
+evaluating them. The native launcher requires its existing macOS condition.
+Unreadable configuration, malformed YAML, duplicate keys, YAML merges and cyclic
+aliases fail. An invalid required suite remains present with errors and no
+selected files.
+
+This proves static selection by script bodies and configured calls only. It does
+not model npm lifecycle hooks, evaluate general CI reachability, prove exit-code
+propagation for every shell, execute test code or establish platform qualification.
+A preceding step may fail, a condition
+may not hold, and assertions may still skip or be empty. Those require execution
+receipts and further review.
+
+Tests outside these models retain `unresolved` selection records, including tests
 with separate existing commands or CI callers. `unresolved` means this guard has
 not verified a selector binding; it does not mean the file is orphaned or optional.
 Platform, capability and method filters need separate selector models and actual
