@@ -6,7 +6,7 @@ import path from 'path';
 import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';
 import { resolveDataPath } from '@/lib/data-dir';
-import { copySqliteDatabaseSync, replaceSqliteDatabase } from '@/lib/sqlite-repair';
+import { copySqliteDatabaseSync, recoverSqliteSwapArtifacts, replaceSqliteDatabase, SqliteSwapRecoveryRequiredError } from '@/lib/sqlite-repair';
 import { bootstrapEmptySqliteDatabase } from '@/lib/sqlite-new-database-bootstrap';
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 /* @Codex */
@@ -21,46 +21,10 @@ const isNextProductionBuild = process.env.NEXT_PHASE === 'phase-production-build
 const dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');
 const legacyDbPath = path.join(process.cwd(), 'medical.db');
 
-// A crash inside replaceSqliteDatabase can leave medical.db.repair-tmp-* /
-// medical.db.old-* files behind. If the crash hit the window between retiring
-// medical.db and renaming the staged copy in, the .old-* file is the only
-// surviving database: restore it before opening; everything else is stale.
-function recoverSwapArtifacts(): void {
-    const dir = path.dirname(dbPath);
-    const base = path.basename(dbPath);
-    let entries: string[];
-    try {
-        entries = fs.readdirSync(dir);
-    } catch {
-        return;
-    }
-    const isSidecar = (name: string) => name.endsWith('-wal') || name.endsWith('-shm');
-    const retired = entries.filter((name) => name.startsWith(`${base}.old-`) && !isSidecar(name));
-    if (!fs.existsSync(dbPath) && retired.length > 0) {
-        const newest = retired
-            .map((name) => ({ name, mtimeMs: fs.statSync(path.join(dir, name)).mtimeMs }))
-            .sort((a, b) => a.mtimeMs - b.mtimeMs)
-            .pop()!.name;
-        try {
-            for (const suffix of ['-wal', '-shm']) {
-                const sidecar = path.join(dir, `${newest}${suffix}`);
-                if (fs.existsSync(sidecar)) fs.renameSync(sidecar, `${dbPath}${suffix}`);
-            }
-            fs.renameSync(path.join(dir, newest), dbPath);
-            console.warn(`[MediFlow] Restored ${base} from interrupted swap artifact ${newest}`);
-        } catch (error) {
-            // Keep the artifacts on disk rather than risk deleting the only copy.
-            console.error('[MediFlow] Failed to restore DB from swap artifact:', error);
-            return;
-        }
-    }
-    for (const name of entries) {
-        if (!name.startsWith(`${base}.repair-tmp`) && !name.startsWith(`${base}.old-`)) continue;
-        const stalePath = path.join(dir, name);
-        if (fs.existsSync(stalePath)) fs.rmSync(stalePath, { force: true });
-    }
-}
-if (!isNextProductionBuild) recoverSwapArtifacts();
+// Recovery decides before legacy adoption, SQLite open or schema bootstrap.
+// Build-time imports have no authority even to inspect persistent artifacts.
+const swapRecovery = isNextProductionBuild ? { status: 'CLEAN' as const } : recoverSqliteSwapArtifacts(dbPath);
+if (swapRecovery.status === 'HOLD') throw new SqliteSwapRecoveryRequiredError();
 
 // An explicitly selected archive must not adopt an unrelated database from cwd.
 // Keep the historical default-root migration, with the same opt-out as E2E setup.
@@ -1047,18 +1011,49 @@ function applySchemaGuardsSerially(): void {
     }).immediate();
 }
 
+// Ordinary startup historically logs some audit-schema failures. A recovery
+// commit needs an explicit check against the shared canonical definition,
+// including same-name triggers that CREATE IF NOT EXISTS cannot repair.
+function validateRecoveryAuditSchema(): void {
+    ensureAuditSqliteSchema(sqlite);
+    const canonical = new Database(':memory:');
+    try {
+        ensureAuditSqliteSchema(canonical);
+        const expected = canonical.prepare("SELECT type, name, sql FROM sqlite_master WHERE tbl_name = 'audit_events' AND sql IS NOT NULL")
+            .all() as Array<{ type: string; name: string; sql: string }>;
+        for (const item of expected) {
+            const actual = sqlite.prepare('SELECT sql FROM sqlite_master WHERE type = ? AND name = ? AND tbl_name = ?')
+                .get(item.type, item.name, 'audit_events') as { sql: string } | undefined;
+            if (!actual || normalizeSchemaSql(actual.sql) !== normalizeSchemaSql(item.sql)) {
+                throw new Error('SQLITE_SWAP_RECOVERY_REQUIRED: incompatible audit schema.');
+            }
+        }
+    } finally { canonical.close(); }
+}
+
 // Next evaluates route modules while collecting build metadata. That phase has
 // no runtime authority and must never open, copy, inspect, or migrate the
 // persistent clinical database. The in-memory handle above keeps imports
 // structurally valid; real bootstrap remains unchanged for dev/server phases.
-if (!isNextProductionBuild) applySchemaGuardsSerially();
+if (!isNextProductionBuild) {
+    try {
+        applySchemaGuardsSerially();
+        if (swapRecovery.status === 'RECOVERED') {
+            validateRecoveryAuditSchema();
+            swapRecovery.complete();
+        }
+    } catch (error) {
+        sqlite.close();
+        throw error;
+    }
+}
 
 /**
  * Replaces the SQLite file from sourcePath without writing under the open
- * shared connection: checkpoint + close, swap via the SQLite backup API (with
- * an optional consistent pre-swap backup), then reopen and re-apply the schema
- * guards. Queries issued during the brief swap window fail fast instead of
- * reading a torn file.
+ * shared connection: close, stage independent SQLite snapshots, journal the
+ * replacement, reopen and re-apply schema guards, then persist the swap commit.
+ * Queries during asynchronous staging encounter the closed shared handle.
+ * Reopening, validation and the durable commit run without an event-loop yield.
  *
  * Swaps are serialized per destination inside replaceSqliteDatabase: a second
  * call while one is running rejects with SqliteSwapInProgressError before
@@ -1072,8 +1067,15 @@ export async function swapDatabaseFromFile(sourcePath: string, backupPath: strin
         connection: sqlite,
         reopenConnection: () => {
             sqlite = new Database(dbPath);
-            initSqlitePragmas(sqlite);
-            applySchemaGuardsSerially();
+            try {
+                initSqlitePragmas(sqlite);
+                applySchemaGuardsSerially();
+                validateRecoveryAuditSchema();
+                return sqlite;
+            } catch (error) {
+                sqlite.close();
+                throw error;
+            }
         },
     });
 }
