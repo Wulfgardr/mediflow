@@ -226,7 +226,7 @@ export async function createNetworkScopedPatient(
     if (!boundaryError.ok) return boundaryError;
 
     const normalized = normalizePatientCreateInput(body, {
-        id: typeof body.id === 'string' ? body.id : randomUUID(),
+        id: randomUUID,
         ambulatoryId: context.scopeAmbulatoryId,
     });
     if (!normalized.ok) {
@@ -237,6 +237,9 @@ export async function createNetworkScopedPatient(
     const denied = dbServer.transaction((tx) => {
         const denied = authorizeCommit(tx);
         if (denied) return denied;
+        if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) {
+            return { status: 409 as const, value: { error: 'Patient create conflict' } };
+        }
         tx.insert(patients).values(normalized.values).run();
         tx.insert(patientsToAmbulatories)
             .values({

@@ -13,7 +13,11 @@ const targetAmbulatorySchema = z.object({
 export const patientAssignSchema = targetAmbulatorySchema.extend({
     patientVersions: patientVersionsSchema,
 }).superRefine(validateExactPatientVersions);
-export const patientDuplicateSchema = targetAmbulatorySchema;
+export const patientDuplicateSchema = targetAmbulatorySchema.extend({
+    sourceAmbulatoryId: idSchema,
+    patientVersions: patientVersionsSchema,
+    duplicateIntentId: z.uuid().transform((id) => id.toLowerCase()),
+}).superRefine(validateExactPatientVersions);
 
 export const patientUnassignSchema = z.object({
     patientIds: patientIdsSchema,

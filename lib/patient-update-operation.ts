@@ -52,6 +52,11 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
 
         if (!existing) return { status: 404, value: { error: 'Not found' } };
 
+        if (existing.version !== input.expectedVersion) return { status: 409,
+            value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
+        if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
+            value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing) };
+
         const updated = tx.update(patients).set({ ...input.values, version: input.expectedVersion + 1 })
             .where(and(eq(patients.id, input.patientId), eq(patients.version, input.expectedVersion), activePatients()))
             .run();

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.32.0
+  version: 1.35.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -807,7 +807,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AmbulatoryWriteRequest'
+              $ref: '#/components/schemas/AmbulatoryUpdateRequest'
       responses:
         '200':
           $ref: '#/components/responses/AmbulatoryMutationSuccess'
@@ -850,6 +850,7 @@ paths:
                 version:
                   type: integer
                   minimum: 1
+                  maximum: 9007199254740991
       responses:
         '200':
           $ref: '#/components/responses/AmbulatoryMutationSuccess'
@@ -893,6 +894,7 @@ paths:
                 version:
                   type: integer
                   minimum: 1
+                  maximum: 9007199254740991
       responses:
         '200':
           $ref: '#/components/responses/AmbulatoryMutationSuccess'
@@ -1951,6 +1953,12 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Create identity conflict after admission; no existing patient data is returned and no writes occur.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -2903,6 +2911,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Checkup ID already exists. Returned only after current parent and scope admission, without existing-row details or a second write.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -5530,6 +5544,41 @@ components:
         version:
           type: integer
           minimum: 1
+    AmbulatoryUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description: On create, an omitted id generates a UUID; a supplied id must contain non-whitespace text and is trimmed. No UUID format is required.
+        name:
+          type: string
+        address:
+          type:
+            - string
+            - 'null'
+        parentId:
+          type:
+            - string
+            - 'null'
+        type:
+          type: string
+          enum: [live, test]
+        description:
+          type:
+            - string
+            - 'null'
+        isDefault:
+          type: boolean
+        createdAt:
+          description: Create only. Omission uses the current time. A supplied value must be a valid date string (including date-only strings) or a finite Unix timestamp in milliseconds; zero is valid. Null and booleans are rejected.
+          oneOf:
+            - type: string
+            - type: number
+        version:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
     AmbulatoryMutationResponse:
       type: object
       additionalProperties: false
@@ -6301,6 +6350,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Optional opaque ID preserved unchanged. Omit to generate a UUID; supplied non-string or blank IDs are invalid.
         date:
           type: string
           format: date-time
@@ -6331,12 +6383,16 @@ components:
         - version
       description: |
         Partial checkup update payload. At least one field other than `version`
-        must be provided. AI/document-derived writes and remote hard delete are
+        must be provided. A current version at 9007199254740991 returns 409
+        VERSION_CONFLICT before effects, even when the expected version matches.
+        The last permitted increment is 9007199254740990 to 9007199254740991.
+        AI/document-derived writes and remote hard delete are
         rejected by the paired boundary.
       properties:
         version:
           type: integer
           minimum: 1
+          maximum: 9007199254740991
         date:
           type: string
           format: date-time
@@ -6849,11 +6905,14 @@ components:
         - version
       description: |
         Partial patient update payload. At least one field other than `version`
-        must be provided.
+        must be provided. A current version at 9007199254740991 returns 409
+        VERSION_CONFLICT before effects, even when the expected version matches.
+        The last permitted increment is 9007199254740990 to 9007199254740991.
       properties:
         version:
           type: integer
           minimum: 1
+          maximum: 9007199254740991
         firstName:
           type: string
         lastName:
@@ -6953,6 +7012,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Omit to generate a UUID. Supplied IDs must be nonblank strings and are preserved exactly; an existing ID returns 409.
         firstName:
           type: string
         lastName:
@@ -7011,6 +7073,7 @@ components:
         version:
           type: integer
           minimum: 1
+          maximum: 9007199254740991
     PatientSoftDeleteRequest:
       allOf:
         - $ref: '#/components/schemas/PatientDeleteRequest'
