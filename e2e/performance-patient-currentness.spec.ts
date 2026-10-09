@@ -14,6 +14,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir, cpus, release, totalmem } from 'node:os';
 import path from 'node:path';
 import { unlockIfNeeded, waitForUnlockedInteractiveShell } from './utils';
+import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 const root = path.resolve(__dirname, '..');
 const patientId = 'perf-patient-000000';
@@ -176,13 +177,13 @@ test('production patient read/edit stays fresh and correct without AI', async ({
       await ready(nextName, nextNotes);
       const saveToFreshFormMs = performance.now() - saved;
       expect(await read(sentinelId), 'Editing A must not change B').toEqual(sentinel);
-      const replay = await page.request.put(`${url}/api/patients/${patientId}`, { data: payload });
+      const replay = await page.request.put(`${url}/api/patients/${patientId}`, { headers: trustedWebRequestHeaders(url), data: payload });
       expect(replay.status()).toBe(409);
       const replayBody = await replay.json();
       expect(replayBody).toEqual({ error: 'Conflict', code: 'VERSION_CONFLICT', entity: 'patient', recordId: patientId,
         expectedVersion: current.version, currentVersion: current.version + 1, currentState: 'present', currentUpdatedAt: fresh.updatedAt,
         currentSnapshot: { id: patientId, version: current.version + 1, updatedAt: fresh.updatedAt, isArchived: fresh.isArchived } });
-      const invalid = await page.request.put(`${url}/api/patients/${patientId}`, { data: { version: fresh.version, birthDate: 'invalid' } });
+      const invalid = await page.request.put(`${url}/api/patients/${patientId}`, { headers: trustedWebRequestHeaders(url), data: { version: fresh.version, birthDate: 'invalid' } });
       expect(invalid.status()).toBe(400);
       const invalidBody = await invalid.json();
       expect(invalidBody).toEqual({ error: 'Invalid birthDate' });
