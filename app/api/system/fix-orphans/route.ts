@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
@@ -87,10 +87,10 @@ export async function POST(request: Request) {
                 ?? tx.select().from(ambulatories).limit(1).get();
             const targetAmbId = target?.id ?? uuidv4();
             const targetAmbName = target?.name ?? 'Sede Principale';
-            const allPatients = tx.select({ id: patients.id }).from(patients).all();
+            const allPatients = tx.select({ id: patients.id, version: patients.version }).from(patients).all();
             const allLinks = tx.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories).all();
             const linkedPids = new Set(allLinks.map(link => link.pid));
-            const orphanPids = allPatients.filter(patient => !linkedPids.has(patient.id)).map(patient => patient.id);
+            const orphanPatients = allPatients.filter(patient => !linkedPids.has(patient.id));
 
             if (!target) {
                 const inserted = tx.insert(ambulatories).values({
@@ -108,15 +108,20 @@ export async function POST(request: Request) {
             }
 
             let fixed = 0;
-            for (const pid of orphanPids) {
+            for (const patient of orphanPatients) {
+                const pid = patient.id;
+                const nextVersion = patient.version + 1;
                 const inserted = tx.insert(patientsToAmbulatories)
                     .values({ patientId: pid, ambulatoryId: targetAmbId }).onConflictDoNothing().run();
                 if (inserted.changes !== 1) throw new Error('Orphan relink did not insert exactly one row');
+                const updated = tx.update(patients).set({ version: nextVersion, updatedAt: new Date() })
+                    .where(and(eq(patients.id, pid), eq(patients.version, patient.version))).run();
+                if (updated.changes !== 1) throw new Error('Orphan patient version did not update exactly one row');
                 fixed += 1;
                 writeAuditEventInTransaction(tx, { ...actor,
                     eventType: 'patient.updated', outcome: 'success', subjectType: 'patient', subjectRef: pid,
                     redactedMetadata: withAuditContextMetadata(auditContext, {
-                        changedFields: ['ambulatoryMemberships'], flags: ['membership:relinked'],
+                        changedFields: ['ambulatoryMemberships'], resourceVersion: nextVersion, flags: ['membership:relinked'],
                     }),
                 });
             }

@@ -269,6 +269,10 @@ export async function clearAmbulatory(
             writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.deleted', 'patient', patient.id,
                 { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version }));
         }
+        for (const patient of result.unlinkedPatients) {
+            writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.updated', 'patient', patient.id,
+                { changedFields: ['ambulatoryMemberships'], resourceVersion: patient.version, flags: ['membership:unassigned'] }));
+        }
         writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.cleared', 'ambulatory', ambulatoryId,
             { resourceVersion: target.version + 1 }));
         return {

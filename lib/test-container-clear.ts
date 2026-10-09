@@ -15,6 +15,8 @@ export type TestContainerClearResult = {
     clearedPatients: ClearedTestPatient[];
     // Members that also hold a live membership: they only lose the test link.
     preservedLivePatientIds: string[];
+    // Existing parents only unlinked by this clear, with their committed version.
+    unlinkedPatients: ClearedTestPatient[];
     removedMembershipRows: number;
 };
 
@@ -84,6 +86,22 @@ export function clearTestContainerByMembership(
         clearedPatients.push({ id: patient.id, version: patient.version });
     }
 
+    // Patients not tombstoned by this clear still lose membership authority.
+    // Preserve their lifecycle fields, including an existing tombstone.
+    const tombstonedIds = new Set(clearedPatients.map(patient => patient.id));
+    const remainingIds = memberIds.filter(id => !tombstonedIds.has(id));
+    const remainingPatients = remainingIds.length === 0 ? [] : runner
+        .select({ id: patients.id, version: patients.version }).from(patients)
+        .where(inArray(patients.id, remainingIds)).all();
+    const unlinkedPatients: ClearedTestPatient[] = [];
+    for (const patient of remainingPatients) {
+        const nextVersion = patient.version + 1;
+        const updated = runner.update(patients).set({ version: nextVersion, updatedAt: now })
+            .where(and(eq(patients.id, patient.id), eq(patients.version, patient.version))).run();
+        if (updated.changes !== 1) throw new Error('Test-container patient version did not update exactly one row');
+        unlinkedPatients.push({ id: patient.id, version: nextVersion });
+    }
+
     const removedMembershipRows = runner
         .delete(patientsToAmbulatories)
         .where(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId))
@@ -96,6 +114,7 @@ export function clearTestContainerByMembership(
 
     return {
         clearedPatients,
+        unlinkedPatients,
         preservedLivePatientIds: memberIds.filter((patientId) => liveMemberIds.has(patientId)),
         removedMembershipRows,
     };

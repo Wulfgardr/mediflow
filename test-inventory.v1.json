@@ -2529,6 +2529,15 @@
       }
     },
     {
+      "path": "lib/prescription-json-envelope.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/checkup-required-audit.test.ts",
       "selection": {
         "state": "mapped",
