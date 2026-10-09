@@ -150,7 +150,7 @@ Sorgenti: [lib/attachment-web-create.ts](../lib/attachment-web-create.ts), [lib/
 
 Create Web: schema, ID client o UUID, payload e parent attivo nella transazione; currentness host. PUT metadata: allowlist e transizioni coda, incremento currentness host. PUT content: expected currentness e CAS, parser dedicato. DELETE Web: ID path e changes=1; nessun CAS esplicito. Paired upload genera ID host e rilegge paziente/scope in transazione; ENC e no campi document-derived. Paired detail è solo GET.
 
-Prove di riferimento: [lib/attachment-web-create-currentness.test.ts](../lib/attachment-web-create-currentness.test.ts), [lib/attachment-web-put-currentness.test.ts](../lib/attachment-web-put-currentness.test.ts), [lib/attachment-currentness-host.test.ts](../lib/attachment-currentness-host.test.ts), [lib/network-attachment-write.test.ts](../lib/network-attachment-write.test.ts). test:network:home-base-documents-write; check:attachment-currentness-writers; test:attachment-currentness-writers. Gap C05-D: audit assente nei writer Web, al meglio in upload paired; non confondere currentness con audit del commit.
+Prove di riferimento: [lib/attachment-web-create-currentness.test.ts](../lib/attachment-web-create-currentness.test.ts), [lib/attachment-web-put-currentness.test.ts](../lib/attachment-web-put-currentness.test.ts), [lib/attachment-currentness-host.test.ts](../lib/attachment-currentness-host.test.ts), [lib/network-attachment-write.test.ts](../lib/network-attachment-write.test.ts). test:network:home-base-documents-write; check:attachment-currentness-writers; test:attachment-currentness-writers. Create/delete Web ora richiedono un evento nella stessa transazione immediata della mutazione; il create legge JSON entro il limite attachment corrente e rifiuta duplicati con 409. La suite create/currentness, già selezionata da unit, copre successo, rollback al guasto audit, INSERT ignorato e input/scope senza effetti. Gap C05-D: audit ancora assente in metadata/content Web e al meglio in upload paired; CAS/replay del delete restano aperti.
 
 ### S — Workflow SISS persistito
 
@@ -177,9 +177,9 @@ lancio SISS non sostituiscono questa suite CRUD.
 
 Sorgenti: [lib/patient-cascade.ts](../lib/patient-cascade.ts).
 
-Sessione Web admin. Restore accetta soltanto patientId, rilegge tombstone/versione in transazione immediata e incrementa versione host; replay dopo restore è 409. Purge richiede tombstone ma lo legge prima della transazione cascade. Fix-orphans usa due transazioni distinte: relink/default e purge opzionale; nessuna versione richiesta dal client.
+Sessione Web admin. Restore accetta soltanto patientId, rilegge tombstone/versione in transazione immediata e incrementa versione host; replay dopo restore è 409. Purge rilegge tombstone e versione, elimina figli/paziente e inserisce l’audit nella stessa transazione immediata. Fix-orphans usa due transazioni distinte: relink/default e purge opzionale; nessuna versione richiesta dal client.
 
-Prove di riferimento: [lib/patient-restore-required-audit.test.ts](../lib/patient-restore-required-audit.test.ts), [lib/patient-lifecycle.test.ts](../lib/patient-lifecycle.test.ts). scripts/patient-restore-required-audit-http.test.mjs; test:patient-cascade. Gap C05-M: non mescolare restore già migrato con purge/relink; test cascade non prova rollback dell’audit mancante.
+Prove di riferimento: [lib/patient-restore-required-audit.test.ts](../lib/patient-restore-required-audit.test.ts), [lib/patient-lifecycle.test.ts](../lib/patient-lifecycle.test.ts). scripts/patient-restore-required-audit-http.test.mjs; test:patient-cascade. Purge è coperto anche da [lib/patient-purge-required-audit.test.ts](../lib/patient-purge-required-audit.test.ts), selezionato dalla suite unit: successo, fault audit con rollback dati/eventi, replay e input/scope senza effetti. La revoca conservativa dei locator del cascade resta attiva anche dopo rollback SQLite. Gap C05-M: versione attesa dal client e relink/purge orfani restano separati.
 
 ### Nomi evento e transazioni dei profili migrati
 
@@ -191,8 +191,8 @@ I core E/T/O/C usano transazioni sincrone immediate con rilettura e audit richie
 P mantiene gli owner distinti di create/update/delete/lifecycle e restore admin.
 PR usa `prosthetic.prescription.*`; SP `service.prescription.*` e
 `service.prescription_item.*`; A `ambulatory.*` e, nel clear, `patient.deleted`.
-I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` dopo commit; purge M usa
-`patient.purged` dopo commit. Nei rami segnati **nessuno** non va presunto un
+I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` dopo commit; purge paziente M usa
+`patient.purged` nella stessa transazione, mentre fix-orphans lo scrive ancora dopo commit. Nei rami segnati **nessuno** non va presunto un
 evento solo perché il dominio compare nella taxonomy.
 
 
@@ -210,8 +210,8 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | A-04 | Web POST [/api/ambulatories/route.ts](../app/api/ambulatories/route.ts) | A; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | ambulatory-write; **TX+audit** | Audit e body migrati; residui campi/ID C05-A sopra |
 | D-01 | Web PUT [/api/attachments/[id]/content/route.ts](../app/api/attachments/[id]/content/route.ts) | D; JSON ≤ resolveMaxAttachmentBytes | ID/currentness del profilo; no patients.version | attachment-currentness-host TX immediata; **nessuno** | Aperto C05-D |
 | D-02 | Web PUT [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; JSON non bounded | ID/currentness del profilo; no patients.version | attachment-currentness-host TX immediata; **nessuno** | Aperto C05-D |
-| D-03 | Web DELETE [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; nessun body letto | ID/currentness del profilo; no patients.version | DELETE statement; **nessuno** | Aperto C05-D |
-| D-04 | Web POST [/api/attachments/route.ts](../app/api/attachments/route.ts) | D; Content-Length + payload; JSON non bounded | ID/currentness del profilo; no patients.version | attachment-web-create TX immediata; **nessuno** | Aperto C05-D |
+| D-03 | Web DELETE [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; nessun body letto | ID del profilo; no versione client | Lookup+delete in TX immediata; **TX+audit** | Audit migrato; CAS/replay C05-D |
+| D-04 | Web POST [/api/attachments/route.ts](../app/api/attachments/route.ts) | D; JSON bounded al limite attachment + payload | ID duplicato409; currentness host; parent attivo | attachment-web-create TX immediata; **TX+audit** | Create migrato; altri writer C05-D aperti |
 | C-01 | Web PUT [/api/checkups/[id]/route.ts](../app/api/checkups/[id]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | C-02 | Web DELETE [/api/checkups/[id]/route.ts](../app/api/checkups/[id]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | C-03 | Web POST [/api/checkups/route.ts](../app/api/checkups/route.ts) | C; 4 MiB | Create: ID/parent del profilo; versione host | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
@@ -241,7 +241,7 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | S-02 | Web DELETE [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; nessun body letto | ID path; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
 | S-03 | Web POST [/api/siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | S; 256 KiB + schema | ID/parent attivo in TX; dup409; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
 | M-01 | Web POST [/api/system/fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | M; JSON non bounded | selezione host; flag purge opzionale | TX relink + TX purge distinte; **relink nessuno; purge al meglio** | Aperto C05-M |
-| M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON non bounded | patientId; tombstone letto prima della TX | TX cascade; **al meglio dopo TX** | Aperto C05-M |
+| M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON oggetto ≤ 64 KiB | patientId; tombstone/versione riletti nella TX | TX immediata cascade+delete; **TX+audit** | Audit/input migrati; versione client residuo C05-M |
 | M-03 | Web POST [/api/system/restore-patient/route.ts](../app/api/system/restore-patient/route.ts) | M; 65.536 byte; solo patientId | patientId/tombstone; versione host nel restore | TX adapter immediata; **TX+audit** | Restore migrato |
 | T-01 | Web PUT [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | T-02 | Web DELETE [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
@@ -360,9 +360,9 @@ roster non li promuove a un nuovo dominio di commit clinico.
 2. **C05-B:** assign/unassign migrati per audit atomico e input limitato; restano
    CAS e replay dopo operazioni interposte. Move migrato con il CAS esistente;
    duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
-3. **C05-D:** create/delete Web, poi metadata/content; upload paired distinto.
+3. **C05-D:** create/delete Web migrati; proseguire metadata/content e upload paired.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
-4. **C05-M:** purge paziente; poi relink/purge orfani. Restore già migrato rimane
+4. **C05-M:** purge paziente migrato; proseguire relink/purge orfani. Restore già migrato rimane
    una riga di regressione, non la prova dei rami diversi.
 5. **C05-SEED/IMPORT/ID:** raccordare gli ingressi composti alle righe aggiornate;
    dare esiti espliciti alle sequenze parziali. Le coorti migrate P/E/T/O/C/PR/SP/A

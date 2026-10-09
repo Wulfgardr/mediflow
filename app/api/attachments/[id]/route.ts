@@ -1,3 +1,4 @@
+import { writeAttachmentWebAudit } from '@/lib/attachment-web-audit';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
@@ -134,8 +135,15 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const deleted = await dbServer.delete(attachments).where(eq(attachments.id, id));
-        if (deleted.changes !== 1) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        const deleted = dbServer.transaction((tx) => {
+            const attachment = tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get();
+            if (!attachment) return false;
+            const result = tx.delete(attachments).where(eq(attachments.id, attachment.id)).run();
+            if (result.changes !== 1) throw new Error('Attachment delete did not affect exactly one row');
+            writeAttachmentWebAudit(tx, request, session, 'attachment.deleted', attachment.id);
+            return true;
+        }, { behavior: 'immediate' });
+        if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         return NextResponse.json({ success: true });
     } catch (error) {
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });

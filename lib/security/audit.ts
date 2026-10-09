@@ -38,6 +38,7 @@ export const AUDIT_EVENT_TYPES = [
     'observation.deleted',
     /* @Codex: WUL-194 W5 S1, paired document domain boundary. */
     'attachment.created',
+    'attachment.deleted',
     'prosthetic.prescription.created',
     'prosthetic.prescription.updated',
     'prosthetic.prescription.deleted',
