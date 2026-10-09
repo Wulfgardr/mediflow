@@ -1,12 +1,12 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { sissHandoffEvents } from '@/lib/schema';
 import { auditContextFromSession, listChangedFields, requestIdFromRequest,
     withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-import { sissHandoffUpdateSchema } from '@/lib/api-schemas/siss-handoffs';
+import { sissHandoffUpdateSchema, sissHandoffWritePreconditionSchema } from '@/lib/api-schemas/siss-handoffs';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 
@@ -84,10 +84,18 @@ export async function PUT(request: Request, context: RouteContext) {
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
-            const existing = tx.select({ id: sissHandoffEvents.id }).from(sissHandoffEvents)
-                .where(eq(sissHandoffEvents.id, id)).get();
+            const target = and(eq(sissHandoffEvents.id, id), eq(sissHandoffEvents.patientId, body.patientId));
+            const existing = tx.select({ version: sissHandoffEvents.version }).from(sissHandoffEvents)
+                .where(target).get();
             if (!existing) return { status: 404, value: { error: 'SISS handoff not found' } } as const;
-            const changed = tx.update(sissHandoffEvents).set(updateData).where(eq(sissHandoffEvents.id, id)).run();
+            if (existing.version !== body.version) {
+                return { status: 409, value: { error: 'Il passaggio SISS è cambiato. Ricarica il diario prima di riprovare.' } } as const;
+            }
+            const expected = and(target, eq(sissHandoffEvents.version, body.version));
+            if (existing.version >= Number.MAX_SAFE_INTEGER) {
+                return { status: 409, value: { error: 'SISS handoff version exhausted' } } as const;
+            }
+            const changed = tx.update(sissHandoffEvents).set({ ...updateData, version: existing.version + 1 }).where(expected).run();
             if (changed.changes !== 1) throw new Error('SISS handoff update did not modify exactly one row');
             writeAuditEventInTransaction(tx, {
                 eventType: 'siss.handoff.updated',
@@ -99,10 +107,10 @@ export async function PUT(request: Request, context: RouteContext) {
                 sourceSurface: auditContext.sourceSurface,
                 requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
-                    changedFields: listChangedFields(body as Record<string, unknown>, []),
+                    changedFields: listChangedFields(body as Record<string, unknown>, ['patientId', 'version']),
                 }),
             });
-            return { status: 200, value: { success: true } } as const;
+            return { status: 200, value: { success: true, version: existing.version + 1 } } as const;
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
@@ -118,13 +126,27 @@ export async function DELETE(request: Request, context: RouteContext) {
     try {
         const { id } = await context.params;
 
+        const parsed = await readBoundedJsonBody(request, SISS_HANDOFF_JSON_MAX_BYTES, 'request-json');
+        if (!parsed.ok) {
+            return NextResponse.json({ error: parsed.status === 413 ? 'Richiesta troppo grande.' : 'Richiesta non valida.' },
+                { status: parsed.status });
+        }
+        const parsedBody = parseApiBody(sissHandoffWritePreconditionSchema, parsed.value);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.data;
+
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
-            const existing = tx.select({ id: sissHandoffEvents.id }).from(sissHandoffEvents)
-                .where(eq(sissHandoffEvents.id, id)).get();
+            const target = and(eq(sissHandoffEvents.id, id), eq(sissHandoffEvents.patientId, body.patientId));
+            const existing = tx.select({ version: sissHandoffEvents.version }).from(sissHandoffEvents)
+                .where(target).get();
             if (!existing) return { status: 404, value: { error: 'SISS handoff not found' } } as const;
-            const changed = tx.delete(sissHandoffEvents).where(eq(sissHandoffEvents.id, id)).run();
+            if (existing.version !== body.version) {
+                return { status: 409, value: { error: 'Il passaggio SISS è cambiato. Ricarica il diario prima di riprovare.' } } as const;
+            }
+            const expected = and(target, eq(sissHandoffEvents.version, body.version));
+            const changed = tx.delete(sissHandoffEvents).where(expected).run();
             if (changed.changes !== 1) throw new Error('SISS handoff delete did not modify exactly one row');
             writeAuditEventInTransaction(tx, {
                 eventType: 'siss.handoff.deleted',
