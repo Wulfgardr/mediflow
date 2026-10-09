@@ -121,9 +121,9 @@ Prove di riferimento: [lib/ambulatory-atomic.test.ts](../lib/ambulatory-atomic.t
 
 Sorgenti: [lib/api-schemas/patient-bulk.ts](../lib/api-schemas/patient-bulk.ts).
 
-Schema array ID e ambulatorio; lookup pazienti attivi/target. Move richiede mappa patientVersions esatta, CAS e incremento versione; duplicate genera UUID e copia le righe nella transazione batch. Assign/unassign non impongono versione paziente: lookup, modifica membership e audit obbligatorio condividono ora una transazione immediata. Gli eventi descrivono solo modifiche effettive; no-op e replay immediato non creano eventi, primary e versione restano invariati. Anche move inserisce gli eventi obbligatori nella sua transazione e limita il JSON a 256 KiB; duplicate resta senza audit.
+Schema array ID e ambulatorio; lookup pazienti attivi/target. Move richiede mappa patientVersions esatta, CAS e incremento versione; duplicate genera UUID e copia le righe nella transazione batch. Assign/unassign non impongono versione paziente: lookup, modifica membership e audit obbligatorio condividono ora una transazione immediata. Gli eventi descrivono solo modifiche effettive; no-op e replay immediato non creano eventi, primary e versione restano invariati. Anche move e duplicate inseriscono gli eventi obbligatori nella propria transazione immediata e limitano il JSON a 256 KiB. Duplicate include i lookup nello stesso snapshot e conserva campi e versione degli originali nei nuovi cloni.
 
-Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Gap C05-B: completare fault/errori/ID, audit obbligatorio e body limitato per duplicate; CAS e replay dopo operazioni interposte in assign/unassign restano aperti.
+Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Gap C05-B: CAS degli originali e idempotenza di duplicate restano aperti: ripetere la richiesta crea nuovi cloni. Anche CAS e replay dopo operazioni interposte in assign/unassign restano aperti.
 
 La [suite SQLite delle membership](../lib/patient-membership-required-audit.test.ts),
 selezionata dal profilo unit richiesto, verifica successo con identità host,
@@ -137,6 +137,12 @@ La [suite SQLite del trasferimento](../lib/patient-move-required-audit.test.ts)
 è selezionata dal profilo unit richiesto: audit del batch, rollback sul secondo
 evento, CAS/replay e input/scope negati senza effetti. Il trasferimento conserva
 la semantica del filtro opzionale `sourceAmbulatoryId` e le altre membership.
+
+Le [prove SQLite di duplicate](../lib/patient-duplicate-required-audit.test.ts),
+selezionate dalla suite unit, verificano due cloni con eventi attribuiti all’host,
+rollback di cloni/membership/eventi al guasto del secondo audit e dinieghi senza
+effetti. UUID nuovi, campi e versione copiati, ambulatorio primario e count sono
+preservati; la transazione non introduce un token di idempotenza.
 
 ### D — Allegati
 
@@ -218,7 +224,7 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | P-01 | Web PUT [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-update-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | P-02 | Web DELETE [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-delete-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | B-01 | Web POST [/api/patients/assign/route.ts](../app/api/patients/assign/route.ts) | B; 256 KiB | Array patientIds e targetAmbulatoryId; nessuna versione | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input migrati; CAS residuo C05-B; prova membership sotto |
-| B-02 | Web POST [/api/patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | B; JSON non bounded | Array patientIds e target; UUID nuovo per clone | TX adapter; **nessuno** | Aperto C05-B |
+| B-02 | Web POST [/api/patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | B; 256 KiB | Array patientIds e target; UUID nuovo per clone | Lookup+insert+membership in TX immediata; **TX+audit** | Audit/input migrati; CAS/replay residui C05-B |
 | B-03 | Web POST [/api/patients/move/route.ts](../app/api/patients/move/route.ts) | B; 256 KiB | Array patientIds, target e mappa patientVersions esatta; CAS | TX immediata adapter; **TX+audit** per paziente | Audit/input migrati; prova move nel profilo B |
 | P-03 | Web POST [/api/patients/route.ts](../app/api/patients/route.ts) | P; 4 MiB | Create: ID/parent del profilo; versione host | TX adapter + patient-create-service; **TX+audit** | Migrato; delta/prove per profilo |
 | B-04 | Web POST [/api/patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | B; 256 KiB | Array patientIds e ambulatoryId; nessuna versione | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input migrati; CAS residuo C05-B; prova membership sotto |
@@ -353,7 +359,7 @@ roster non li promuove a un nuovo dominio di commit clinico.
    resta distinto dal diario persistito.
 2. **C05-B:** assign/unassign migrati per audit atomico e input limitato; restano
    CAS e replay dopo operazioni interposte. Move migrato con il CAS esistente;
-   duplicate è la prossima coorte batch, includendo i lookup nella transazione.
+   duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
 3. **C05-D:** create/delete Web, poi metadata/content; upload paired distinto.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
 4. **C05-M:** purge paziente; poi relink/purge orfani. Restore già migrato rimane
