@@ -5,10 +5,11 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 
 const root = path.resolve(import.meta.dirname, '..');
-const loader = path.join(root, 'scripts/register-strip-types-loader.mjs');
+const loader = pathToFileURL(path.join(root, 'scripts/register-strip-types-loader.mjs')).href;
 const worker = `
   import fs from 'node:fs';
   import os from 'node:os';
