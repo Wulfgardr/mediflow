@@ -8,7 +8,7 @@ read_when:
 
 Roster per [WUL-720](https://linear.app/wulfgardr/issue/WUL-720), ricavato dalla
 base `fe974d1956a72d97bf90fc10fd36d0892b092b8e` e aggiornato con la migrazione
-atomica del diario SISS locale. Le correzioni successive aggiornano la riga
+atomica del diario SISS locale e delle membership ambulatoriali. Le correzioni successive aggiornano la riga
 interessata insieme al codice. Le celle con un gap indicano lavoro ancora aperto
 in C05; la presenza della tabella non ne attesta il completamento.
 
@@ -121,9 +121,17 @@ Prove di riferimento: [lib/ambulatory-atomic.test.ts](../lib/ambulatory-atomic.t
 
 Sorgenti: [lib/api-schemas/patient-bulk.ts](../lib/api-schemas/patient-bulk.ts).
 
-Schema array ID e ambulatorio; lookup pazienti attivi/target. Move richiede mappa patientVersions esatta, CAS e incremento versione; duplicate genera UUID e copia le righe nella transazione batch. Assign/unassign non impongono versione paziente e non sono una transazione comune con i lookup. Nessun evento audit nei quattro adapter.
+Schema array ID e ambulatorio; lookup pazienti attivi/target. Move richiede mappa patientVersions esatta, CAS e incremento versione; duplicate genera UUID e copia le righe nella transazione batch. Assign/unassign non impongono versione paziente: lookup, modifica membership e audit obbligatorio condividono ora una transazione immediata. Gli eventi descrivono solo modifiche effettive; no-op e replay immediato non creano eventi, primary e versione restano invariati. Move e duplicate restano senza audit.
 
-Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Gap C05-B: aggiungere roster di fault/errori/ID per operazione, audit obbligatorio e body bounded senza attribuire copertura inesistente.
+Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Gap C05-B: completare fault/errori/ID, audit obbligatorio e body limitato per move/duplicate; CAS e replay dopo operazioni interposte nelle membership restano aperti.
+
+La [suite SQLite delle membership](../lib/patient-membership-required-audit.test.ts),
+selezionata dal profilo unit richiesto, verifica successo con identità host,
+rollback di tutto il batch al secondo audit, replay/no-op e 4xx senza effetti.
+Lo smoke [patient-concurrency](../scripts/patient-concurrency.test.mjs) usa
+l'origine e i metadati di trasporto richiesti dal client Web. I suoi cinque
+scenari verificano conflitti Web/API v1 e contesa del move; la prova specifica
+di assign/unassign resta nella suite SQLite delle membership.
 
 ### D — Allegati
 
@@ -204,11 +212,11 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | O-03 | Web POST [/api/observations/route.ts](../app/api/observations/route.ts) | O; 4 MiB | Create: ID/parent del profilo; versione host | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | P-01 | Web PUT [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-update-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | P-02 | Web DELETE [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-delete-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| B-01 | Web POST [/api/patients/assign/route.ts](../app/api/patients/assign/route.ts) | B; JSON non bounded | Array patientIds e ambulatoryId; nessuna versione | statement; lookup fuori TX; **nessuno** | Aperto C05-B |
+| B-01 | Web POST [/api/patients/assign/route.ts](../app/api/patients/assign/route.ts) | B; 256 KiB | Array patientIds e targetAmbulatoryId; nessuna versione | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input migrati; CAS residuo C05-B; prova membership sotto |
 | B-02 | Web POST [/api/patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | B; JSON non bounded | Array patientIds e target; UUID nuovo per clone | TX adapter; **nessuno** | Aperto C05-B |
 | B-03 | Web POST [/api/patients/move/route.ts](../app/api/patients/move/route.ts) | B; JSON non bounded | Array patientIds, target e mappa patientVersions esatta | TX adapter; **nessuno** | Aperto C05-B |
 | P-03 | Web POST [/api/patients/route.ts](../app/api/patients/route.ts) | P; 4 MiB | Create: ID/parent del profilo; versione host | TX adapter + patient-create-service; **TX+audit** | Migrato; delta/prove per profilo |
-| B-04 | Web POST [/api/patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | B; JSON non bounded | Array patientIds e ambulatoryId; nessuna versione | statement; lookup fuori TX; **nessuno** | Aperto C05-B |
+| B-04 | Web POST [/api/patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | B; 256 KiB | Array patientIds e ambulatoryId; nessuna versione | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input migrati; CAS residuo C05-B; prova membership sotto |
 | PR-01 | Web PUT [/api/prosthetic-prescriptions/[id]/route.ts](../app/api/prosthetic-prescriptions/[id]/route.ts) | PR; JSON non bounded | ID path; parent e versione del profilo | prosthetic-prescription-write; **TX+audit** | Audit migrato; body/ID C05-PR |
 | PR-02 | Web DELETE [/api/prosthetic-prescriptions/[id]/route.ts](../app/api/prosthetic-prescriptions/[id]/route.ts) | PR; JSON non bounded | ID path; parent e versione del profilo | prosthetic-prescription-write; **TX+audit** | Audit migrato; body/ID C05-PR |
 | PR-03 | Web POST [/api/prosthetic-prescriptions/route.ts](../app/api/prosthetic-prescriptions/route.ts) | PR; JSON non bounded | Create: ID/parent del profilo; versione host | prosthetic-prescription-write; **TX+audit** | Audit migrato; body/ID C05-PR |
@@ -338,8 +346,9 @@ roster non li promuove a un nuovo dominio di commit clinico.
 1. **C05-S:** audit atomico dei tre writer Web migrato. Restano CAS/versioni,
    verifica del parent nei percorsi di modifica e idempotenza PUT. Il lancio SISS
    resta distinto dal diario persistito.
-2. **C05-B:** assign/unassign insieme; move e duplicate in coorti distinte per
-   CAS e batch. I lookup fuori transazione sono parte del lavoro, non solo il log.
+2. **C05-B:** assign/unassign migrati per audit atomico e input limitato; restano
+   CAS e replay dopo operazioni interposte. Move e duplicate in coorti distinte
+   per CAS e batch; includere i lookup nel confine transazionale.
 3. **C05-D:** create/delete Web, poi metadata/content; upload paired distinto.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
 4. **C05-M:** purge paziente; poi relink/purge orfani. Restore già migrato rimane
