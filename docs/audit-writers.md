@@ -2,7 +2,7 @@
 
 Elenco C04 / [WUL-719](https://linear.app/wulfgardr/issue/WUL-719), verificato
 sulla base `fe974d1956a72d97bf90fc10fd36d0892b092b8e`, con la successiva
-migrazione C05 del diario SISS locale descritta sotto. La classificazione segue
+migrazione C05 del diario SISS locale e delle membership ambulatoriali descritte sotto. La classificazione segue
 [ADR 0015](./adr/0015-audit-taxonomy-minimum-catalog.md); la migrazione dei writer
 clinici residui appartiene a [C05 / WUL-720](https://linear.app/wulfgardr/issue/WUL-720),
 con le operazioni e le prove raccolte nel [roster delle scritture](./clinical-write-roster.md).
@@ -21,7 +21,7 @@ cambiamento dello scheduler OS non è una transazione SQLite distribuita.
 
 Le righe identificano i punti di scrittura e i wrapper che li raggiungono;
 gli adapter che convergono sulla stessa operazione non sono writer aggiuntivi.
-I numeri di riga si riferiscono alla base sopra; i link SISS puntano ai writer aggiornati.
+I numeri di riga si riferiscono alla base sopra; i link SISS e membership puntano ai writer aggiornati.
 Test, fixture, DDL,
 lettori dell'audit ed export dei record non sono nuovi eventi di produzione.
 
@@ -64,6 +64,8 @@ una riga inserita; non apre una seconda connessione.
 | [ambulatory-write.ts:232](../lib/ambulatory-write.ts#L232) | Eliminazione ambulatorio: cambia lo scope persistito. | Transazione immediata host/paired. |
 | [ambulatory-write.ts:258](../lib/ambulatory-write.ts#L258) | Pulizia ambulatorio: evento per ciascun paziente eliminato logicamente. | Transazione della pulizia, anche per contenitori di test. |
 | [ambulatory-write.ts:261](../lib/ambulatory-write.ts#L261) | Evento complessivo `ambulatory.cleared`. | Stessa transazione degli effetti sui pazienti. |
+| [patients/assign/route.ts](../app/api/patients/assign/route.ts) | Associazione secondaria paziente/ambulatorio: cambia lo scope persistito. | C05: lookup, insert ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
+| [patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | Rimozione associazione secondaria, con primary e versione invariati. | C05: lookup, delete ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
@@ -75,6 +77,13 @@ Le [prove SQLite dei tre handler](../lib/siss-handoff-required-audit.test.ts)
 verificano rollback per guasto audit e successo con un solo evento. Il controllo
 di versione e l'idempotenza generale dei PUT restano lavori C05: la transazione
 immediata non li introduce.
+
+Assign e unassign leggono JSON fino a 256 KiB e validano gli schemi esistenti.
+Le [prove SQLite della famiglia](../lib/patient-membership-required-audit.test.ts)
+verificano rollback dell'intero batch se il secondo audit fallisce o viene
+ignorato, identità host, dinieghi senza effetti e replay immediato senza audit
+aggiuntivo. La versione del paziente e l'ambulatorio primario restano invariati;
+CAS e replay dopo operazioni interposte restano residui C05.
 
 ## Writer clinici ancora al meglio: consegna a C05
 

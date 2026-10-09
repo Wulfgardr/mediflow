@@ -326,7 +326,11 @@ async function createAuthContext() {
     });
 
     return {
-        web: new LaneClient('web', '/api/patients', { Cookie: cookieHeader }),
+        web: new LaneClient('web', '/api/patients', {
+            Cookie: cookieHeader,
+            Origin: new URL(BASE_URL).origin,
+            'Sec-Fetch-Site': 'same-origin',
+        }),
         'native-v1': nativeLane,
         native: nativeLane
     };

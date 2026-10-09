@@ -4019,6 +4019,15 @@
       }
     },
     {
+      "path": "lib/patient-membership-required-audit.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/patient-module-rail-mapping.test.ts",
       "selection": {
         "state": "mapped",
