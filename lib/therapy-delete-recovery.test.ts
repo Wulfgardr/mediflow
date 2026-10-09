@@ -271,7 +271,8 @@ for (const rejected of [true, false]) {
         if (!rejected) f.facade.remove = async () => { throw new Error('uncertain'); };
         await f.begin();
         f.controller.cancel();
-        assert.equal(f.controller.snapshot, null);
+        assert.equal(f.states.at(-1), null);
+        assert.equal(f.controller.blocked, false);
         await f.controller.begin(therapy, async () => { assert.fail('must reread first'); });
         assert.equal(f.writes.length, 1);
         assert.equal(f.controller.snapshot?.reason, '');
