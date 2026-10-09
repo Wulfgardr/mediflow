@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
 
 // Real authenticated routes and synthetic SQLite records. Only the named
 // transport failures are injected; writes forwarded by route.fetch still commit.
@@ -97,6 +97,20 @@ for (const width of [1440, 390]) {
     expect(writes.map(write => write.version)).toEqual([1, 2]);
     const stored = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
     expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', status: 'suspended' });
+    await expect(save(page)).toBeHidden();
+
+    // Read the persisted, decrypted note in a fresh document, without filling
+    // the editor again or reusing the pre-save draft as the readback oracle.
+    await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await openPatientSection(page, 'terapie');
+    await page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })
+      .locator('..').locator('..').locator('..').getByRole('button', { name: 'Modifica', exact: true }).click();
+    await expect(note(page)).toHaveValue('Nota sintetica da conservare');
+    await expect(dosage(page)).toHaveValue('Dose della bozza sintetica');
+    const reloaded = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
+    expect(reloaded).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', status: 'suspended' });
+    expect(writes.map(write => write.version)).toEqual([1, 2]);
     await assertNoHorizontalOverflow(page, [{ label: 'therapy pane', selector: '#terapie' }]);
   });
 }
