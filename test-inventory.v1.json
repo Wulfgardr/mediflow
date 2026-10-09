@@ -266,29 +266,37 @@
     {
       "path": "e2e/ai-label-read-lifecycle.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/ai-rollout-guard-settings.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/ai-rollout-readiness-panel.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/ambulatory-write-integrity.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
@@ -329,29 +337,37 @@
     {
       "path": "e2e/clinical-scales-validation.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/cockpit-navigation.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/contrasto-registri.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/disabled-model-preference-restart.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
@@ -364,64 +380,82 @@
     {
       "path": "e2e/document-flow-real-route.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/document-import.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/document-stack-accessibility.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/document-synthesis-fabric-review.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/document-upload-anydoc-focus.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/document-upload-ocr-recovery.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/document-upload-ocr.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/fhir-diagnosis-warning.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/fhir-share.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
@@ -434,134 +468,172 @@
     {
       "path": "e2e/function-status.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/header-sicurezza.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/intelligent-host-patient-action.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/kree8-area-focus.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/kree8-keyboard.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/live-query-lifecycle.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-analytics-settings.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-diario.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-editor.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-frame.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-new-entry.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-quadro.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-runtime.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-scheda.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/lume-worklist.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/motion-budget.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/official-ui.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/onboarding-experience.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/ordinary-chatgpt-four-functions.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
@@ -574,134 +646,172 @@
     {
       "path": "e2e/patient-bulk-import.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/patient-edit-snapshot.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/patient-header.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/patient-insight-fabric-review.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/patient-insight-kill-switch.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/patient-insight-render.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/performance-patient-currentness.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/pin-unlock-parity.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/prosthetic-write-integrity.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/runtime-twin.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/runtime-workbench.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/service-prescription-write-integrity.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/settings-compliance.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/settings-fabric.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/smart-import-kill-switch.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/smart-import.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/therapy-recovery.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/treatment-reasoning-fabric-review.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/treatment-reasoning-kill-switch.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
@@ -714,43 +824,55 @@
     {
       "path": "e2e/web-auth-access-lifecycle.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/web-auth-login-p3.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/web-auth-recovery.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/web-cookie-mutation-admission.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/web-smoke.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
       "path": "e2e/work-profile-onboarding.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
       }
     },
     {
