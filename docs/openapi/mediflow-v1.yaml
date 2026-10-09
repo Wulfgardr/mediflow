@@ -1411,6 +1411,8 @@ paths:
       operationId: createNetworkServicePrescription
       summary: Create service prescription through the paired boundary
       description: |
+        Requires a JSON object within 4 MiB. Malformed JSON, null, arrays and
+        scalar bodies return 400 before mutation; oversized bodies return 413.
         Creates a service prescription for a patient in the paired client's
         effective ambulatory scope. This route requires
         `network.replica.write-service-prescriptions`.
@@ -1451,6 +1453,8 @@ paths:
       operationId: updateNetworkServicePrescription
       summary: Update service prescription through the paired boundary
       description: |
+        Requires a JSON object within 4 MiB. Malformed JSON, null, arrays and
+        scalar bodies return 400 before mutation; oversized bodies return 413.
         Applies a compare-on-write update to a service prescription in scope.
         `version` is required and stale versions return `VERSION_CONFLICT`.
         This route requires `network.replica.write-service-prescriptions`.
@@ -1545,6 +1549,8 @@ paths:
       operationId: createNetworkServicePrescriptionItem
       summary: Create service prescription item through the paired boundary
       description: |
+        Requires a JSON object within 4 MiB. Malformed JSON, null, arrays and
+        scalar bodies return 400 before mutation; oversized bodies return 413.
         Creates an item for a scoped parent service prescription. The item
         inherits patientId from its parent. This route requires
         `network.replica.write-service-prescriptions`.
@@ -1585,6 +1591,8 @@ paths:
       operationId: updateNetworkServicePrescriptionItem
       summary: Update service prescription item through the paired boundary
       description: |
+        Requires a JSON object within 4 MiB. Malformed JSON, null, arrays and
+        scalar bodies return 400 before mutation; oversized bodies return 413.
         Applies a compare-on-write update to a service prescription item in
         scope. `version` is required and stale versions return
         `VERSION_CONFLICT`. This route requires
@@ -1732,6 +1740,8 @@ paths:
       operationId: createNetworkProstheticPrescription
       summary: Create prosthetic prescription through the paired boundary
       description: |
+        Requires a JSON object within 4 MiB. Malformed JSON, null, arrays and
+        scalar bodies return 400 before mutation; oversized bodies return 413.
         Creates a prosthetic prescription for a patient in the paired client's
         effective ambulatory scope. This route requires
         `network.replica.write-prosthetic-prescriptions`.
@@ -1772,6 +1782,8 @@ paths:
       operationId: updateNetworkProstheticPrescription
       summary: Update prosthetic prescription through the paired boundary
       description: |
+        Requires a JSON object within 4 MiB. Malformed JSON, null, arrays and
+        scalar bodies return 400 before mutation; oversized bodies return 413.
         Applies a compare-on-write update to a prosthetic prescription in
         scope. `version` is required and stale versions return
         `VERSION_CONFLICT`. This route requires
