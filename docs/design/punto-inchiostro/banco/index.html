@@ -32,9 +32,9 @@ button,select,input{font:inherit;color:inherit}
 
 /* ═════ applicazione ═════ */
 .app{--penombra:#e8eaee;--piano:#fff;--filetto:#dfe2e7;--filetto2:#c9ced6;--ink:#14161a;--fresh:#2346b0;--matita:#5f6878;--sec:#555e6b;--freshbg:#f3f6fd;--freshln:#d9e0f3;--hov:#f5f6f8;--sel:#eef2fb;--warn:#8a5a1c;--crit:#a33a2f;--ok:#3f5a49;--soglia:#14161a;--sogliatx:#fff;
- --row:36px;--rc:10px;--rp:16px;--prosa:17px;--reg:13.5px;--tposa:520ms;--tdry:1500ms;--side:176px;
+ --u:4px;--row:40px;--rc:10px;--rp:16px;--prosa:17px;--reg:14px;--tposa:520ms;--tdry:1500ms;--side:192px;
  --f:-apple-system,BlinkMacSystemFont,"Segoe UI Variable","Segoe UI",Roboto,"Noto Sans",sans-serif;--s:"Newsreader",Georgia,"Times New Roman",serif;--m:"IBM Plex Mono",ui-monospace,Menlo,monospace;
- width:100%;height:100%;display:flex;flex-direction:column;background:var(--penombra);color:var(--ink);font:var(--reg)/1.4 var(--f);-webkit-font-smoothing:antialiased;position:relative}
+ width:100%;height:100%;display:flex;flex-direction:column;background:var(--penombra);color:var(--ink);font:var(--reg)/1.5 var(--f);-webkit-font-smoothing:antialiased;position:relative}
 .app.gr{--penombra:#101216;--piano:#1a1d22;--filetto:#2a2e35;--filetto2:#3b414b;--ink:#e9ecef;--fresh:#9db4ff;--matita:#9aa3b0;--sec:#a3acb8;--freshbg:#1d2333;--freshln:#2f3a5c;--hov:#20242a;--sel:#232a3d;--warn:#d9a75f;--crit:#f08a7d;--ok:#8fbf9f;--soglia:#e9ecef;--sogliatx:#14161a}
 .app.touch{--row:44px}
 .app button{cursor:pointer;font:inherit;color:inherit}
@@ -53,7 +53,7 @@ button,select,input{font:inherit;color:inherit}
 .fresh{color:var(--fresh)}.pencil{color:var(--matita);text-decoration:underline dashed;text-decoration-thickness:1px;text-underline-offset:4px}
 .dries{animation:dry var(--tdry) ease-out both}@keyframes dry{from{color:var(--fresh)}to{color:var(--ink)}}
 .w{color:var(--warn)}.cr{color:var(--crit)}.okc{color:var(--ok)}
-.c{font-family:var(--m);font-size:.89em;color:var(--sec);white-space:nowrap}.v{font-family:var(--m);font-weight:500;white-space:nowrap}.r{text-align:right}.num{font-variant-numeric:tabular-nums}
+.c{font-size:.93em;color:var(--sec);white-space:nowrap;font-variant-numeric:tabular-nums}.v{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}.code{font-family:var(--m);font-size:.86em;color:var(--sec);white-space:nowrap;letter-spacing:-.01em}.r{text-align:right}.num{font-variant-numeric:tabular-nums}
 .grow{flex:1}.sr{position:absolute;left:-9999px}
 /* cornici di piattaforma */
 .tb{display:flex;align-items:center;gap:10px;height:40px;padding:0 12px;flex:none;color:var(--sec);font-size:12.5px}
@@ -64,13 +64,13 @@ button,select,input{font:inherit;color:inherit}
 .pf-win .tb{height:34px}
 .ios-st{display:flex;justify-content:space-between;padding:10px 26px 2px;font-weight:600;font-size:14px;flex:none}
 .shell{flex:1;min-height:0;display:flex}
-.side{width:var(--side);flex:none;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
-.side .wm{padding:2px 10px 14px}
-.side button{border:0;background:transparent;text-align:left;height:var(--row);padding:0 10px;border-radius:var(--rc);color:var(--sec);flex:none}
+.side{width:var(--side);flex:none;padding:calc(var(--u)*4) calc(var(--u)*3);display:flex;flex-direction:column;gap:2px;overflow:auto}
+.side .wm{padding:calc(var(--u)*1) calc(var(--u)*3) calc(var(--u)*5)}
+.side button{border:0;background:transparent;text-align:left;height:var(--row);padding:0 calc(var(--u)*3);border-radius:var(--rc);color:var(--sec);flex:none}
 .side button[aria-current]{background:color-mix(in srgb,var(--piano) 80%,transparent);color:var(--ink);font-weight:600}
 .pf-win .side button[aria-current]{box-shadow:inset 3px 0 0 var(--fresh);border-radius:4px}
 .side .sp{flex:1}
-.main{flex:1;min-width:0;display:flex;padding:10px 10px 0 0}
+.main{flex:1;min-width:0;display:flex;padding:calc(var(--u)*3) calc(var(--u)*3) 0 0}
 .pf-mac .main,.pf-win .main,.pf-linux .main{padding-top:0}
 .plane{flex:1;min-width:0;background:var(--piano);border-radius:var(--rp) var(--rp) 0 0;box-shadow:0 0 0 1px color-mix(in srgb,var(--ink) 6%,transparent),0 18px 44px -26px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden}
 .scroll{flex:1;min-height:0;overflow:auto}
@@ -79,56 +79,56 @@ button,select,input{font:inherit;color:inherit}
 .tabs button[aria-current]{color:var(--fresh);font-weight:600}
 .tabs svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6}
 /* testate e controlli */
-.hd{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:14px 22px 12px;border-bottom:1px solid var(--filetto);flex:none}
-.hd h2{font-family:var(--s);font-weight:400;font-size:30px;line-height:1.05;letter-spacing:-.012em;margin:0}
-.facts{color:var(--sec);font-family:var(--m);font-size:12px}
-.alg{color:var(--crit);border:1px solid var(--crit);border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
-.btn{height:var(--row);padding:0 14px;border-radius:var(--rc);border:1px solid var(--filetto2);background:var(--piano);font-weight:500;transition:transform 80ms;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.hd{display:flex;flex-wrap:wrap;gap:calc(var(--u)*2) calc(var(--u)*4);align-items:center;padding:calc(var(--u)*5) calc(var(--u)*7) calc(var(--u)*4);border-bottom:1px solid var(--filetto);flex:none}
+.hd h2{font-family:var(--s);font-weight:400;font-size:28px;line-height:1.1;letter-spacing:-.01em;margin:0}
+.facts{color:var(--sec);font-size:.93em;font-variant-numeric:tabular-nums}
+.alg{color:var(--crit);border:1px solid var(--crit);border-radius:999px;padding:3px 10px;font-size:.93em;font-weight:600;white-space:nowrap}
+.btn{height:var(--row);padding:0 calc(var(--u)*4);border-radius:var(--rc);border:1px solid var(--filetto2);background:var(--piano);font-weight:500;transition:transform 80ms;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .btn:active{transform:scale(.97)}.btn.p{background:var(--fresh);border-color:var(--fresh);color:var(--piano)}
 .btn[disabled]{opacity:.55;cursor:default}
 .btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7}
 .inp{height:var(--row);border:1px solid var(--filetto2);border-radius:var(--rc);padding:0 12px;background:var(--piano);color:var(--ink);font:inherit;min-width:0}
 .sgm{display:inline-flex;background:var(--penombra);border-radius:var(--rc);padding:2px;max-width:100%;overflow-x:auto}
-.sgm button{border:0;background:transparent;height:calc(var(--row) - 4px);padding:0 11px;border-radius:calc(var(--rc) - 2px);color:var(--sec);white-space:nowrap;transition:background 160ms}
+.sgm button{border:0;background:transparent;height:calc(var(--row) - 4px);padding:0 calc(var(--u)*3.5);border-radius:calc(var(--rc) - 2px);color:var(--sec);white-space:nowrap;transition:background 160ms}
 .sgm button[aria-pressed="true"]{background:var(--piano);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.16)}
-.body{padding:4px 22px 18px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:28px;align-items:start}
+.body{padding:0 calc(var(--u)*7) calc(var(--u)*7);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:calc(var(--u)*10);align-items:start}
 .body.one{grid-template-columns:minmax(0,1fr)}
-h3{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--sec);font-weight:600;margin:14px 0 0;padding-bottom:6px;border-bottom:1px solid var(--filetto2);display:flex;justify-content:space-between;gap:10px}
-h3 span{font-family:var(--m);letter-spacing:0;text-transform:none;font-weight:400}
+h3{font-size:.86em;letter-spacing:.05em;text-transform:uppercase;color:var(--sec);font-weight:600;margin:calc(var(--u)*7) 0 0;padding-bottom:calc(var(--u)*2);border-bottom:1px solid var(--filetto2);display:flex;justify-content:space-between;gap:10px}
+h3 span{letter-spacing:0;text-transform:none;font-weight:400;font-variant-numeric:tabular-nums}
 table{border-collapse:collapse;width:100%}
-td,th{padding:7px 12px 7px 0;border-bottom:1px solid var(--filetto);text-align:left;vertical-align:baseline}
+td,th{padding:calc(var(--u)*2.5) calc(var(--u)*4) calc(var(--u)*2.5) 0;border-bottom:1px solid var(--filetto);text-align:left;vertical-align:baseline}
 td:last-child,th:last-child{padding-right:0}
-thead th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--sec);font-weight:600;border-bottom-color:var(--filetto2)}
-.en{display:grid;grid-template-columns:70px minmax(0,1fr);gap:0 14px;padding:12px 0;border-bottom:1px solid var(--filetto)}
-.en .when{font-family:var(--m);font-size:12px;color:var(--sec);padding-top:2px}.en .ty{font-weight:600}
-.en p,.prosa{font-family:var(--s);font-size:var(--prosa);line-height:1.45;margin:3px 0 0;max-width:64ch}
-.en .by{font-family:var(--m);font-size:11px;color:var(--sec);margin-top:5px;display:flex;align-items:center}
+thead th{font-size:.86em;letter-spacing:.05em;text-transform:uppercase;color:var(--sec);font-weight:600;border-bottom-color:var(--filetto2)}
+.en{display:grid;grid-template-columns:84px minmax(0,1fr);gap:0 calc(var(--u)*4);padding:calc(var(--u)*4) 0;border-bottom:1px solid var(--filetto)}
+.en .when{font-size:.93em;color:var(--sec);padding-top:1px;font-variant-numeric:tabular-nums}.en .ty{font-weight:600}
+.en p,.prosa{font-family:var(--s);font-size:var(--prosa);line-height:1.5;margin:calc(var(--u)*1.5) 0 0;max-width:64ch}
+.en .by{font-size:.89em;color:var(--sec);margin-top:calc(var(--u)*2);display:flex;align-items:center}
 .en.dim p{color:var(--sec)}
-.en.live{background:var(--freshbg);margin:8px -12px 0;padding:12px;border-radius:12px;border-bottom:0;box-shadow:0 0 0 1px var(--freshln)}
-.en.live textarea{border:0;background:transparent;font-family:var(--s);font-size:var(--prosa);line-height:1.45;min-height:190px;padding:0;color:var(--fresh);width:100%;resize:vertical}
-.state{display:flex;align-items:center;font-weight:600;font-size:12.5px;gap:8px;flex-wrap:wrap}
-.it{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid var(--freshln)}
-.it li{display:grid;grid-template-columns:14px 74px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--freshln);min-height:38px}
-.it .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--sec);font-weight:600}
-.it .mini,.mini{display:flex;gap:6px;flex-wrap:wrap}
-.foot{flex:none;background:var(--piano);border-top:1px solid var(--filetto2);padding:10px 22px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.en.live{background:var(--freshbg);margin:calc(var(--u)*3) calc(var(--u)*-4) 0;padding:calc(var(--u)*4);border-radius:12px;border-bottom:0;box-shadow:0 0 0 1px var(--freshln)}
+.en.live textarea{border:0;background:transparent;font-family:var(--s);font-size:var(--prosa);line-height:1.5;min-height:200px;padding:0;color:var(--fresh);width:100%;resize:vertical}
+.state{display:flex;align-items:center;font-weight:600;font-size:.93em;gap:8px;flex-wrap:wrap}
+.it{list-style:none;margin:calc(var(--u)*3) 0 0;padding:0;border-top:1px solid var(--freshln)}
+.it li{display:grid;grid-template-columns:14px 74px minmax(0,1fr) auto;gap:calc(var(--u)*3);align-items:center;padding:calc(var(--u)*2) 0;border-bottom:1px solid var(--freshln);min-height:44px}
+.it .k{font-size:.82em;letter-spacing:.05em;text-transform:uppercase;color:var(--sec);font-weight:600}
+.it .mini,.mini{display:flex;gap:calc(var(--u)*2);flex-wrap:wrap}
+.foot{flex:none;background:var(--piano);border-top:1px solid var(--filetto2);padding:calc(var(--u)*3.5) calc(var(--u)*7);display:flex;flex-wrap:wrap;gap:calc(var(--u)*3);align-items:center}
 .foot.cf{background:var(--soglia);color:var(--sogliatx);border-color:var(--soglia)}
 .foot.cf .btn{background:transparent;color:var(--sogliatx);border-color:color-mix(in srgb,var(--sogliatx) 45%,transparent)}
 .foot.cf .btn.p{background:var(--sogliatx);color:var(--soglia);border-color:var(--sogliatx)}
-.foot .msg{flex:1;min-width:200px}.foot .msg b{font-family:var(--s);font-size:17px;font-weight:500;display:flex;align-items:center}
-.foot .msg small{display:block;font-size:12.5px;opacity:.82}
-.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:14px 22px;border-bottom:1px solid var(--filetto);flex:none}
-.filters h2{font-family:var(--s);font-weight:400;font-size:28px;margin:0 8px 0 0;line-height:1}
-.lst{display:grid;grid-template-columns:minmax(0,1fr) 290px;flex:1;min-height:0}
-.lst .tbw{overflow:auto;padding:0 22px}
-.lst thead th{height:30px;padding-block:0}.lst tbody td{height:var(--row);padding-block:0}
+.foot .msg{flex:1;min-width:200px}.foot .msg b{font-size:1.07em;font-weight:600;display:flex;align-items:center}
+.foot .msg small{display:block;font-size:.93em;opacity:.85;margin-top:2px}
+.filters{display:flex;flex-wrap:wrap;gap:calc(var(--u)*3);align-items:center;padding:calc(var(--u)*4) calc(var(--u)*7);border-bottom:1px solid var(--filetto);flex:none}
+.filters h2{font-family:var(--s);font-weight:400;font-size:26px;margin:0 12px 0 0;line-height:1.1}
+.lst{display:grid;grid-template-columns:minmax(0,1fr) 304px;flex:1;min-height:0}
+.lst .tbw{overflow:auto;padding:0 calc(var(--u)*7)}
+.lst thead th{height:36px;padding-block:0}.lst tbody td{height:var(--row);padding-block:0}
 .lst tbody tr{cursor:pointer}.lst tbody tr:hover{background:var(--hov)}.lst tbody tr.sel{background:var(--sel)}
-.rowb{border:0;background:transparent;padding:0;text-align:left;height:var(--row);width:100%;font-family:var(--s);font-size:17px;display:flex;align-items:center}
+.rowb{border:0;background:transparent;padding:0;text-align:left;height:var(--row);width:100%;font-weight:600;display:flex;align-items:center}
 .rowb .nod{width:.44em;margin-right:.5em;flex:none}
-.insp{border-left:1px solid var(--filetto);padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:var(--hov);overflow:auto}
+.insp{border-left:1px solid var(--filetto);padding:calc(var(--u)*6);display:flex;flex-direction:column;gap:calc(var(--u)*4);background:var(--hov);overflow:auto}
 .insp h4{font-family:var(--s);font-weight:400;font-size:22px;margin:0}
-dl{margin:0;display:grid;grid-template-columns:104px 1fr;gap:5px 8px}dt{color:var(--sec)}dd{margin:0}
-.leg{padding:8px 22px;color:var(--sec);font-size:12.5px;display:flex;flex-wrap:wrap;gap:4px 18px;border-top:1px solid var(--filetto);flex:none}
+dl{margin:0;display:grid;grid-template-columns:112px 1fr;gap:calc(var(--u)*2) calc(var(--u)*3)}dt{color:var(--sec)}dd{margin:0}
+.leg{padding:calc(var(--u)*3) calc(var(--u)*7);color:var(--sec);font-size:.93em;display:flex;flex-wrap:wrap;gap:4px 18px;border-top:1px solid var(--filetto);flex:none}
 .leg span{display:inline-flex;align-items:center}
 .center{flex:1;display:flex;align-items:center;justify-content:center;padding:20px}
 .card{width:min(420px,100%);display:flex;flex-direction:column;gap:14px}
@@ -138,20 +138,20 @@ dl{margin:0;display:grid;grid-template-columns:104px 1fr;gap:5px 8px}dt{color:va
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--piano);box-shadow:0 1px 2px rgba(0,0,0,.3);transition:left 160ms}
 .sw::before{content:"";position:absolute;inset:-10px -2px}
 .sw[aria-checked="true"]{background:var(--fresh);border-color:var(--fresh)}.sw[aria-checked="true"]::after{left:18px}
-.setrow{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--filetto);min-height:52px}
+.setrow{display:flex;gap:calc(var(--u)*4);align-items:center;justify-content:space-between;padding:calc(var(--u)*3.5) 0;border-bottom:1px solid var(--filetto);min-height:60px}
 .setrow small{display:block;color:var(--sec)}
-.two{display:grid;grid-template-columns:200px minmax(0,1fr);flex:1;min-height:0}
-.two>nav{border-right:1px solid var(--filetto);padding:10px 8px;display:flex;flex-direction:column;gap:2px;overflow:auto}
+.two{display:grid;grid-template-columns:216px minmax(0,1fr);flex:1;min-height:0}
+.two>nav{border-right:1px solid var(--filetto);padding:calc(var(--u)*3);display:flex;flex-direction:column;gap:2px;overflow:auto}
 .two>nav button{border:0;background:transparent;text-align:left;height:var(--row);padding:0 10px;border-radius:var(--rc);color:var(--sec);flex:none}
 .two>nav button[aria-current]{background:var(--sel);color:var(--ink);font-weight:600}
 .two>nav b{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--sec);padding:10px 10px 4px}
 .doc{background:var(--hov);border:1px solid var(--filetto);border-radius:8px;padding:16px;font-family:var(--m);font-size:12px;line-height:1.6;color:var(--sec);white-space:pre-wrap}
 .bars{display:flex;align-items:flex-end;gap:5px;height:90px;border-bottom:1px solid var(--filetto2)}
 .bars i{flex:1;background:var(--ink);opacity:.82;min-width:6px}.bars i.hi{background:var(--fresh);opacity:1}
-.kp{display:flex;gap:28px;flex-wrap:wrap;margin:12px 0}.kp div b{display:block;font-family:var(--m);font-size:24px;font-weight:500}.kp div span{color:var(--sec)}
-.stt{padding:14px 0;border-bottom:1px solid var(--filetto);display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.kp{display:flex;gap:calc(var(--u)*8);flex-wrap:wrap;margin:calc(var(--u)*4) 0}.kp div b{display:block;font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}.kp div span{color:var(--sec)}
+.stt{padding:calc(var(--u)*4) 0;border-bottom:1px solid var(--filetto);display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
 .stt b{display:block}.stt span{color:var(--sec)}
-.vp{margin-top:8px;border-top:1px solid var(--freshln);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.vp{margin-top:calc(var(--u)*3);border-top:1px solid var(--freshln);padding-top:calc(var(--u)*3);display:flex;flex-direction:column;gap:calc(var(--u)*3)}
 .lv{display:flex;align-items:center;gap:3px;height:22px}.lv i{width:3px;background:var(--matita);border-radius:2px;animation:lv 900ms ease-in-out infinite}
 @keyframes lv{50%{transform:scaleY(.35)}}
 .vp textarea{border:1px dashed var(--matita);border-radius:8px;background:transparent;font-family:var(--s);font-size:var(--prosa);line-height:1.45;color:var(--matita);padding:8px;width:100%;min-height:96px;resize:vertical}
@@ -159,16 +159,16 @@ dl{margin:0;display:grid;grid-template-columns:104px 1fr;gap:5px 8px}dt{color:va
 .cli .fr{color:#9db4ff}.cli .pn{color:#a3abb8}
 .fold{display:none}
 /* forme per piattaforma */
-.pf-mac{--rc:8px;--rp:12px;--reg:13px}.pf-win{--rc:4px;--rp:8px;--reg:14px;--f:"Segoe UI Variable","Segoe UI",system-ui,sans-serif}
+.pf-mac{--rc:8px;--rp:12px;--reg:13.5px}.pf-win{--rc:4px;--rp:8px;--reg:14px;--f:"Segoe UI Variable","Segoe UI",system-ui,sans-serif}
 .pf-linux{--rc:6px;--rp:10px;--reg:14px;--f:"Adwaita Sans",Cantarell,"Noto Sans",system-ui,sans-serif}
-.pf-ipad,.pf-iphone,.pf-duo,.pf-duoc{--rc:12px;--rp:18px;--reg:15px;--home:14px}
+.pf-ipad,.pf-iphone,.pf-duo,.pf-duoc{--rc:12px;--rp:18px;--reg:15.5px;--home:14px}
 /* classi di larghezza: compatta sotto 700, media 700-1000, estesa oltre */
 @container dev (max-width:1000px){
- .side{--side:150px}.body{gap:18px}.lst{grid-template-columns:minmax(0,1fr) 250px}.hide2{display:none}
+ .side{--side:160px}.body{gap:calc(var(--u)*6)}.lst{grid-template-columns:minmax(0,1fr) 256px}.hide2{display:none}
 }
 @container dev (max-width:700px){
  .side,.tb.desk{display:none}.tabs{display:flex}.main{padding:0}.plane{border-radius:0;box-shadow:none}
- .body,.lst,.two{grid-template-columns:minmax(0,1fr)}.body{padding:0 16px 16px;gap:4px}.body.wr>div:first-child{order:2}
+ .body,.lst,.two{grid-template-columns:minmax(0,1fr)}.body{padding:0 calc(var(--u)*4) calc(var(--u)*5);gap:0}.body.wr>div:first-child{order:2}
  .hd,.filters,.foot{padding-inline:16px}.lst .tbw{padding:0 16px}.insp,.two>nav.col{display:none}
  .hide,.hide2{display:none}.hd h2{font-size:26px}.en{grid-template-columns:minmax(0,1fr)}
  .it li{grid-template-columns:14px 74px minmax(0,1fr)}.it .mini{grid-column:2/-1}
@@ -178,9 +178,9 @@ dl{margin:0;display:grid;grid-template-columns:104px 1fr;gap:5px 8px}dt{color:va
 .pf-duo .fold{display:block;position:absolute;top:0;bottom:0;left:50%;width:1px;background:color-mix(in srgb,var(--ink) 14%,transparent);z-index:3;pointer-events:none}
 .pf-duo .side{display:none}.pf-duo .tabs{display:flex}.pf-duo .main{padding:0}.pf-duo .plane{border-radius:0}
 .pf-duo .body,.pf-duo .lst,.pf-duo .two{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0}
-.pf-duo .body>div{padding:0 20px 14px}.pf-duo .body{padding:0}.pf-duo .insp{display:flex}.pf-duo .lst .tbw{padding:0 20px}
+.pf-duo .body>div{padding:0 calc(var(--u)*5) calc(var(--u)*5)}.pf-duo .body{padding:0}.pf-duo .insp{display:flex}.pf-duo .lst .tbw{padding:0 20px}
 .pf-duo .hide,.pf-duo .hide2{display:none}
-.pf-duo .hd,.pf-duo .filters,.pf-duo .foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 40px;padding-inline:20px}.pf-duo .hd .grow{display:none}.pf-duo .foot .mini,.pf-duo .foot>.btn{justify-self:start}.pf-duo .body.one{grid-template-columns:minmax(0,1fr)}.pf-duo .body.one>div{padding:0 20px 14px}
+.pf-duo .hd,.pf-duo .filters,.pf-duo .foot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 40px;padding-inline:20px}.pf-duo .hd .grow{display:none}.pf-duo .foot .mini,.pf-duo .foot>.btn{justify-self:start}.pf-duo .body.one{grid-template-columns:minmax(0,1fr)}.pf-duo .body.one>div{padding:0 calc(var(--u)*5) calc(var(--u)*5)}
 </style>
 
 <div class="bar">
@@ -207,8 +207,8 @@ dl{margin:0;display:grid;grid-template-columns:104px 1fr;gap:5px 8px}dt{color:va
 
 <script>
 /* ───── token decisi (specchio di tokens/punto-inchiostro.tokens.json) ───── */
-const T0={fresh:'#2346b0',matita:'#5f6878',penombra:'#e8eaee',ink:'#14161a',row:36,rc:10,rp:16,prosa:17,reg:13.5,tposa:520,tdry:1500};
-const TL={fresh:'Inchiostro fresco',matita:'Matita',penombra:'Penombra',ink:'Inchiostro asciutto',row:'Riga, px',rc:'Raggio controlli, px',rp:'Raggio piano, px',prosa:'Prosa, px',reg:'Registro, px',tposa:'Posa del punto, ms',tdry:'Asciugatura, ms'};
+const T0={fresh:'#2346b0',matita:'#5f6878',penombra:'#e8eaee',ink:'#14161a',u:4,row:40,rc:10,rp:16,prosa:17,reg:14,tposa:520,tdry:1500};
+const TL={fresh:'Inchiostro fresco',matita:'Matita',penombra:'Penombra',ink:'Inchiostro asciutto',u:'Respiro: unità di spazio, px',row:'Riga, px',rc:'Raggio controlli, px',rp:'Raggio piano, px',prosa:'Prosa, px',reg:'Registro, px',tposa:'Posa del punto, ms',tdry:'Asciugatura, ms'};
 let T={...T0};
 const PF={web:['Web localhost',1440,900,0,'Browser sullo stesso computer. Navigazione a sinistra, piano in luce.'],
  mac:['macOS',1280,800,0,'Finestra con barra unificata. Raggi e carattere di sistema. Menu e scorciatoie con ⌘.'],
@@ -251,13 +251,13 @@ function frame(inner,cur='Pazienti',bare=false){
  if(bare)return `<div class="${cls}">${tb}${inner}</div>`;
  return `<div class="${cls}">${tb}<div class="shell"><nav class="side" aria-label="Aree">${wm()}${NAV.map(n=>`<button ${n===cur?'aria-current="page"':''} data-go="${NAVK[n]}">${n}</button>`).join('')}<div class="sp"></div><button ${cur==='Impostazioni'?'aria-current="page"':''} data-go="impostazioni">Impostazioni</button><button data-go="sblocco">Blocca</button></nav><div class="main"><div class="plane">${inner}</div></div></div>
  <nav class="tabs" aria-label="Aree">${[['Pazienti','ppl','elenco'],['Agenda','cal','agenda'],['Diario','book','diario'],['Altro','more','impostazioni']].map(t=>`<button ${t[0]===cur||(t[0]==='Altro'&&!['Pazienti','Agenda','Diario'].includes(cur))?'aria-current="page"':''} data-go="${t[2]}">${IC[t[1]]}${t[0]}</button>`).join('')}</nav><i class="fold"></i></div>`}
-const hd=(x='')=>`<div class="hd"><h2>${P.name}</h2><span class="facts">F · ${P.age} anni · ${P.born} · ${P.cf}</span><span class="alg">▲ ${P.allergy}</span><span class="grow"></span>${x}</div>`;
+const hd=(x='')=>`<div class="hd"><h2>${P.name}</h2><span class="facts">F · ${P.age} anni · ${P.born} · <span class="code">${P.cf}</span></span><span class="alg">▲ ${P.allergy}</span><span class="grow"></span>${x}</div>`;
 const secs=(cur)=>`<div class="filters" style="padding-block:8px"><div class="sgm" role="group" aria-label="Sezione">${[['Riepilogo','scheda'],['Terapie','terapie'],['Misure','misure'],['Documenti','documenti']].map(s=>`<button aria-pressed="${s[1]===cur}" data-go="${s[1]}">${s[0]}</button>`).join('')}</div></div>`;
 function quadro(){const sv=S.w==='saved',dr=sv?'dries':'';
  const ther=P.ther.map((t,i)=>i===0&&sv?[t[0],'10 mg',t[2],t[3],t[4],1]:t);
  const meas=sv?[['Pressione arteriosa','142/84','mmHg','09/10','−6 sistolica dal 06/10','',1],...P.meas.slice(1)]:P.meas;
- return `<h3>Problemi <span>${P.prob.length}</span></h3><table>${P.prob.map(p=>`<tr><td class="c">${p[0]}</td><td>${p[1]}</td><td class="c r hide2">${p[2]}</td></tr>`).join('')}</table>
- <h3>Terapie attive <span>${ther.length}</span></h3><table>${ther.map(t=>`<tr class="${t[5]?dr:''}"><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td>${t[2]}</td><td class="c r hide2">ATC ${t[3]}</td></tr>`).join('')}</table>
+ return `<h3>Problemi <span>${P.prob.length}</span></h3><table>${P.prob.map(p=>`<tr><td class="code">${p[0]}</td><td>${p[1]}</td><td class="c r hide2">${p[2]}</td></tr>`).join('')}</table>
+ <h3>Terapie attive <span>${ther.length}</span></h3><table>${ther.map(t=>`<tr class="${t[5]?dr:''}"><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td>${t[2]}</td><td class="code r hide2">ATC ${t[3]}</td></tr>`).join('')}</table>
  <h3>Misure recenti <span>ultime 4</span></h3><table>${meas.map(m=>`<tr class="${m[6]?dr:''}"><td>${m[0]}</td><td class="v r num">${m[1]} <span class="c">${m[2]}</span></td><td class="c">${m[3]}</td><td class="c hide2">${stl(m[4],m[5])}</td></tr>`).join('')}</table>
  <h3>Controlli aperti <span>${P.due.length}</span></h3><table>${P.due.map(d=>`<tr><td>${d[0]}</td><td class="r">${stl(d[1],d[2])}</td></tr>`).join('')}</table>`}
 const en=(d,c='')=>`<article class="en ${c}"><div class="when">${d.d} ${d.m}<br>${d.h}</div><div><span class="ty">${d.t}</span> <span class="c">· ${d.w}</span><p>${nl(d.x)}</p><div class="by"><i class="dot dry" aria-hidden="true"></i>Registrata da Dr. demo</div></div></article>`;
@@ -298,12 +298,12 @@ const R={
   return frame(hd()+`<div class="scroll"><div class="body wr"><div>${quadro()}</div><div><h3>Diario <span>${P.diary.length+1} voci</span></h3>${live}${P.diary.map(d=>en(d,sv?'':'dim')).join('')}</div></div></div>
   <div class="foot ${S.w==='confirm'?'cf':''}" role="status">${lis?`<div class="msg"><b><i class="dot lis"></i>In ascolto 02:14</b><small>Ferma l'ascolto prima di registrare.</small></div><button class="btn p" disabled>Registra ${n} elementi</button>`:`<div class="msg"><b>${dot}${m[0]}</b><small>${m[1]}</small></div>${wbtns(n)}`}</div>`)},
  voce(){return this.scrittura(true)},
- terapie(){return frame(hd(`<button class="btn p">Nuova terapia</button>`)+secs('terapie')+`<div class="scroll"><div class="body one"><div><h3>Terapie attive <span>3</span></h3><table><thead><tr><th>Farmaco</th><th>Posologia</th><th class="hide">Dal</th><th class="hide hide2">ATC</th><th></th></tr></thead><tbody>${P.ther.map(t=>`<tr><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td>${t[2]}</td><td class="c hide">${t[4]}</td><td class="c hide hide2">${t[3]}</td><td class="r"><span class="mini" style="justify-content:flex-end"><button class="btn">Modifica</button><button class="btn hide">Sospendi</button><button class="btn hide">Concludi</button></span></td></tr>`).join('')}</tbody></table>
+ terapie(){return frame(hd(`<button class="btn p">Nuova terapia</button>`)+secs('terapie')+`<div class="scroll"><div class="body one"><div><h3>Terapie attive <span>3</span></h3><table><thead><tr><th>Farmaco</th><th>Posologia</th><th class="hide">Dal</th><th class="hide hide2">ATC</th><th></th></tr></thead><tbody>${P.ther.map(t=>`<tr><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td>${t[2]}</td><td class="c hide">${t[4]}</td><td class="code hide hide2">${t[3]}</td><td class="r"><span class="mini" style="justify-content:flex-end"><button class="btn">Modifica</button><button class="btn hide">Sospendi</button><button class="btn hide">Concludi</button></span></td></tr>`).join('')}</tbody></table>
   <h3>Concluse <span>1</span></h3><table><tr><td style="color:var(--sec)"><b>Amlodipina</b> <span class="v">5 mg</span></td><td style="color:var(--sec)">1 compressa alla sera</td><td class="c">conclusa il 20/08/2024 · edemi declivi</td></tr></table>
   <h3>Proposte <span>1</span></h3><table><tr><td><i class="dot pen"></i><span class="pencil">Rivalutare la dose di metformina con eGFR 58 mL/min</span><div class="c" style="white-space:normal;margin-top:3px">Ragionamento terapeutico locale · 2 fonti · solo revisione</div></td><td class="r"><span class="mini" style="justify-content:flex-end"><button class="btn">Vedi le fonti</button><button class="btn">Scarta</button></span></td></tr></table></div></div></div>`)},
  misure(){const pa=[138,141,136,144,139,148,142];return frame(hd(`<button class="btn p">Nuova misura</button>`)+secs('misure')+`<div class="scroll"><div class="body"><div><h3>Ultime misure <span>4 tipi</span></h3><table><thead><tr><th>Misura</th><th class="r">Valore</th><th>Data</th><th class="hide2">Variazione</th></tr></thead><tbody>${P.meas.map((m,i)=>`<tr class="${i===0?'sel':''}"><td>${m[0]}</td><td class="v r num">${m[1]} <span class="c">${m[2]}</span></td><td class="c">${m[3]}</td><td class="c hide2">${stl(m[4],m[5])}</td></tr>`).join('')}</tbody></table></div>
   <div><h3>Pressione sistolica <span>ultime 7, mmHg</span></h3><div class="bars" style="margin-top:14px" role="img" aria-label="Pressione sistolica, ultime 7 misure: da 138 a 142 mmHg, massimo 148 il 6 ottobre">${pa.map((v,i)=>`<i class="${i===6?'hi':''}" style="height:${(v-120)*3}px" title="${v}"></i>`).join('')}</div><div class="c" style="display:flex;justify-content:space-between;margin-top:4px"><span>20/05</span><span>09/10</span></div><div class="kp"><div><b>142</b><span>ultima</span></div><div><b>148</b><span>massima, 06/10</span></div><div><b>135</b><span>obiettivo</span></div></div></div></div></div>`)},
- documenti(){return frame(hd(`<button class="btn p">Aggiungi documento</button>`)+secs('documenti')+`<div class="scroll"><div class="body"><div><h3>Documenti <span>3</span></h3><table><tbody>${[['Referto Holter ECG 24 h','08/10/2026','1 proposta da rivedere','pen'],['Esami ematochimici','22/09/2026','letto',''],['Lettera di dimissione, cardiologia','12/06/2026','letto','']].map((d,i)=>`<tr class="${i===0?'sel':''}"><td><button class="rowb" style="font-size:16px">${d[3]?'<i class="dot pen"></i>':'<i class="nod"></i>'}${d[0]}</button></td><td class="c">${d[1]}</td><td class="hide2 ${d[3]?'pencil':''}" style="color:var(--sec)">${d[2]}</td></tr>`).join('')}</tbody></table>
+ documenti(){return frame(hd(`<button class="btn p">Aggiungi documento</button>`)+secs('documenti')+`<div class="scroll"><div class="body"><div><h3>Documenti <span>3</span></h3><table><tbody>${[['Referto Holter ECG 24 h','08/10/2026','1 proposta da rivedere','pen'],['Esami ematochimici','22/09/2026','letto',''],['Lettera di dimissione, cardiologia','12/06/2026','letto','']].map((d,i)=>`<tr class="${i===0?'sel':''}"><td><button class="rowb">${d[3]?'<i class="dot pen"></i>':'<i class="nod"></i>'}${d[0]}</button></td><td class="c">${d[1]}</td><td class="hide2 ${d[3]?'pencil':''}" style="color:var(--sec)">${d[2]}</td></tr>`).join('')}</tbody></table>
   <h3>Dal documento <span>proposte</span></h3><ul class="it" style="border-color:var(--filetto)"><li style="border-color:var(--filetto)"><i class="dot pen"></i><span class="k">Misura</span><span class="pencil">Frequenza cardiaca media 74 bpm</span><span class="mini"><button class="btn">Scarta</button><button class="btn">Porta in una voce</button></span></li></ul></div>
   <div><h3>Originale <span>pagina 1 di 2</span></h3><div class="doc" style="margin-top:12px">REFERTO HOLTER ECG 24 ORE (documento sintetico)
 Paziente: MORETTI ELENA        Data: 08/10/2026
@@ -314,7 +314,7 @@ Brevi episodi di fibrillazione atriale,
 il più lungo di 4 minuti. Nessuna pausa &gt; 2,5 s.</div><p class="c" style="white-space:normal;margin-top:8px">Il testo estratto e la sintesi sono derivati. L'originale resta la fonte.</p></div></div></div>`)},
  agenda(){return frame(`<div class="filters"><h2>Agenda</h2><div class="sgm"><button aria-pressed="true">Scadenze · 6</button><button aria-pressed="false">Oggi</button><button aria-pressed="false">Settimana</button></div></div><div class="scroll"><div class="body one"><div><h3>Scaduti <span>1</span></h3><table><tr><td><button class="rowb"><i class="nod"></i>Bianchi Aldo</button></td><td>Controllo del peso</td><td class="r">${stl('scaduto il 05/10','cr')}</td></tr></table><h3>Da prenotare <span>2</span></h3><table><tr><td><button class="rowb"><i class="nod"></i>Moretti Elena</button></td><td>Holter ECG 24 h</td><td class="r">${stl('da prenotare','w')}</td></tr><tr><td><button class="rowb"><i class="nod"></i>Ferri Marta</button></td><td>Rinnovo del piano terapeutico</td><td class="r">${stl('entro il 20/10','w')}</td></tr></table><h3>Prossimi <span>3</span></h3><table>${[['Riva Enzo','eGFR','09/11'],['De Luca Piero','HbA1c','15/11'],['Sala Nora','Emocromo','04/11']].map(r=>`<tr><td><button class="rowb"><i class="nod"></i>${r[0]}</button></td><td>${r[1]}</td><td class="c r">entro il ${r[2]}/2026</td></tr>`).join('')}</table></div></div></div>`,'Agenda')},
  diario(){return frame(`<div class="filters"><h2>Diario</h2><input class="inp" id="dq" placeholder="Cerca nel diario" aria-label="Cerca nel diario" style="flex:1 1 200px"><div class="sgm"><button aria-pressed="true">Tutte</button><button aria-pressed="false">Visite</button><button aria-pressed="false">Telefonate</button></div></div><div class="scroll"><div class="body one"><div><h3>Ottobre 2026 <span>3 voci</span></h3>${[['Bianchi Aldo','08','ott','16:40','Telefonata','Peso aumentato di 2 kg in 4 giorni. Aumentata furosemide come da piano. Controllo in ambulatorio venerdì.'],['Moretti Elena','06','ott','11:20','Visita',P.diary[0].x],['Conti Sara','02','ott','09:15','Visita','Asma controllata. Tecnica inalatoria rivista. Spirometria richiesta.']].map(d=>`<article class="en"><div class="when">${d[1]} ${d[2]}<br>${d[3]}</div><div><span class="ty">${d[0]}</span> <span class="c">· ${d[4]}</span><p>${e(d[5])}</p></div></article>`).join('')}</div></div></div>`,'Diario')},
- repertori(){return frame(`<div class="filters"><h2>Repertori</h2><div class="sgm"><button aria-pressed="true">Diagnosi ICD</button><button aria-pressed="false">Farmaci AIFA</button><button aria-pressed="false">Protesica</button></div><input class="inp" id="rq" value="fibrillazione" aria-label="Cerca nel repertorio" style="flex:1 1 200px"></div><div class="scroll"><div class="body one"><div><h3>Risultati <span>3 · ICD-10</span></h3><table><thead><tr><th>Codice</th><th>Descrizione</th><th class="hide"></th></tr></thead><tbody>${[['I48.0','Fibrillazione atriale parossistica'],['I48.1','Fibrillazione atriale persistente'],['I48.2','Fibrillazione atriale cronica']].map(r=>`<tr><td class="v">${r[0]}</td><td>${r[1]}</td><td class="r hide"><button class="btn">Copia il codice</button></td></tr>`).join('')}</tbody></table><p class="c" style="white-space:normal;margin-top:10px">Fonte: catalogo locale, aggiornato il 01/09/2026. La ricerca avviene su questo computer.</p></div></div></div>`,'Repertori')},
+ repertori(){return frame(`<div class="filters"><h2>Repertori</h2><div class="sgm"><button aria-pressed="true">Diagnosi ICD</button><button aria-pressed="false">Farmaci AIFA</button><button aria-pressed="false">Protesica</button></div><input class="inp" id="rq" value="fibrillazione" aria-label="Cerca nel repertorio" style="flex:1 1 200px"></div><div class="scroll"><div class="body one"><div><h3>Risultati <span>3 · ICD-10</span></h3><table><thead><tr><th>Codice</th><th>Descrizione</th><th class="hide"></th></tr></thead><tbody>${[['I48.0','Fibrillazione atriale parossistica'],['I48.1','Fibrillazione atriale persistente'],['I48.2','Fibrillazione atriale cronica']].map(r=>`<tr><td class="code" style="color:var(--ink)">${r[0]}</td><td>${r[1]}</td><td class="r hide"><button class="btn">Copia il codice</button></td></tr>`).join('')}</tbody></table><p class="c" style="white-space:normal;margin-top:10px">Fonte: catalogo locale, aggiornato il 01/09/2026. La ricerca avviene su questo computer.</p></div></div></div>`,'Repertori')},
  analisi(){return frame(`<div class="filters"><h2>Analisi</h2><div class="sgm"><button aria-pressed="true">Ultimi 12 mesi</button><button aria-pressed="false">Anno 2026</button></div></div><div class="scroll"><div class="body"><div><h3>Attività <span>ambulatorio locale</span></h3><div class="kp"><div><b>14</b><span>pazienti in carico</span></div><div><b>112</b><span>voci di diario</span></div><div><b>6</b><span>controlli aperti</span></div></div><h3>Problemi più frequenti <span>pazienti</span></h3><table>${[['Ipertensione essenziale',5],['Diabete mellito tipo 2',3],['Fibrillazione atriale',2]].map(r=>`<tr><td>${r[0]}</td><td class="v r num">${r[1]}</td></tr>`).join('')}</table></div><div><h3>Voci di diario per mese <span>da nov 2025</span></h3><div class="bars" style="margin-top:14px" role="img" aria-label="Voci di diario per mese, da 6 a 14">${[8,6,9,7,10,12,9,11,8,7,14,11].map((v,i)=>`<i class="${i===11?'hi':''}" style="height:${v*6}px"></i>`).join('')}</div><div class="c" style="display:flex;justify-content:space-between;margin-top:4px"><span>nov</span><span>ott</span></div></div></div></div>`,'Analisi')},
  scale(){const it=[['Scompenso cardiaco',0],['Ipertensione',1],['Età 65-74 anni',1],['Diabete mellito',1],['Ictus o TIA',0],['Malattia vascolare',0],['Sesso femminile',1]];return frame(hd()+`<div class="scroll"><div class="body"><div><h3>CHA₂DS₂-VASc <span>7 voci</span></h3>${it.map((r,i)=>`<div class="setrow"><span>${r[0]}</span><button class="sw" role="switch" aria-checked="${r[1]?'true':'false'}" aria-label="${r[0]}" data-sw="c${i}"></button></div>`).join('')}</div><div><h3>Risultato <span>bozza</span></h3><div class="kp"><div><b class="fresh">4</b><span>punti su 9</span></div></div><p class="prosa fresh">Punteggio 4. La scala descrive un rischio; la decisione sulla terapia resta clinica.</p><p class="c" style="white-space:normal;margin-top:10px">Scala: versione 2010, fonte e data registrate con il risultato.</p></div></div></div><div class="foot"><div class="msg"><b><i class="dot"></i>Bozza non registrata</b><small>1 risultato di scala pronto per la scheda di ${P.name}.</small></div><button class="btn p">Registra il risultato</button></div>`,'Scale')},
  impostazioni(){const g=[['Postazione',['Profilo','Accesso','Ambulatori','Aspetto']],['Dati',['Backup','Repertori']],['Intelligenza',['Funzioni AI','Modelli','Governo dei dati']],['Supporto',['Diagnostica','Zona pericolo']]];
@@ -342,11 +342,11 @@ Registrare nella scheda di Moretti Elena, 67 anni?
 
 /* ───── banco ───── */
 const $=id=>document.getElementById(id);
-function applyTokens(app){if(!app)return;const d=S.gr;app.style.setProperty('--row',(PF[S.pf][3]?44:T.row)+'px');app.style.setProperty('--prosa',T.prosa+'px');app.style.setProperty('--tposa',T.tposa+'ms');app.style.setProperty('--tdry',T.tdry+'ms');
+function applyTokens(app){if(!app)return;const d=S.gr;app.style.setProperty('--row',(PF[S.pf][3]?44:T.row)+'px');app.style.setProperty('--prosa',T.prosa+'px');app.style.setProperty('--u',T.u+'px');app.style.setProperty('--tposa',T.tposa+'ms');app.style.setProperty('--tdry',T.tdry+'ms');
  if(S.pf==='web'){app.style.setProperty('--rc',T.rc+'px');app.style.setProperty('--rp',T.rp+'px');app.style.setProperty('--reg',T.reg+'px')}
  if(!d){app.style.setProperty('--fresh',T.fresh);app.style.setProperty('--matita',T.matita);app.style.setProperty('--penombra',T.penombra);app.style.setProperty('--ink',T.ink)}}
 function dtcg(){const c=(v,d)=>({$type:'color',$value:v,$description:d}),n=(v,u,d)=>({$type:u==='ms'?'duration':'dimension',$value:v+u,$description:d});
- return JSON.stringify({'punto-inchiostro':{giorno:{'inchiostro-fresco':c(T.fresh,'Bozza, azione principale, fuoco'),matita:c(T.matita,'Proposte'),penombra:c(T.penombra,'Fondo e contesto'),'inchiostro-asciutto':c(T.ink,'Testo, soglia')},misure:{riga:n(T.row,'px','44px al tocco'),'raggio-controllo':n(T.rc,'px','Web; le piattaforme native usano il proprio'),'raggio-piano':n(T.rp,'px',''),prosa:n(T.prosa,'px','Newsreader'),registro:n(T.reg,'px','Carattere di sistema')},movimento:{'posa-del-punto':n(T.tposa,'ms',''),asciugatura:n(T.tdry,'ms','Solo colore')}}},null,1)}
+ return JSON.stringify({'punto-inchiostro':{giorno:{'inchiostro-fresco':c(T.fresh,'Bozza, azione principale, fuoco'),matita:c(T.matita,'Proposte'),penombra:c(T.penombra,'Fondo e contesto'),'inchiostro-asciutto':c(T.ink,'Testo, soglia')},misure:{unita:n(T.u,'px','Ogni distanza e\' un multiplo'),riga:n(T.row,'px','44px al tocco'),'raggio-controllo':n(T.rc,'px','Web; le piattaforme native usano il proprio'),'raggio-piano':n(T.rp,'px',''),prosa:n(T.prosa,'px','Newsreader'),registro:n(T.reg,'px','Carattere di sistema')},movimento:{'posa-del-punto':n(T.tposa,'ms',''),asciugatura:n(T.tdry,'ms','Solo colore')}}},null,1)}
 function render(){
  const p=PF[S.pf];$('cap').innerHTML=`<b>${p[0]} · ${p[1]}×${p[2]}.</b> ${p[4]} Dati sintetici.`;
  const dev=$('dev');dev.style.width=p[1]+'px';dev.style.height=p[2]+'px';dev.style.setProperty('--dr',['iphone','duo','duoc'].includes(S.pf)?'34px':['ipad','ipadp'].includes(S.pf)?'22px':'10px');
@@ -358,7 +358,7 @@ $('scr').innerHTML=SC.map(s=>`<option value="${s[0]}">${s[1]}</option>`).join(''
 $('scr').value=S.scr;$('scr').onchange=ev=>go(ev.target.value);$('pf').onchange=ev=>{S.pf=ev.target.value;if(S.scr==='voce')S.v=S.pf==='mac'?'info':'assente';render()};
 for(const k of ['gr','rm','tg','er'])$(k).onclick=ev=>{S[k]=!S[k];ev.currentTarget.setAttribute('aria-pressed',S[k]);render()};
 $('tn').onclick=ev=>{const t=$('tun');t.hidden=!t.hidden;ev.currentTarget.setAttribute('aria-pressed',!t.hidden);$('wrap').classList.toggle('t',!t.hidden);fit()};
-function tunrows(){$('tunrows').innerHTML=Object.keys(T).map(k=>`<div class="r"><label for="t-${k}">${TL[k]}</label><input id="t-${k}" data-t="${k}" type="${typeof T0[k]==='string'?'color':'number'}" step="${k==='reg'?0.5:1}" value="${T[k]}"></div>`).join('')}
+function tunrows(){$('tunrows').innerHTML=Object.keys(T).map(k=>`<div class="r"><label for="t-${k}">${TL[k]}</label><input id="t-${k}" data-t="${k}" type="${typeof T0[k]==='string'?'color':'number'}" step="${k==='reg'||k==='u'?0.5:1}" value="${T[k]}"></div>`).join('')}
 tunrows();$('tunrows').oninput=ev=>{const k=ev.target.dataset.t;T[k]=typeof T0[k]==='string'?ev.target.value:+ev.target.value;render()};
 $('reset').onclick=()=>{T={...T0};tunrows();render()};
 $('copy').onclick=()=>{const o=$('out');navigator.clipboard.writeText(o.value).then(()=>{$('copy').textContent='Copiati'},()=>{o.select()})};

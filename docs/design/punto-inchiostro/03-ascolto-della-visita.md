@@ -50,9 +50,9 @@ Oggi l'app Mac dice "Registrazione visita" e "Avvia registrazione". Nella
 nuova direzione "Registra" è il comando che scrive in cartella. Due
 significati per lo stesso verbo, nella stessa schermata, sono un rischio.
 
-**Proposta:** l'audio si "ascolta". Comando "Ascolta la visita", stato "In
-ascolto", arresto "Ferma l'ascolto". È una decisione di Leonardo, perché
-cambia testi già in uso.
+**Deciso da Leonardo il 9 ottobre 2026:** l'audio si "ascolta". Comando
+"Ascolta la visita", stato "In ascolto", arresto "Ferma l'ascolto". I testi
+dell'app Mac vanno allineati quando l'interfaccia viene adeguata (WUL-768).
 
 ## Come si lega ai tre inchiostri
 
