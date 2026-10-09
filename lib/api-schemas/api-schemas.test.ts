@@ -156,8 +156,8 @@ test('patient bulk schemas normalize IDs and reject malformed payloads', async (
         patientVersions: { 'patient-1': 1, 'patient-2': 2 },
     });
     await expectValid(patientDuplicateSchema, {
-        patientIds: ['patient-1'],
-        targetAmbulatoryId: 'ambulatory-2',
+        patientIds: ['patient-1'], targetAmbulatoryId: 'ambulatory-2', sourceAmbulatoryId: 'ambulatory-1',
+        patientVersions: { 'patient-1': 4 }, duplicateIntentId: '11cf2a9a-5448-44f2-81b1-4101267477ca',
     });
     await expectValid(patientUnassignSchema, {
         patientIds: ['patient-1'],
@@ -229,4 +229,12 @@ test('service item ordinal accepts exact safe integers and decimal strings witho
     }
     assert.equal((await expectValid(servicePrescriptionItemCreateSchema, { prescriptionId: 'synthetic-parent', serviceName: 'Synthetic' })).ordinal, undefined);
     assert.equal((await expectValid(servicePrescriptionItemUpdateSchema, { version: 1 })).ordinal, undefined);
+});
+
+
+test('checkup create IDs allow omission and preserve opaque strings but reject provided invalid IDs', async () => {
+    const body = { patientId: 'synthetic-patient', date: '2026-01-01T00:00:00Z', title: 'Synthetic checkup' };
+    assert.equal((await expectValid(checkupCreateSchema, body)).id, undefined);
+    assert.equal((await expectValid(checkupCreateSchema, { ...body, id: ' opaque-checkup ' })).id, ' opaque-checkup ');
+    for (const id of [null, 42, '', ' \t ']) await expectInvalid400(checkupCreateSchema, { ...body, id });
 });

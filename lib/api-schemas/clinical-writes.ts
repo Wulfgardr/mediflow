@@ -9,8 +9,11 @@ import {
     requiredTextSchema,
 } from './common';
 
+// Checkup IDs are opaque and preserved; only omission authorizes generation.
+export const checkupCreateIdSchema = z.string().refine(value => value.trim().length > 0).optional();
+
 export const checkupCreateSchema = z.object({
-    id: optionalIdSchema,
+    id: checkupCreateIdSchema,
     patientId: requiredTextSchema,
     date: dateInputSchema,
     title: requiredTextSchema,

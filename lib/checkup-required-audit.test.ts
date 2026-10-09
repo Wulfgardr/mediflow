@@ -274,3 +274,62 @@ test('Web audit actor and surface follow admitted session despite bearer and for
     const metadata=JSON.parse(event.redacted_metadata as string) as {flags:string[]};
     assert.deepEqual(metadata.flags,['auth:session']);
 });
+
+for (const surface of ['web', 'v1', 'network'] as const) {
+    test(`${surface} create rejects provided invalid IDs without generating a replacement`, async () => {
+        for (const id of [42, null, '', ' \t ']) {
+            const result = await capture(`${surface}-invalid-create-id`, surface, 'POST', { change: body => ({ ...body, id }) });
+            assert.equal(result.status, 400);
+            assert.deepEqual(result.after, result.before);
+        }
+    });
+    test(`${surface} duplicate create ID returns 409 without effects`, async () => {
+        const ids = seed(`${surface}-create-id-replay`, false);
+        const body = validBody(surface, 'POST', ids);
+        assert.equal((await invoke(surface, 'POST', ids, body)).status, 201);
+        const before = readBack(ids.patientId, ids.checkupId);
+        const repeated = await invoke(surface, 'POST', ids, body);
+        assert.equal(repeated.status, 409);
+        assert.deepEqual(readBack(ids.patientId, ids.checkupId), before);
+    });
+}
+
+
+test('checkup create generates only omitted IDs and preserves opaque IDs across adapters', async () => {
+    for (const surface of ['web', 'v1', 'network'] as const) {
+        const ids = seed(`${surface}-generated-create-id`, false);
+        const { id: _id, ...body } = validBody(surface, 'POST', ids) as Record<string, unknown>;
+        const created = await invoke(surface, 'POST', ids, body);
+        assert.equal(created.status, 201);
+        const generated = (await created.json()).id as string;
+        assert.match(generated, /^[0-9a-f-]{36}$/);
+        const stored = readBack(ids.patientId, generated);
+        assert.equal(stored.allPatientCheckups.length, 1);
+        assert.equal(stored.audit.length, 1);
+        const opaque = ` opaque-${surface} `;
+        assert.equal((await invoke(surface, 'POST', ids, { ...body, id: opaque })).status, 201);
+        assert.ok(readBack(ids.patientId, opaque).checkup);
+    }
+});
+
+test('checkup duplicate detection follows parent and paired scope admission without revealing the existing row', async () => {
+    const existing = seed('duplicate-existing-other-patient', true);
+    for (const surface of ['web', 'v1', 'network'] as const) {
+        const rejected = await capture(`${surface}-duplicate-deleted-parent`, surface, 'POST', {
+            deletedPatient: true, change: body => ({ ...body, id: existing.checkupId }),
+        });
+        assert.equal(rejected.status, 404);
+        assert.deepEqual(rejected.after, rejected.before);
+        const admitted = await capture(`${surface}-duplicate-admitted-other-parent`, surface, 'POST', {
+            change: body => ({ ...body, id: existing.checkupId }),
+        });
+        assert.equal(admitted.status, 409);
+        assert.deepEqual(admitted.json, { error: 'Checkup already exists' });
+        assert.deepEqual(admitted.after, admitted.before);
+    }
+    const denied = await capture('network-duplicate-out-of-scope', 'network', 'POST', {
+        wrongScope: true, change: body => ({ ...body, id: existing.checkupId }),
+    });
+    assert.equal(denied.status, 404);
+    assert.deepEqual(denied.after, denied.before);
+});

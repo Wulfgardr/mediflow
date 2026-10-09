@@ -1,3 +1,4 @@
+import { checkupCreateIdSchema } from './api-schemas/clinical-writes';
 /* @Codex: paired checkup boundary preserves current capability, normalization and ENC semantics. */
 import { v4 as uuidv4 } from 'uuid';
 import { listChangedFields, requestIdFromRequest } from './security/audit';
@@ -86,7 +87,9 @@ export async function createNetworkScopedCheckup(
 ): Promise<NetworkCheckupMutationResponse> {
     const boundaryError = validateNetworkCheckupMutationBoundary(body, NETWORK_FORBIDDEN_CHECKUP_CREATE_FIELDS);
     if (boundaryError) return boundaryError;
-    const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
+    const parsedId = checkupCreateIdSchema.safeParse(body.id);
+    if (!parsedId.success) return { status: 400, value: { error: 'Invalid id' } };
+    const newId = parsedId.data ?? uuidv4();
     const normalized = normalizeCheckupCreateInput(body, { id: newId, patientId: context.patientId });
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     return createCheckupOperation({
