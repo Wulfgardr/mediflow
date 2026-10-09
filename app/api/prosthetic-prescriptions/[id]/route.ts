@@ -1,3 +1,4 @@
+import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -18,7 +19,9 @@ export async function PUT(request: Request, context: RouteContext) {
 
     try {
         const { id } = await context.params;
-        const body = await request.json() as Record<string, unknown>;
+        const parsedBody = await readPrescriptionJsonObject(request);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body;
         const result = await updateHostProstheticPrescription({ request, session, id }, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
@@ -33,7 +36,9 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     try {
         const { id } = await context.params;
-        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+        const parsedBody = await readPrescriptionJsonObject(request, 'empty-object');
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body;
         const versionResult = requireExpectedVersion(body.version);
         if (!versionResult.ok) {
             return NextResponse.json(versionResult.value, { status: versionResult.status });

@@ -1,5 +1,5 @@
 /* @Codex */
-import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -32,16 +32,15 @@ export async function POST(request: Request) {
         const resolved = await requireNetworkWriteContext(request, NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        const parsedBody = await readPrescriptionJsonObject(request);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body;
         const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : '';
         if (!patientId) return NextResponse.json({ error: 'patientId is required' }, { status: 400 });
 
         const result = await createNetworkScopedProstheticPrescription({ ...resolved.context, patientId }, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
-        const sizeError = jsonBodyTooLargeResponse(error);
-        if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/prosthetic-prescriptions error:', error);
         return NextResponse.json({ error: 'Failed to create prosthetic prescription' }, { status: 500 });
     }
