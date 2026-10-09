@@ -2,6 +2,7 @@
 import { expect, test } from './fixtures/isolated-runtime';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
+import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 const STRONG_AUTH_CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
 
@@ -24,7 +25,9 @@ test('Web access recovers across application lock, logout, and synthetic admin r
     await bootstrapUnlockedSession(setupPage, pin);
     await expect(setupPage.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
     await setupPage.close();
-    expect((await setupContext.request.post('/api/auth/logout')).status()).toBe(204);
+    expect((await setupContext.request.post('/api/auth/logout', {
+      headers: trustedWebRequestHeaders(baseURL),
+    })).status()).toBe(204);
   } finally {
     await setupContext.close();
   }
