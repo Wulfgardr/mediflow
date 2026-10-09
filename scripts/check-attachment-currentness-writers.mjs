@@ -16,13 +16,13 @@ const SELF = new Set(['scripts/check-attachment-currentness-writers.mjs', 'scrip
 // occurrence count all match. `finding` records keep the production gate red.
 const record = (path, kind, fingerprint, count, disposition = 'current', code) => ({ path, kind, fingerprint, count, disposition, code });
 export const CONTRACT = [
-    record('app/api/attachments/[id]/route.ts', 'orm-delete', '46227366b7b8c814', 1),
+    record('app/api/attachments/[id]/route.ts', 'orm-delete', 'fb6f0ee390651912', 1),
     record('app/patients/[id]/entries/new/page.tsx', 'facade-add', 'a31458e0ddb9239b', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-add', 'bb17b19c4e9ee44b', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-delete', 'ea20bffd502bf35b', 1, 'delegated'),
     record('lib/attachment-currentness-host.ts', 'raw-update', '9c1cca84075cc579', 1),
     record('lib/attachment-currentness-host.ts', 'raw-update', 'f7b9893a376ee118', 1),
-    record('lib/attachment-web-create.ts', 'orm-insert', '58b77ec84cbf40a6', 1),
+    record('lib/attachment-web-create.ts', 'orm-insert', 'a916851f34917616', 1),
     record('lib/backup-restore-executor.ts', 'restore-clear-binding', '94a040e199bf2242', 1),
     record('lib/backup-restore-executor.ts', 'restore-delete', 'bcb60d05c6552e6d', 1),
     record('lib/backup-restore-executor.ts', 'restore-insert-binding', 'd047e211add695dc', 1),

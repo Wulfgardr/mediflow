@@ -7,6 +7,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { attachmentCreateSchema } from './api-schemas/attachments';
 import { parseApiBody } from './api-schemas/parse';
+import { readBoundedJsonBody } from './bounded-request-body';
+import { writeAttachmentWebAudit } from './attachment-web-audit';
 import { buildAttachmentPath } from './attachment-path';
 import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from './attachment-payload';
 import { createHostAttachmentCurrentness } from './attachment-currentness-host';
@@ -26,11 +28,18 @@ export async function createWebAttachment(
 ): Promise<Response> {
     if (!session) return unauthorizedResponse();
     try {
-        const contentLength = Number.parseInt(request.headers.get('content-length') ?? '', 10);
-        if (Number.isFinite(contentLength) && contentLength > resolveMaxAttachmentBytes()) {
-            return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
+        const maxBytes = resolveMaxAttachmentBytes();
+        let json;
+        try {
+            json = await readBoundedJsonBody(request, maxBytes, 'request-json',
+                { signal: request.signal, deadline: Infinity });
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
-        const parsedBody = parseApiBody(attachmentCreateSchema, await request.json());
+        if (!json.ok) return NextResponse.json(
+            { error: json.status === 413 ? 'Attachment payload too large' : 'Invalid JSON body' },
+            { status: json.status });
+        const parsedBody = parseApiBody(attachmentCreateSchema, json.value);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
         if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
@@ -43,12 +52,13 @@ export async function createWebAttachment(
         }
 
         const id = body.id || uuidv4();
-        const created = dbServer.transaction((tx): 'created' | 'missing' => {
+        const created = dbServer.transaction((tx): 'created' | 'missing' | 'duplicate' => {
             const patient = tx.select({ id: patients.id }).from(patients)
                 .where(and(eq(patients.id, body.patientId), activePatients())).get();
             if (!patient) return 'missing';
+            if (tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get()) return 'duplicate';
             const currentness = mintHostAttachmentCurrentness();
-            tx.insert(attachments).values({
+            const inserted = tx.insert(attachments).values({
                 id,
                 patientId: body.patientId,
                 name: body.name,
@@ -66,8 +76,11 @@ export async function createWebAttachment(
                 documentRevision: currentness.revision,
                 documentFreshnessEpoch: currentness.freshnessEpoch,
             }).run();
+            if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
+            writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
             return 'created';
         }, { behavior: 'immediate' });
+        if (created === 'duplicate') return NextResponse.json({ error: 'Attachment already exists' }, { status: 409 });
         if (created === 'missing') return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
         return NextResponse.json({ id }, { status: 201 });
     } catch {

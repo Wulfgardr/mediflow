@@ -150,7 +150,7 @@ Sorgenti: [lib/attachment-web-create.ts](../lib/attachment-web-create.ts), [lib/
 
 Create Web: schema, ID client o UUID, payload e parent attivo nella transazione; currentness host. PUT metadata: allowlist e transizioni coda, incremento currentness host. PUT content: expected currentness e CAS, parser dedicato. DELETE Web: ID path e changes=1; nessun CAS esplicito. Paired upload genera ID host e rilegge paziente/scope in transazione; ENC e no campi document-derived. Paired detail è solo GET.
 
-Prove di riferimento: [lib/attachment-web-create-currentness.test.ts](../lib/attachment-web-create-currentness.test.ts), [lib/attachment-web-put-currentness.test.ts](../lib/attachment-web-put-currentness.test.ts), [lib/attachment-currentness-host.test.ts](../lib/attachment-currentness-host.test.ts), [lib/network-attachment-write.test.ts](../lib/network-attachment-write.test.ts). test:network:home-base-documents-write; check:attachment-currentness-writers; test:attachment-currentness-writers. Gap C05-D: audit assente nei writer Web, al meglio in upload paired; non confondere currentness con audit del commit.
+Prove di riferimento: [lib/attachment-web-create-currentness.test.ts](../lib/attachment-web-create-currentness.test.ts), [lib/attachment-web-put-currentness.test.ts](../lib/attachment-web-put-currentness.test.ts), [lib/attachment-currentness-host.test.ts](../lib/attachment-currentness-host.test.ts), [lib/network-attachment-write.test.ts](../lib/network-attachment-write.test.ts). test:network:home-base-documents-write; check:attachment-currentness-writers; test:attachment-currentness-writers. Create/delete Web ora richiedono un evento nella stessa transazione immediata della mutazione; il create legge JSON entro il limite attachment corrente e rifiuta duplicati con 409. La suite create/currentness, già selezionata da unit, copre successo, rollback al guasto audit, INSERT ignorato e input/scope senza effetti. Gap C05-D: audit ancora assente in metadata/content Web e al meglio in upload paired; CAS/replay del delete restano aperti.
 
 ### S — Workflow SISS persistito
 
@@ -210,8 +210,8 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | A-04 | Web POST [/api/ambulatories/route.ts](../app/api/ambulatories/route.ts) | A; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | ambulatory-write; **TX+audit** | Audit e body migrati; residui campi/ID C05-A sopra |
 | D-01 | Web PUT [/api/attachments/[id]/content/route.ts](../app/api/attachments/[id]/content/route.ts) | D; JSON ≤ resolveMaxAttachmentBytes | ID/currentness del profilo; no patients.version | attachment-currentness-host TX immediata; **nessuno** | Aperto C05-D |
 | D-02 | Web PUT [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; JSON non bounded | ID/currentness del profilo; no patients.version | attachment-currentness-host TX immediata; **nessuno** | Aperto C05-D |
-| D-03 | Web DELETE [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; nessun body letto | ID/currentness del profilo; no patients.version | DELETE statement; **nessuno** | Aperto C05-D |
-| D-04 | Web POST [/api/attachments/route.ts](../app/api/attachments/route.ts) | D; Content-Length + payload; JSON non bounded | ID/currentness del profilo; no patients.version | attachment-web-create TX immediata; **nessuno** | Aperto C05-D |
+| D-03 | Web DELETE [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; nessun body letto | ID del profilo; no versione client | Lookup+delete in TX immediata; **TX+audit** | Audit migrato; CAS/replay C05-D |
+| D-04 | Web POST [/api/attachments/route.ts](../app/api/attachments/route.ts) | D; JSON bounded al limite attachment + payload | ID duplicato409; currentness host; parent attivo | attachment-web-create TX immediata; **TX+audit** | Create migrato; altri writer C05-D aperti |
 | C-01 | Web PUT [/api/checkups/[id]/route.ts](../app/api/checkups/[id]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | C-02 | Web DELETE [/api/checkups/[id]/route.ts](../app/api/checkups/[id]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | C-03 | Web POST [/api/checkups/route.ts](../app/api/checkups/route.ts) | C; 4 MiB | Create: ID/parent del profilo; versione host | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
@@ -360,7 +360,7 @@ roster non li promuove a un nuovo dominio di commit clinico.
 2. **C05-B:** assign/unassign migrati per audit atomico e input limitato; restano
    CAS e replay dopo operazioni interposte. Move migrato con il CAS esistente;
    duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
-3. **C05-D:** create/delete Web, poi metadata/content; upload paired distinto.
+3. **C05-D:** create/delete Web migrati; proseguire metadata/content e upload paired.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
 4. **C05-M:** purge paziente migrato; proseguire relink/purge orfani. Restore già migrato rimane
    una riga di regressione, non la prova dei rami diversi.
