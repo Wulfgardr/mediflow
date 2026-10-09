@@ -158,3 +158,76 @@ test('network ambulatory writes emit paired-client scope audit flags', async () 
     const metadata = JSON.parse(audit?.redactedMetadata ?? '{}') as { flags?: string[] };
     assert.deepEqual(metadata.flags, ['auth:paired-client', 'paired-client:paired-amb-client', 'scope:ambulatory']);
 });
+
+
+test('create rejects invalid id, default flag and date types without SQLite or audit effects', async () => {
+    const modules = await loadModules();
+    await resetDatabase(modules);
+    await seed(modules, 'field-validation-default', true, 3);
+    const snapshot = () => ({
+        ambulatories: modules.dbServer.select().from(modules.schema.ambulatories).all(),
+        audit: modules.dbServer.select().from(modules.schema.auditEvents).all(),
+    });
+    const before = snapshot();
+    const badFields: Record<string, unknown>[] = [
+        ...[null, 42, '', '   ', undefined].map(id => ({ id })),
+        ...[null, 1, 'false', undefined].map(isDefault => ({ isDefault })),
+        ...[null, true, [], {}, '', 'not-a-date', new Date(NaN), undefined].map(createdAt => ({ createdAt })),
+    ];
+    for (const fields of badFields) {
+        const result = modules.createAmbulatory({ request: request(), session: adminSession() }, {
+            name: 'Synthetic validation', isDefault: true, ...fields,
+        });
+        assert.equal(result.status, 400, `invalid ${Object.keys(fields)[0]}`);
+        assert.deepEqual(snapshot(), before);
+    }
+});
+
+test('create preserves omitted identity/time and valid zero, ISO and Date timestamps', async () => {
+    const modules = await loadModules();
+    await resetDatabase(modules);
+    const hostContext = { request: request(), session: adminSession() };
+    const earliest = Math.floor(Date.now() / 1000) * 1000;
+    const generated = modules.createAmbulatory(hostContext, { name: 'Synthetic generated' });
+    assert.equal(generated.status, 201);
+    assert.match(generated.value.id as string, /^[0-9a-f-]{36}$/i);
+    const defaultRow = modules.dbServer.select().from(modules.schema.ambulatories)
+        .where(eq(modules.schema.ambulatories.id, generated.value.id as string)).get()!;
+    assert.equal(defaultRow.isDefault, true);
+    assert(defaultRow.createdAt!.getTime() >= earliest);
+    assert(defaultRow.createdAt!.getTime() <= Date.now());
+    const dates = [0, '2026-05-01', new Date('2026-05-02T12:00:00Z')];
+    for (const [index, createdAt] of dates.entries()) {
+        const id = `opaque-field-id-${index}`;
+        const result = modules.createAmbulatory(hostContext, { id: `  ${id}  `, name: 'Synthetic time',
+            createdAt, isDefault: false, parentId: defaultRow.id, address: null, description: null });
+        assert.equal(result.status, 201);
+        assert.equal(result.value.id, id);
+        const row = modules.dbServer.select().from(modules.schema.ambulatories)
+            .where(eq(modules.schema.ambulatories.id, id)).get()!;
+        assert.equal(row.createdAt!.getTime(), new Date(createdAt).getTime());
+        assert.equal(row.version, 1);
+        assert.equal(row.isDefault, false);
+        assert.equal(row.parentId, defaultRow.id);
+        assert.equal(row.address, null);
+        assert.equal(row.description, null);
+    }
+});
+
+test('paired create forwards field rejection before changing default or audit', async () => {
+    const modules = await loadModules();
+    await resetDatabase(modules);
+    await seed(modules, 'paired-field-default', true, 5);
+    const snapshot = () => ({
+        ambulatories: modules.dbServer.select().from(modules.schema.ambulatories).all(),
+        audit: modules.dbServer.select().from(modules.schema.auditEvents).all(),
+    });
+    const before = snapshot();
+    const context = { request: request(), scopeAmbulatoryId: 'paired-field-default', session: adminSession(),
+        pairedClient: { clientId: 'paired-field-client' } } as Parameters<LoadedModules['createNetworkAmbulatory']>[0];
+    const result = await modules.createNetworkAmbulatory(context, {
+        id: 'paired-field-candidate', name: 'Synthetic paired', isDefault: true, createdAt: false,
+    });
+    assert.equal(result.status, 400);
+    assert.deepEqual(snapshot(), before);
+});
