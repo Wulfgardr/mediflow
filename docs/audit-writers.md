@@ -67,6 +67,7 @@ una riga inserita; non apre una seconda connessione.
 | [patients/assign/route.ts](../app/api/patients/assign/route.ts) | Associazione secondaria paziente/ambulatorio: cambia lo scope persistito. | C05: lookup, insert ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
 | [patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | Rimozione associazione secondaria, con primary e versione invariati. | C05: lookup, delete ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
 | [patients/move/route.ts](../app/api/patients/move/route.ts) | Trasferimento batch: cambia associazioni, ambulatorio primario e versione. | C05: CAS, mutazioni ed evento per paziente nella stessa transazione immediata; rollback dell'intero batch al guasto audit. |
+| [patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | Duplicazione batch: crea pazienti e associazioni nel target. | C05: lookup, cloni, membership e un evento per clone nella stessa transazione immediata; guasto audit annulla l’intero batch. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
@@ -92,6 +93,12 @@ verificano eventi e versioni sul successo, rollback completo se il secondo audit
 fallisce o viene ignorato e replay con versione vecchia senza effetti.
 `sourceAmbulatoryId` resta il filtro opzionale per la rimozione di una membership;
 non diventa una nuova precondizione di appartenenza.
+
+Duplicate usa JSON fino a 256 KiB e conserva lo schema e i campi copiati.
+Le [prove SQLite del batch](../lib/patient-duplicate-required-audit.test.ts)
+verificano eventi host sul successo e rollback totale al guasto del secondo
+audit. CAS degli originali e idempotenza restano lavori C05: una richiesta
+ripetuta crea nuovi cloni secondo il comportamento corrente.
 
 ## Writer clinici ancora al meglio: consegna a C05
 
