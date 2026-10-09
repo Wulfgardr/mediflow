@@ -76,6 +76,15 @@ Per `SISS` e `FSE` il confine rimane il passaggio contestuale verso i servizi
 ufficiali e i percorsi `webapp-assisted`, finché non esista un canale
 `SSI/A2A` qualificato, documentato e sostenibile.
 
+Il diario locale `/api/siss-handoffs` restituisce la versione host della voce
+(1 alla creazione). Aggiornamento e cancellazione richiedono il `patientId`
+e la `version` osservati: un paziente diverso restituisce 404, una versione
+superata 409, senza mutazione né audit di successo. Confronto, incremento
+all'aggiornamento e audit obbligatorio condividono la transazione IMMEDIATE.
+La UI conserva questi valori dalla voce visualizzata, prima della conferma,
+e rilegge tramite la live query dopo il successo. Non cambia la superficie
+`/api/v1` né introduce collegamenti regionali.
+
 ### Porte locali (default)
 
 | Componente | Default | Note |

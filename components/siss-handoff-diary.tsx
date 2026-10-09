@@ -3,7 +3,7 @@
 /* @Codex */
 import { type FormEvent, useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, LoaderCircle, Plus, Trash2 } from 'lucide-react';
-import { db, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
+import { db, captureSissHandoffWritePrecondition, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -143,13 +143,14 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         setError(null);
         setIsSaving(true);
         try {
+            const sissPrecondition = captureSissHandoffWritePrecondition(pendingHandoff);
             await db.sissHandoffs.update(pendingHandoff.id, {
                 outcome: closureOutcome,
                 completedAt: new Date(),
                 nextAction: optionalValue(closureNextAction),
                 notes: optionalValue(closureNotes),
                 updatedAt: new Date(),
-            });
+            }, { sissPrecondition });
             setClosureNotes('');
             setClosureNextAction('');
             setClosureOutcome('completed');
@@ -161,13 +162,19 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     };
 
     const deleteItem = async (item: SissHandoffEvent) => {
-        const { confirmed } = await confirm({
-            title: `Eliminare la voce SISS "${item.moduleLabel}"?`,
-            confirmLabel: 'Elimina',
-            tone: 'danger'
-        });
-        if (!confirmed) return;
-        await db.sissHandoffs.delete(item.id);
+        setError(null);
+        try {
+            const sissPrecondition = captureSissHandoffWritePrecondition(item);
+            const { confirmed } = await confirm({
+                title: `Eliminare la voce SISS "${item.moduleLabel}"?`,
+                confirmLabel: 'Elimina',
+                tone: 'danger'
+            });
+            if (!confirmed) return;
+            await db.sissHandoffs.delete(sissPrecondition.id, { sissPrecondition });
+        } catch {
+            setError('Eliminazione non riuscita. La voce potrebbe essere cambiata: ricarica il diario prima di riprovare.');
+        }
     };
 
     const headerActions = (
