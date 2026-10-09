@@ -51,7 +51,7 @@ test('cleanup success reports patients, excludes other patients and preserves de
         }
         return Response.json(url === '/api/patients' ? [patient, { id: 'synthetic-control', taxCode: 'CONTROL' }] : []);
     });
-    assert.deepEqual(await nukeTestData(false), { deleted: 1 });
+    assert.deepEqual(await nukeTestData(false), { mode: 'test', deleted: 1 });
     assert.deepEqual(deletes, ['/api/patients/synthetic']);
 });
 
@@ -125,4 +125,20 @@ test('UI uses confirmed results and incomplete messages; errors never reload or 
         assert.match(handler, /tone: 'error'/);
         assert.doesNotMatch(handler, /location.reload|setTimeout|\.stack/);
     }
+});
+
+
+test('full reset returns no inferred count and the UI selects its generic success message', async t => {
+    const calls: string[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string, init?: RequestInit) => {
+        // No list snapshot: bulk success does not acknowledge a record count.
+        assert.equal(init?.method, 'DELETE');
+        calls.push(url);
+        return Response.json({ success: true });
+    });
+    assert.deepEqual(await nukeTestData(true), { mode: 'full' });
+    assert.deepEqual(calls, ['/api/entries', '/api/therapies', '/api/checkups', '/api/attachments',
+        '/api/patients', '/api/conversations', '/api/messages']);
+    const source = fs.readFileSync('components/data-seeder.tsx', 'utf8');
+    assert.match(source, /description: result.mode === 'full'\s*\? 'Reset totale completato\.'\s*:\s*`Eliminati \$\{result.deleted\}/);
 });
