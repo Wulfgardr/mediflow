@@ -66,9 +66,19 @@ test.afterEach(() => {
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('authenticated metadata mutations advance the host tuple exactly once, including concurrent accepted updates', async () => {
-    reset(); const first = await invoke('PUT', { summarySnapshot: 'old' });
+    reset(); const beforeAudit = atomicSnapshot().audit.length;
+    const first = await invoke('PUT', { summarySnapshot: 'old' });
     assert.equal(first.status, 200); assert.deepEqual(snapshot(), { patient_id: PATIENT, summary_snapshot: 'old', parse_evidence_artifact_snapshot: null,
         ocr_queue_state: 'pending', document_source_ref: REF, document_revision: 2, document_freshness_epoch: 2 });
+    const audit = atomicSnapshot().audit;
+    assert.equal(audit.length, beforeAudit + 1);
+    const event = audit.at(-1)!;
+    assert.equal(event.event_type, 'attachment.updated');
+    assert.equal(event.actor_ref, auth.userId);
+    assert.equal(event.source_surface, 'web');
+    assert.equal(event.subject_ref, ATTACHMENT);
+    assert.deepEqual(JSON.parse(event.redacted_metadata as string),
+        { changedFields: ['summarySnapshot'], resourceVersion: 2, flags: ['auth:session'] });
     const changed = await invoke('PUT', { summarySnapshot: 'new' }); assert.equal(changed.status, 200);
     const responses = await Promise.all([invoke('PUT', { summarySnapshot: 'next' }), invoke('PUT', { parseEvidenceArtifactSnapshot: 'evidence' })]);
     assert.deepEqual(responses.map((response) => response.status), [200, 200]);
@@ -104,4 +114,72 @@ test('wrong-patient source authority stays denied and DELETE makes an in-flight 
     assert.equal((await invoke('DELETE')).status, 200); assert.equal(snapshot(), undefined);
     assert.equal(authority.finalize(begun.operation).status, 'denied'); authority.dispose();
     assert.equal((await invoke('DELETE')).status, 404);
+});
+
+
+function atomicSnapshot() {
+    const sql = new Database(dbPath);
+    try { return {
+        attachments: sql.prepare('SELECT * FROM attachments ORDER BY id').all(),
+        audit: sql.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
+    }; } finally { sql.close(); }
+}
+
+test('required metadata audit FAIL and IGNORE roll back the nested currentness transaction', async () => {
+    for (const fault of ["FAIL, 'synthetic update audit fault'", 'IGNORE']) {
+        reset();
+        const before = atomicSnapshot();
+        const sql = new Database(dbPath);
+        try {
+            sql.exec(`CREATE TRIGGER synthetic_update_audit_fault BEFORE INSERT ON audit_events
+                BEGIN SELECT RAISE(${fault}); END`);
+            const response = await invoke('PUT', { summarySnapshot: 'synthetic updated summary' });
+            assert.deepEqual(atomicSnapshot(), before, 'data, currentness and events must roll back together');
+            assert.equal(response.status, 500);
+        } finally {
+            sql.exec('DROP TRIGGER IF EXISTS synthetic_update_audit_fault');
+            sql.close();
+        }
+    }
+});
+
+
+test('metadata null clears only the supplied field and audits only its allowlisted name', async () => {
+    reset();
+    const sql = new Database(dbPath);
+    try { sql.prepare('UPDATE attachments SET parse_evidence_artifact_snapshot = ? WHERE id = ?').run('synthetic preserved evidence', ATTACHMENT); }
+    finally { sql.close(); }
+    const response = await invoke('PUT', { summarySnapshot: null });
+    assert.equal(response.status, 200);
+    const row = snapshot() as Record<string, unknown>;
+    assert.equal(row.summary_snapshot, null);
+    assert.equal(row.parse_evidence_artifact_snapshot, 'synthetic preserved evidence');
+    assert.equal(row.document_revision, 2);
+    assert.deepEqual(JSON.parse(atomicSnapshot().audit.at(-1)!.redacted_metadata as string),
+        { changedFields: ['summarySnapshot'], resourceVersion: 2, flags: ['auth:session'] });
+});
+
+test('metadata JSON is bounded at 4 MiB and rejects malformed or invalid shapes before effects', async () => {
+    reset();
+    const original = serverAuth.requireSession;
+    serverAuth.requireSession = async () => auth;
+    const send = (body: string, headers: HeadersInit = {}) => route.PUT(new Request(`http://localhost/api/attachments/${ATTACHMENT}`, {
+        method: 'PUT', body, headers,
+    }), { params: Promise.resolve({ id: ATTACHMENT }) });
+    try {
+        for (const body of ['{', 'null', '[]', 'true', '{"summarySnapshot":7}']) {
+            const before = atomicSnapshot();
+            assert.equal((await send(body)).status, 400);
+            assert.deepEqual(atomicSnapshot(), before);
+        }
+        const maximum = 4 * 1024 * 1024;
+        const json = '{"summarySnapshot":null}';
+        const atLimit = json + ' '.repeat(maximum - Buffer.byteLength(json));
+        assert.equal((await send(atLimit)).status, 200);
+        for (const headers of [{}, { 'content-length': '1' }, { 'content-length': String(maximum + 1) }] as HeadersInit[]) {
+            const before = atomicSnapshot();
+            assert.equal((await send(atLimit + ' ', headers)).status, 413);
+            assert.deepEqual(atomicSnapshot(), before);
+        }
+    } finally { serverAuth.requireSession = original; }
 });
