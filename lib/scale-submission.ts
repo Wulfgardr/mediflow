@@ -11,12 +11,14 @@ export function prepareScaleSubmission(scaleId: string, answers: unknown) {
         scaleId: definition.id,
         score: result.score,
         interpretation: result.interpretation,
+        ...(result.interpretationVersion ? { interpretationVersion: result.interpretationVersion } : {}),
         answers: result.answers,
         ...(definition.instrument ? { instrument: { ...definition.instrument } } : {}),
     };
     return {
         title: definition.title,
-        content: `Valutazione ${definition.title} completata.\nPunteggio: ${result.score}\nInterpretazione: ${result.interpretation}`,
+        content: `Valutazione ${definition.title} completata.\nPunteggio: ${result.score}\nInterpretazione: ${result.interpretation}`
+            + (result.interpretationVersion ? `\nVersione interpretazione: ${result.interpretationVersion}` : ''),
         metadata,
     };
 }
