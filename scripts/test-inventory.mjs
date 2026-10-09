@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { collectPlaywrightTestFiles } from './playwright-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection } from './explicit-npm-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
@@ -13,6 +14,17 @@ export async function collectHeadlessInventorySelection(root) {
   try {
     const binding = collectNpmScriptBinding(root, headlessSuite, 'node scripts/run-headless-portable-tests.mjs');
     return { files: await collectHeadlessPortableTests(root), errors: [], binding };
+  } catch (error) {
+    return { files: [], errors: [error.message], binding: null };
+  }
+}
+
+export function collectPlaywrightInventorySelection(root) {
+  try {
+    const binding = collectNpmScriptBinding(root, {
+      script: 'test:e2e', workflow: '.github/workflows/e2e.yml', job: 'e2e',
+    }, 'playwright test --workers=1');
+    return { files: collectPlaywrightTestFiles(root), errors: [], binding };
   } catch (error) {
     return { files: [], errors: [error.message], binding: null };
   }
@@ -163,7 +175,8 @@ async function cli(args) {
   catch (error) { unit = { files: [], errors: [error.message] }; }
   const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
     'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
-    'npm:check:claims:self-test': collectClaimsSelfTestSelection(root) });
+    'npm:check:claims:self-test': collectClaimsSelfTestSelection(root),
+    'npm:test:e2e': collectPlaywrightInventorySelection(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);

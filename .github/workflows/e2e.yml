@@ -133,7 +133,7 @@ jobs:
           # @Codex: document-flow-real-route owns an empty standalone runtime and
           # runs only when this explicit synthetic-fixture opt-in is present.
           E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
-        run: npx playwright test --workers=1
+        run: npm run test:e2e
 
       # This browser harness uses node:test and top-level await, so it is not
       # collectable by Playwright. Keep it in its canonical runner with an
