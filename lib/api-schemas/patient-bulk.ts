@@ -10,18 +10,26 @@ const targetAmbulatorySchema = z.object({
     targetAmbulatoryId: idSchema,
 });
 
-export const patientAssignSchema = targetAmbulatorySchema;
+export const patientAssignSchema = targetAmbulatorySchema.extend({
+    patientVersions: patientVersionsSchema,
+}).superRefine(validateExactPatientVersions);
 export const patientDuplicateSchema = targetAmbulatorySchema;
 
 export const patientUnassignSchema = z.object({
     patientIds: patientIdsSchema,
     ambulatoryId: idSchema,
-});
+    patientVersions: patientVersionsSchema,
+}).superRefine(validateExactPatientVersions);
 
 export const patientMoveSchema = targetAmbulatorySchema.extend({
     sourceAmbulatoryId: idSchema.nullish().transform((value) => value ?? undefined),
     patientVersions: patientVersionsSchema,
-}).superRefine((value, context) => {
+}).superRefine(validateExactPatientVersions);
+
+function validateExactPatientVersions(
+    value: { patientIds: string[]; patientVersions: Record<string, number> },
+    context: z.RefinementCtx,
+) {
     const requestedIds = new Set(value.patientIds);
     for (const patientId of requestedIds) {
         if (!Object.hasOwn(value.patientVersions, patientId)) {
@@ -41,4 +49,4 @@ export const patientMoveSchema = targetAmbulatorySchema.extend({
             });
         }
     }
-});
+}

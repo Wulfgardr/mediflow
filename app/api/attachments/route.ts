@@ -34,6 +34,11 @@ const ATTACHMENT_METADATA_COLUMNS = {
     ocrQueueUpdatedAt: attachments.ocrQueueUpdatedAt,
     ocrReplayArtifactSnapshot: attachments.ocrReplayArtifactSnapshot,
     createdAt: attachments.createdAt,
+    currentness: {
+        sourceRef: attachments.documentSourceRef,
+        revision: attachments.documentRevision,
+        freshnessEpoch: attachments.documentFreshnessEpoch,
+    },
 } as const;
 
 const ATTACHMENT_RESPONSE_COLUMNS = {
