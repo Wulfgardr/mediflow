@@ -141,10 +141,20 @@ test('descriptor-first request schema rejects ambient and exotic shapes without 
 
 test('authenticated route replaces only sealed data and returns a sanitized currentness receipt', async () => {
     reset();
-    const response = await invoke({ expected: expected(), replacement: sealed });
+    const beforeAudit = atomicSnapshot().audit.length;
+    const response = await invoke({ expected: expected(), replacement: sealed }, 'attachment.synthetic.1', true, { 'x-mediflow-source-surface': 'job' });
     assert.equal(response.status, 200);
     assert.deepEqual(await json(response), { outcome: 'replaced', currentness: { sourceRef: ref, revision: 2, freshnessEpoch: 2 } });
     assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: sealed, document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
+    const audit = atomicSnapshot().audit;
+    assert.equal(audit.length, beforeAudit + 1);
+    const event = audit.at(-1)!;
+    assert.equal(event.event_type, 'attachment.updated');
+    assert.equal(event.actor_ref, session.userId);
+    assert.equal(event.source_surface, 'web');
+    assert.equal(event.subject_ref, 'attachment.synthetic.1');
+    assert.deepEqual(JSON.parse(event.redacted_metadata as string),
+        { changedFields: ['data'], resourceVersion: 2, flags: ['auth:session'] });
 });
 
 test('post-import regex poisoning cannot admit plaintext through the route', async () => {
@@ -257,4 +267,31 @@ test('two process-level route contenders produce one receipt and one conflict', 
         assert.deepEqual((await Promise.all([routeWorker(), routeWorker()])).sort(), ['200', '409']);
         assert.deepEqual(snapshot(), { patient_id: 'patient.synthetic.1', data: sealed, document_source_ref: ref, document_revision: 2, document_freshness_epoch: 2 });
     } finally { fs.rmSync(workerPath, { force: true }); }
+});
+
+
+function atomicSnapshot() {
+    const sql = new Database(dbPath);
+    try { return {
+        attachments: sql.prepare('SELECT * FROM attachments ORDER BY id').all(),
+        audit: sql.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
+    }; } finally { sql.close(); }
+}
+
+test('required content audit FAIL and IGNORE roll back the nested currentness transaction', async () => {
+    for (const fault of ["FAIL, 'synthetic update audit fault'", 'IGNORE']) {
+        reset();
+        const before = atomicSnapshot();
+        const sql = new Database(dbPath);
+        try {
+            sql.exec(`CREATE TRIGGER synthetic_update_audit_fault BEFORE INSERT ON audit_events
+                BEGIN SELECT RAISE(${fault}); END`);
+            const response = await invoke({ expected: expected(), replacement: sealed });
+            assert.deepEqual(atomicSnapshot(), before, 'data, currentness and events must roll back together');
+            assert.equal(response.status, 503);
+        } finally {
+            sql.exec('DROP TRIGGER IF EXISTS synthetic_update_audit_fault');
+            sql.close();
+        }
+    }
 });
