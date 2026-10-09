@@ -16,7 +16,7 @@ const SELF = new Set(['scripts/check-attachment-currentness-writers.mjs', 'scrip
 // occurrence count all match. `finding` records keep the production gate red.
 const record = (path, kind, fingerprint, count, disposition = 'current', code) => ({ path, kind, fingerprint, count, disposition, code });
 export const CONTRACT = [
-    record('app/api/attachments/[id]/route.ts', 'orm-delete', '46227366b7b8c814', 1),
+    record('app/api/attachments/[id]/route.ts', 'orm-delete', 'fb6f0ee390651912', 1),
     record('app/patients/[id]/entries/new/page.tsx', 'facade-add', 'a31458e0ddb9239b', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-add', 'bb17b19c4e9ee44b', 1, 'delegated'),
     record('components/document-upload.tsx', 'facade-delete', 'ea20bffd502bf35b', 1, 'delegated'),
