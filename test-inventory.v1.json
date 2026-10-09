@@ -4037,6 +4037,15 @@
       }
     },
     {
+      "path": "lib/patient-move-required-audit.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/patient-open-loops.test.ts",
       "selection": {
         "state": "mapped",

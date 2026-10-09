@@ -8,10 +8,14 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { patientMoveSchema } from '@/lib/api-schemas/patient-bulk';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 /* @Codex */
 import { buildPatientVersionConflictPayload } from '@/lib/patient-concurrency';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
 import { activePatients } from '@/lib/patient-lifecycle';
+
+const MOVE_JSON_MAX_BYTES = 262_144;
 
 export async function POST(request: Request) {
     /* @Codex */
@@ -19,9 +23,15 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const parsedBody = parseApiBody(patientMoveSchema, await request.json());
+        const body = await readBoundedJsonBody(request, MOVE_JSON_MAX_BYTES, 'request-json',
+            { signal: request.signal, deadline: Infinity });
+        if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'JSON payload too large' : 'Invalid JSON body' }, { status: body.status });
+        const parsedBody = parseApiBody(patientMoveSchema, body.value);
         if (!parsedBody.ok) return parsedBody.response;
         const { patientIds, patientVersions, targetAmbulatoryId, sourceAmbulatoryId } = parsedBody.data;
+
+        const auditContext = auditContextFromSession(session);
+        const requestId = requestIdFromRequest(request);
 
         // WUL-268 (STREAM A): membership delete + insert + primary-ownership update
         // must land atomically. better-sqlite3 transactions are synchronous, so no
@@ -93,6 +103,16 @@ export async function POST(request: Request) {
                 if (updateResult.changes !== 1) {
                     throw new Error('Patient version changed during move');
                 }
+                writeAuditEventInTransaction(tx, {
+                    eventType: 'patient.updated', outcome: 'success',
+                    actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                    subjectType: 'patient', subjectRef: patient.id,
+                    sourceSurface: auditContext.sourceSurface, requestId,
+                    redactedMetadata: withAuditContextMetadata(auditContext, {
+                        changedFields: ['ambulatoryId', 'ambulatoryMemberships'],
+                        resourceVersion: nextVersion, flags: ['membership:moved'],
+                    }),
+                });
                 updatedVersions[patient.id] = nextVersion;
             }
 
