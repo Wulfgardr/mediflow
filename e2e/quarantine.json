@@ -1,0 +1,124 @@
+[
+  {
+    "id": "native-filechooser-timeout",
+    "owner": "Leonardo / WUL-729",
+    "diagnosis": "https://linear.app/wulfgardr/issue/WUL-729",
+    "expiresAt": "2026-10-16T00:00:00Z",
+    "reason": "Intermittent on unchanged code; native filechooser timeout, cause unresolved. Review before expiry.",
+    "tests": [
+      {
+        "runner": "playwright",
+        "file": "e2e/document-upload-anydoc-focus.spec.ts",
+        "title": "AnyDoc: le azioni allegato restano visibili al focus e sui viewport stretti",
+        "signature": "^(?:Error: )?page\\.waitForEvent: Test timeout of 45000ms exceeded\\.\\s*=+ logs =+\\s*waiting for event \"filechooser\"\\s*=+\\s*$",
+        "errors": [
+          "^Test timeout of 45000ms exceeded\\.$",
+          "^(?:Error: )?page\\.waitForEvent: Test timeout of 45000ms exceeded\\.\\s*=+ logs =+\\s*waiting for event \"filechooser\"\\s*=+\\s*$"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "chromium-no-store-response-abort",
+    "owner": "Leonardo / WUL-729",
+    "diagnosis": "https://github.com/microsoft/playwright/issues/42742",
+    "expiresAt": "2026-10-16T00:00:00Z",
+    "reason": "Known browser response abort. Remove when locked Playwright includes Chromium CL 8508456; expiry never auto-renews.",
+    "tests": [
+      {
+        "runner": "playwright",
+        "file": "e2e/document-upload-ocr.spec.ts",
+        "title": "Estrazione locale: text, dalla UI al risultato corrente",
+        "signature": "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$",
+        "errors": [
+          "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$"
+        ]
+      },
+      {
+        "runner": "playwright",
+        "file": "e2e/document-upload-ocr.spec.ts",
+        "title": "Estrazione locale: image, dalla UI al risultato corrente",
+        "signature": "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$",
+        "errors": [
+          "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$"
+        ]
+      },
+      {
+        "runner": "playwright",
+        "file": "e2e/document-upload-ocr-recovery.spec.ts",
+        "title": "OCR recovery UI: real protected PDF keeps manual review available after retry",
+        "signature": "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$",
+        "errors": [
+          "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$"
+        ]
+      },
+      {
+        "runner": "playwright",
+        "file": "e2e/document-upload-ocr-recovery.spec.ts",
+        "title": "OCR recovery UI: real corrupt PDF keeps manual review available after retry",
+        "signature": "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$",
+        "errors": [
+          "^AnyDoc same-response observation: project did not finish \\(status=200 received=\\d+ streamed=\\d+ prefix=\\d+ finished=false canceled=true error=net::ERR_ABORTED type=\\w+ blocked=[\\w-]+(?: diagnosticId=[\\w-]+)?\\)$"
+        ]
+      },
+      {
+        "runner": "node",
+        "file": "e2e/chatgpt-synthesis-product.spec.ts",
+        "title": "409 pending challenge survives local polls at 1280px",
+        "signature": "^(?:ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]|ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\])$",
+        "errors": [
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\]$"
+        ]
+      },
+      {
+        "runner": "node",
+        "file": "e2e/chatgpt-synthesis-product.spec.ts",
+        "title": "consent/login/picker/manual synthesis/source receipt/logout at 1280px",
+        "signature": "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+        "errors": [
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\]$"
+        ]
+      },
+      {
+        "runner": "node",
+        "file": "e2e/chatgpt-synthesis-product.spec.ts",
+        "title": "409 pending challenge survives local polls at 390px",
+        "signature": "^(?:ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]|ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\])$",
+        "errors": [
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\]$"
+        ]
+      },
+      {
+        "runner": "node",
+        "file": "e2e/chatgpt-synthesis-product.spec.ts",
+        "title": "consent/login/picker/manual synthesis/source receipt/logout at 390px",
+        "signature": "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+        "errors": [
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\]$"
+        ]
+      },
+      {
+        "runner": "node",
+        "file": "e2e/chatgpt-browser-response.contract.ts",
+        "title": "same browser response oracle: valid",
+        "signature": "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$",
+        "errors": [
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=consent; responseStatus=200; requestSelected=true; networkTerminal=failed\\]$"
+        ]
+      },
+      {
+        "runner": "node",
+        "file": "e2e/chatgpt-browser-response.contract.ts",
+        "title": "same browser response oracle: pending-409",
+        "signature": "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\]$",
+        "errors": [
+          "^ORACLE_NETWORK_FAILED: net::ERR_ABORTED \\[operation=login/complete; responseStatus=409; requestSelected=true; networkTerminal=failed\\]$"
+        ]
+      }
+    ]
+  }
+]
