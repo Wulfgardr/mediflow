@@ -39,3 +39,5 @@ export function createPatientAtPreviewDestination(database: PatientCreateDatabas
         return values.id;
     });
 }
+
+export class PatientCreateConflictError extends Error {}

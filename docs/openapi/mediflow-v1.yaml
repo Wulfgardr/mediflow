@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.32.0
+  version: 1.34.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1951,6 +1951,12 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Create identity conflict after admission; no existing patient data is returned and no writes occur.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -6953,6 +6959,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Omit to generate a UUID. Supplied IDs must be nonblank strings and are preserved exactly; an existing ID returns 409.
         firstName:
           type: string
         lastName:

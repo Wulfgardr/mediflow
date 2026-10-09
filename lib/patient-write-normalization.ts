@@ -14,7 +14,7 @@ type PatientWriteResult<T> =
     | { ok: false; error: string };
 
 type NormalizePatientCreateOptions = {
-    id: string;
+    id: string | (() => string);
     ambulatoryId?: string | null;
     allowArchivedOnCreate?: boolean;
     now?: Date;
@@ -97,6 +97,12 @@ export function normalizePatientCreateInput(
     body: Record<string, unknown>,
     options: NormalizePatientCreateOptions
 ): PatientWriteResult<PatientInsertValues> {
+    if (Object.prototype.hasOwnProperty.call(body, 'id') &&
+        (typeof body.id !== 'string' || !body.id.trim())) {
+        return { ok: false, error: 'Invalid id' };
+    }
+    const id = typeof body.id === 'string' ? body.id
+        : typeof options.id === 'function' ? options.id() : options.id;
     const birthDate = normalizeBirthDateForCreate(body.birthDate);
     if (!birthDate.ok) {
         return birthDate;
@@ -107,7 +113,7 @@ export function normalizePatientCreateInput(
     return {
         ok: true,
         values: {
-            id: options.id,
+            id,
             firstName: body.firstName as string,
             lastName: body.lastName as string,
             taxCode: body.taxCode as string,

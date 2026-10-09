@@ -126,9 +126,10 @@ for (const operation of ['create', 'delete', 'restore'] as const) {
         assert.doesNotMatch(JSON.stringify(event), /SECRET_SYNTHETIC|forged|ENC:aQ==:ZGF0YQ==/);
 
         if (operation === 'create') {
-            await assert.rejects(() => lifecycle.createNetworkScopedPatient(ctx, {
+            const repeated = await lifecycle.createNetworkScopedPatient(ctx, {
                 id, firstName: 'Ada', lastName: 'Sintetica', taxCode: `SYNTH-${id}`,
-            }));
+            });
+            assert.deepEqual(repeated, { status: 409, value: { error: 'Patient create conflict' } });
         } else if (operation === 'delete') {
             const repeated = await lifecycle.deleteNetworkScopedPatient(ctx, { version: 3, deletionReason: sealed });
             assert.equal(repeated.status, 404);
@@ -175,4 +176,26 @@ test('wrong scope, stale version and invalid sealed boundary do not write patien
     assert.equal(plaintextDelete.status, 400);
     assert.deepEqual(readBack(createId), beforeCreate);
     assert.equal(readBack(activeId).audit.length, 0);
+});
+
+test('paired create rejects numeric identity without UUID fallback writes', async () => {
+    setup('invalid-id', 'absent');
+    const ctx = context('invalid-id');
+    const snapshot = () => sql.prepare('SELECT (SELECT count(*) FROM patients) AS patients, (SELECT count(*) FROM patients_to_ambulatories) AS memberships, (SELECT count(*) FROM audit_events) AS audit').get();
+    const before = snapshot();
+    const result = await lifecycle.createNetworkScopedPatient(ctx, { id: 42, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-INVALID' });
+    assert.deepEqual(result, { status: 400, value: { error: 'Invalid id' } });
+    assert.deepEqual(snapshot(), before);
+});
+
+test('paired duplicate admission denial precedes global identity conflict', async () => {
+    const id = 'c05-network-duplicate-denied';
+    setup(id, 'active');
+    const ctx = context(id);
+    const before = readBack(id);
+    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-DUPLICATE' };
+    const denied = await lifecycle.createNetworkScopedPatient({ ...ctx, scopeAmbulatoryId: 'missing-scope' }, body);
+    assert.equal(denied.status, 403);
+    assert.doesNotMatch(JSON.stringify(denied.value), /c05-network-duplicate-denied|Patient create conflict/);
+    assert.deepEqual(readBack(id), before);
 });
