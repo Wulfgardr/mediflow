@@ -71,6 +71,7 @@ una riga inserita; non apre una seconda connessione.
 | [purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | Purge rimuove paziente e figli clinici. | C05: lifecycle/versione, cascade, delete e audit nella stessa transazione immediata; errore audit ripristina tutte le righe. |
 | [attachment-web-create.ts](../lib/attachment-web-create.ts) | Creazione allegato Web e currentness host. | C05: insert verificato e audit `attachment.created` nella stessa transazione immediata, dopo parent attivo. |
 | [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), DELETE | Rimozione allegato Web. | C05: lookup, delete verificato e audit `attachment.deleted` nella stessa transazione immediata. |
+| [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), PUT e [attachment-content-cas-route.ts](../lib/attachment-content-cas-route.ts) | Metadata e contenuto allegato Web. | C05: transazione esterna immediata, savepoint currentness sulla stessa connessione e required `attachment.updated`; metadata audit solo nomi dei campi e revisione. |
 | [fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | Default emergenziale, relink e purge opzionale di figli orfani. | C05: lookup, mutazioni e audit richiesti nella stessa transazione immediata; audit per modifiche effettive, replay vuoto senza eventi. |
 | [network-attachment-write.ts](../lib/network-attachment-write.ts) | `attachment.created` attesta allegato paired e currentness. | C05: scope/paziente attivo, insert verificato e required audit nella stessa transazione immediata; identità native/session e campi ENC conservati. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
@@ -114,7 +115,7 @@ autorità già revocata. Il client continua a fornire il solo `patientId`.
 Create/delete allegati Web usano il contesto della sessione autenticata e
 metadata senza nome, percorso o contenuto clinico. Le [prove SQLite della famiglia](../lib/attachment-web-create-currentness.test.ts)
 coprono il rollback di dati, currentness ed eventi al guasto audit; un insert
-ignorato non può produrre un audit orfano. Metadata/content Web rimangono writer distinti da migrare; l’upload paired
+ignorato non può produrre un audit orfano. Metadata/content Web aggiungono una transazione esterna con audit obbligatorio attorno al savepoint currentness esistente. Le prove [metadata](../lib/attachment-web-put-currentness.test.ts) e [content](../lib/attachment-metadata-currentness.test.ts) verificano il rollback di entrambe le parti; l’upload paired
 ha le proprie prove SQLite e conserva la propria autorità.
 
 ## Residui della migrazione C05
@@ -122,7 +123,7 @@ ha le proprie prove SQLite e conserva la propria autorità.
 Le operazioni classificate sopra come audit obbligatorio sono state migrate
 alla transazione che possiede la scrittura. Restano i writer senza audit e le
 garanzie di input, versione e replay assegnati nel [roster C05](./clinical-write-roster.md),
-in particolare metadata/content degli allegati Web. La classificazione delle
+in particolare CAS/replay client metadata/delete e caller indiretti degli allegati Web. La classificazione delle
 chiamate audit non dimostra da sola la copertura di tutti i writer indiretti.
 
 La riparazione orfani ora traccia anche default e relink, oltre al purge
