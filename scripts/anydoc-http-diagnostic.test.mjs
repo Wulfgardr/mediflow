@@ -7,6 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import diagnostic from './anydoc-http-diagnostic.cjs';
+import { collectNpmScriptBinding, collectExplicitNpmNodeTests } from './explicit-npm-test-selection.mjs';
 
 const ID = 'ad1-0123456789abcdef0123456789abcdef-1-1';
 const { assertSyntheticFixture, installHttpDiagnostic, openDiagnosticFile, exportDiagnosticFile } = diagnostic;
@@ -173,7 +174,18 @@ test('real preload and exporter write only metadata to the exact uploaded file, 
     const artifactPath = artifactStep.match(/\n {10}path: (.+)/)?.[1];
     assert.equal(artifactPath, '${{ runner.temp }}/anydoc-http-diagnostic.jsonl');
     assert.match(workflow, /id: anydoc_diagnostic_export\n {8}if: always\(\)\n {8}run: node scripts\/anydoc-http-diagnostic\.cjs --export "\$\{RUNNER_TEMP\}\/anydoc-http-diagnostic\.jsonl"/);
-    assert.match(workflow, /run: node --test scripts\/anydoc-http-diagnostic\.test\.mjs/);
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    const diagnosticFiles = [
+      'scripts/anydoc-http-diagnostic.test.mjs',
+      'scripts/anydoc-consumer-diagnostic.test.mjs',
+      'scripts/anydoc-diagnostic-correlation.test.mjs',
+    ];
+    const binding = collectNpmScriptBinding(root, {
+      script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e',
+    }, `node --test ${diagnosticFiles.join(' ')}`);
+    assert.equal(binding.run, 'npm run test:anydoc-diagnostics');
+    assert.equal(binding.stepName, 'Test AnyDoc diagnostic artifact boundary');
+    assert.deepEqual(collectExplicitNpmNodeTests(root, 'test:anydoc-diagnostics'), diagnosticFiles);
     const sentinels = ['SYNTHETIC_EXCLUDED_STDOUT', 'SYNTHETIC_EXCLUDED_STDERR', 'SYNTHETIC_EXCLUDED_BODY',
       'SYNTHETIC_EXCLUDED_ID', 'SYNTHETIC_EXCLUDED_QUERY', 'SYNTHETIC_EXCLUDED_HEADER'];
     const script = `
