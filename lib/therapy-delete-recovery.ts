@@ -38,6 +38,7 @@ export function createTherapyDeleteRecovery<T extends DeletableTherapy>(ports: P
     const validVersion = (item: T) => Number.isSafeInteger(item.version) && (item.version ?? 0) > 0;
     const current = (token: number) => live && generation === token && ports.isCurrent();
     const publish = (next: DeleteRecovery<T> | null) => { state = next; ports.changed(next); };
+    const snapshot = (): DeleteRecovery<T> | null => state;
     const pending = () => !!state && ['prompt', 'writing', 'reading', 'confirming'].includes(state.phase);
     async function write(token: number, item: T, reason: string, signal: AbortSignal) {
         if (!current(token) || signal.aborted || !validVersion(item) || item.patientId !== ports.patientId) return;
@@ -60,7 +61,7 @@ export function createTherapyDeleteRecovery<T extends DeletableTherapy>(ports: P
     }
     return {
         get blocked() { return !!state; },
-        get snapshot() { return state; },
+        get snapshot() { return snapshot(); },
         activate() { live = true; },
         dispose() { live = false; generation++; state = null; reviewedSignal = undefined; unresolved.clear(); },
         cancel() {
@@ -90,7 +91,8 @@ export function createTherapyDeleteRecovery<T extends DeletableTherapy>(ports: P
                 if (signal.aborted) return;
                 await write(token, original, result.reason, signal);
             } catch {
-                if (current(token)) publish(state?.reason ? { ...state, phase: 'unavailable' } : null);
+                const latest = snapshot();
+                if (current(token)) publish(latest?.reason ? { ...latest, phase: 'unavailable' } : null);
             }
         },
         async reread() {
