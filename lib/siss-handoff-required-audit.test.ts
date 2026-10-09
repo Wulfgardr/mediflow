@@ -1,7 +1,8 @@
 // Real SISS handlers, synthetic SQLite and an authenticated session seam.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -66,6 +67,8 @@ function invoke(method: 'POST' | 'PUT' | 'DELETE', raw?: string, id = 'synthetic
             'x-request-id': 'synthetic-siss-request' }, ...(raw === undefined ? {} : { body: raw }) });
     return method === 'POST' ? createRoute.POST(request) : itemRoute[method](request, { params: Promise.resolve({ id }) });
 }
+const precondition = { patientId: 'synthetic-patient', version: 1 };
+const writeBody = (changes = {}) => JSON.stringify({ ...precondition, ...changes });
 const createBody = JSON.stringify({ id: 'synthetic-handoff', patientId: 'synthetic-patient', action: 'menu.open', notes: 'ENC:synthetic:notes' });
 
 for (const method of ['POST', 'PUT', 'DELETE'] as const) {
@@ -74,7 +77,7 @@ for (const method of ['POST', 'PUT', 'DELETE'] as const) {
         const before = snapshot();
         sql.exec("CREATE TRIGGER siss_audit_fault BEFORE INSERT ON audit_events BEGIN SELECT RAISE(FAIL, 'synthetic audit failure'); END");
         try {
-            const response = await invoke(method, method === 'POST' ? createBody : method === 'PUT' ? '{"notes":"ENC:synthetic:updated"}' : undefined);
+            const response = await invoke(method, method === 'POST' ? createBody : writeBody({ notes: 'ENC:synthetic:updated' }));
             assert.equal(response.status, 500);
             assert.deepEqual(snapshot(), before);
         } finally { sql.exec('DROP TRIGGER siss_audit_fault'); }
@@ -82,9 +85,9 @@ for (const method of ['POST', 'PUT', 'DELETE'] as const) {
     test(`${method}: mutation commits with one session-attributed audit`, async () => {
         reset(); if (method !== 'POST') seed();
         const auditCount = snapshot().audit.length;
-        const response = await invoke(method, method === 'POST' ? createBody : method === 'PUT' ? '{"notes":null,"completedAt":""}' : undefined);
+        const response = await invoke(method, method === 'POST' ? createBody : writeBody({ notes: null, completedAt: '' }));
         assert.equal(response.status, method === 'POST' ? 201 : 200);
-        assert.deepEqual(await response.json(), method === 'POST' ? { id: 'synthetic-handoff' } : { success: true });
+        assert.deepEqual(await response.json(), method === 'POST' ? { id: 'synthetic-handoff', version: 1 } : method === 'PUT' ? { success: true, version: 2 } : { success: true });
         const after = snapshot();
         assert.equal(after.handoffs.length, method === 'DELETE' ? 0 : 1);
         if (method === 'PUT') {
@@ -121,12 +124,12 @@ test('POST duplicate ID and absent/deleted patients have no effects', async () =
 test('PUT/DELETE missing handoff have no effects', async () => {
     reset(); const before = snapshot();
     for (const method of ['PUT', 'DELETE'] as const) {
-        assert.equal((await invoke(method, method === 'PUT' ? '{}' : undefined)).status, 404);
+        assert.equal((await invoke(method, writeBody())).status, 404);
         assert.deepEqual(snapshot(), before);
     }
 });
 
-for (const method of ['POST', 'PUT'] as const) {
+for (const method of ['POST', 'PUT', 'DELETE'] as const) {
     test(`${method}: malformed, non-object and oversized JSON rejected without effects`, async () => {
         reset(); seed(); const before = snapshot();
         for (const raw of ['null', '[]', '{', JSON.stringify({ notes: 'x'.repeat(262144) })]) {
@@ -136,3 +139,159 @@ for (const method of ['POST', 'PUT'] as const) {
         }
     });
 }
+
+
+test('observed patient and version fence writes, stale replay and delete replay without effects', async () => {
+    reset(); seed();
+    for (const method of ['PUT', 'DELETE'] as const) {
+        for (const [changes, status] of [[{ patientId: 'other-patient' }, 404], [{ version: 2 }, 409]] as const) {
+            const before = snapshot();
+            assert.equal((await invoke(method, writeBody(changes))).status, status);
+            assert.deepEqual(snapshot(), before);
+        }
+    }
+    assert.equal((await invoke('PUT', writeBody({ notes: 'updated' }))).status, 200);
+    const afterUpdate = snapshot();
+    assert.equal((await invoke('PUT', writeBody({ notes: 'replay' }))).status, 409);
+    assert.equal((await invoke('DELETE', writeBody())).status, 409);
+    assert.deepEqual(snapshot(), afterUpdate);
+    const listed = await createRoute.GET(new Request('http://localhost/api/siss-handoffs?patientId=synthetic-patient'));
+    assert.equal((await listed.json())[0].version, 2);
+    assert.equal((await invoke('DELETE', writeBody({ version: 2 }))).status, 200);
+    const afterDelete = snapshot();
+    assert.equal((await invoke('DELETE', writeBody({ version: 2 }))).status, 404);
+    assert.deepEqual(snapshot(), afterDelete);
+});
+
+test('shared precondition parser requires a patient and positive safe integer without coercion', () => {
+    const { sissHandoffWritePreconditionSchema: schema } = load('./api-schemas/siss-handoffs.ts');
+    for (const version of [undefined, null, 0, -1, 1.5, '1', Number.MAX_SAFE_INTEGER + 1]) {
+        assert.equal(schema.safeParse({ patientId: 'synthetic-patient', version }).success, false);
+    }
+    for (const patientId of [undefined, null, '', ' ']) {
+        assert.equal(schema.safeParse({ patientId, version: 1 }).success, false);
+    }
+    assert.equal(schema.safeParse(precondition).success, true);
+});
+
+test('route rejects missing preconditions; authentication precedes malformed JSON', async () => {
+    reset(); seed(); const before = snapshot();
+    assert.equal((await invoke('PUT', '{}')).status, 400);
+    assert.equal((await invoke('DELETE')).status, 400);
+    const session = state.session;
+    state.session = null;
+    try {
+        for (const method of ['POST', 'PUT', 'DELETE'] as const) assert.equal((await invoke(method, '{')).status, 401);
+    } finally { state.session = session; }
+    assert.deepEqual(snapshot(), before);
+});
+
+test('host owns create version and preserves existing update policy for deleted parents', async () => {
+    reset();
+    assert.equal((await invoke('POST', JSON.stringify({ ...JSON.parse(createBody), version: 42 }))).status, 201);
+    assert.equal((snapshot().handoffs[0] as { version: number }).version, 1);
+    sql.prepare('UPDATE patients SET deleted_at=1 WHERE id=?').run('synthetic-patient');
+    assert.equal((await invoke('PUT', writeBody({ notes: null }))).status, 200);
+});
+
+test('fresh and legacy bootstraps converge on version 1 without losing rows or values', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mediflow-siss-migration-'));
+    const bootstrap = () => spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/db-server-bootstrap-worker.mjs'], {
+        cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: dir }, encoding: 'utf8',
+    });
+    try {
+        let result = bootstrap(); assert.equal(result.status, 0, result.stderr);
+        const db = new Database(join(dir, 'medical.db'));
+        try {
+            db.prepare("INSERT INTO patients (id, first_name, last_name, tax_code) VALUES ('synthetic-parent', 'A', 'Synthetic', 'SYNTHETIC')").run();
+            db.prepare("INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at, notes) VALUES ('synthetic-row', 'synthetic-parent', 'menu.open', 'Menu', 123, 'preserved')").run();
+            const fresh = db.prepare('SELECT * FROM siss_handoff_events').get() as Record<string, unknown>;
+            assert.equal(fresh.version, 1);
+            db.exec('ALTER TABLE siss_handoff_events DROP COLUMN version');
+            result = bootstrap(); assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(db.prepare('SELECT * FROM siss_handoff_events').get(), fresh);
+            result = bootstrap(); assert.equal(result.status, 0, result.stderr);
+            assert.deepEqual(db.prepare('SELECT * FROM siss_handoff_events').get(), fresh);
+        } finally { db.close(); }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test('client captures the displayed precondition and never refreshes or retries it', async t => {
+    const { db, captureSissHandoffWritePrecondition } = load('./db.ts') as typeof import('./db.ts');
+    const calls: Array<{ method: string; body: unknown }> = [];
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, options: RequestInit) => {
+        calls.push({ method: options.method!, body: JSON.parse(options.body as string) });
+        return Response.json({ error: 'Changed' }, { status: 409 });
+    });
+    await assert.rejects(db.sissHandoffs.update('synthetic-handoff', { outcome: 'completed' }));
+    await assert.rejects(db.sissHandoffs.delete('synthetic-handoff'));
+    assert.equal(calls.length, 0);
+    const displayed = { id: 'synthetic-handoff', ...precondition };
+    const sissPrecondition = captureSissHandoffWritePrecondition(displayed);
+    displayed.version = 2;
+    displayed.patientId = 'different-patient';
+    await assert.rejects(db.sissHandoffs.update(displayed.id, { outcome: 'completed' }, { sissPrecondition }), /cambiato/);
+    await assert.rejects(db.sissHandoffs.delete(displayed.id, { sissPrecondition, version: 2 }));
+    assert.deepEqual(calls, [
+        { method: 'PUT', body: { outcome: 'completed', ...precondition } },
+        { method: 'DELETE', body: precondition },
+    ]);
+});
+
+
+test('clear uses the listed SISS versions and reports partial failures without refreshing', async t => {
+    const { db } = load('./db.ts') as typeof import('./db.ts');
+    const listed = [{ id: 'first', patientId: 'synthetic-patient', version: 3 },
+        { id: 'second', patientId: 'synthetic-patient', version: 7 }];
+    const calls: string[] = [];
+    let failSecond = false;
+    t.mock.method(globalThis, 'fetch', async (url: unknown, options?: RequestInit) => {
+        const method = options?.method ?? 'GET';
+        calls.push(`${method} ${url}`);
+        if (url === '/api/siss-handoffs' && method === 'DELETE') return new Response(null, { status: 405 });
+        if (method === 'GET') return Response.json(listed);
+        const item = listed.find(row => url === `/api/siss-handoffs/${row.id}`)!;
+        assert.deepEqual(JSON.parse(options!.body as string), { patientId: item.patientId, version: item.version });
+        return failSecond && item.id === 'second'
+            ? Response.json({ error: 'Changed' }, { status: 409 }) : Response.json({ success: true });
+    });
+    await db.sissHandoffs.clear();
+    assert.deepEqual(calls, ['DELETE /api/siss-handoffs', 'GET /api/siss-handoffs',
+        'DELETE /api/siss-handoffs/first', 'DELETE /api/siss-handoffs/second']);
+    calls.length = 0;
+    failSecond = true;
+    await assert.rejects(db.sissHandoffs.clear(), /1\/2 deletions confirmed/);
+    assert.deepEqual(calls, ['DELETE /api/siss-handoffs', 'GET /api/siss-handoffs',
+        'DELETE /api/siss-handoffs/first', 'DELETE /api/siss-handoffs/second']);
+});
+
+test('a compiled closure draft cannot adopt a refreshed version, pending record or patient', async t => {
+    const { db, resolveSissHandoffDraftPrecondition } = load('./db.ts') as typeof import('./db.ts');
+    db.setKey(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+    t.after(() => db.setKey(null));
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => { calls++; return Response.json({ success: true }); });
+    const original = { id: 'original-pending', ...precondition };
+    const draft = { precondition: resolveSissHandoffDraftPrecondition(null, original), notes: 'compiled draft' };
+    const submit = async (displayed: typeof original) => {
+        const sissPrecondition = resolveSissHandoffDraftPrecondition(draft.precondition, displayed);
+        await db.sissHandoffs.update(sissPrecondition.id, { notes: draft.notes }, { sissPrecondition });
+    };
+    for (const refreshed of [{ ...original, version: 2 }, { ...original, id: 'different-pending' },
+        { ...original, patientId: 'different-patient' }]) {
+        await assert.rejects(submit(refreshed), /durante la compilazione/);
+    }
+    assert.equal(calls, 0);
+    assert.equal(draft.notes, 'compiled draft');
+    assert.equal(resolveSissHandoffDraftPrecondition(draft.precondition, { ...original }), draft.precondition);
+    await submit(original);
+    assert.equal(calls, 1);
+    const source = readFileSync('components/siss-handoff-diary.tsx', 'utf8');
+    for (const field of ['Outcome', 'Notes', 'NextAction']) {
+        assert.ok(source.includes(`if (beginClosureDraft()) setClosure${field}`));
+    }
+    const submitSource = source.slice(source.indexOf('const closePendingHandoff'), source.indexOf('const deleteItem'));
+    assert.match(submitSource, /resolveSissHandoffDraftPrecondition\(closurePrecondition.current, pendingHandoff\)/);
+    assert.match(submitSource, /update\(sissPrecondition.id/);
+});
