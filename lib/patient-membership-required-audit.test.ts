@@ -160,7 +160,9 @@ for (const repair of ['fix-orphans', 'migrate-m2m'] as const) {
         const body = JSON.stringify(payload('unassign', { ambulatoryId: 'primary' }));
         assert.equal((await request('unassign', body)).status, 200);
         const before = snapshot();
-        const route = load(`../app/api/system/${repair}/route.ts`) as { POST: (request: Request) => Promise<Response> };
+        const route: { POST: (request: Request) => Promise<Response> } = repair === 'fix-orphans'
+            ? load('../app/api/system/fix-orphans/route.ts')
+            : load('../app/api/system/migrate-m2m/route.ts');
         assert.equal((await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST' }))).status, 200);
         const repaired = snapshot();
         assert.deepEqual(repaired.patients.map(p => p.version), [2, 2]);
