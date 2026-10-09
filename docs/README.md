@@ -46,6 +46,10 @@ le tappe 0.9.0–1.0 definite nel
 La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
+L’[inventario incrementale dei test](./test-inventory.md) descrive il controllo
+delle omissioni nei selettori e il debito ancora aperto; non attesta la
+completezza di C14 né l’esecuzione delle prove sulle piattaforme installate.
+
 La 0.9.0 consolida il prodotto attuale; servizi condivisi, Rust,
 interoperabilità e distribuzione nativa hanno tappe successive distinte.
 I precedenti rinvii generici alla 1.0 restano storia, non il piano corrente.

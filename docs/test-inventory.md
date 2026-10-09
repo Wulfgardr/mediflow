@@ -1,0 +1,127 @@
+# Test inventory
+
+The inventory detects changes to test discovery, the unit suite's selection, and
+five explicit npm test selections, the Headless selector and the Claims guard
+self-test, each with configured CI calls.
+It does not certify that tests ran, that their assertions are sufficient, or that a
+release is qualified. Unresolved selections remain visible work; they are not
+approved exclusions or deferrals.
+
+Run with the repository's Node 24 version:
+
+```sh
+npm run test:test-inventory
+npm run check:test-inventory-integrity
+npm run check:test-inventory-complete
+```
+
+`integrity` checks candidates against `test-inventory.v1.json` in both directions.
+New candidates, stale entries after deletion or rename, duplicate records, broken
+suite mappings and incomplete required groups fail. Repository Guards runs this
+command and its synthetic negative fixtures on pull requests and main. Run the
+same command locally before publishing a change.
+
+`complete` additionally fails while any selection is unresolved. A successful
+integrity check can therefore accompany an incomplete selection report. Both
+commands print the unresolved count and state that execution evidence and C14
+acceptance have not been assessed. The complete check is expected to fail on the
+current inventory; its unresolved records must not be converted into exclusions
+to obtain a passing result.
+
+## Discovery and selection
+
+Discovery reads tracked paths and non-ignored untracked files, without restricting
+the top-level directory. It uses test/spec names and source signals for Node,
+Playwright, Swift, Python, Rust and shell wrappers. These are inclusive review
+signals: imports in helpers or embedded fixture text can be candidates, while
+unconventional test registration may require an additional signal. Discovery
+inspects conventional test names, JavaScript/TypeScript, Python, Rust, Swift,
+shell/PowerShell and C-family sources, plus extensionless files. Other extensions
+without conventional test names are not inspected; this is a known limitation.
+Discovery
+neither imports test code nor launches an application, database, browser or test
+suite. A source match is not proof that assertions execute.
+
+The real unit runner and the inventory guard both use
+`scripts/unit-test-selection.mjs`. Its two recursive
+groups and explicit script list preserve the unit suite's ordering and loader.
+Every required group must be readable and non-empty; every explicit test must be
+a file. Selection fails before database bootstrap or child launch if these
+conditions do not hold. The bootstrap, data-directory ownership, child error
+propagation and cleanup remain in `scripts/run-unit-suite.mjs`.
+
+The npm adapter reads the script bodies and CI configuration for
+`test:launcher-helpers`, `test:native-launcher`, `test:usage-dashboard`,
+`test:fabric-generative-runtime-crosswalk` and `test:lume-tokens`. Their suite IDs
+are prefixed with `npm:`. Each script must be exactly `node --test` followed by
+simple literal relative file paths. Missing files, duplicate paths (including
+directory aliases), flags, filters, shell syntax and expansions fail selection.
+
+Each required script must have one literal call in its designated CI job. The
+entire step's run block must consist of `npm run <script>` lines, blanks or
+standalone comments; a mention inside shell control flow or a heredoc is not a
+binding. The adapter rejects explicit false conditions, `continue-on-error`,
+shell failure-masking syntax and non-root working directories. It resolves working-directory and shell defaults
+from workflow to job to step; explicit shells are limited to `bash`, `sh` and
+`pwsh`. It preserves conditions, needs, runner and matrix metadata without
+evaluating them. The native launcher requires its existing macOS condition.
+Unreadable configuration, malformed YAML, duplicate keys, YAML merges and cyclic
+aliases fail. An invalid required suite remains present with errors and no
+selected files.
+
+This proves static selection by script bodies and configured calls only. It does
+not model npm lifecycle hooks, evaluate general CI reachability, prove exit-code
+propagation for every shell, execute test code or establish platform qualification.
+A preceding step may fail, a condition
+may not hold, and assertions may still skip or be empty. Those require execution
+receipts and further review.
+
+The Headless model, `npm:test:headless-portable`, calls the real asynchronous
+`collectHeadlessPortableTests` selector shared with the portable runner. Each of
+the AIP, Mini and MCP package groups must contain tests; all four explicit script
+tests must be files. A missing, empty or unreadable required group fails before
+the runner acquires a data directory or launches a child. The inventory calls
+only the selector, preserving its ordering and avoiding a second path list.
+Importing the runner checks its CLI entrypoint with `realpath` reads but does not
+launch a suite or acquire/clean a data directory.
+
+The Headless npm command must remain exactly
+`node scripts/run-headless-portable-tests.mjs`, with one literal call in the
+`headless-contracts` CI job. It uses the same binding guards as the five explicit
+npm models above. The inventory awaits selection and keeps the required suite
+present with errors and no selected files if either binding or selection fails.
+This adds static selector coverage, not proof of assertions or installed targets.
+
+The `npm:check:claims:self-test` model selects only
+`scripts/check-claims-guard.mjs`. It verifies that this is a regular file inside
+the repository, that `check:claims` has the exact command
+`node scripts/check-claims-guard.mjs`, and that the `repository-guards` job has
+one literal `npm run check:claims -- --self-test` call. The ordinary
+`npm run check:claims` scan alone does not satisfy the self-test binding.
+Only this declared argument sequence is admitted; other arguments, shell
+embedding or duplicate calls fail, with the same CI context guards as above.
+Collection does not read, import or execute the Claims guard. Its existing
+rules and self-test assertions remain unchanged; their execution and adequacy
+need separate evidence.
+The literal self-test argument also makes the adapter itself an inclusive
+discovery candidate. That helper retains an unresolved record pending semantic
+classification; it is not silently excluded to reduce the unresolved count.
+
+Tests outside these models retain `unresolved` selection records, including tests
+with separate existing commands or CI callers. `unresolved` means this guard has
+not verified a selector binding; it does not mean the file is orphaned or optional.
+Platform, capability and method filters need separate selector models and actual
+execution receipts before any coverage claim.
+
+## Updating the inventory
+
+Ordinary changes to test bodies need no digest acknowledgement. For a new,
+renamed or removed candidate, update the manifest alongside the source and its
+real suite binding. A mapped entry must name a supported selector that actually
+selects that file. An unresolved entry must explain the missing verification;
+it remains incomplete and visible in every report. Manifest edits are reviewed
+source changes, never automatic acceptance of a test omission.
+
+Keep execution outcomes separate: selected files may still contain skipped,
+filtered, cancelled or empty tests. Pass/fail/skip/flaky results and qualified
+platforms come from the corresponding suite receipts, not this static inventory.

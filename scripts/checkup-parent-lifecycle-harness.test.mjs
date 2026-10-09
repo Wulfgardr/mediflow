@@ -57,12 +57,3 @@ test('guard: child-first safety oracle rejects loss of IMMEDIATE writer exclusio
     await assert.rejects(assertChildFirst(h, 'DELETE', { version: 5 }),
         { code: 'ERR_ASSERTION', actual: 'committed', expected: 'SQLITE_BUSY' });
 });
-
-test('registration: behavior and private-loader suites each occur once in required units', () => {
-    const runner = fs.readFileSync(new URL('./run-unit-suite.mjs', import.meta.url), 'utf8');
-    const selection = runner.match(/const unitArgs = (\[[^\n]+\]);/)?.[1];
-    assert.ok(selection);
-    for (const filename of ['scripts/checkup-parent-lifecycle.test.mjs', 'scripts/checkup-parent-lifecycle-harness.test.mjs']) {
-        assert.equal(selection.split(`'${filename}'`).length, 2, `${filename} must be selected exactly once`);
-    }
-});
