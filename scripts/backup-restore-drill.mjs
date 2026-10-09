@@ -159,6 +159,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const timings = {};
   const failures = [];
+  let report;
   const sourceDataDir = path.join(options.workDir, 'source-data');
   const targetDataDir = path.join(options.workDir, 'target-data');
   const backupDir = path.join(options.workDir, 'backups');
@@ -168,10 +169,10 @@ async function main() {
 
   try {
     timed('prepareSourceDbMs', timings, () => {
-      command(['node', 'scripts/prepare-e2e-db.mjs'], { MEDIFLOW_E2E_DATA_DIR: sourceDataDir });
+      command(['node', 'scripts/prepare-e2e-db.mjs'], { MEDIFLOW_DATA_DIR: sourceDataDir, MEDIFLOW_E2E_DATA_DIR: sourceDataDir });
       configureSchedulerState(sourceDataDir, backupDir);
     });
-    timed('prepareTargetDbMs', timings, () => command(['node', 'scripts/prepare-e2e-db.mjs'], { MEDIFLOW_E2E_DATA_DIR: targetDataDir }));
+    timed('prepareTargetDbMs', timings, () => command(['node', 'scripts/prepare-e2e-db.mjs'], { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_E2E_DATA_DIR: targetDataDir }));
 
     const staleArtifact = path.join(backupDir, 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow');
     const staleTemp = `${staleArtifact}.tmp`;
@@ -215,7 +216,7 @@ async function main() {
     }
     if (!syntheticOnly(drillArtifact)) failures.push({ step: 'phi-safe', message: 'Drill artifact contains a real-data shaped token.', remediation: 'Use synthetic identifiers only.' });
 
-    const report = {
+    report = {
       schemaVersion: 1,
       generatedAt: new Date().toISOString(),
       status: failures.length === 0 ? 'pass' : 'fail',
@@ -247,13 +248,15 @@ async function main() {
       timings,
       failures,
     };
-    fs.mkdirSync(path.dirname(options.report), { recursive: true });
-    fs.writeFileSync(options.report, `${JSON.stringify(report, null, 2)}\n`);
-    process.stdout.write(`Restore drill ${report.status}. Report: ${path.relative(ROOT, options.report)}\n`);
-    if (failures.length > 0) process.exitCode = 1;
   } finally {
     if (!options.keepWorkDir) fs.rmSync(options.workDir, { recursive: true, force: true });
   }
+
+  // Publish after fixture cleanup so reports inside the work directory survive.
+  fs.mkdirSync(path.dirname(options.report), { recursive: true });
+  fs.writeFileSync(options.report, `${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`Restore drill ${report.status}. Report: ${path.relative(ROOT, options.report)}\n`);
+  if (failures.length > 0) process.exitCode = 1;
 }
 
 await main();
