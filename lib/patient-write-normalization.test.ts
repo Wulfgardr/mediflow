@@ -214,3 +214,18 @@ test('normalizePatientUpdateInput rejects invalid birthDate and empty payloads',
         error: 'No valid fields to update',
     });
 });
+
+test('create identity validates before fallback and preserves opaque strings exactly', () => {
+    let generated = 0;
+    const options = { id: () => { generated++; return 'synthetic-generated-id'; } };
+    for (const id of [42, null, false, {}, [], '', '   ', '\t\n', undefined]) {
+        assert.deepEqual(normalizePatientCreateInput({ id }, options), { ok: false, error: 'Invalid id' });
+    }
+    assert.equal(generated, 0);
+    const opaque = normalizePatientCreateInput({ id: ' opaque ID / 42 ' }, options);
+    assert(opaque.ok); assert.equal(opaque.values.id, ' opaque ID / 42 ');
+    assert.equal(generated, 0);
+    const omitted = normalizePatientCreateInput({}, options);
+    assert(omitted.ok); assert.equal(omitted.values.id, 'synthetic-generated-id');
+    assert.equal(generated, 1);
+});
