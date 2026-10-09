@@ -72,6 +72,7 @@ una riga inserita; non apre una seconda connessione.
 | [attachment-web-create.ts](../lib/attachment-web-create.ts) | Creazione allegato Web e currentness host. | C05: insert verificato e audit `attachment.created` nella stessa transazione immediata, dopo parent attivo. |
 | [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), DELETE | Rimozione allegato Web. | C05: lookup, delete verificato e audit `attachment.deleted` nella stessa transazione immediata. |
 | [fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | Default emergenziale, relink e purge opzionale di figli orfani. | C05: lookup, mutazioni e audit richiesti nella stessa transazione immediata; audit per modifiche effettive, replay vuoto senza eventi. |
+| [network-attachment-write.ts](../lib/network-attachment-write.ts) | `attachment.created` attesta allegato paired e currentness. | C05: scope/paziente attivo, insert verificato e required audit nella stessa transazione immediata; identità native/session e campi ENC conservati. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
@@ -113,19 +114,16 @@ autorità già revocata. Il client continua a fornire il solo `patientId`.
 Create/delete allegati Web usano il contesto della sessione autenticata e
 metadata senza nome, percorso o contenuto clinico. Le [prove SQLite della famiglia](../lib/attachment-web-create-currentness.test.ts)
 coprono il rollback di dati, currentness ed eventi al guasto audit; un insert
-ignorato non può produrre un audit orfano. Metadata/content e upload paired
-rimangono writer distinti da migrare.
+ignorato non può produrre un audit orfano. Metadata/content Web rimangono writer distinti da migrare; l’upload paired
+ha le proprie prove SQLite e conserva la propria autorità.
 
-## Writer clinici ancora al meglio: consegna a C05
+## Residui della migrazione C05
 
-Questa operazione è **obbligatoria**, ma il codice corrente può
-committare la modifica prima dell'audit. C05 deve spostare l'evento nel writer
-che possiede la transazione, usando il contesto attore già derivato dall'host
-e la stessa interfaccia del pilota; un errore audit deve annullare gli effetti.
-
-| Punto di scrittura | Motivo | Stato da correggere in C05 |
-| --- | --- | --- |
-| [network-attachment-write.ts:126](../lib/network-attachment-write.ts#L126) | `attachment.created` attesta un nuovo allegato e la sua currentness. | Wrapper :120 chiamato da `createNetworkScopedAttachment` a :209, dopo il commit; catch assorbe l'errore. Adapter: [attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts). |
+Le operazioni classificate sopra come audit obbligatorio sono state migrate
+alla transazione che possiede la scrittura. Restano i writer senza audit e le
+garanzie di input, versione e replay assegnati nel [roster C05](./clinical-write-roster.md),
+in particolare metadata/content degli allegati Web. La classificazione delle
+chiamate audit non dimostra da sola la copertura di tutti i writer indiretti.
 
 La riparazione orfani ora traccia anche default e relink, oltre al purge
 esplicito; le [prove SQLite composte](../lib/orphan-repair-required-audit.test.ts)
