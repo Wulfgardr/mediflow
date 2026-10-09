@@ -127,7 +127,7 @@ test('real isolated payload imports all eight approved sources and real ESM/CJS 
     const receipt = await assertScheduledBackupRuntime(f.payload);
     assert.equal(receipt.imported, true);
     assert.equal(receipt.databaseAccess, 'denied');
-    assert.equal(receipt.sourceFiles, 8);
+    assert.equal(receipt.sourceFiles, 9);
     assert.ok(receipt.resolvedFiles.includes('node_modules/better-sqlite3/lib/database.js'));
     assert.ok(receipt.resolvedFiles.includes('node_modules/bindings/bindings.js'));
     assert.ok(receipt.resolvedFiles.includes('node_modules/file-uri-to-path/index.js'));
@@ -137,7 +137,7 @@ test('real isolated payload imports all eight approved sources and real ESM/CJS 
 });
 
 test('tracing roster contains every approved source and the explicit native/import closure without duplicates', () => {
-  assert.equal(SCHEDULED_BACKUP_RUNTIME_ROSTER.length, 8);
+  assert.equal(SCHEDULED_BACKUP_RUNTIME_ROSTER.length, 9);
   assert.equal(new Set(SCHEDULED_BACKUP_TRACING_INCLUDES).size, SCHEDULED_BACKUP_TRACING_INCLUDES.length);
   for (const item of SCHEDULED_BACKUP_RUNTIME_ROSTER) {
     assert.match(item.sha256, /^[a-f0-9]{64}$/);
@@ -155,7 +155,7 @@ test('Next config contains each canonical scheduler path exactly once as a route
   assert.throws(() => assertSchedulerTraceLiterals(source.replace('"/*": [', '"/unrelated": [')), /exactly one \/\* property/);
 });
 
-for (const relative of ['lib/sqlite-maintenance-admission.mjs', 'lib/exemption-import-contract.ts',
+for (const relative of ['lib/sqlite-maintenance-admission.mjs', 'lib/sqlite-durability.mjs', 'lib/exemption-import-contract.ts',
   'lib/reference-data/prosthetics-catalog-contract.ts', 'node_modules/better-sqlite3/lib/methods/table.js',
   'node_modules/file-uri-to-path/index.js', 'node_modules/better-sqlite3/build/Release/better_sqlite3.node']) {
   test(`missing runtime closure fails closed: ${relative}`, async () => {
@@ -287,7 +287,7 @@ test('configuration can import the contract without dependencies or persistent a
       cwd: f.dir, env: { NODE_ENV: 'test' }, encoding: 'utf8', timeout: 5000,
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.equal(run.stdout.trim(), '8');
+    assert.equal(run.stdout.trim(), '9');
   } finally { f.cleanup(); }
 });
 
@@ -302,7 +302,7 @@ test('CommonJS configuration can synchronously require the contract without runn
       cwd: f.dir, env: { NODE_ENV: 'test' }, encoding: 'utf8', timeout: 5000,
     });
     assert.equal(run.status, 0, run.stderr);
-    assert.deepEqual(JSON.parse(run.stdout), { sources: 8, includes: 27, check: 'function' });
+    assert.deepEqual(JSON.parse(run.stdout), { sources: 9, includes: 28, check: 'function' });
     assert.deepEqual(fs.readdirSync(f.dir).sort(), ['contract.mjs', 'payload']);
   } finally { f.cleanup(); }
 });

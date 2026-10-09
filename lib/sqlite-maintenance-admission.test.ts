@@ -235,7 +235,7 @@ test('failed intent fsync never starts maintenance or permits a conflicting open
     let intentFd = -1;
     fs.openSync = ((file, flags, mode) => {
         const fd = nativeOpen(file, flags, mode);
-        if (String(file).endsWith('/intent.json')) intentFd = fd;
+        if (path.basename(String(file)) === 'intent.json') intentFd = fd;
         return fd;
     }) as typeof fs.openSync;
     fs.fsyncSync = fd => { if (fd === intentFd) throw Object.assign(new Error('synthetic disk full'), { code: 'ENOSPC' }); nativeSync(fd); };
@@ -243,6 +243,29 @@ test('failed intent fsync never starts maintenance or permits a conflicting open
         await assert.rejects(runWithSqliteMaintenance(f.target, {}, () => assert.fail('no snapshot')), SqliteMaintenanceHoldError);
     } finally { fs.openSync = nativeOpen; fs.fsyncSync = nativeSync; }
     try {
+        assert.ok(fs.existsSync(path.join(store(f.target), 'intent.json')));
+        assert.throws(() => openAdmittedSqlite(f.target), /maintenance_pending/);
+    } finally { f.cleanup(); }
+});
+
+test('failed directory flush retains intent and blocks conflicting admission', async () => {
+    const f = fixture();
+    const nativeSync = fs.fsyncSync;
+    const before = fs.readFileSync(f.target);
+    let injected = false;
+    fs.fsyncSync = fd => {
+        if (fs.fstatSync(fd).isDirectory() && fs.existsSync(path.join(store(f.target), 'intent.json'))) {
+            injected = true;
+            throw Object.assign(new Error('synthetic directory flush denied'), { code: 'EPERM' });
+        }
+        nativeSync(fd);
+    };
+    try {
+        await assert.rejects(runWithSqliteMaintenance(f.target, {}, () => assert.fail('no snapshot')), SqliteMaintenanceHoldError);
+        assert.equal(injected, true);
+    } finally { fs.fsyncSync = nativeSync; }
+    try {
+        assert.deepEqual(fs.readFileSync(f.target), before);
         assert.ok(fs.existsSync(path.join(store(f.target), 'intent.json')));
         assert.throws(() => openAdmittedSqlite(f.target), /maintenance_pending/);
     } finally { f.cleanup(); }

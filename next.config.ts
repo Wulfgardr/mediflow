@@ -72,6 +72,7 @@ const nextConfig: NextConfig = {
       "./scripts/run-scheduled-backup.mjs",
       "./scripts/scheduled-backup-date-fields.mjs",
       "./lib/sqlite-maintenance-admission.mjs",
+      "./lib/sqlite-durability.mjs",
       "./lib/backup-audit.ts",
       "./lib/exemption-import-receipt.ts",
       "./lib/exemption-import-contract.ts",

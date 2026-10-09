@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/run-scheduled-backup.mjs', 'd0446a62097d13a7c5ca1c6d0f3203d077e90997b4c920d47d2b554d5880c913'],
   ['scripts/scheduled-backup-date-fields.mjs', '508ca02d04a291113d6f714eb6169420d7e16d760a7981ce600edc312393403c'],
-  ['lib/sqlite-maintenance-admission.mjs', '51874cfccee20bf43ac82da5ee69c9dac801e0b5533aa541f9fa924377cb8a4e'],
+  ['lib/sqlite-maintenance-admission.mjs', 'd042bf1258a300bbd085593088c0051f51f975636eca33b29c9b11e9d3d3f556'],
+  ['lib/sqlite-durability.mjs', '11dc5fd229cd0939fde2cc61703c7cd8e36ab6db335f4b87443b395e53ec3e35'],
   ['lib/backup-audit.ts', 'd58f0e13136e8be04823839f4a61394bb85404da9603803f9a0b27c396243c56'],
   ['lib/exemption-import-receipt.ts', '894cc749fa4f512f65d10e3ff66f0a445b129cd23c56627bfe0c549a932c1e3a'],
   ['lib/exemption-import-contract.ts', '12b97b4a54bca6a3d56103f442035b81d5269ec276789ee2febc0560e533b0e0'],
