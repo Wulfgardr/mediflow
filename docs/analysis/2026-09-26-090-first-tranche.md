@@ -167,6 +167,9 @@ contratti più forti non devono essere ridotti alla garanzia del pilota.
 
 ### Classificazione iniziale e destinazione degli altri writer
 
+Questa è la fotografia iniziale. Il riferimento corrente per file e operazione
+è l’[elenco dei writer audit](../audit-writers.md), con i residui consegnati a C05.
+
 L'inventario statico corrente comprende 82 chiamanti/sink osservati e 30
 passaggi attraverso wrapper. Include il sink SQL interpolato del commit SOAP,
 che una ricerca del solo nome letterale della tabella non rilevava. I riferimenti
