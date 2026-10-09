@@ -247,7 +247,21 @@ export type TherapyDeleteClientContext = Readonly<{
     signal: AbortSignal;
     isCurrent: () => boolean;
 }>;
+export type AttachmentCurrentness = Readonly<{ sourceRef: string; revision: number; freshnessEpoch: number }>;
+export type AttachmentWritePrecondition = Readonly<{ attachmentId: string; patientId: string; expected: AttachmentCurrentness }>;
+
+/** Capture the displayed record, never refresh a precondition while dispatching a write. */
+export function captureAttachmentWritePrecondition(record: Pick<Attachment, 'id' | 'patientId' | 'currentness'>): AttachmentWritePrecondition {
+    const value = record.currentness;
+    if (!record.id || !record.patientId || !value || !/^[a-f0-9]{64}$/u.test(value.sourceRef)
+        || !Number.isSafeInteger(value.revision) || value.revision < 1
+        || !Number.isSafeInteger(value.freshnessEpoch) || value.freshnessEpoch < 1
+        || Object.keys(value).length !== 3) throw new Error('Attachment precondition unavailable');
+    return Object.freeze({ attachmentId: record.id, patientId: record.patientId, expected: Object.freeze({ ...value }) });
+}
+
 type ApiDeleteOptions = {
+    attachmentPrecondition?: AttachmentWritePrecondition;
     suppressNotify?: boolean;
     version?: number;
     deletionReason?: string;
@@ -451,7 +465,10 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         const encryptedItem = await this.encryptItem(item);
         assertCurrent();
         // @Codex: attachment creation time remains owned by the host.
-        if (this.tableName === 'attachments') delete encryptedItem.createdAt;
+        if (this.tableName === 'attachments') {
+            delete encryptedItem.createdAt;
+            delete encryptedItem.currentness;
+        }
         const res = await fetch(this.endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...(context ? {
@@ -487,7 +504,8 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     /* @Codex */
-    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean }): Promise<void> {
+    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; attachmentPrecondition?: AttachmentWritePrecondition }): Promise<void> {
+        const precondition = this.attachmentWritePayload(id, options?.attachmentPrecondition);
         /* @Codex */
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
         if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
@@ -498,7 +516,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(encryptedChanges)
+            body: JSON.stringify({ ...encryptedChanges, ...precondition })
         });
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
@@ -512,6 +530,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
 
     /* @Codex */
     async delete(id: string, options?: ApiDeleteOptions): Promise<void> {
+        const precondition = this.attachmentWritePayload(id, options?.attachmentPrecondition);
         const fenced = options != null && 'deleteContext' in options;
         const context = fenced ? options.deleteContext : undefined;
         const key = fenced ? this.getMasterKey() : null;
@@ -534,12 +553,13 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             const init: RequestInit = { method: 'DELETE', ...(fenced ? { signal } : {}) };
             const encryptsDeletionReason = ENCRYPTED_FIELDS[this.tableName]?.includes('deletionReason') ?? false;
             const rawDeletionReason = options?.deletionReason ?? (encryptsDeletionReason ? 'web-delete' : undefined);
-            if (typeof options?.version === 'number' || typeof rawDeletionReason === 'string') {
+            if (precondition || typeof options?.version === 'number' || typeof rawDeletionReason === 'string') {
                 const deletionReason = typeof rawDeletionReason === 'string'
                     ? await this.encryptDeleteField('deletionReason', rawDeletionReason)
                     : undefined;
                 init.headers = { 'Content-Type': 'application/json' };
                 init.body = JSON.stringify({
+                    ...precondition,
                     ...(typeof options?.version === 'number' ? { version: options.version } : {}),
                     ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
                 });
@@ -566,14 +586,17 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         }
     }
 
-    async bulkDelete(ids: string[]): Promise<void> {
+    async bulkDelete(ids: string[], options?: { attachmentRecords?: readonly Attachment[] }): Promise<void> {
         if (ids.length === 0) return;
+        const attachmentPreconditions = new Map(options?.attachmentRecords?.map(record => [record.id, captureAttachmentWritePrecondition(record)]));
+        if (this.tableName === 'attachments' && ids.some(id => !attachmentPreconditions.has(id))) throw new Error('Attachment precondition unavailable');
         const versionsById = this.requiresVersionedWrite()
             ? await this.getVersionsByIdForDelete(ids)
             : new Map<string, number>();
         await Promise.all(ids.map(id => this.delete(id, {
             suppressNotify: true,
             version: versionsById.get(id),
+            attachmentPrecondition: attachmentPreconditions.get(id),
         })));
         this.emitChange();
     }
@@ -636,12 +659,20 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             const version = this.requiresVersionedWrite()
                 ? this.getRecordVersion(item)
                 : undefined;
-            return this.delete(id, { suppressNotify: true, version });
+            return this.delete(id, { suppressNotify: true, version,
+                ...(this.tableName === 'attachments' ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Attachment) } : {}) });
         }));
         if (ids.length > 0) this.emitChange();
     }
 
     /* @Codex */
+    private attachmentWritePayload(id: string, value?: AttachmentWritePrecondition) {
+        if (this.tableName !== 'attachments') return undefined;
+        if (!value || value.attachmentId !== id) throw new Error('Attachment precondition unavailable');
+        const captured = captureAttachmentWritePrecondition({ id, patientId: value.patientId, currentness: value.expected });
+        return { patientId: captured.patientId, expected: captured.expected };
+    }
+
     private getItemIdentifier(item: unknown): string | null {
         if (!item || typeof item !== 'object') return null;
 
@@ -1090,6 +1121,7 @@ export interface Observation {
 }
 
 export interface Attachment {
+    currentness?: AttachmentCurrentness; // Present on Web reads; absent on create input.
     id: string;
     patientId: string;
     name: string;
