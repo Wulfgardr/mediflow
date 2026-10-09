@@ -1,5 +1,5 @@
 /* @Codex */
-import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
+import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -36,13 +36,12 @@ export async function POST(request: Request) {
         const resolved = await requireNetworkWriteContext(request, NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY);
         if (!resolved.ok) return resolved.response;
 
-        const body = await readNativeNetworkJson(request) as Record<string, unknown>;
+        const parsedBody = await readPrescriptionJsonObject(request);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body;
         const result = await createNetworkScopedServicePrescriptionItem(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
-        const sizeError = jsonBodyTooLargeResponse(error);
-        if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/service-prescription-items error:', error);
         return NextResponse.json({ error: 'Failed to create service prescription item' }, { status: 500 });
     }

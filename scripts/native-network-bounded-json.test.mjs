@@ -70,7 +70,7 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
     ]);
     function load(relative) {
         if (cache.has(relative)) return cache.get(relative);
-        assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts',
+        assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts', 'lib/prescription-json-body.ts',
             'lib/entry-write-input.ts', 'lib/therapy-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts'].includes(relative), `unexpected production import ${relative}`);
         const source = fs.readFileSync(path.join(root, relative), 'utf8');
         const exports = {};
@@ -86,6 +86,9 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             }
             if (name === '@/lib/native-network-json-body') {
                 return load('lib/native-network-json-body.ts');
+            }
+            if (name === '@/lib/prescription-json-body') {
+                return load('lib/prescription-json-body.ts');
             }
             if (name === '@/lib/patient-json-object') {
                 return load('lib/patient-json-object.ts');
@@ -227,6 +230,16 @@ function boundedReaderInventory(source, filename) {
         if (ts.isAwaitExpression(node)) {
             const expression = node.expression;
             if (boundedAwait(expression)) readers++;
+            if (callNamed(expression, 'readPrescriptionJsonObject')) {
+                assert.ok(expression.arguments.length === 1 && named(expression.arguments[0], 'request'));
+                assert.match(source, /import\s*\{\s*readPrescriptionJsonObject\s*\}\s*from\s*['"]@\/lib\/prescription-json-body['"]/u);
+                const helper = fs.readFileSync(path.join(root, 'lib/prescription-json-body.ts'), 'utf8');
+                assert.match(helper, /readBoundedJsonBody\(request, PRESCRIPTION_JSON_MAX_BYTES, 'request-json'/u);
+                assert.match(helper, /PRESCRIPTION_JSON_MAX_BYTES = 4 \* 1024 \* 1024/u);
+                assert.match(helper, /signal: request.signal/u);
+                assert.doesNotMatch(helper, /request\.(json|text|arrayBuffer|blob)\(/u);
+                readers++;
+            }
             if (callNamed(expression, 'readPatientJsonObject')) {
                 assert.ok(expression.arguments.length === 1 && named(expression.arguments[0], 'request'));
                 assert.match(source, /import\s*\{\s*readPatientJsonObject\s*\}\s*from\s*['"]@\/lib\/patient-json-object['"]/u);
