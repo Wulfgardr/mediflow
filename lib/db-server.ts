@@ -883,6 +883,7 @@ function applySchemaGuards() {
         sqlite.prepare(`
             CREATE TABLE IF NOT EXISTS siss_handoff_events (
                 id TEXT PRIMARY KEY NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
                 patient_id TEXT NOT NULL,
                 action TEXT NOT NULL,
                 module_label TEXT NOT NULL,
@@ -898,6 +899,10 @@ function applySchemaGuards() {
                 FOREIGN KEY (patient_id) REFERENCES patients(id)
             )
         `).run();
+        const handoffColumns = sqlite.prepare('PRAGMA table_info(siss_handoff_events)').all() as { name: string }[];
+        if (!handoffColumns.some((column) => column.name === 'version')) {
+            sqlite.prepare('ALTER TABLE siss_handoff_events ADD COLUMN version INTEGER NOT NULL DEFAULT 1').run();
+        }
         sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_patient_idx ON siss_handoff_events(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_started_idx ON siss_handoff_events(started_at DESC)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_outcome_idx ON siss_handoff_events(outcome)').run();

@@ -184,6 +184,7 @@ export type SissHandoffOutcome = 'started' | 'completed' | 'blocked' | 'cancelle
 
 /* @Codex */
 export interface SissHandoffEvent {
+    version?: number;
     id: string;
     patientId: string;
     action: string;
@@ -260,7 +261,29 @@ export function captureAttachmentWritePrecondition(record: Pick<Attachment, 'id'
     return Object.freeze({ attachmentId: record.id, patientId: record.patientId, expected: Object.freeze({ ...value }) });
 }
 
+export type SissHandoffWritePrecondition = Readonly<{ id: string; patientId: string; version: number }>;
+
+export function captureSissHandoffWritePrecondition(record: Pick<SissHandoffEvent, 'id' | 'patientId' | 'version'>): SissHandoffWritePrecondition {
+    if (!record.id || !record.patientId?.trim() || !Number.isSafeInteger(record.version) || record.version! < 1) {
+        throw new Error('Ricarica il diario SISS prima di modificare questa voce.');
+    }
+    return Object.freeze({ id: record.id, patientId: record.patientId, version: record.version! });
+}
+
+/** A draft may only be submitted against the record on which editing began. */
+export function resolveSissHandoffDraftPrecondition(
+    draft: SissHandoffWritePrecondition | null,
+    displayed: Pick<SissHandoffEvent, 'id' | 'patientId' | 'version'>,
+): SissHandoffWritePrecondition {
+    const observed = captureSissHandoffWritePrecondition(displayed);
+    if (draft && (draft.id !== observed.id || draft.patientId !== observed.patientId || draft.version !== observed.version)) {
+        throw new Error('Il passaggio SISS è cambiato durante la compilazione. Ricarica il diario e ricompila la chiusura.');
+    }
+    return draft ?? observed;
+}
+
 type ApiDeleteOptions = {
+    sissPrecondition?: SissHandoffWritePrecondition;
     attachmentPrecondition?: AttachmentWritePrecondition;
     suppressNotify?: boolean;
     version?: number;
@@ -504,8 +527,8 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     /* @Codex */
-    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; attachmentPrecondition?: AttachmentWritePrecondition }): Promise<void> {
-        const precondition = this.attachmentWritePayload(id, options?.attachmentPrecondition);
+    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition }): Promise<void> {
+        const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
         /* @Codex */
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
         if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
@@ -523,6 +546,8 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
             }
+            if (this.tableName === 'siss_handoff_events') throw new Error(res.status === 409
+                ? 'Il passaggio SISS è cambiato. Ricarica il diario prima di riprovare.' : 'Modifica del passaggio SISS non riuscita.');
             throw new Error("Failed to update item");
         }
         if (!options?.suppressNotify) this.emitChange();
@@ -530,7 +555,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
 
     /* @Codex */
     async delete(id: string, options?: ApiDeleteOptions): Promise<void> {
-        const precondition = this.attachmentWritePayload(id, options?.attachmentPrecondition);
+        const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
         const fenced = options != null && 'deleteContext' in options;
         const context = fenced ? options.deleteContext : undefined;
         const key = fenced ? this.getMasterKey() : null;
@@ -560,7 +585,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 init.headers = { 'Content-Type': 'application/json' };
                 init.body = JSON.stringify({
                     ...precondition,
-                    ...(typeof options?.version === 'number' ? { version: options.version } : {}),
+                    ...(this.tableName !== 'siss_handoff_events' && typeof options?.version === 'number' ? { version: options.version } : {}),
                     ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
                 });
             }
@@ -660,7 +685,8 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 ? this.getRecordVersion(item)
                 : undefined;
             return this.delete(id, { suppressNotify: true, version,
-                ...(this.tableName === 'attachments' ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Attachment) } : {}) });
+                ...(this.tableName === 'attachments' ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Attachment) } : {}),
+                ...(this.tableName === 'siss_handoff_events' ? { sissPrecondition: captureSissHandoffWritePrecondition(item as SissHandoffEvent) } : {}) });
         }));
         const confirmed = results.filter(result => result.status === 'fulfilled').length;
         if (confirmed > 0) this.emitChange();
@@ -671,6 +697,13 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     /* @Codex */
+    private sissWritePayload(id: string, value?: SissHandoffWritePrecondition) {
+        if (this.tableName !== 'siss_handoff_events') return undefined;
+        if (!value || value.id !== id) throw new Error('Ricarica il diario SISS prima di modificare questa voce.');
+        const captured = captureSissHandoffWritePrecondition(value);
+        return { patientId: captured.patientId, version: captured.version };
+    }
+
     private attachmentWritePayload(id: string, value?: AttachmentWritePrecondition) {
         if (this.tableName !== 'attachments') return undefined;
         if (!value || value.attachmentId !== id) throw new Error('Attachment precondition unavailable');
