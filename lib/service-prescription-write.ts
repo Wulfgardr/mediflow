@@ -30,8 +30,6 @@ import {
     SERVICE_PRESCRIPTION_SOURCE_SET,
     SERVICE_PRESCRIPTION_STATUS_SET,
     isAllowedPrescriptionValue,
-    optionalPrescriptionInteger,
-    optionalPrescriptionIntegerForUpdate,
     optionalPrescriptionText,
     optionalPrescriptionTextForUpdate,
     parseOptionalPrescriptionDate,
@@ -242,7 +240,7 @@ function normalizeServicePrescriptionItemCreate(
             id: optionalPrescriptionText(body.id) ?? uuidv4(),
             patientId: parent.patientId,
             prescriptionId,
-            ordinal: optionalPrescriptionInteger(body.ordinal),
+            ordinal: body.ordinal ?? 0,
             status,
             category,
             codeSystem: optionalPrescriptionText(body.codeSystem),
@@ -274,7 +272,7 @@ function normalizeServicePrescriptionItemUpdate(
         if (hasOwn(body, field)) updateData[field] = optionalPrescriptionTextForUpdate(body[field]) as never;
     }
 
-    const ordinal = optionalPrescriptionIntegerForUpdate(body.ordinal);
+    const ordinal = body.ordinal;
     if (ordinal !== undefined) updateData.ordinal = ordinal;
 
     const serviceName = optionalPrescriptionTextForUpdate(body.serviceName);
@@ -428,6 +426,10 @@ export async function createHostServicePrescription(context: HostContext, rawBod
     if (!normalized.ok) return badRequest(normalized.error);
     return dbServer.transaction((tx): MutationResponse => {
         if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Not found' } };
+        if (tx.select({ id: servicePrescriptions.id }).from(servicePrescriptions)
+            .where(eq(servicePrescriptions.id, normalized.values.id)).get()) {
+            return { status: 409, value: { error: 'Prescription ID already exists' } };
+        }
         const inserted = tx.insert(servicePrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Service prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription.created', 'service_prescription', normalized.values.id, {
@@ -506,6 +508,10 @@ async function createServicePrescriptionItem(context: HostContext | NetworkWrite
         if (!activeParentExists(tx, parent.patientId) || (surface === 'network' && !patientIsInScope(tx, parent.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
         const normalized = normalizeServicePrescriptionItemCreate(body, parent);
         if (!normalized.ok) return badRequest(normalized.error);
+        if (tx.select({ id: servicePrescriptionItems.id }).from(servicePrescriptionItems)
+            .where(eq(servicePrescriptionItems.id, normalized.values.id)).get()) {
+            return { status: 409, value: { error: 'Prescription ID already exists' } };
+        }
         const inserted = tx.insert(servicePrescriptionItems).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Service prescription item create did not write exactly one row');
         writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription_item.created', 'service_prescription_item', normalized.values.id, {
@@ -567,6 +573,10 @@ export async function createNetworkScopedServicePrescription(context: NetworkPat
     if (!normalized.ok) return badRequest(normalized.error);
     return dbServer.transaction((tx): MutationResponse => {
         if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
+        if (tx.select({ id: servicePrescriptions.id }).from(servicePrescriptions)
+            .where(eq(servicePrescriptions.id, normalized.values.id)).get()) {
+            return { status: 409, value: { error: 'Prescription ID already exists' } };
+        }
         const inserted = tx.insert(servicePrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Service prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, serviceAuditInput(context, 'network', 'service.prescription.created', 'service_prescription', normalized.values.id,

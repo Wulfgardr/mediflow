@@ -114,3 +114,41 @@ Regole decisionali:
 2. Richiedere da subito spec diff o nota `no contract impact` per ogni PR che tocca
    `/api/v1/*`.
 3. Aggiungere in follow-up contract checks e generazione client solo dopo la baseline.
+
+
+## Fase di compatibilità prescrizioni C05 — WUL-720 (2026-10-09)
+
+La revisione `1.32.0` resta nella superficie `v1` con una fase di compatibilità
+esplicita, approvata dall'owner delegato nella consegna WUL-720. Non aggiunge
+route, capability o autorità di scrittura. Il perimetro è limitato agli ID dei
+create di prescrizioni protesiche, prestazioni e item, e a `ordinal` degli item.
+
+- Un ID omesso continua a essere generato dall'host. Gli ID opachi non vuoti
+  restano validi e sono normalizzati con trim; ID forniti vuoti o composti solo
+  da whitespace ora ricevono `400`, anziché generare una nuova identità.
+- Un ID già presente nella relativa tabella riceve `409` generico, senza dati
+  del record esistente né modifiche cliniche o audit. Il controllo avviene nella
+  transazione IMMEDIATE dopo la verifica di parent e scope e prima di INSERT.
+- `ordinal` accetta interi safe di JavaScript, compresi zero e negativi, oppure
+  stringhe decimali complete con segno facoltativo e whitespace esterno. La
+  conversione deve produrre un intero safe. Frazioni, stringhe parziali,
+  notazione esponenziale/hex testuale e overflow ora ricevono `400`, senza
+  troncamento tramite `parseInt` o `Math.trunc`. `null` resta non ammesso.
+  L'omissione resta `0` nel create e conserva il valore corrente nell'update.
+
+I caller correnti sono compatibili: il manager Web invia `ordinal: index`
+(zero-based), mentre il workspace Swift invia `index + 1`. I payload Swift
+usano `Int?` ed omettono il campo quando assente. Le stringhe decimali valide
+sono mantenute come compatibilità API anche se questi caller non le emettono.
+Il Web genera UUID espliciti; Swift può omettere l'ID per protesica e item.
+Riferimenti: [manager Web](../../components/service-prescription-manager.tsx),
+[workspace Swift](../../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift)
+e [payload Swift](../../native/MediFlowMac/Sources/MediFlowCore/HomeBaseModels.swift).
+
+Questa decisione restringe intenzionalmente input prima accettati e non
+rivendica retrocompatibilità universale. `contract-policy.json` registra
+soltanto i due cambi `request.ordinal` di POST collection e PUT item segnalati
+dal guard. Il guard resta attivo per tutti gli altri cambi; gli override non
+si estendono ad altri campi, domini o futuri comportamenti. La revisione
+indipendente deve verificare schema, normalizzazione, risposta duplicato e
+prove SQLite senza effetti prima del merge.
