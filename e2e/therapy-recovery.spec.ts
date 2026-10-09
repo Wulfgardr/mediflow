@@ -93,10 +93,14 @@ for (const width of [1440, 390]) {
     await expect(save(page)).toBeEnabled();
     const accepted = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
     await save(page).click();
-    expect((await accepted).status()).toBe(200);
+    const acceptedResponse = await accepted;
+    expect(acceptedResponse.status()).toBe(200);
     expect(writes.map(write => write.version)).toEqual([1, 2]);
+    // The API stores the client's encrypted note; plaintext is verified in the UI.
+    const savedMotivation: unknown = acceptedResponse.request().postDataJSON().motivation;
+    expect(savedMotivation).toMatch(/^ENC:.+/);
     const stored = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
-    expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: 'Nota sintetica da conservare', status: 'suspended' });
+    expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: savedMotivation, status: 'suspended' });
     await expect(save(page)).toBeHidden();
 
     // Read the saved dosage and note from the suspended card after a fresh load.
@@ -112,7 +116,7 @@ for (const width of [1440, 390]) {
     await expect(suspendedCard.getByRole('button', { name: 'Modifica', exact: true })).toHaveCount(0);
     await expect(suspendedCard.getByRole('button', { name: 'Riprendi', exact: true })).toBeVisible();
     const reloaded = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
-    expect(reloaded).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: 'Nota sintetica da conservare', status: 'suspended' });
+    expect(reloaded).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: savedMotivation, status: 'suspended' });
     expect(writes.map(write => write.version)).toEqual([1, 2]);
     await assertNoHorizontalOverflow(page, [{ label: 'therapy pane', selector: '#terapie' }]);
   });
