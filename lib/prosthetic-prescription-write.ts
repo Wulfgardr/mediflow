@@ -239,6 +239,10 @@ export async function createHostProstheticPrescription(context: HostContext, raw
 
     return dbServer.transaction((tx): MutationResponse => {
         if (!activeParentExists(tx, normalized.values.patientId)) return { status: 404, value: { error: 'Patient not found' } };
+        if (tx.select({ id: prostheticPrescriptions.id }).from(prostheticPrescriptions)
+            .where(eq(prostheticPrescriptions.id, normalized.values.id)).get()) {
+            return { status: 409, value: { error: 'Prescription ID already exists' } };
+        }
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'host', 'prosthetic.prescription.created', normalized.values.id, {
@@ -320,6 +324,10 @@ export async function createNetworkScopedProstheticPrescription(context: Network
 
     const commit = dbServer.transaction((tx): MutationResponse => {
         if (!activeParentExists(tx, context.patientId) || !patientIsInScope(tx, context.patientId, context.scopeAmbulatoryId)) return { status: 404, value: { error: 'Not found' } };
+        if (tx.select({ id: prostheticPrescriptions.id }).from(prostheticPrescriptions)
+            .where(eq(prostheticPrescriptions.id, normalized.values.id)).get()) {
+            return { status: 409, value: { error: 'Prescription ID already exists' } };
+        }
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'network', 'prosthetic.prescription.created', normalized.values.id,

@@ -4,8 +4,6 @@ import {
     dateInputSchema,
     nullableDateInputSchema,
     optionalDateInputSchema,
-    optionalIdSchema,
-    optionalIntegerInputSchema,
     optionalTextSchema,
     requiredTextSchema,
 } from './common';
@@ -22,6 +20,14 @@ import {
     SERVICE_PRESCRIPTION_STATUSES,
 } from '../prescription-domain';
 
+// Prescription IDs remain opaque; only omission authorizes ID generation.
+const prescriptionCreateIdSchema = z.string().refine((value) => value.trim().length > 0).optional();
+// Preserve decimal string callers, but never truncate fractions or parse prefixes.
+const prescriptionOrdinalSchema = z.union([
+    z.number(),
+    z.string().trim().regex(/^[+-]?\d+$/).transform(Number),
+]).refine(Number.isSafeInteger).optional();
+
 const prostheticStatusSchema = z.enum(PROSTHETIC_PRESCRIPTION_STATUSES);
 const prostheticCategorySchema = z.enum(PROSTHETIC_PRESCRIPTION_CATEGORIES);
 const prostheticSourceSchema = z.enum(PROSTHETIC_PRESCRIPTION_SOURCES);
@@ -34,7 +40,7 @@ const serviceMatchStatusSchema = z.enum(SERVICE_PRESCRIPTION_ITEM_MATCH_STATUSES
 const serviceConfidenceSchema = z.enum(SERVICE_PRESCRIPTION_ITEM_CONFIDENCES);
 
 export const prostheticPrescriptionCreateSchema = z.object({
-    id: optionalIdSchema,
+    id: prescriptionCreateIdSchema,
     patientId: requiredTextSchema,
     prescribedAt: dateInputSchema,
     status: prostheticStatusSchema.optional(),
@@ -72,7 +78,7 @@ export const prostheticPrescriptionUpdateSchema = z.object({
 });
 
 export const servicePrescriptionCreateSchema = z.object({
-    id: optionalIdSchema,
+    id: prescriptionCreateIdSchema,
     patientId: requiredTextSchema,
     prescribedAt: dateInputSchema,
     status: serviceStatusSchema.optional(),
@@ -116,9 +122,9 @@ export const servicePrescriptionUpdateSchema = z.object({
 });
 
 export const servicePrescriptionItemCreateSchema = z.object({
-    id: optionalIdSchema,
+    id: prescriptionCreateIdSchema,
     prescriptionId: requiredTextSchema,
-    ordinal: optionalIntegerInputSchema,
+    ordinal: prescriptionOrdinalSchema,
     status: serviceStatusSchema.optional(),
     category: serviceCategorySchema.nullable().optional(),
     codeSystem: optionalTextSchema,
@@ -139,7 +145,7 @@ export const servicePrescriptionItemCreateSchema = z.object({
 export const servicePrescriptionItemUpdateSchema = z.object({
     /* @Codex */
     version: z.number().int().positive(),
-    ordinal: optionalIntegerInputSchema,
+    ordinal: prescriptionOrdinalSchema,
     status: serviceStatusSchema.optional(),
     category: serviceCategorySchema.nullable().optional(),
     codeSystem: optionalTextSchema,

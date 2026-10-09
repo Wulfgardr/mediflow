@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.31.0
+  version: 1.32.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1441,6 +1441,17 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: The supplied prescription ID already exists; no data or audit mutation occurs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    const: Prescription ID already exists
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -1579,6 +1590,17 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: The supplied prescription ID already exists; no data or audit mutation occurs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    const: Prescription ID already exists
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -1770,6 +1792,17 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: The supplied prescription ID already exists; no data or audit mutation occurs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    const: Prescription ID already exists
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -7123,6 +7156,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Optional opaque ID, trimmed before persistence. Omit to generate an ID; blank IDs are invalid.
         patientId:
           type: string
         prescribedAt:
@@ -7370,10 +7406,19 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Optional opaque ID, trimmed before persistence. Omit to generate an ID; blank IDs are invalid.
         prescriptionId:
           type: string
         ordinal:
-          type: integer
+          description: Signed safe integer or whitespace-trimmed signed decimal integer string; fractions, partial numbers and unsafe integers are invalid. Omission defaults to zero.
+          oneOf:
+            - type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            - type: string
+              pattern: '^\s*[+-]?[0-9]+\s*$'
         status:
           type: string
           enum: [prescribed, booked, performed, report_received, cancelled]
@@ -7445,7 +7490,13 @@ components:
           type: integer
           minimum: 1
         ordinal:
-          type: integer
+          description: Signed safe integer or whitespace-trimmed signed decimal integer string; fractions, partial numbers and unsafe integers are invalid. Omission preserves the current ordinal.
+          oneOf:
+            - type: integer
+              minimum: -9007199254740991
+              maximum: 9007199254740991
+            - type: string
+              pattern: '^\s*[+-]?[0-9]+\s*$'
         status:
           type: string
           enum: [prescribed, booked, performed, report_received, cancelled]
@@ -7645,6 +7696,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Optional opaque ID, trimmed before persistence. Omit to generate an ID; blank IDs are invalid.
         patientId:
           type: string
         prescribedAt:
