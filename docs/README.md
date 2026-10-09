@@ -179,6 +179,7 @@ il documento o la prova nominati, non l’intero prodotto.
 - Mappa completa markdown: [docs/markdown-index.md](./markdown-index.md)
 - Governance repository e topologia runtime/publication: [docs/repository-topology.md](./repository-topology.md)
 - Vetro Clinico, baseline storica e transitoria di design: [docs/design/vetro-clinico/README.md](./design/vetro-clinico/README.md)
+- Punto d'inchiostro, direzione estetica di destinazione scelta il 9 ottobre 2026, con specifica, token e banco navigabile; non ancora nel runtime: [docs/design/punto-inchiostro/README.md](./design/punto-inchiostro/README.md)
 - Lume, lingua di design attiva con token DTCG nella release sorgente v0.8; i gate di parity restano separati: [docs/design/lume/README.md](./design/lume/README.md)
 - Lettura completa dello stato corrente: [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md)
 - FAQ pubbliche e stato sintetico del prodotto: [docs/FAQ.md](./FAQ.md)
