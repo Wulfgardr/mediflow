@@ -121,6 +121,8 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     ['app/api/system/fix-orphans/route.ts', 'tx.select({ id: patients.id, version: patients.version }).from(patients).all()', 1],
     ['app/api/system/migrate/route.ts', 'dbServer.select().from(patients).where(isNull(patients.ambulatoryId))', 1],
     ['app/api/system/migrate-m2m/route.ts', 'tx.select({ id: patients.id, version: patients.version, ambulatoryId: patients.ambulatoryId }) .from(patients).where(isNotNull(patients.ambulatoryId)).all()', 1],
+    // Admin purge rereads tombstone/version in the write transaction before cascade and guarded delete.
+    ['app/api/system/purge-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 1],
     ['app/api/system/purge-patient/route.ts', 'dbServer .select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients) .where(eq(patients.id, patientId)) .get()', 1],
     ['app/api/system/restore-patient/route.ts', 'dbServer .select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, deletedAt: patients.deletedAt, deletionReason: patients.deletionReason, version: patients.version, }) .from(patients) .where(isNotNull(patients.deletedAt)) .orderBy(desc(patients.deletedAt))', 1],
     // @Codex: admin restore reads this tombstone inside its IMMEDIATE transaction.
@@ -128,6 +130,9 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     ['lib/network-patient-lifecycle.ts', 'tx .select({ id: patients.id, version: patients.version, updatedAt: patients.updatedAt, isArchived: patients.isArchived, }) .from(patients) .where(and(eq(patients.id, patientId), isNotNull(patients.deletedAt))) .get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx .select({ patient: patients }) .from(patients) .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId)) .where(and(eq(patients.id, context.patientId), eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId), isNotNull(patients.deletedAt))) .get()', 1],
     ['lib/network-patient-read.ts', 'dbServer .select({ patient: patients }) .from(patients) .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId)) .where(and(...filters)) .orderBy(desc(patients.updatedAt))', 1],
+    // Clear's remaining selected members include existing tombstones: bump membership authority
+    // without rewriting lifecycle fields (test-container-clear's tombstoned-member oracle).
+    ['lib/test-container-clear.ts', 'runner .select({ id: patients.id, version: patients.version }).from(patients) .where(inArray(patients.id, remainingIds)).all()', 1],
     ['lib/patient-cascade.ts', 'runner.select({ id: patients.id }).from(patients)', 2],
 ];
 

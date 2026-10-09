@@ -1037,3 +1037,12 @@ del tipo test, stale version, versione audit e divieto hard-delete. I negativi
 AST per sostituzione/duplicazione e le prove SQLite di famiglia non cambiano.
 Questo raccordo test/documenti non modifica la produzione delle coorti già
 revisionate e non qualifica automaticamente tutti gli altri lookup del guard.
+
+Le ulteriori classificazioni esatte del medesimo guard comprendono: lookup
+SISS del parent con rifiuto immediato del tombstone; GET e POST fix-orphans
+separati (uno ciascuno), amministrativamente comprensivi dei tombstone;
+lookup POST purge con controllo tombstone/versione nella IMMEDIATE; lookup
+clear dei soli membri residui selezionati, inclusi tombstone già presenti,
+per invalidare la vecchia autorità membership senza riscrivere il lifecycle.
+Ogni fingerprint ha molteplicità uno. Nessun pattern generico o modifica allo
+scanner è introdotto; restano le prove negative e il divieto di hard delete.
