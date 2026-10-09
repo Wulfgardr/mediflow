@@ -177,9 +177,9 @@ lancio SISS non sostituiscono questa suite CRUD.
 
 Sorgenti: [lib/patient-cascade.ts](../lib/patient-cascade.ts).
 
-Sessione Web admin. Restore accetta soltanto patientId, rilegge tombstone/versione in transazione immediata e incrementa versione host; replay dopo restore è 409. Purge richiede tombstone ma lo legge prima della transazione cascade. Fix-orphans usa due transazioni distinte: relink/default e purge opzionale; nessuna versione richiesta dal client.
+Sessione Web admin. Restore accetta soltanto patientId, rilegge tombstone/versione in transazione immediata e incrementa versione host; replay dopo restore è 409. Purge rilegge tombstone e versione, elimina figli/paziente e inserisce l’audit nella stessa transazione immediata. Fix-orphans usa due transazioni distinte: relink/default e purge opzionale; nessuna versione richiesta dal client.
 
-Prove di riferimento: [lib/patient-restore-required-audit.test.ts](../lib/patient-restore-required-audit.test.ts), [lib/patient-lifecycle.test.ts](../lib/patient-lifecycle.test.ts). scripts/patient-restore-required-audit-http.test.mjs; test:patient-cascade. Gap C05-M: non mescolare restore già migrato con purge/relink; test cascade non prova rollback dell’audit mancante.
+Prove di riferimento: [lib/patient-restore-required-audit.test.ts](../lib/patient-restore-required-audit.test.ts), [lib/patient-lifecycle.test.ts](../lib/patient-lifecycle.test.ts). scripts/patient-restore-required-audit-http.test.mjs; test:patient-cascade. Purge è coperto anche da [lib/patient-purge-required-audit.test.ts](../lib/patient-purge-required-audit.test.ts), selezionato dalla suite unit: successo, fault audit con rollback dati/eventi, replay e input/scope senza effetti. La revoca conservativa dei locator del cascade resta attiva anche dopo rollback SQLite. Gap C05-M: versione attesa dal client e relink/purge orfani restano separati.
 
 ### Nomi evento e transazioni dei profili migrati
 
@@ -191,8 +191,8 @@ I core E/T/O/C usano transazioni sincrone immediate con rilettura e audit richie
 P mantiene gli owner distinti di create/update/delete/lifecycle e restore admin.
 PR usa `prosthetic.prescription.*`; SP `service.prescription.*` e
 `service.prescription_item.*`; A `ambulatory.*` e, nel clear, `patient.deleted`.
-I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` dopo commit; purge M usa
-`patient.purged` dopo commit. Nei rami segnati **nessuno** non va presunto un
+I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` dopo commit; purge paziente M usa
+`patient.purged` nella stessa transazione, mentre fix-orphans lo scrive ancora dopo commit. Nei rami segnati **nessuno** non va presunto un
 evento solo perché il dominio compare nella taxonomy.
 
 
@@ -241,7 +241,7 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | S-02 | Web DELETE [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; nessun body letto | ID path; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
 | S-03 | Web POST [/api/siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | S; 256 KiB + schema | ID/parent attivo in TX; dup409; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
 | M-01 | Web POST [/api/system/fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | M; JSON non bounded | selezione host; flag purge opzionale | TX relink + TX purge distinte; **relink nessuno; purge al meglio** | Aperto C05-M |
-| M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON non bounded | patientId; tombstone letto prima della TX | TX cascade; **al meglio dopo TX** | Aperto C05-M |
+| M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON oggetto ≤ 64 KiB | patientId; tombstone/versione riletti nella TX | TX immediata cascade+delete; **TX+audit** | Audit/input migrati; versione client residuo C05-M |
 | M-03 | Web POST [/api/system/restore-patient/route.ts](../app/api/system/restore-patient/route.ts) | M; 65.536 byte; solo patientId | patientId/tombstone; versione host nel restore | TX adapter immediata; **TX+audit** | Restore migrato |
 | T-01 | Web PUT [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | T-02 | Web DELETE [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
@@ -362,7 +362,7 @@ roster non li promuove a un nuovo dominio di commit clinico.
    duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
 3. **C05-D:** create/delete Web, poi metadata/content; upload paired distinto.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
-4. **C05-M:** purge paziente; poi relink/purge orfani. Restore già migrato rimane
+4. **C05-M:** purge paziente migrato; proseguire relink/purge orfani. Restore già migrato rimane
    una riga di regressione, non la prova dei rami diversi.
 5. **C05-SEED/IMPORT/ID:** raccordare gli ingressi composti alle righe aggiornate;
    dare esiti espliciti alle sequenze parziali. Le coorti migrate P/E/T/O/C/PR/SP/A
