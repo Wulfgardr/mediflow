@@ -7500,8 +7500,10 @@
     {
       "path": "scripts/check-ai-clinical-write-gate.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:check:ai-clinical-writes:self-test"
+        ]
       }
     },
     {
@@ -7514,8 +7516,10 @@
     {
       "path": "scripts/check-api-error-leak.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:check:api-error-leak:self-test"
+        ]
       }
     },
     {
@@ -7628,8 +7632,10 @@
     {
       "path": "scripts/check-openapi-drift.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:check:openapi:drift:self-test"
+        ]
       }
     },
     {
@@ -7644,8 +7650,10 @@
     {
       "path": "scripts/check-schema-writers.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:check:schema-writers:self-test"
+        ]
       }
     },
     {
