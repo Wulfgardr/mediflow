@@ -47,7 +47,8 @@ La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranc
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
 L’[elenco dei writer audit](./audit-writers.md) classifica obblighi, stato corrente
-e residui clinici consegnati da C04 a C05.
+e residui clinici consegnati da C04 a C05. Il [roster delle scritture cliniche](./clinical-write-roster.md)
+collega ciascun ingresso a validazione, transazione, audit, prove e lavori C05.
 
 L’[inventario incrementale dei test](./test-inventory.md) descrive il controllo
 delle omissioni nei selettori e il debito ancora aperto; non attesta la

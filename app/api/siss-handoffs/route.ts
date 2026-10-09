@@ -3,11 +3,16 @@ import { NextResponse } from 'next/server';
 import { desc, eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from '@/lib/db-server';
-import { sissHandoffEvents } from '@/lib/schema';
-import { listChangedFields, safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { patients, sissHandoffEvents } from '@/lib/schema';
+import { auditContextFromSession, listChangedFields, requestIdFromRequest,
+    withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { sissHandoffCreateSchema } from '@/lib/api-schemas/siss-handoffs';
 import { parseApiBody } from '@/lib/api-schemas/parse';
+import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+
+// Local handoff notes and metadata; no documents or attachment payloads.
+const SISS_HANDOFF_JSON_MAX_BYTES = 262_144;
 
 const OUTCOMES = new Set(['started', 'completed', 'blocked', 'cancelled']);
 const ACTION_LABELS: Record<string, string> = {
@@ -55,7 +60,12 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const rawBody = await request.json() as Record<string, unknown>;
+        const parsed = await readBoundedJsonBody(request, SISS_HANDOFF_JSON_MAX_BYTES, 'request-json');
+        if (!parsed.ok) {
+            return NextResponse.json({ error: parsed.status === 413 ? 'Richiesta troppo grande.' : 'Richiesta non valida.' },
+                { status: parsed.status });
+        }
+        const rawBody = parsed.value;
         const parsedBody = parseApiBody(sissHandoffCreateSchema, rawBody);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
@@ -76,33 +86,51 @@ export async function POST(request: Request) {
         const id = optionalText(body.id) ?? uuidv4();
         const moduleLabel = optionalText(body.moduleLabel) ?? ACTION_LABELS[action] ?? action;
 
-        await dbServer.insert(sissHandoffEvents).values({
-            id,
-            patientId,
-            action,
-            moduleLabel,
-            reason: optionalText(body.reason),
-            startedAt,
-            completedAt,
-            outcome,
-            nextAction: optionalText(body.nextAction),
-            notes: optionalText(body.notes),
-            correlationId: optionalText(body.correlationId),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        });
-
-        await safeWriteAuditEventFromRequest(request, session, {
-            eventType: 'siss.handoff.created',
-            subjectType: 'siss_handoff',
-            subjectRef: id,
-            redactedMetadata: {
+        const auditContext = auditContextFromSession(session);
+        const requestId = requestIdFromRequest(request);
+        const result = dbServer.transaction((tx) => {
+            const patient = tx.select({ deletedAt: patients.deletedAt }).from(patients)
+                .where(eq(patients.id, patientId)).get();
+            if (!patient || patient.deletedAt) {
+                return { status: 404, value: { error: 'Patient not found' } } as const;
+            }
+            if (tx.select({ id: sissHandoffEvents.id }).from(sissHandoffEvents)
+                .where(eq(sissHandoffEvents.id, id)).get()) {
+                return { status: 409, value: { error: 'SISS handoff already exists' } } as const;
+            }
+            const inserted = tx.insert(sissHandoffEvents).values({
+                id,
+                patientId,
+                action,
+                moduleLabel,
+                reason: optionalText(body.reason),
+                startedAt,
+                completedAt,
+                outcome,
+                nextAction: optionalText(body.nextAction),
+                notes: optionalText(body.notes),
+                correlationId: optionalText(body.correlationId),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            }).run();
+            if (inserted.changes !== 1) throw new Error('SISS handoff insert did not modify exactly one row');
+            writeAuditEventInTransaction(tx, {
+                eventType: 'siss.handoff.created',
+                outcome: 'success',
+                actorType: auditContext.actorType,
+                actorRef: auditContext.actorRef,
+                subjectType: 'siss_handoff',
+                subjectRef: id,
+                sourceSurface: auditContext.sourceSurface,
+                requestId,
+                redactedMetadata: withAuditContextMetadata(auditContext, {
                     changedFields: listChangedFields(body as Record<string, unknown>, ['id']),
-                flags: [`action:${action}`, `outcome:${outcome}`],
-            },
-        }, '[MediFlow] SISS handoff audit write failed:');
-
-        return NextResponse.json({ id }, { status: 201 });
+                    flags: [`action:${action}`, `outcome:${outcome}`],
+                }),
+            });
+            return { status: 201, value: { id } } as const;
+        }, { behavior: 'immediate' });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /siss-handoffs error:', error);
         return NextResponse.json({ error: 'Failed to create SISS handoff' }, { status: 500 });
