@@ -128,7 +128,7 @@ e la stessa interfaccia del pilota; un errore audit deve annullare gli effetti.
 | [network-attachment-write.ts:126](../lib/network-attachment-write.ts#L126) | `attachment.created` attesta un nuovo allegato e la sua currentness. | Wrapper :120 chiamato da `createNetworkScopedAttachment` a :209, dopo il commit; catch assorbe l'errore. Adapter: [attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts). |
 
 La riparazione orfani ora traccia anche default e relink, oltre al purge
-esplicito; le [prove SQLite composte](../lib/patient-orphan-repair-required-audit.test.ts)
+esplicito; le [prove SQLite composte](../lib/orphan-repair-required-audit.test.ts)
 verificano rollback fino all’ultimo evento. Il purge vuoto non produce un evento
 clinico né revoca locator. Questa lista non sostituisce il censimento C05 degli
 altri writer e dei caller indiretti.
