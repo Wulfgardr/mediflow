@@ -196,6 +196,11 @@ fresco. Il completamento del pilota non equivale al completamento di C04:
 la classificazione di tutti i sink e chiamanti e la lista di migrazione C05
 devono restare esplicite, con gli elementi non risolti ancora aperti.
 
+La [classificazione corrente dei writer](../audit-writers.md) elenca i punti
+di scrittura, il motivo dell’obbligo e i residui da migrare in C05. Sostituisce
+i conteggi iniziali come riferimento operativo, senza modificare i contratti
+di sicurezza e delle ricevute headless.
+
 ## Estensione C05 del 26 settembre 2026 — DELETE paziente Web e API-v1
 
 Candidato locale da verificare, scritto prima dell'implementazione. Questa
