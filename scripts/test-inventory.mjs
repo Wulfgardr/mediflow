@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectPlaywrightTestFiles } from './playwright-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
-import { collectExplicitNpmSelections, collectNpmScriptBinding, collectGuardSelfTestSelections } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmSelections, collectNpmScriptBinding, collectGuardSelfTestSelections, collectSyntheticPluginSelections } from './explicit-npm-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
 const headlessSuite = Object.freeze({ script: 'test:headless-portable', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts' });
@@ -112,6 +112,7 @@ export function checkInventory(candidates, manifest, selections) {
   const support = [];
   const staticImports = new Map();
   const verifiedSuites = new Set();
+  const conditionalSuites = [];
   const discovered = new Set();
   const entries = new Map();
   const suites = new Map();
@@ -157,6 +158,7 @@ export function checkInventory(candidates, manifest, selections) {
     add('INVALID_SELECTIONS', 'expected object'); selections = {};
   }
   for (const [id, selection] of Object.entries(selections)) {
+    if (selection?.conditional === true) conditionalSuites.push(id);
     if (!selection || !Array.isArray(selection.files) || !Array.isArray(selection.errors)) {
       add('INVALID_SUITE', id); continue;
     }
@@ -195,7 +197,7 @@ export function checkInventory(candidates, manifest, selections) {
       if (!staticImports.get(importer)?.has(file)) add('SUPPORT_IMPORT_MISSING', `${file}: ${importer}`);
     }
   }
-  return { errors, unresolved, support, integrityPassed: errors.length === 0,
+  return { errors, unresolved, support, conditionalSuites, integrityPassed: errors.length === 0,
     selectionComplete: errors.length === 0 && unresolved.length === 0 };
 }
 
@@ -231,6 +233,7 @@ async function cli(args) {
   const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
     'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
     ...collectGuardSelfTestSelections(root),
+    ...collectSyntheticPluginSelections(root),
     'npm:test:e2e': collectPlaywrightInventorySelection(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
@@ -242,6 +245,7 @@ function printReport(result) {
   console.log(`Selection completeness: ${result.selectionComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
   console.log(`Unresolved selection: ${result.unresolved.length}`);
   console.log(`Support entrypoint exclusions: ${result.support.length}`);
+  if (result.conditionalSuites.length) console.log(`Conditional suites (workflow paths): ${result.conditionalSuites.join(', ')}`);
   console.log('Execution evidence: NOT_ASSESSED');
   console.log('Npm CI bindings: configured literal calls only; reachability and lifecycle effects NOT_ASSESSED');
   console.log('C14 acceptance: NOT_ASSESSED');

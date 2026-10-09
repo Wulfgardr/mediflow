@@ -147,6 +147,28 @@ not verified a selector binding; it does not mean the file is orphaned or option
 Platform, capability and method filters need separate selector models and actual
 execution receipts before any coverage claim.
 
+## Conditional synthetic plugin suites
+
+`npm:synthetic-plugin:test` and `npm:synthetic-plugin:test:browser` are selected
+by `.github/workflows/synthetic-plugin.yml`, not required on every push. Reports
+label them as conditional. The adapter verifies the existing `pull_request.paths`
+and `push.paths` arrays (plugin subtree, MCP contracts and that workflow), plus
+`push.branches: [main]`. Filter drift fails instead of silently broadening claims.
+
+The effective working directory must be `plugins/mediflow-synthetic`, including
+workflow/job defaults and step overrides. Package commands must remain exactly
+`node --test test/*.test.mjs` and `node scripts/browser-smoke.mjs`, with one exact
+CI call each: `npm test` and `npm run test:browser`. Existing condition, shell,
+error masking and YAML guards apply. Root suite bindings still require root cwd.
+
+The adapter expands only the declared nonrecursive `test/*.test.mjs` glob,
+excluding hidden names as the shell does. It returns sorted paths without reading
+or importing tests, fails for missing/empty groups or nonregular selected files,
+and uses no duplicate test roster. The browser model checks its single declared
+script without running it. The manifest maps four Node test files and that browser
+script; the other Codex scripts remain unresolved. This models configured selection
+when workflow filters match, not execution, browser readiness or host qualification.
+
 ## Support modules, not standalone test entrypoints
 
 A reviewed `support` disposition excludes a helper from standalone entrypoint
