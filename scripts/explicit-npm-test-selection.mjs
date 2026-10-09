@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { load, JSON_SCHEMA } from 'js-yaml';
 
 export const EXPLICIT_NPM_SUITES = Object.freeze([
@@ -7,6 +8,7 @@ export const EXPLICIT_NPM_SUITES = Object.freeze([
   { script: 'test:native-launcher', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts', stepIf: "runner.os == 'macOS'" },
   { script: 'test:usage-dashboard', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:fabric-generative-runtime-crosswalk', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
+  { script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e' },
   { script: 'test:lume-tokens', workflow: '.github/workflows/web-core.yml', job: 'web-core' },
 ].map(suite => Object.freeze({ ...suite, id: `npm:${suite.script}` })));
 
@@ -109,6 +111,7 @@ function ciBinding(root, suite) {
   // js-yaml's default duplicate-key check stays enabled (json option is not used).
   const workflow = load(readText(root, suite.workflow), { schema: JSON_SCHEMA });
   checkYamlTree(workflow);
+  if (suite.triggers && !isDeepStrictEqual(workflow.on, suite.triggers)) throw new Error('Required CI triggers changed');
   const job = workflow?.jobs?.[suite.job];
   if (!object(workflow) || !object(job) || !Array.isArray(job.steps)) throw new Error(`Missing CI job: ${suite.job}`);
   const matches = [];
@@ -116,7 +119,9 @@ function ciBinding(root, suite) {
   const expectedCall = selfTestCall ?? suite.script;
   job.steps.forEach((step, index) => {
     if (!object(step)) return;
-    const commands = npmRunBlock(step.run, selfTestCall, suite.companionCall);
+    const commands = suite.ciCall
+      ? (typeof step.run === 'string' && step.run.trim() === suite.ciCall ? [suite.script] : null)
+      : npmRunBlock(step.run, selfTestCall, suite.companionCall);
     for (const command of commands ?? []) if (command === expectedCall) matches.push({ step, index, commands });
   });
   if (matches.length !== 1) throw new Error(`Expected exactly one literal CI call: ${expectedCall}; found ${matches.length}`);
@@ -132,11 +137,13 @@ function ciBinding(root, suite) {
   const jobDefaults = runDefaults(job, 'job');
   const effective = { ...workflowDefaults, ...jobDefaults, ...step };
   const directory = effective['working-directory'];
-  if (directory !== undefined && directory !== '.' && directory !== './') throw new Error('CI binding must run at repository root');
+  if (suite.workingDirectory) {
+    if (directory !== suite.workingDirectory) throw new Error('Required CI working directory changed');
+  } else if (directory !== undefined && directory !== '.' && directory !== './') throw new Error('CI binding must run at repository root');
   const shell = effective.shell;
   if (shell !== undefined && !['bash', 'sh', 'pwsh'].includes(shell)) throw new Error('Unsupported CI binding shell');
   return {
-    workflow: suite.workflow, job: suite.job, stepIndex: index, stepName: step.name ?? null,
+    workflow: suite.workflow, triggers: workflow.on ?? null, job: suite.job, stepIndex: index, stepName: step.name ?? null,
     run: step.run, commands, jobIf, stepIf, needs: job.needs ?? null,
     runsOn: job['runs-on'] ?? null, matrix: job.strategy?.matrix ?? null,
     workflowDefaults, jobDefaults, workingDirectory: directory ?? null, shell: shell ?? null,
@@ -146,7 +153,7 @@ function ciBinding(root, suite) {
 
 /** Verify a known runner entrypoint without launching npm or parsing its source. */
 export function collectNpmScriptBinding(root, suite, expectedCommand) {
-  const pkg = JSON.parse(readText(root, 'package.json'));
+  const pkg = JSON.parse(readText(root, suite.packageFile ?? 'package.json'));
   if (pkg.scripts?.[suite.script] !== expectedCommand) {
     throw new Error(`Required npm command changed or missing: ${suite.script}`);
   }
@@ -182,6 +189,41 @@ export function collectExplicitNpmSelections(root) {
       return [suite.id, { files, errors: [], binding }];
     } catch (error) {
       return [suite.id, { files: [], errors: [error.message], binding: null }];
+    }
+  }));
+}
+
+
+/** Closed model for the existing, path-conditional synthetic plugin workflow. */
+export function collectSyntheticPluginSelections(root) {
+  const directory = 'plugins/mediflow-synthetic';
+  const workflow = '.github/workflows/synthetic-plugin.yml';
+  const paths = [`${directory}/**`, 'packages/mcp/src/contracts.ts', workflow];
+  const common = { workflow, job: 'synthetic-plugin', workingDirectory: directory,
+    packageFile: `${directory}/package.json`,
+    triggers: { pull_request: { paths }, push: { branches: ['main'], paths } } };
+  return Object.fromEntries([
+    { script: 'test', ciCall: 'npm test', command: 'node --test test/*.test.mjs' },
+    { script: 'test:browser', ciCall: 'npm run test:browser', command: 'node scripts/browser-smoke.mjs' },
+  ].map(suite => {
+    const id = `npm:synthetic-plugin:${suite.script}`;
+    try {
+      const binding = collectNpmScriptBinding(root, { ...common, ...suite }, suite.command);
+      let files;
+      if (suite.script === 'test') {
+        // Exactly the package's literal nonrecursive shell glob; hidden files
+        // are not matched. No second roster and no test imports or execution.
+        const group = `${directory}/test`;
+        const real = fs.realpathSync(path.join(root, group));
+        if (!real.startsWith(fs.realpathSync(root) + path.sep)) throw new Error('Plugin test group escapes root');
+        files = fs.readdirSync(path.join(root, group)).filter(name => !name.startsWith('.') && name.endsWith('.test.mjs'))
+          .sort().map(name => `${group}/${name}`);
+        if (!files.length) throw new Error('Required synthetic plugin test group is empty');
+      } else files = [`${directory}/scripts/browser-smoke.mjs`];
+      for (const file of files) regularFile(root, file);
+      return [id, { files, errors: [], binding, conditional: true }];
+    } catch (error) {
+      return [id, { files: [], errors: [error.message], binding: null, conditional: true }];
     }
   }));
 }
