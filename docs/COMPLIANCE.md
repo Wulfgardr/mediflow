@@ -112,6 +112,18 @@ risorse descritte di seguito.
 | `MedicationStatement` | Terapie, con farmaco rappresentato oggi come testo |
 | `Observation` | Scale con punteggio e osservazioni strutturate |
 
+Nel web, il mapper riconosce soltanto i sistemi esatti `ICD-9`, `ICD-10` e
+`ICD-11`. Un sistema diverso o vuoto conserva la descrizione in
+`Condition.code.text` e omette `coding`; download e condivisione richiedono
+conferma dell'avviso locale. Il controllo usa i record locali già caricati,
+senza aggiungere dati clinici alle route di controllo server. Gli URI dei
+sistemi riconosciuti restano quelli legacy, compreso `icd-9`: l'URI
+`icd-9-cm` previsto dall'ADR 0081 resta da adottare nella migrazione condivisa.
+Questa slice WUL-457 non modifica il mapper Swift, che conserva ancora il
+fallback ICD-11, né dimostra parità per sistemi sconosciuti. DTO v2, warning
+con identificatori canonici, golden condiviso e gate ufficiale offline
+restano aperti.
+
 I test verificano la mappatura su dati sintetici. Questo permette di controllare
 come i record selezionati vengano trasformati, ma non attesta la conformità
 completa alla base R4 o ai profili HL7 Italia/FSE, la correttezza terminologica

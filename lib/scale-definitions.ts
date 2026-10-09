@@ -64,7 +64,7 @@ const definitions: Record<string, ScaleDefinition> = {
     'iadl': {
         id: 'iadl',
         title: 'IADL (Indice di Lawton)',
-        description: 'Attività Strumentali della vita quotidiana (1 = F, 0 = NF). Nota: Storicamente 8 item per donne, 5 per uomini.',
+        description: 'Attività strumentali della vita quotidiana: questa versione richiede tutte le 8 risposte per ogni persona, con punteggio totale da 0 a 8.',
         questions: [
             { id: 'q1', text: '1. Capace di usare il telefono', type: 'choice', options: [{ label: '0. No (non usa/non risponde)', value: 0 }, { label: '1. Si (chiama/risponde autonomamente)', value: 1 }] },
             { id: 'q2', text: '2. Fare acquisti', type: 'choice', options: [{ label: '0. No (incapace/accompagnato)', value: 0 }, { label: '1. Si (provvede autonomamente)', value: 1 }] },

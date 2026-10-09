@@ -3,16 +3,17 @@ import 'server-only';
 
 import bcrypt from 'bcryptjs';
 import { types } from 'node:util';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, lte, or, sql } from 'drizzle-orm';
 
 import type { dbServer as dbServerType } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import {
+    AUTH_LOCKOUT_DURATION_MS,
     AUTH_LOCKOUT_MAX_FAILURES,
+    AUTH_LOCKOUT_WINDOW_MS,
     createInvalidCredentialsPayload,
     createLockedPayload,
     isLockoutActive,
-    recordFailedLogin,
     resetLockoutState,
 } from '@/lib/security/auth-lockout';
 import {
@@ -92,6 +93,45 @@ async function usernameFor(
     return accounts.length === 1 ? accounts[0].username : '';
 }
 
+async function recordFailedLoginAtomically(
+    db: Database,
+    user: Pick<typeof users.$inferSelect, 'id' | 'passwordHash'>,
+    now: Date,
+) {
+    const nowSeconds = Math.floor(now.getTime() / 1000);
+    const windowStartSeconds = Math.floor((now.getTime() - AUTH_LOCKOUT_WINDOW_MS) / 1000);
+    const lockedUntilSeconds = Math.floor((now.getTime() + AUTH_LOCKOUT_DURATION_MS) / 1000);
+    const activeLockout = sql`${users.lockedUntil} is not null and ${users.lockedUntil} > ${nowSeconds}`;
+    const withinWindow = sql`${users.firstFailedLoginAt} is not null and ${users.firstFailedLoginAt} >= ${windowStartSeconds}`;
+    const currentAttempts = sql<number>`case
+        when ${users.failedLoginAttempts} > 0 then ${users.failedLoginAttempts}
+        else 0
+    end`;
+    const nextAttempts = sql<number>`case
+        when ${activeLockout} then ${currentAttempts}
+        when ${withinWindow} then ${currentAttempts} + 1
+        else 1
+    end`;
+
+    return db.update(users).set({
+        failedLoginAttempts: nextAttempts,
+        firstFailedLoginAt: sql`case
+            when ${activeLockout} or ${withinWindow} then ${users.firstFailedLoginAt}
+            else ${nowSeconds}
+        end`,
+        lockedUntil: sql`case
+            when ${activeLockout} then ${users.lockedUntil}
+            when ${nextAttempts} >= ${AUTH_LOCKOUT_MAX_FAILURES} then ${lockedUntilSeconds}
+            else null
+        end`,
+    }).where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash)))
+        .returning({
+            failedLoginAttempts: users.failedLoginAttempts,
+            firstFailedLoginAt: users.firstFailedLoginAt,
+            lockedUntil: users.lockedUntil,
+        }).get();
+}
+
 async function deny(
     username: string, dependencies: HostCredentialVerifierDependencies,
     lockedUntil?: Date | null, failedLoginAttempts?: number,
@@ -154,19 +194,39 @@ export async function verifyHostCredentials(
 
         const valid = await (dependencies.compare ?? bcrypt.compare)(credential.pin, user.passwordHash);
         if (!valid) {
-            const next = recordFailedLogin(user, now);
-            const update = await db.update(users).set({
-                failedLoginAttempts: next.failedLoginAttempts,
-                firstFailedLoginAt: next.firstFailedLoginAt,
-                lockedUntil: next.lockedUntil,
-            }).where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash))).run();
-            if (update.changes !== 1) return deny(user.username, dependencies);
-            return deny(user.username, dependencies, next.isLocked ? next.lockedUntil : null, next.failedLoginAttempts);
+            const next = await recordFailedLoginAtomically(db, user, now);
+            if (!next) return deny(user.username, dependencies);
+            const nextLockout = isLockoutActive(next, now);
+            return deny(
+                user.username,
+                dependencies,
+                nextLockout,
+                nextLockout
+                    ? Math.max(next.failedLoginAttempts, AUTH_LOCKOUT_MAX_FAILURES)
+                    : next.failedLoginAttempts,
+            );
         }
 
         const reset = await db.update(users).set(resetLockoutState())
-            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash))).run();
-        if (reset.changes !== 1) return deny(user.username, dependencies);
+            .where(and(
+                eq(users.id, user.id),
+                eq(users.passwordHash, user.passwordHash),
+                or(isNull(users.lockedUntil), lte(users.lockedUntil, now)),
+            )).returning({ id: users.id }).get();
+        if (!reset) {
+            const current = await db.select().from(users).where(and(
+                eq(users.id, user.id),
+                eq(users.passwordHash, user.passwordHash),
+            )).get();
+            const concurrentLockout = current ? isLockoutActive(current, now) : null;
+            if (current && concurrentLockout) return deny(
+                current.username,
+                dependencies,
+                concurrentLockout,
+                Math.max(current.failedLoginAttempts, AUTH_LOCKOUT_MAX_FAILURES),
+            );
+            return deny(user.username, dependencies);
+        }
         return {
             kind: 'verified', account: {
                 id: user.id, username: user.username, displayName: user.displayName,

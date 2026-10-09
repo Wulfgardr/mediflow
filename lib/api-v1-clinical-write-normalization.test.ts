@@ -13,6 +13,27 @@ import {
     normalizeTherapyUpdateInput,
 } from './api-v1-clinical-write-normalization';
 
+test('therapy create and update reject inherited names as status values', () => {
+    for (const status of ['constructor', '__proto__']) {
+        const error = { ok: false, error: 'Invalid therapy status' };
+        assert.deepEqual(normalizeTherapyCreateInput({
+            drugName: 'ENC:synthetic:drug', dosage: 'ENC:synthetic:dose',
+            startDate: '2026-10-09', status,
+        }, { id: 'synthetic-therapy', patientId: 'synthetic-patient' }), error);
+        assert.deepEqual(normalizeTherapyUpdateInput({ status }), error);
+    }
+});
+
+test('checkup create and update reject inherited names as status values', () => {
+    for (const status of ['constructor', '__proto__']) {
+        const error = { ok: false, error: 'Invalid checkup status' };
+        assert.deepEqual(normalizeCheckupCreateInput({
+            title: 'Synthetic checkup', date: '2026-10-09', status,
+        }, { id: 'synthetic-checkup', patientId: 'synthetic-patient' }), error);
+        assert.deepEqual(normalizeCheckupUpdateInput({ status }), error);
+    }
+});
+
 test('normalizes the service item link only for the local web observation path', () => {
     const input = {
         codeSystem: 'LOINC',

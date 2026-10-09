@@ -7,6 +7,7 @@ import { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runT
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
+import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs'; // @Codex
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
 // @Codex: only safe, failure-only smoke diagnostics omit the CLI exception stack.
@@ -1054,6 +1055,9 @@ if (runtimeContract.schemaVersion !== 1 || runtimeContract.node?.major !== nodeC
 }
 
 const requireFromStandalone = createRequire(serverPath);
+
+// @Codex: require the raw scheduler closure before any runtime smoke is attempted.
+await assertScheduledBackupRuntime(standaloneDir);
 
 function fail(message) {
   console.error(message);
