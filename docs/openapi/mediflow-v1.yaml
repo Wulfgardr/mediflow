@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.30.0
+  version: 1.31.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -5457,6 +5457,7 @@ components:
       properties:
         id:
           type: string
+          description: On create, an omitted id generates a UUID; a supplied id must contain non-whitespace text and is trimmed. No UUID format is required.
         name:
           type: string
         address:
@@ -5476,6 +5477,11 @@ components:
             - 'null'
         isDefault:
           type: boolean
+        createdAt:
+          description: Create only. Omission uses the current time. A supplied value must be a valid date string (including date-only strings) or a finite Unix timestamp in milliseconds; zero is valid. Null and booleans are rejected.
+          oneOf:
+            - type: string
+            - type: number
         version:
           type: integer
           minimum: 1

@@ -1,6 +1,7 @@
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from './db-server';
+import { dateInputSchema } from './api-schemas/common';
 import { ambulatories, patients, patientsToAmbulatories } from './schema';
 import { activePatients } from './patient-lifecycle';
 import { clearTestContainerByMembership, TEST_CONTAINER_CLEAR_REASON } from './test-container-clear';
@@ -101,9 +102,19 @@ export function createAmbulatory(context: AmbulatoryWriteContext, rawBody: Recor
     if (!name) return { status: 400, value: { error: 'Ambulatory name is required' } };
     const type = normalizeType(rawBody.type, false);
     if (!type) return { status: 400, value: { error: 'Invalid ambulatory type' } };
-    const id = typeof rawBody.id === 'string' && rawBody.id.trim() ? rawBody.id.trim() : uuidv4();
-    const createdAt = rawBody.createdAt === undefined ? new Date() : new Date(rawBody.createdAt as string | number | Date);
-    if (Number.isNaN(createdAt.getTime())) return { status: 400, value: { error: 'Invalid createdAt' } };
+    if (hasOwn(rawBody, 'id') && (typeof rawBody.id !== 'string' || !rawBody.id.trim())) {
+        return { status: 400, value: { error: 'Invalid ambulatory id' } };
+    }
+    const id = hasOwn(rawBody, 'id') ? (rawBody.id as string).trim() : uuidv4();
+    if (hasOwn(rawBody, 'isDefault') && typeof rawBody.isDefault !== 'boolean') {
+        return { status: 400, value: { error: 'Invalid isDefault value' } };
+    }
+    let createdAt = new Date();
+    if (hasOwn(rawBody, 'createdAt')) {
+        const parsedDate = dateInputSchema.safeParse(rawBody.createdAt);
+        if (!parsedDate.success) return { status: 400, value: { error: 'Invalid createdAt' } };
+        createdAt = new Date(parsedDate.data);
+    }
     const parentValue = hasOwn(rawBody, 'parentId') ? nullableText(rawBody.parentId, 'parentId') : { ok: true as const, value: null };
     if (!parentValue.ok) return { status: 400, value: { error: parentValue.error } };
     const addressValue = hasOwn(rawBody, 'address') ? nullableText(rawBody.address, 'address') : { ok: true as const, value: null };
