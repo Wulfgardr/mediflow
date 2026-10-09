@@ -116,7 +116,9 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     // The SISS family SQLite oracle retains its tombstoned-parent denial case.
     ['app/api/siss-handoffs/route.ts', 'tx.select({ deletedAt: patients.deletedAt }).from(patients) .where(eq(patients.id, patientId)).get()', 1],
     ['app/api/system/backup-restore/route.ts', 'tx.select().from(patients).all()', 1],
-    ['app/api/system/fix-orphans/route.ts', 'dbServer.select({ id: patients.id }).from(patients)', 2],
+    // ADR0066: admin orphan inspection and transactional repair deliberately include tombstones.
+    ['app/api/system/fix-orphans/route.ts', 'dbServer.select({ id: patients.id }).from(patients)', 1],
+    ['app/api/system/fix-orphans/route.ts', 'tx.select({ id: patients.id, version: patients.version }).from(patients).all()', 1],
     ['app/api/system/migrate/route.ts', 'dbServer.select().from(patients).where(isNull(patients.ambulatoryId))', 1],
     ['app/api/system/migrate-m2m/route.ts', 'tx.select({ id: patients.id, version: patients.version, ambulatoryId: patients.ambulatoryId }) .from(patients).where(isNotNull(patients.ambulatoryId)).all()', 1],
     ['app/api/system/purge-patient/route.ts', 'dbServer .select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients) .where(eq(patients.id, patientId)) .get()', 1],
