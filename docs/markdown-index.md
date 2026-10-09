@@ -43,6 +43,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [design/2026-09-06-086-macos-redesign.md](./design/2026-09-06-086-macos-redesign.md) | Proposta Mac con una sola lista laterale, gerarchia documentale e prove locali. | Revisione del redesign successivo alla prima rifinitura Apple 0.8.6. |
 | [analysis/2026-09-26-090-first-tranche.md](./analysis/2026-09-26-090-first-tranche.md) | Prima tranche locale 0.9.0: inventario, aggiornamento paziente atomico, audit pilota e riparazioni dei test. | Per distinguere candidati verificati, limiti e lavoro ancora aperto dalla release. |
 | [audit-writers.md](./audit-writers.md) | Classificazione dei writer audit correnti e residui clinici C05. | Prima di modificare un writer o verificare i criteri C04. |
+| [clinical-write-roster.md](./clinical-write-roster.md) | Operazioni cliniche per superficie, garanzie e residui C05. | Prima di modificare una scrittura, il suo parser o la sua prova. |
 | [test-inventory.md](./test-inventory.md) | Inventario incrementale dei test, selettori verificati e omissioni; debito unresolved distinto dall’esecuzione e dall’accettazione C14. | Per aggiornare candidati e binding senza trasformare selezione statica o integrità in qualifica della release. |
 
 ## 📚 Come usare questo indice

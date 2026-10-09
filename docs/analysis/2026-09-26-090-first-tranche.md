@@ -199,6 +199,9 @@ considerata completata o messa in HOLD approvato dal solo censimento.
 
 ## C05 — prime coorti circoscritte
 
+Questa sezione conserva le consegne iniziali; il riferimento operativo corrente
+è il [roster delle scritture cliniche](../clinical-write-roster.md).
+
 ### Oggetto JSON in ingresso
 
 La baseline conferma nove risposte 500 improprie: JSON nullo, malformato o
