@@ -1891,6 +1891,15 @@
       }
     },
     {
+      "path": "lib/api-table-clear-outcomes.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/api-table-response.test.ts",
       "selection": {
         "state": "mapped",
@@ -5734,6 +5743,15 @@
     },
     {
       "path": "lib/security/web-cookie-mutation-admission.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/seeder-outcomes.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
