@@ -198,3 +198,15 @@ test('paired create uses admitted patient and session identity', async () => {
     const event = read(ids.id).audit[0] as Record<string, unknown>;
     assert.equal(event.actor_ref, pairedSession.userId); assert.equal(event.source_surface, 'native');
 });
+
+
+test('duplicate prosthetic create IDs return generic conflict without domain or audit effects', async () => {
+    for (const op of ['host-create', 'paired-create'] as const) {
+        const ids = seed();
+        assert.equal((await invoke(op, ids)).status, 201);
+        const before = read(ids.id);
+        const result = await invoke(op, ids);
+        assert.deepEqual(result, { status: 409, value: { error: 'Prescription ID already exists' } });
+        assert.deepEqual(read(ids.id), before);
+    }
+});

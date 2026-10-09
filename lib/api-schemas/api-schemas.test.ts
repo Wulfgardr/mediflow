@@ -13,7 +13,7 @@ import {
     patientMoveSchema,
     patientUnassignSchema,
 } from './patient-bulk';
-import { servicePrescriptionCreateSchema } from './prescriptions';
+import { prostheticPrescriptionCreateSchema, servicePrescriptionCreateSchema, servicePrescriptionItemCreateSchema, servicePrescriptionItemUpdateSchema } from './prescriptions';
 import { sissHandoffCreateSchema } from './siss-handoffs';
 
 async function expectValid<T>(schema: z.ZodType<T>, payload: unknown): Promise<T> {
@@ -204,4 +204,26 @@ test('patient move requires one positive expected version per requested patient'
         targetAmbulatoryId: 'ambulatory-2',
         patientVersions: {},
     });
+});
+
+
+test('prescription create IDs reject empty supplied identities and preserve opaque IDs', async () => {
+    const payload = { patientId: 'synthetic-patient', prescriptionId: 'synthetic-parent', prescribedAt: '2026-01-01', description: 'Synthetic', serviceName: 'Synthetic' };
+    const schemas: z.ZodType[] = [prostheticPrescriptionCreateSchema, servicePrescriptionCreateSchema, servicePrescriptionItemCreateSchema];
+    for (const schema of schemas) {
+        await expectValid(schema, payload);
+        await expectValid(schema, { ...payload, id: ' opaque-id ' });
+        for (const id of ['', '  ', null, 12, [], {}]) await expectInvalid400(schema, { ...payload, id });
+    }
+});
+test('service item ordinal accepts exact safe integers and decimal strings without truncation', async () => {
+    for (const [ordinal, expected] of [[0, 0], [-1, -1], [12, 12], [' 12 ', 12], ['01', 1], ['+1', 1], ['-1', -1], [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER]] as const) {
+        const result = await expectValid(servicePrescriptionItemUpdateSchema, { version: 1, ordinal });
+        assert.equal(result.ordinal, expected);
+    }
+    for (const ordinal of [1.5, '12garbage', '1.5', '1e2', '0x10', '', ' ', null, true, [], {}, Number.MAX_SAFE_INTEGER + 1, '9007199254740992']) {
+        await expectInvalid400(servicePrescriptionItemUpdateSchema, { version: 1, ordinal });
+    }
+    assert.equal((await expectValid(servicePrescriptionItemCreateSchema, { prescriptionId: 'synthetic-parent', serviceName: 'Synthetic' })).ordinal, undefined);
+    assert.equal((await expectValid(servicePrescriptionItemUpdateSchema, { version: 1 })).ordinal, undefined);
 });
