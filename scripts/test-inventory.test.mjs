@@ -5,7 +5,7 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { discoverCandidates, checkInventory, collectHeadlessInventorySelection, collectPlaywrightInventorySelection } from './test-inventory.mjs';
+import { discoverCandidates, collectStaticSupportImports, checkInventory, collectHeadlessInventorySelection, collectPlaywrightInventorySelection } from './test-inventory.mjs';
 import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
 import { EXPLICIT_NPM_SUITES, GUARD_SELF_TEST_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectPlaywrightTestFiles, playwrightTestSelection } from './playwright-test-selection.mjs';
@@ -435,4 +435,76 @@ test('new self-test bindings are required by the real CLI, independently of ordi
   assert.equal(result.status, 1);
   assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:check:openapi:drift:self-test/);
   assert.match(result.stderr, /MAPPED_NOT_SELECTED: npm:check:openapi:drift:self-test: scripts\/check-openapi-drift.mjs/);
+});
+
+
+test('support links use only runtime imports in the closed prologue, never comments, types or strings', () => {
+  const file = 'lib/entry.test.ts';
+  const statement = "import { fixture as helper, type Shape } from './support.mjs';";
+  assert.deepEqual(collectStaticSupportImports(`/* header */\nvoid import.meta.url; // ESM\n${statement}`, file), ['lib/support.mjs']);
+  for (const source of [`// ${statement}`, `/* ${statement} */`, `const text = \`${statement}\`;`,
+    `function hidden() { ${statement} }`, "import type { Shape } from './support.mjs';",
+    "import { type Shape } from './support.mjs';", "await import('./support.mjs');",
+    "const helper = require('./support.mjs');", `const before = 1;\n${statement}`]) {
+    assert.deepEqual(collectStaticSupportImports(source, file), [], source);
+  }
+});
+
+function supportCase() {
+  const sources = { 'lib/entry.test.ts': "import { helper } from './support.mjs';",
+    'lib/support.mjs': "import assert from 'node:assert/strict'; export const helper = () => assert.ok(true);" };
+  const entries = [mapped('lib/entry.test.ts'), { path: 'lib/support.mjs', selection: {
+    state: 'support', reason: 'WUL-729: shared assertion helper, no standalone tests', owner: '@Wulfgardr', importers: ['lib/entry.test.ts'],
+  } }];
+  return { sources, entries };
+}
+const checkSupport = ({ sources, entries }, selected = selections(['lib/entry.test.ts'])) =>
+  checkInventory(discoverCandidates(Object.keys(sources), file => sources[file]), manifest(entries), selected);
+
+test('support requires explicit reason, owner and importers and reports disposition separately', () => {
+  const valid = checkSupport(supportCase());
+  assert.equal(valid.selectionComplete, true);
+  assert.deepEqual(valid.unresolved, []);
+  assert.deepEqual(valid.support, ['lib/support.mjs']);
+  for (const [key, value] of [['reason', undefined], ['owner', undefined], ['owner', ' '], ['importers', undefined],
+    ['importers', []], ['importers', ['../escape']], ['importers', ['lib/support.mjs']]]) {
+    const input = supportCase(); input.entries[1].selection[key] = value;
+    assert.match(checkSupport(input).errors.join('\n'), /INVALID_SUPPORT/);
+  }
+});
+
+test('support importer must exist, be mapped and actually selected by an error-free suite with a real import', () => {
+  for (const mutate of [
+    input => { delete input.sources['lib/entry.test.ts']; },
+    input => { input.entries[0] = debt('lib/entry.test.ts'); },
+    input => { input.sources['lib/entry.test.ts'] = '// import removed'; },
+  ]) {
+    const input = supportCase(); mutate(input);
+    assert.match(checkSupport(input).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED|SUPPORT_IMPORT_MISSING/);
+  }
+  assert.match(checkSupport(supportCase(), selections([])).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
+  assert.match(checkSupport(supportCase(), { unit: { files: ['lib/entry.test.ts'], errors: ['broken binding'] } }).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
+  assert.match(checkSupport(supportCase(), selections(['lib/entry.test.ts', 'lib/support.mjs'])).errors.join('\n'), /SUPPORT_SELECTED_AS_TEST/);
+});
+
+test('real CLI verifies support linkage and rejects removed imports and renamed support files', t => {
+  const root = fixture(t);
+  const source = path.join(root, 'lib/a.test.ts');
+  fs.writeFileSync(source, "import { helper } from './helper.mjs';\nthrow new Error('Do not execute');");
+  fs.writeFileSync(path.join(root, 'lib/helper.mjs'), "import assert from 'node:assert/strict'; export const helper = () => assert.ok(true);");
+  const file = path.join(root, 'test-inventory.v1.json');
+  const inventory = JSON.parse(fs.readFileSync(file));
+  inventory.entries.push({ path: 'lib/helper.mjs', selection: { state: 'support', owner: '@Wulfgardr',
+    reason: 'WUL-729: synthetic shared helper', importers: ['lib/a.test.ts'] } });
+  fs.writeFileSync(file, JSON.stringify(inventory));
+  const valid = run(root, 'complete');
+  assert.equal(valid.status, 0, valid.stderr);
+  assert.match(valid.stdout, /Support entrypoint exclusions: 1/);
+  fs.writeFileSync(source, 'throw new Error("Do not execute");');
+  assert.match(run(root).stderr, /SUPPORT_IMPORT_MISSING/);
+  fs.renameSync(path.join(root, 'lib/helper.mjs'), path.join(root, 'lib/renamed-helper.mjs'));
+  const renamed = run(root);
+  assert.equal(renamed.status, 1);
+  assert.match(renamed.stderr, /STALE_ENTRY: lib\/helper.mjs/);
+  assert.match(renamed.stderr, /UNREGISTERED_CANDIDATE: lib\/renamed-helper.mjs/);
 });

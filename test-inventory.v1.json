@@ -232,8 +232,12 @@
     {
       "path": "components/settings/settings-presentation.test-support.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "reason": "WUL-729: JSX mounting and inspection helpers; no standalone test registration.",
+        "owner": "@Wulfgardr",
+        "importers": [
+          "components/intelligent-host-checkup-action.test.ts"
+        ]
       }
     },
     {
@@ -2421,8 +2425,12 @@
     {
       "path": "lib/chatgpt-execution/ordinary-content.test-support.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "reason": "WUL-729: Synthetic content factories and shared assertions invoked by publication tests; no standalone test registration.",
+        "owner": "@Wulfgardr",
+        "importers": [
+          "lib/chatgpt-product/ordinary-publication.test.ts"
+        ]
       }
     },
     {
@@ -2437,8 +2445,12 @@
     {
       "path": "lib/chatgpt-execution/ordinary-module.test-support.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "reason": "WUL-729: Process-local module doubles and cleanup hooks used by tests; no standalone test registration.",
+        "owner": "@Wulfgardr",
+        "importers": [
+          "lib/headless/synthetic-disclosure/dispatch.test.ts"
+        ]
       }
     },
     {
@@ -5012,8 +5024,12 @@
     {
       "path": "lib/security/headless-soap-command-binding-test-fixture.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "reason": "WUL-729: Synthetic binding and proof factories used by lifecycle tests; no standalone test registration.",
+        "owner": "@Wulfgardr",
+        "importers": [
+          "lib/security/headless-soap-command-binding-lifecycle.test.ts"
+        ]
       }
     },
     {
@@ -8430,15 +8446,23 @@
     {
       "path": "scripts/test-support/checkup-parent-lifecycle-assertions.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "reason": "WUL-729: Shared behavioral assertion functions called by the lifecycle tests; no standalone test registration.",
+        "owner": "@Wulfgardr",
+        "importers": [
+          "scripts/checkup-parent-lifecycle.test.mjs"
+        ]
       }
     },
     {
       "path": "scripts/test-support/checkup-parent-lifecycle-harness.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "reason": "WUL-729: Harness factory used by lifecycle tests; no standalone test registration.",
+        "owner": "@Wulfgardr",
+        "importers": [
+          "scripts/checkup-parent-lifecycle.test.mjs"
+        ]
       }
     },
     {
