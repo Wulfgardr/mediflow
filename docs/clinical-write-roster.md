@@ -177,9 +177,9 @@ lancio SISS non sostituiscono questa suite CRUD.
 
 Sorgenti: [lib/patient-cascade.ts](../lib/patient-cascade.ts).
 
-Sessione Web admin. Restore accetta soltanto patientId, rilegge tombstone/versione in transazione immediata e incrementa versione host; replay dopo restore è 409. Purge rilegge tombstone e versione, elimina figli/paziente e inserisce l’audit nella stessa transazione immediata. Fix-orphans usa due transazioni distinte: relink/default e purge opzionale; nessuna versione richiesta dal client.
+Sessione Web admin. Restore accetta soltanto patientId, rilegge tombstone/versione in transazione immediata e incrementa versione host; replay dopo restore è 409. Purge rilegge tombstone e versione, elimina figli/paziente e inserisce l’audit nella stessa transazione immediata. Fix-orphans unisce lookup, default, relink e purge opzionale con i rispettivi audit in una transazione immediata; nessuna versione richiesta dal client.
 
-Prove di riferimento: [lib/patient-restore-required-audit.test.ts](../lib/patient-restore-required-audit.test.ts), [lib/patient-lifecycle.test.ts](../lib/patient-lifecycle.test.ts). scripts/patient-restore-required-audit-http.test.mjs; test:patient-cascade. Purge è coperto anche da [lib/patient-purge-required-audit.test.ts](../lib/patient-purge-required-audit.test.ts), selezionato dalla suite unit: successo, fault audit con rollback dati/eventi, replay e input/scope senza effetti. La revoca conservativa dei locator del cascade resta attiva anche dopo rollback SQLite. Gap C05-M: versione attesa dal client e relink/purge orfani restano separati.
+Prove di riferimento: [lib/patient-restore-required-audit.test.ts](../lib/patient-restore-required-audit.test.ts), [lib/patient-lifecycle.test.ts](../lib/patient-lifecycle.test.ts). scripts/patient-restore-required-audit-http.test.mjs; test:patient-cascade. Purge è coperto anche da [lib/patient-purge-required-audit.test.ts](../lib/patient-purge-required-audit.test.ts), selezionato dalla suite unit: successo, fault audit con rollback dati/eventi, replay e input/scope senza effetti. La revoca conservativa dei locator del cascade resta attiva anche dopo rollback SQLite. Le [prove SQLite di fix-orphans](../lib/patient-orphan-repair-required-audit.test.ts), selezionate dalla suite unit, coprono successo composto, rollback all’ultimo audit o durante il purge, input e replay vuoto senza eventi né revoca locator. Il corpo assente resta compatibile, il flag purge richiede un booleano esplicito. Gap C05-M: versione attesa dal client e replay dopo operazioni interposte restano aperti.
 
 ### Nomi evento e transazioni dei profili migrati
 
@@ -192,7 +192,7 @@ P mantiene gli owner distinti di create/update/delete/lifecycle e restore admin.
 PR usa `prosthetic.prescription.*`; SP `service.prescription.*` e
 `service.prescription_item.*`; A `ambulatory.*` e, nel clear, `patient.deleted`.
 I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` dopo commit; purge paziente M usa
-`patient.purged` nella stessa transazione, mentre fix-orphans lo scrive ancora dopo commit. Nei rami segnati **nessuno** non va presunto un
+`patient.purged` nella stessa transazione, anche nel purge opzionale di fix-orphans. Nei rami segnati **nessuno** non va presunto un
 evento solo perché il dominio compare nella taxonomy.
 
 
@@ -240,7 +240,7 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | S-01 | Web PUT [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; 256 KiB + schema | ID path; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
 | S-02 | Web DELETE [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; nessun body letto | ID path; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
 | S-03 | Web POST [/api/siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | S; 256 KiB + schema | ID/parent attivo in TX; dup409; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
-| M-01 | Web POST [/api/system/fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | M; JSON non bounded | selezione host; flag purge opzionale | TX relink + TX purge distinte; **relink nessuno; purge al meglio** | Aperto C05-M |
+| M-01 | Web POST [/api/system/fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | M; oggetto ≤ 64 KiB, body assente ammesso | selezione host; flag purge booleano opzionale | Default+relink+purge in TX immediata; **TX+audit** | Audit/input migrati; CAS/replay interposto residui C05-M |
 | M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON oggetto ≤ 64 KiB | patientId; tombstone/versione riletti nella TX | TX immediata cascade+delete; **TX+audit** | Audit/input migrati; versione client residuo C05-M |
 | M-03 | Web POST [/api/system/restore-patient/route.ts](../app/api/system/restore-patient/route.ts) | M; 65.536 byte; solo patientId | patientId/tombstone; versione host nel restore | TX adapter immediata; **TX+audit** | Restore migrato |
 | T-01 | Web PUT [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
@@ -362,7 +362,8 @@ roster non li promuove a un nuovo dominio di commit clinico.
    duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
 3. **C05-D:** create/delete Web migrati; proseguire metadata/content e upload paired.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
-4. **C05-M:** purge paziente migrato; proseguire relink/purge orfani. Restore già migrato rimane
+4. **C05-M:** purge paziente e riparazione orfani migrati; restano versione client e
+   replay dopo operazioni interposte. Restore già migrato rimane
    una riga di regressione, non la prova dei rami diversi.
 5. **C05-SEED/IMPORT/ID:** raccordare gli ingressi composti alle righe aggiornate;
    dare esiti espliciti alle sequenze parziali. Le coorti migrate P/E/T/O/C/PR/SP/A
