@@ -433,19 +433,16 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
 
 // --- Nuke Function ---
 
-export async function nukeTestData(full: boolean = false): Promise<{ deleted: number }> {
+export async function nukeTestData(full: boolean = false): Promise<{ mode: 'full' } | { mode: 'test'; deleted: number }> {
     const outcome: SeederOutcome = { operation: 'cleanup', confirmedPatients: 0, completedPatients: 0, confirmedRelatedRecords: 0 };
     try {
         if (full) {
-            // Keep the existing reset operations. A rejected clear can itself be partial;
-            // its unacknowledged writes are deliberately not included in the counts.
-            const patients = await db.patients.toArray({ rejectAuthUnavailable: true });
+            // Bulk reset confirms completion, not a number of deleted records.
             await db.entries.clear();
             await db.therapies.clear();
             await db.checkups.clear();
             await db.attachments.clear();
             await db.patients.clear();
-            outcome.confirmedPatients = patients.length;
             await db.conversations.clear();
             await db.messages.clear();
         } else {
@@ -486,5 +483,5 @@ export async function nukeTestData(full: boolean = false): Promise<{ deleted: nu
         if (full) throw error;
         throw new SeederIncompleteError(outcome, error);
     }
-    return { deleted: outcome.confirmedPatients };
+    return full ? { mode: 'full' } : { mode: 'test', deleted: outcome.confirmedPatients };
 }

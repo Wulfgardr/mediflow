@@ -91,7 +91,9 @@ export default function DataSeeder() {
         setNuking(true);
         try {
             const result = await nukeTestData(nukeAll);
-            showToast({ tone: 'success', title: 'Eliminazione completata', description: `Eliminati ${result.deleted} pazienti e completata la pulizia dei dati collegati.` });
+            showToast({ tone: 'success', title: 'Eliminazione completata', description: result.mode === 'full'
+                ? 'Reset totale completato.'
+                : `Eliminati ${result.deleted} pazienti e completata la pulizia dei dati collegati.` });
             window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error(e);
