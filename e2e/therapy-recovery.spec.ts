@@ -258,3 +258,151 @@ test('a lost create response is reconciled by stable identity without a duplicat
   await page.getByRole('button', { name: 'Chiudi scheda terapia', exact: true }).click();
   await expect(create).toBeHidden();
 });
+
+const deleteRecovery = (page: Page) => page.getByRole('alert', { name: 'Recupero eliminazione terapia', exact: true });
+const reviewedDelete = (page: Page) => deleteRecovery(page).getByRole('button', { name: 'Ho confrontato i dati: elimina con questa motivazione', exact: true });
+const deletionReason = 'Inserimento duplicato sintetico: motivazione da conservare';
+
+async function openTherapies(page: Page, data: Fixture): Promise<void> {
+  await page.goto(`/patients/${data.patientId}/modules`);
+  await openPatientSection(page, 'terapie');
+  await expect(page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })).toBeVisible();
+}
+
+async function requestDeletion(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Elimina Farmaco sintetico principale solo se inserito per errore', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?', exact: true });
+  await dialog.getByRole('textbox', { name: "Motivazione dell'eliminazione" }).fill(deletionReason);
+  await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
+}
+
+for (const width of [1440, 390]) {
+  test(`delete conflict keeps its reason through a failed reread and requires renewed confirmation at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 960 });
+    const data = await fixture(page);
+    await openTherapies(page, data);
+    await concurrentEdit(page, data);
+    const writes: Array<{ version: number; deletionReason: string }> = [];
+    page.on('request', request => {
+      if (request.method() === 'DELETE' && request.url().endsWith(`/api/therapies/${data.therapyId}`)) writes.push(request.postDataJSON());
+    });
+    const conflict = page.waitForResponse(response => response.request().method() === 'DELETE' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
+    await requestDeletion(page);
+    expect((await conflict).status()).toBe(409);
+    await expect(deleteRecovery(page)).toBeFocused();
+    await expect(deleteRecovery(page)).toContainText('Eliminazione rifiutata: terapia aggiornata altrove');
+    await expect(deleteRecovery(page)).toContainText(deletionReason);
+    await assertNoHorizontalOverflow(page, [{ label: 'therapy deletion recovery', selector: '#terapie' }]);
+    await expect(reviewedDelete(page)).toHaveCount(0);
+    expect(writes.map(write => write.version)).toEqual([1]);
+
+    await page.route('**/api/therapies?*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Synthetic read failure"}' }));
+    await page.keyboard.press('Tab');
+    await expect(deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(deleteRecovery(page)).toContainText('Verifica non riuscita');
+    await expect(deleteRecovery(page)).toContainText(deletionReason);
+    await expect(reviewedDelete(page)).toHaveCount(0);
+    expect(writes).toHaveLength(1);
+
+    await page.unroute('**/api/therapies?*');
+    await deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true }).click();
+    await expect(deleteRecovery(page).locator('[aria-label="Terapia attualmente registrata"]')).toContainText('Dose concorrente 2');
+    await expect(deleteRecovery(page)).toContainText(deletionReason);
+    await assertNoHorizontalOverflow(page, [{ label: 'therapy deletion comparison', selector: '#terapie' }]);
+    await test.info().attach(`delete-recovery-${width}px`, { body: await deleteRecovery(page).screenshot(), contentType: 'image/png' });
+    expect(writes).toHaveLength(1);
+    await reviewedDelete(page).click();
+    const confirmation = page.getByRole('dialog', { name: 'Confermi l’eliminazione della terapia riletta?', exact: true });
+    await expect(confirmation).toBeVisible();
+    expect(writes).toHaveLength(1);
+    const accepted = page.waitForResponse(response => response.request().method() === 'DELETE' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
+    await confirmation.getByRole('button', { name: 'Conferma nuovo invio', exact: true }).click();
+    expect((await accepted).status()).toBe(200);
+    await expect(deleteRecovery(page)).toHaveCount(0);
+    expect(writes.map(write => write.version)).toEqual([1, 2]);
+    expect(writes.every(write => typeof write.deletionReason === 'string' && write.deletionReason.length > 0)).toBe(true);
+    const remaining = await records(page, data.patientId);
+    expect(remaining.some(item => item.id === data.therapyId)).toBe(false);
+    expect(remaining.find(item => item.id === data.secondId)).toMatchObject({ patientId: data.patientId, version: 1 });
+    await assertNoHorizontalOverflow(page, [{ label: 'therapy pane', selector: '#terapie' }]);
+  });
+}
+
+test('lost delete response keeps the reason and absence does not authorize another deletion', async ({ page }) => {
+  const data = await fixture(page);
+  await openTherapies(page, data);
+  let writes = 0;
+  await page.route(`**/api/therapies/${data.therapyId}`, async route => {
+    if (route.request().method() !== 'DELETE') return route.continue();
+    writes++;
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    await route.abort('failed');
+  });
+  await requestDeletion(page);
+  await expect(deleteRecovery(page)).toContainText('L’esito non è confermato');
+  await expect(deleteRecovery(page)).toContainText(deletionReason);
+  await expect(reviewedDelete(page)).toHaveCount(0);
+  await deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true }).click();
+  await expect(deleteRecovery(page)).toContainText('Questo non conferma che la richiesta di eliminazione sia riuscita');
+  await expect(deleteRecovery(page)).toContainText(deletionReason);
+  await expect(reviewedDelete(page)).toHaveCount(0);
+  expect(writes).toBe(1);
+  const remaining = await records(page, data.patientId);
+  expect(remaining.some(item => item.id === data.therapyId)).toBe(false);
+  expect(remaining.find(item => item.id === data.secondId)).toMatchObject({ patientId: data.patientId, version: 1 });
+  await deleteRecovery(page).getByRole('button', { name: 'Annulla recupero e scarta la motivazione', exact: true }).click();
+  await expect(deleteRecovery(page)).toHaveCount(0);
+  expect(writes).toBe(1);
+});
+
+test('discarding recovery still requires reread and a new reason before another deletion', async ({ page }) => {
+  const data = await fixture(page);
+  await openTherapies(page, data);
+  let writes = 0;
+  await page.route(`**/api/therapies/${data.therapyId}`, async route => {
+    if (route.request().method() !== 'DELETE') return route.continue();
+    writes++;
+    if (writes === 1) return route.abort('failed');
+    return route.continue();
+  });
+  await requestDeletion(page);
+  await expect(deleteRecovery(page)).toContainText('L’esito non è confermato');
+  await deleteRecovery(page).getByRole('button', { name: 'Annulla recupero e scarta la motivazione', exact: true }).click();
+  await expect(deleteRecovery(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Elimina Farmaco sintetico principale solo se inserito per errore', exact: true }).click();
+  await expect(deleteRecovery(page)).toContainText('La motivazione precedente è stata scartata');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(writes).toBe(1);
+  await deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true }).click();
+  await deleteRecovery(page).getByRole('button', { name: 'Ho confrontato i dati: indica una nuova motivazione', exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Confermi l’eliminazione della terapia riletta?', exact: true });
+  await expect(confirmation.getByRole('button', { name: 'Conferma nuovo invio', exact: true })).toBeDisabled();
+  expect(writes).toBe(1);
+  await confirmation.getByRole('textbox', { name: "Motivazione dell'eliminazione" }).fill('Nuova motivazione sintetica');
+  const accepted = page.waitForResponse(response => response.request().method() === 'DELETE' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
+  await confirmation.getByRole('button', { name: 'Conferma nuovo invio', exact: true }).click();
+  expect((await accepted).status()).toBe(200);
+  await expect(deleteRecovery(page)).toHaveCount(0);
+  expect(writes).toBe(2);
+  expect((await records(page, data.patientId)).some(item => item.id === data.therapyId)).toBe(false);
+});
+
+test('unreadable therapy note blocks renewed deletion after a conflict', async ({ page }) => {
+  const data = await fixture(page);
+  await openTherapies(page, data);
+  expect(await page.evaluate(async id => {
+    const response = await fetch(`/api/therapies/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ version: 1, motivation: 'ENC:malformed' }) });
+    return response.status;
+  }, data.therapyId)).toBe(200);
+  let writes = 0;
+  page.on('request', request => { if (request.method() === 'DELETE' && request.url().endsWith(`/api/therapies/${data.therapyId}`)) writes++; });
+  await requestDeletion(page);
+  await expect(deleteRecovery(page)).toContainText('Eliminazione rifiutata');
+  await deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true }).click();
+  await expect(deleteRecovery(page)).toContainText('dati non leggibili');
+  await expect(deleteRecovery(page)).toContainText(deletionReason);
+  await expect(reviewedDelete(page)).toHaveCount(0);
+  expect(writes).toBe(1);
+});
