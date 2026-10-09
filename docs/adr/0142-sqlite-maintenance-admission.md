@@ -135,6 +135,10 @@ esistenti su un volume locale fisso NTFS, senza reparse point negli antenati.
 Il percorso è passato come dato, mai interpolato nel comando. UNC, device,
 filesystem ignoto, timeout o controllo non disponibile mantengono HOLD.
 Non si cambiano ACL, policy o configurazione del sistema.
+Dopo la validazione del normale percorso locale, il checker costruisce
+internamente il prefisso Windows esteso per non rimuovere spazi finali dai
+componenti: esistenza e attributi di ogni antenato devono riferirsi alla stessa
+directory vista da Node. Namespace forniti dal chiamante restano rifiutati.
 
 Il controllo precede la canonicalizzazione dell'ammissione e dello swap;
 include il parent del backup opzionale prima dello scambio. Si ripete alla
