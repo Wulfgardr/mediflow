@@ -69,6 +69,40 @@ Adottiamo l'opzione 3.
   ripristinati anche nella relazione join corrispondente, senza introdurre un
   payload separato per `patients_to_ambulatories`.
 
+## Estensione audit ordinario — WUL-730
+
+I produttori correnti aggiungono la collection `auditEvents` al payload v1,
+al manifest e ai counts/checksum quando la tabella sorgente esiste. Una tabella
+presente vuota produce `auditEvents: []`; una tabella assente omette la collection.
+Gli artifact precedenti restano leggibili dal nuovo lettore. L'omissione resta
+distinta dal vuoto durante la normalizzazione e nel risultato del preflight e
+del restore; non attesta una storia vuota o un recupero completo. I lettori
+precedenti, che richiedono il vecchio set esatto, rifiutano la nuova collection.
+
+Lo snapshot conserva tutte le tredici colonne persistite: identità, versione
+dello schema evento, tipo/esito, attore/soggetto/superficie originali, requestId,
+metadata testuale e timestamp SQLite in secondi. `createdAt` può essere `null`;
+NULL e stringhe vuote restano distinti. Non si filtrano gli eventi in base ai
+soggetti clinici ancora presenti né si rigenerano eventi tramite writer clinici.
+ID duplicati nell'artifact sono invalidi. Con audit incluso, ogni snapshot audit
+H7b deve esistere ed essere field-exact nella collection generale.
+
+Il restore, sotto lo stesso writer lock e prima di cancellare dati target,
+rifiuta un eventId presente con uno dei tredici campi diverso. Riusa soltanto
+eventi identici e inserisce direttamente quelli assenti nella stessa transazione
+dei dati clinici e del ledger H7b. Non aggiorna o cancella audit, conserva la
+storia esclusiva del target e annulla anche gli eventi appena inseriti se la
+transazione fallisce. Le guardie dei durable review commands, il mutation fence
+e l'ammissione admin/trasporto esistenti restano invariati.
+
+Il risultato conserva il checksum del payload originale prima della
+normalizzazione, la copertura `included`/`omitted` e i conteggi eventi inseriti
+o riusati. In modalità `omitted`, questi conteggi possono descrivere il solo
+sottoinsieme H7b incorporato nell'artifact legacy. Checksum, conteggi e riferimenti
+storici non autenticano la sorgente e non concedono authority, sessioni o chiavi.
+Un re-export fotografa l'unione corrente, senza ricostruire storia omessa da un
+artifact precedente. Questa estensione non qualifica il recupero completo C15.
+
 ## Conseguenze
 
 - Positivo: il backup diventa verificabile e molto piu facile da manutenere.

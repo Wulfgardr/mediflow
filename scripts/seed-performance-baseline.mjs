@@ -205,7 +205,10 @@ function seedRows(db, counts, wrappedMasterKey) {
         address: encryptedFixture(`Via sintetica ${patientIndex % 200}, Comune test`, `${identity}:address`),
         phone: encryptedFixture(`+3902${String(patientIndex).padStart(8, '0')}`, `${identity}:phone`),
         caregiver: encryptedFixture(`Contatto sintetico ${patientIndex}`, `${identity}:caregiver`),
-        diagnoses: encryptedFixture([{ code: 'TEST-01', description: 'Condizione cronica sintetica' }], `${identity}:diagnoses`),
+        // Explicit legacy coding avoids an implicit WHO lookup; the code is
+        // fictional. The current editor requires both system and date.
+        diagnoses: encryptedFixture([{ system: 'ICD-10', code: 'TEST-01', description: 'Condizione cronica sintetica',
+          date: new Date(createdAt * 1000).toISOString() }], `${identity}:diagnoses`),
         notes: encryptedFixture('Nota clinica sintetica ripetibile per il benchmark locale.', `${identity}:notes`),
         documentInsights: encryptedFixture([], `${identity}:document-insights`),
         isAdi: patientIndex % 10 === 0 ? 1 : 0,
@@ -239,7 +242,7 @@ function seedRows(db, counts, wrappedMasterKey) {
           patientId: id,
           date: FIXED_NOW_SECONDS + offsetDays * 86400 + 9 * 3600,
           title: index === 0 ? 'Controllo eseguito' : 'Controllo programmato',
-          status: index === 0 ? 'done' : ['pending', 'scheduled'][patientIndex % 2],
+          status: index === 0 ? 'completed' : 'pending',
           notes: encryptedFixture(`Nota di controllo sintetica ${index + 1}`, `${identity}:checkup:${index}:notes`),
           createdAt,
         });
@@ -282,6 +285,28 @@ function seedRows(db, counts, wrappedMasterKey) {
   })();
 }
 
+function fixtureManifest(db) {
+  // Hash logical fixture rows, not SQLite pages/WAL or bootstrap timestamps.
+  // Include ciphertext and all columns: changing version, related records or
+  // encrypted content must change the workload identity.
+  const tables = {
+    users: db.prepare('SELECT * FROM users WHERE id = ?').all(FIXTURE_USER.id),
+    ambulatories: db.prepare("SELECT * FROM ambulatories WHERE id = 'performance-baseline-ambulatory'").all(),
+    patients: db.prepare("SELECT * FROM patients WHERE id LIKE 'perf-patient-%' ORDER BY id").all(),
+    memberships: db.prepare("SELECT * FROM patients_to_ambulatories WHERE patient_id LIKE 'perf-patient-%' ORDER BY patient_id, ambulatory_id").all(),
+    entries: db.prepare("SELECT * FROM entries WHERE patient_id LIKE 'perf-patient-%' ORDER BY id").all(),
+    observations: db.prepare("SELECT * FROM observations WHERE patient_id LIKE 'perf-patient-%' ORDER BY id").all(),
+    checkups: db.prepare("SELECT * FROM checkups WHERE patient_id LIKE 'perf-patient-%' ORDER BY id").all(),
+    attachments: db.prepare("SELECT * FROM attachments WHERE patient_id LIKE 'perf-patient-%' ORDER BY id").all(),
+  };
+  return {
+    fixtureRevision: 2,
+    provenance: 'deterministic synthetic records; not a real-patient distribution',
+    cardinalities: Object.fromEntries(Object.entries(tables).map(([name, rows]) => [name, rows.length])),
+    logicalSHA256: createHash('sha256').update(JSON.stringify(tables)).digest('hex'),
+  };
+}
+
 export async function seedPerformanceDatabase(options) {
   fs.mkdirSync(options.dataDir, { recursive: true });
   const dbPath = path.join(options.dataDir, 'medical.db');
@@ -310,7 +335,7 @@ export async function seedPerformanceDatabase(options) {
     db.exec('ANALYZE');
     db.pragma('wal_checkpoint(TRUNCATE)');
     return {
-      schemaVersion: 'mediflow.performance_seed.v1',
+      schemaVersion: 'mediflow.performance_seed.v2',
       seed: 'mediflow-performance-2026-07-17',
       dataDir: options.dataDir,
       dbPath,
@@ -318,6 +343,8 @@ export async function seedPerformanceDatabase(options) {
       entries: options.patients * options.entries,
       observations: options.patients * options.observations,
       documents: options.patients * options.documents,
+      checkups: options.patients * 2,
+      ...fixtureManifest(db),
       login: { username: FIXTURE_USER.username, pin: FIXTURE_USER.pin },
     };
   } finally {

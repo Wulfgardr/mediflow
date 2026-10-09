@@ -96,7 +96,7 @@ test('scheduled backup canonicalizes SOAP attestations before artifact checksum'
   assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
 });
 
-test('scheduled backup canonicalizes the H7b ledger without exporting audit_events', async () => {
+test('scheduled serialization keeps general audit omitted when its source did not supply it', async () => {
   const later = { idempotencyKey: `hsai_${'f'.repeat(64)}`, auditSnapshot: '{"eventId":"synthetic-later"}' };
   const earlier = { idempotencyKey: `hsai_${'a'.repeat(64)}`, auditSnapshot: '{"eventId":"synthetic-earlier"}' };
   const createdAt = new Date('2026-08-26T08:00:00.000Z');
@@ -107,4 +107,23 @@ test('scheduled backup canonicalizes the H7b ledger without exporting audit_even
   assert.equal('auditEvents' in forward.payload, false);
   assert.deepEqual(forward.payload, reverse.payload);
   assert.equal(forward.manifest.checksum, reverse.manifest.checksum);
+});
+
+test('scheduled serialization preserves audit seconds, NULL, text and deterministic event order', async () => {
+  const empty = Object.fromEntries(extractStringArray(parseSource('lib/backup-artifact.ts', ts.ScriptKind.TS), 'BACKUP_COLLECTIONS')
+    .map(collection => [collection, []]));
+  const first = { eventId: 'synthetic-a', schemaVersion: 2, eventType: 'patient.updated', occurredAt: 1783000001,
+    outcome: 'success', actorType: 'user', actorRef: 'synthetic-actor', subjectType: 'patient', subjectRef: null,
+    sourceSurface: 'api', requestId: '', redactedMetadata: '{ "counts": {} }', createdAt: null };
+  const second = { ...first, eventId: 'synthetic-b', subjectRef: '', requestId: null, redactedMetadata: '', createdAt: 0 };
+  const date = new Date('2026-10-04T00:00:00Z');
+  const forward = JSON.parse(await serializeBackupArtifact({ ...empty, auditEvents: [second, first] }, date));
+  const reverse = JSON.parse(await serializeBackupArtifact({ ...empty, auditEvents: [first, second] }, date));
+  assert.deepEqual(forward.payload.auditEvents, [first, second]);
+  assert.deepEqual(forward, reverse);
+  assert.equal(forward.manifest.recordCounts.auditEvents, 2);
+  assert.ok(forward.manifest.collections.includes('auditEvents'));
+  await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [first, first] }), /duplicate/i);
+  await assert.rejects(() => serializeBackupArtifact({ ...empty, auditEvents: [],
+    headlessSoapEntryCommits: [{ auditSnapshot: JSON.stringify(first) }] }), /missing or divergent/);
 });

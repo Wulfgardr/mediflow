@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import ts from 'typescript';
 
 // Evaluate only the test helper in a separate realm; no application/DB imports.
 const source = fs.readFileSync(new URL('../e2e/anydoc-consumer-diagnostic.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-function fixture() {
+const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
+function fixture({ correlated = false } = {}) {
   const chunk = { done: false, value: new Uint8Array([83, 69, 67, 82, 69, 84]) };
   const readPromise = Promise.resolve(chunk);
   const cancelPromise = Promise.resolve();
@@ -23,13 +25,15 @@ function fixture() {
   let called;
   const nativeFetch = function(...args) { called = { receiver: this, args }; return fetchPromise; };
   const listeners = new Map();
-  const context = vm.createContext({ exports: {}, URL, Request, Headers, Uint8Array,
+  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
     location: { href: 'http://127.0.0.1:3000/synthetic' }, fetch: nativeFetch,
     addEventListener(name, fn) { listeners.set(name, fn); },
     removeEventListener(name) { listeners.delete(name); },
   });
   vm.runInContext(compiled, context);
-  context.exports.installAnyDocConsumerDiagnostic('/api/attachments/SYN/local-extraction');
+  context.exports.installAnyDocConsumerDiagnostic(correlated
+    ? { pathname: '/api/attachments/SYN/local-extraction', scope: '1234567890abcdef1234567890abcdef' }
+    : '/api/attachments/SYN/local-extraction');
   const api = context.__mfAnyDocDiagnostic;
   api.arm(1);
   return { context, api, body, reader, readPromise, cancelPromise, response, fetchPromise, nativeFetch,
@@ -37,13 +41,73 @@ function fixture() {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+for (const shape of ['inherited', 'nonenumerable', 'accessors']) {
+  test(`correlation preserves ${shape} RequestInit options and original getter receivers`, async () => {
+    const f = fixture({ correlated: true });
+    const controller = new AbortController();
+    const headers = new Headers({ 'x-mediflow-extraction-action': 'project', 'x-synthetic-extra': 'preserved' });
+    const values = { method: 'POST', body: 'SYNTHETIC_BODY', signal: controller.signal,
+      cache: 'no-store', credentials: 'omit', redirect: 'manual', referrerPolicy: 'no-referrer', keepalive: true, headers };
+    const init = shape === 'inherited' ? Object.create(values) : {};
+    if (shape === 'nonenumerable') for (const [key, value] of Object.entries(values)) {
+      Object.defineProperty(init, key, { value });
+    }
+    if (shape === 'accessors') {
+      const receivers = new WeakMap([[init, values]]);
+      for (const key of Object.keys(values)) Object.defineProperty(init, key, {
+        get() { assert.ok(receivers.has(this), 'getter retains the original init receiver'); return receivers.get(this)[key]; },
+      });
+    }
+    const input = 'http://127.0.0.1:3000/api/attachments/SYN/local-extraction';
+    const expected = new Request(input, init);
+    const returned = f.context.fetch(input, init);
+    assert.strictEqual(returned, f.fetchPromise);
+    const [forwardedInput, forwardedInit] = f.called().args;
+    const actual = new Request(forwardedInput, forwardedInit);
+    for (const key of ['method', 'cache', 'credentials', 'redirect', 'referrerPolicy', 'keepalive']) {
+      assert.equal(actual[key], expected[key], key);
+    }
+    assert.equal(await actual.text(), await expected.text());
+    assert.strictEqual(forwardedInit.signal, controller.signal);
+    controller.abort();
+    assert.equal(actual.signal.aborted, true);
+    assert.equal(actual.headers.get('x-synthetic-extra'), 'preserved');
+    assert.match(actual.headers.get('x-mediflow-anydoc-diagnostic'), /^ad1-[a-f0-9]{32}-1-1$/u);
+    assert.equal(headers.has('x-mediflow-anydoc-diagnostic'), false);
+    assert.equal(Object.keys(init).length, 0);
+    assert.strictEqual(init.headers, headers);
+    f.api.dispose();
+  });
+}
+
+test('correlation preserves Request input options when init is absent', async () => {
+  const f = fixture({ correlated: true });
+  const controller = new AbortController();
+  const input = new Request('http://127.0.0.1:3000/api/attachments/SYN/local-extraction', {
+    method: 'POST', body: 'SYNTHETIC_BODY', signal: controller.signal,
+    cache: 'no-store', credentials: 'omit', headers: { 'x-mediflow-extraction-action': 'project' },
+  });
+  assert.strictEqual(f.context.fetch(input), f.fetchPromise);
+  assert.strictEqual(f.called().args[0], input);
+  const actual = new Request(...f.called().args);
+  assert.equal(actual.method, 'POST');
+  assert.equal(actual.cache, 'no-store');
+  assert.equal(actual.credentials, 'omit');
+  assert.equal(await actual.text(), 'SYNTHETIC_BODY');
+  controller.abort();
+  assert.equal(actual.signal.aborted, true);
+  assert.equal(input.headers.has('x-mediflow-anydoc-diagnostic'), false);
+  assert.match(actual.headers.get('x-mediflow-anydoc-diagnostic'), /^ad1-[a-f0-9]{32}-1-1$/u);
+  f.api.dispose();
+});
+
 function streamFixture({ delayedResponse = false } = {}) {
   let controller;
   const stream = new ReadableStream({ start(value) { controller = value; } });
   const response = new Response(stream);
   let resolveResponse;
   const responsePromise = delayedResponse ? new Promise(resolve => { resolveResponse = resolve; }) : Promise.resolve(response);
-  const context = vm.createContext({ exports: {}, URL, Request, Headers, Uint8Array,
+  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
     location: { href: 'http://synthetic.invalid/' }, fetch: () => responsePromise,
     addEventListener() {}, removeEventListener() {},
   });
@@ -99,6 +163,26 @@ test('diagnostic ignores other requests and bounds repeated observation metadata
   const snapshot = f.api.snapshot();
   assert.equal(snapshot.events.length, 128);
   assert.equal(snapshot.dropped, 173);
+  f.api.dispose();
+});
+
+test('release observation preserves the request and Promise without reading or retaining its body', async () => {
+  const f = fixture();
+  const originalGetReader = f.body.getReader;
+  const input = '/api/attachments/SYN/local-extraction';
+  const controller = new AbortController();
+  const init = { method: 'DELETE', keepalive: true, signal: controller.signal,
+    headers: { 'x-mediflow-extraction-grant': 'PRIVATE-GRANT' } };
+  assert.strictEqual(f.context.fetch(input, init), f.fetchPromise);
+  assert.strictEqual(f.called().args[0], input);
+  assert.strictEqual(f.called().args[1], init);
+  await tick();
+  controller.abort();
+  assert.strictEqual(f.body.getReader, originalGetReader);
+  assert.deepEqual(f.counts(), { reads: 0, cancels: 0, releases: 0 });
+  assert.deepEqual(Array.from(f.api.snapshot().events, event => event.event),
+    ['armed', 'release_start', 'release_response', 'release_signal_abort']);
+  assert.doesNotMatch(JSON.stringify(f.api.snapshot()), /PRIVATE|attachments|SYN/);
   f.api.dispose();
 });
 
