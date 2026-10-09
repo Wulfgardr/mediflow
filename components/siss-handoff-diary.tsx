@@ -1,9 +1,9 @@
 'use client';
 
 /* @Codex */
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, LoaderCircle, Plus, Trash2 } from 'lucide-react';
-import { db, captureSissHandoffWritePrecondition, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
+import { db, captureSissHandoffWritePrecondition, resolveSissHandoffDraftPrecondition, type SissHandoffWritePrecondition, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
@@ -74,6 +74,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
+    const closurePrecondition = useRef<SissHandoffWritePrecondition | null>(null);
     const [closureNotes, setClosureNotes] = useState('');
     const [closureNextAction, setClosureNextAction] = useState('');
     const [closureOutcome, setClosureOutcome] = useState<SissHandoffOutcome>('completed');
@@ -138,19 +139,31 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
         }
     };
 
+    const beginClosureDraft = () => {
+        if (!pendingHandoff) return false;
+        try {
+            closurePrecondition.current = resolveSissHandoffDraftPrecondition(closurePrecondition.current, pendingHandoff);
+            return true;
+        } catch (draftError) {
+            setError(draftError instanceof Error ? draftError.message : 'Ricarica il diario SISS.');
+            return false;
+        }
+    };
+
     const closePendingHandoff = async () => {
         if (!pendingHandoff) return;
         setError(null);
         setIsSaving(true);
         try {
-            const sissPrecondition = captureSissHandoffWritePrecondition(pendingHandoff);
-            await db.sissHandoffs.update(pendingHandoff.id, {
+            const sissPrecondition = resolveSissHandoffDraftPrecondition(closurePrecondition.current, pendingHandoff);
+            await db.sissHandoffs.update(sissPrecondition.id, {
                 outcome: closureOutcome,
                 completedAt: new Date(),
                 nextAction: optionalValue(closureNextAction),
                 notes: optionalValue(closureNotes),
                 updatedAt: new Date(),
             }, { sissPrecondition });
+            closurePrecondition.current = null;
             setClosureNotes('');
             setClosureNextAction('');
             setClosureOutcome('completed');
@@ -230,7 +243,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                         <select
                             className="input-field h-10 max-w-44"
                             value={closureOutcome}
-                            onChange={(event) => setClosureOutcome(event.target.value as SissHandoffOutcome)}
+                            onChange={(event) => { if (beginClosureDraft()) setClosureOutcome(event.target.value as SissHandoffOutcome); }}
                         >
                             {OUTCOME_OPTIONS.filter((item) => item.value !== 'started').map((item) => (
                                 <option key={item.value} value={item.value}>{item.label}</option>
@@ -240,11 +253,11 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Cosa va ricordato
-                            <textarea className="input-field min-h-20" value={closureNotes} onChange={(event) => setClosureNotes(event.target.value)} />
+                            <textarea className="input-field min-h-20" value={closureNotes} onChange={(event) => { if (beginClosureDraft()) setClosureNotes(event.target.value); }} />
                         </label>
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Prossima azione
-                            <textarea className="input-field min-h-20" value={closureNextAction} onChange={(event) => setClosureNextAction(event.target.value)} />
+                            <textarea className="input-field min-h-20" value={closureNextAction} onChange={(event) => { if (beginClosureDraft()) setClosureNextAction(event.target.value); }} />
                         </label>
                     </div>
                     <button

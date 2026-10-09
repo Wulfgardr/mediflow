@@ -270,6 +270,18 @@ export function captureSissHandoffWritePrecondition(record: Pick<SissHandoffEven
     return Object.freeze({ id: record.id, patientId: record.patientId, version: record.version! });
 }
 
+/** A draft may only be submitted against the record on which editing began. */
+export function resolveSissHandoffDraftPrecondition(
+    draft: SissHandoffWritePrecondition | null,
+    displayed: Pick<SissHandoffEvent, 'id' | 'patientId' | 'version'>,
+): SissHandoffWritePrecondition {
+    const observed = captureSissHandoffWritePrecondition(displayed);
+    if (draft && (draft.id !== observed.id || draft.patientId !== observed.patientId || draft.version !== observed.version)) {
+        throw new Error('Il passaggio SISS è cambiato durante la compilazione. Ricarica il diario e ricompila la chiusura.');
+    }
+    return draft ?? observed;
+}
+
 type ApiDeleteOptions = {
     sissPrecondition?: SissHandoffWritePrecondition;
     attachmentPrecondition?: AttachmentWritePrecondition;
@@ -673,7 +685,8 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 ? this.getRecordVersion(item)
                 : undefined;
             return this.delete(id, { suppressNotify: true, version,
-                ...(this.tableName === 'attachments' ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Attachment) } : {}) });
+                ...(this.tableName === 'attachments' ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Attachment) } : {}),
+                ...(this.tableName === 'siss_handoff_events' ? { sissPrecondition: captureSissHandoffWritePrecondition(item as SissHandoffEvent) } : {}) });
         }));
         const confirmed = results.filter(result => result.status === 'fulfilled').length;
         if (confirmed > 0) this.emitChange();
