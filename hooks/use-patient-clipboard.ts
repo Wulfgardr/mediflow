@@ -19,8 +19,17 @@ export function usePatientClipboard() {
         sourceAmbulatoryId: null
     });
 
-    const copy = useCallback((patientIds: string[], sourceAmbulatoryId: string) => {
-        setClipboard({ patientIds: [...patientIds], patientVersions: {}, operation: 'copy', sourceAmbulatoryId });
+    const copy = useCallback((
+        patientIds: string[],
+        sourceAmbulatoryId: string,
+        patientVersions: Record<string, number>,
+    ) => {
+        setClipboard({
+            patientIds: [...patientIds],
+            patientVersions: { ...patientVersions },
+            operation: 'copy',
+            sourceAmbulatoryId,
+        });
         console.log(`Copied ${patientIds.length} patients`);
     }, []);
 

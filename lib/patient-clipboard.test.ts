@@ -116,3 +116,59 @@ test('copy rejects absent, partial or extra version maps before dispatch and ret
     }), false);
     assert.equal(cleared, false);
 });
+
+test('clipboard hook captures copy versions and passes the observed snapshot to live paste', async () => {
+    const { createRequire } = await import('node:module');
+    const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { pathToFileURL } = await import('node:url');
+    const load = createRequire(import.meta.url);
+    const dir = mkdtempSync(join(tmpdir(), 'mediflow-clipboard-hook-'));
+    const reactFile = join(dir, 'react.cjs');
+    const liveQueryFile = join(dir, 'live-query.cjs');
+    // Only React scheduling and the notification sink are replaced. The hook's
+    // copy callback, captured state and production paste function all execute.
+    writeFileSync(reactFile, `let state;
+exports.useState=initial=>[state??=initial,value=>{state=value}];
+exports.useCallback=callback=>callback;`);
+    writeFileSync(liveQueryFile, 'exports.notifyDbChange=()=>{};');
+    const { registerHooks } = load('node:module') as {
+        registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
+            next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
+    };
+    const hooks = registerHooks({ resolve(specifier, context, next) {
+        const file = specifier === 'react' ? reactFile : specifier === '@/lib/live-query' ? liveQueryFile : null;
+        return file ? { url: pathToFileURL(file).href, shortCircuit: true } : next(specifier, context);
+    } });
+    const originalFetch = globalThis.fetch;
+    try {
+        const { usePatientClipboard } = load('../hooks/use-patient-clipboard.ts') as typeof import('../hooks/use-patient-clipboard');
+        const calls: Array<{ url: string; body: unknown }> = [];
+        globalThis.fetch = async (url, init) => {
+            calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+            return new Response(null, { status: 200 });
+        };
+        const ids = ['patient-1'];
+        const versions = { 'patient-1': 4 };
+        usePatientClipboard().copy(ids, 'source', versions);
+        ids.push('patient-2');
+        versions['patient-1'] = 9;
+        const captured = usePatientClipboard();
+        assert.deepEqual(captured.clipboard.patientVersions, { 'patient-1': 4 });
+        assert.equal(await captured.paste('target', false), true);
+        assert.deepEqual(calls, [{ url: '/api/patients/assign', body: {
+            patientIds: ['patient-1'], patientVersions: { 'patient-1': 4 }, targetAmbulatoryId: 'target',
+        } }]);
+        assert.equal(usePatientClipboard().hasContent, false);
+
+        usePatientClipboard().copy(['patient-1'], 'source', {});
+        assert.equal(await usePatientClipboard().paste('target', false), false);
+        assert.equal(calls.length, 1, 'the shared exact-version check rejects an incomplete captured map');
+        assert.equal(usePatientClipboard().hasContent, true);
+    } finally {
+        globalThis.fetch = originalFetch;
+        hooks.deregister();
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
