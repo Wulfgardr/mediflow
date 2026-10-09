@@ -153,6 +153,22 @@ async function capture(name: string, surface: Surface, operation: Operation, opt
     return { ...result, ids };
 }
 
+test('therapy writes reject inherited status names without row or audit effects', async () => {
+    for (const surface of ['web', 'v1', 'network'] as const) {
+        for (const operation of ['POST', 'PUT'] as const) {
+            for (const status of ['constructor', '__proto__']) {
+                const result = await capture(`${surface}-${operation}-status-${status}`, surface, operation, {
+                    change: body => ({ ...body, status }),
+                });
+                assert.equal(result.status, 400, result.name);
+                assert.deepEqual(result.json, { error: 'Invalid therapy status' }, result.name);
+                assert.deepEqual(result.after, result.before, result.name);
+                assert.equal(result.auditDelta, 0, result.name);
+            }
+        }
+    }
+});
+
 test('eight therapy mutations rollback on audit FAIL and IGNORE', async () => {
     for (const surface of ['web','v1','network'] as const) {
         for (const operation of (surface === 'network' ? ['POST','PUT'] : ['POST','PUT','DELETE']) as Operation[]) {
