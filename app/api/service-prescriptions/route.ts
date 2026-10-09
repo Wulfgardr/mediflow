@@ -1,3 +1,4 @@
+import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -26,7 +27,9 @@ export async function POST(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const body = await request.json() as Record<string, unknown>;
+        const parsedBody = await readPrescriptionJsonObject(request);
+        if (!parsedBody.ok) return parsedBody.response;
+        const body = parsedBody.body;
         const result = await createHostServicePrescription({ request, session }, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {

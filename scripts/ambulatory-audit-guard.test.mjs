@@ -46,6 +46,9 @@ for (const [handler, mode, operation, route] of cases) {
             assert.notDeepEqual(check(core, mutant), []);
         }
         if (operation === 'clear') {
+            assert.notDeepEqual(check(core.replace("'patient.updated', 'patient', patient.id", "'patient.deleted', 'patient', patient.id")), []);
+            assert.notDeepEqual(check(core.replace('result.unlinkedPatients', 'result.clearedPatients')), []);
+            assert.notDeepEqual(check(core, adapter, routeSource, clear.replace('updated.changes !== 1', 'updated.changes === 1')), []);
             assert.notDeepEqual(check(core, adapter, routeSource, clear.replace('tombstone.changes !== 1', 'tombstone.changes === 1')), []);
             assert.notDeepEqual(check(core, adapter, routeSource, clear.replace('removedMembershipRows !== memberIds.length', 'removedMembershipRows === memberIds.length')), []);
         }
