@@ -73,6 +73,20 @@ jobs:
         # would parse as a mapping separator (this exact line broke the workflow).
         run: >-
           node -e "const fs=require('fs'); const compiled=fs.existsSync('node_modules/better-sqlite3/build/Release/obj'); console.log(compiled ? 'WARNING: better-sqlite3 compiled from source (no matching prebuild for this Node/OS)' : 'OK: better-sqlite3 prebuilt binary used');"
+      - name: Verify Windows SQLite durability and recovery
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP ('mediflow-sqlite-' + [guid]::NewGuid().ToString())
+          New-Item -ItemType Directory -Path $fixture | Out-Null
+          $env:MEDIFLOW_DATA_DIR = $fixture
+          $env:MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1'
+          try {
+            node scripts/run-strip-types.mjs --test lib/sqlite-durability.test.ts lib/sqlite-maintenance-admission.test.ts lib/sqlite-swap-recovery.test.ts lib/sqlite-repair.test.ts lib/backup-total-roundtrip.test.ts lib/scheduled-backup-runtime-contract.test.ts
+            if ($LASTEXITCODE -ne 0) { throw 'Windows SQLite durability and recovery tests failed' }
+          } finally {
+            Remove-Item -LiteralPath $fixture -Recurse -Force
+          }
       - name: Build
         run: npm run build
       - name: Start smoke (boot on this OS)
