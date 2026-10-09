@@ -11,8 +11,10 @@
     {
       "path": "app/api/patients/route.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {

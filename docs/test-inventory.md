@@ -44,7 +44,9 @@ suite. A source match is not proof that assertions execute.
 
 The real unit runner and the inventory guard both use
 `scripts/unit-test-selection.mjs`. Its two recursive
-groups and explicit script list preserve the unit suite's ordering and loader.
+groups and explicit file list preserve the unit suite's ordering and loader.
+`app/api/patients/route.test.ts` is registered explicitly in that list; other
+`app/` tests are not pulled into the unit suite by recursive discovery.
 Every required group must be readable and non-empty; every explicit test must be
 a file. Selection fails before database bootstrap or child launch if these
 conditions do not hold. The bootstrap, data-directory ownership, child error
