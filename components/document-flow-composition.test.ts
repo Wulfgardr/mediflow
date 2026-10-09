@@ -57,12 +57,36 @@ test('source views retire on identity, security lock and full navigation, withou
 test('delete confirmation is fenced and failures remain visible; only successful deletion clears source state', async () => {
     const source = await upload();
     const start = source.indexOf('const handleDelete =');
-    const end = source.indexOf('const interruptLocalExtraction =');
+    const end = source.indexOf('/* @Codex: extraction-only lifecycle', start);
+    assert.ok(start >= 0 && end > start, 'the delete handler must be present and isolated');
     const body = source.slice(start, end);
-    assert.match(body, /if \(!confirmed \|\| activeDelete.current !== operation\) return/u);
-    assert.ok(body.indexOf('await db.attachments.delete(file.id)') > body.indexOf('await confirm('));
-    assert.ok(body.indexOf('setViewingId') > body.indexOf('await db.attachments.delete(file.id)'));
-    assert.match(body, /catch \{[\s\S]*setDeleteErrorId\(file.id\)/u);
+    const orderedSteps = [
+        'if (activeDelete.current) return;',
+        'activeDelete.current = operation;',
+        'const attachmentPrecondition = captureAttachmentWritePrecondition(file);',
+        'await confirm(',
+        'if (!confirmed || activeDelete.current !== operation) return;',
+        'await db.attachments.delete(file.id, { attachmentPrecondition });',
+        'if (activeDelete.current !== operation) return;',
+        'setLocalExtraction((value)',
+        'setViewingId((value)',
+        'setSelectedId((value)',
+        '} catch {',
+        'if (activeDelete.current === operation) setDeleteErrorId(file.id);',
+        '} finally {',
+    ];
+    let previous = -1;
+    for (const step of orderedSteps) {
+        const position = body.indexOf(step);
+        assert.ok(position > previous, `delete step must exist in order: ${step}`);
+        previous = position;
+    }
+    assert.equal((body.match(/captureAttachmentWritePrecondition\(file\)/gu) ?? []).length, 1);
+    assert.equal((body.match(/db\.attachments\.delete\(/gu) ?? []).length, 1);
+    assert.doesNotMatch(body, /db\.attachments\.(get|query)|fetch\(/u);
+    const failureAndCleanup = body.slice(body.indexOf('} catch {'));
+    assert.doesNotMatch(failureAndCleanup, /setLocalExtraction|setViewingId|setSelectedId/u);
+    assert.match(failureAndCleanup, /if \(activeDelete.current === operation\) \{ activeDelete.current = null; setDeletingId\(null\); \}/u);
     assert.match(source, /Eliminazione non confermata/u);
     assert.doesNotMatch(source, /console\.(log|error)|showToast/u);
 });
