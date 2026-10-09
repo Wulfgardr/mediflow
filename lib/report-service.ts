@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { scaleInterpretationVersionLabel } from './scale-history';
 /* @Codex */
 import { clinicalRichTextToPlainText } from './clinical-rich-text';
 /* @Codex */
@@ -327,7 +328,7 @@ export const generatePatientReport = (
             formatDate(s.date),
             s.metadata?.title || 'Scala',
             formatScaleScore(s.metadata?.score),
-            s.metadata?.interpretation || '-'
+            [s.metadata?.interpretation || '-', scaleInterpretationVersionLabel(s.metadata)].filter(Boolean).join('\n')
         ]);
 
         autoTable(doc, {
