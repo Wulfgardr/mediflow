@@ -124,6 +124,12 @@ export const patients = sqliteTable('patients', {
     lastNameIdx: index('patients_last_name_idx').on(t.lastName),
 }));
 
+// Consumed duplicate intents survive clone deletion; no patient or actor data is stored.
+export const patientDuplicateIntents = sqliteTable('patient_duplicate_intents', {
+    id: text('id').primaryKey().notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // --- Patient <-> Ambulatory (Many-to-Many) ---
 export const patientsToAmbulatories = sqliteTable('patients_to_ambulatories', {
     patientId: text('patient_id').references(() => patients.id, { onDelete: 'cascade' }).notNull(),

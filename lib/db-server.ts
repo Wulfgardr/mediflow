@@ -484,6 +484,12 @@ function upgradeLegacyAttachmentCurrentness(): void {
 // Schema guards run on every (re)open so older DB files gain the tables and
 // columns the current code expects (re-applied after a repair swaps the file).
 function applySchemaGuards() {
+    // Replay admission is required on both fresh and upgraded archives.
+    sqlite.exec(`CREATE TABLE IF NOT EXISTS patient_duplicate_intents (
+        id TEXT PRIMARY KEY NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`);
+
     try {
         ensureColumn('ambulatories', 'version', 'version INTEGER NOT NULL DEFAULT 1');
     } catch (error) {

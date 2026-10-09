@@ -141,6 +141,32 @@ not verified a selector binding; it does not mean the file is orphaned or option
 Platform, capability and method filters need separate selector models and actual
 execution receipts before any coverage claim.
 
+## Support modules, not standalone test entrypoints
+
+A reviewed `support` disposition excludes a helper from standalone entrypoint
+selection; it does not claim another test ran. It requires a non-empty `reason`,
+`owner` and list of `importers`. The six initial dispositions are owned by
+`@Wulfgardr` under WUL-729. Their assertions, fixture factories, module doubles
+and cleanup hooks are consumed by tests, rather than registered as independent
+tests. Fixtures with top-level assertions are not included in this disposition.
+
+Every listed importer must exist among discovered candidates, have a mapped
+entry, and actually be selected by an error-free verified suite. Merely naming
+an importer or suite in the manifest is insufficient. The source must contain
+a runtime import of the exact support path in its leading import prologue.
+The closed grammar accepts comments, whitespace, the literal ESM marker
+`void import.meta.url;`, and semicolon-terminated default, namespace or named
+imports from unescaped string literals. Relative imports require explicit paths;
+there is no extension inference. Type-only imports do not count. Inspection
+stops at the first other statement, so strings, embedded fixtures, dynamic imports,
+`require` calls and imports later in a module do not establish a binding.
+
+Support classification remains a reviewed source decision: this limited check
+verifies declared import links, not arbitrary JavaScript semantics or the absence
+of standalone tests. A support file selected as a test is rejected. New, renamed
+or missing candidates retain the ordinary integrity failures. Reports show support
+entrypoint exclusions separately from unresolved selections and execution evidence.
+
 ## Updating the inventory
 
 Ordinary changes to test bodies need no digest acknowledgement. For a new,

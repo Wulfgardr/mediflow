@@ -15,6 +15,7 @@ export function usePatientClipboard() {
     const [clipboard, setClipboard] = useState<ClipboardState>({
         patientIds: [],
         patientVersions: {},
+        duplicateIntentId: null,
         operation: null,
         sourceAmbulatoryId: null
     });
@@ -27,6 +28,7 @@ export function usePatientClipboard() {
         setClipboard({
             patientIds: [...patientIds],
             patientVersions: { ...patientVersions },
+            duplicateIntentId: crypto.randomUUID(),
             operation: 'copy',
             sourceAmbulatoryId,
         });
@@ -42,6 +44,7 @@ export function usePatientClipboard() {
         setClipboard({
             patientIds: [...patientIds],
             patientVersions: { ...patientVersions },
+            duplicateIntentId: crypto.randomUUID(),
             operation: 'cut',
             sourceAmbulatoryId,
         });
@@ -49,7 +52,7 @@ export function usePatientClipboard() {
     }, []);
 
     const clear = useCallback(() => {
-        setClipboard({ patientIds: [], patientVersions: {}, operation: null, sourceAmbulatoryId: null });
+        setClipboard({ patientIds: [], patientVersions: {}, duplicateIntentId: null, operation: null, sourceAmbulatoryId: null });
     }, []);
 
     const paste = useCallback(async (targetAmbulatoryId: string, isTestEnvironment: boolean) => {

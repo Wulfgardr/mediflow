@@ -1,3 +1,4 @@
+import { checkupCreateIdSchema } from '@/lib/api-schemas/clinical-writes';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
@@ -106,7 +107,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const body = envelope.body;
         /* @Codex */
         const auditBody = body;
-        const newId = typeof body.id === 'string' && body.id.trim().length > 0 ? body.id : uuidv4();
+        const parsedId = checkupCreateIdSchema.safeParse(body.id);
+        if (!parsedId.success) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
+        const newId = parsedId.data ?? uuidv4();
         const normalized = normalizeCheckupCreateInput(body, {
             id: newId,
             patientId: id,

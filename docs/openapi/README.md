@@ -260,6 +260,10 @@ ad accedere ai suoi dati e a eseguire operazioni:
   `network.replica.write-checkups`, `checkups.version`, `409` PHI-safe e
   soft delete via `deletedAt`; hard delete remoto e campi AI/document-derived
   restano fuori boundary
+  Nei POST checkup Web/v1/paired, ID omesso genera UUID; ID fornito nonstringa o
+  blank restituisce 400, ID opaco valido resta invariato. Duplicato: 409 dopo
+  ammissione di padre e scope, senza dettagli del record o nuovo audit
+  (OpenAPI 1.33.0, ADR 0015).
 - `/api/v1/network/patients/{id}/observations*` pubblica la slice osservazioni paired:
   capability `network.replica.readonly-observations` /
   `network.replica.write-observations`, `observations.version`, `409` PHI-safe e

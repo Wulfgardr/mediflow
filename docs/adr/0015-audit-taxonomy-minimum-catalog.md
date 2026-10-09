@@ -785,6 +785,23 @@ La guardia strutturale verifica delega e ordine mutazione/audit, non sostituisce
 le prove comportamentali. Restano esclusi writer document-derived, direct-native
 e headless, schema database, CRUD generico, pubblicazione e accettazione clinica.
 
+### Identità create checkup (9 ottobre 2026)
+
+Questa correzione separata sostituisce la conservazione degli input ID e della
+risposta duplicati della tranche atomica precedente. Nei POST Web, v1 locale e
+paired, solo l'omissione dell'ID autorizza la generazione di un UUID. Un ID
+fornito deve essere stringa non vuota dopo trim; altrimenti la risposta è 400
+prima della scrittura, senza rigenerazione silenziosa. Gli ID opachi validi
+restano invariati, senza imporre formato UUID o una nuova normalizzazione.
+
+Il core verifica l'ID duplicato nella transazione IMMEDIATE, dopo padre attivo
+e scope paired: restituisce 409 senza dati del record esistente, nuova riga o
+nuovo audit. La precedente risposta 500 diventa quindi un conflitto esplicito;
+non viene introdotto replay idempotente. Padre non ammesso e scope errato
+conservano 404. Date, ENC, lifecycle, versioni e attribuzione audit non cambiano.
+OpenAPI 1.33.0 descrive la restrizione per la slice paired; il create v1 locale
+resta nella lista implementation-only con nota di contratto.
+
 ### Correzione separata dei tipi data (9 ottobre 2026)
 
 Il parser data condiviso accetta solo stringhe, numeri e istanze `Date`
@@ -914,3 +931,48 @@ Le prove di accettazione usano SQLite reale e dati sintetici: guasti audit
 retry deliberato, predefinito e fallback, casi di membership e percorsi Web e
 paired. Questa coorte non completa gli altri domini o la normalizzazione
 complessiva degli errori richiesta da WUL-720.
+
+## C05-B — Duplicazione con snapshot e intento consumabile (WUL-720)
+
+`POST /api/patients/duplicate` è una scrittura Web autenticata. Il body JSON
+limitato a 256 KiB richiede `patientIds`, `patientVersions` con una versione
+positiva per ciascun ID normalizzato e nessuna chiave estranea,
+`sourceAmbulatoryId`, `targetAmbulatoryId` e `duplicateIntentId` UUID. Il token
+è normalizzato in minuscolo, così la variazione di case non crea un altro
+intento. Body o binding invalidi ricevono `400`; body eccessivo `413`.
+
+Nella stessa transazione SQLite IMMEDIATE il writer rifiuta con `409` ogni
+token già consumato, indipendentemente dal body del retry. Per un intento
+nuovo verifica target, pazienti attivi e appartenenza di tutto il batch
+all'ambulatorio sorgente (`404` se mancanti), poi tutte le versioni osservate
+(`409` con il conflitto paziente esistente). Nessuna di queste risposte consuma
+il token o modifica righe cliniche, membership o audit. La policy del tipo di
+ambulatorio target resta invariata; il server non introduce un vincolo
+`type=test`.
+
+Il commit inserisce il token in `patient_duplicate_intents`, poi UUID nuovi
+per i cloni, membership target e un evento `patient.created` per clone. Campi
+ENC, versione originale copiata, primary target e risposta iniziale
+`{success:true,count}` restano invariati. Qualsiasi guasto DML/audit annulla
+anche il token e consente un nuovo tentativo. Il token contiene soltanto ID e
+timestamp: nessun riferimento paziente, attore o dato clinico. Non ha FK sui
+cloni né cleanup automatico; cancellare i cloni non riabilita il retry.
+La risposta a un replay resta `409`, non una replica del successo originario.
+
+Il clipboard genera l'intento una sola volta al copy/cut, insieme allo snapshot
+locale delle versioni. Il ramo duplicate invia sorgente, versioni e intento;
+errori e retry li conservano, senza riletture implicite. Clear/successo svuota
+il clipboard. I rami live assign/move conservano il proprio contratto.
+Il hook e l'helper hanno prove dirette, ma non risultano collegati a un
+consumatore UI nella revisione di questa coorte: ciò non attesta una funzione
+visibile consegnata.
+
+Il guard di bootstrap crea la tabella sia negli archivi nuovi sia in quelli
+precedenti. Le prove SQLite verificano parità fresh/upgrade, rollback sul
+secondo audit, conflitti batch, replay dopo cancellazione cloni e preservazione
+dello snapshot nei caller. La protezione replay è locale all'archivio corrente.
+Il formato backup applicativo non esporta questi token: un restore nello
+stesso archivio conserva i token locali, mentre un import in un archivio nuovo
+non ricostruisce i consumi precedenti. Restore/swap a una storia precedente e
+portabilità dei token restano un residuo C15 esplicito; questa coorte non
+modifica il restore né promette protezione attraverso tali operazioni.
