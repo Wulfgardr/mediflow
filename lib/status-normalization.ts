@@ -32,14 +32,14 @@ function clean(value: unknown): string | null {
 export function parseTherapyStatus(value: unknown): TherapyStatus | null {
     const key = clean(value);
     if (!key) return null;
-    return THERAPY_STATUS_MAP[key] ?? null;
+    return Object.prototype.hasOwnProperty.call(THERAPY_STATUS_MAP, key) ? THERAPY_STATUS_MAP[key] : null;
 }
 
 /* @Codex */
 export function parseCheckupStatus(value: unknown): CheckupStatus | null {
     const key = clean(value);
     if (!key) return null;
-    return CHECKUP_STATUS_MAP[key] ?? null;
+    return Object.prototype.hasOwnProperty.call(CHECKUP_STATUS_MAP, key) ? CHECKUP_STATUS_MAP[key] : null;
 }
 
 /* @Codex */

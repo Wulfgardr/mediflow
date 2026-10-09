@@ -9,7 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import Database from 'better-sqlite3';
+import { openAdmittedSqlite } from '../lib/sqlite-maintenance-admission.mjs';
 
 import { normalizeRowDates } from './scheduled-backup-date-fields.mjs';
 
@@ -477,13 +477,17 @@ async function main() {
   const dbPath = path.join(dataDir, 'medical.db');
   const forced = process.env.MEDIFLOW_BACKUP_FORCE === '1';
   let backupLockPath = null;
+  let participant = null;
+  let db = null;
+  let result;
 
   try {
     if (!fs.existsSync(dbPath)) {
       throw new Error(`Database non trovato: ${dbPath}`);
     }
 
-    const db = new Database(dbPath, { readonly: false });
+    participant = openAdmittedSqlite(dbPath, { role: 'scheduled-backup', sqliteOptions: { fileMustExist: true } });
+    db = participant.database;
     const currentState = readState(db);
     const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
 
@@ -531,48 +535,45 @@ async function main() {
       : 'Backup completato.';
     saveState(db, nextState);
 
-    console.log(JSON.stringify({
+    result = {
       ok: true,
       artifactPath: finalPath,
       createdAt: createdAt.toISOString(),
       message: nextState.run.lastRunMessage,
-    }));
-    db.close();
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Backup fallito.';
-    if (fs.existsSync(dbPath)) {
-      const db = new Database(dbPath, { readonly: false });
-      const currentState = readState(db);
-      const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
-      const nextState = {
-        ...currentState,
-        config: {
-          ...currentState.config,
-          destinationDir,
-        },
-        run: {
-          lastRunAt: new Date().toISOString(),
-          lastRunStatus: 'error',
-          lastRunMessage: message,
-          lastArtifactPath: currentState.run.lastArtifactPath,
-        },
-      };
+    // Admission denial must not acquire a second writer to report the error.
+    // An already admitted run may finish its state update before it drains.
+    if (db?.open) {
       try {
-        saveState(db, nextState);
+        const currentState = readState(db);
+        const destinationDir = process.env.MEDIFLOW_BACKUP_DEST_DIR || currentState.config.destinationDir;
+        saveState(db, {
+          ...currentState,
+          config: { ...currentState.config, destinationDir },
+          run: {
+            lastRunAt: new Date().toISOString(),
+            lastRunStatus: 'error',
+            lastRunMessage: message,
+            lastArtifactPath: currentState.run.lastArtifactPath,
+          },
+        });
       } catch {
         // best effort
-      } finally {
-        db.close();
       }
     }
-    console.log(JSON.stringify({
-      ok: false,
-      message,
-    }));
-    process.exitCode = 1;
+    result = { ok: false, message };
   } finally {
-    releaseBackupLock(backupLockPath);
+    try { if (participant) await participant.close(); }
+    catch (error) {
+      result = { ok: false, message: error instanceof Error ? error.message : 'Chiusura database non verificata.' };
+    }
+    try { releaseBackupLock(backupLockPath); }
+    catch { result = { ok: false, message: 'Pulizia lock backup non completata.' }; }
   }
+  console.log(JSON.stringify(result));
+  if (!result.ok) process.exitCode = 1;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

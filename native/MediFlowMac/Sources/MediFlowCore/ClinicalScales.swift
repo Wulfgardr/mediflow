@@ -33,6 +33,14 @@ public struct ClinicalScaleResult: Equatable, Sendable {
     public let score: Int
     public let interpretation: String
     public let answers: [String: Int]
+    public let interpretationVersion: String?
+
+    public init(score: Int, interpretation: String, answers: [String: Int], interpretationVersion: String? = nil) {
+        self.score = score
+        self.interpretation = interpretation
+        self.answers = answers
+        self.interpretationVersion = interpretationVersion
+    }
 }
 
 public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
@@ -95,7 +103,9 @@ public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
             guard !addition.overflow else { throw ClinicalScaleValidationError.invalidDefinition }
             score = addition.partialValue
         }
-        return ClinicalScaleResult(score: score, interpretation: interpret(score), answers: answers)
+        let current = ClinicalScaleInterpretation.current(scaleId: id, score: score)
+        return ClinicalScaleResult(score: score, interpretation: current?.text ?? interpret(score), answers: answers,
+                                   interpretationVersion: current?.version)
     }
 }
 
@@ -159,7 +169,7 @@ public enum ClinicalScales {
     public static let iadl = ClinicalScaleDefinition(
         id: "iadl",
         title: "IADL (Indice di Lawton)",
-        scaleDescription: "Attività Strumentali della vita quotidiana (1 = F, 0 = NF). Nota: Storicamente 8 item per donne, 5 per uomini.",
+        scaleDescription: "Attività strumentali della vita quotidiana: questa versione richiede tutte le 8 risposte per ogni persona, con punteggio totale da 0 a 8.",
         questions: [
             q("q1", "1. Capace di usare il telefono", [("0. No (non usa/non risponde)", 0), ("1. Si (chiama/risponde autonomamente)", 1)]),
             q("q2", "2. Fare acquisti", [("0. No (incapace/accompagnato)", 0), ("1. Si (provvede autonomamente)", 1)]),
@@ -281,6 +291,7 @@ public enum ClinicalScales {
             scaleId: canonical.id,
             score: checked.score,
             interpretation: checked.interpretation,
+            interpretationVersion: checked.interpretationVersion,
             answers: checked.answers,
             instrument: canonical.instrument
         )
@@ -295,6 +306,7 @@ public enum ClinicalScales {
 
     public static func contentSummary(definition: ClinicalScaleDefinition, result: ClinicalScaleResult) -> String {
         "Valutazione \(definition.title) completata.\nPunteggio: \(result.score)\nInterpretazione: \(result.interpretation)"
+            + (result.interpretationVersion.map { "\nVersione interpretazione: \($0)" } ?? "")
     }
 
     private struct ScaleMetadata: Encodable {
@@ -302,6 +314,7 @@ public enum ClinicalScales {
         let scaleId: String
         let score: Int
         let interpretation: String
+        let interpretationVersion: String?
         let answers: [String: Int]
         let instrument: ClinicalScaleInstrumentProvenance?
     }

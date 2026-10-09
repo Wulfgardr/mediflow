@@ -242,7 +242,7 @@
     "jspdf": "4.2.1",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.562.0",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "openai": "^6.16.0",
     "pdf-lib": "1.17.1",
     "pdfjs-dist": "4.10.38",
@@ -278,7 +278,7 @@
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.8",
     "js-yaml": "4.3.1",
     "tailwindcss": "^4",
     "typescript": "5.9.3"

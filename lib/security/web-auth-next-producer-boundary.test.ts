@@ -11,7 +11,7 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const EXPECTED_NODE = process.versions.node;
 const EXPECTED_NODE_MAJOR = 24;
 const EXPECTED_NODE_ABI = '137';
-const EXPECTED_NEXT = '16.3.4';
+const EXPECTED_NEXT = '16.3.8';
 const SESSION_ID = 'a'.repeat(64);
 const CONTROL_ID = 'c'.repeat(64);
 /* @Codex: synchronous stage-only diagnostics; never print request cookies or response data. */

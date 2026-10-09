@@ -114,3 +114,37 @@ test('historical default-root migration still copies a compatible synthetic lega
     assert.equal(marker(path.join(sandbox, 'synthetic-home', dataDir, 'medical.db')), 'SYNTHETIC-LEGACY');
   });
 });
+
+function auditObjects(dbPath) {
+  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  try {
+    return db.prepare("SELECT type, name FROM sqlite_master WHERE name LIKE 'audit_events%' ORDER BY type, name").all()
+      .map((row) => `${row.type}:${row.name}`);
+  } finally { db.close(); }
+}
+
+test('startup stops when the append-only audit schema cannot be established', () => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-schema-'));
+  try {
+    const directory = path.join(sandbox, 'context');
+    const dbPath = path.join(directory, 'medical.db');
+    expectReady(bootstrap(sandbox, { directory, rejectLegacyProbe: true }));
+    const ready = auditObjects(dbPath);
+    assert.ok(ready.includes('table:audit_events'));
+    assert.ok(ready.includes('trigger:audit_events_no_update'));
+    assert.ok(ready.includes('trigger:audit_events_no_delete'));
+
+    // A same-named view makes the table creation a no-op and the index creation
+    // fail, so the store would otherwise run without an audit table or triggers.
+    const db = new Database(dbPath);
+    try {
+      db.exec('DROP TABLE audit_events; CREATE VIEW audit_events AS SELECT 1 AS event_id;');
+    } finally { db.close(); }
+
+    const result = bootstrap(sandbox, { directory, rejectLegacyProbe: true });
+    assert.equal(result.error, undefined);
+    assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stderr, /views may not be indexed/);
+    assert.deepEqual(auditObjects(dbPath), ['view:audit_events']);
+  } finally { fs.rmSync(sandbox, { recursive: true, force: true }); }
+});

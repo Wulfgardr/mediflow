@@ -92,8 +92,17 @@ export default function EditPatientPage() {
                 }
 
                 // Dynamic import for bundle generator
-                const { generatePatientBundle } = await import('@/lib/fhir/bundle-generator');
-                const bundle = await generatePatientBundle(id);
+                const { generatePatientBundle, buildFhirDiagnosisWarningMessage } = await import('@/lib/fhir/bundle-generator');
+                const bundle = await generatePatientBundle(id, async (warnings) => {
+                    const { confirmed } = await confirm({
+                        title: 'Diagnosi esportate senza codifica',
+                        message: buildFhirDiagnosisWarningMessage(warnings),
+                        confirmLabel: 'Esporta comunque',
+                        cancelLabel: 'Annulla',
+                    });
+                    return confirmed;
+                });
+                if (!bundle) return;
 
                 const jsonString = JSON.stringify(bundle, null, 2);
                 const blob = new Blob([jsonString], { type: 'application/json' });

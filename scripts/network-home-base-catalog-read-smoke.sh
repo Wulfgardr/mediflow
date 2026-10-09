@@ -76,7 +76,9 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting Next.js dev server for network home-base catalog smoke..."
-npx next dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
+# Own the Next CLI itself: it forwards SIGTERM and waits for its server child.
+# Waiting for an npx wrapper can leave that child writing during workspace removal.
+node "$ROOT_DIR/node_modules/next/dist/bin/next" dev "$WORKSPACE_DIR" --webpack --hostname "$HOST" --port "$PORT" >"$DEV_LOG" 2>&1 &
 DEV_PID=$!
 
 echo "Waiting for $BASE_URL/api/v1/ambulatories ..."

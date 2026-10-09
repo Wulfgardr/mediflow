@@ -179,6 +179,58 @@ operativa del cloud.
 
 ---
 
+<a id="clinical-scales"></a>
+
+## Scale cliniche: fonti, versioni e diritti
+
+Verifica documentale del 8 ottobre 2026. Le fonti seguenti non costituiscono
+approvazione clinica dell'implementazione né autorizzazione generale alla
+riproduzione degli strumenti. La licenza del codice MediFlow non concede
+diritti su scale, traduzioni o manuali di terzi. Nessun accordo privato è stato
+esaminato per questa modifica e nessun revisore clinico o dei diritti ha
+approvato gli strumenti: il registro `lib/scales/scale-use-contract.ts` conserva
+esplicitamente questi campi mancanti.
+
+| Strumento nel catalogo | Fonte e perimetro verificato | Decisione ancora necessaria |
+| --- | --- | --- |
+| POMA-28 v1 | [NHS FPS 006 V1, luglio 2012](https://www.shropscommunityhealth.nhs.uk/content/doclib/10756.pdf), mappatura già documentata nell'[ADR 0118](./docs/adr/0118-tinetti-poma28-source-bound-submission.md). Identità, 16+12 punti e assenza di classificazione automatica restano invariati. | Verificare permesso applicabile alla resa italiana locale e all'uso elettronico, insieme alla popolazione e al contesto d'impiego. La resa non validata non è di per sé prova d'invalidità. |
+| ADL locale | [HIGN, Katz, Try This n. 2](https://hign.org/sites/default/files/2020-06/Try_This_General_Assessment_2.pdf). Il riferimento ammette aiuto per allacciare le scarpe; categorie a 4 e 2 punti differiscono da quelle implementate. | Identificare l'adattamento italiano adottato e i diritti di riproduzione/adattamento. Eventuali correzioni degli item o categorie richiedono una nuova definizione approvata; questa modifica non le applica. |
+| IADL locale | [HIGN, Lawton, Try This n. 23](https://hign.org/consultgeri/try-this-series/lawton-instrumental-activities-daily-living-iadl-scale). Il riferimento raccomanda gli otto domini per entrambi i sessi; il codice richiedeva già otto risposte. | Identificare la versione italiana, gli ancoraggi semplificati e il permesso applicabile. Il riferimento esclude l'uso negli anziani istituzionalizzati; l'applicabilità locale richiede revisione. La descrizione ora esplicita il calcolo su otto item. |
+| MMSE locale | [PAR MMSE](https://www.parinc.com/products/MMSE) e [indicazioni PAR sui permessi](https://www.parinc.com/about/connect-with-us/licensing-team). Edizione e traduzione effettivamente implementate non sono identificate. | Il titolare del progetto deve verificare un accordo che copra edizione, lingua, riproduzione, adattamento, incorporamento elettronico e distribuzione. Mancanza di evidenza disponibile non dimostra una violazione. |
+| GDS-15 locale | [Pagina dell'autore Yesavage](https://web.stanford.edu/~yesavage/GDS): strumento di screening; originale nel pubblico dominio; le traduzioni sono distinte e non garantite dall'autore. | Identificare traduzione italiana, periodo di riferimento, corrispondenza degli item e diritti applicabili a quella versione. Il pubblico dominio dell'originale non approva la versione locale. |
+
+Le condizioni HIGN riguardano la riproduzione del materiale completo per scopi
+educativi senza fini di lucro, con attribuzione; i materiali mantengono il
+copyright della Gerontological Society of America. Non si presume che questo
+permesso copra l'adattamento e la distribuzione di MediFlow.
+
+Per i soli **nuovi risultati**, MMSE usa
+`mediflow.mmse.screening-limits.v1` e GDS-15 usa
+`mediflow.gds15.screening-limits.v1`. Le nuove formulazioni descrivono un
+punteggio grezzo di screening: nessuna diagnosi, esclusione di demenza o
+classificazione della gravità; nessuna nuova soglia o correzione normativa.
+Il principio è coerente con [NICE NG97, 1.2.4](https://www.nice.org.uk/guidance/ng97/chapter/recommendations)
+e con la descrizione GDS dell'autore. La pagina NICE completa ha restituito
+403 durante questa verifica: resta da confermare la fonte corrente completa;
+il testo indicizzato NICE CKS riporta il principio di non esclusione.
+
+`interpretationVersion` è distinto da `instrument`: compare nei metadati e nel
+testo dei nuovi risultati Web e Swift. Storico e report leggono il testo
+registrato, senza ricalcolare le risposte. La versione registrata compare nelle
+proiezioni di storico/stampa; FHIR la conserva nella nota testuale. Patient
+Insight include l'identificatore registrato entro il budget esistente, ma la
+sua selezione di estratti non promette l'intero testo della valutazione.
+Versione assente non significa versione corrente. POMA e le registrazioni
+precedenti non vengono migrati o rinominati.
+
+Le proposte di sospensione del **nuovo uso** per diritti o applicabilità
+irrisolti restano decisioni aperte per ciascuno strumento; il registro non è un
+blocco runtime e questa modifica non dichiara soddisfatto quel requisito di
+WUL-723. Servono riferimenti minimi agli accordi, ambito e scadenza, revisore
+dei diritti e revisore clinico qualificato con decisione sulla versione concreta.
+Non pubblicare contratti privati. Review AI e test tecnici non sostituiscono
+queste decisioni.
+
 ## Sviluppo assistito
 
 Questi strumenti hanno assistito la scrittura del codice; non costituiscono

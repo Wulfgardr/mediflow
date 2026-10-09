@@ -1,4 +1,5 @@
 // @Codex MF085-003: pure input contract shared by UI and the write boundary.
+import { currentScaleInterpretation } from './scales/scale-use-contract';
 export interface ScaleQuestion {
     id: string;
     text: string;
@@ -36,6 +37,7 @@ export interface ScaleResult {
     score: number;
     answers: ScaleAnswers;
     interpretation: string;
+    interpretationVersion?: string;
 }
 
 export class ScaleValidationError extends Error {
@@ -109,5 +111,7 @@ export function calculateScaleResult(definition: ScaleDefinition, input: unknown
     const answers = { ...input };
     const score = definition.scoringLogic(answers);
     if (!Number.isFinite(score)) throw new ScaleValidationError(['invalid-total']);
-    return { score, answers, interpretation: definition.interpretation(score) };
+    // Only newly calculated results use this policy. History reads persisted text.
+    const interpretation = currentScaleInterpretation(definition.id, score);
+    return { score, answers, ...(interpretation ?? { interpretation: definition.interpretation(score) }) };
 }

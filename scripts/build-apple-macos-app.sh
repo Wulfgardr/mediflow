@@ -291,6 +291,8 @@ echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
 mkdir -p "$WEB"
 cp -R "$STANDALONE_DIR/." "$WEB/"
+# @Codex: verify the copied scheduler before native relocation changes its dependencies.
+node "$ROOT_DIR/scripts/scheduled-backup-runtime-contract.mjs" --runtime-root "$WEB"
 # @Codex: native startup reserves a fresh database before it creates log/PID files.
 # The helper has a direct-Node packaged mode, so no source tree or TS loader ships.
 # `preflight_app_destination` above and here reject a pre-existing symlink before this copy.
