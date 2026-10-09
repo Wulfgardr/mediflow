@@ -112,6 +112,9 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['app/api/v1/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
+    // SISS create checks deletedAt immediately after lookup and returns 404 before insert/audit.
+    // The SISS family SQLite oracle retains its tombstoned-parent denial case.
+    ['app/api/siss-handoffs/route.ts', 'tx.select({ deletedAt: patients.deletedAt }).from(patients) .where(eq(patients.id, patientId)).get()', 1],
     ['app/api/system/backup-restore/route.ts', 'tx.select().from(patients).all()', 1],
     ['app/api/system/fix-orphans/route.ts', 'dbServer.select({ id: patients.id }).from(patients)', 2],
     ['app/api/system/migrate/route.ts', 'dbServer.select().from(patients).where(isNull(patients.ambulatoryId))', 1],
