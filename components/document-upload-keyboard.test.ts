@@ -9,10 +9,14 @@ import {
 } from '../e2e/anydoc-keyboard-chooser.ts';
 
 type Listener = (event: Record<string, unknown>) => void;
-function fixture(install = installKeyboardChooserObservation) {
+type BrowserContext = { focused: boolean; visibility: string; activation: { isActive: boolean; hasBeenActive: boolean } };
+function fixture(install = installKeyboardChooserObservation, browserContext?: BrowserContext) {
   const listeners = new Map<string, Set<Listener>>();
   const document = {
     activeElement: null as unknown,
+    hasFocus: browserContext ? () => browserContext.focused : undefined,
+    visibilityState: browserContext?.visibility,
+    defaultView: browserContext ? { navigator: { userActivation: browserContext.activation } } : undefined,
     addEventListener(name: string, listener: Listener, capture: boolean) {
       assert.equal(capture, true);
       if (!listeners.has(name)) listeners.set(name, new Set());
@@ -66,8 +70,44 @@ test('valid metadata only authorizes waiting for a native chooser, never declare
 
 test('observer serializes without module closure or Playwright/runtime globals', () => {
   const serialized = runInNewContext(`(${installKeyboardChooserObservation.toString()})`) as typeof installKeyboardChooserObservation;
-  const f = fixture(serialized);
+  const f = fixture(serialized, { focused: true, visibility: 'visible', activation: { isActive: true, hasBeenActive: true } });
   assert.equal(keyboardChooserDecision(f.valid()), 'AWAIT_NATIVE_CHOOSER');
+  assert.equal(f.observation.snapshot().initial.browser.userActivationIsActive, true);
+});
+
+test('unavailable browser state stays unknown and never declares native chooser success', () => {
+  const f = fixture();
+  assert.deepEqual(f.observation.snapshot().initial.browser, {
+    documentHasFocus: null, visibilityState: null, userActivationIsActive: null, userActivationHasBeenActive: null,
+  });
+  assert.equal(keyboardChooserDecision(f.valid()), 'AWAIT_NATIVE_CHOOSER');
+});
+
+test('browser activation is captured at Enter and input click without being inferred from a later state', () => {
+  const context = { focused: true, visibility: 'visible', activation: { isActive: false, hasBeenActive: false } };
+  const f = fixture(undefined, context);
+  context.activation.isActive = true; context.activation.hasBeenActive = true;
+  const enter = f.dispatch('keydown'); enter.defaultPrevented = true;
+  context.activation.isActive = false;
+  f.dispatch('click');
+  context.activation.isActive = true;
+  const snapshot = f.observation.snapshot();
+  assert.equal(snapshot.initial.browser.userActivationIsActive, false);
+  assert.equal(snapshot.enter?.state.browser.userActivationIsActive, true);
+  assert.equal(snapshot.click?.state.browser.userActivationIsActive, false);
+  assert.equal(snapshot.current.browser.userActivationIsActive, true);
+  assert.equal(snapshot.click?.state.browser.userActivationHasBeenActive, true);
+  assert.equal(keyboardChooserDecision(snapshot), 'AWAIT_NATIVE_CHOOSER');
+});
+
+test('root focus remains distinct from document focus and visibility in passive diagnostics', () => {
+  const f = fixture(undefined, { focused: false, visibility: 'hidden', activation: { isActive: false, hasBeenActive: false } });
+  const snapshot = f.valid();
+  assert.equal(snapshot.initial.rootFocused, true);
+  assert.equal(snapshot.enter?.state.rootFocused, true);
+  assert.equal(snapshot.click?.state.browser.documentHasFocus, false);
+  assert.equal(snapshot.click?.state.browser.visibilityState, 'hidden');
+  assert.equal(keyboardChooserDecision(snapshot), 'AWAIT_NATIVE_CHOOSER');
 });
 
 test('listener is passive and reads cancellation performed later in the same dispatch', () => {

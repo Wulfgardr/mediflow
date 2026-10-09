@@ -749,6 +749,19 @@ Create produce checkup.created; update e restore checkup.updated; un deletedAt
 non nullo effettivamente applicato produce checkup.deleted, come gia previsto.
 Omissione, null esplicito e tombstone sono distinti.
 
+Riconciliazione documentale della sola coorte checkup: questa decisione Accepted,
+integrata in `34719db232801ae29bba72ed9aad2c0533041901` il 26 settembre 2026,
+supersedes l'esito race-specifico 409 con snapshot mancante descritto in
+`docs/web-patient-edit-and-analytics-085.md`, sezione «Seconda revisione combinata:
+disponibilità del genitore», integrata in
+`4f2aa312c9404a3f2b5118bde165851c379a28cc` il 5 settembre 2026. La spiegazione
+storica resta conservata in quel documento. Una cancellazione gia committata
+al riesame transazionale del padre restituisce 404 senza effetti sul figlio o
+sul suo audit; una connessione concorrente non puo committare durante il writer
+lock IMMEDIATE. Il conflitto di versione del figlio disponibile rimane 409.
+La riconciliazione adegua documenti e fixture al comportamento corrente, senza
+modificare produzione, schema, locking o contratti di altre coorti.
+
 Questa tranche non introduce una migrazione degli input. Restano invariati i
 normalizzatori condivisi e le differenze osservate tra superfici: Web POST
 ammette date numerica zero e source testuale libera; v1/rete conservano le
@@ -766,6 +779,18 @@ prove HTTP reali delle superfici e UI per le azioni effettivamente esposte.
 La guardia strutturale verifica delega e ordine mutazione/audit, non sostituisce
 le prove comportamentali. Restano esclusi writer document-derived, direct-native
 e headless, schema database, CRUD generico, pubblicazione e accettazione clinica.
+
+### Correzione separata dei tipi data (9 ottobre 2026)
+
+Il parser data condiviso accetta solo stringhe, numeri e istanze `Date`
+valide: booleani, array e oggetti JSON non vengono convertiti implicitamente.
+Nei checkup Web PUT, v1 locale POST/PUT e paired POST/PUT, un tipo non ammesso
+raggiunge la risposta di validazione 400, prima della mutazione e
+dell'audit, invece di diventare una data o causare un errore di coercizione.
+Web POST aveva gia un controllo di tipo. Restano invariati i formati data
+gia ammessi, omissione e null, le precedenze di validazione, i timestamp host
+e le differenze sul numero zero: Web POST lo ammette, il parser condiviso
+lo rifiuta. Non cambia il contratto di autenticazione o di atomicita.
 
 
 ## Coorte prescrizioni protesiche ordinarie (27 settembre 2026)

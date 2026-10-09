@@ -119,6 +119,9 @@ tentativo precedente.
 ## Seconda revisione combinata: disponibilità del genitore
 
 <!-- @Codex MF085-COMB-001 -->
+**Descrizione storica: l'esito di race indicato sotto è superato per la sola
+coorte checkup dalla riconciliazione esplicita che segue.**
+
 Il no-op della scheda rende legittimo un piano di soli checkup. La versione del
 checkup non cambia quando il paziente viene eliminato: il CAS del figlio, da
 solo, non attesta che il genitore sia disponibile. Le route Web
@@ -133,7 +136,28 @@ automatico, nessuna scrittura paziente fittizia viene introdotta. Questa
 correzione riguarda le due route Web usate dall'editor, non una revisione
 generale dei writer `/api/v1` o paired.
 
-Regressione locale, solo dati sintetici e SQLite in memoria:
+**Nota storica e supersessione per la sola coorte checkup ordinari.** Il
+paragrafo precedente descrive il contratto integrato con
+`4f2aa312c9404a3f2b5118bde165851c379a28cc` il 5 settembre 2026: l'UPDATE aveva
+un predicato di padre attivo e il successivo snapshot era filtrato dallo
+stesso predicato. Per questo il padre scomparso dopo il primo lookup poteva
+produrre 409 con snapshot mancante pur lasciando il figlio alla stessa versione.
+
+Quel solo esito di race e il relativo modello di fixture sono superseded dal
+contratto Accepted della coorte checkup in
+[ADR 0015, «Coorte checkup ordinari: atomicita richiesta (26 settembre 2026)»](./adr/0015-audit-taxonomy-minimum-catalog.md#coorte-checkup-ordinari-atomicita-richiesta-26-settembre-2026),
+integrato con `34719db232801ae29bba72ed9aad2c0533041901` il 26 settembre 2026.
+L'owner IMMEDIATE riesamina padre e versione nella stessa transazione della
+scrittura e dell'audit: una cancellazione del padre committata dopo il preflight
+ma prima della transazione produce 404 senza modifiche al figlio o al suo audit.
+Se l'owner possiede gia il writer lock, una connessione distinta non puo
+committare il tombstone fino al suo rilascio; le richieste successive alla
+cancellazione ricevono 404. Il conflitto su una versione obsoleta del figlio
+rimane 409 con snapshot presente. Draft e journal conservano le stesse
+protezioni. Questa riconciliazione non cambia comportamento runtime, locking,
+schema o contratti di altre coorti.
+
+Regressione locale, solo dati sintetici e SQLite:
 
 ```sh
 node --test scripts/checkup-parent-lifecycle.test.mjs
@@ -141,14 +165,27 @@ node --test scripts/checkup-parent-lifecycle.test.mjs
 
 Il test esegue route, normalizzatori, journal, Drizzle e better-sqlite3 reali.
 Gli oggetti colonna vengono da `lib/schema.ts` non modificato; DDL minimale e
-righe sono sintetici, esclusivamente in memoria. Non importa `lib/db-server.ts`
+righe sono sintetici: i controlli semplici usano SQLite in memoria; le prove
+dei due ordini writer usano due connessioni reali a un file WAL temporaneo
+posseduto dal test e rimosso alla chiusura. Non importa `lib/db-server.ts`
 né avvia un server. Solo Next, sessione e audit restano doubles. Il logger del
-vero driver inserisce la transizione sintetica del genitore immediatamente
-prima dell'UPDATE, senza ricostruire o sostituire SQL: non è una prova di
+vero driver fornisce il barrier prima dell'UPDATE: il tombstone viene tentato
+dalla seconda connessione, mai iniettato sulla connessione della mutazione.
+Un secondo barrier dopo il preflight permette alla cancellazione di committare
+prima dell'IMMEDIATE. Il busy timeout zero del contender osserva soltanto
+l'esclusione del writer; non misura l'attesa in produzione. Non è una prova di
 concorrenza multiprocesso. Le dipendenze mancanti causano errore, mai fallback
 simulato o skip. Il controllo HTTP Next, il flusso browser e i gate Node 24
 restano verifiche distinte; il PASS dei dieci test sul vecchio harness non
 attesta l'esecuzione del nuovo.
+
+`npm run test:unit` seleziona ora esplicitamente e una sola volta
+`scripts/checkup-parent-lifecycle.test.mjs` per le invarianti di comportamento
+e `scripts/checkup-parent-lifecycle-harness.test.mjs` per loader, seam audit,
+controlli negativi dell'oracle e registrazione CI. Entrambi restano eseguibili
+standalone. Le prove negative valutano copie in memoria dell'owner senza
+riscrivere file di produzione: rimuovere il controllo transazionale del padre
+o perdere l'esclusione IMMEDIATE deve essere rilevato dalle stesse invarianti.
 
 ### Followup della seconda revisione: currentness Patient Insight
 

@@ -78,6 +78,71 @@ modelli spiegano un principio, non aggiungono combinazioni ammesse dal sistema.
 
 ## Pubblicazione
 
+### Esplora il codice
+
+La [prima mappa curata](../tools/code-explorer/index.html) presenta due esempi:
+lettura headless delle attività e conferma Web di una transizione checkup.
+Quindici nodi e relazioni tipizzate hanno fonti nel codice pubblico, fissate al
+commit `90fa7771fc0822475611c9affb9c22e212939399`. È una fotografia storica,
+non la revisione disponibile in ogni installazione. Selezione, ricerca,
+spiegazioni e un elenco consultabile anche senza JavaScript accompagnano le
+domande «dove passa il dato?», «chi può modificarlo?» e «quali prove abbiamo?».
+
+Import, chiamata, composizione, contratto e richiesta HTTP sono relazioni
+distinte. Le curve non mostrano traffico clinico; il collegamento non attesta
+esecuzione, autorizzazione o raggiungibilità. Non coprono tutta l’applicazione,
+tutti i writer o una verifica delle protezioni. La pagina non è collegata al
+runtime, non contiene dati clinici e non usa un modello AI.
+
+Il [JSON generato](../tools/code-explorer/snapshot.json) conserva albero Git,
+hash dei file, righe e limiti. La mappa manuale resta in
+`tools/code-explorer/curated-map.json`; il generatore legge esclusivamente
+blob Git al pin, senza importare il runtime:
+
+```bash
+node tools/code-explorer/generate.mjs
+node tools/code-explorer/generate.mjs --check
+node --test tools/code-explorer/generate.test.mjs tools/code-explorer/extract-files.test.mjs
+python3 -m http.server 8765 --bind 127.0.0.1 --directory tools/code-explorer
+```
+
+Aprire `http://127.0.0.1:8765` per consultarla localmente. Per aggiornare il
+pin, riesaminare anche il significato delle relazioni e i limiti, poi rigenerare
+e verificare lo [schema](../tools/code-explorer/snapshot.schema.json), i target
+e le fonti. L’inventario `--ref` attesta presenza dei file, non import eseguiti.
+
+La vista «Moduli e file citati» conserva la mappa architetturale e usa lo stesso
+pin. Comprende l’unione dei 19 file citati dai nodi e dalle relazioni: «file
+citato come prova» è un’associazione editoriale molti-a-molti, non proprietà
+del file. L’extractor usa l’AST della dipendenza TypeScript già presente e il
+resolver con l’albero Git e `tsconfig.json` al pin; non importa il runtime e
+non risolve target dalla checkout corrente o dai pacchetti installati.
+
+La [fotografia dei file](../tools/code-explorer/file-topology.json) conserva
+118 dichiarazioni statiche e le loro righe: 19 tra file selezionati, 62 verso
+file fuori selezione, 22 moduli Node e 15 pacchetti esterni. Nessun target
+irrisolto o costrutto dinamico cercato è rilevato in questa selezione storica.
+Import, re-export e dichiarazioni soltanto di tipi restano riconoscibili;
+una coppia di file conserva tutte le dichiarazioni che la collegano. Gli
+asset citati sono attestati come file presenti, senza analizzarne il contenuto.
+
+Scelta del modulo, ricerca e filtro delle dichiarazioni accompagnano una
+spiegazione con fonti in entrata e uscita; l’elenco conserva tutti i file anche
+senza JavaScript. I target fuori selezione non vengono analizzati
+ricorsivamente. Import dinamici, chiamate denominate `require` e import come
+espressioni di tipo sono segnalati e restano fuori dal grafo. Questo perimetro
+non rappresenta tutta la codebase, la copertura dei test o flussi di dati:
+le relazioni semantiche tra moduli e le dichiarazioni tra file restano viste
+distinte. Lo [schema](../tools/code-explorer/file-topology.schema.json) e i test
+controllano dati, classificazione e casi esclusi; `generate.mjs --check`
+verifica entrambe le fotografie e la pagina riproducibile.
+
+L’artefatto documentale è predisposto per la sezione «Come funziona» del sito,
+con carta, grafite e blu minerale. La consegna nella repository non attesta
+integrazione o pubblicazione su Get MediFlow: richiedono i sorgenti correnti
+del sito, navigazione coerente e una ricevuta Sites separata. Per la vista
+mobile l’elenco sostituisce il diagramma e conserva tutte le spiegazioni.
+
 Il sito e la repository hanno compiti diversi: il primo presenta il prodotto,
 la seconda permette di studiarne il codice, ricostruire le decisioni e
 contribuire allo sviluppo. Il sito personale rimanda a Get MediFlow per

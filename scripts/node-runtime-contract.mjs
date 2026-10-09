@@ -26,8 +26,19 @@ export function assertNodeRuntime(contract, runtime = process.versions) {
 }
 
 export function verifyNativeBinding(root = defaultRoot) {
-    const requireFromRoot = createRequire(path.join(root, 'package.json'));
-    const Database = requireFromRoot('better-sqlite3');
+    const runtimeRoot = fs.realpathSync(root);
+    const requireFromRoot = createRequire(path.join(runtimeRoot, 'package.json'));
+    const packageRoot = path.join(runtimeRoot, 'node_modules/better-sqlite3');
+    const packageJson = requireFromRoot.resolve('better-sqlite3/package.json');
+    const entry = requireFromRoot.resolve('better-sqlite3');
+    if (fs.realpathSync(packageRoot) !== packageRoot
+        || packageJson !== path.join(packageRoot, 'package.json')
+        || fs.realpathSync(packageJson) !== packageJson
+        || !entry.startsWith(`${packageRoot}${path.sep}`)
+        || fs.realpathSync(entry) !== entry) {
+        throw new Error('better-sqlite3 must resolve from the selected runtime physical node_modules package.');
+    }
+    const Database = requireFromRoot(entry);
     const db = new Database(':memory:');
     try {
         if (db.prepare('select 1 as value').get().value !== 1) throw new Error('SQLite probe failed.');

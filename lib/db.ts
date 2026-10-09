@@ -243,6 +243,16 @@ export type PatientCreateClientContext = Readonly<{
     signal: AbortSignal;
     isCurrent: () => boolean;
 }>;
+export type TherapyDeleteClientContext = Readonly<{
+    signal: AbortSignal;
+    isCurrent: () => boolean;
+}>;
+type ApiDeleteOptions = {
+    suppressNotify?: boolean;
+    version?: number;
+    deletionReason?: string;
+    deleteContext?: TherapyDeleteClientContext;
+};
 type ApiAddOptions = { suppressNotify?: boolean };
 export type PatientAddOptions = ApiAddOptions & { createContext?: PatientCreateClientContext };
 
@@ -316,21 +326,27 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return clone;
     }
 
-    async toArray(): Promise<T[]> {
-        const res = await fetch(this.buildListEndpoint(), { cache: 'no-store' });
+    async toArray(options?: { signal?: AbortSignal; rejectAuthUnavailable?: boolean }): Promise<T[]> {
+        const signal = options?.signal;
+        signal?.throwIfAborted();
+        const res = await fetch(this.buildListEndpoint(), { cache: 'no-store', ...(signal ? { signal } : {}) });
+        signal?.throwIfAborted();
         /* @Codex */
         if (isApiTableAuthUnavailableStatus(res.status)) {
             notifyApiAuthUnavailable(res.status);
+            if (options?.rejectAuthUnavailable) throw new Error('Authenticated list unavailable.');
             return [];
         }
         if (!res.ok) throw new Error(`Failed to fetch ${this.endpoint}`);
         const rawJson = await res.json();
+        signal?.throwIfAborted();
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let data = await Promise.all(rawJson.map(async (item: any) => {
             const revived = this.reviveDates(item);
             return await this.decryptItem(revived);
         }));
+        signal?.throwIfAborted();
 
         if (this._filterFn) {
             data = data.filter(this._filterFn);
@@ -495,34 +511,59 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     /* @Codex */
-    async delete(id: string, options?: { suppressNotify?: boolean; version?: number; deletionReason?: string }): Promise<void> {
-        if (this.requiresVersionedWrite() && typeof options?.version !== 'number') {
-            throw new Error(`Missing required version for ${this.versionedEntityLabel()} delete`);
-        }
-
-        const init: RequestInit = { method: 'DELETE' };
-        const encryptsDeletionReason = ENCRYPTED_FIELDS[this.tableName]?.includes('deletionReason') ?? false;
-        const rawDeletionReason = options?.deletionReason ?? (encryptsDeletionReason ? 'web-delete' : undefined);
-        if (typeof options?.version === 'number' || typeof rawDeletionReason === 'string') {
-            const deletionReason = typeof rawDeletionReason === 'string'
-                ? await this.encryptDeleteField('deletionReason', rawDeletionReason)
-                : undefined;
-            init.headers = { 'Content-Type': 'application/json' };
-            init.body = JSON.stringify({
-                ...(typeof options?.version === 'number' ? { version: options.version } : {}),
-                ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
-            });
-        }
-
-        const res = await fetch(`${this.endpoint}/${id}`, init);
-        if (!res.ok) {
-            const payload = await res.json().catch(() => null);
-            if (res.status === 409 && isApiVersionConflictPayload(payload)) {
-                throw this.buildVersionConflictError(payload);
+    async delete(id: string, options?: ApiDeleteOptions): Promise<void> {
+        const fenced = options != null && 'deleteContext' in options;
+        const context = fenced ? options.deleteContext : undefined;
+        const key = fenced ? this.getMasterKey() : null;
+        const signal = context?.signal;
+        const isCurrent = context?.isCurrent;
+        const assertCurrent = () => {
+            if (!fenced) return;
+            if (this.tableName !== 'therapies' || !context || !key || this.getMasterKey() !== key
+                || !(signal instanceof AbortSignal) || signal.aborted
+                || typeof isCurrent !== 'function' || isCurrent() !== true) {
+                throw new Error('Therapy delete context unavailable.');
             }
-            throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
+        };
+        try {
+            assertCurrent();
+            if (this.requiresVersionedWrite() && typeof options?.version !== 'number') {
+                throw new Error(`Missing required version for ${this.versionedEntityLabel()} delete`);
+            }
+
+            const init: RequestInit = { method: 'DELETE', ...(fenced ? { signal } : {}) };
+            const encryptsDeletionReason = ENCRYPTED_FIELDS[this.tableName]?.includes('deletionReason') ?? false;
+            const rawDeletionReason = options?.deletionReason ?? (encryptsDeletionReason ? 'web-delete' : undefined);
+            if (typeof options?.version === 'number' || typeof rawDeletionReason === 'string') {
+                const deletionReason = typeof rawDeletionReason === 'string'
+                    ? await this.encryptDeleteField('deletionReason', rawDeletionReason)
+                    : undefined;
+                init.headers = { 'Content-Type': 'application/json' };
+                init.body = JSON.stringify({
+                    ...(typeof options?.version === 'number' ? { version: options.version } : {}),
+                    ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
+                });
+            }
+
+            // Encryption is asynchronous: retire the write before dispatch, not just in the UI.
+            assertCurrent();
+            const res = await fetch(`${this.endpoint}/${id}`, init);
+            assertCurrent();
+            if (!res.ok) {
+                const payload = await res.json().catch(() => null);
+                assertCurrent();
+                if (res.status === 409 && isApiVersionConflictPayload(payload)) {
+                    throw this.buildVersionConflictError(payload);
+                }
+                throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
+            }
+            if (!options?.suppressNotify) this.emitChange();
+        } catch (error) {
+            if (fenced && !(error instanceof ApiConflictError)) {
+                throw new Error('Therapy delete was not confirmed.');
+            }
+            throw error;
         }
-        if (!options?.suppressNotify) this.emitChange();
     }
 
     async bulkDelete(ids: string[]): Promise<void> {
