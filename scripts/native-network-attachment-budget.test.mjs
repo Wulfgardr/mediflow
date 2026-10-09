@@ -152,7 +152,7 @@ test('malformed body, stream error, service rejection and response failure relea
         });
         const f = request({ text: mode === 'parse' ? '{' : '{}' });
         if (mode === 'stream') Object.defineProperty(f.req, 'body', { value: new ReadableStream({ pull() { throw new Error('synthetic'); } }, { highWaterMark: 0 }) });
-        assert.equal((await h.route.POST(f.req, ctx)).status, 500);
+        assert.equal((await h.route.POST(f.req, ctx)).status, mode === 'parse' || mode === 'stream' ? 400 : 500);
         fail = false;
         assert.equal(h.timers.size, 0);
         assert.equal((await h.route.POST(request().req, ctx)).status, 201);
@@ -249,5 +249,27 @@ test('established size rejection remains 413 if cancellation also triggers the d
     const response = await h.route.POST(f.req, ctx);
     assert.equal(response.status, 413);
     assert.equal((await response.json()).code, 'JSON_BODY_TOO_LARGE');
+    assert.equal((await h.route.POST(request().req, ctx)).status, 201);
+});
+
+
+test('attachment wrapper rejects malformed and non-object JSON before consuming and releases its slot', async () => {
+    const h = harness();
+    let calls = 0;
+    const consume = async () => { calls++; return Response.json({ ok: true }); };
+    for (const text of ['{', 'null', '[]', '17', '"text"', 'true']) {
+        const response = await h.helper.withNetworkAttachmentJson(request({ text }).req, consume);
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { error: 'Invalid JSON body' });
+        assert.equal(calls, 0);
+        assert.equal(h.timers.size, 0);
+    }
+    assert.equal((await h.helper.withNetworkAttachmentJson(request().req, consume)).status, 200);
+    assert.equal(calls, 1);
+
+    // Actual POST wiring, with only admission and downstream service isolated.
+    const response = await h.route.POST(request({ text: 'null' }).req, ctx);
+    assert.equal(response.status, 400);
+    assert.deepEqual(h.events.filter(event => event === 'auth' || event === 'service'), ['auth']);
     assert.equal((await h.route.POST(request().req, ctx)).status, 201);
 });

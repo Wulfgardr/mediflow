@@ -150,7 +150,13 @@ Sorgenti: [lib/attachment-web-create.ts](../lib/attachment-web-create.ts), [lib/
 
 Create Web: schema, ID client o UUID, payload e parent attivo nella transazione; currentness host. PUT metadata: allowlist e transizioni coda, incremento currentness host. PUT content: expected currentness e CAS, parser dedicato. DELETE Web: ID path e changes=1; nessun CAS esplicito. Paired upload genera ID host e rilegge paziente/scope in transazione; ENC e no campi document-derived. Paired detail è solo GET.
 
-Prove di riferimento: [lib/attachment-web-create-currentness.test.ts](../lib/attachment-web-create-currentness.test.ts), [lib/attachment-web-put-currentness.test.ts](../lib/attachment-web-put-currentness.test.ts), [lib/attachment-currentness-host.test.ts](../lib/attachment-currentness-host.test.ts), [lib/network-attachment-write.test.ts](../lib/network-attachment-write.test.ts). test:network:home-base-documents-write; check:attachment-currentness-writers; test:attachment-currentness-writers. Create/delete Web ora richiedono un evento nella stessa transazione immediata della mutazione; il create legge JSON entro il limite attachment corrente e rifiuta duplicati con 409. La suite create/currentness, già selezionata da unit, copre successo, rollback al guasto audit, INSERT ignorato e input/scope senza effetti. Gap C05-D: audit ancora assente in metadata/content Web e al meglio in upload paired; CAS/replay del delete restano aperti.
+Prove di riferimento: [lib/attachment-web-create-currentness.test.ts](../lib/attachment-web-create-currentness.test.ts), [lib/attachment-web-put-currentness.test.ts](../lib/attachment-web-put-currentness.test.ts), [lib/attachment-currentness-host.test.ts](../lib/attachment-currentness-host.test.ts), [lib/network-attachment-write.test.ts](../lib/network-attachment-write.test.ts). test:network:home-base-documents-write; check:attachment-currentness-writers; test:attachment-currentness-writers. Create/delete Web ora richiedono un evento nella stessa transazione immediata della mutazione; il create legge JSON entro il limite attachment corrente e rifiuta duplicati con 409. La suite create/currentness, già selezionata da unit, copre successo, rollback al guasto audit, INSERT ignorato e input/scope senza effetti. Gap C05-D: audit ancora assente in metadata/content Web; CAS/replay del delete restano aperti.
+
+Il create paired mantiene campi sigillati, allowlist e scope esistenti: insert,
+currentness e audit condividono la transazione immediata. Le [prove SQLite paired](../lib/network-attachment-write.test.ts)
+coprono successo, scope, fault audit e insert ignorato. Il wrapper POST distingue
+input invalido (400) da guasto writer (500), conservando reservation, abort,
+timeout e soglia JSON; prova in [native-network-attachment-budget](../scripts/native-network-attachment-budget.test.mjs).
 
 ### S — Workflow SISS persistito
 
@@ -191,7 +197,7 @@ I core E/T/O/C usano transazioni sincrone immediate con rilettura e audit richie
 P mantiene gli owner distinti di create/update/delete/lifecycle e restore admin.
 PR usa `prosthetic.prescription.*`; SP `service.prescription.*` e
 `service.prescription_item.*`; A `ambulatory.*` e, nel clear, `patient.deleted`.
-I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` dopo commit; purge paziente M usa
+I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` nella stessa transazione; purge paziente M usa
 `patient.purged` nella stessa transazione, anche nel purge opzionale di fix-orphans. Nei rami segnati **nessuno** non va presunto un
 evento solo perché il dominio compare nella taxonomy.
 
@@ -250,7 +256,7 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | A-06 | paired DELETE [/api/v1/network/ambulatories/[id]/route.ts](../app/api/v1/network/ambulatories/[id]/route.ts) | A; 4 MiB | ID path; parent e versione del profilo | ambulatory-write; **TX+audit** | Audit e body migrati; residui campi/ID C05-A sopra |
 | A-07 | paired POST [/api/v1/network/ambulatories/clear/route.ts](../app/api/v1/network/ambulatories/clear/route.ts) | A; 4 MiB | ambulatoryId + versione; solo test container | ambulatory-write; **TX+audit** | Audit e body migrati; residui campi/ID C05-A sopra |
 | A-08 | paired POST [/api/v1/network/ambulatories/route.ts](../app/api/v1/network/ambulatories/route.ts) | A; 4 MiB | Create: ID/parent del profilo; versione host | ambulatory-write; **TX+audit** | Audit e body migrati; residui campi/ID C05-A sopra |
-| D-05 | paired POST [/api/v1/network/patients/[id]/attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts) | D; payload + 4 MiB; 30 s; 1 in-flight | ID/currentness del profilo; no patients.version | network-attachment-write TX; **al meglio dopo TX** | Aperto C05-D |
+| D-05 | paired POST [/api/v1/network/patients/[id]/attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts) | D; payload + 4 MiB; 30 s; 1 in-flight | ID/currentness del profilo; no patients.version | network-attachment-write TX; **TX+audit** | Audit paired migrato; allowlist e scope preservati |
 | C-04 | paired PUT [/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts](../app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | C-05 | paired POST [/api/v1/network/patients/[id]/checkups/route.ts](../app/api/v1/network/patients/[id]/checkups/route.ts) | C; 4 MiB | Create: ID/parent del profilo; versione host | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | E-04 | paired PUT [/api/v1/network/patients/[id]/entries/[entryId]/route.ts](../app/api/v1/network/patients/[id]/entries/[entryId]/route.ts) | E; 4 MiB | ID path; parent e versione del profilo | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
@@ -360,7 +366,7 @@ roster non li promuove a un nuovo dominio di commit clinico.
 2. **C05-B:** assign/unassign migrati per audit atomico e input limitato; restano
    CAS e replay dopo operazioni interposte. Move migrato con il CAS esistente;
    duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
-3. **C05-D:** create/delete Web migrati; proseguire metadata/content e upload paired.
+3. **C05-D:** create/delete Web e upload paired migrati; proseguire metadata/content.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
 4. **C05-M:** purge paziente e riparazione orfani migrati; restano versione client e
    replay dopo operazioni interposte. Restore già migrato rimane
