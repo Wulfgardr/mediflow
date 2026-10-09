@@ -121,7 +121,7 @@ function fixture(t, withDebt = false) {
   fs.writeFileSync(path.join(root, 'e2e/a.spec.ts'), 'throw new Error("Playwright test must not execute");');
   entries.push({ path: 'e2e/a.spec.ts', selection: { state: 'mapped', suiteIds: ['npm:test:e2e'] } });
   pkg.scripts['test:e2e'] = 'playwright test --workers=1';
-  workflows['.github/workflows/e2e.yml'] = { jobs: { e2e: { steps: [{ run: 'npm run test:e2e' }] } } };
+  workflows['.github/workflows/e2e.yml'].jobs.e2e.steps.push({ run: 'npm run test:e2e' });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
   for (const [file, workflow] of Object.entries(workflows)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
