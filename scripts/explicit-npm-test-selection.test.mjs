@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, collectGuardSelfTestSelections, GUARD_SELF_TEST_SUITES, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { checkInventory } from './test-inventory.mjs';
 
@@ -331,4 +331,67 @@ test('known runner binding requires the exact npm command and the same CI guards
   change(root, 'package.json', pkg => { pkg.scripts[target] = expected; });
   bindingChange(root, (workflow, job, step) => { step.if = false; });
   assert.throws(() => collectNpmScriptBinding(root, suite, expected), /Disabled step if/);
+});
+
+
+test('required guard self-tests select real entrypoints and preserve exact CI provenance', () => {
+  const selections = collectGuardSelfTestSelections(sourceRoot);
+  assert.deepEqual(Object.fromEntries(Object.entries(selections).map(([id, value]) => [id, value.files])), {
+    'npm:check:claims:self-test': ['scripts/check-claims-guard.mjs'],
+    'npm:check:schema-writers:self-test': ['scripts/check-schema-writers.mjs'],
+    'npm:check:ai-clinical-writes:self-test': ['scripts/check-ai-clinical-write-gate.mjs'],
+    'npm:check:api-error-leak:self-test': ['scripts/check-api-error-leak.mjs'],
+    'npm:check:openapi:drift:self-test': ['scripts/check-openapi-drift.mjs'],
+  });
+  for (const [id, selection] of Object.entries(selections)) {
+    assert.deepEqual(selection.errors, []);
+    assert.equal(selection.binding.workflow, claimsWorkflow);
+    assert.equal(selection.binding.job, 'repository-guards');
+    const script = id.slice(4, -':self-test'.length);
+    assert.deepEqual(selection.binding.commands, [script === 'check:openapi:drift'
+      ? 'check:openapi:drift -- --base-ref origin/main' : script, `${script} -- --self-test`]);
+    assert.equal(selection.binding.stepIf, "${{ !cancelled() && steps.install.outcome == 'success' }}");
+  }
+});
+
+function guardFixture(t, suite) {
+  const root = fixture(t);
+  write(root, suite.file, 'throw new Error("Guard must not execute during selection");');
+  change(root, 'package.json', pkg => { pkg.scripts[suite.script] = `node ${suite.file}`; });
+  change(root, suite.workflow, workflow => {
+    workflow.jobs[suite.job].steps.push({ run: `npm run ${suite.companionCall ?? suite.script}\nnpm run ${suite.script} -- --self-test` });
+  });
+  return root;
+}
+
+test('each new guard fails closed for missing self-test, changed npm body or duplicate self-test', t => {
+  for (const suite of GUARD_SELF_TEST_SUITES.slice(1)) {
+    const call = `npm run ${suite.script} -- --self-test`;
+    for (const mutate of [
+      root => claimsChange(root, (job, step) => { step.run = `npm run ${suite.companionCall ?? suite.script}`; }),
+      root => change(root, 'package.json', pkg => { pkg.scripts[suite.script] += ' --filter=one'; }),
+      root => claimsChange(root, job => { job.steps.push({ run: call }); }),
+    ]) {
+      const root = guardFixture(t, suite);
+      assert.deepEqual(collectGuardSelfTestSelections(root)[suite.id].files, [suite.file]);
+      mutate(root);
+      const selection = collectGuardSelfTestSelections(root)[suite.id];
+      assert.deepEqual(selection.files, []);
+      assert.equal(selection.binding, null);
+      assert.match(selection.errors.join('\n'), /Required npm command changed or missing|exactly one literal CI call/);
+    }
+  }
+});
+
+test('OpenAPI companion arguments are exact and restricted to its own self-test binding', t => {
+  const suite = GUARD_SELF_TEST_SUITES.find(suite => suite.script === 'check:openapi:drift');
+  for (const companion of ['check:openapi:drift -- --base-ref other',
+    'check:openapi:drift -- --base-ref origin/main || true', 'check:other -- --base-ref origin/main']) {
+    const root = guardFixture(t, suite);
+    claimsChange(root, (job, step) => { step.run = `npm run ${companion}\nnpm run ${suite.script} -- --self-test`; });
+    assert.match(collectGuardSelfTestSelections(root)[suite.id].errors.join('\n'), /exactly one literal CI call/);
+  }
+  const root = claimsFixture(t);
+  claimsChange(root, (job, step) => { step.run = `npm run ${suite.companionCall}\n${claimsCall}`; });
+  claimsRejected(root, /exactly one literal CI call/);
 });

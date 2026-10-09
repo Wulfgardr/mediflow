@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { discoverCandidates, checkInventory, collectHeadlessInventorySelection, collectPlaywrightInventorySelection } from './test-inventory.mjs';
 import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
-import { EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { EXPLICIT_NPM_SUITES, GUARD_SELF_TEST_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectPlaywrightTestFiles, playwrightTestSelection } from './playwright-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
@@ -105,6 +105,14 @@ function fixture(t, withDebt = false) {
   }
   pkg.scripts['test:headless-portable'] = 'node scripts/run-headless-portable-tests.mjs';
   workflows['.github/workflows/cross-platform.yml'].jobs['headless-contracts'].steps.push({ run: 'npm run test:headless-portable' });
+  for (const suite of GUARD_SELF_TEST_SUITES.filter(suite => suite.script !== 'check:claims')) {
+    fs.writeFileSync(path.join(root, suite.file), 'throw new Error("Guard --self-test must not execute during inventory");');
+    entries.push({ path: suite.file, selection: { state: 'mapped', suiteIds: [suite.id] } });
+    pkg.scripts[suite.script] = `node ${suite.file}`;
+    workflows[suite.workflow].jobs[suite.job].steps.push({
+      run: `npm run ${suite.companionCall ?? suite.script}\nnpm run ${suite.script} -- --self-test`,
+    });
+  }
   fs.writeFileSync(path.join(root, 'scripts/check-claims-guard.mjs'), 'throw new Error("Claims --self-test must not execute during inventory");');
   entries.push({ path: 'scripts/check-claims-guard.mjs', selection: { state: 'mapped', suiteIds: ['npm:check:claims:self-test'] } });
   pkg.scripts['check:claims'] = 'node scripts/check-claims-guard.mjs';
@@ -409,4 +417,22 @@ test('Playwright rejects command filters and nonbinding or masked CI calls witho
     assert.equal(result.status, 1);
     assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:e2e/);
   }
+});
+
+
+test('new self-test bindings are required by the real CLI, independently of ordinary guard scans', t => {
+  const root = fixture(t);
+  assert.equal(run(root, 'complete').status, 0);
+  const file = path.join(root, '.github/workflows/openapi-contract-guard.yml');
+  const workflow = JSON.parse(fs.readFileSync(file));
+  for (const step of workflow.jobs['repository-guards'].steps) {
+    if (step.run.startsWith('npm run check:openapi:drift ')) {
+      step.run = 'npm run check:openapi:drift -- --base-ref origin/main';
+    }
+  }
+  fs.writeFileSync(file, JSON.stringify(workflow));
+  const result = run(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:check:openapi:drift:self-test/);
+  assert.match(result.stderr, /MAPPED_NOT_SELECTED: npm:check:openapi:drift:self-test: scripts\/check-openapi-drift.mjs/);
 });
