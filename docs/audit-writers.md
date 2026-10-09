@@ -69,6 +69,8 @@ una riga inserita; non apre una seconda connessione.
 | [patients/move/route.ts](../app/api/patients/move/route.ts) | Trasferimento batch: cambia associazioni, ambulatorio primario e versione. | C05: CAS, mutazioni ed evento per paziente nella stessa transazione immediata; rollback dell'intero batch al guasto audit. |
 | [patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | Duplicazione batch: crea pazienti e associazioni nel target. | C05: lookup, cloni, membership e un evento per clone nella stessa transazione immediata; guasto audit annulla l’intero batch. |
 | [purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | Purge rimuove paziente e figli clinici. | C05: lifecycle/versione, cascade, delete e audit nella stessa transazione immediata; errore audit ripristina tutte le righe. |
+| [attachment-web-create.ts](../lib/attachment-web-create.ts) | Creazione allegato Web e currentness host. | C05: insert verificato e audit `attachment.created` nella stessa transazione immediata, dopo parent attivo. |
+| [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), DELETE | Rimozione allegato Web. | C05: lookup, delete verificato e audit `attachment.deleted` nella stessa transazione immediata. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
@@ -106,6 +108,12 @@ conserva conteggi e flag nel required audit. Le [prove SQLite del purge](../lib/
 verificano successo, rollback e replay senza effetti. La revoca conservativa dei
 locator nel cascade non viene annullata dal rollback delle righe; non riabilita
 autorità già revocata. Il client continua a fornire il solo `patientId`.
+
+Create/delete allegati Web usano il contesto della sessione autenticata e
+metadata senza nome, percorso o contenuto clinico. Le [prove SQLite della famiglia](../lib/attachment-web-create-currentness.test.ts)
+coprono il rollback di dati, currentness ed eventi al guasto audit; un insert
+ignorato non può produrre un audit orfano. Metadata/content e upload paired
+rimangono writer distinti da migrare.
 
 ## Writer clinici ancora al meglio: consegna a C05
 
