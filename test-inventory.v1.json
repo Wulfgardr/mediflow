@@ -411,6 +411,13 @@
       }
     },
     {
+      "path": "e2e/fhir-diagnosis-warning.spec.ts",
+      "selection": {
+        "state": "unresolved",
+        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
       "path": "e2e/fhir-share.spec.ts",
       "selection": {
         "state": "unresolved",
@@ -720,6 +727,13 @@
     },
     {
       "path": "e2e/web-auth-recovery.spec.ts",
+      "selection": {
+        "state": "unresolved",
+        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "e2e/web-cookie-mutation-admission.spec.ts",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
@@ -3249,7 +3263,25 @@
       }
     },
     {
+      "path": "lib/fhir/export-precheck.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/fhir/id.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/fhir/scale-interpretation-version.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -4329,7 +4361,25 @@
       }
     },
     {
+      "path": "lib/scale-agent-projection.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/scheduled-backup-membership-roundtrip.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/scheduled-backup-runtime-contract.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -5611,6 +5661,15 @@
       }
     },
     {
+      "path": "lib/security/web-cookie-mutation-admission.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/service-prescription-atomic.test.ts",
       "selection": {
         "state": "mapped",
@@ -5728,6 +5787,15 @@
       }
     },
     {
+      "path": "lib/sqlite-maintenance-admission.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/sqlite-pragmas.test.ts",
       "selection": {
         "state": "mapped",
@@ -5738,6 +5806,24 @@
     },
     {
       "path": "lib/sqlite-repair.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/sqlite-swap-recovery.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/status-normalization.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -6507,6 +6593,13 @@
     },
     {
       "path": "native/MediFlowMac/Tests/MediFlowCoreTests/ClinicalRichTextTests.swift",
+      "selection": {
+        "state": "unresolved",
+        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/ClinicalScaleInterpretationTests.swift",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
@@ -7469,6 +7562,15 @@
       }
     },
     {
+      "path": "scripts/generate-runtime-payload-ledger.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "scripts/icd-docker-packaging-retirement.test.mjs",
       "selection": {
         "state": "unresolved",
@@ -7685,6 +7787,15 @@
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "scripts/network-catalog-smoke-cleanup.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
