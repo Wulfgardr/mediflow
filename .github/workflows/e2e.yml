@@ -11,8 +11,8 @@ name: E2E (Playwright)
 # Next dist dir (MEDIFLOW_NEXT_DIST_DIR=.next-e2e); nothing depends on a checked-in
 # medical.db or on developer state.
 #
-# No fixme'd specs: the whole e2e/*.spec.ts suite runs and must pass. The suite passed
-# 3 consecutive local runs before this workflow landed, so this is a normal blocking job.
+# Every spec still runs. Only exact failures in e2e/quarantine.json are temporarily
+# non-blocking; raw failures and expiry decisions remain in the uploaded reports.
 
 on:
   pull_request:
