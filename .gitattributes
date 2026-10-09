@@ -6,3 +6,13 @@ scripts/apple-vision-ocr.swift text eol=lf
 
 scripts/anydoc-tesseract-artifacts.json text eol=lf
 scripts/anydoc-pdf-renderer-profiles.json text eol=lf
+
+# @Codex: keep scheduled-backup source hashes stable across checkouts.
+scripts/run-scheduled-backup.mjs text eol=lf
+scripts/scheduled-backup-date-fields.mjs text eol=lf
+lib/sqlite-maintenance-admission.mjs text eol=lf
+lib/backup-audit.ts text eol=lf
+lib/exemption-import-receipt.ts text eol=lf
+lib/exemption-import-contract.ts text eol=lf
+lib/reference-data/prosthetics-catalog-backup.ts text eol=lf
+lib/reference-data/prosthetics-catalog-contract.ts text eol=lf
