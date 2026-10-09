@@ -1,9 +1,11 @@
 # Writer audit del prodotto corrente
 
 Elenco C04 / [WUL-719](https://linear.app/wulfgardr/issue/WUL-719), verificato
-sui sorgenti `fe974d1956a72d97bf90fc10fd36d0892b092b8e`. La classificazione segue
+sulla base `fe974d1956a72d97bf90fc10fd36d0892b092b8e`, con la successiva
+migrazione C05 del diario SISS locale descritta sotto. La classificazione segue
 [ADR 0015](./adr/0015-audit-taxonomy-minimum-catalog.md); la migrazione dei writer
-clinici residui appartiene a [C05 / WUL-720](https://linear.app/wulfgardr/issue/WUL-720).
+clinici residui appartiene a [C05 / WUL-720](https://linear.app/wulfgardr/issue/WUL-720),
+con le operazioni e le prove raccolte nel [roster delle scritture](./clinical-write-roster.md).
 
 **Obbligatorio** indica la traccia necessaria all'operazione. Per una modifica
 clinica, dati ed evento devono committare nella stessa transazione del database
@@ -19,7 +21,8 @@ cambiamento dello scheduler OS non è una transazione SQLite distribuita.
 
 Le righe identificano i punti di scrittura e i wrapper che li raggiungono;
 gli adapter che convergono sulla stessa operazione non sono writer aggiuntivi.
-I numeri di riga si riferiscono alla revisione sopra. Test, fixture, DDL,
+I numeri di riga si riferiscono alla base sopra; i link SISS puntano ai writer aggiornati.
+Test, fixture, DDL,
 lettori dell'audit ed export dei record non sono nuovi eventi di produzione.
 
 ## Mutazioni cliniche con audit nella transazione
@@ -61,19 +64,27 @@ una riga inserita; non apre una seconda connessione.
 | [ambulatory-write.ts:232](../lib/ambulatory-write.ts#L232) | Eliminazione ambulatorio: cambia lo scope persistito. | Transazione immediata host/paired. |
 | [ambulatory-write.ts:258](../lib/ambulatory-write.ts#L258) | Pulizia ambulatorio: evento per ciascun paziente eliminato logicamente. | Transazione della pulizia, anche per contenitori di test. |
 | [ambulatory-write.ts:261](../lib/ambulatory-write.ts#L261) | Evento complessivo `ambulatory.cleared`. | Stessa transazione degli effetti sui pazienti. |
+| [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
+| [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
+| [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
+
+Il diario SISS locale usa l'identità della sessione autenticata. POST e PUT
+leggono al massimo 256 KiB e applicano gli schemi esistenti; input non valido,
+ID duplicato e paziente assente/eliminato sono respinti prima della creazione.
+Le [prove SQLite dei tre handler](../lib/siss-handoff-required-audit.test.ts)
+verificano rollback per guasto audit e successo con un solo evento. Il controllo
+di versione e l'idempotenza generale dei PUT restano lavori C05: la transazione
+immediata non li introduce.
 
 ## Writer clinici ancora al meglio: consegna a C05
 
-Queste sei operazioni sono **obbligatorie**, ma il codice corrente può
+Queste tre operazioni sono **obbligatorie**, ma il codice corrente può
 committare la modifica prima dell'audit. C05 deve spostare l'evento nel writer
 che possiede la transazione, usando il contesto attore già derivato dall'host
 e la stessa interfaccia del pilota; un errore audit deve annullare gli effetti.
 
 | Punto di scrittura | Motivo | Stato da correggere in C05 |
 | --- | --- | --- |
-| [siss-handoffs/route.ts:95](../app/api/siss-handoffs/route.ts#L95) | POST persiste un workflow riferito al paziente. | Insert :79, poi `safeWriteAuditEventFromRequest`; manca la transazione comune. |
-| [siss-handoffs/[id]/route.ts:82](../app/api/siss-handoffs/[id]/route.ts#L82) | PUT modifica workflow, stato e tempi persistiti. | Update :80, poi audit al meglio; manca la transazione comune. |
-| [siss-handoffs/[id]/route.ts:112](../app/api/siss-handoffs/[id]/route.ts#L112) | DELETE elimina il workflow persistito. | Delete :111, poi audit al meglio; manca la transazione comune. |
 | [purge-patient/route.ts:96](../app/api/system/purge-patient/route.ts#L96) | Purge rimuove paziente e figli clinici. | Audit dopo il commit di `purgePatientCascade` e cancellazione paziente. |
 | [fix-orphans/route.ts:144](../app/api/system/fix-orphans/route.ts#L144) | Purge opzionale rimuove figli clinici orfani. | Audit dopo la transazione di cancellazione :142. |
 | [network-attachment-write.ts:126](../lib/network-attachment-write.ts#L126) | `attachment.created` attesta un nuovo allegato e la sua currentness. | Wrapper :120 chiamato da `createNetworkScopedAttachment` a :209, dopo il commit; catch assorbe l'errore. Adapter: [attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts). |
@@ -165,7 +176,7 @@ la storia clinica in `medical.db`.
 - [security/audit.ts](../lib/security/audit.ts): `writeAuditEventInTransaction`
   è il sink obbligatorio; `writeAuditEvent` esegue l'insert sulla connessione
   server e propaga gli errori, ma da solo non collega evento e modifica.
-  `safeWriteAuditEventFromRequest` assorbe gli errori: i suoi dodici punti
+  `safeWriteAuditEventFromRequest` assorbe gli errori: i suoi nove punti
   produzione sono tutti classificati nelle tabelle sopra.
 - [network-patient-write.ts:110](../lib/network-patient-write.ts#L110):
   `writeNetworkPatientAuditEvent` è un helper esportato senza caller produzione
