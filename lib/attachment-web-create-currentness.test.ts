@@ -243,8 +243,8 @@ test('web creation rolls back a duplicate id and generates unique host refs conc
     const first = await invoke(request(payload({ id: 'attachment.synthetic.first' })));
     assert.equal(first.status, 201);
     const collision = await invoke(request(payload({ id: 'attachment.synthetic.first' })));
-    assert.equal(collision.status, 500);
-    assert.deepEqual(await collision.json(), { error: 'Create Failed' });
+    assert.equal(collision.status, 409);
+    assert.deepEqual(await collision.json(), { error: 'Attachment already exists' });
     assert.equal(rows().length, 1);
 
     reset();
@@ -256,4 +256,122 @@ test('web creation rolls back a duplicate id and generates unique host refs conc
     assert.equal(created.length, 8);
     assert.equal(new Set(created.map((row) => row.document_source_ref)).size, 8);
     assert.ok(created.every((row) => row.document_revision === 1 && row.document_freshness_epoch === 1));
+});
+
+function snapshot(): { attachments: unknown[]; audit: Array<Record<string, unknown>> } {
+    const sql = new Database(dbPath, { readonly: true });
+    try {
+        return {
+            attachments: sql.prepare('SELECT * FROM attachments ORDER BY id').all(),
+            audit: sql.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
+        };
+    } finally { sql.close(); }
+}
+
+async function remove(id: string, admitted: unknown = session): Promise<Response> {
+    const original = serverAuth.requireSession;
+    try {
+        serverAuth.requireSession = async () => admitted;
+        return await detailRoute.DELETE(new Request(`http://localhost/api/attachments/${id}`, {
+            method: 'DELETE', headers: { 'x-mediflow-source-surface': 'job' },
+        }), { params: Promise.resolve({ id }) });
+    } finally { serverAuth.requireSession = original; }
+}
+
+test('create and delete commit exactly one session-derived event without clinical metadata', async () => {
+    reset();
+    const before = snapshot();
+    const id = 'attachment.synthetic.audit';
+    const response = await invoke(new Request('http://localhost/api/attachments', {
+        method: 'POST', headers: { 'x-mediflow-source-surface': 'job' },
+        body: JSON.stringify(payload({ id, data: 'ENC:c3ludGhldGlj:YmxvYg==' })),
+    }));
+    assert.equal(response.status, 201);
+    const created = snapshot();
+    assert.equal(created.audit.length, before.audit.length + 1);
+    assert.equal((await remove(id)).status, 200);
+    const deleted = snapshot();
+    assert.equal(deleted.audit.length, created.audit.length + 1);
+    assert.deepEqual(deleted.attachments, []);
+    const events = deleted.audit.slice(before.audit.length);
+    assert.deepEqual(events.map(event => event.event_type), ['attachment.created', 'attachment.deleted']);
+    for (const event of events) {
+        assert.equal(event.actor_ref, session.userId);
+        assert.equal(event.actor_type, 'user');
+        assert.equal(event.subject_type, 'attachment');
+        assert.equal(event.subject_ref, id);
+        assert.equal(event.source_surface, 'web');
+        assert.equal(event.outcome, 'success');
+        assert.deepEqual(JSON.parse(event.redacted_metadata as string), { flags: ['auth:session'] });
+    }
+});
+
+test('audit FAIL and IGNORE roll back create and delete including the whole currentness tuple', async () => {
+    for (const operation of ['create', 'delete']) {
+        for (const fault of ["FAIL, 'synthetic audit fault'", 'IGNORE']) {
+            reset();
+            const id = `attachment.synthetic.rollback.${operation}`;
+            if (operation === 'delete') assert.equal((await invoke(request(payload({ id })))).status, 201);
+            const before = snapshot();
+            const sql = new Database(dbPath);
+            try {
+                sql.exec(`CREATE TRIGGER synthetic_attachment_audit_fault BEFORE INSERT ON audit_events
+                    BEGIN SELECT RAISE(${fault}); END`);
+                const response = operation === 'create' ? await invoke(request(payload({ id }))) : await remove(id);
+                assert.deepEqual(snapshot(), before, `${operation} ${fault}: data/currentness/events must roll back`);
+                assert.equal(response.status, 500, `${operation} ${fault}`);
+            } finally {
+                sql.exec('DROP TRIGGER IF EXISTS synthetic_attachment_audit_fault');
+                sql.close();
+            }
+        }
+    }
+});
+
+test('create rejects malformed, non-object, wrong-type and oversized JSON before side effects', async () => {
+    reset();
+    const previous = process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
+    process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = '1024';
+    try {
+        for (const body of ['{', '', 'null', '[]', '17', JSON.stringify(payload({ size: '1' })),
+            JSON.stringify(payload({ patientId: 17 })), JSON.stringify(payload({ name: ' ' })),
+            JSON.stringify(payload({ ocrQueueState: 'unknown' })), JSON.stringify(payload({ actorRef: 'injected' }))]) {
+            const before = snapshot();
+            const response = await invoke(new Request('http://localhost/api/attachments', { method: 'POST', body }));
+            assert.equal(response.status, 400, body);
+            assert.deepEqual(snapshot(), before);
+        }
+        const valid = JSON.stringify(payload({ id: 'attachment.synthetic.bound' }));
+        const atLimit = valid + ' '.repeat(1024 - Buffer.byteLength(valid));
+        assert.equal((await invoke(new Request('http://localhost/api/attachments', { method: 'POST', body: atLimit }))).status, 201);
+        for (const headers of [{}, { 'content-length': '1' }, { 'content-length': '1025' }] as HeadersInit[]) {
+            const before = snapshot();
+            const response = await invoke(new Request('http://localhost/api/attachments', {
+                method: 'POST', headers, body: atLimit + ' ',
+            }));
+            assert.equal(response.status, 413);
+            assert.deepEqual(snapshot(), before);
+        }
+    } finally {
+        if (previous === undefined) delete process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES;
+        else process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = previous;
+    }
+});
+
+test('auth, missing/deleted parent, duplicate ID and missing delete preserve data and events', async () => {
+    reset();
+    const id = 'attachment.synthetic.scope';
+    assert.equal((await invoke(request(payload({ id })))).status, 201);
+    const before = snapshot();
+    assert.equal((await invoke(request(payload({ id })))).status, 409);
+    assert.equal((await invoke(request(payload()), null)).status, 401);
+    assert.equal((await remove(id, null)).status, 401);
+    assert.equal((await remove('attachment.synthetic.missing')).status, 404);
+    assert.equal((await invoke(request(payload({ patientId: 'patient.synthetic.missing' })))).status, 404);
+    assert.deepEqual(snapshot(), before);
+    const sql = new Database(dbPath);
+    try { sql.prepare('UPDATE patients SET deleted_at = unixepoch() WHERE id = ?').run(patientId); }
+    finally { sql.close(); }
+    assert.equal((await invoke(request(payload()))).status, 404);
+    assert.deepEqual(snapshot(), before);
 });
