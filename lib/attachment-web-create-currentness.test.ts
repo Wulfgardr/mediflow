@@ -375,3 +375,21 @@ test('auth, missing/deleted parent, duplicate ID and missing delete preserve dat
     assert.equal((await invoke(request(payload()))).status, 404);
     assert.deepEqual(snapshot(), before);
 });
+
+
+test('ignored attachment insert fails without an orphan creation audit', async () => {
+    reset();
+    const before = snapshot();
+    const sql = new Database(dbPath);
+    try {
+        sql.exec(`CREATE TRIGGER synthetic_attachment_insert_ignore BEFORE INSERT ON attachments
+            BEGIN SELECT RAISE(IGNORE); END`);
+        const response = await invoke(request(payload({ id: 'attachment.synthetic.ignored' })));
+        assert.equal(response.status, 500);
+        assert.deepEqual(await response.json(), { error: 'Create Failed' });
+        assert.deepEqual(snapshot(), before);
+    } finally {
+        sql.exec('DROP TRIGGER IF EXISTS synthetic_attachment_insert_ignore');
+        sql.close();
+    }
+});
