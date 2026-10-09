@@ -71,7 +71,9 @@ export async function withNetworkAttachmentJson(
             body = await readNativeNetworkJson(request, networkAttachmentJsonMaxBytes(), { signal: controller.signal, deadline });
         } catch (error) {
             if (error instanceof JsonBodyTooLargeError) throw error;
-            if (!controller.signal.aborted && performance.now() < deadline) throw error;
+            if (!controller.signal.aborted && performance.now() < deadline) {
+                return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
+            }
             const aborted = request.signal.aborted;
             return Response.json({
                 error: aborted ? 'Attachment body read aborted' : 'Attachment body read timeout',
@@ -80,6 +82,9 @@ export async function withNetworkAttachmentJson(
         } finally {
             clearTimeout(timer);
             request.signal.removeEventListener('abort', abort);
+        }
+        if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+            return Response.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
         // Await is essential: abort/timeout must never race a still-running service.
         return await consume(body);

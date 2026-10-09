@@ -94,6 +94,7 @@ function resetDatabase(): void {
 test('network attachment create accepts the real paired projection and applies server defaults', async () => {
     resetDatabase();
 
+    const auditCount = dbServer.select().from(auditEvents).all().length;
     const result = await createNetworkScopedAttachment(makeContext(), validCreateBody());
     assert.equal(result.status, 201);
     if (result.status !== 201) return;
@@ -123,6 +124,14 @@ test('network attachment create accepts the real paired projection and applies s
         .where(and(eq(auditEvents.eventType, 'attachment.created'), eq(auditEvents.subjectRef, result.value.id)))
         .get();
     assert.ok(audit);
+    assert.equal(dbServer.select().from(auditEvents).all().length, auditCount + 1);
+    assert.equal(audit.actorRef, 'user-attachment-write-test');
+    assert.equal(audit.actorType, 'user');
+    assert.equal(audit.sourceSurface, 'native');
+    assert.equal(audit.subjectType, 'attachment');
+    assert.equal(audit.outcome, 'success');
+    assert.deepEqual(JSON.parse(audit.redactedMetadata ?? '{}').changedFields, ['name', 'path', 'data', 'type', 'size']);
+    assert.ok(!audit.redactedMetadata?.includes('ENC:'));
     const metadata = JSON.parse(audit?.redactedMetadata ?? '{}') as { flags?: string[] };
     assert.deepEqual(metadata.flags, [
         'auth:paired-client',
@@ -252,3 +261,48 @@ test('concurrent network creates persist distinct host currentness tuples', asyn
     assert.equal(new Set(rows.map((row) => row.sourceRef)).size, 8);
     assert.ok(rows.every((row) => row.revision === 1 && row.freshnessEpoch === 1));
 });
+
+
+function atomicSnapshot() {
+    return {
+        attachments: dbServer.select().from(attachments).all(),
+        audit: dbServer.select().from(auditEvents).all(),
+    };
+}
+
+test('paired attachment audit FAIL and IGNORE roll back data, currentness and events', async () => {
+    for (const fault of ["FAIL, 'synthetic paired audit fault'", 'IGNORE']) {
+        resetDatabase();
+        const before = atomicSnapshot();
+        const sql = new Database(path.join(DATA_DIR, 'medical.db'));
+        try {
+            sql.exec(`CREATE TRIGGER synthetic_paired_audit_fault BEFORE INSERT ON audit_events
+                BEGIN SELECT RAISE(${fault}); END`);
+            let rejected = false;
+            try { await createNetworkScopedAttachment(makeContext(), validCreateBody()); }
+            catch { rejected = true; }
+            assert.deepEqual(atomicSnapshot(), before, 'failed audit must roll back attachment and currentness');
+            assert.equal(rejected, true, 'audit failure must propagate to the adapter');
+        } finally {
+            sql.exec('DROP TRIGGER IF EXISTS synthetic_paired_audit_fault');
+            sql.close();
+        }
+    }
+});
+
+test('ignored paired attachment insert fails without an orphan creation event', async () => {
+    resetDatabase();
+    const before = atomicSnapshot();
+    const sql = new Database(path.join(DATA_DIR, 'medical.db'));
+    try {
+        sql.exec(`CREATE TRIGGER synthetic_paired_insert_ignore BEFORE INSERT ON attachments
+            BEGIN SELECT RAISE(IGNORE); END`);
+        await assert.rejects(createNetworkScopedAttachment(makeContext(), validCreateBody()));
+        assert.deepEqual(atomicSnapshot(), before);
+    } finally {
+        sql.exec('DROP TRIGGER IF EXISTS synthetic_paired_insert_ignore');
+        sql.close();
+    }
+});
+
+test.after(() => fs.rmSync(DATA_DIR, { recursive: true, force: true }));
