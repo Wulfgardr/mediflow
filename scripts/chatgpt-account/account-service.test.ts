@@ -139,11 +139,26 @@ test('timeout and unexpected exit are terminal; explicit restart creates a fresh
     second.failure('process_exited'); assert.equal(service.status().notice, 'process_exited');
     await service.dispose();
 });
-test('session dispose while creating a process closes the late process and rejects result', async () => {
+test('session dispose while creating a process closes the late process and rejects result', { timeout: 5000 }, async (t) => {
     const created = deferred<SyntheticAccountTransport>(); const reached = deferred<void>(); const transport = new SyntheticAccountTransport();
     const service = createAccountService({ configured: true, createTransport: () => { reached.resolve(); return created.promise; } });
-    const starting = service.execute('login/start'); await reached.promise; await service.dispose(); created.resolve(transport);
-    await assert.rejects(starting, /session_expired/); assert.equal(transport.closed, 1);
+    t.after(async () => { created.resolve(transport); await service.dispose(); });
+    const starting = service.execute('login/start');
+    const rejected = assert.rejects(starting, /session_expired/);
+    await reached.promise;
+    let disposed = false;
+    const disposing = service.dispose().then((drained) => { disposed = true; return drained; });
+    assert.equal(service.status().state, 'disconnected');
+    assert.deepEqual(service.status().actions, []);
+    await assert.rejects(service.execute('login/start'), /session_expired/);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(disposed, false, 'Disposal must wait for the pending startup cleanup');
+    // Release the factory before awaiting the receipt that drains its late child.
+    created.resolve(transport);
+    assert.equal(await disposing, true);
+    await rejected;
+    assert.equal(transport.closed, 1);
+    assert.deepEqual(transport.calls, []);
 });
 test('catalog pagination is bounded and rejects cycles; malformed account fails closed', async () => {
     const { service, transport } = await connected();

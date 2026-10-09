@@ -1,6 +1,8 @@
+import { backupAuditCoverage, type BackupAuditCoverage } from './backup-audit';
 import fs from 'fs';
 import {
     BackupArtifact,
+    backupArtifactInputChecksum,
     BackupArtifactError,
     type BackupArtifactErrorCode,
     parseBackupArtifact,
@@ -32,6 +34,7 @@ export type BackupRestorePreflightResult = {
     ok: boolean;
     error?: string;
     checks: BackupRestorePreflightCheck[];
+    audit?: { coverage: BackupAuditCoverage; sourceChecksum: string };
     target: {
         dataDir: string | null;
         dbPath: string | null;
@@ -228,6 +231,7 @@ export async function runBackupRestorePreflight(
         ok: !failure,
         error: failure ? `${failure.message}${failure.remediation ? ` ${failure.remediation}` : ''}` : undefined,
         checks,
+        ...(artifact ? { audit: { coverage: backupAuditCoverage(artifact.payload), sourceChecksum: backupArtifactInputChecksum(artifact) } } : {}),
         target: {
             dataDir,
             dbPath,

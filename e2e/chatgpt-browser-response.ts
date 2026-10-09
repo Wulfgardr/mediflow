@@ -139,6 +139,7 @@ export async function createBrowserResponseOracle(page: Page, base: string) {
         assert.equal(active, false, 'ORACLE_TICKET_ALREADY_ACTIVE'); active = true;
         const id = randomUUID(), url = base + namespace + operation;
         let request: BrowserRequest | undefined, responseValue: BrowserResponse | undefined;
+        let networkTerminal: 'pending' | 'finished' | 'failed' = 'pending';
         let settleResponse!: (response: BrowserResponse) => void, settleFinished!: () => void, reject!: (error: Error) => void;
         const response = new Promise<BrowserResponse>(resolve => { settleResponse = resolve; });
         const finished = new Promise<void>(resolve => { settleFinished = resolve; });
@@ -146,7 +147,15 @@ export async function createBrowserResponseOracle(page: Page, base: string) {
         // The same rejection is raced by response/json. Mark it handled during the
         // user's click without converting it into a success or changing its cause.
         void failure.catch(() => {});
-        const fail = (code: string) => reject(new Error(code));
+        const fail = (code: string) => {
+            // Snapshot Node observations at this failure, not a reader phase or
+            // an abort initiator. The plain message also survives CI reporting.
+            const context = Object.freeze({ operation, requestSelected: request !== undefined,
+                responseStatus: responseValue?.status() ?? null, networkTerminal });
+            const error = new Error(`${code} [operation=${context.operation}; responseStatus=${context.responseStatus ?? 'not-observed'}; requestSelected=${context.requestSelected}; networkTerminal=${context.networkTerminal}]`);
+            Object.defineProperty(error, 'oracleContext', { value: context, enumerable: true });
+            reject(error);
+        };
         const onRequest = (value: BrowserRequest) => {
             if (value.url() !== url || value.method() !== 'POST') return;
             if (request) { fail('ORACLE_DUPLICATE_BROWSER_REQUEST'); return; }
@@ -158,8 +167,8 @@ export async function createBrowserResponseOracle(page: Page, base: string) {
             if (responseValue || value.fromServiceWorker() || value.url() !== url) { fail('ORACLE_BROWSER_RESPONSE_IDENTITY'); return; }
             responseValue = value; settleResponse(value);
         };
-        const onFinished = (value: BrowserRequest) => { if (value === request) settleFinished(); };
-        const onFailed = (value: BrowserRequest) => { if (value === request) fail(`ORACLE_NETWORK_FAILED: ${value.failure()?.errorText ?? 'unknown'}`); };
+        const onFinished = (value: BrowserRequest) => { if (value === request) { networkTerminal = 'finished'; settleFinished(); } };
+        const onFailed = (value: BrowserRequest) => { if (value === request) { networkTerminal = 'failed'; fail(`ORACLE_NETWORK_FAILED: ${value.failure()?.errorText ?? 'unknown'}`); } };
         const onClose = () => fail('ORACLE_PAGE_CLOSED');
         const onCrash = () => fail('ORACLE_PAGE_CRASHED');
         const onNavigation = (frame: Frame) => { if (frame === page.mainFrame()) fail('ORACLE_DOCUMENT_CHANGED'); };
