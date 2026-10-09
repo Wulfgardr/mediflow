@@ -115,10 +115,18 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         const onlyTest = after.patients.find(patient => patient.id === patientIds[0])!;
         const shared = after.patients.find(patient => patient.id === patientIds[1])!;
         expect(onlyTest.deleted_at).not.toBeNull(); expect(onlyTest.version).toBe(2);
-        expect(shared.deleted_at).toBeNull(); expect(shared.version).toBe(1);
+        expect(shared.deleted_at).toBeNull(); expect(shared.version).toBe(2);
+        expect(shared.ambulatory_id).toBe(before.patients.find(patient => patient.id === shared.id)!.ambulatory_id);
         expect(after.memberships).toEqual(before.memberships.filter(membership => membership.ambulatory_id === live!.id));
         const addedEvents = after.events.slice(before.events.length);
-        expect(addedEvents.map(event => event.event_type).sort()).toEqual(['ambulatory.cleared', 'ambulatory.cleared', 'patient.deleted']);
+        expect(addedEvents.map(event => event.event_type).sort()).toEqual(['ambulatory.cleared', 'ambulatory.cleared', 'patient.deleted', 'patient.updated']);
+        const unlinkedEvents = addedEvents.filter(event => event.event_type === 'patient.updated');
+        expect(unlinkedEvents).toHaveLength(1);
+        expect(unlinkedEvents[0].subject_ref).toBe(shared.id);
+        expect(JSON.parse(String(unlinkedEvents[0].redacted_metadata))).toEqual({
+            changedFields: ['ambulatoryMemberships'], resourceVersion: 2,
+            flags: ['membership:unassigned', 'auth:session'],
+        });
         expect(addedEvents.every(event => event.source_surface === 'web')).toBe(true);
         expect(addedEvents.filter(event => event.subject_ref === id).map(event => JSON.parse(String(event.redacted_metadata)).resourceVersion)).toEqual([2, 3]);
         const readback = await page.request.get('/api/ambulatories');
