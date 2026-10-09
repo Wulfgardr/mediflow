@@ -19,7 +19,7 @@ import { ATTACHMENTS_ABSENT, frame, PAYLOAD_DIGEST_CODEC, SEAL_DIGEST_CODEC,
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LOADER = path.join(ROOT, 'scripts/register-strip-types-loader.mjs');
+const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')).href;
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 const NON_BACKUP_TABLES = new Set(['settings', 'users']);
 /* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
