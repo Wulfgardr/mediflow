@@ -4,10 +4,11 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { acquireTestDataDir, cleanupTestDataDir } from './test-data-dir.mjs';
+import { unitTestArguments } from './unit-test-selection.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const node = process.execPath;
-const unitArgs = ['scripts/run-strip-types.mjs', '--test', '--glob', 'lib/**/*.test.ts', '--glob', 'components/**/*.test.ts', 'scripts/admin-route-auth-boundary.test.mjs', 'scripts/check-never-regress-icd-who.test.mjs', 'scripts/inventory-first-party-code.test.mjs', 'scripts/test-data-dir.test.mjs', 'scripts/check-schema-drift.test.ts', 'scripts/run-native-probe.test.mjs', 'scripts/audit-quality-gate.test.mjs', 'scripts/audit-test-config.test.mjs', 'scripts/prosthetic-audit-guard.test.mjs', 'scripts/service-audit-guard.test.mjs', 'scripts/ambulatory-audit-guard.test.mjs', 'scripts/prepare-e2e-db.test.mjs', 'scripts/db-server-data-isolation.test.mjs', 'scripts/native-first-install.test.mjs', 'scripts/native-network-bounded-json.test.mjs', 'scripts/native-network-attachment-budget.test.mjs', 'scripts/checkup-parent-lifecycle.test.mjs', 'scripts/checkup-parent-lifecycle-harness.test.mjs', 'scripts/anydoc-consumer-diagnostic.test.mjs', 'scripts/run-unit-suite.test.mjs', 'scripts/network-catalog-smoke-cleanup.test.mjs', 'scripts/e2e-quarantine.test.mjs', 'scripts/run-strip-types.test.mjs', 'scripts/check-motion-budget.test.mjs', 'scripts/node-runtime-contract.test.mjs', 'scripts/generate-runtime-payload-ledger.test.mjs', 'scripts/chatgpt-account/account-service.test.ts', 'scripts/chatgpt-account/account-browser.test.ts', 'scripts/chatgpt-account/account-session-http.test.ts', 'scripts/chatgpt-account/account-transport.test.ts'];
+const unitArgs = unitTestArguments(root);
 
 function run(args, env) {
   const result = spawnSync(node, args, { cwd: root, env, stdio: 'inherit' });

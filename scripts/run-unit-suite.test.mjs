@@ -5,16 +5,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS } from './unit-test-selection.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const source = fs.readFileSync(path.join(root, 'scripts', 'run-unit-suite.mjs'), 'utf8');
 const dataDirSource = fs.readFileSync(path.join(root, 'scripts', 'test-data-dir.mjs'), 'utf8');
+const selectionSource = fs.readFileSync(path.join(root, 'scripts', 'unit-test-selection.mjs'), 'utf8');
 
 function fixture(unit, { preserveUnitArgs = false } = {}) {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-unit-wrapper-'));
   const scripts = path.join(sandbox, 'scripts'); fs.mkdirSync(scripts);
   fs.writeFileSync(path.join(scripts, 'prepare-e2e-db.mjs'), "process.exit(Number(process.env.TEST_BOOTSTRAP_STATUS ?? 0));\n");
   fs.writeFileSync(path.join(scripts, 'test-data-dir.mjs'), dataDirSource.replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
+  fs.writeFileSync(path.join(scripts, 'unit-test-selection.mjs'), selectionSource);
   const runnerSource = preserveUnitArgs ? source
     : source.replace(/const unitArgs = .*;\n/u, `const unitArgs = ['--eval', ${JSON.stringify(unit)}];\n`);
   fs.writeFileSync(path.join(scripts, 'run-unit-suite.mjs'), runnerSource.replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
@@ -57,6 +60,12 @@ test('preserves a non-empty explicit relative data-dir value for every child', (
 
 function defaultSelectionFixture(testFile) {
   const value = fixture('', { preserveUnitArgs: true });
+  // Supply every required selection path without importing application code.
+  for (const relative of [...UNIT_TEST_GROUPS.map(group => `${group}/fixture.test.ts`), ...UNIT_SCRIPT_TESTS]) {
+    const target = path.join(value.sandbox, relative);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, 'export {};\n');
+  }
   // Keep the real wrapper and its default argv. Only the child suite is synthetic:
   // it executes physically present test files using Node's real test runner.
   fs.writeFileSync(path.join(value.sandbox, 'scripts', 'run-strip-types.mjs'), `
@@ -64,7 +73,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 const args = process.argv.slice(2);
 fs.writeFileSync('selected-args.json', JSON.stringify(args));
-const files = args.filter(arg => /\\.test\\.(?:mjs|ts)$/.test(arg) && fs.existsSync(arg));
+const files = args.filter(arg => arg === ${JSON.stringify(`scripts/${testFile}`)} && fs.existsSync(arg));
 if (!files.length) process.exit(0);
 const env = { ...process.env };
 for (const key of Object.keys(env)) if (key.startsWith('NODE_TEST')) delete env[key];
@@ -90,6 +99,11 @@ for (const testFile of [
   'run-strip-types.test.mjs',
   'check-motion-budget.test.mjs',
   'node-runtime-contract.test.mjs',
+  'check-never-regress-ocr-retirement.test.mjs',
+  'check-never-regress-tinetti-provenance.test.mjs',
+  'unit-test-selection.test.mjs',
+  'test-inventory.test.mjs',
+  'explicit-npm-test-selection.test.mjs',
   'generate-runtime-payload-ledger.test.mjs',
   'chatgpt-account/account-service.test.ts',
   'chatgpt-account/account-browser.test.ts',
