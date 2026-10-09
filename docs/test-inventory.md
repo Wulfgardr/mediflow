@@ -1,8 +1,8 @@
 # Test inventory
 
 The inventory detects changes to test discovery, the unit suite's selection, and
-five explicit npm test selections, the Headless and Playwright selectors and the Claims guard
-self-test, each with configured CI calls.
+five explicit npm test selections, the Headless and Playwright selectors and five guard
+self-tests, each with configured CI calls.
 It does not certify that tests ran, that their assertions are sufficient, or that a
 release is qualified. Unresolved selections remain visible work; they are not
 approved exclusions or deferrals.
@@ -92,17 +92,25 @@ npm models above. The inventory awaits selection and keeps the required suite
 present with errors and no selected files if either binding or selection fails.
 This adds static selector coverage, not proof of assertions or installed targets.
 
-The `npm:check:claims:self-test` model selects only
-`scripts/check-claims-guard.mjs`. It verifies that this is a regular file inside
-the repository, that `check:claims` has the exact command
-`node scripts/check-claims-guard.mjs`, and that the `repository-guards` job has
-one literal `npm run check:claims -- --self-test` call. The ordinary
-`npm run check:claims` scan alone does not satisfy the self-test binding.
-Only this declared argument sequence is admitted; other arguments, shell
-embedding or duplicate calls fail, with the same CI context guards as above.
-Collection does not read, import or execute the Claims guard. Its existing
-rules and self-test assertions remain unchanged; their execution and adequacy
-need separate evidence.
+The guard self-test models select the real entrypoint for each command:
+
+| Suite ID | Selected file |
+| --- | --- |
+| `npm:check:claims:self-test` | `scripts/check-claims-guard.mjs` |
+| `npm:check:schema-writers:self-test` | `scripts/check-schema-writers.mjs` |
+| `npm:check:ai-clinical-writes:self-test` | `scripts/check-ai-clinical-write-gate.mjs` |
+| `npm:check:api-error-leak:self-test` | `scripts/check-api-error-leak.mjs` |
+| `npm:check:openapi:drift:self-test` | `scripts/check-openapi-drift.mjs` |
+
+Each model verifies a regular file inside the repository, an exact npm command
+`node <selected file>`, and one literal `npm run <script> -- --self-test` call
+in the `repository-guards` job. The ordinary scan alone does not satisfy this
+binding. Only the OpenAPI model admits the existing companion invocation
+`npm run check:openapi:drift -- --base-ref origin/main`; that line never counts
+as the self-test. Other arguments, shell embedding or duplicate self-test calls
+fail, with the same CI context guards as above. Collection does not read, import
+or execute the guards. Their rules and assertions remain unchanged; execution
+and adequacy need separate evidence from the existing CI steps.
 The literal self-test argument also makes the adapter itself an inclusive
 discovery candidate. That helper retains an unresolved record pending semantic
 classification; it is not silently excluded to reduce the unresolved count.
@@ -132,6 +140,32 @@ with separate existing commands or CI callers. `unresolved` means this guard has
 not verified a selector binding; it does not mean the file is orphaned or optional.
 Platform, capability and method filters need separate selector models and actual
 execution receipts before any coverage claim.
+
+## Support modules, not standalone test entrypoints
+
+A reviewed `support` disposition excludes a helper from standalone entrypoint
+selection; it does not claim another test ran. It requires a non-empty `reason`,
+`owner` and list of `importers`. The six initial dispositions are owned by
+`@Wulfgardr` under WUL-729. Their assertions, fixture factories, module doubles
+and cleanup hooks are consumed by tests, rather than registered as independent
+tests. Fixtures with top-level assertions are not included in this disposition.
+
+Every listed importer must exist among discovered candidates, have a mapped
+entry, and actually be selected by an error-free verified suite. Merely naming
+an importer or suite in the manifest is insufficient. The source must contain
+a runtime import of the exact support path in its leading import prologue.
+The closed grammar accepts comments, whitespace, the literal ESM marker
+`void import.meta.url;`, and semicolon-terminated default, namespace or named
+imports from unescaped string literals. Relative imports require explicit paths;
+there is no extension inference. Type-only imports do not count. Inspection
+stops at the first other statement, so strings, embedded fixtures, dynamic imports,
+`require` calls and imports later in a module do not establish a binding.
+
+Support classification remains a reviewed source decision: this limited check
+verifies declared import links, not arbitrary JavaScript semantics or the absence
+of standalone tests. A support file selected as a test is rejected. New, renamed
+or missing candidates retain the ordinary integrity failures. Reports show support
+entrypoint exclusions separately from unresolved selections and execution evidence.
 
 ## Updating the inventory
 

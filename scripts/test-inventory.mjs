@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { collectPlaywrightTestFiles } from './playwright-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
-import { collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection } from './explicit-npm-test-selection.mjs';
+import { collectExplicitNpmSelections, collectNpmScriptBinding, collectGuardSelfTestSelections } from './explicit-npm-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
 const headlessSuite = Object.freeze({ script: 'test:headless-portable', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts' });
@@ -55,6 +55,34 @@ function text(bytes, label) {
   catch { throw new Error(`Invalid UTF-8: ${label}`); }
 }
 
+/** Closed import prologue only; never search comments, strings or function bodies. */
+export function collectStaticSupportImports(source, importer) {
+  const identifier = String.raw`[A-Za-z_$][\w$]*`;
+  const binding = String.raw`(?:type\s+)?${identifier}(?:\s+as\s+${identifier})?`;
+  const named = String.raw`\{\s*(?:${binding}(?:\s*,\s*${binding})*\s*,?)?\s*\}`;
+  const namespace = String.raw`\*\s+as\s+${identifier}`;
+  const clause = String.raw`(?:${identifier}(?:\s*,\s*(?:${named}|${namespace}))?|${named}|${namespace})`;
+  const declaration = new RegExp(String.raw`^import\s+(type\s+)?(${clause})\s+from\s+(['"])([^'"\\\r\n]+)\3\s*;`, 'u');
+  const imports = [];
+  let rest = source;
+  while (rest) {
+    const trivia = /^(?:\s+|\/\/[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)/u.exec(rest);
+    if (trivia) { rest = rest.slice(trivia[0].length); continue; }
+    if (rest.startsWith('void import.meta.url;')) { rest = rest.slice('void import.meta.url;'.length); continue; }
+    const match = declaration.exec(rest);
+    if (!match) break;
+    rest = rest.slice(match[0].length);
+    const [, typeOnly, imported, , specifier] = match;
+    // `import type` and named bindings all prefixed by `type` do not load support.
+    if (typeOnly || (imported.startsWith('{') && imported.slice(1, -1).split(',')
+      .filter(part => part.trim()).every(part => /^\s*type\s/u.test(part)))) continue;
+    if (!specifier.startsWith('./') && !specifier.startsWith('../')) continue;
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(importer), specifier));
+    if (validPath(target)) imports.push(target);
+  }
+  return [...new Set(imports)];
+}
+
 /** Heuristic candidate discovery only. Never imports or evaluates source text. */
 export function discoverCandidates(paths, readSource) {
   if (!Array.isArray(paths) || typeof readSource !== 'function') throw new Error('Invalid discovery input');
@@ -71,7 +99,8 @@ export function discoverCandidates(paths, readSource) {
     const source = text(readSource(relative), relative);
     const found = named ? ['conventional-test-name'] : [];
     for (const [name, pattern] of signals) if (pattern.test(source)) found.push(name);
-    if (found.length) candidates.push({ path: relative, signals: found });
+    if (found.length) candidates.push({ path: relative, signals: found,
+      staticImports: collectStaticSupportImports(source, relative) });
   }
   return candidates.sort((a, b) => a.path.localeCompare(b.path, 'en'));
 }
@@ -80,6 +109,9 @@ export function discoverCandidates(paths, readSource) {
 export function checkInventory(candidates, manifest, selections) {
   const errors = [];
   const unresolved = [];
+  const support = [];
+  const staticImports = new Map();
+  const verifiedSuites = new Set();
   const discovered = new Set();
   const entries = new Map();
   const suites = new Map();
@@ -90,6 +122,7 @@ export function checkInventory(candidates, manifest, selections) {
     if (!validPath(file)) { add('INVALID_CANDIDATE_PATH', JSON.stringify(file)); continue; }
     if (discovered.has(file)) add('DUPLICATE_CANDIDATE', file);
     discovered.add(file);
+    staticImports.set(file, new Set(candidate.staticImports ?? []));
   }
   if (!manifest || manifest.version !== 1 || !Array.isArray(manifest.entries)
     || Object.keys(manifest).some(key => !['version', 'entries'].includes(key))) {
@@ -110,6 +143,14 @@ export function checkInventory(candidates, manifest, selections) {
         || selection.suiteIds.some(id => typeof id !== 'string' || !id.trim())
         || new Set(selection.suiteIds).size !== selection.suiteIds.length
         || Object.keys(selection).some(key => !['state', 'suiteIds'].includes(key))) add('INVALID_MAPPING', entry.path);
+    } else if (selection?.state === 'support') {
+      support.push(entry.path);
+      if (typeof selection.reason !== 'string' || !selection.reason.trim()
+        || typeof selection.owner !== 'string' || !selection.owner.trim()
+        || !Array.isArray(selection.importers) || !selection.importers.length
+        || selection.importers.some(importer => !validPath(importer) || importer === entry.path)
+        || new Set(selection.importers).size !== selection.importers.length
+        || Object.keys(selection).some(key => !['state', 'reason', 'owner', 'importers'].includes(key))) add('INVALID_SUPPORT', entry.path);
     } else add('INVALID_SELECTION_STATE', entry.path);
   }
   if (!selections || typeof selections !== 'object' || Array.isArray(selections)) {
@@ -130,6 +171,7 @@ export function checkInventory(candidates, manifest, selections) {
       if (!discovered.has(file)) add('SELECTED_WITHOUT_CANDIDATE', `${id}: ${file}`);
     }
     suites.set(id, files);
+    if (!selection.errors.length && files.size) verifiedSuites.add(id);
   }
   for (const file of discovered) if (!entries.has(file)) add('UNREGISTERED_CANDIDATE', file);
   for (const [file, entry] of entries) {
@@ -140,7 +182,20 @@ export function checkInventory(candidates, manifest, selections) {
       else if (!suites.get(id).has(file)) add('MAPPED_NOT_SELECTED', `${id}: ${file}`);
     }
   }
-  return { errors, unresolved, integrityPassed: errors.length === 0,
+  for (const file of support) {
+    const selection = entries.get(file).selection;
+    if ([...suites.values()].some(files => files.has(file))) add('SUPPORT_SELECTED_AS_TEST', file);
+    for (const importer of Array.isArray(selection.importers) ? selection.importers : []) {
+      const mapped = entries.get(importer)?.selection;
+      if (!discovered.has(importer) || mapped?.state !== 'mapped'
+        || !Array.isArray(mapped.suiteIds)
+        || !mapped.suiteIds.some(id => verifiedSuites.has(id) && suites.get(id).has(importer))) {
+        add('SUPPORT_IMPORTER_NOT_SELECTED', `${file}: ${importer}`);
+      }
+      if (!staticImports.get(importer)?.has(file)) add('SUPPORT_IMPORT_MISSING', `${file}: ${importer}`);
+    }
+  }
+  return { errors, unresolved, support, integrityPassed: errors.length === 0,
     selectionComplete: errors.length === 0 && unresolved.length === 0 };
 }
 
@@ -175,7 +230,7 @@ async function cli(args) {
   catch (error) { unit = { files: [], errors: [error.message] }; }
   const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
     'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
-    'npm:check:claims:self-test': collectClaimsSelfTestSelection(root),
+    ...collectGuardSelfTestSelections(root),
     'npm:test:e2e': collectPlaywrightInventorySelection(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
@@ -186,6 +241,7 @@ function printReport(result) {
   console.log(`Inventory integrity: ${result.integrityPassed ? 'PASS' : 'FAIL'}`);
   console.log(`Selection completeness: ${result.selectionComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
   console.log(`Unresolved selection: ${result.unresolved.length}`);
+  console.log(`Support entrypoint exclusions: ${result.support.length}`);
   console.log('Execution evidence: NOT_ASSESSED');
   console.log('Npm CI bindings: configured literal calls only; reachability and lifecycle effects NOT_ASSESSED');
   console.log('C14 acceptance: NOT_ASSESSED');
