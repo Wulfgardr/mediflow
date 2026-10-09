@@ -112,3 +112,11 @@ test('at-cap valid request preserves omitted address and explicit null clears de
     const row = sql.prepare('SELECT address, description, version FROM ambulatories WHERE id=?').get('synthetic-amb');
     assert.deepEqual(row, { address: 'Synthetic address', description: null, version: 2 });
 });
+
+
+test('Web create forwards invalid field rejection without changing data or audit', async () => {
+    const before = snapshot();
+    const response = await call('create', JSON.stringify({ name: 'Synthetic create', id: 42, isDefault: true }));
+    assert.equal(response.status, 400);
+    assert.deepEqual(snapshot(), before);
+});
