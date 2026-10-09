@@ -12,7 +12,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: false,
   retries: 1,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [['./scripts/e2e-quarantine-playwright.mjs'], ['list'], ['html', { open: 'never' }]],
   use: {
     baseURL,
     trace: 'on-first-retry',
