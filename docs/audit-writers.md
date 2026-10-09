@@ -115,7 +115,7 @@ autorità già revocata. Il client continua a fornire il solo `patientId`.
 Create/delete allegati Web usano il contesto della sessione autenticata e
 metadata senza nome, percorso o contenuto clinico. Le [prove SQLite della famiglia](../lib/attachment-web-create-currentness.test.ts)
 coprono il rollback di dati, currentness ed eventi al guasto audit; un insert
-ignorato non può produrre un audit orfano. Metadata/content Web aggiungono una transazione esterna con audit obbligatorio attorno al savepoint currentness esistente. Le prove [metadata](../lib/attachment-web-put-currentness.test.ts) e [content](../lib/attachment-metadata-currentness.test.ts) verificano il rollback di entrambe le parti; l’upload paired
+ignorato non può produrre un audit orfano. Metadata/content Web aggiungono una transazione esterna con audit obbligatorio attorno al savepoint currentness esistente. Le prove [metadata](../lib/attachment-metadata-currentness.test.ts) e [content](../lib/attachment-web-put-currentness.test.ts) verificano il rollback di entrambe le parti; l’upload paired
 ha le proprie prove SQLite e conserva la propria autorità.
 
 ## Residui della migrazione C05
