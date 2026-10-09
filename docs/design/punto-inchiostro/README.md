@@ -29,7 +29,9 @@ non una lingua nuova.
 | 4 | [02-piattaforme-e-schermate.md](./02-piattaforme-e-schermate.md) | Che cosa è uguale ovunque, che cosa segue la piattaforma, mappa di ogni schermata |
 | 5 | [03-ascolto-della-visita.md](./03-ascolto-della-visita.md) | Microfono, stati dell'ascolto, rapporto con ADR 0113 |
 | 6 | [tokens/punto-inchiostro.tokens.json](./tokens/punto-inchiostro.tokens.json) | I valori in formato DTCG, Giorno e Grafite |
-| 7 | [icona/](./icona/) | Icona candidata: Giorno, Grafite, livello senza sfondo, più un'alternativa |
+| 7 | [icona/](./icona/) | Icona candidata: Giorno, Grafite, livello senza sfondo, più un'alternativa, con anteprima a più dimensioni |
+| 8 | [anteprime/](./anteprime/) | Nove schermate del banco come immagini, per chi non può aprire il browser: web, macOS, Windows, Linux, iPad, iPhone, iPhone Duo |
+| 9 | [prototipi/](./prototipi/) | Il confronto da cui è nata la scelta: stato di partenza con schermate reali su dati sintetici, le tre direzioni iniziali e la prima sintesi. Materiale storico |
 
 In Linear: documento
 [MediFlow, Direzione estetica](https://linear.app/wulfgardr/document/mediflow-direzione-estetica-8e713290463a)
@@ -132,9 +134,34 @@ l'ascolto nei loro stati di errore.
 - Copre 17 schermate di riferimento. Le superfici restanti sono assegnate a
   una di esse nella mappa delle schermate, non disegnate una per una.
 
+## Come si è arrivati qui
+
+Tutto il 9 ottobre 2026, in quest'ordine.
+
+1. **Stato di partenza.** Schermate reali del web su dati sintetici e del sito
+   pubblico: tre pazienti e mezzo per schermata, scheda in una colonna, chi
+   scrive non vede il quadro del paziente. Sono in `prototipi/`.
+2. **Tre direzioni** sugli stessi contenuti: Strumento (tabelle dense),
+   Registro (pagina tipografica), Luce e inchiostro (piano in luce, fogli).
+3. **Scelta di Leonardo:** l'ibrido fra struttura densa e voce serif, più luce
+   e inchiostro, con la richiesta di una cifra riconoscibile, simpatica,
+   pratica e uguale su ogni piattaforma.
+4. **Sintesi:** Punto d'inchiostro, con il punto e i tre inchiostri. Cifra
+   confermata; carattere di sistema per i controlli; sito affidato al modello
+   che Leonardo sceglierà.
+5. **Tracciamento:** specifica, piattaforme con iPhone Duo, mappa delle
+   schermate, ascolto della visita, token, banco.
+6. **Rifinitura:** parola "ascolto" per l'audio; caratteri armonizzati e spazi
+   su un'unità di 4 px; tre livelli per il secondo tempo della soglia; icona
+   candidata.
+
+I prototipi di `prototipi/confronto.html` sono precedenti alla rifinitura del
+punto 6: mostrano il percorso, non le misure. Per le misure vale il banco.
+
 ## Da dove viene
 
 Prototipi di confronto fra le tre direzioni iniziali e la sintesi:
+[prototipi/confronto.html](./prototipi/confronto.html), pubblicati anche su
 <https://claude.ai/artifact/N2dP4HpDnjuUouJoSy9xK5>. Reference dallo studio
 estetico di Leonardo, usato come libreria: Sales CRM di Marcel Kargul, Frame
 e Table di coss, griglie dense di ReUI, Emil Kowalski sul movimento per
