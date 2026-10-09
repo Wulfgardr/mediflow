@@ -60,12 +60,12 @@ async function records(page: Page, patientId: string) {
   return page.evaluate(async id => {
     const response = await fetch(`/api/therapies?patientId=${encodeURIComponent(id)}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Authoritative read: ${response.status}`);
-    return response.json() as Promise<Array<{ id: string; patientId: string; version: number; dosage: string; status: string }>>;
+    return response.json() as Promise<Array<{ id: string; patientId: string; version: number; dosage: string; motivation: string | null; status: string }>>;
   }, patientId);
 }
 
 for (const width of [1440, 390]) {
-  test(`409 preserves draft and requires read/review before an explicit save at ${width}px`, async ({ page }) => {
+  test(`409 recovery reads suspended therapy dosage and note after reload at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 960 });
     const data = await fixture(page);
     await openDraft(page, data);
@@ -93,10 +93,31 @@ for (const width of [1440, 390]) {
     await expect(save(page)).toBeEnabled();
     const accepted = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
     await save(page).click();
-    expect((await accepted).status()).toBe(200);
+    const acceptedResponse = await accepted;
+    expect(acceptedResponse.status()).toBe(200);
     expect(writes.map(write => write.version)).toEqual([1, 2]);
+    // The API stores the client's encrypted note; plaintext is verified in the UI.
+    const savedMotivation: unknown = acceptedResponse.request().postDataJSON().motivation;
+    expect(savedMotivation).toMatch(/^ENC:.+/);
     const stored = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
-    expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', status: 'suspended' });
+    expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: savedMotivation, status: 'suspended' });
+    await expect(save(page)).toBeHidden();
+
+    // Read the saved dosage and note from the suspended card after a fresh load.
+    await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await openPatientSection(page, 'terapie');
+    const suspendedCard = page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })
+      .locator('..').locator('..').locator('..');
+    await expect(suspendedCard.getByText('Sospesa', { exact: true })).toBeVisible();
+    await expect(suspendedCard.getByText('Dose della bozza sintetica', { exact: true })).toBeVisible();
+    await expect(suspendedCard.getByText('Nota sintetica da conservare', { exact: true })).toBeVisible();
+    await expect(suspendedCard.getByRole('textbox')).toHaveCount(0);
+    await expect(suspendedCard.getByRole('button', { name: 'Modifica', exact: true })).toHaveCount(0);
+    await expect(suspendedCard.getByRole('button', { name: 'Riprendi', exact: true })).toBeVisible();
+    const reloaded = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
+    expect(reloaded).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', motivation: savedMotivation, status: 'suspended' });
+    expect(writes.map(write => write.version)).toEqual([1, 2]);
     await assertNoHorizontalOverflow(page, [{ label: 'therapy pane', selector: '#terapie' }]);
   });
 }

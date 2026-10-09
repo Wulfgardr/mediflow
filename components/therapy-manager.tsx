@@ -741,12 +741,13 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 </h5>
                                 {suspendedTherapies.map(t => (
                                     <div key={t.id} className="flex flex-col items-start justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 sm:flex-row sm:items-center">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
+                                        <div className="min-w-0 flex-1 break-words">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <span className="font-semibold text-[color:var(--lume-ink)]">{t.drugName}</span>
                                                 <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold text-[color:var(--lume-ink-muted)]">Sospesa</span>
                                             </div>
-                                            <p className="mt-0.5 text-sm text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
+                                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
+                                            {t.motivation && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[color:var(--lume-ink-muted)]">{t.motivation}</p>}
                                         </div>
                                         <div className="flex gap-2">
                                             <button
