@@ -2479,6 +2479,15 @@
       }
     },
     {
+      "path": "lib/checkup-date-validation.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/checkup-json-envelope.test.ts",
       "selection": {
         "state": "mapped",
@@ -2498,6 +2507,15 @@
     },
     {
       "path": "lib/clinical-agenda-bridge.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/clinical-date-normalization.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -5755,6 +5773,24 @@
       }
     },
     {
+      "path": "lib/therapy-delete-client.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/therapy-delete-recovery.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/therapy-required-audit.test.ts",
       "selection": {
         "state": "mapped",
@@ -6323,14 +6359,14 @@
       }
     },
     {
-      "path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientsFilteringTests.swift",
+      "path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientSummaryPresentationTests.swift",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
       }
     },
     {
-      "path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientSummaryPresentationTests.swift",
+      "path": "native/MediFlowMac/Tests/MediFlowAppleSharedTests/PatientsFilteringTests.swift",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
@@ -6428,14 +6464,14 @@
       }
     },
     {
-      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/AgendaPresentationTests.swift",
+      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/APIVersionConflictEncodeTests.swift",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
       }
     },
     {
-      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/APIVersionConflictEncodeTests.swift",
+      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/AgendaPresentationTests.swift",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
@@ -6582,13 +6618,6 @@
       }
     },
     {
-      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/ServicePrescriptionParsingTests.swift",
-      "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
-      }
-    },
-    {
       "path": "native/MediFlowMac/Tests/MediFlowCoreTests/SQLiteClinicalStoreTests.swift",
       "selection": {
         "state": "unresolved",
@@ -6604,6 +6633,13 @@
     },
     {
       "path": "native/MediFlowMac/Tests/MediFlowCoreTests/SQLiteVendorTests.swift",
+      "selection": {
+        "state": "unresolved",
+        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "native/MediFlowMac/Tests/MediFlowCoreTests/ServicePrescriptionParsingTests.swift",
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
@@ -7356,6 +7392,15 @@
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "scripts/e2e-quarantine.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {

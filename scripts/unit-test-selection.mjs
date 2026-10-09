@@ -25,6 +25,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/checkup-parent-lifecycle-harness.test.mjs',
   'scripts/anydoc-consumer-diagnostic.test.mjs',
   'scripts/run-unit-suite.test.mjs',
+  'scripts/e2e-quarantine.test.mjs',
   'scripts/run-strip-types.test.mjs',
   'scripts/check-motion-budget.test.mjs',
   'scripts/node-runtime-contract.test.mjs',
