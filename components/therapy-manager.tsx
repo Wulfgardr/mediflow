@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
 import { useLiveQuery } from '@/lib/live-query';
 import { ApiConflictError, db, Therapy } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
@@ -43,12 +44,12 @@ const fieldLabelClassName = 'section-kicker flex items-center justify-between ga
 const inputClassName = 'w-full rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2.5 text-sm text-[color:var(--lume-ink)] outline-none transition-colors placeholder:text-[color:var(--lume-ink-muted)] focus-visible:border-[color:color-mix(in_srgb,var(--lume-ink)_28%,transparent)] focus-visible:shadow-[var(--lume-focus-ring)] read-only:bg-[color:var(--lume-surface-focal)]';
 const textareaClassName = `${inputClassName} min-h-[88px] resize-y`;
 const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_26%,transparent)] hover:bg-[color:var(--lume-surface-focal)]';
+const recoveryButtonClassName = `${quietButtonClassName.replace('h-9', 'min-h-11')} whitespace-normal py-2 text-left`;
 const statusButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 text-xs font-semibold text-[color:var(--lume-ink-muted)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] hover:text-[color:var(--lume-ink)]';
 const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors';
 
 export default function TherapyManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
     const [isAdding, setIsAdding] = useState(false);
-    useRuntimeTwinPendingForm(isAdding);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isGalenic, setIsGalenic] = useState(false); // Toggle for Free Text vs AIFA
     const [selectedDiagnosis, setSelectedDiagnosis] = useState<{ code: string; title: string } | null>(null);
@@ -67,6 +68,35 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     useEffect(() => { if (recovery) recoveryRef.current?.focus(); }, [recovery]);
     const { showToast } = useToast();
     const confirm = useConfirm();
+    const [deleteState, setDeleteState] = useState<{
+        owner: ReturnType<typeof createTherapyDeleteRecovery<Therapy>>;
+        value: DeleteRecovery<Therapy> | null;
+    } | null>(null);
+    const deleteRef = useRef<HTMLDivElement>(null);
+    const statusWriting = useRef(false);
+    const deletion = useMemo(() => {
+        const controller = createTherapyDeleteRecovery<Therapy>({
+            patientId,
+            isCurrent: () => currentPatientId.current === patientId,
+            signal: () => db.getSessionReadSignal(),
+            readParent: (id, signal) => db.patients.get(id, { signal }),
+            readTherapies: (id, signal) => db.therapies.query({ patientId: id }).toArray({ signal, rejectAuthUnavailable: true }),
+            remove: (id, options) => db.therapies.delete(id, { ...options, suppressNotify: true }),
+            isConflict: (error) => error instanceof ApiConflictError,
+            changed: (value) => setDeleteState({ owner: controller, value }),
+            succeeded: () => notifyDbChange('therapies'),
+        });
+        return controller;
+    }, [patientId]);
+    useLayoutEffect(() => {
+        currentPatientId.current = patientId;
+        deletion.activate();
+        return () => deletion.dispose();
+    }, [deletion, patientId]);
+    const deleteRecovery = deleteState?.owner === deletion ? deleteState.value : null;
+    const deleteBusy = !!deleteRecovery && ['prompt', 'writing', 'reading', 'confirming'].includes(deleteRecovery.phase);
+    useRuntimeTwinPendingForm(isAdding || !!deleteRecovery);
+    useEffect(() => { if (deleteRecovery && !deleteBusy) deleteRef.current?.focus(); }, [deleteRecovery, deleteBusy]);
 
     const therapies = useLiveQuery(
         async () => {
@@ -98,7 +128,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     });
 
     const startEditing = (therapy: Therapy) => {
-        if (isSaving || isReading || therapy.patientId !== patientId) return;
+        if (deletion.blocked || statusWriting.current || isSaving || isReading || therapy.patientId !== patientId) return;
         const context = { patientId, id: therapy.id, version: therapy.version, editing: true };
         activeDraft.current = context;
         setDraft(context);
@@ -135,6 +165,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     };
 
     const startAdding = () => {
+        if (deletion.blocked || statusWriting.current || saving.current || isReading) return;
         cancelEditing();
         const context = { patientId, id: uuidv4(), editing: false };
         activeDraft.current = context;
@@ -200,7 +231,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
 
     const onSubmit = async (data: TherapyFormValues) => {
         const context = activeDraft.current;
-        if (saving.current || recovery || !context || context.patientId !== patientId) return;
+        if (deletion.blocked || statusWriting.current || saving.current || recovery || !context || context.patientId !== patientId) return;
         saving.current = true;
         setIsSaving(true);
         let therapyCreated = false;
@@ -285,6 +316,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     };
 
     const updateStatus = async (id: string, status: Therapy['status']) => {
+        if (deletion.blocked || statusWriting.current || saving.current || isReading) return;
         const therapy = visibleTherapies.find((item) => item.id === id);
         if (!therapy || typeof therapy.version !== 'number') {
             showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
@@ -297,6 +329,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
            non lo cancellerebbe (la route pulisce endDate solo su null o ''). */
         if (status === 'completed') patch.endDate = new Date();
         if (status === 'active') patch.endDate = null;
+        statusWriting.current = true;
         try {
             await db.therapies.update(id, { ...patch, version: therapy.version });
         } catch (error) {
@@ -307,41 +340,33 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                 return;
             }
             showToast({ tone: 'error', title: 'Aggiornamento terapia fallito' });
+        } finally {
+            statusWriting.current = false;
         }
     };
 
     const handleSoftDelete = async (id: string) => {
+        if (deletion.blocked || statusWriting.current || saving.current || isReading || isAdding) return;
         const therapy = visibleTherapies.find((item) => item.id === id);
-        if (!therapy || typeof therapy.version !== 'number') {
+        if (!therapy || therapy.patientId !== patientId || !Number.isSafeInteger(therapy.version) || (therapy.version ?? 0) < 1) {
             showToast({ tone: 'error', title: 'Versione terapia non disponibile', description: 'Ricarica la pagina e riprova.' });
             return;
         }
-        const { confirmed, reason } = await confirm({
+        await deletion.begin(therapy, () => confirm({
             title: 'Eliminare questo farmaco dalla cartella?',
             message: 'Usa Elimina solo per errori di inserimento; per una terapia interrotta scegli Sospendi o Concludi.',
             confirmLabel: 'Elimina',
             tone: 'danger',
             requireReason: true,
-            reasonLabel: 'Motivazione dell\'eliminazione',
+            reasonLabel: "Motivazione dell'eliminazione",
             reasonPlaceholder: 'Es. inserimento duplicato',
-        });
-        if (!confirmed || !reason) return;
-        try {
-            await db.therapies.delete(id, { version: therapy.version, deletionReason: reason });
-        } catch (error) {
-            console.error('Failed to delete therapy', error);
-            if (error instanceof ApiConflictError) {
-                notifyDbChange('therapies');
-                showToast({ tone: 'error', title: 'Terapia aggiornata altrove', description: 'I dati sono stati ricaricati. Controlla e riprova.' });
-                return;
-            }
-            showToast({ tone: 'error', title: 'Eliminazione terapia fallita' });
-        }
+        }));
     };
 
     const newButton = !isAdding ? (
         <button
             onClick={startAdding}
+            disabled={!!deleteRecovery}
             className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold"
         >
             <Plus className="w-4 h-4" />
@@ -366,6 +391,59 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         </p>
                     </div>
                     {newButton}
+                </div>
+            )}
+
+            {deleteRecovery && deleteRecovery.phase !== 'prompt' && (
+                <div ref={deleteRef} role="alert" aria-atomic="true" aria-label="Recupero eliminazione terapia" tabIndex={-1} className="mb-6 rounded-[14px] border border-[color:var(--lume-signal-critical)] p-4 text-sm leading-6 focus-visible:shadow-[var(--lume-focus-ring)]">
+                    <p className="font-semibold">{deleteRecovery.phase === 'conflict' ? 'Eliminazione rifiutata: terapia aggiornata altrove' : 'Eliminazione da verificare'}</p>
+                    <p>{deleteRecovery.phase === 'conflict'
+                        ? 'La richiesta è stata rifiutata. La motivazione è conservata: rileggi la terapia e confronta i dati prima di decidere.'
+                        : deleteRecovery.phase === 'ready'
+                            ? 'Terapia riletta. Confronta i dati attuali prima di decidere. Un nuovo invio richiede una motivazione e la tua conferma.'
+                            : deleteRecovery.phase === 'absent'
+                                ? 'La terapia non compare nella cartella. Questo non conferma che la richiesta di eliminazione sia riuscita. Non puoi inviarla di nuovo; verifica la cartella.'
+                                : deleteRecovery.phase === 'unavailable'
+                                    ? 'Verifica non riuscita, dati non leggibili o sessione non più valida. Un nuovo invio resta bloccato finché la rilettura non riesce.'
+                                    : deleteRecovery.phase === 'writing' ? 'Invio dell’eliminazione in corso…'
+                                        : deleteRecovery.phase === 'reading' ? 'Rilettura della cartella in corso…'
+                                            : 'L’esito non è confermato: la richiesta potrebbe essere stata registrata. Rileggi la terapia prima di continuare.'}</p>
+                    <p className="mt-3 break-words">{deleteRecovery.reason
+                        ? <><strong>Motivazione conservata:</strong> {deleteRecovery.reason}</>
+                        : 'La motivazione precedente è stata scartata. Dopo la rilettura, un nuovo invio richiede una nuova motivazione.'}</p>
+                    <div className="my-3 grid gap-3 md:grid-cols-2">
+                        {[{ title: 'Terapia prima della richiesta', therapy: deleteRecovery.original }, ...(deleteRecovery.current ? [{ title: 'Terapia attualmente registrata', therapy: deleteRecovery.current }] : [])].map(({ title, therapy }) => (
+                            <div key={title} className="space-y-1 break-words" aria-label={title}>
+                                <p className="font-semibold">{title}</p>
+                                <p><strong>Farmaco:</strong> {therapy.drugName}</p>
+                                <p><strong>Principio attivo:</strong> {therapy.activePrinciple || 'Non indicato'}</p>
+                                {therapy.aic && <p><strong>Codice AIC:</strong> {therapy.aic}</p>}
+                                <p><strong>Posologia:</strong> {therapy.dosage}</p>
+                                <p><strong>Stato:</strong> {therapy.status === 'active' ? 'Attiva' : therapy.status === 'suspended' ? 'Sospesa' : 'Conclusa'}</p>
+                                <p><strong>Indicazione o nota:</strong> {therapy.motivation || 'Non indicata'}</p>
+                                <p><strong>Diagnosi:</strong> {therapy.diagnosisName || 'Non collegata'}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" disabled={deleteBusy} onClick={() => deletion.reread()} className={recoveryButtonClassName}>Rileggi terapia</button>
+                        {deleteRecovery.phase === 'ready' && (
+                            <button type="button" onClick={() => deletion.retry(() => confirm({
+                                title: 'Confermi l’eliminazione della terapia riletta?',
+                                message: deleteRecovery.reason
+                                    ? 'Hai confrontato i dati attuali. Il nuovo invio userà la motivazione conservata e riguarderà la terapia appena riletta.'
+                                    : 'Hai confrontato i dati attuali. Indica una nuova motivazione per eliminare la terapia appena riletta.',
+                                confirmLabel: 'Conferma nuovo invio', tone: 'danger',
+                                requireReason: !deleteRecovery.reason,
+                                reasonLabel: "Motivazione dell'eliminazione",
+                                reasonPlaceholder: 'Es. inserimento duplicato',
+                            }))} className={recoveryButtonClassName}>{deleteRecovery.reason
+                                ? 'Ho confrontato i dati: elimina con questa motivazione'
+                                : 'Ho confrontato i dati: indica una nuova motivazione'}</button>
+                        )}
+                        <button type="button" disabled={deleteBusy} onClick={() => deletion.cancel()} className={recoveryButtonClassName}>Annulla recupero e scarta la motivazione</button>
+                    </div>
+                    <p className="mt-2">Annullare il recupero elimina solo la motivazione conservata in questa vista; non annulla un’eventuale eliminazione già registrata.</p>
                 </div>
             )}
 
@@ -613,6 +691,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <button
+                                        disabled={!!deleteRecovery}
                                         onClick={() => startEditing(t)}
                                         className={quietButtonClassName}
                                         title="Modifica terapia"
@@ -622,6 +701,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     </button>
 
                                     <button
+                                        disabled={!!deleteRecovery}
                                         onClick={() => updateStatus(t.id, 'suspended')}
                                         className={statusButtonClassName}
                                         title="Sospendi temporaneamente"
@@ -631,6 +711,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     </button>
 
                                     <button
+                                        disabled={!!deleteRecovery}
                                         onClick={() => updateStatus(t.id, 'completed')}
                                         className={statusButtonClassName}
                                         title="Termina terapia"
@@ -640,6 +721,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     </button>
 
                                     <button
+                                        disabled={!!deleteRecovery || isAdding}
                                         onClick={() => handleSoftDelete(t.id)}
                                         className="inline-flex h-9 w-9 items-center justify-center rounded-[11px] text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                                         title="Elimina solo se inserito per errore"
@@ -659,21 +741,24 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 </h5>
                                 {suspendedTherapies.map(t => (
                                     <div key={t.id} className="flex flex-col items-start justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 sm:flex-row sm:items-center">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
+                                        <div className="min-w-0 flex-1 break-words">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <span className="font-semibold text-[color:var(--lume-ink)]">{t.drugName}</span>
                                                 <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold text-[color:var(--lume-ink-muted)]">Sospesa</span>
                                             </div>
-                                            <p className="mt-0.5 text-sm text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
+                                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
+                                            {t.motivation && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[color:var(--lume-ink-muted)]">{t.motivation}</p>}
                                         </div>
                                         <div className="flex gap-2">
                                             <button
+                                                disabled={!!deleteRecovery}
                                                 onClick={() => updateStatus(t.id, 'active')}
                                                 className={quietButtonClassName}
                                             >
                                                 <Play className="w-3 h-3" /> Riprendi
                                             </button>
                                             <button
+                                                disabled={!!deleteRecovery}
                                                 onClick={() => updateStatus(t.id, 'completed')}
                                                 className={statusButtonClassName}
                                             >
@@ -702,6 +787,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 </div>
                                 <div className="flex gap-2 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                                     <button
+                                        disabled={!!deleteRecovery}
                                         onClick={() => updateStatus(t.id, 'active')}
                                         className={quietButtonClassName}
                                     >

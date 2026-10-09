@@ -205,7 +205,8 @@ function parseRequiredDate(value: unknown, field: string): WriteNormalizationRes
 /* @Codex */
 function parseDate(value: unknown): Date | null {
     if (!value) return null;
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
+    if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) return null;
+    const parsed = value instanceof Date ? value : new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
