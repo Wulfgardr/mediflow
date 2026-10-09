@@ -194,6 +194,20 @@ a un solo dispositivo e codifica ICD obbligatoria. Per eseguirlo:
 npm run check:claims
 ```
 
+### Quarantena E2E temporanea
+
+`e2e/quarantine.json` elenca le sole instabilità ammesse da WUL-729, con
+owner, diagnosi e scadenza UTC. I test e le loro asserzioni continuano a
+eseguire. List/HTML e i report `test-results/quarantine-*` conservano gli
+errori; soltanto le firme registrate, prima della scadenza, non bloccano il
+gate. Alla scadenza tornano bloccanti automaticamente. Errori diversi,
+cleanup falliti e processi interrotti restano bloccanti.
+
+Playwright usa il reporter dalla configurazione condivisa; l'harness
+`node:test` usa lo stesso registro tramite `chatgpt-product-focused-tests.mjs`.
+Prima del rilascio rimuovere le voci, oppure ottenere la decisione esplicita
+prevista da WUL-735. Non rinnovare le scadenze automaticamente.
+
 ### Test concorrenza pazienti
 
 Per verificare come vengono gestiti i conflitti fra client su
