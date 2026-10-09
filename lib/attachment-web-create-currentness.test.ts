@@ -181,24 +181,29 @@ test('extra JavaScript mint callbacks are ignored for missing and soft-deleted p
     assert.equal(extraCalls, 0);
 });
 
-test('web list response omits every currentness tuple field', async () => {
+test('web list and metadata reads expose nested currentness with the observed record', async () => {
     reset();
     const created = await invoke(request(payload({ id: 'attachment.synthetic.list' })));
     assert.equal(created.status, 201);
     const originalRequireSession = serverAuth.requireSession;
     try {
         serverAuth.requireSession = async () => session;
-        const response = await route.GET(new Request('http://localhost/api/attachments'));
-        assert.equal(response.status, 200);
-        const [attachment] = await response.json() as Array<Record<string, unknown>>;
-        assert.ok(attachment);
-        for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']) assert.equal(key in attachment, false);
+        for (const suffix of ['', '?metadata=true']) {
+            const response = await route.GET(new Request(`http://localhost/api/attachments${suffix}`));
+            assert.equal(response.status, 200);
+            const [attachment] = await response.json() as Array<Record<string, unknown>>;
+            const row = rows()[0]!;
+            assert.deepEqual(attachment.currentness, { sourceRef: row.document_source_ref, revision: 1, freshnessEpoch: 1 });
+            assert.equal(attachment.patientId, patientId);
+            for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']) assert.equal(key in attachment, false);
+            if (suffix) assert.equal('data' in attachment, false);
+        }
     } finally {
         serverAuth.requireSession = originalRequireSession;
     }
 });
 
-test('web detail response preserves the legacy payload projection without currentness', async () => {
+test('web detail exposes nested currentness alongside the payload', async () => {
     const attachmentId = 'attachment.synthetic.detail';
     const attachmentPath = '/private/synthetic/detail.pdf';
     reset();
@@ -226,10 +231,11 @@ test('web detail response preserves the legacy payload projection without curren
         assert.equal(response.status, 200);
         const detail = await response.json() as Record<string, unknown>;
         assert.deepEqual(Object.keys(detail).sort(), [
-            'createdAt', 'data', 'id', 'name', 'ocrQueueReason', 'ocrQueueState', 'ocrQueueUpdatedAt',
+            'createdAt', 'currentness', 'data', 'id', 'name', 'ocrQueueReason', 'ocrQueueState', 'ocrQueueUpdatedAt',
             'ocrReplayArtifactSnapshot', 'parseEvidenceArtifactSnapshot', 'path', 'patientId', 'size',
             'summarySnapshot', 'type',
         ]);
+        assert.deepEqual(detail.currentness, { sourceRef: 'd'.repeat(64), revision: 1, freshnessEpoch: 1 });
         assert.equal(detail.data, 'synthetic-base64');
         assert.equal(detail.path, buildAttachmentPath(attachmentPath, 'detail.pdf', attachmentId));
         for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch']) assert.equal(key in detail, false);
@@ -272,8 +278,11 @@ async function remove(id: string, admitted: unknown = session): Promise<Response
     const original = serverAuth.requireSession;
     try {
         serverAuth.requireSession = async () => admitted;
+        const row = rows().find(row => row.id === id);
         return await detailRoute.DELETE(new Request(`http://localhost/api/attachments/${id}`, {
             method: 'DELETE', headers: { 'x-mediflow-source-surface': 'job' },
+            body: JSON.stringify({ patientId, expected: { sourceRef: row?.document_source_ref ?? 'a'.repeat(64),
+                revision: row?.document_revision ?? 1, freshnessEpoch: row?.document_freshness_epoch ?? 1 } }),
         }), { params: Promise.resolve({ id }) });
     } finally { serverAuth.requireSession = original; }
 }

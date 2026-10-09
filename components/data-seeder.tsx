@@ -95,7 +95,7 @@ export default function DataSeeder() {
             window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error(e);
-            showToast({ tone: 'error', title: "Errore durante l'eliminazione", description: String(e) });
+            showToast({ tone: 'error', title: "Eliminazione non completata", description: "Alcuni dati potrebbero essere già stati eliminati. Ricarica l’elenco prima di riprovare." });
         } finally {
             setNuking(false);
         }

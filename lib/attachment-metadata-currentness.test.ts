@@ -55,7 +55,13 @@ function snapshot() { const db = new Database(dbPath); try { return db.prepare(`
 function request(method: 'PUT' | 'DELETE', body?: unknown) { return new Request(`http://localhost/api/attachments/${ATTACHMENT}`, {
     method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
 }); }
-async function invoke(method: 'PUT' | 'DELETE', body?: unknown, id = ATTACHMENT, session: unknown = auth) {
+function observed() {
+    const row = snapshot() as Record<string, unknown> | undefined;
+    return { patientId: PATIENT, expected: { sourceRef: row?.document_source_ref ?? REF,
+        revision: row?.document_revision ?? 1, freshnessEpoch: row?.document_freshness_epoch ?? 1 } };
+}
+async function invoke(method: 'PUT' | 'DELETE', body?: unknown, id = ATTACHMENT, session: unknown = auth, raw = false) {
+    if (!raw) body = { ...observed(), ...(body as object) };
     const original = serverAuth.requireSession; serverAuth.requireSession = async () => session;
     try { return route[method](request(method, body), { params: Promise.resolve({ id }) }); }
     finally { serverAuth.requireSession = original; }
@@ -65,7 +71,7 @@ test.afterEach(() => {
 });
 test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
-test('authenticated metadata mutations advance the host tuple exactly once, including concurrent accepted updates', async () => {
+test('authenticated metadata mutations advance the host tuple exactly once, with one winner for concurrent client preconditions', async () => {
     reset(); const beforeAudit = atomicSnapshot().audit.length;
     const first = await invoke('PUT', { summarySnapshot: 'old' });
     assert.equal(first.status, 200); assert.deepEqual(snapshot(), { patient_id: PATIENT, summary_snapshot: 'old', parse_evidence_artifact_snapshot: null,
@@ -81,9 +87,9 @@ test('authenticated metadata mutations advance the host tuple exactly once, incl
         { changedFields: ['summarySnapshot'], resourceVersion: 2, flags: ['auth:session'] });
     const changed = await invoke('PUT', { summarySnapshot: 'new' }); assert.equal(changed.status, 200);
     const responses = await Promise.all([invoke('PUT', { summarySnapshot: 'next' }), invoke('PUT', { parseEvidenceArtifactSnapshot: 'evidence' })]);
-    assert.deepEqual(responses.map((response) => response.status), [200, 200]);
-    assert.deepEqual(snapshot(), { patient_id: PATIENT, summary_snapshot: 'next', parse_evidence_artifact_snapshot: 'evidence',
-        ocr_queue_state: 'pending', document_source_ref: REF, document_revision: 5, document_freshness_epoch: 5 });
+    assert.deepEqual(responses.map((response) => response.status), [200, 409]);
+    assert.deepEqual(snapshot(), { patient_id: PATIENT, summary_snapshot: 'next', parse_evidence_artifact_snapshot: null,
+        ocr_queue_state: 'pending', document_source_ref: REF, document_revision: 4, document_freshness_epoch: 4 });
 });
 
 test('no-op, auth, missing, overflow, transition, stale-CAS, and storage failures change nothing', async () => {
@@ -173,7 +179,7 @@ test('metadata JSON is bounded at 4 MiB and rejects malformed or invalid shapes 
             assert.deepEqual(atomicSnapshot(), before);
         }
         const maximum = 4 * 1024 * 1024;
-        const json = '{"summarySnapshot":null}';
+        const json = JSON.stringify({ ...observed(), summarySnapshot: null });
         const atLimit = json + ' '.repeat(maximum - Buffer.byteLength(json));
         assert.equal((await send(atLimit)).status, 200);
         for (const headers of [{}, { 'content-length': '1' }, { 'content-length': String(maximum + 1) }] as HeadersInit[]) {
@@ -182,4 +188,72 @@ test('metadata JSON is bounded at 4 MiB and rejects malformed or invalid shapes 
             assert.deepEqual(atomicSnapshot(), before);
         }
     } finally { serverAuth.requireSession = original; }
+});
+
+
+test('client preconditions are required before any metadata or delete effect', async () => {
+    for (const method of ['PUT', 'DELETE'] as const) {
+        reset(); const before = atomicSnapshot();
+        assert.equal((await invoke(method, method === 'PUT' ? { summarySnapshot: 'changed' } : {}, ATTACHMENT, auth, true)).status, 400);
+        assert.deepEqual(atomicSnapshot(), before);
+    }
+});
+
+
+test('wrong parent, stale and replay preconditions cannot mutate data or audit', async () => {
+    reset(); const initial = observed();
+    for (const method of ['PUT', 'DELETE'] as const) {
+        for (const [condition, status] of [
+            [{ ...initial, patientId: OTHER }, 404],
+            [{ ...initial, expected: { ...initial.expected, revision: 2 } }, 409],
+            [{ ...initial, expected: { ...initial.expected, extra: true } }, 400],
+            [{ ...initial, expected: { ...initial.expected, freshnessEpoch: 0 } }, 400],
+        ] as const) {
+            const before = atomicSnapshot();
+            assert.equal((await invoke(method, { ...condition, summarySnapshot: 'new' })).status, status);
+            assert.deepEqual(atomicSnapshot(), before);
+        }
+    }
+    assert.equal((await invoke('PUT', { ...initial, summarySnapshot: 'new', ignoredRootField: true })).status, 200);
+    const committed = atomicSnapshot();
+    for (const method of ['PUT', 'DELETE'] as const) {
+        assert.equal((await invoke(method, { ...initial, summarySnapshot: 'replay' })).status, 409);
+        assert.deepEqual(atomicSnapshot(), committed);
+    }
+    const current = observed();
+    assert.equal((await invoke('DELETE', current)).status, 200);
+    const deleted = atomicSnapshot();
+    assert.equal((await invoke('DELETE', current)).status, 404);
+    assert.deepEqual(atomicSnapshot(), deleted);
+    reset();
+    const sql = new Database(dbPath);
+    try { sql.prepare('UPDATE attachments SET document_source_ref = ? WHERE id = ?').run('c'.repeat(64), ATTACHMENT); }
+    finally { sql.close(); }
+    const recreated = atomicSnapshot();
+    assert.equal((await invoke('DELETE', initial)).status, 409);
+    assert.deepEqual(atomicSnapshot(), recreated);
+});
+
+test('matching client snapshot preserves tombstoned-parent admission and OCR transition', async () => {
+    reset(); const sql = new Database(dbPath);
+    try { sql.prepare('UPDATE patients SET deleted_at = 1 WHERE id = ?').run(PATIENT); } finally { sql.close(); }
+    assert.equal((await invoke('PUT', { ocrQueueState: 'processing', summarySnapshot: '' })).status, 200);
+    const row = snapshot() as Record<string, unknown>;
+    assert.equal(row.ocr_queue_state, 'processing'); assert.equal(row.summary_snapshot, null);
+    assert.equal((await invoke('DELETE')).status, 200);
+});
+
+
+test('content replacement invalidates earlier metadata and delete snapshots', async () => {
+    reset(); const earlier = observed();
+    const { putAttachmentContent } = await import('./attachment-content-cas-route.ts');
+    const replaced = await putAttachmentContent(new Request(`http://localhost/api/attachments/${ATTACHMENT}/content`, {
+        method: 'PUT', body: JSON.stringify({ expected: earlier.expected, replacement: 'ENC:c3ludGhldGlj:cmVwbGFjZW1lbnQ=' }),
+    }), ATTACHMENT, auth as ServerSession);
+    assert.equal(replaced.status, 200);
+    const committed = atomicSnapshot();
+    for (const method of ['PUT', 'DELETE'] as const) {
+        assert.equal((await invoke(method, { ...earlier, summarySnapshot: 'stale' })).status, 409);
+        assert.deepEqual(atomicSnapshot(), committed);
+    }
 });

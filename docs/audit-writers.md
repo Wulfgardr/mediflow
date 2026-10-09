@@ -118,12 +118,14 @@ coprono il rollback di dati, currentness ed eventi al guasto audit; un insert
 ignorato non può produrre un audit orfano. Metadata/content Web aggiungono una transazione esterna con audit obbligatorio attorno al savepoint currentness esistente. Le prove [metadata](../lib/attachment-metadata-currentness.test.ts) e [content](../lib/attachment-web-put-currentness.test.ts) verificano il rollback di entrambe le parti; l’upload paired
 ha le proprie prove SQLite e conserva la propria autorità.
 
+Metadata e delete Web verificano patientId e currentness osservata nella stessa transazione dell’audit. La UI conserva la precondizione durante la conferma, la facade non la aggiorna automaticamente e il seeder segnala eliminazione incompleta se un allegato viene respinto. Le [prove client](../lib/attachment-client-preconditions.test.ts) collegano la snapshot al payload; il [contratto Web](./adr/0099-ocr-document-locator-and-source-currentness.md) distingue queste letture dalla proiezione paired.
+
 ## Residui della migrazione C05
 
 Le operazioni classificate sopra come audit obbligatorio sono state migrate
 alla transazione che possiede la scrittura. Restano i writer senza audit e le
 garanzie di input, versione e replay assegnati nel [roster C05](./clinical-write-roster.md),
-in particolare CAS/replay client metadata/delete e caller indiretti degli allegati Web. La classificazione delle
+in particolare caller indiretti degli allegati Web e ripristino. La classificazione delle
 chiamate audit non dimostra da sola la copertura di tutti i writer indiretti.
 
 La riparazione orfani ora traccia anche default e relink, oltre al purge
