@@ -66,6 +66,7 @@ una riga inserita; non apre una seconda connessione.
 | [ambulatory-write.ts:261](../lib/ambulatory-write.ts#L261) | Evento complessivo `ambulatory.cleared`. | Stessa transazione degli effetti sui pazienti. |
 | [patients/assign/route.ts](../app/api/patients/assign/route.ts) | Associazione secondaria paziente/ambulatorio: cambia lo scope persistito. | C05: lookup, insert ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
 | [patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | Rimozione associazione secondaria, con primary e versione invariati. | C05: lookup, delete ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
+| [patients/move/route.ts](../app/api/patients/move/route.ts) | Trasferimento batch: cambia associazioni, ambulatorio primario e versione. | C05: CAS, mutazioni ed evento per paziente nella stessa transazione immediata; rollback dell'intero batch al guasto audit. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
@@ -84,6 +85,13 @@ verificano rollback dell'intero batch se il secondo audit fallisce o viene
 ignorato, identità host, dinieghi senza effetti e replay immediato senza audit
 aggiuntivo. La versione del paziente e l'ambulatorio primario restano invariati;
 CAS e replay dopo operazioni interposte restano residui C05.
+
+Il trasferimento `move` applica gli stessi limiti JSON e conserva il CAS
+esistente. Le [prove SQLite del trasferimento](../lib/patient-move-required-audit.test.ts)
+verificano eventi e versioni sul successo, rollback completo se il secondo audit
+fallisce o viene ignorato e replay con versione vecchia senza effetti.
+`sourceAmbulatoryId` resta il filtro opzionale per la rimozione di una membership;
+non diventa una nuova precondizione di appartenenza.
 
 ## Writer clinici ancora al meglio: consegna a C05
 
