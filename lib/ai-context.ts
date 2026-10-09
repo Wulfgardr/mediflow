@@ -25,6 +25,7 @@ import {
 } from '@/lib/domain/documents/evidence-queue-contract';
 /* @Codex */
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
+import { scaleInterpretationVersionLabel } from '@/lib/scale-history';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
@@ -895,9 +896,17 @@ export async function buildPatientInsightContext(
             const rendered = snippets.length > 0
                 ? snippets.join(' | ')
                 : compactText(clinicalRichTextToPlainText(entry?.content ?? ''), 220);
+            const interpretationVersion = entry?.type === 'scale'
+                ? scaleInterpretationVersionLabel(entry.metadata) : null;
+            // Retain the existing per-entry snippet/fallback budget. Metadata is
+            // a bounded identifier, never an arbitrary prompt or a clinical claim.
+            const renderBudget = snippets.length > 0 ? snippets.length * 160 + (snippets.length - 1) * 3 : 220;
+            const versionedRendered = interpretationVersion
+                // compactText's three-dot suffix can add two extra characters.
+                ? compactText(`${interpretationVersion}. ${rendered}`, renderBudget - 2) : rendered;
 
             return {
-                promptLine: `- [${formatDate(entry?.date)}] ${String(entry?.type ?? 'note').toUpperCase()}: ${rendered}`,
+                promptLine: `- [${formatDate(entry?.date)}] ${String(entry?.type ?? 'note').toUpperCase()}: ${versionedRendered}`,
                 evidenceSourceId: item.source.id,
                 evidenceSchemaVersion: evidenceQueue.schemaVersion,
                 citation: item.renderableClaims[0]?.citation,

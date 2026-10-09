@@ -56,6 +56,12 @@ switch (command) {
     } else if (args.join(' ') !== 'run check:standalone-runtime-bundle') throw new Error('Unexpected npm invocation');
     break;
   case 'generate': case 'record-stager': break;
+  case 'scheduled-backup-order-only':
+    if (args.length !== 2 || args[0] !== '--runtime-root'
+      || target !== path.join(root, 'derived/Build/Products', process.env.MEDIFLOW_MAC_CONFIG, 'MediFlow.app/Contents/Resources/WebRuntime')
+      || !fs.existsSync(path.join(target, 'server.js'))) throw new Error('Scheduled backup check did not target the copied WebRuntime');
+    if (process.env.MEDIFLOW_PACKAGING_TEST_BACKUP_REJECT === '1') throw new Error('Synthetic scheduled backup closure rejection');
+    break; // Call order and failure propagation only; the real import closure has dedicated tests.
   case 'headless-order-only':
     if (!['--stage', '--check'].includes(args[0]) || args[1] !== '--app') throw new Error('Bad Headless call');
     if (args[0] === '--stage' && fs.existsSync(path.join(target, 'Contents/_CodeSignature'))) throw new Error('Headless write after seal');
@@ -130,6 +136,10 @@ function buildFixture(t) {
   }
   write(path.join(bin, 'git'), '#!/bin/bash\nunset DEVELOPER_DIR\nexec /usr/bin/git "$@"\n', 0o755);
   write(path.join(bin, 'node'), `#!/bin/bash
+if [[ "\${1:-}" == */scripts/scheduled-backup-runtime-contract.mjs ]]; then
+  shift
+  exec "${process.execPath}" "${driverPath}" scheduled-backup-order-only "$@"
+fi
 if [[ "\${1:-}" == */scripts/stage-headless-runtime.mjs ]]; then
   shift
   exec "${process.execPath}" "${driverPath}" headless-order-only "$@"
@@ -234,6 +244,27 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
   });
 }
 /* @Codex: real metadata staging, synthetic Xcode/signing; no Keychain or runtime claim. */
+test('scheduled backup check uses copied WebRuntime before native relocation', t => {
+  const input = buildFixture(t);
+  pass(input.run());
+  const events = input.events();
+  const checks = events.flatMap((event, index) => event.command === 'scheduled-backup-order-only' ? [{ event, index }] : []);
+  assert.equal(checks.length, 1);
+  assert.deepEqual(checks[0].event.args, ['--runtime-root', path.join(input.app, 'Contents/Resources/WebRuntime')]);
+  const relocation = events.findIndex(event => event.command === 'install_name_tool');
+  assert.ok(relocation > checks[0].index);
+});
+test('scheduled backup rejection stops copied app before native relocation or signing', t => {
+  const input = buildFixture(t);
+  const result = input.run({ MEDIFLOW_PACKAGING_TEST_BACKUP_REJECT: '1' });
+  deny(result);
+  assert.match(result.stderr, /Synthetic scheduled backup closure rejection/u);
+  assert.equal(fs.existsSync(path.join(input.app, 'Contents/Resources/WebRuntime/server.js')), true);
+  const events = input.events();
+  assert.equal(events.filter(event => event.command === 'scheduled-backup-order-only').length, 1);
+  assert.equal(events.some(event => event.command === 'install_name_tool'
+    || event.command === 'codesign' && event.args[0] === '--force'), false);
+});
 test('QA namespace is sealed with a separate bundle identity and no ordinary URL handler', t => {
   const input = buildFixture(t), namespace = '0123456789abcdef0123456789abcdef';
   pass(input.run({ MEDIFLOW_MAC_QA_NAMESPACE: namespace, MEDIFLOW_CODESIGN_IDENTITY: '-' }));
