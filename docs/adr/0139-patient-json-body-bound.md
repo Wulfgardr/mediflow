@@ -57,3 +57,15 @@ la destinazione; nessun paziente, membership o audit viene modificato.
 La risposta 201, versione iniziale e audit required restano invariati.
 POST locale resta fuori dalla specifica stabile; lo schema paired documenta
 la restrizione e il 409. Restore e purge/ricreazione restano fuori coorte.
+
+
+## Destinazione create locale (C05, 2026-10-09)
+
+Il POST v1 locale valida `ambulatoryId` originale: omissione e null mantengono
+la creazione senza membership; un valore fornito non stringa o vuoto dopo trim
+produce 400. Una stringa opaca valida viene conservata senza trim.
+Nel create Web legacy e v1, un target ambulatoriale inesistente produce 404
+`Ambulatory not found`, verificato nella transazione prima del lookup dell'ID
+paziente duplicato. Il diniego non modifica pazienti, membership o audit.
+L'ammissione paired, fixed-preview e create-context resta invariata. Il POST v1
+locale resta fuori dalla superficie OpenAPI stabile; non si introduce un endpoint.

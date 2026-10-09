@@ -288,8 +288,37 @@ for (const surface of ['web-legacy', 'v1'] as const) {
         const before = readBack(id);
         state.selected = 'missing-destination';
         const response = await create(surface, id, { body: { ambulatoryId: 'missing-destination' } });
-        assert.equal(response.status, 500);
-        assert.deepEqual(await response.json(), { error: 'Failed to create patient' });
+        assert.equal(response.status, 404);
+        assert.deepEqual(await response.json(), { error: 'Ambulatory not found' });
         assert.deepEqual(readBack(id), before);
     });
 }
+
+
+test('v1 validates original destination and preserves omitted, null and opaque destinations', async () => {
+    reset(); newSession('v1-destination-input');
+    const counts = () => sql.prepare('SELECT (SELECT count(*) FROM patients) AS patients, (SELECT count(*) FROM patients_to_ambulatories) AS memberships, (SELECT count(*) FROM audit_events) AS audit').get();
+    for (const ambulatoryId of [42, false, {}, [], '', '   ']) {
+        const before = counts();
+        const response = await create('v1', 'c05-malformed-destination', { body: { ambulatoryId } });
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { error: 'Invalid ambulatoryId' });
+        assert.deepEqual(counts(), before);
+    }
+    for (const [label, ambulatoryId] of [['omitted', undefined], ['null', null]] as const) {
+        const id = `c05-destination-${label}`;
+        assert.equal((await create('v1', id, { body: { ambulatoryId } })).status, 201);
+        const snapshot = readBack(id);
+        assert.equal((snapshot.patient as { ambulatory_id: string | null }).ambulatory_id, null);
+        assert.deepEqual(snapshot.memberships, []);
+        assert.equal(snapshot.audit.length, 1);
+    }
+    const ambulatoryId = ' opaque destination ';
+    dbServer.insert(ambulatories).values({ id: ambulatoryId, name: 'Destinazione sintetica opaca', type: 'live' }).run();
+    const id = 'c05-destination-opaque';
+    assert.equal((await create('v1', id, { body: { ambulatoryId } })).status, 201);
+    const snapshot = readBack(id);
+    assert.equal((snapshot.patient as { ambulatory_id: string }).ambulatory_id, ambulatoryId);
+    assert.equal((snapshot.memberships[0] as { ambulatory_id: string }).ambulatory_id, ambulatoryId);
+    assert.equal(snapshot.audit.length, 1);
+});
