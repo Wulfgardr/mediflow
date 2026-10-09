@@ -39,3 +39,21 @@ Fixture sintetiche SQLite sulle nove operazioni: sotto/al/oltre limite,
 chunked e header assente/mendace/non valido, JSON invalidi, abort pendente,
 righe/versioni/membership/audit invariati al diniego, valori ENC preservati.
 Rollback della sola coorte prima della promozione; nessun replay o rimozione audit.
+
+## Identità create (C05, 2026-10-09)
+
+Le tre superfici POST patient validano l'ID originale prima del fallback:
+solo l'omissione genera un UUID; un ID fornito non stringa o vuoto dopo trim
+riceve 400 `{"error":"Invalid id"}`. Le stringhe opache valide sono conservate
+esattamente, inclusi spazi periferici; il trim serve solo alla validazione.
+Questa restrizione corregge il precedente fallback silenzioso per ID invalidi;
+i client devono omettere `id` per richiedere la generazione, senza inviare null
+oppure stringhe vuote. Non cambia l'identità dei record già esistenti.
+
+Una collisione create-only riceve 409 `{"error":"Patient create conflict"}`
+anziché 500, senza snapshot o identità esistente nella risposta. Il lookup
+avviene nella transazione IMMEDIATE dopo l'ammissione di autorità/scope e
+la destinazione; nessun paziente, membership o audit viene modificato.
+La risposta 201, versione iniziale e audit required restano invariati.
+POST locale resta fuori dalla specifica stabile; lo schema paired documenta
+la restrizione e il 409. Restore e purge/ricreazione restano fuori coorte.
