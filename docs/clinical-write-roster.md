@@ -172,14 +172,12 @@ assente/eliminato, 409 per ID già presente. PUT/DELETE rileggono il handoff nel
 transazione. Tutte e tre le mutazioni verificano rowcount e inseriscono audit
 attribuito alla sessione nella stessa transazione sincrona IMMEDIATE; il successo
 segue il commit. PUT/DELETE non aggiungono una nuova verifica del lifecycle parent.
-Nessuna versione/CAS del client o idempotenza del PUT è introdotta. Solo Web.
+Create e letture espongono versione host (iniziale 1). PUT/DELETE richiedono patientId e versione osservati: parent diverso 404, versione superata 409 prima degli effetti; PUT incrementa la versione nello stesso commit. Solo Web.
 
 Prova: [siss-handoff-required-audit.test.ts](../lib/siss-handoff-required-audit.test.ts),
 registrata nella suite unit. Verifica i tre rollback per errore audit, i successi
 con un solo evento attribuito alla sessione e i dinieghi senza effetti.
-Gap C05-S residuo: concorrenza tramite versione/CAS, replay e idempotenza PUT da
-trattare esplicitamente; l'audit atomico non risolve tali contratti. I test del
-lancio SISS non sostituiscono questa suite CRUD.
+La stessa suite prova wrong-parent, versione superata e replay senza effetti, parità dello schema nuovo/aggiornato e versioni iniziali dei record legacy. La facade invia la snapshot osservata; clear la cattura dagli item letti. La UI fissa target e versione all’inizio della bozza e blocca l’invio se cambiano, senza adottare una versione fresca; delete cattura prima della conferma. Restore C15 e cancellazione seguita da ricreazione della stessa identità/versione restano residui distinti. I test del lancio SISS non sostituiscono questa suite CRUD.
 
 ### M — Manutenzione paziente
 
@@ -245,9 +243,9 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | SP-04 | Web PUT [/api/service-prescriptions/[id]/route.ts](../app/api/service-prescriptions/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
 | SP-05 | Web DELETE [/api/service-prescriptions/[id]/route.ts](../app/api/service-prescriptions/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
 | SP-06 | Web POST [/api/service-prescriptions/route.ts](../app/api/service-prescriptions/route.ts) | SP; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| S-01 | Web PUT [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; 256 KiB + schema | ID path; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
-| S-02 | Web DELETE [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; nessun body letto | ID path; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
-| S-03 | Web POST [/api/siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | S; 256 KiB + schema | ID/parent attivo in TX; dup409; nessuna versione | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; gap CAS/replay |
+| S-01 | Web PUT [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; 256 KiB + schema | ID path, patientId/versione osservati | CAS+bump in TX IMMEDIATE; **TX+audit** | Audit/CAS e caller migrati; replay stale409 |
+| S-02 | Web DELETE [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; 256 KiB + schema | ID path, patientId/versione osservati | CAS+delete in TX IMMEDIATE; **TX+audit** | Audit/CAS e conferma osservata migrati |
+| S-03 | Web POST [/api/siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | S; 256 KiB + schema | ID/parent attivo in TX; dup409; versione host1 | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; versione restituita al caller |
 | M-05 | Web POST [/api/system/migrate-m2m/route.ts](../app/api/system/migrate-m2m/route.ts) | M; admin; nessun body letto | Pazienti con primario e nessuna membership; versione host | Lookup+relink+bump in TX immediata; **TX+audit** | Audit e invalidazione CAS membership migrati; suite membership |
 | M-01 | Web POST [/api/system/fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | M; oggetto ≤ 64 KiB, body assente ammesso | selezione host; flag purge booleano opzionale | Default+relink+purge in TX immediata; **TX+audit** | Audit/input migrati; CAS/replay interposto residui C05-M |
 | M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON oggetto ≤ 64 KiB | patientId; tombstone/versione riletti nella TX | TX immediata cascade+delete; **TX+audit** | Audit/input migrati; versione client residuo C05-M |

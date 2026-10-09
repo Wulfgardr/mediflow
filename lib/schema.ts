@@ -337,6 +337,7 @@ export const serviceCatalogEntries = sqliteTable('service_catalog_entries', {
 /* @Codex */
 export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     id: text('id').primaryKey(),
+    version: integer('version').notNull().default(1),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     action: text('action').notNull(),
     moduleLabel: text('module_label').notNull(),
