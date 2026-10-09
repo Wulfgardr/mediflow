@@ -1,3 +1,4 @@
+import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { writeAttachmentWebAudit } from '@/lib/attachment-web-audit';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -66,8 +67,18 @@ export async function PUT(
 
     try {
         const { id } = await params;
-        const body = await request.json().catch(() => null) as unknown;
-        if (!body || typeof body !== 'object') {
+        let json;
+        try {
+            json = await readBoundedJsonBody(request, 4 * 1024 * 1024, 'request-json',
+                { signal: request.signal, deadline: Infinity });
+        } catch {
+            return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+        }
+        if (!json.ok) return NextResponse.json(
+            { error: json.status === 413 ? 'JSON payload too large' : 'Invalid payload' },
+            { status: json.status });
+        const body = json.value;
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
             return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
         const parsedBody = parseApiBody(attachmentUpdateSchema, body);
@@ -104,11 +115,15 @@ export async function PUT(
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        transitionAttachmentMetadataCurrentness(id, {
-            summarySnapshot: updateData.summarySnapshot,
-            parseEvidenceArtifactSnapshot: updateData.parseEvidenceArtifactSnapshot,
-            ocrQueueState: updateData.ocrQueueState,
-        });
+        dbServer.transaction((tx) => {
+            const currentness = transitionAttachmentMetadataCurrentness(id, {
+                summarySnapshot: updateData.summarySnapshot,
+                parseEvidenceArtifactSnapshot: updateData.parseEvidenceArtifactSnapshot,
+                ocrQueueState: updateData.ocrQueueState,
+            });
+            writeAttachmentWebAudit(tx, request, session, 'attachment.updated', id,
+                { changedFields: Object.keys(updateData), resourceVersion: currentness.revision });
+        }, { behavior: 'immediate' });
         return NextResponse.json({ success: true });
     } catch (error) {
         if (isAttachmentMetadataCurrentnessHostError(error)) {

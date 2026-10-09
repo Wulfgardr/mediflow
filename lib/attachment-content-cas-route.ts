@@ -2,6 +2,8 @@
 import 'server-only';
 
 import { NextResponse } from 'next/server';
+import { dbServer } from '@/lib/db-server';
+import { writeAttachmentWebAudit } from '@/lib/attachment-web-audit';
 
 import { parseAttachmentContentCurrentnessPut } from '@/lib/api-schemas/attachments';
 import { resolveMaxAttachmentBytes } from '@/lib/attachment-payload';
@@ -50,7 +52,12 @@ export async function putAttachmentContent(
     }
 
     try {
-        const currentness = transitionAttachmentContentCurrentness(id, parsed.expected, parsed.replacement);
+        const currentness = dbServer.transaction((tx) => {
+            const updated = transitionAttachmentContentCurrentness(id, parsed.expected, parsed.replacement);
+            writeAttachmentWebAudit(tx, request, session, 'attachment.updated', id,
+                { changedFields: ['data'], resourceVersion: updated.revision });
+            return updated;
+        }, { behavior: 'immediate' });
         return NextResponse.json(Object.freeze({ outcome: 'replaced', currentness }));
     } catch (error) {
         return mapCurrentnessError(error);
