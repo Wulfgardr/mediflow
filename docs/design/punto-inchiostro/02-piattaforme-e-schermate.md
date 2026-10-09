@@ -12,8 +12,8 @@ read_when:
 Su ogni piattaforma, senza eccezioni:
 
 - il punto e i tre inchiostri, con le stesse parole;
-- Newsreader per nomi dei pazienti, prosa clinica e titoli; IBM Plex Mono per
-  dosi, codici, date;
+- Newsreader per nome del paziente, prosa clinica e titoli; IBM Plex Mono solo
+  per i codici;
 - i colori dei token, Giorno e Grafite;
 - l'ordine delle informazioni: identità e allergia, quadro, diario, soglia;
 - i testi dei comandi e della soglia;
@@ -31,8 +31,8 @@ locale. Una differenza oltre queste va scritta con la sua ragione, come chiede
 | | Web localhost | macOS | Windows | Linux | iPad | iPhone | iPhone Duo |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Carattere dei controlli | `system-ui` | San Francisco | Segoe UI Variable | Carattere del desktop | San Francisco | San Francisco | San Francisco |
-| Corpo del registro | 13,5 px | 13 pt | 14 px | 14 px | 15 pt in tabella, 17 pt nel testo | 15 e 17 pt | 15 e 17 pt |
-| Riga | 36 px | 36 pt | 36 px, 44 al tocco | 36 px | 44 pt | 44 pt | 44 pt |
+| Corpo del registro | 14 px | 13,5 pt | 14 px | 14 px | 15,5 pt | 15,5 pt | 15,5 pt |
+| Riga | 40 px | 40 pt | 40 px, 44 al tocco | 40 px | 44 pt | 44 pt | 44 pt |
 | Raggio controlli e piano | 10 e 16 | 8 e 12 | 4 e 8 | 6 e 10 | 12 e 18 | 12 e 18 | 12 e 18 |
 | Navigazione | Colonna a sinistra | Barra laterale | Navigazione a sinistra con tacca di selezione | Barra laterale | Barra laterale | Schede in basso | Chiuso: schede. Aperto: schede, due pagine |
 | Cornice | Nessuna | Barra unificata, semafori | Barra del titolo, comandi a destra | Barra d'intestazione, titolo al centro | Nessuna | Barra di stato | Barra di stato |
@@ -132,6 +132,19 @@ implementare. Non le ho verificate su un dispositivo.
 Stessi tre stati con gli stessi nomi: `○ matita`, `● fresco`, `● asciutto`.
 Stessa domanda di conferma con nome, età e conteggio. Dopo la scrittura una
 riga dice che cosa è rimasto fuori. Vedi la schermata "Mini" del banco.
+
+### Icona e installer
+
+Icona candidata in [icona/](./icona/): un tratto orizzontale che comincia a
+matita (due punti grigi), diventa inchiostro fresco (tratto blu) e si chiude
+nel punto asciutto. Niente testo, niente simboli medici, forme piene leggibili
+fino a 16 px. `punto-giorno.svg` e `punto-grafite.svg` sono i due registri;
+`punto-fg.svg` è il livello senza sfondo per gli strumenti di composizione
+della piattaforma; `alternativa-alone-giorno.svg` è una seconda idea, il punto
+con un alone a matita. Come l'icona attuale, i livelli restano quadrati e
+senza ombre: maschera e materiali li applica il sistema. L'icona in uso
+(`app/icon.svg` e gli asset nativi) non cambia finché Leonardo non accetta la
+candidata. Nell'installer il nome è in serif con il punto.
 
 ### Sito
 

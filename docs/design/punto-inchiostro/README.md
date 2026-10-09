@@ -29,6 +29,7 @@ non una lingua nuova.
 | 4 | [02-piattaforme-e-schermate.md](./02-piattaforme-e-schermate.md) | Che cosa è uguale ovunque, che cosa segue la piattaforma, mappa di ogni schermata |
 | 5 | [03-ascolto-della-visita.md](./03-ascolto-della-visita.md) | Microfono, stati dell'ascolto, rapporto con ADR 0113 |
 | 6 | [tokens/punto-inchiostro.tokens.json](./tokens/punto-inchiostro.tokens.json) | I valori in formato DTCG, Giorno e Grafite |
+| 7 | [icona/](./icona/) | Icona candidata: Giorno, Grafite, livello senza sfondo, più un'alternativa |
 
 In Linear: documento
 [MediFlow, Direzione estetica](https://linear.app/wulfgardr/document/mediflow-direzione-estetica-8e713290463a)
@@ -44,9 +45,9 @@ e issue WUL-765, 766, 767, 768, 769, 771, 772.
    scrittura è registrata cade, si posa e diventa nero.
 3. **Tutto il paziente in una schermata** su desktop: quadro a sinistra,
    diario a destra.
-4. **Due voci.** Serif (Newsreader) per nomi dei pazienti e prosa clinica.
-   Carattere di sistema per controlli e tabelle. Mono (IBM Plex Mono) per
-   dosi, codici, date.
+4. **Due voci.** Serif (Newsreader) dove si parla di una persona: nome del
+   paziente, prosa clinica, titoli. Carattere di sistema per tutto il resto.
+   Il mono (IBM Plex Mono) solo per i codici.
 5. **Un solo piano in luce** su un fondo in penombra.
 6. **Tabelle a filetti**, mai una card per riga.
 7. **La scrittura nasce nel diario**, con il quadro accanto, e passa da una
@@ -68,19 +69,17 @@ e issue WUL-765, 766, 767, 768, 769, 771, 772.
 | Carattere dei controlli | Quello di sistema su ogni piattaforma, web compreso. Inter esce dall'interfaccia | 9 ottobre 2026 |
 | Sito pubblico | Lo realizza il modello che Leonardo sceglierà, con gli strumenti che servono. La forma è in questo dossier | 9 ottobre 2026 |
 | Ascolto della visita | Il percorso è già deciso da ADR 0113: Mac con macOS 26, trascrizione locale, audio mai salvato. Qui si decide il disegno | 1 settembre 2026 |
+| Parola per l'audio | "Ascolto": Ascolta la visita, In ascolto, Ferma l'ascolto. "Registra" resta solo per la scrittura in cartella | 9 ottobre 2026 |
+| Quando serve il secondo tempo della soglia | Tre livelli: un gesto, due tempi, due tempi con parola digitata. Scelta delegata da Leonardo, motivata in [01-specifica.md](./01-specifica.md#quando-serve-il-secondo-tempo) | 9 ottobre 2026 |
+| Armonia di caratteri e spazi | Mono solo per i codici, serif fuori dalle righe di tabella, corpi su due scale corte, distanze su un'unità di 4 px | 9 ottobre 2026 |
+| Icona | Nuova icona candidata in [icona/](./icona/): un tratto che da matita diventa inchiostro e si chiude nel punto | 9 ottobre 2026 |
 
 ## Decisioni ancora di Leonardo
 
-Sono elencate nelle issue che le riguardano. In breve:
-
-- quali scritture passano dalla soglia in due tempi e quali con un solo gesto
-  (WUL-767);
-- la parola per l'audio: questo dossier propone "ascolto" al posto di
-  "registrazione", perché "Registra" è già il comando che scrive in cartella
-  (WUL-772);
+- l'icona candidata va guardata e accettata prima di sostituire quella in uso
+  (WUL-768);
 - estendere l'ascolto oltre il Mac richiede una valutazione misurata di un
-  modello locale e una decisione sul perimetro (WUL-772);
-- l'icona dell'applicazione (WUL-768).
+  modello locale e una decisione sul perimetro (WUL-772).
 
 ## Come lavorare
 
@@ -102,8 +101,8 @@ Sono elencate nelle issue che le riguardano. In breve:
 
 ## Come regolare il disegno
 
-Il banco ha un pannello "Regola i token": cambia inchiostri, penombra, altezza
-di riga, raggi, corpi e durate, e mostra subito l'effetto su ogni schermata e
+Il banco ha un pannello "Regola i token": cambia inchiostri, penombra, respiro
+(l'unità di spazio), altezza di riga, raggi, corpi e durate, e mostra subito l'effetto su ogni schermata e
 dispositivo. "Esporta" produce i valori in formato DTCG.
 
 Per cambiare una decisione di disegno:
