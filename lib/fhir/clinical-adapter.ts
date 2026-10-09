@@ -2,6 +2,16 @@ import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4'
 import { toFhirDerivedId, toFhirId } from './id';
 import type { FhirClinicalEntryInput, FhirDiagnosisInput, FhirObservationInput, FhirTherapyInput } from './types';
 
+/* Preserve the legacy recognized-system URIs until the shared DTO v2 migration. */
+export function fhirDiagnosisSystem(system: string): string | undefined {
+    switch (system) {
+        case 'ICD-9': return 'http://hl7.org/fhir/sid/icd-9';
+        case 'ICD-10': return 'http://hl7.org/fhir/sid/icd-10';
+        case 'ICD-11': return 'http://id.who.int/icd/release/11/mms';
+        default: return undefined;
+    }
+}
+
 /* @Codex */
 export function toFhirCondition(
     diagnosis: FhirDiagnosisInput,
@@ -9,6 +19,7 @@ export function toFhirCondition(
     orderedPosition: number,
 ): Condition {
     const diagnosisDate = new Date(diagnosis.date).toISOString();
+    const system = fhirDiagnosisSystem(diagnosis.system);
     return {
         resourceType: "Condition",
         id: diagnosis.id
@@ -24,12 +35,11 @@ export function toFhirCondition(
             coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: "active" }]
         },
         code: {
-            coding: [{
-                system: diagnosis.system === 'ICD-9' ? "http://hl7.org/fhir/sid/icd-9" :
-                    diagnosis.system === 'ICD-10' ? "http://hl7.org/fhir/sid/icd-10" : "http://id.who.int/icd/release/11/mms",
+            ...(system ? { coding: [{
+                system,
                 code: diagnosis.code,
                 display: diagnosis.description
-            }],
+            }] } : {}),
             text: diagnosis.description
         },
         onsetDateTime: diagnosisDate
