@@ -10,7 +10,7 @@ import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-p
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const owner = '@mediflow/web-auth-lifecycle-owner';
-function fixture(t, profile = 'local-package') {
+function fixture(t, profile = 'local-package', { ignoredSource = false } = {}) {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-payload-synthetic-')));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const sourceRoot = path.join(directory, 'source'), payloadRoot = path.join(directory, 'payload');
@@ -43,6 +43,10 @@ function fixture(t, profile = 'local-package') {
     artifact: { path: archivePath, bytes: archive.length, sha256: digest(archive), integrity }, inputs,
     roster: inputs.map(input => ({ ...input, path: `package/${input.path}`, type: 'file', mode: '0644' })),
   });
+  if (ignoredSource) {
+    put(sourceRoot, 'anchor.txt', 'unrelated committed anchor\n');
+    put(sourceRoot, '.gitignore', '*\n!.gitignore\n!anchor.txt\n');
+  }
   execFileSync('git', ['init', '-q'], { cwd: sourceRoot });
   function commit() {
     execFileSync('git', ['add', '.'], { cwd: sourceRoot });
@@ -151,13 +155,21 @@ test('CLI emits one external ledger and verification rejects tampered bytes', t 
 });
 
 test('independent regression: ignored source inputs cannot inherit an unrelated clean Git identity', t => {
-  const input = fixture(t);
-  fs.rmSync(path.join(input.sourceRoot, '.git'), { recursive: true, force: true });
-  input.put(input.sourceRoot, 'anchor.txt', 'unrelated committed anchor\n');
-  input.put(input.sourceRoot, '.gitignore', '*\n!.gitignore\n!anchor.txt\n');
-  execFileSync('git', ['init', '-q'], { cwd: input.sourceRoot });
-  input.commit();
-  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: input.sourceRoot, encoding: 'utf8' }).trim(), '');
+  const input = fixture(t, 'local-package', { ignoredSource: true });
+  const git = (args, stdin) => execFileSync('git', args, { cwd: input.sourceRoot, encoding: 'utf8', input: stdin });
+  assert.equal(git(['rev-parse', '--show-toplevel']).trim(), input.sourceRoot);
+  assert.deepEqual(git(['ls-tree', '-r', '--name-only', '-z', 'HEAD']).split('\0').filter(Boolean).sort(), ['.gitignore', 'anchor.txt']);
+  const ignoredInputs = [
+    '.nvmrc', 'LICENSE', 'package.json', 'package-lock.json',
+    'packages/web-auth-lifecycle-owner/package.json',
+    'packages/web-auth-lifecycle-owner/index.js',
+    'packages/web-auth-lifecycle-owner/artifacts/synthetic.tgz',
+    'packages/web-auth-lifecycle-owner/artifacts/synthetic.provenance.json',
+  ];
+  for (const name of ignoredInputs) assert.ok(fs.statSync(path.join(input.sourceRoot, name)).isFile(), name);
+  assert.deepEqual(git(['check-ignore', '-z', '--stdin'], `${ignoredInputs.join('\0')}\0`).split('\0').filter(Boolean).sort(), [...ignoredInputs].sort());
+  assert.equal(git(['ls-files', '-z', '--', ...ignoredInputs]), '');
+  assert.equal(git(['status', '--porcelain']).trim(), '');
   assert.throws(() => generatePayloadLedger(input), /source input is not tracked in the pinned commit/u);
 });
 
