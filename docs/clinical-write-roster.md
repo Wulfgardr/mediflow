@@ -59,7 +59,7 @@ Sorgenti: [lib/patient-write-normalization.ts](../lib/patient-write-normalizatio
 
 Create: normalizzazione paziente, ID fornito o generato secondo adapter, versione iniziale host; associazione ambulatoriale nel commit. PUT: ID path, versione attesa e CAS; assente/null del primario distinti, associazioni conservate. DELETE: tombstone e versione. Paired: parent paziente nello scope e campi sigillati; restore rete distinto dal ripristino amministrativo. Create-context Web lega la creazione al contesto corrente, non crea il paziente.
 
-Prove di riferimento: [lib/patient-required-audit.test.ts](../lib/patient-required-audit.test.ts), [lib/patient-create-required-audit.test.ts](../lib/patient-create-required-audit.test.ts), [lib/network-patient-lifecycle-required-audit.test.ts](../lib/network-patient-lifecycle-required-audit.test.ts), [lib/patient-json-envelope.test.ts](../lib/patient-json-envelope.test.ts), [lib/patient-create-service.test.ts](../lib/patient-create-service.test.ts). test:concurrency:patients; test:network:home-base-patient-lifecycle-write; HTTP create in scripts/patient-create-required-audit-http.test.mjs. Gap C05: riesame per superficie/ID, non rifare la migrazione già presente.
+Prove di riferimento: [lib/patient-required-audit.test.ts](../lib/patient-required-audit.test.ts), [lib/patient-create-required-audit.test.ts](../lib/patient-create-required-audit.test.ts), [lib/network-patient-lifecycle-required-audit.test.ts](../lib/network-patient-lifecycle-required-audit.test.ts), [lib/patient-json-envelope.test.ts](../lib/patient-json-envelope.test.ts), [lib/patient-create-service.test.ts](../lib/patient-create-service.test.ts). test:concurrency:patients; test:network:home-base-patient-lifecycle-write; HTTP create in scripts/patient-create-required-audit-http.test.mjs. Gap C05-P confermato: ID create forniti non validi possono essere rigenerati/accettati dagli adapter; il duplicato esplicito restituisce 500. Atomicità e CAS esistenti non risolvono questi errori di input.
 
 ### E — Diario
 
@@ -67,7 +67,7 @@ Sorgenti: [lib/entry-write-input.ts](../lib/entry-write-input.ts), [lib/entry-wr
 
 Allowlist, date e normalizzazione; ID create validato o generato, patientId body Web/path v1 e paired. Update: ID figlio, versione richiesta, parent riletto nel core; v1/paired vincolano il figlio al path. Paired aggiunge membership e ENC, esclude campi AI/document-derived. PUT include tombstone/ripristino; DELETE locale è logico, non hard delete.
 
-Prove di riferimento: [lib/entry-required-audit.test.ts](../lib/entry-required-audit.test.ts). test:network:home-base-diary-write; scripts/entry-required-audit-http.test.mjs. Gap C05: conservare la politica parent/soft-delete di ADR 0015 e i client, nessuna nuova semantica di replay.
+Prove di riferimento: [lib/entry-required-audit.test.ts](../lib/entry-required-audit.test.ts). test:network:home-base-diary-write; scripts/entry-required-audit-http.test.mjs. La suite SQLite verifica malformed input, parent/scope errati e stale senza effetti; il replay create con ID esplicito dà 409 su Web/v1 oppure 200 senza nuovi effetti su paired. Il diniego dopo tombstone del parent resta provato. La politica ADR 0015 è un’invariante, non una migrazione ancora da fare.
 
 ### T — Terapie
 
@@ -75,7 +75,7 @@ Sorgenti: [lib/therapy-write-input.ts](../lib/therapy-write-input.ts), [lib/api-
 
 Allowlist/date/stati e normalizzazione per superficie; ID create o generazione host; patientId body Web/path v1 e paired. Parent attivo riletto nella transazione. Update/DELETE usano versione attesa e CAS del figlio; paired verifica membership e campi ENC. PUT comprende lifecycle; DELETE locale logico.
 
-Prove di riferimento: [lib/therapy-required-audit.test.ts](../lib/therapy-required-audit.test.ts). test:network:home-base-therapy-write; scripts/therapy-required-audit-http.test.mjs. Gap C05: preservare differenze ammesse degli adapter e verificare ID/errori sui client.
+Prove di riferimento: [lib/therapy-required-audit.test.ts](../lib/therapy-required-audit.test.ts). test:network:home-base-therapy-write; scripts/therapy-required-audit-http.test.mjs. La suite SQLite copre le otto mutazioni con audit FAIL/IGNORE, ID/versioni non validi, parent/scope e duplicati senza effetti; le prove HTTP locali e paired sono collegate sopra. Conservare le differenze di data/timestamp già asserite fra adapter.
 
 ### O — Osservazioni
 
@@ -83,7 +83,7 @@ Sorgenti: [lib/observation-write-input.ts](../lib/observation-write-input.ts), [
 
 Allowlist/date e normalizzazione; ID create, parent attivo e CAS del figlio. v1/paired vincolano patientId al path; paired anche scope/ENC. Solo Web ammette servicePrescriptionItemId, verificato sullo stesso paziente nella transazione. PUT comprende tombstone/ripristino; DELETE locale logico.
 
-Prove di riferimento: [lib/observation-required-audit.test.ts](../lib/observation-required-audit.test.ts), [lib/observation-service-item-link-schema.test.ts](../lib/observation-service-item-link-schema.test.ts). test:network:home-base-observation-write. Gap C05: non estendere implicitamente il link prestazione a v1/paired.
+Prove di riferimento: [lib/observation-required-audit.test.ts](../lib/observation-required-audit.test.ts), [lib/observation-service-item-link-schema.test.ts](../lib/observation-service-item-link-schema.test.ts). test:network:home-base-observation-write. Le prove SQLite coprono le otto mutazioni, input/ID/versioni, parent/scope e duplicati senza effetti. Il link prestazione viene verificato sullo stesso paziente e rimane esplicitamente respinto da v1/paired.
 
 ### C — Checkup
 
@@ -91,7 +91,7 @@ Sorgenti: [lib/checkup-json-body.ts](../lib/checkup-json-body.ts), [lib/api-v1-c
 
 Schema/stati/date normalizzati; ID create, parent attivo nella transazione; update e DELETE con versione attesa/CAS. Figlio vincolato al patientId path v1/paired; membership e ENC paired. PUT comprende stato e lifecycle, DELETE locale logico; non conferisce autorità alla transizione headless.
 
-Prove di riferimento: [lib/checkup-required-audit.test.ts](../lib/checkup-required-audit.test.ts), [lib/checkup-json-envelope.test.ts](../lib/checkup-json-envelope.test.ts). test:network:home-base-checkup-write. Gap C05: conservare le decisioni su date e body di ADR 0015/0141.
+Prove di riferimento: [lib/checkup-required-audit.test.ts](../lib/checkup-required-audit.test.ts), [lib/checkup-json-envelope.test.ts](../lib/checkup-json-envelope.test.ts). test:network:home-base-checkup-write. Gap C05-C confermato: ID create non validi possono essere sostituiti o accettati dagli adapter; duplicato valido ancora 500. Le prove body/date e audit già presenti restano invarianti ADR 0015/0141.
 
 ### PR — Prescrizioni protesiche
 
@@ -125,7 +125,7 @@ Sorgenti: [lib/api-schemas/patient-bulk.ts](../lib/api-schemas/patient-bulk.ts).
 
 Schema array ID e ambulatorio; lookup pazienti attivi/target. Move richiede mappa patientVersions esatta, CAS e incremento versione; duplicate genera UUID e copia le righe nella transazione batch. Assign/unassign richiedono la mappa patientVersions esatta e verificano tutto il batch prima degli effetti. Ogni modifica effettiva aggiorna versione/updatedAt e audit nella stessa transazione immediata; primary resta invariato. No-op con versione corrente non modifica dati né audit; richieste stale e replay di mutazioni restituiscono 409. Anche move e duplicate inseriscono gli eventi obbligatori nella propria transazione immediata e limitano il JSON a 256 KiB. Duplicate include i lookup nello stesso snapshot e conserva campi e versione degli originali nei nuovi cloni.
 
-Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Gap C05-B: CAS degli originali e idempotenza di duplicate restano aperti: ripetere la richiesta crea nuovi cloni. Assign/unassign respingono versioni superate anche da fix-orphans, migrate-m2m e clear. Restore C15 e purge seguito da ricreazione dello stesso ID/versione restano casi distinti da risolvere.
+Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Duplicate richiede sourceAmbulatoryId, patientVersions esatta e duplicateIntentId UUID; verifica appartenenza sorgente e versioni del batch prima degli effetti. Il token viene consumato nella stessa transazione di cloni e audit: qualunque riuso restituisce 409 anche dopo la rimozione dei cloni. Assign/unassign respingono versioni superate anche da fix-orphans, migrate-m2m e clear. Restore C15 e purge seguito da ricreazione dello stesso ID/versione restano casi distinti da risolvere.
 
 La [suite SQLite delle membership](../lib/patient-membership-required-audit.test.ts),
 selezionata dal profilo unit richiesto, verifica successo con identità host,
@@ -144,7 +144,7 @@ Le [prove SQLite di duplicate](../lib/patient-duplicate-required-audit.test.ts),
 selezionate dalla suite unit, verificano due cloni con eventi attribuiti all’host,
 rollback di cloni/membership/eventi al guasto del secondo audit e dinieghi senza
 effetti. UUID nuovi, campi e versione copiati, ambulatorio primario e count sono
-preservati; la transazione non introduce un token di idempotenza.
+preservati. La suite verifica CAS, sorgente errata, replay con body/target cambiato o cloni rimossi e rollback del token al guasto audit; il retry dopo rollback può completare. La snapshot e l’intento del clipboard restano stabili sugli errori. Non risultano consumatori UI del hook nella base esaminata: le prove del helper non attestano un percorso grafico operativo. Il registro è locale: restore nello stesso DB conserva i token, export/restore in un nuovo DB perde quelli storici; questo limite resta in WUL-730/C15.
 
 ### D — Allegati
 
@@ -196,7 +196,7 @@ aggiornamento secondo il writer, non un evento `*.restored` inventato.
 I core E/T/O/C usano transazioni sincrone immediate con rilettura e audit richiesto.
 P mantiene gli owner distinti di create/update/delete/lifecycle e restore admin.
 PR usa `prosthetic.prescription.*`; SP `service.prescription.*` e
-`service.prescription_item.*`; A `ambulatory.*` e, nel clear, `patient.deleted`.
+`service.prescription_item.*`; A `ambulatory.*` e, nel clear, `patient.deleted` oppure `patient.updated` per il solo unlink.
 I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella stessa transazione; D paired usa `attachment.created` nella stessa transazione; purge paziente M usa
 `patient.purged` nella stessa transazione, anche nel purge opzionale di fix-orphans. Nei rami segnati **nessuno** non va presunto un
 evento solo perché il dominio compare nella taxonomy.
@@ -230,7 +230,7 @@ sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come co
 | P-01 | Web PUT [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-update-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | P-02 | Web DELETE [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-delete-operation; **TX+audit** | Migrato; delta/prove per profilo |
 | B-01 | Web POST [/api/patients/assign/route.ts](../app/api/patients/assign/route.ts) | B; 256 KiB | Array patientIds, targetAmbulatoryId e mappa patientVersions esatta; CAS | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input e CAS migrati; prova membership sotto |
-| B-02 | Web POST [/api/patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | B; 256 KiB | Array patientIds e target; UUID nuovo per clone | Lookup+insert+membership in TX immediata; **TX+audit** | Audit/input migrati; CAS/replay residui C05-B |
+| B-02 | Web POST [/api/patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | B; 256 KiB | IDs, source/target, versioni esatte e intento UUID; UUID nuovo per clone | Precheck+token+clone+membership in TX immediata; **TX+audit** | CAS/replay archivio attivo migrati; restore nuovo DB resta C15 |
 | B-03 | Web POST [/api/patients/move/route.ts](../app/api/patients/move/route.ts) | B; 256 KiB | Array patientIds, target e mappa patientVersions esatta; CAS | TX immediata adapter; **TX+audit** per paziente | Audit/input migrati; prova move nel profilo B |
 | P-03 | Web POST [/api/patients/route.ts](../app/api/patients/route.ts) | P; 4 MiB | Create: ID/parent del profilo; versione host | TX adapter + patient-create-service; **TX+audit** | Migrato; delta/prove per profilo |
 | B-04 | Web POST [/api/patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | B; 256 KiB | Array patientIds, ambulatoryId e mappa patientVersions esatta; CAS | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input e CAS migrati; prova membership sotto |
@@ -361,12 +361,10 @@ roster non li promuove a un nuovo dominio di commit clinico.
 
 ## Ordine delle coorti e criterio di aggiornamento
 
-1. **C05-S:** audit atomico dei tre writer Web migrato. Restano CAS/versioni,
-   verifica del parent nei percorsi di modifica e idempotenza PUT. Il lancio SISS
-   resta distinto dal diario persistito.
+1. **C05-S:** audit e CAS osservato dei writer Web migrati, con binding paziente e bozza stabile. Restore e ricreazione della stessa identità/versione restano distinti; il lancio SISS non equivale al diario persistito.
 2. **C05-B:** assign/unassign migrati per audit atomico, input e CAS; repair/clear
    invalidano le versioni precedenti. Restore/ricreazione identità restano distinti. Move migrato con il CAS esistente;
-   duplicate migrato con lookup e audit atomici, CAS/replay restano aperti.
+   duplicate usa CAS degli originali e token consumato atomicamente; la garanzia non copre export/restore su nuovo DB (C15).
 3. **C05-D:** create/delete e metadata/content Web, upload paired migrati per audit atomico.
    Metadata/delete hanno precondizione osservata; restano caller indiretti e restore.
    Conservare sourceRef/revision/freshness e le restrizioni document-derived.
