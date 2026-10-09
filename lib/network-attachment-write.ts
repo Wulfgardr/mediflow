@@ -8,7 +8,7 @@ import { getAttachmentPayloadByteSize, isSealedAttachmentValue, resolveMaxAttach
 import {
     listChangedFields,
     requestIdFromRequest,
-    writeAuditEvent,
+    writeAuditEventInTransaction,
     type AuditRedactedMetadata,
 } from './security/audit';
 /* @Codex */
@@ -117,34 +117,33 @@ function patientIsActiveAndInScope(
     return Boolean(scopedPatient);
 }
 
-async function writeNetworkAttachmentAuditEvent(input: {
-    context: NetworkAttachmentMutationContext;
-    subjectRef: string;
-    metadata?: AuditRedactedMetadata | null;
-}): Promise<void> {
-    try {
-        await writeAuditEvent({
-            eventType: 'attachment.created',
-            outcome: 'success',
-            actorType: 'user',
-            actorRef: input.context.session.userId,
-            subjectType: 'attachment',
-            subjectRef: input.subjectRef,
-            sourceSurface: 'native',
-            requestId: requestIdFromRequest(input.context.request),
-            redactedMetadata: {
-                ...(input.metadata ?? {}),
-                flags: [
-                    ...(input.metadata?.flags ?? []),
-                    'auth:paired-client',
-                    `paired-client:${input.context.pairedClient.clientId}`,
-                    'scope:ambulatory',
-                ],
-            },
-        });
-    } catch (error) {
-        console.error('[MediFlow] Network document audit write failed:', error);
-    }
+function writeNetworkAttachmentAuditEvent(
+    tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
+    input: {
+        context: NetworkAttachmentMutationContext;
+        subjectRef: string;
+        metadata?: AuditRedactedMetadata | null;
+    },
+): void {
+    writeAuditEventInTransaction(tx, {
+        eventType: 'attachment.created',
+        outcome: 'success',
+        actorType: 'user',
+        actorRef: input.context.session.userId,
+        subjectType: 'attachment',
+        subjectRef: input.subjectRef,
+        sourceSurface: 'native',
+        requestId: requestIdFromRequest(input.context.request),
+        redactedMetadata: {
+            ...(input.metadata ?? {}),
+            flags: [
+                ...(input.metadata?.flags ?? []),
+                'auth:paired-client',
+                `paired-client:${input.context.pairedClient.clientId}`,
+                'scope:ambulatory',
+            ],
+        },
+    });
 }
 
 /* @Codex */
@@ -176,13 +175,13 @@ export async function createNetworkScopedAttachment(
     // before sealing.
     const path = body.path as string;
 
-    const commit = dbServer.transaction((tx): NetworkAttachmentMutationResponse => {
+    return dbServer.transaction((tx): NetworkAttachmentMutationResponse => {
         if (!patientIsActiveAndInScope(tx, context.patientId, context.scopeAmbulatoryId)) {
             return { status: 404, value: { error: 'Not found' } };
         }
         const currentness = createHostAttachmentCurrentness();
 
-        tx.insert(attachments).values({
+        const inserted = tx.insert(attachments).values({
             id: newId,
             patientId: context.patientId,
             name,
@@ -201,18 +200,12 @@ export async function createNetworkScopedAttachment(
             documentFreshnessEpoch: currentness.freshnessEpoch,
         }).run();
 
+        if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
+        writeNetworkAttachmentAuditEvent(tx, {
+            context,
+            subjectRef: newId,
+            metadata: { changedFields: listChangedFields(body) },
+        });
         return { status: 201, value: { id: newId } };
-    });
-
-    if (commit.status !== 201) return commit;
-
-    await writeNetworkAttachmentAuditEvent({
-        context,
-        subjectRef: commit.value.id,
-        metadata: {
-            changedFields: listChangedFields(body),
-        },
-    });
-
-    return commit;
+    }, { behavior: 'immediate' });
 }
