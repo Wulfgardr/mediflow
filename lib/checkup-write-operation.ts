@@ -74,6 +74,9 @@ export function updateCheckupOperation(input: UpdateInput): Result {
         if (existing.version !== input.expectedVersion) return { status: 409,
             value: buildCheckupVersionConflictPayload(input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
 
+        if (existing.version >= Number.MAX_SAFE_INTEGER) return { status: 409,
+            value: buildCheckupVersionConflictPayload(input.expectedVersion, input.checkupId, existing) as unknown as Record<string, unknown> };
+
         const changed = tx.update(checkups).set({ ...input.values, version: input.expectedVersion + 1 })
             .where(and(eq(checkups.id, input.checkupId), eq(checkups.patientId, existing.patientId),
                 eq(checkups.version, input.expectedVersion))).run();

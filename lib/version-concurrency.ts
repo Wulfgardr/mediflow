@@ -42,7 +42,7 @@ export type VersionConflictSource = {
 
 /* @Codex */
 export function parseExpectedVersion(value: unknown): number | null {
-    return Number.isInteger(value) && typeof value === 'number' && value > 0 ? value : null;
+    return Number.isSafeInteger(value) && typeof value === 'number' && value > 0 ? value : null;
 }
 
 /* @Codex */

@@ -152,3 +152,34 @@ dal guard. Il guard resta attivo per tutti gli altri cambi; gli override non
 si estendono ad altri campi, domini o futuri comportamenti. La revisione
 indipendente deve verificare schema, normalizzazione, risposta duplicato e
 prove SQLite senza effetti prima del merge.
+
+
+## WUL-720 — Confine numerico delle versioni C05 (spec 1.35.0)
+
+L'owner autorizza la restrizione agli interi positivi rappresentabili senza
+perdita in JavaScript (`Number.isSafeInteger`, massimo 9007199254740991).
+Gli input superiori, prima accettati dal parser comune, ora ricevono `400`.
+Non è una promessa di compatibilità universale: i caller che inviano versioni
+safe osservate restano compatibili, quelli che inviano numeri unsafe no.
+
+| Percorso | Effetto di questa coorte |
+| --- | --- |
+| Patient profile PUT e checkup UPDATE, Web/local v1/paired | Parser unsafe `400`; dopo lookup, scope e stale, una versione corrente a MAX restituisce `409 VERSION_CONFLICT` prima di DML, membership o audit. MAX−1 → MAX resta permesso; il replay della vecchia versione resta `409`. |
+| Patient lifecycle DELETE/restore e ambulatory PUT/DELETE/clear | Il parser comune rifiuta unsafe `400`; questa coorte non aggiunge guard sull'incremento a MAX a questi writer. |
+| Entry, therapy, observation mutation | I parser locali già rifiutano unsafe e MAX; il limite esclusivo preesistente non cambia. |
+| PR/SP UPDATE | Lo schema Zod `.int()` già rifiuta unsafe: nessun nuovo restringimento del relativo request pubblico. I DELETE Web tramite parser comune diventano safe; nessun endpoint paired DELETE è introdotto. |
+| Create, bulk move/assign, restore archivio | Fuori dal guard di esaurimento dei due core; nessuna qualifica aggiuntiva. |
+
+Lo spec aggiorna `maximum` soltanto nei request pubblici interessati dal
+cambiamento runtime. `AmbulatoryUpdateRequest` conserva i campi del precedente
+schema condiviso e aggiunge il limite solo al PUT: il create non viene
+ristretto attraverso un riferimento condiviso. I payload di conflitto
+esistenti sono mantenuti anche per esaurimento (expected e current possono
+coincidere); nessun nuovo codice o capacità è introdotto.
+
+Il guard OpenAPI resta invariato: la sua normalizzazione attuale non confronta
+`minimum`/`maximum`, dunque non produce override puntuali per questo delta e
+`contract-policy.json` non viene ampliato. La restrizione viene dichiarata qui
+ed è verificata da parser e SQLite reale, oltre alla review indipendente.
+Questo limite del guard non dimostra retrocompatibilità. C05 complessivo e i
+residui lifecycle/move/restore restano aperti.

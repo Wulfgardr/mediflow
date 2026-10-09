@@ -333,3 +333,25 @@ test('checkup duplicate detection follows parent and paired scope admission with
     assert.equal(denied.status, 404);
     assert.deepEqual(denied.after, denied.before);
 });
+
+
+test('checkup safe version boundary rejects exhaustion without effects and permits the last increment', async () => {
+    const ids = seed('safe-version-boundary', true);
+    const max = Number.MAX_SAFE_INTEGER;
+    sql.prepare('UPDATE checkups SET version=? WHERE id=?').run(max, ids.checkupId);
+    const before = readBack(ids.patientId, ids.checkupId);
+    assert.equal((await invoke('web', 'PUT', ids, { version: max, title: 'Blocked synthetic update' })).status, 409);
+    assert.deepEqual(readBack(ids.patientId, ids.checkupId), before);
+    assert.equal((await invoke('web', 'PUT', ids, { version: max + 1, title: 'Unsafe synthetic update' })).status, 400);
+    assert.deepEqual(readBack(ids.patientId, ids.checkupId), before);
+    assert.equal((await invoke('web', 'PUT', ids, { version: max - 1, title: 'Stale synthetic update' })).status, 409, 'safe but stale remains a conflict');
+    assert.deepEqual(readBack(ids.patientId, ids.checkupId), before);
+    sql.prepare('UPDATE checkups SET version=? WHERE id=?').run(max - 1, ids.checkupId);
+    const body = { version: max - 1, title: 'Last synthetic increment' };
+    assert.equal((await invoke('web', 'PUT', ids, body)).status, 200);
+    const after = readBack(ids.patientId, ids.checkupId);
+    assert.equal((after.checkup as { version: number }).version, max);
+    assert.equal(after.audit.length, before.audit.length + 1);
+    assert.equal((await invoke('web', 'PUT', ids, body)).status, 409);
+    assert.deepEqual(readBack(ids.patientId, ids.checkupId), after);
+});
