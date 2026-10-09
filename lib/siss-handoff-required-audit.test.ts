@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -237,4 +237,61 @@ test('client captures the displayed precondition and never refreshes or retries 
         { method: 'PUT', body: { outcome: 'completed', ...precondition } },
         { method: 'DELETE', body: precondition },
     ]);
+});
+
+
+test('clear uses the listed SISS versions and reports partial failures without refreshing', async t => {
+    const { db } = load('./db.ts') as typeof import('./db.ts');
+    const listed = [{ id: 'first', patientId: 'synthetic-patient', version: 3 },
+        { id: 'second', patientId: 'synthetic-patient', version: 7 }];
+    const calls: string[] = [];
+    let failSecond = false;
+    t.mock.method(globalThis, 'fetch', async (url: unknown, options?: RequestInit) => {
+        const method = options?.method ?? 'GET';
+        calls.push(`${method} ${url}`);
+        if (url === '/api/siss-handoffs' && method === 'DELETE') return new Response(null, { status: 405 });
+        if (method === 'GET') return Response.json(listed);
+        const item = listed.find(row => url === `/api/siss-handoffs/${row.id}`)!;
+        assert.deepEqual(JSON.parse(options!.body as string), { patientId: item.patientId, version: item.version });
+        return failSecond && item.id === 'second'
+            ? Response.json({ error: 'Changed' }, { status: 409 }) : Response.json({ success: true });
+    });
+    await db.sissHandoffs.clear();
+    assert.deepEqual(calls, ['DELETE /api/siss-handoffs', 'GET /api/siss-handoffs',
+        'DELETE /api/siss-handoffs/first', 'DELETE /api/siss-handoffs/second']);
+    calls.length = 0;
+    failSecond = true;
+    await assert.rejects(db.sissHandoffs.clear(), /1\/2 deletions confirmed/);
+    assert.deepEqual(calls, ['DELETE /api/siss-handoffs', 'GET /api/siss-handoffs',
+        'DELETE /api/siss-handoffs/first', 'DELETE /api/siss-handoffs/second']);
+});
+
+test('a compiled closure draft cannot adopt a refreshed version, pending record or patient', async t => {
+    const { db, resolveSissHandoffDraftPrecondition } = load('./db.ts') as typeof import('./db.ts');
+    db.setKey(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+    t.after(() => db.setKey(null));
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => { calls++; return Response.json({ success: true }); });
+    const original = { id: 'original-pending', ...precondition };
+    const draft = { precondition: resolveSissHandoffDraftPrecondition(null, original), notes: 'compiled draft' };
+    const submit = async (displayed: typeof original) => {
+        const sissPrecondition = resolveSissHandoffDraftPrecondition(draft.precondition, displayed);
+        await db.sissHandoffs.update(sissPrecondition.id, { notes: draft.notes }, { sissPrecondition });
+    };
+    for (const refreshed of [{ ...original, version: 2 }, { ...original, id: 'different-pending' },
+        { ...original, patientId: 'different-patient' }]) {
+        await assert.rejects(submit(refreshed), /durante la compilazione/);
+    }
+    assert.equal(calls, 0);
+    assert.equal(draft.notes, 'compiled draft');
+    assert.equal(resolveSissHandoffDraftPrecondition(draft.precondition, { ...original }), draft.precondition);
+    await submit(original);
+    assert.equal(calls, 1);
+    const source = readFileSync('components/siss-handoff-diary.tsx', 'utf8');
+    for (const field of ['Outcome', 'Notes', 'NextAction']) {
+        assert.ok(source.includes(`if (beginClosureDraft()) setClosure${field}`));
+    }
+    const submitSource = source.slice(source.indexOf('const closePendingHandoff'), source.indexOf('const deleteItem'));
+    assert.match(submitSource, /resolveSissHandoffDraftPrecondition\(closurePrecondition.current, pendingHandoff\)/);
+    assert.match(submitSource, /update\(sissPrecondition.id/);
 });
