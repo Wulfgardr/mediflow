@@ -5,9 +5,10 @@ import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { discoverCandidates, checkInventory, collectHeadlessInventorySelection } from './test-inventory.mjs';
+import { discoverCandidates, checkInventory, collectHeadlessInventorySelection, collectPlaywrightInventorySelection } from './test-inventory.mjs';
 import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
 import { EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
+import { collectPlaywrightTestFiles, playwrightTestSelection } from './playwright-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
 const cli = fileURLToPath(new URL('./test-inventory.mjs', import.meta.url));
@@ -108,6 +109,11 @@ function fixture(t, withDebt = false) {
   entries.push({ path: 'scripts/check-claims-guard.mjs', selection: { state: 'mapped', suiteIds: ['npm:check:claims:self-test'] } });
   pkg.scripts['check:claims'] = 'node scripts/check-claims-guard.mjs';
   workflows['.github/workflows/openapi-contract-guard.yml'].jobs['repository-guards'].steps.push({ run: 'npm run check:claims\nnpm run check:claims -- --self-test' });
+  fs.mkdirSync(path.join(root, 'e2e'));
+  fs.writeFileSync(path.join(root, 'e2e/a.spec.ts'), 'throw new Error("Playwright test must not execute");');
+  entries.push({ path: 'e2e/a.spec.ts', selection: { state: 'mapped', suiteIds: ['npm:test:e2e'] } });
+  pkg.scripts['test:e2e'] = 'playwright test --workers=1';
+  workflows['.github/workflows/e2e.yml'] = { jobs: { e2e: { steps: [{ run: 'npm run test:e2e' }] } } };
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
   for (const [file, workflow] of Object.entries(workflows)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -333,4 +339,74 @@ await import(${JSON.stringify(new URL('./test-inventory.mjs', import.meta.url).h
   assert.match(result.stderr, /synthetic access denied/);
   assert.match(result.stderr, /EACCES/);
   assert.equal(result.stdout, '');
+});
+
+test('Playwright shares exact config matches, default extensions, nested order and harness ignore without importing tests', t => {
+  const root = fixture(t);
+  const expected = ['e2e/a.spec.ts'];
+  const ignored = ['e2e/helper.ts', 'e2e/wrong.spec.TS', 'e2e/nested/chatgpt-synthesis-product.spec.ts',
+    'e2e/CHATGPT-SYNTHESIS-PRODUCT.spec.ts', 'e2e/node_modules/dependency.spec.ts'];
+  for (const kind of ['spec', 'TEST']) for (const prefix of ['', 'c', 'm']) for (const language of ['js', 'ts']) for (const jsx of ['', 'x']) {
+    expected.push(`e2e/nested/a.${kind}.${prefix}${language}${jsx}`);
+  }
+  expected.push('e2e/.hidden/[literal]+.spec.ts', 'e2e/z.spec.ts');
+  for (const file of [...expected, ...ignored]) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), 'throw new Error("Must not import this test");');
+  }
+  const selected = collectPlaywrightTestFiles(root);
+  assert.deepEqual([...selected].sort(), [...expected].sort());
+  assert.equal(selected[0], 'e2e/.hidden/[literal]+.spec.ts');
+  assert.equal(selected.at(-1), 'e2e/z.spec.ts');
+  const config = playwrightTestSelection(root);
+  assert.equal(config.testDir, path.join(root, 'e2e'));
+  assert.equal(config.testMatch.length, selected.length);
+  selected.forEach((file, index) => assert.ok(config.testMatch[index].test(path.join(root, file))));
+  for (const file of [...ignored, 'e2e/.hidden/literallll.spec.ts', 'e2e/a.spec.ts.extra']) {
+    assert.equal(config.testMatch.some(pattern => pattern.test(path.join(root, file))), false, file);
+  }
+  const inventory = collectPlaywrightInventorySelection(root);
+  assert.deepEqual(inventory.files, selected);
+  assert.deepEqual(inventory.errors, []);
+  assert.deepEqual(inventory.binding.commands, ['test:e2e']);
+});
+
+test('Playwright missing or empty group fails both config and inventory; rename and addition fail manifest integrity', t => {
+  for (const remove of ['e2e', 'e2e/a.spec.ts']) {
+    const root = fixture(t);
+    fs.rmSync(path.join(root, remove), { recursive: true });
+    assert.throws(() => playwrightTestSelection(root), /[Pp]laywright test group/);
+    const selection = collectPlaywrightInventorySelection(root);
+    assert.deepEqual(selection.files, []);
+    assert.match(selection.errors.join('\n'), /[Pp]laywright test group/);
+    assert.match(run(root).stderr, /INCOMPLETE_SELECTION: npm:test:e2e/);
+  }
+  const root = fixture(t);
+  fs.renameSync(path.join(root, 'e2e/a.spec.ts'), path.join(root, 'e2e/renamed.test.mjs'));
+  const result = run(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /STALE_ENTRY: e2e\/a.spec.ts/);
+  assert.match(result.stderr, /SELECTED_WITHOUT_ENTRY: npm:test:e2e: e2e\/renamed.test.mjs/);
+  assert.match(result.stderr, /MAPPED_NOT_SELECTED: npm:test:e2e: e2e\/a.spec.ts/);
+});
+
+test('Playwright rejects command filters and nonbinding or masked CI calls without promoting files', t => {
+  const mutations = [
+    root => { const file = path.join(root, 'package.json'); const pkg = JSON.parse(fs.readFileSync(file)); pkg.scripts['test:e2e'] += ' e2e/a.spec.ts'; fs.writeFileSync(file, JSON.stringify(pkg)); },
+    ...[{ run: 'npx playwright test --workers=1' }, { run: 'npm run test:e2e || true' },
+      { run: 'npm run test:e2e', 'continue-on-error': true }, { run: 'npm run test:e2e', if: false },
+      { run: 'npm run test:e2e\nnpm run test:e2e' }].map(step => root => {
+        fs.writeFileSync(path.join(root, '.github/workflows/e2e.yml'), JSON.stringify({ jobs: { e2e: { steps: [step] } } }));
+      }),
+  ];
+  for (const mutate of mutations) {
+    const root = fixture(t); mutate(root);
+    const selection = collectPlaywrightInventorySelection(root);
+    assert.deepEqual(selection.files, []);
+    assert.equal(selection.binding, null);
+    assert.equal(selection.errors.length, 1);
+    const result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /INCOMPLETE_SELECTION: npm:test:e2e/);
+  }
 });

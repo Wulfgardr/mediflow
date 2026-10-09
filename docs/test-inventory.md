@@ -1,7 +1,7 @@
 # Test inventory
 
 The inventory detects changes to test discovery, the unit suite's selection, and
-five explicit npm test selections, the Headless selector and the Claims guard
+five explicit npm test selections, the Headless and Playwright selectors and the Claims guard
 self-test, each with configured CI calls.
 It does not certify that tests ran, that their assertions are sufficient, or that a
 release is qualified. Unresolved selections remain visible work; they are not
@@ -106,6 +106,26 @@ need separate evidence.
 The literal self-test argument also makes the adapter itself an inclusive
 discovery candidate. That helper retains an unresolved record pending semantic
 classification; it is not silently excluded to reduce the unresolved count.
+
+The Playwright model, `npm:test:e2e`, and `playwright.config.ts` both use
+`scripts/playwright-test-selection.mjs`. The filesystem-only selector preserves
+Playwright's default `.spec`/`.test` pattern, JS/TS extensions with optional `c`/`m`
+and `x`, nested and hidden directories, and depth-first `localeCompare` order.
+As in the previous explicit `testDir` configuration, Git ignores do not filter
+selection, symlinks are not followed, and `node_modules` directories are skipped.
+The existing `chatgpt-synthesis-product.spec.ts` ignore remains case-insensitive
+at every depth. Helpers and that separate Node harness retain unresolved records.
+The required `e2e` group must be readable and non-empty. The real config uses exact
+escaped regular expressions from this selector, avoiding a second file list or
+an independent discovery pattern. Selection never imports test sources.
+
+`test:e2e` must be exactly `playwright test --workers=1`, with one literal
+`npm run test:e2e` call in the `e2e` job of `.github/workflows/e2e.yml`. This replaces
+the equivalent direct `npx` invocation; runtime, retries, timeouts, quarantine and
+browser settings are unchanged. The existing closed CI binding guards apply.
+Renamed, new and missing selected files still require a manifest update; a broken
+binding or missing/empty group leaves this required suite present with errors.
+The ordinary E2E CI job supplies execution evidence after static selection checks.
 
 Tests outside these models retain `unresolved` selection records, including tests
 with separate existing commands or CI callers. `unresolved` means this guard has
