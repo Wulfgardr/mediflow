@@ -1025,3 +1025,15 @@ dello stesso ID/versione (ABA), restore C15, purge e fix-orphans restano
 residui distinti. Le prove SQLite nella suite membership coprono successo,
 stale/interposto, target, rollback audit, tombstone, ultimo incremento safe,
 input/auth e preview oltre limite; non attestano quei residui.
+
+
+Raccordo degli oracoli delle coorti precedenti: il test statico soft-delete
+registra i quattro lookup esatti dell'identità create (due rami Web, uno
+local-v1 e uno paired), ciascuno con molteplicità uno. Includono volutamente
+i tombstone per impedire il riuso dell'ID dopo l'ammissione. L'oracolo clear
+segue ora la delega route/core (`result.value`/`result.status`) e il loop di
+audit sui pazienti effettivamente cancellati logicamente, conservando controllo
+del tipo test, stale version, versione audit e divieto hard-delete. I negativi
+AST per sostituzione/duplicazione e le prove SQLite di famiglia non cambiano.
+Questo raccordo test/documenti non modifica la produzione delle coorti già
+revisionate e non qualifica automaticamente tutti gli altri lookup del guard.

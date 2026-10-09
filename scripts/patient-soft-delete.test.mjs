@@ -86,8 +86,11 @@ test('ambulatories/clear is membership-based, soft-deletes and stays test-only',
     assert.match(clearServiceSource, /status: 403/, 'clearing a non-test ambulatory must stay rejected');
 
     // (d) one patient.deleted audit event per cleared patient, PHI-safe metadata only.
-    assert.match(clearServiceSource, /clearedPatientVersions: result\.clearedPatients/, 'clear service must retain the membership-clear result for auditing');
-    assert.match(clearServiceSource, /for \(const item of cleared\)/, 'clear must audit each cleared patient');
+    assert.match(routeSource, /NextResponse\.json\(result\.value, \{ status: result\.status \}\)/, 'route must preserve the core response and status');
+    assert.match(clearServiceSource, /const result = clearTestContainerByMembership\(tx, ambulatoryId\)/, 'clear must retain the transactional membership result');
+    assert.match(clearServiceSource, /for \(const patient of result\.clearedPatients\)/, 'clear must audit each cleared patient');
+    assert.match(clearServiceSource, /resourceVersion: patient\.version/, 'each patient audit must retain the resulting version');
+    assert.match(clearServiceSource, /target\.version !== parsedVersion/, 'stale container versions must be rejected');
     assert.match(clearServiceSource, /'patient\.deleted'/, 'clear must emit the patient.deleted audit event');
     assert.match(clearServiceSource, /reasonCode: TEST_CONTAINER_CLEAR_REASON/, 'audit metadata must carry the dedicated deletion reason');
 });
@@ -103,6 +106,12 @@ test('the membership-clear helper tombstones with the dedicated reason', () => {
 // ADR 0066 allowlist guard (WUL-316 style): unfiltered reads are intentional only
 // at these stable AST fingerprints. The number is the expected multiplicity.
 const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
+    // Create identity checks intentionally include tombstones after admission: IDs may not be reused.
+    // Two Web branches, one local-v1 branch, and the paired branch each have one exact lookup.
+    ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, values.id)).get()', 1],
+    ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
+    ['app/api/v1/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
+    ['lib/network-patient-lifecycle.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['app/api/system/backup-restore/route.ts', 'tx.select().from(patients).all()', 1],
     ['app/api/system/fix-orphans/route.ts', 'dbServer.select({ id: patients.id }).from(patients)', 2],
     ['app/api/system/migrate/route.ts', 'dbServer.select().from(patients).where(isNull(patients.ambulatoryId))', 1],
