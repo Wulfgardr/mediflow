@@ -1873,6 +1873,15 @@
       }
     },
     {
+      "path": "lib/ambulatory-json-body.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/api-schemas/api-schemas.test.ts",
       "selection": {
         "state": "mapped",
