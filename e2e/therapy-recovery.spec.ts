@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+import { expect, test, type Page, type Route } from '@playwright/test';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
 
 // Real authenticated routes and synthetic SQLite records. Only the named
 // transport failures are injected; writes forwarded by route.fetch still commit.
@@ -406,3 +406,286 @@ test('unreadable therapy note blocks renewed deletion after a conflict', async (
   await expect(reviewedDelete(page)).toHaveCount(0);
   expect(writes).toBe(1);
 });
+
+// A deterministic response barrier, not a claim about a real transport race.
+// Fetch first so the server outcome is known, then hold delivery across a real
+// React context transition. Session lock may abort the browser request instead.
+async function holdTherapyResponse(page: Page, patientId: string, therapyId: string, method: 'GET' | 'DELETE') {
+  // Passive observers return the native promises and preserve receivers/results.
+  // Observe both reread branches; the parent may finish after the held list.
+  // Crypto tracking conservatively includes work in the replacement context.
+  // Fixture therapy fields are plaintext; no decryption delay is injected.
+  await page.evaluate(({ patientId, therapyId, method }) => {
+    const nativeFetch = window.fetch;
+    const nativeDecrypt = crypto.subtle.decrypt;
+    const decryptDescriptor = Object.getOwnPropertyDescriptor(crypto.subtle, 'decrypt');
+    const requests: Record<string, { seen: boolean; settled: boolean; rejected: boolean; jsonCalls: number; jsonSettled: number }> = {};
+    for (const name of method === 'GET' ? ['list', 'parent'] : ['delete']) {
+      requests[name] = { seen: false, settled: false, rejected: false, jsonCalls: 0, jsonSettled: 0 };
+    }
+    const state = { requests, pending: 0, activity: 0, decryptCalls: 0, restore: () => {} };
+    const restoreResponses: Array<() => void> = [];
+    const observe = <T,>(promise: Promise<T>, completed?: () => void) => {
+      state.pending++;
+      state.activity++;
+      const finish = () => { state.pending--; state.activity++; completed?.(); };
+      void promise.then(finish, finish);
+      return promise;
+    };
+    const trackedDecrypt: SubtleCrypto['decrypt'] = function (this: SubtleCrypto, ...args: Parameters<SubtleCrypto['decrypt']>) {
+      state.decryptCalls++;
+      return observe(Reflect.apply(nativeDecrypt, this, args) as Promise<ArrayBuffer>);
+    };
+    const trackedFetch: typeof fetch = function (this: Window, input, init) {
+      const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+      const requestMethod = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+      const name = method === 'GET' && requestMethod === 'GET'
+        ? url.pathname === '/api/therapies' && url.searchParams.get('patientId') === patientId ? 'list'
+          : url.pathname === `/api/patients/${patientId}` ? 'parent' : undefined
+        : method === 'DELETE' && requestMethod === 'DELETE' && url.pathname === `/api/therapies/${therapyId}` ? 'delete' : undefined;
+      const promise = Reflect.apply(nativeFetch, this, [input, init]) as Promise<Response>;
+      if (name && !requests[name].seen) {
+        const request = requests[name];
+        request.seen = true;
+        state.activity++;
+        // Register before the caller's await continuation, while returning its
+        // original fetch promise. Wrap json only on this observed Response.
+        void promise.then(response => {
+          request.settled = true;
+          state.activity++;
+          const nativeJson = response.json;
+          const descriptor = Object.getOwnPropertyDescriptor(response, 'json');
+          response.json = function (this: Response) {
+            request.jsonCalls++;
+            return observe(Reflect.apply(nativeJson, this, []) as Promise<unknown>, () => { request.jsonSettled++; });
+          };
+          restoreResponses.push(() => {
+            if (descriptor) Object.defineProperty(response, 'json', descriptor);
+            else Reflect.deleteProperty(response, 'json');
+          });
+        }, () => { request.settled = true; request.rejected = true; state.activity++; });
+      }
+      return promise;
+    };
+    window.fetch = trackedFetch;
+    crypto.subtle.decrypt = trackedDecrypt;
+    state.restore = () => {
+      if (window.fetch === trackedFetch) window.fetch = nativeFetch;
+      if (crypto.subtle.decrypt === trackedDecrypt) {
+        if (decryptDescriptor) Object.defineProperty(crypto.subtle, 'decrypt', decryptDescriptor);
+        else Reflect.deleteProperty(crypto.subtle, 'decrypt');
+      }
+      for (const restore of restoreResponses) restore();
+      Reflect.deleteProperty(window, '__therapyLifecycleCompletion');
+    };
+    Reflect.set(window, '__therapyLifecycleCompletion', state);
+  }, { patientId, therapyId, method });
+  const matches = (url: URL) => method === 'GET'
+    ? url.pathname === '/api/therapies' && url.searchParams.get('patientId') === patientId
+    : url.pathname === `/api/therapies/${therapyId}`;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let taken = false;
+  let entered = false;
+  let settled = false;
+  let terminal = false;
+  let heldRequest: ReturnType<Route['request']> | undefined;
+  let status: number | undefined;
+  const errors: unknown[] = [];
+  const completed = (request: ReturnType<Route['request']>) => { if (request === heldRequest) terminal = true; };
+  page.on('requestfinished', completed);
+  page.on('requestfailed', completed);
+  const handler = async (route: Route) => {
+    if (taken || route.request().method() !== method) return route.continue();
+    taken = true;
+    heldRequest = route.request();
+    try {
+      const response = await route.fetch();
+      status = response.status();
+      entered = true;
+      await gate;
+      if (!route.request().failure()) await route.fulfill({ response });
+    } catch (error) {
+      // Only a browser-observed cancellation is allowed to retire delivery.
+      if (!route.request().failure()) errors.push(error);
+    } finally {
+      settled = true;
+    }
+  };
+  await page.route(matches, handler);
+  return {
+    async wait() {
+      await expect.poll(() => entered || settled, 'authoritative response reached the delay barrier').toBe(true);
+      expect(errors).toEqual([]);
+      expect(status).toBe(200);
+      expect(entered).toBe(true);
+    },
+    async finish(allowAbortedRead = false) {
+      release();
+      try {
+        if (taken) {
+          await expect.poll(() => settled, 'held route handler completed').toBe(true);
+          await expect.poll(() => terminal, 'held browser request finished or was cancelled').toBe(true);
+          await expect.poll(() => page.evaluate(async ({ requireJson }) => {
+            const state = Reflect.get(window, '__therapyLifecycleCompletion') as {
+              requests: Record<string, { seen: boolean; settled: boolean; jsonCalls: number; jsonSettled: number }>;
+              pending: number; activity: number;
+            };
+            const complete = () => state.pending === 0 && Object.values(state.requests).every(request =>
+              request.seen && request.settled && request.jsonCalls === request.jsonSettled && (!requireJson || request.jsonCalls > 0));
+            if (!complete()) return false;
+            const activity = state.activity;
+            // A task drains preceding promise continuations, including chained
+            // field decrypts; the frame lets resulting React work reach the DOM.
+            await new Promise<void>(resolve => {
+              const channel = new MessageChannel();
+              channel.port1.onmessage = () => { channel.port1.close(); channel.port2.close(); resolve(); };
+              channel.port2.postMessage(null);
+            });
+            await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+            return complete() && state.activity === activity;
+          }, { requireJson: method === 'GET' && !allowAbortedRead }), 'held fetch/body/decrypt continuations reached a stable task and frame').toBe(true);
+        }
+      } finally {
+        await page.unroute(matches, handler);
+        page.off('requestfinished', completed);
+        page.off('requestfailed', completed);
+        await page.evaluate(() => (Reflect.get(window, '__therapyLifecycleCompletion') as { restore: () => void } | undefined)?.restore());
+      }
+      expect(errors).toEqual([]);
+    },
+  };
+}
+
+async function leaveTherapyContext(page: Page, destination: 'patient' | 'unmount', other: Fixture) {
+  const link = destination === 'patient'
+    ? page.getByRole('navigation', { name: 'Cartelle aperte', exact: true }).locator(`a[href="/patients/${other.patientId}/modules"]`)
+    : page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Analisi', exact: true });
+  await link.click();
+  const discard = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
+  await expect(discard).toBeVisible();
+  await discard.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
+  await expect(page).toHaveURL(destination === 'patient' ? new RegExp(`/patients/${other.patientId}/modules`) : /\/analytics$/);
+  await expect(deleteRecovery(page)).toHaveCount(0);
+}
+
+for (const transition of ['patient', 'session', 'unmount'] as const) {
+  for (const phase of ['reviewed recovery', 'pending reread', 'pending committed response'] as const) {
+    test(`${transition} retires delete ${phase} without contaminating the next therapy context`, async ({ page }) => {
+      const original = await fixture(page);
+      const other = await fixture(page);
+      // Register both record tabs through ordinary SPA navigation. A second
+      // page.goto would reset the frame's in-memory list of opened records.
+      await openTherapies(page, original);
+      await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+        .getByRole('link', { name: 'Pazienti', exact: true }).click();
+      await expect(page).toHaveURL(/area=incarico/);
+      await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true })
+        .fill(other.therapyId.replace(/^therapy-/, 'SYN'));
+      // Search includes raw synthetic taxCode; the visible row masks that code.
+      const otherRow = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true }).getByRole('option');
+      await expect(otherRow).toHaveCount(1);
+      await otherRow.click();
+      await expect(page).toHaveURL(new RegExp(`/patients/${other.patientId}/modules`));
+      const openRecords = page.getByRole('navigation', { name: 'Cartelle aperte', exact: true });
+      await openRecords.locator(`a[href="/patients/${original.patientId}/modules"]`).click();
+      await expect(page).toHaveURL(new RegExp(`/patients/${original.patientId}/modules`));
+      await expect(openRecords.locator(`a[href="/patients/${other.patientId}/modules"]`)).toBeVisible();
+      await openPatientSection(page, 'terapie');
+      await expect(page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })).toBeVisible();
+      // The lifecycle transition must retain this document; a reload would
+      // destroy callbacks and could falsely appear to prove controller fencing.
+      const documentMarker = await page.evaluate(() => {
+        const marker = crypto.randomUUID();
+        Object.defineProperty(window, '__therapyLifecycleDocument', { value: marker });
+        return marker;
+      });
+      const beforeOriginal = await records(page, original.patientId);
+      const beforeOther = await records(page, other.patientId);
+      const writes: Array<{ id: string; version: number }> = [];
+      page.on('request', request => {
+        const path = new URL(request.url()).pathname;
+        if (request.method() === 'DELETE' && path.startsWith('/api/therapies/')) {
+          writes.push({ id: path.split('/').pop()!, version: request.postDataJSON().version });
+        }
+      });
+      let held: Awaited<ReturnType<typeof holdTherapyResponse>> | undefined;
+      try {
+        if (phase === 'pending committed response') {
+          held = await holdTherapyResponse(page, original.patientId, original.therapyId, 'DELETE');
+          await requestDeletion(page);
+          await held.wait();
+          await expect(deleteRecovery(page)).toContainText('Invio dell’eliminazione in corso');
+        } else {
+          // Explicit injected rejection before commit; no production failure assumed.
+          const endpoint = `**/api/therapies/${original.therapyId}`;
+          const reject = (route: Route) => route.request().method() === 'DELETE'
+            ? route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Synthetic lifecycle rejection before commit"}' })
+            : route.continue();
+          await page.route(endpoint, reject);
+          await requestDeletion(page);
+          await expect(deleteRecovery(page)).toContainText('L’esito non è confermato');
+          await page.unroute(endpoint, reject);
+          if (phase === 'pending reread') held = await holdTherapyResponse(page, original.patientId, original.therapyId, 'GET');
+          await deleteRecovery(page).getByRole('button', { name: 'Rileggi terapia', exact: true }).click();
+          if (held) {
+            await held.wait();
+            await expect(deleteRecovery(page)).toContainText('Rilettura della cartella in corso');
+          } else {
+            await expect(reviewedDelete(page)).toBeVisible();
+          }
+        }
+        expect(writes).toEqual([{ id: original.therapyId, version: 1 }]);
+
+        if (transition === 'session') {
+          const locked = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/lock' && response.request().method() === 'POST');
+          await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+          expect((await locked).status()).toBe(200);
+          await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
+          expect((await page.request.get(`/api/therapies?patientId=${original.patientId}`)).status()).toBe(401);
+          await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+          await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        } else {
+          await leaveTherapyContext(page, transition, other);
+        }
+        // Release only after the old component/context has retired. The new
+        // context exists before delivery; late state must not replace its state.
+        if (transition === 'unmount') {
+          await page.getByRole('navigation', { name: 'Cartelle aperte', exact: true })
+            .locator(`a[href="/patients/${original.patientId}/modules"]`).click();
+          await expect(page).toHaveURL(new RegExp(`/patients/${original.patientId}/modules`));
+        }
+        await openPatientSection(page, 'terapie');
+        await expect(page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico secondario', exact: true })).toBeVisible();
+        await expect(deleteRecovery(page)).toHaveCount(0);
+        // Establish a fresh prompt before releasing the old result. It must
+        // retain an empty reason and remain cancellable without another DELETE.
+        await page.getByRole('button', { name: 'Elimina Farmaco sintetico secondario solo se inserito per errore', exact: true }).click();
+        const freshPrompt = page.getByRole('dialog', { name: 'Eliminare questo farmaco dalla cartella?', exact: true });
+        await expect(freshPrompt.getByRole('textbox', { name: "Motivazione dell'eliminazione" })).toHaveValue('');
+        if (held) {
+          const pending = held;
+          held = undefined;
+          await pending.finish(transition === 'session');
+        }
+        expect(await page.evaluate(() => Reflect.get(window, '__therapyLifecycleDocument'))).toBe(documentMarker);
+        // Authoritative reads after request completion also precede the final
+        // UI observations, rather than asserting immediate absence at release.
+        const afterOriginal = await records(page, original.patientId);
+        const expectedOriginal = phase === 'pending committed response'
+          ? beforeOriginal.filter(item => item.id !== original.therapyId) : beforeOriginal;
+        expect(afterOriginal).toEqual(expectedOriginal);
+        expect(await records(page, other.patientId)).toEqual(beforeOther);
+        await expect(freshPrompt).toBeVisible();
+        await expect(freshPrompt.getByRole('textbox', { name: "Motivazione dell'eliminazione" })).toHaveValue('');
+        await expect(deleteRecovery(page)).toHaveCount(0);
+        await freshPrompt.getByRole('button', { name: 'Annulla', exact: true }).click();
+        await expect(freshPrompt).toHaveCount(0);
+        await expect(deleteRecovery(page)).toHaveCount(0);
+        expect(writes).toEqual([{ id: original.therapyId, version: 1 }]);
+      } finally {
+        if (held) await held.finish(transition === 'session');
+      }
+    });
+  }
+}
