@@ -1025,11 +1025,9 @@ function applySchemaGuards() {
         console.warn('[MediFlow] Core secondary index check skipped:', error);
     }
     /* @Codex */
-    try {
-        ensureAuditSqliteSchema(sqlite);
-    } catch (error) {
-        console.warn('[MediFlow] Audit schema check skipped:', error);
-    }
+    // Not best-effort: without the audit table and its append-only triggers the
+    // store must not open, so a failure here aborts the schema transaction.
+    ensureAuditSqliteSchema(sqlite);
     /* @Codex */
     ensureHeadlessSoapEntryCommitSchema();
 }
