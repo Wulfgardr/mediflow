@@ -91,7 +91,7 @@ Sorgenti: [lib/checkup-json-body.ts](../lib/checkup-json-body.ts), [lib/api-v1-c
 
 Schema/stati/date normalizzati; ID create, parent attivo nella transazione; update e DELETE con versione attesa/CAS. Figlio vincolato al patientId path v1/paired; membership e ENC paired. PUT comprende stato e lifecycle, DELETE locale logico; non conferisce autorità alla transizione headless.
 
-Prove di riferimento: [lib/checkup-required-audit.test.ts](../lib/checkup-required-audit.test.ts), [lib/checkup-json-envelope.test.ts](../lib/checkup-json-envelope.test.ts). test:network:home-base-checkup-write. Gap C05-C confermato: ID create non validi possono essere sostituiti o accettati dagli adapter; duplicato valido ancora 500. Le prove body/date e audit già presenti restano invarianti ADR 0015/0141.
+Prove di riferimento: [lib/checkup-required-audit.test.ts](../lib/checkup-required-audit.test.ts), [lib/checkup-json-envelope.test.ts](../lib/checkup-json-envelope.test.ts). test:network:home-base-checkup-write. Create Web/v1/paired genera UUID solo se ID omesso; ID fornito non stringa, null o vuoto dopo trim dà 400 e gli ID opachi validi restano invariati. Duplicato dà 409 dopo parent/scope, senza effetti o dettagli del record esistente. La suite SQLite e lo schema coprono questi casi; OpenAPI 1.33.0 e ADR 0015 descrivono la restrizione. I caller Web forniscono UUID e Swift omette l’ID, quindi restano compatibili. Le prove body/date e audit restano invarianti ADR 0015/0141. Il limite numerico del parser versioni condiviso P/C resta da correggere separatamente.
 
 ### PR — Prescrizioni protesiche
 
