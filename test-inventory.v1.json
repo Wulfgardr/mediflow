@@ -5706,6 +5706,15 @@
       }
     },
     {
+      "path": "lib/siss-handoff-required-audit.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/siss-patient-context.test.ts",
       "selection": {
         "state": "mapped",
