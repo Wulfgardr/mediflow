@@ -1,7 +1,7 @@
 // WUL-306 (ADR 0066): audited admin purge of a soft-deleted patient (GDPR Art. 17 tool).
 // Modeled on fix-orphans: GET dry-run with per-table counts, POST execute, admin only.
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
@@ -13,7 +13,10 @@ import {
     totalPatientCascadeRows,
     type PatientCascadeCounts,
 } from '@/lib/patient-cascade';
-import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
+import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+
+const PURGE_JSON_MAX_BYTES = 65_536;
 
 export const dynamic = 'force-dynamic';
 
@@ -68,52 +71,50 @@ export async function POST(request: Request) {
     if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
-        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+        const parsed = await readBoundedJsonBody(request, PURGE_JSON_MAX_BYTES, 'request-json',
+            { signal: request.signal, deadline: Infinity }).catch(() => ({ ok: false as const, status: 400 as const }));
+        if (!parsed.ok) return NextResponse.json({ error: parsed.status === 413 ? 'JSON payload too large' : 'Invalid JSON body' }, { status: parsed.status });
+        if (typeof parsed.value !== 'object' || parsed.value === null || Array.isArray(parsed.value)) {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
+        const body = parsed.value as Record<string, unknown>;
         const patientId = typeof body.patientId === 'string' ? body.patientId.trim() : '';
         if (!patientId) {
             return NextResponse.json({ error: 'patientId is required' }, { status: 400 });
         }
 
-        const patient = await selectPatientLifecycleRow(patientId);
-        if (!patient) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-        // Double confirmation: erasure only follows an explicit operational soft-delete.
-        if (!patient.deletedAt) {
-            return NextResponse.json(
-                { error: 'Patient is still active: soft-delete it before purging' },
-                { status: 409 }
-            );
-        }
+        const auditContext = auditContextFromSession(session);
+        const requestId = requestIdFromRequest(request);
+        const result = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt })
+                .from(patients).where(eq(patients.id, patientId)).get();
+            if (!patient) return { status: 404, value: { error: 'Not found' } };
+            // Erasure only follows an explicit operational soft-delete, reread under the write lock.
+            if (!patient.deletedAt) return {
+                status: 409, value: { error: 'Patient is still active: soft-delete it before purging' },
+            };
 
-        // @Codex better-sqlite3 transactions are synchronous; promise callbacks break execution.
-        const childRowCounts = dbServer.transaction((tx) => {
-            const counts = purgePatientCascade(tx, patientId);
-            tx.delete(patients).where(eq(patients.id, patientId)).run();
-            return counts;
-        });
-
-        await safeWriteAuditEventFromRequest(
-            request,
-            session,
-            {
-                eventType: 'patient.purged',
-                subjectType: 'patient',
-                subjectRef: patientId,
-                redactedMetadata: {
+            const childRowCounts = purgePatientCascade(tx, patientId);
+            const deleted = tx.delete(patients).where(and(eq(patients.id, patientId),
+                eq(patients.version, patient.version), eq(patients.deletedAt, patient.deletedAt))).run();
+            if (deleted.changes !== 1) throw new Error('Patient purge did not delete exactly one row');
+            writeAuditEventInTransaction(tx, {
+                eventType: 'patient.purged', outcome: 'success',
+                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                subjectType: 'patient', subjectRef: patientId,
+                sourceSurface: auditContext.sourceSurface, requestId,
+                redactedMetadata: withAuditContextMetadata(auditContext, {
                     counts: totalPatientCascadeRows(childRowCounts),
                     flags: cascadeCountFlags('purged', childRowCounts),
-                },
-            },
-            '[MediFlow] Patient purge audit write failed:',
-        );
+                }),
+            });
+            return { status: 200, value: {
+                success: true, patientId, childRowCounts,
+                totalChildRows: totalPatientCascadeRows(childRowCounts),
+            } };
+        }, { behavior: 'immediate' });
 
-        return NextResponse.json({
-            success: true,
-            patientId,
-            childRowCounts,
-            totalChildRows: totalPatientCascadeRows(childRowCounts),
-        });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('[MediFlow] Purge patient failed:', error);
         return NextResponse.json({ error: 'Purge failed' }, { status: 500 });
