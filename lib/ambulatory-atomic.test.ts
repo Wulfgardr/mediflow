@@ -177,7 +177,7 @@ test('eight baseline successes and audit FAIL/IGNORE outcomes', async () => {
         const auditDelta = success.after.audit.length - success.before.audit.length;
         const expectedEvents = baseline
             ? (op.endsWith('clear') ? (op.startsWith('paired') ? 3 : 2) : (op.startsWith('paired') ? 1 : 0))
-            : (op.endsWith('clear') ? 3 : 2);
+            : (op.endsWith('clear') ? 6 : 2);
         assert.equal(auditDelta, expectedEvents, op);
         if (!baseline) {
             const events = (success.after.audit as Array<Record<string, unknown>>)
@@ -201,6 +201,9 @@ test('eight baseline successes and audit FAIL/IGNORE outcomes', async () => {
             if (op.endsWith('clear')) {
                 const patientEvents = events.filter(event => event.event_type === 'patient.deleted');
                 assert.equal(patientEvents.length, 2);
+                const unlinked = events.filter(event => event.event_type === 'patient.updated');
+                assert.equal(unlinked.length, 3);
+                assert.ok(unlinked.every(event => JSON.parse(String(event.redacted_metadata)).resourceVersion === 4));
                 assert.ok(patientEvents.every(event => JSON.parse(String(event.redacted_metadata)).resourceVersion === 3));
             } else {
                 const indirect = events.find(event => event.subject_ref === success.ids.fallback);

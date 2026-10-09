@@ -34,8 +34,9 @@ export async function executePatientClipboardPaste(
         endpoint = '/api/patients/duplicate';
         body = { patientIds: clipboard.patientIds, targetAmbulatoryId };
     } else if (clipboard.operation === 'copy') {
+        if (!hasExactPatientVersions(clipboard)) return false;
         endpoint = '/api/patients/assign';
-        body = { patientIds: clipboard.patientIds, targetAmbulatoryId };
+        body = { patientIds: clipboard.patientIds, patientVersions: clipboard.patientVersions, targetAmbulatoryId };
     } else {
         if (!clipboard.sourceAmbulatoryId || !hasExactPatientVersions(clipboard)) return false;
         endpoint = '/api/patients/move';

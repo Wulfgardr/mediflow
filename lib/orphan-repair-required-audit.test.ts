@@ -57,7 +57,7 @@ function snapshot() {
     const reopened = new Database(join(dataDir, 'medical.db'), { readonly: true });
     try { return {
         ambulatories: reopened.prepare('SELECT * FROM ambulatories ORDER BY id').all() as Array<Record<string, unknown>>,
-        patients: reopened.prepare('SELECT * FROM patients ORDER BY id').all(),
+        patients: reopened.prepare('SELECT * FROM patients ORDER BY id').all() as Array<Record<string, unknown>>,
         entries: reopened.prepare('SELECT * FROM entries ORDER BY id').all(),
         memberships: reopened.prepare('SELECT * FROM patients_to_ambulatories ORDER BY patient_id, ambulatory_id').all() as Array<Record<string, unknown>>,
         events: reopened.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
@@ -106,7 +106,7 @@ test('repair: default, two relinks and explicit purge commit with minimal host e
     assert.deepEqual(result.purgedOrphanChildRows, expectedCounts);
     assert.equal(result.message, "Created/Used Default Ambulatory and linked 2 orphan patients to 'Sede Principale'. Refresh the page.");
     const after = snapshot();
-    assert.deepEqual(after.patients, before.patients, 'includes tombstone; primary and versions preserved');
+    assert.deepEqual(after.patients, before.patients.map((patient, i) => ({ ...patient, version: Number(patient.version) + 1, updated_at: after.patients[i].updated_at })), 'each relink bumps once; primary and tombstone preserved');
     assert.equal(after.ambulatories.length, 1);
     assert.equal(after.ambulatories[0].is_default, 1);
     assert.equal(after.ambulatories[0].name, 'Sede Principale');
@@ -128,7 +128,7 @@ test('repair: default, two relinks and explicit purge commit with minimal host e
     for (const event of events.slice(1, 3)) {
         assert(ids.includes(event.subject_ref as string));
         assert.deepEqual(JSON.parse(event.redacted_metadata as string), {
-            changedFields: ['ambulatoryMemberships'], flags: ['membership:relinked', 'auth:session'],
+            changedFields: ['ambulatoryMemberships'], resourceVersion: 8 + ids.indexOf(String(event.subject_ref)), flags: ['membership:relinked', 'auth:session'],
         });
     }
     assert.equal(events[3].subject_ref, null);

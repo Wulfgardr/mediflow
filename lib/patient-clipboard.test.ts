@@ -9,7 +9,7 @@ import {
 function makeClipboard(overrides: Partial<PatientClipboardState> = {}): PatientClipboardState {
     return {
         patientIds: ['patient-1'],
-        patientVersions: {},
+        patientVersions: { 'patient-1': 4 },
         operation: 'copy',
         sourceAmbulatoryId: 'ambulatory-source',
         ...overrides,
@@ -36,6 +36,7 @@ test('copy links live patients and test targets always duplicate', async () => {
         { request: live.request },
     ), true);
     assert.equal(live.calls[0]?.url, '/api/patients/assign');
+    assert.deepEqual(JSON.parse(String(live.calls[0]?.init.body)), { patientIds: ['patient-1'], patientVersions: { 'patient-1': 4 }, targetAmbulatoryId: 'ambulatory-target' });
 
     const testTarget = makeRecorder(true);
     assert.equal(await executePatientClipboardPaste(
@@ -82,7 +83,7 @@ test('failed or incomplete moves do not run the success effect', async () => {
 
     const incomplete = makeRecorder(true);
     assert.equal(await executePatientClipboardPaste(
-        makeClipboard({ operation: 'cut' }),
+        makeClipboard({ operation: 'cut', patientVersions: {} }),
         'ambulatory-target',
         false,
         { request: incomplete.request, onSuccess: () => { successCount += 1; } },
@@ -101,4 +102,17 @@ test('successful paste runs the clear effect once', async () => {
         { request: recorder.request, onSuccess: () => { successCount += 1; } },
     ), true);
     assert.equal(successCount, 1);
+});
+
+test('copy rejects absent, partial or extra version maps before dispatch and retains clipboard on conflict', async () => {
+    for (const patientVersions of [{}, { other: 4 }, { 'patient-1': 4, other: 4 }] as Record<string, number>[]) {
+        const recorder = makeRecorder(true);
+        assert.equal(await executePatientClipboardPaste(makeClipboard({ patientVersions }), 'target', false, { request: recorder.request }), false);
+        assert.equal(recorder.calls.length, 0);
+    }
+    let cleared = false;
+    assert.equal(await executePatientClipboardPaste(makeClipboard(), 'target', false, {
+        request: makeRecorder(false).request, onSuccess: () => { cleared = true; },
+    }), false);
+    assert.equal(cleared, false);
 });

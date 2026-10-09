@@ -12,6 +12,7 @@ import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
 import { activePatients } from '@/lib/patient-lifecycle';
+import { buildPatientVersionConflictPayload } from '@/lib/patient-concurrency';
 
 const MEMBERSHIP_JSON_MAX_BYTES = 262_144;
 
@@ -26,20 +27,27 @@ export async function POST(request: Request) {
         if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'JSON payload too large' : 'Invalid JSON body' }, { status: body.status });
         const parsedBody = parseApiBody(patientUnassignSchema, body.value);
         if (!parsedBody.ok) return parsedBody.response;
-        const { patientIds, ambulatoryId } = parsedBody.data;
+        const { patientIds, patientVersions, ambulatoryId } = parsedBody.data;
 
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
-        const rejection = dbServer.transaction((tx) => {
+        const result = dbServer.transaction((tx): { status: 200 | 404 | 409; value: Record<string, unknown> } => {
             const target = tx.select({ id: ambulatories.id }).from(ambulatories)
                 .where(eq(ambulatories.id, ambulatoryId)).get();
-            if (!target) return { error: 'Ambulatory not found' };
+            if (!target) return { status: 404, value: { error: 'Ambulatory not found' } };
 
-            const existingPatients = tx.select({ id: patients.id }).from(patients)
+            const existingPatients = tx.select({ id: patients.id, version: patients.version, updatedAt: patients.updatedAt, isArchived: patients.isArchived }).from(patients)
                 .where(and(inArray(patients.id, patientIds), activePatients())).all();
             const existingIds = new Set(existingPatients.map((item) => item.id));
             const missingPatientIds = patientIds.filter((id) => !existingIds.has(id));
-            if (missingPatientIds.length > 0) return { error: 'Some patients were not found', missingPatientIds };
+            if (missingPatientIds.length > 0) return { status: 404, value: { error: 'Some patients were not found', missingPatientIds } };
+
+            for (const patient of existingPatients) {
+                const expectedVersion = patientVersions[patient.id];
+                if (patient.version !== expectedVersion) return {
+                    status: 409, value: buildPatientVersionConflictPayload(expectedVersion, patient.id, patient),
+                };
+            }
 
             const memberships = tx.select({ patientId: patientsToAmbulatories.patientId })
                 .from(patientsToAmbulatories).where(and(
@@ -48,28 +56,31 @@ export async function POST(request: Request) {
                 )).all();
             const linked = new Set(memberships.map((item) => item.patientId));
             for (const patientId of patientIds) {
-                // A retry/no-op preserves the response, without claiming a new mutation.
+                // A current no-op preserves the response without a version bump or event.
                 if (!linked.has(patientId)) continue;
                 const result = tx.delete(patientsToAmbulatories).where(and(
                     eq(patientsToAmbulatories.patientId, patientId),
                     eq(patientsToAmbulatories.ambulatoryId, ambulatoryId),
                 )).run();
                 if (result.changes !== 1) throw new Error('Membership mutation did not affect exactly one row');
+                const expectedVersion = patientVersions[patientId];
+                const nextVersion = expectedVersion + 1;
+                const updated = tx.update(patients).set({ version: nextVersion, updatedAt: new Date() })
+                    .where(and(eq(patients.id, patientId), eq(patients.version, expectedVersion), activePatients())).run();
+                if (updated.changes !== 1) throw new Error('Membership patient version did not update exactly one row');
                 writeAuditEventInTransaction(tx, {
                     eventType: 'patient.updated', outcome: 'success',
                     actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                     subjectType: 'patient', subjectRef: patientId,
                     sourceSurface: auditContext.sourceSurface, requestId,
                     redactedMetadata: withAuditContextMetadata(auditContext, {
-                        changedFields: ['ambulatoryMemberships'], flags: ['membership:unassigned'],
+                        changedFields: ['ambulatoryMemberships'], resourceVersion: nextVersion, flags: ['membership:unassigned'],
                     }),
                 });
             }
-            return null;
+            return { status: 200, value: { success: true, count: patientIds.length, ambulatoryId } };
         }, { behavior: 'immediate' });
-        if (rejection) return NextResponse.json(rejection, { status: 404 });
-
-        return NextResponse.json({ success: true, count: patientIds.length, ambulatoryId });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error("Unassign patients error:", error);
         return NextResponse.json({ error: "Failed to unlink patients" }, { status: 500 });
