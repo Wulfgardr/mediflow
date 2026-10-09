@@ -1,7 +1,7 @@
 # Test inventory
 
 The inventory detects changes to test discovery, the unit suite's selection, and
-five explicit npm test selections, the Headless and Playwright selectors and five guard
+six explicit npm test selections, the Headless and Playwright selectors and five guard
 self-tests, each with configured CI calls.
 It does not certify that tests ran, that their assertions are sufficient, or that a
 release is qualified. Unresolved selections remain visible work; they are not
@@ -52,10 +52,16 @@ propagation and cleanup remain in `scripts/run-unit-suite.mjs`.
 
 The npm adapter reads the script bodies and CI configuration for
 `test:launcher-helpers`, `test:native-launcher`, `test:usage-dashboard`,
-`test:fabric-generative-runtime-crosswalk` and `test:lume-tokens`. Their suite IDs
+`test:fabric-generative-runtime-crosswalk`, `test:lume-tokens` and
+`test:anydoc-diagnostics`. Their suite IDs
 are prefixed with `npm:`. Each script must be exactly `node --test` followed by
 simple literal relative file paths. Missing files, duplicate paths (including
 directory aliases), flags, filters, shell syntax and expansions fail selection.
+
+`test:anydoc-diagnostics` preserves the existing E2E job's three-file `node --test`
+command and ordering: HTTP diagnostic, consumer diagnostic, then correlation.
+The npm script replaces the equivalent literal CI command; it adds no execution.
+Consumer diagnostic retains its existing `unit` mapping as well.
 
 Each required script must have one literal call in its designated CI job. The
 entire step's run block must consist of `npm run <script>` lines, blanks or
@@ -87,7 +93,7 @@ launch a suite or acquire/clean a data directory.
 
 The Headless npm command must remain exactly
 `node scripts/run-headless-portable-tests.mjs`, with one literal call in the
-`headless-contracts` CI job. It uses the same binding guards as the five explicit
+`headless-contracts` CI job. It uses the same binding guards as the six explicit
 npm models above. The inventory awaits selection and keeps the required suite
 present with errors and no selected files if either binding or selection fails.
 This adds static selector coverage, not proof of assertions or installed targets.
