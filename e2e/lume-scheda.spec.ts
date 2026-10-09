@@ -200,8 +200,10 @@ test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page
     const box = element.getBoundingClientRect();
     return { width: box.width, height: box.height, radius: style.borderRadius };
   });
-  expect(geometry.width).toBeGreaterThanOrEqual(44);
-  expect(geometry.height).toBeGreaterThanOrEqual(44);
+  // DOM geometry can round a 44 px target to 43.99997 px.
+  const geometryTolerance = 0.5;
+  expect(geometry.width).toBeGreaterThanOrEqual(44 - geometryTolerance);
+  expect(geometry.height).toBeGreaterThanOrEqual(44 - geometryTolerance);
   expect(geometry.radius).toBe('12px');
 
   await action.click();

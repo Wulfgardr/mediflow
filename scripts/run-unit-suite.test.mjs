@@ -10,12 +10,14 @@ const root = path.resolve(import.meta.dirname, '..');
 const source = fs.readFileSync(path.join(root, 'scripts', 'run-unit-suite.mjs'), 'utf8');
 const dataDirSource = fs.readFileSync(path.join(root, 'scripts', 'test-data-dir.mjs'), 'utf8');
 
-function fixture(unit) {
+function fixture(unit, { preserveUnitArgs = false } = {}) {
   const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-unit-wrapper-'));
   const scripts = path.join(sandbox, 'scripts'); fs.mkdirSync(scripts);
   fs.writeFileSync(path.join(scripts, 'prepare-e2e-db.mjs'), "process.exit(Number(process.env.TEST_BOOTSTRAP_STATUS ?? 0));\n");
   fs.writeFileSync(path.join(scripts, 'test-data-dir.mjs'), dataDirSource.replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
-  fs.writeFileSync(path.join(scripts, 'run-unit-suite.mjs'), source.replace(/const unitArgs = .*;\n/u, `const unitArgs = ['--eval', ${JSON.stringify(unit)}];\n`).replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
+  const runnerSource = preserveUnitArgs ? source
+    : source.replace(/const unitArgs = .*;\n/u, `const unitArgs = ['--eval', ${JSON.stringify(unit)}];\n`);
+  fs.writeFileSync(path.join(scripts, 'run-unit-suite.mjs'), runnerSource.replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
   return { sandbox, runner: path.join(scripts, 'run-unit-suite.mjs') };
 }
 function execute(value, env = {}) { const childEnv = { ...process.env, ...env }; delete childEnv.MEDIFLOW_DATA_DIR; return spawnSync(process.execPath, [value.runner], { encoding: 'utf8', env: childEnv }); }
@@ -52,3 +54,71 @@ test('preserves a non-empty explicit relative data-dir value for every child', (
     fs.rmSync(value.sandbox, { recursive: true, force: true });
   }
 });
+
+function defaultSelectionFixture(testFile) {
+  const value = fixture('', { preserveUnitArgs: true });
+  // Keep the real wrapper and its default argv. Only the child suite is synthetic:
+  // it executes physically present test files using Node's real test runner.
+  fs.writeFileSync(path.join(value.sandbox, 'scripts', 'run-strip-types.mjs'), `
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+const args = process.argv.slice(2);
+fs.writeFileSync('selected-args.json', JSON.stringify(args));
+const files = args.filter(arg => /\\.test\\.(?:mjs|ts)$/.test(arg) && fs.existsSync(arg));
+if (!files.length) process.exit(0);
+const env = { ...process.env };
+for (const key of Object.keys(env)) if (key.startsWith('NODE_TEST')) delete env[key];
+const result = spawnSync(process.execPath, ['--experimental-strip-types', '--test', ...files], { env, stdio: 'inherit' });
+process.exit(result.status ?? 1);
+`);
+  const testPath = path.join(value.sandbox, 'scripts', testFile);
+  fs.mkdirSync(path.dirname(testPath), { recursive: true });
+  fs.writeFileSync(testPath, `
+import fs from 'node:fs';
+import test from 'node:test';
+test('synthetic selected regression', () => {
+  const marker${testFile.endsWith('.ts') ? ': string' : ''} = 'once\\n';
+  fs.appendFileSync('selected-test-ran', marker);
+  if (process.env.TEST_SELECTED_REGRESSION_FAIL === '1') throw new Error('seeded selected regression failure');
+});
+`);
+  return value;
+}
+
+for (const testFile of [
+  'run-unit-suite.test.mjs',
+  'run-strip-types.test.mjs',
+  'check-motion-budget.test.mjs',
+  'node-runtime-contract.test.mjs',
+  'chatgpt-account/account-service.test.ts',
+  'chatgpt-account/account-browser.test.ts',
+  'chatgpt-account/account-session-http.test.ts',
+  'chatgpt-account/account-transport.test.ts',
+]) {
+  test(`default unit selection executes ${testFile} exactly once`, () => {
+    const value = defaultSelectionFixture(testFile);
+    try {
+      const result = execute(value);
+      assert.equal(result.status, 0, result.stderr + result.stdout);
+      assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
+      const selected = JSON.parse(fs.readFileSync(path.join(value.sandbox, 'selected-args.json'), 'utf8'));
+      assert.equal(selected.filter(arg => arg === `scripts/${testFile}`).length, 1);
+      assert.deepEqual(implicitDirs(value), []);
+    } finally {
+      fs.rmSync(value.sandbox, { recursive: true, force: true });
+    }
+  });
+
+  test(`default unit selection propagates a failing ${testFile} and cleans its data`, () => {
+    const value = defaultSelectionFixture(testFile);
+    try {
+      const result = execute(value, { TEST_SELECTED_REGRESSION_FAIL: '1' });
+      assert.equal(result.status, 1, result.stderr + result.stdout);
+      assert.match(result.stdout, /seeded selected regression failure/);
+      assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
+      assert.deepEqual(implicitDirs(value), []);
+    } finally {
+      fs.rmSync(value.sandbox, { recursive: true, force: true });
+    }
+  });
+}

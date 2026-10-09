@@ -6,6 +6,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, lstatSync, realpathSy
 import { isAbsolute, resolve, join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { runNodeWithQuarantine } from './e2e-quarantine-node.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 function fail(message) { console.error(message); process.exit(2); }
 if (Number(process.versions.node.split('.')[0]) !== 24) fail(`NODE24_REQUIRED: observed ${process.versions.node}; no alternative-runtime PASS is accepted.`);
@@ -96,7 +97,10 @@ const command = [join(root, 'scripts/run-strip-types.mjs'), '--test', '--test-co
 console.log(JSON.stringify({ node: process.version, ownerVersion: pinned.version, ownerArchiveIntegrity: digest,
     testData: 'explicit-run-owned-synthetic', selectedTests: tests, loopbackProxy: args.includes('--loopback-proxy'),
     browser: args.includes('--browser') || browserOnly, browserOnly, liveProvider: 'NOT_RUN', osQualification: 'NOT_RUN' }, null, 2));
-const result = spawnSync(process.execPath, command, { cwd: root, stdio: 'inherit', shell: false,
-    env: { ...process.env, MEDIFLOW_DATA_DIR: directory, NEXT_TELEMETRY_DISABLED: '1' } });
+const options = { cwd: root, stdio: 'inherit', shell: false,
+    env: { ...process.env, MEDIFLOW_DATA_DIR: directory, NEXT_TELEMETRY_DISABLED: '1' } };
+const result = args.includes('--browser') || browserOnly
+    ? runNodeWithQuarantine(command, options)
+    : spawnSync(process.execPath, command, options);
 if (result.error) fail(`TEST_PROCESS_FAILED: ${result.error.code ?? 'unknown'}`);
 process.exit(result.status ?? 1);

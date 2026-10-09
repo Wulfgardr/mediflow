@@ -1,11 +1,16 @@
 /* @Codex: test-only, passive observation of one real keyboard activation.
  * No synthetic events, focus repair, input activation or application hooks.
- * The returned object remains in the page; snapshots contain booleans/counts only.
+ * The returned object remains in the page; snapshots contain passive state and bounded counts only.
  */
+export type ChooserBrowserState = Readonly<{
+  documentHasFocus: boolean | null; visibilityState: DocumentVisibilityState | null;
+  userActivationIsActive: boolean | null; userActivationHasBeenActive: boolean | null;
+}>;
 export type ChooserState = Readonly<{
   rootConnected: boolean; rootVisible: boolean; rootEnabled: boolean; rootIdle: boolean;
   rootTabbable: boolean; rootFocused: boolean; inputCount: number;
   sameInput: boolean; inputEnabled: boolean; inputNotTabbable: boolean;
+  browser: ChooserBrowserState;
 }>;
 export type KeyboardChooserSnapshot = Readonly<{
   initial: ChooserState; current: ChooserState; enters: number; inputClicks: number;
@@ -19,6 +24,17 @@ export function installKeyboardChooserObservation(element: Element) {
   const root = element as HTMLElement;
   const document = root.ownerDocument;
   const input = root.querySelector<HTMLInputElement>('input[type="file"]');
+  // Passive browser context at each phase; absent APIs stay unknown. These
+  // diagnostics do not replace the native event/original-input oracle.
+  const browserState = (): ChooserBrowserState => {
+    const activation = document.defaultView?.navigator.userActivation;
+    return {
+      documentHasFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+      visibilityState: typeof document.visibilityState === 'string' ? document.visibilityState : null,
+      userActivationIsActive: activation?.isActive ?? null,
+      userActivationHasBeenActive: activation?.hasBeenActive ?? null,
+    };
+  };
   const state = (): ChooserState => ({
     rootConnected: root.isConnected,
     rootVisible: root.getClientRects().length > 0,
@@ -31,6 +47,7 @@ export function installKeyboardChooserObservation(element: Element) {
     sameInput: input !== null && input.isConnected && root.querySelector('input[type="file"]') === input,
     inputEnabled: input !== null && !input.disabled && !input.matches(':disabled'),
     inputNotTabbable: input !== null && input.tabIndex === -1,
+    browser: browserState(),
   });
   const initial = state();
   let enters = 0, inputClicks = 0;
