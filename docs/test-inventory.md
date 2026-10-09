@@ -1,7 +1,7 @@
 # Test inventory
 
 The inventory detects changes to test discovery, the unit suite's selection, and
-five explicit npm test selections, the Headless and Playwright selectors and five guard
+six explicit npm test selections, the Headless and Playwright selectors and five guard
 self-tests, each with configured CI calls.
 It does not certify that tests ran, that their assertions are sufficient, or that a
 release is qualified. Unresolved selections remain visible work; they are not
@@ -44,7 +44,9 @@ suite. A source match is not proof that assertions execute.
 
 The real unit runner and the inventory guard both use
 `scripts/unit-test-selection.mjs`. Its two recursive
-groups and explicit script list preserve the unit suite's ordering and loader.
+groups and explicit file list preserve the unit suite's ordering and loader.
+`app/api/patients/route.test.ts` is registered explicitly in that list; other
+`app/` tests are not pulled into the unit suite by recursive discovery.
 Every required group must be readable and non-empty; every explicit test must be
 a file. Selection fails before database bootstrap or child launch if these
 conditions do not hold. The bootstrap, data-directory ownership, child error
@@ -52,10 +54,16 @@ propagation and cleanup remain in `scripts/run-unit-suite.mjs`.
 
 The npm adapter reads the script bodies and CI configuration for
 `test:launcher-helpers`, `test:native-launcher`, `test:usage-dashboard`,
-`test:fabric-generative-runtime-crosswalk` and `test:lume-tokens`. Their suite IDs
+`test:fabric-generative-runtime-crosswalk`, `test:lume-tokens` and
+`test:anydoc-diagnostics`. Their suite IDs
 are prefixed with `npm:`. Each script must be exactly `node --test` followed by
 simple literal relative file paths. Missing files, duplicate paths (including
 directory aliases), flags, filters, shell syntax and expansions fail selection.
+
+`test:anydoc-diagnostics` preserves the existing E2E job's three-file `node --test`
+command and ordering: HTTP diagnostic, consumer diagnostic, then correlation.
+The npm script replaces the equivalent literal CI command; it adds no execution.
+Consumer diagnostic retains its existing `unit` mapping as well.
 
 Each required script must have one literal call in its designated CI job. The
 entire step's run block must consist of `npm run <script>` lines, blanks or
@@ -87,7 +95,7 @@ launch a suite or acquire/clean a data directory.
 
 The Headless npm command must remain exactly
 `node scripts/run-headless-portable-tests.mjs`, with one literal call in the
-`headless-contracts` CI job. It uses the same binding guards as the five explicit
+`headless-contracts` CI job. It uses the same binding guards as the six explicit
 npm models above. The inventory awaits selection and keeps the required suite
 present with errors and no selected files if either binding or selection fails.
 This adds static selector coverage, not proof of assertions or installed targets.
@@ -140,6 +148,28 @@ with separate existing commands or CI callers. `unresolved` means this guard has
 not verified a selector binding; it does not mean the file is orphaned or optional.
 Platform, capability and method filters need separate selector models and actual
 execution receipts before any coverage claim.
+
+## Conditional synthetic plugin suites
+
+`npm:synthetic-plugin:test` and `npm:synthetic-plugin:test:browser` are selected
+by `.github/workflows/synthetic-plugin.yml`, not required on every push. Reports
+label them as conditional. The adapter verifies the existing `pull_request.paths`
+and `push.paths` arrays (plugin subtree, MCP contracts and that workflow), plus
+`push.branches: [main]`. Filter drift fails instead of silently broadening claims.
+
+The effective working directory must be `plugins/mediflow-synthetic`, including
+workflow/job defaults and step overrides. Package commands must remain exactly
+`node --test test/*.test.mjs` and `node scripts/browser-smoke.mjs`, with one exact
+CI call each: `npm test` and `npm run test:browser`. Existing condition, shell,
+error masking and YAML guards apply. Root suite bindings still require root cwd.
+
+The adapter expands only the declared nonrecursive `test/*.test.mjs` glob,
+excluding hidden names as the shell does. It returns sorted paths without reading
+or importing tests, fails for missing/empty groups or nonregular selected files,
+and uses no duplicate test roster. The browser model checks its single declared
+script without running it. The manifest maps four Node test files and that browser
+script; the other Codex scripts remain unresolved. This models configured selection
+when workflow filters match, not execution, browser readiness or host qualification.
 
 ## Support modules, not standalone test entrypoints
 

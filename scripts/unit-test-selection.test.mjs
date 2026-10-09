@@ -6,11 +6,12 @@ import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { collectUnitTestFiles, unitTestArguments, UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS } from './unit-test-selection.mjs';
 
-test('registration: behavior and private-loader suites each occur once in required units', () => {
+test('registration: route, behavior and private-loader suites each occur once in required units', () => {
   const selection = collectUnitTestFiles(path.resolve(import.meta.dirname, '..'));
-  for (const filename of ['scripts/checkup-parent-lifecycle.test.mjs', 'scripts/checkup-parent-lifecycle-harness.test.mjs']) {
+  for (const filename of ['app/api/patients/route.test.ts', 'scripts/checkup-parent-lifecycle.test.mjs', 'scripts/checkup-parent-lifecycle-harness.test.mjs']) {
     assert.equal(selection.filter(file => file === filename).length, 1, `${filename} must be selected exactly once`);
   }
+  assert.deepEqual(selection.filter(file => file.startsWith('app/')), ['app/api/patients/route.test.ts']);
 });
 
 function fixture(t) {
