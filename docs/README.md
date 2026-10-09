@@ -46,6 +46,9 @@ le tappe 0.9.0–1.0 definite nel
 La [prima tranche locale del 26 settembre](./analysis/2026-09-26-090-first-tranche.md)
 distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
+L’[elenco dei writer audit](./audit-writers.md) classifica obblighi, stato corrente
+e residui clinici consegnati da C04 a C05.
+
 L’[inventario incrementale dei test](./test-inventory.md) descrive il controllo
 delle omissioni nei selettori e il debito ancora aperto; non attesta la
 completezza di C14 né l’esecuzione delle prove sulle piattaforme installate.
