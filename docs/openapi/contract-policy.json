@@ -70,7 +70,7 @@
         "POST"
       ],
       "trackingIssue": "WUL-40",
-      "reason": "Checkup endpoints are intentionally excluded from the current stable OpenAPI slice while parity work is still open. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted. ADR0141 / WUL-720: ordinary local POST introduces a NEW inclusive 4194304-byte serialized UTF-8 JSON body cap (413 JSON_BODY_TOO_LARGE); malformed/null/array/scalar/failed-stream/body-read-abort envelopes return 400 Invalid JSON body after admission. Request.json replacement UTF-8 and last duplicate key semantics, fields and atomic audit remain unchanged."
+      "reason": "Checkup endpoints are intentionally excluded from the current stable OpenAPI slice while parity work is still open. WUL-308: GET hides soft-deleted rows by default and accepts includeDeleted. ADR0141 / WUL-720: ordinary local POST introduces a NEW inclusive 4194304-byte serialized UTF-8 JSON body cap (413 JSON_BODY_TOO_LARGE); malformed/null/array/scalar/failed-stream/body-read-abort envelopes return 400 Invalid JSON body after admission. Request.json replacement UTF-8 and last duplicate key semantics, fields and atomic audit remain unchanged. WUL-720 checkup create identity: omitted ID generates a UUID; supplied non-string or blank ID returns 400; opaque nonblank ID is preserved. Duplicate ID returns 409 only after active parent admission, with no write or extra audit (ADR0015)."
     },
     {
       "path": "/api/v1/patients/{id}/checkups/{checkupId}",
@@ -275,6 +275,11 @@
       "change": "PUT /api/v1/network/service-prescription-items/{id} request.ordinal changed",
       "trackingIssue": "WUL-720",
       "reason": "WUL-720 C05 prescription compatibility phase (ADR0010, spec 1.32.0): preserve current Web/Swift integer callers, zero and negative integers, and complete signed decimal integer strings within the safe-integer range. Reject fractions, partial strings and overflow previously truncated or accepted. This is a deliberate input restriction, not universal backwards compatibility; create omission remains 0 and update omission preserves the ordinal."
+    },
+    {
+      "change": "POST /api/v1/network/patients/{id}/checkups request.id changed",
+      "trackingIssue": "WUL-720",
+      "reason": "ADR0015 checkup create identity (spec 1.33.0): explicit invalid or blank IDs now return 400 instead of being persisted or silently replaced. Omission still generates a UUID; valid opaque IDs are preserved. Duplicate IDs return 409 after parent/scope admission, without another write or audit."
     }
   ]
 }

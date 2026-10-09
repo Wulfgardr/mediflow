@@ -39,6 +39,11 @@ export function createCheckupOperation(input: CreateInput): Result {
             : activeParentExists(tx, input.patientId);
         if (!admitted) return { status: 404, value: { error: input.mode === 'network' ? 'Not found' : 'Patient not found' } };
 
+        // Admission precedes duplicate detection; never disclose the existing row.
+        if (tx.select({ id: checkups.id }).from(checkups).where(eq(checkups.id, input.checkupId)).get()) {
+            return { status: 409, value: { error: 'Checkup already exists' } };
+        }
+
         const inserted = tx.insert(checkups).values({ ...input.values, id: input.checkupId,
             patientId: input.patientId, version: 1 }).run();
         if (inserted.changes !== 1) throw new Error('Checkup create did not write exactly one row');
