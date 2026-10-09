@@ -14,6 +14,8 @@ import { getTableConfig } from 'drizzle-orm/sqlite-core';
 import { resolveDataPath } from '@/lib/data-dir';
 import * as schema from '@/lib/schema';
 
+import { collectAuditAppendOnlyProblems } from './schema-drift-audit-append-only.mjs';
+
 // Importing db-server exercises the real brand-new database path: the empty
 // database receives its minimal base schema and then the runtime guards layer
 // on additive columns, guard-owned tables, constraints, and indices.
@@ -59,6 +61,17 @@ function collectLive(dbPath) {
     }
 }
 
+function collectAuditProblems(dbPath) {
+    // Separate writable connection on the check-owned temp database: the probe
+    // needs to attempt writes, which it always rolls back.
+    const db = new Database(dbPath);
+    try {
+        return collectAuditAppendOnlyProblems(db);
+    } finally {
+        db.close();
+    }
+}
+
 function main() {
     const dbPath = resolveDataPath('medical.db');
     const { expectedTables, expectedIndices } = collectExpected();
@@ -75,6 +88,8 @@ function main() {
     if (!hasCanonicalDurableReviewPatientLinkSchema()) {
         problems.push('INVALID CONSTRAINTS: "durable_review_patient_links" is not the canonical constrained DDL.');
     }
+
+    problems.push(...collectAuditProblems(dbPath));
 
     // Every table declared in schema.ts must exist in the bootstrapped runtime
     // schema, with all its columns. (The runtime may carry extra tables/columns/
