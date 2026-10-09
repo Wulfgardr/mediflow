@@ -13,7 +13,10 @@ import {
     purgeOrphanedClinicalRows,
     totalPatientCascadeRows,
 } from '@/lib/patient-cascade';
-import { safeWriteAuditEventFromRequest } from '@/lib/security/audit';
+import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
+import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+
+const REPAIR_JSON_MAX_BYTES = 65_536;
 
 export const dynamic = 'force-dynamic';
 
@@ -62,114 +65,89 @@ export async function POST(request: Request) {
     if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
-        console.log("Fixing Orphans...");
-
-        // WUL-306 (ADR 0066): orphan child rows are purged only behind an explicit flag.
-        const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-        const purgeOrphanedClinicalRowsRequested = body.purgeOrphanedClinicalRows === true;
-
-        // 1. Get Target Ambulatory (Default or First)
-        let targetAmbId: string | null = null;
-        let targetAmbName = "";
-
-        const defaults = await dbServer.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1);
-        if (defaults.length > 0) {
-            targetAmbId = defaults[0].id;
-            targetAmbName = defaults[0].name;
-        } else {
-            const all = await dbServer.select().from(ambulatories).limit(1);
-            if (all.length > 0) {
-                targetAmbId = all[0].id;
-                targetAmbName = all[0].name;
-            }
+        const parsed = await readBoundedJsonBody(request, REPAIR_JSON_MAX_BYTES, 'request-json',
+            { signal: request.signal, deadline: Infinity }, 'empty-object')
+            .catch(() => ({ ok: false as const, status: 400 as const }));
+        if (!parsed.ok) return NextResponse.json({ error: parsed.status === 413 ? 'JSON payload too large' : 'Invalid JSON body' }, { status: parsed.status });
+        if (typeof parsed.value !== 'object' || parsed.value === null || Array.isArray(parsed.value)) {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
         }
-
-        // 2. Reserve a default ambulatory id if none exists (Emergency Restore).
-        // The row is inserted inside the transaction below, together with the relink.
-        const mustCreateDefault = !targetAmbId;
-        if (mustCreateDefault) {
-            targetAmbId = uuidv4();
-            targetAmbName = "Sede Principale";
+        const body = parsed.value as Record<string, unknown>;
+        if (Object.hasOwn(body, 'purgeOrphanedClinicalRows') && typeof body.purgeOrphanedClinicalRows !== 'boolean') {
+            return NextResponse.json({ error: 'purgeOrphanedClinicalRows must be a boolean' }, { status: 400 });
         }
-        const relinkAmbulatoryId = targetAmbId as string;
+        const purgeRequested = body.purgeOrphanedClinicalRows === true;
+        const auditContext = auditContextFromSession(session);
+        const requestId = requestIdFromRequest(request);
+        const actor = { actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+            sourceSurface: auditContext.sourceSurface, requestId };
 
-        // 3. Find Orphans (reads outside the transaction)
-        const allPatients = await dbServer.select({ id: patients.id }).from(patients);
-        const allLinks = await dbServer.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories);
+        const result = dbServer.transaction((tx) => {
+            const target = tx.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1).get()
+                ?? tx.select().from(ambulatories).limit(1).get();
+            const targetAmbId = target?.id ?? uuidv4();
+            const targetAmbName = target?.name ?? 'Sede Principale';
+            const allPatients = tx.select({ id: patients.id }).from(patients).all();
+            const allLinks = tx.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories).all();
+            const linkedPids = new Set(allLinks.map(link => link.pid));
+            const orphanPids = allPatients.filter(patient => !linkedPids.has(patient.id)).map(patient => patient.id);
 
-        const linkedPids = new Set(allLinks.map(l => l.pid));
-        const orphanPids = allPatients.filter(p => !linkedPids.has(p.id)).map(p => p.id);
-
-        console.log(`Found ${orphanPids.length} orphans from ${allPatients.length} total patients.`);
-
-        // 4. Create the emergency default (if needed) and link every orphan to it in
-        // one atomic step. WUL-268 (STREAM A): a mid-loop crash must never leave the
-        // default ambulatory committed with only some orphans relinked, nor relink
-        // orphans to an ambulatory that was never committed. Transaction is
-        // synchronous (no awaits inside).
-        const fixed = dbServer.transaction((tx) => {
-            if (mustCreateDefault) {
-                console.log("No ambulatories found. Creating Default Ambulatory 'Sede Principale'...");
-                tx.insert(ambulatories).values({
-                    id: relinkAmbulatoryId,
-                    name: "Sede Principale",
-                    address: "Sede Centrale",
-                    isDefault: true,
-                    type: 'live',
-                    createdAt: new Date()
+            if (!target) {
+                const inserted = tx.insert(ambulatories).values({
+                    id: targetAmbId, name: 'Sede Principale', address: 'Sede Centrale',
+                    isDefault: true, type: 'live', createdAt: new Date(),
                 }).run();
+                if (inserted.changes !== 1) throw new Error('Repair default did not insert exactly one row');
+                writeAuditEventInTransaction(tx, { ...actor,
+                    eventType: 'ambulatory.created', outcome: 'success',
+                    subjectType: 'ambulatory', subjectRef: targetAmbId,
+                    redactedMetadata: withAuditContextMetadata(auditContext, {
+                        resourceVersion: 1, flags: ['fix-orphans:default-created'],
+                    }),
+                });
             }
 
-            let linked = 0;
+            let fixed = 0;
             for (const pid of orphanPids) {
-                tx.insert(patientsToAmbulatories)
-                    .values({
-                        patientId: pid,
-                        ambulatoryId: relinkAmbulatoryId,
-                    })
-                    .onConflictDoNothing()
-                    .run();
-                linked++;
+                const inserted = tx.insert(patientsToAmbulatories)
+                    .values({ patientId: pid, ambulatoryId: targetAmbId }).onConflictDoNothing().run();
+                if (inserted.changes !== 1) throw new Error('Orphan relink did not insert exactly one row');
+                fixed += 1;
+                writeAuditEventInTransaction(tx, { ...actor,
+                    eventType: 'patient.updated', outcome: 'success', subjectType: 'patient', subjectRef: pid,
+                    redactedMetadata: withAuditContextMetadata(auditContext, {
+                        changedFields: ['ambulatoryMemberships'], flags: ['membership:relinked'],
+                    }),
+                });
             }
-            return linked;
-        });
 
-        // 5. WUL-306 (ADR 0066): purge child rows whose patient_id no longer resolves,
-        // only behind the explicit flag and AFTER the relink step above.
-        let purgedOrphanChildRows = null;
-        if (purgeOrphanedClinicalRowsRequested) {
-            // @Codex better-sqlite3 transactions are synchronous; promise callbacks break execution.
-            const counts = dbServer.transaction((tx) => purgeOrphanedClinicalRows(tx));
-            purgedOrphanChildRows = counts;
-            await safeWriteAuditEventFromRequest(
-                request,
-                session,
-                {
-                    eventType: 'patient.purged',
-                    subjectType: 'patient',
-                    subjectRef: null,
-                    redactedMetadata: {
-                        reasonCode: 'fix-orphans',
-                        counts: totalPatientCascadeRows(counts),
-                        flags: Object.entries(counts).map(([table, count]) => `purged:${table}:${count}`),
-                    },
-                },
-                '[MediFlow] Orphan purge audit write failed:',
-            );
-        }
+            let purgedOrphanChildRows = null;
+            if (purgeRequested) {
+                const pending = countOrphanedClinicalRows(tx);
+                // An empty replay must neither claim a purge nor revoke locator authority.
+                purgedOrphanChildRows = totalPatientCascadeRows(pending) > 0 ? purgeOrphanedClinicalRows(tx) : pending;
+                if (totalPatientCascadeRows(purgedOrphanChildRows) > 0) {
+                    writeAuditEventInTransaction(tx, { ...actor,
+                        eventType: 'patient.purged', outcome: 'success', subjectType: 'patient', subjectRef: null,
+                        redactedMetadata: withAuditContextMetadata(auditContext, {
+                            reasonCode: 'fix-orphans', counts: totalPatientCascadeRows(purgedOrphanChildRows),
+                            flags: Object.entries(purgedOrphanChildRows).map(([table, count]) => `purged:${table}:${count}`),
+                        }),
+                    });
+                }
+            }
 
-        if (fixed === 0 && !purgeOrphanedClinicalRowsRequested) {
-            return NextResponse.json({ success: true, fixed: 0, message: "No orphans found. All patients are linked." });
-        }
-
-        return NextResponse.json({
-            success: true,
-            fixed,
-            purgedOrphanChildRows,
-            message: fixed > 0
-                ? `Created/Used Default Ambulatory and linked ${fixed} orphan patients to '${targetAmbName}'. Refresh the page.`
-                : "No orphan patients to relink."
-        });
+            if (fixed === 0 && !purgeRequested) {
+                return { success: true, fixed: 0, message: 'No orphans found. All patients are linked.' };
+            }
+            return {
+                success: true, fixed, purgedOrphanChildRows,
+                message: fixed > 0
+                    ? `Created/Used Default Ambulatory and linked ${fixed} orphan patients to '${targetAmbName}'. Refresh the page.`
+                    : 'No orphan patients to relink.',
+            };
+        }, { behavior: 'immediate' });
+        return NextResponse.json(result);
 
     } catch (error) {
         console.error("Fix Orphan Error:", error);
