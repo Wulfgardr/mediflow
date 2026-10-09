@@ -11,8 +11,10 @@
     {
       "path": "app/api/patients/route.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -7181,8 +7183,10 @@
     {
       "path": "plugins/mediflow-synthetic/scripts/browser-smoke.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:synthetic-plugin:test:browser"
+        ]
       }
     },
     {
@@ -7202,29 +7206,37 @@
     {
       "path": "plugins/mediflow-synthetic/test/codex-agent-contract.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:synthetic-plugin:test"
+        ]
       }
     },
     {
       "path": "plugins/mediflow-synthetic/test/package.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:synthetic-plugin:test"
+        ]
       }
     },
     {
       "path": "plugins/mediflow-synthetic/test/protocol.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:synthetic-plugin:test"
+        ]
       }
     },
     {
       "path": "plugins/mediflow-synthetic/test/review.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:synthetic-plugin:test"
+        ]
       }
     },
     {
@@ -7257,7 +7269,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:anydoc-diagnostics"
         ]
       }
     },
@@ -7278,15 +7291,19 @@
     {
       "path": "scripts/anydoc-diagnostic-correlation.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:anydoc-diagnostics"
+        ]
       }
     },
     {
       "path": "scripts/anydoc-http-diagnostic.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:anydoc-diagnostics"
+        ]
       }
     },
     {

@@ -48,7 +48,7 @@ jobs:
       - run: npm ci
 
       - name: Test AnyDoc diagnostic artifact boundary
-        run: node --test scripts/anydoc-http-diagnostic.test.mjs scripts/anydoc-consumer-diagnostic.test.mjs scripts/anydoc-diagnostic-correlation.test.mjs
+        run: npm run test:anydoc-diagnostics
 
       - name: Install Playwright chromium
         run: npx playwright install --with-deps chromium

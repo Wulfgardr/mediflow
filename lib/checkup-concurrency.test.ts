@@ -3,11 +3,15 @@ import assert from 'node:assert/strict';
 /* @Codex */
 import { buildCheckupVersionConflictPayload, parseCheckupExpectedVersion } from './checkup-concurrency.ts';
 
-test('parseCheckupExpectedVersion requires a positive integer', () => {
+test('parseCheckupExpectedVersion requires a positive safe integer', () => {
     assert.equal(parseCheckupExpectedVersion(1), 1);
     assert.equal(parseCheckupExpectedVersion(0), null);
     assert.equal(parseCheckupExpectedVersion(1.5), null);
     assert.equal(parseCheckupExpectedVersion('1'), null);
+    assert.equal(parseCheckupExpectedVersion(Number.MAX_SAFE_INTEGER), Number.MAX_SAFE_INTEGER);
+    for (const value of [Number.MAX_SAFE_INTEGER + 1, Infinity, NaN, -1, null, undefined]) {
+        assert.equal(parseCheckupExpectedVersion(value), null);
+    }
 });
 
 test('buildCheckupVersionConflictPayload returns a PHI-safe checkup snapshot', () => {
