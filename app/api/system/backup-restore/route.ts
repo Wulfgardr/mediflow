@@ -1,5 +1,6 @@
 /* @Codex */
 import { NextResponse } from 'next/server';
+import { sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import {
     attachments,
@@ -30,6 +31,7 @@ import {
     sissHandoffEvents,
     therapies,
 } from '@/lib/schema';
+import * as backupSchema from '@/lib/schema';
 import {
     forbiddenResponse,
     requireSession,
@@ -38,7 +40,6 @@ import {
 /* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
-    BACKUP_COLLECTIONS,
     type BackupDataset,
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
@@ -103,6 +104,8 @@ function buildBackupDataset(): BackupDataset {
         const checkupsRows = tx.select().from(checkups).all();
         const therapiesRows = tx.select().from(therapies).all();
         const patientAmbulatoryRows = tx.select().from(patientsToAmbulatories).all();
+        const auditRows = tx.get(sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'audit_events'`)
+            ? tx.select().from(backupSchema.auditEvents).all() : undefined;
 
     const normalizedPatientAmbulatoryRows = sortBackupRows(patientAmbulatoryRows);
     const enrichedPatients = enrichBackupPatientsWithAmbulatoryLinks(patientsRows, normalizedPatientAmbulatoryRows);
@@ -152,6 +155,7 @@ function buildBackupDataset(): BackupDataset {
             sissHandoffs: sortBackupRows(filterRowsByReference(sissHandoffRows, 'patientId', patientIds)),
             checkups: sortBackupRows(filterRowsByReference(checkupsRows, 'patientId', patientIds)),
             therapies: sortBackupRows(filterRowsByReference(therapiesRows, 'patientId', patientIds)),
+            ...(auditRows === undefined ? {} : { auditEvents: auditRows }),
         };
     });
 }
@@ -196,14 +200,15 @@ export async function POST(request: Request) {
             );
         }
 
-        restoreBackupArtifact(artifact, disposeCheckupStatusTransitionForHostV1);
+        const restored = restoreBackupArtifact(artifact, disposeCheckupStatusTransitionForHostV1);
 
         return NextResponse.json({
             success: true,
             format: artifact.format,
             version: artifact.version,
-            collections: [...BACKUP_COLLECTIONS],
+            collections: [...artifact.manifest.collections],
             counts: artifact.manifest.recordCounts,
+            ...restored,
         });
     } catch (error) {
         /* La distinzione 400/500 resta: un artefatto malformato e' colpa del

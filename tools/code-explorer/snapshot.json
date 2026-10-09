@@ -1,0 +1,731 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/Wulfgardr/mediflow",
+  "sourceCommit": "90fa7771fc0822475611c9affb9c22e212939399",
+  "scope": "Due esempi del codice: lettura headless delle attività e conferma Web di una transizione checkup.",
+  "limits": [
+    "Mappa curata di relazioni nel sorgente, non tracciamento del runtime.",
+    "Un import attesta una dipendenza nel codice, non esecuzione, raggiungibilità o autorizzazione.",
+    "Nessun dato clinico, collegamento a MediFlow o modello AI in questa pagina.",
+    "Non copre Fabric, tutti i percorsi UI, tutti i writer o una valutazione delle protezioni."
+  ],
+  "nodes": [
+    {
+      "id": "mcp",
+      "label": "Ingresso agenti · MCP",
+      "group": "surface",
+      "x": 95,
+      "y": 70,
+      "summary": "Espone operazioni nominate a un client agente, attraverso un canale mediato.",
+      "questions": {
+        "data": "Le richieste passano al client RPC; questo ingresso non espone un database al client.",
+        "authority": "Il catalogo distingue letture e proposte. Il tool checkup prepara una transizione da confermare nel Web.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Compatibilità e collegamento con un host esterno non sono dimostrati dalla mappa.",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/server.ts",
+          "anchor": "export async function createUsefulMcpServer()",
+          "line": 25,
+          "endLine": 25,
+          "blob": "61aece520d34f48a2b0932b716e08cdd1e6ddd7c",
+          "sha256": "f025712ca33e502f4462540fc1d71824fc5484e3594e51d61dc5bcde860a8c31",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L25-L25"
+        }
+      ]
+    },
+    {
+      "id": "mini",
+      "label": "Terminale · Mini",
+      "group": "surface",
+      "x": 95,
+      "y": 200,
+      "summary": "Traduce comandi circoscritti del terminale negli stessi metodi del client RPC.",
+      "questions": {
+        "data": "I comandi raggiungono il client RPC, fra cui ricerca terminologica e lettura delle attività.",
+        "authority": "Il protocollo elenca i comandi ammessi. Un comando non concede accesso diretto a SQLite.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Mini è un percorso di sviluppo; la presenza del protocollo non qualifica una distribuzione.",
+      "evidence": [
+        {
+          "path": "packages/mini/src/protocol.ts",
+          "anchor": "export function executeMiniRequest(",
+          "line": 37,
+          "endLine": 37,
+          "blob": "976046842f8162ad8aa3ea03f287315105ff15fe",
+          "sha256": "de2816cc62b4dcfb306c9aad7ffbad33a33cacfba06e69dfab80b16a34ac4e5b",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L37-L37"
+        }
+      ]
+    },
+    {
+      "id": "client",
+      "label": "Canale verso l’host",
+      "group": "transport",
+      "x": 290,
+      "y": 125,
+      "summary": "Invia richieste sul collegamento ereditato dal processo padre e ne controlla le risposte.",
+      "questions": {
+        "data": "Il codice usa messaggi IPC, con limiti di dimensione e scadenza delle richieste.",
+        "authority": "In assenza del collegamento previsto il client rifiuta la richiesta con host_unbound.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non è una cattura di messaggi reali né una prova della configurazione corrente.",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/operation-client.ts",
+          "anchor": "export function createOperationClient()",
+          "line": 38,
+          "endLine": 38,
+          "blob": "992a2f59fc288fe9e1fb763a2421431c89c74080",
+          "sha256": "c7504ec6c30905c93e88e9a5fbb3fdbedab04dfa820779d1cd8c9364bba2e7d6",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L38-L38"
+        }
+      ]
+    },
+    {
+      "id": "composition",
+      "label": "Composizione dell’host",
+      "group": "host",
+      "x": 290,
+      "y": 285,
+      "summary": "Coordina i processi e compone i servizi dell’host che li collega.",
+      "questions": {
+        "data": "Il Supervisor collega Web e processo agente su IPC ereditato.",
+        "authority": "La composizione fornisce contesto e servizi al launcher; la chiusura revoca il collegamento.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "La mappa non prova avvio, installazione o disponibilità dei servizi.",
+      "evidence": [
+        {
+          "path": "lib/security/portable-supervisor-production.ts",
+          "anchor": "export function createPortableSupervisorProductionRuntimeV1(",
+          "line": 70,
+          "endLine": 70,
+          "blob": "74c51e3424f15517257e4ad0d7bff4f25ec2cbf7",
+          "sha256": "f3752cebc4a18416ef2bad3e5ee5b7f95ca16ede760d0524be41756b9067547c",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/portable-supervisor-production.ts#L70-L70"
+        },
+        {
+          "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+          "anchor": "function createProductionLauncher(",
+          "line": 75,
+          "endLine": 75,
+          "blob": "983449748589715459db56070f36d9aa7187907e",
+          "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L75-L75"
+        }
+      ]
+    },
+    {
+      "id": "launcher",
+      "label": "Sessione e operazioni",
+      "group": "policy",
+      "x": 485,
+      "y": 125,
+      "summary": "Associa sessione, ambito e operazioni ai servizi nominati dell’host.",
+      "questions": {
+        "data": "Il catalogo RPC collega la lettura delle attività al servizio Open Loops.",
+        "authority": "Prima della lettura viene richiesto un permesso al broker. Il checkup headless resta proposal_only.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Le operazioni rappresentate sono un campione, non il catalogo completo.",
+      "evidence": [
+        {
+          "path": "lib/headless/authenticated-agent-launcher.ts",
+          "anchor": "export function createAuthenticatedAgentLauncherV1(",
+          "line": 52,
+          "endLine": 52,
+          "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+          "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L52-L52"
+        }
+      ]
+    },
+    {
+      "id": "broker",
+      "label": "Regole e permessi · AIP",
+      "group": "policy",
+      "x": 680,
+      "y": 60,
+      "summary": "Controlla ambito, durata, revoca e budget dei permessi dell’agente.",
+      "questions": {
+        "data": "Il broker lega i permessi a riferimenti e ambito della sessione.",
+        "authority": "Può rifiutare permessi scaduti, revocati, riusati o incoerenti. Un collegamento nella mappa non concede un permesso.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Questa vista del sorgente non è una verifica indipendente delle protezioni.",
+      "evidence": [
+        {
+          "path": "packages/aip/src/owner-broker.ts",
+          "anchor": "export type AipOwnerBrokerV1ErrorCode",
+          "line": 18,
+          "endLine": 18,
+          "blob": "a8957021eadb089c6c3b6ad6dd229df4d91d8354",
+          "sha256": "1175c76d54f5fb8e91e0c4ba37f942a61a93b8334bfc5163ec55a7b7ad0215d3",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/owner-broker.ts#L18-L18"
+        }
+      ]
+    },
+    {
+      "id": "rpc",
+      "label": "Operazioni RPC nominate",
+      "group": "transport",
+      "x": 680,
+      "y": 205,
+      "summary": "Riceve richieste per operazioni del catalogo, con uno stadio massimo dichiarato.",
+      "questions": {
+        "data": "Ogni definizione contiene un servizio nominato e una funzione execute.",
+        "authority": "Il tipo distingue read_only e proposal_only; il trasporto non attribuisce autorità clinica generale.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Una definizione nel catalogo non dimostra esecuzione o ammissione in produzione.",
+      "evidence": [
+        {
+          "path": "packages/aip/src/operation-rpc.ts",
+          "anchor": "type Metadata = Readonly<",
+          "line": 32,
+          "endLine": 32,
+          "blob": "9a53cdacf36c1208f1913fa51aeb7214c92ff1f0",
+          "sha256": "2dcfc7a53075f4055da2e97f3a66197818ca95214b7833ab76ba87f172df2e72",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L32-L32"
+        }
+      ]
+    },
+    {
+      "id": "openloops",
+      "label": "Regole della lettura",
+      "group": "service",
+      "x": 680,
+      "y": 340,
+      "summary": "Prepara una lettura circoscritta delle attività da seguire, con controlli e ricevuta.",
+      "questions": {
+        "data": "Legge attraverso le fonti fornite dall’host; controlla la validità del contesto e registra l’esito.",
+        "authority": "La ricevuta di questo percorso dichiara writesPerformed: 0.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Copre soltanto la lettura Open Loops rappresentata.",
+      "evidence": [
+        {
+          "path": "packages/aip/src/patient-open-loops.ts",
+          "anchor": "export function createPatientOpenLoopsReadServiceV1(",
+          "line": 31,
+          "endLine": 31,
+          "blob": "5d212aaaf97cc6c09ecd3e56cf644900eb9351bf",
+          "sha256": "c3f3c4193e628b8619d22ee35a92a556ae0b875668b6b69593049edddf6ee5b5",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L31-L31"
+        },
+        {
+          "path": "packages/aip/src/patient-open-loops.ts",
+          "anchor": "writesPerformed: 0 as const",
+          "line": 104,
+          "endLine": 104,
+          "blob": "5d212aaaf97cc6c09ecd3e56cf644900eb9351bf",
+          "sha256": "c3f3c4193e628b8619d22ee35a92a556ae0b875668b6b69593049edddf6ee5b5",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/patient-open-loops.ts#L104-L104"
+        }
+      ]
+    },
+    {
+      "id": "reader",
+      "label": "Lettore dati dell’host",
+      "group": "host",
+      "x": 880,
+      "y": 335,
+      "summary": "Collega il servizio di lettura ai dati e alle regole locali dell’host.",
+      "questions": {
+        "data": "Legge osservazioni e prestazioni da SQLite e deriva una proiezione delle attività.",
+        "authority": "Fornisce al servizio contesto, permessi e audit; non trasferisce il database al client agente.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non descrive tutti i lettori e gli scrittori dell’app.",
+      "evidence": [
+        {
+          "path": "lib/security/patient-open-loops-read-production.ts",
+          "anchor": "export function createPatientOpenLoopsReadInternalCandidateV1(",
+          "line": 203,
+          "endLine": 203,
+          "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+          "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L203-L203"
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "label": "Database locale · SQLite",
+      "group": "storage",
+      "x": 880,
+      "y": 495,
+      "summary": "Apre SQLite sul server e lo espone attraverso il livello dati.",
+      "questions": {
+        "data": "Il percorso persistente usa medical.db; la raccolta dati della build usa memoria.",
+        "authority": "Avere un import del livello dati non equivale ad avere autorizzazione a una scrittura clinica.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "La mappa non prova cifratura dell’intero file, contenuto, backup o idoneità clinica.",
+      "evidence": [
+        {
+          "path": "lib/db-server.ts",
+          "anchor": "let sqlite = new Database(dbPath);",
+          "line": 88,
+          "endLine": 88,
+          "blob": "b63b006fe04d0930d2fb413c3121b07c6c0f02e4",
+          "sha256": "38a102f2bf25a03727123bbffee10254e124759b276e8327ff379483e2ce0db8",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L88-L88"
+        },
+        {
+          "path": "lib/db-server.ts",
+          "anchor": "const dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');",
+          "line": 21,
+          "endLine": 21,
+          "blob": "b63b006fe04d0930d2fb413c3121b07c6c0f02e4",
+          "sha256": "38a102f2bf25a03727123bbffee10254e124759b276e8327ff379483e2ce0db8",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/db-server.ts#L21-L21"
+        }
+      ]
+    },
+    {
+      "id": "ui",
+      "label": "Conferma nel Web",
+      "group": "surface",
+      "x": 95,
+      "y": 495,
+      "summary": "Permette al professionista di rileggere e confermare una proposta sul checkup.",
+      "questions": {
+        "data": "L’adapter del browser invia richieste alla route della proposta selezionata.",
+        "authority": "La conferma esplicita richiede il PIN e resta distinta dall’anteprima preparata dall’agente.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "È un esempio preciso: non descrive tutte le modifiche cliniche.",
+      "evidence": [
+        {
+          "path": "components/intelligent-host-checkup-action.tsx",
+          "anchor": "export function IntelligentHostCheckupAction(",
+          "line": 37,
+          "endLine": 37,
+          "blob": "5256d0612354afed5fd803366840ca19c3bbbb3f",
+          "sha256": "b292069331453ab0af2e57e82093b385dbc0fad2736a38abb426c2351a3e2c67",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/components/intelligent-host-checkup-action.tsx#L37-L37"
+        },
+        {
+          "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+          "anchor": "candidatePin",
+          "line": 120,
+          "endLine": 120,
+          "blob": "accf7885e41cfe9e2f51b728daaa11de17994bd6",
+          "sha256": "a0610a264e4b9d87d7002ec578841b450881da359147398a61152a4fc665b405",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts#L120-L120"
+        }
+      ]
+    },
+    {
+      "id": "route",
+      "label": "Route della proposta",
+      "group": "transport",
+      "x": 290,
+      "y": 495,
+      "summary": "Collega lettura e conferma della proposta ai servizi Web autenticati.",
+      "questions": {
+        "data": "La route passa la conferma al servizio Web, senza implementare da sola la scrittura.",
+        "authority": "La composizione legge la sessione Web autenticata e usa un servizio nominato di conferma.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "La sola presenza della route non prova il percorso completo con un utente reale.",
+      "evidence": [
+        {
+          "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+          "anchor": "export const POST = handlers.confirm;",
+          "line": 20,
+          "endLine": 20,
+          "blob": "7b19b96991abd8af876ca0b12595b4568ba5e53f",
+          "sha256": "98432ef989b7e3d4caa315fab6018de7cad1cc03c022036941719592979883f7",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L20-L20"
+        }
+      ]
+    },
+    {
+      "id": "webowner",
+      "label": "Revisione e gesto esplicito",
+      "group": "policy",
+      "x": 485,
+      "y": 495,
+      "summary": "Rilegge contesto e proposta, poi lega la conferma al gesto specifico della UI.",
+      "questions": {
+        "data": "La conferma passa all’owner Web, che compone il servizio di transizione.",
+        "authority": "Contesto corrente, ruolo e PIN sono controllati prima della conferma; la proof resta nel server.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Questa mappa non valuta l’efficacia clinica della decisione.",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-web-production.ts",
+          "anchor": "export async function confirmCheckupStatusTransitionProposalV1(",
+          "line": 235,
+          "endLine": 235,
+          "blob": "976be212cb20eff8f44264169ed297de64da193c",
+          "sha256": "4d1dc08895d8575014cdc146a882c7adf53d0a57bbb5174819a69314e69ef160",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-production.ts#L235-L235"
+        },
+        {
+          "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1",
+          "line": 10,
+          "endLine": 10,
+          "blob": "987ebed9759616664b6e0bde805d361794a65245",
+          "sha256": "13fd9b7430def7936009d35515abe9f56295463cf8250af0067b630e726055a7",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L10-L10"
+        }
+      ]
+    },
+    {
+      "id": "writer",
+      "label": "Servizio di transizione",
+      "group": "service",
+      "x": 680,
+      "y": 495,
+      "summary": "Compone la transizione del checkup con una prova di conferma a durata limitata.",
+      "questions": {
+        "data": "Il servizio usa un adapter di persistenza distinto dal trasporto Web.",
+        "authority": "Le prove hanno durata e stato; il servizio collega il risultato alla persistenza controllata.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non conferisce all’agente un metodo di commit.",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-production.ts",
+          "anchor": "const PROOF_TTL_MS = 30_000;",
+          "line": 18,
+          "endLine": 18,
+          "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+          "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L18-L18"
+        },
+        {
+          "path": "lib/security/headless-checkup-status-transition-production.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionStorageV1",
+          "line": 12,
+          "endLine": 12,
+          "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+          "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L12-L12"
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "label": "Scrittura e ricevuta",
+      "group": "storage",
+      "x": 880,
+      "y": 630,
+      "summary": "Aggiorna lo stato del checkup in una transazione, con controllo di versione, audit e ricevuta.",
+      "questions": {
+        "data": "Il livello di persistenza accede al database locale tramite dbServer.",
+        "authority": "La scrittura controlla la versione attesa e gestisce l’idempotenza; la mappa mostra questo solo writer.",
+        "evidence": "Le fonti qui sotto attestano il codice presente alla revisione mostrata. Non sono una prova di esecuzione sul tuo Mac."
+      },
+      "knownUnknown": "Non è una prova di esecuzione o di recuperabilità del database.",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-storage.ts",
+          "anchor": "UPDATE checkups SET status = ?, version = version + 1, updated_at = ?",
+          "line": 279,
+          "endLine": 279,
+          "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+          "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L279-L279"
+        },
+        {
+          "path": "lib/security/headless-checkup-status-transition-storage.ts",
+          "anchor": "runDbServerImmediateTransaction(",
+          "line": 260,
+          "endLine": 260,
+          "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+          "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L260-L260"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "mcp--client",
+      "source": "mcp",
+      "target": "client",
+      "kind": "import",
+      "label": "importa il client RPC",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/server.ts",
+          "anchor": "from './operation-client.ts'",
+          "line": 12,
+          "endLine": 12,
+          "blob": "61aece520d34f48a2b0932b716e08cdd1e6ddd7c",
+          "sha256": "f025712ca33e502f4462540fc1d71824fc5484e3594e51d61dc5bcde860a8c31",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/server.ts#L12-L12"
+        }
+      ]
+    },
+    {
+      "id": "mini--client",
+      "source": "mini",
+      "target": "client",
+      "kind": "call",
+      "label": "invoca i metodi del client",
+      "evidence": [
+        {
+          "path": "packages/mini/src/protocol.ts",
+          "anchor": "case 'open-loops': return client.readOpenLoops();",
+          "line": 42,
+          "endLine": 42,
+          "blob": "976046842f8162ad8aa3ea03f287315105ff15fe",
+          "sha256": "de2816cc62b4dcfb306c9aad7ffbad33a33cacfba06e69dfab80b16a34ac4e5b",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mini/src/protocol.ts#L42-L42"
+        }
+      ]
+    },
+    {
+      "id": "client--rpc",
+      "source": "client",
+      "target": "rpc",
+      "kind": "contract",
+      "label": "usa lo stesso identificatore di schema RPC",
+      "evidence": [
+        {
+          "path": "packages/mcp/src/contracts.ts",
+          "anchor": "export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1'",
+          "line": 11,
+          "endLine": 11,
+          "blob": "89bd32740daa0547642790991b78ff8a0cc4ecf5",
+          "sha256": "28f97bd823593e80c6218ce2065dc7ed3b271fa46cfa9f1847cdfba830bd093c",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/contracts.ts#L11-L11"
+        },
+        {
+          "path": "packages/aip/src/operation-rpc.ts",
+          "anchor": "export const AIP_OPERATION_RPC_REQUEST_SCHEMA_V1 = 'mediflow.aip.operation.request.v1'",
+          "line": 9,
+          "endLine": 9,
+          "blob": "9a53cdacf36c1208f1913fa51aeb7214c92ff1f0",
+          "sha256": "2dcfc7a53075f4055da2e97f3a66197818ca95214b7833ab76ba87f172df2e72",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/aip/src/operation-rpc.ts#L9-L9"
+        },
+        {
+          "path": "packages/mcp/src/operation-client.ts",
+          "anchor": "publish({ schemaVersion: RPC_REQUEST_SCHEMA, ...frame, requestId });",
+          "line": 151,
+          "endLine": 151,
+          "blob": "992a2f59fc288fe9e1fb763a2421431c89c74080",
+          "sha256": "c7504ec6c30905c93e88e9a5fbb3fdbedab04dfa820779d1cd8c9364bba2e7d6",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/packages/mcp/src/operation-client.ts#L151-L151"
+        }
+      ]
+    },
+    {
+      "id": "composition--launcher",
+      "source": "composition",
+      "target": "launcher",
+      "kind": "composition",
+      "label": "compone il launcher autenticato",
+      "evidence": [
+        {
+          "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+          "anchor": "return createAuthenticatedAgentLauncherV1({",
+          "line": 79,
+          "endLine": 79,
+          "blob": "983449748589715459db56070f36d9aa7187907e",
+          "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L79-L79"
+        }
+      ]
+    },
+    {
+      "id": "launcher--broker",
+      "source": "launcher",
+      "target": "broker",
+      "kind": "call",
+      "label": "richiede un permesso",
+      "evidence": [
+        {
+          "path": "lib/headless/authenticated-agent-launcher.ts",
+          "anchor": "broker.authorize(broker.issueLease(state.owner)",
+          "line": 231,
+          "endLine": 231,
+          "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+          "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L231-L231"
+        }
+      ]
+    },
+    {
+      "id": "launcher--rpc",
+      "source": "launcher",
+      "target": "rpc",
+      "kind": "composition",
+      "label": "compone il catalogo delle operazioni",
+      "evidence": [
+        {
+          "path": "lib/headless/authenticated-agent-launcher.ts",
+          "anchor": "rpcHost = createAipOperationRpcHostV1({",
+          "line": 338,
+          "endLine": 338,
+          "blob": "6a54ac94d9a2443c065304879f20564198a153c7",
+          "sha256": "27c294fbb8ddfe2dbeccb62b606b0ed1a0adf83739947ce6650448bb2c42134d",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/headless/authenticated-agent-launcher.ts#L338-L338"
+        }
+      ]
+    },
+    {
+      "id": "launcher--reader",
+      "source": "launcher",
+      "target": "reader",
+      "kind": "composition",
+      "label": "riceve il lettore dalla composizione host",
+      "evidence": [
+        {
+          "path": "lib/security/authenticated-headless-agent-launcher-production.ts",
+          "anchor": "createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,",
+          "line": 95,
+          "endLine": 95,
+          "blob": "983449748589715459db56070f36d9aa7187907e",
+          "sha256": "ad02f36bf3ff919facf0e8ff3c05bc409d29662788ca9f9f46aaa3625c82c865",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/authenticated-headless-agent-launcher-production.ts#L95-L95"
+        }
+      ]
+    },
+    {
+      "id": "reader--openloops",
+      "source": "reader",
+      "target": "openloops",
+      "kind": "composition",
+      "label": "compone le regole della lettura",
+      "evidence": [
+        {
+          "path": "lib/security/patient-open-loops-read-production.ts",
+          "anchor": "const core = createPatientOpenLoopsReadServiceV1(",
+          "line": 255,
+          "endLine": 255,
+          "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+          "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L255-L255"
+        }
+      ]
+    },
+    {
+      "id": "reader--db",
+      "source": "reader",
+      "target": "db",
+      "kind": "import",
+      "label": "importa il livello dati server",
+      "evidence": [
+        {
+          "path": "lib/security/patient-open-loops-read-production.ts",
+          "anchor": "import { dbServer } from '../db-server';",
+          "line": 13,
+          "endLine": 13,
+          "blob": "69b43a28ad66a7fb3c8b026e6ddd05d98873f392",
+          "sha256": "dce56bc349a7dd8e35a8f2faf957cb25218a75ca03b5d2f0ac7464007b294e71",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/patient-open-loops-read-production.ts#L13-L13"
+        }
+      ]
+    },
+    {
+      "id": "ui--route",
+      "source": "ui",
+      "target": "route",
+      "kind": "http",
+      "label": "richiede la conferma della proposta via HTTP",
+      "evidence": [
+        {
+          "path": "lib/security/intelligent-host-checkup-browser-adapter.ts",
+          "anchor": "encodeURIComponent(accepted.proposalRef)",
+          "line": 192,
+          "endLine": 192,
+          "blob": "accf7885e41cfe9e2f51b728daaa11de17994bd6",
+          "sha256": "a0610a264e4b9d87d7002ec578841b450881da359147398a61152a4fc665b405",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/intelligent-host-checkup-browser-adapter.ts#L192-L192"
+        }
+      ]
+    },
+    {
+      "id": "route--webowner",
+      "source": "route",
+      "target": "webowner",
+      "kind": "composition",
+      "label": "collega il gestore alla conferma Web",
+      "evidence": [
+        {
+          "path": "app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts",
+          "anchor": "confirm: confirmCheckupStatusTransitionProposalV1,",
+          "line": 16,
+          "endLine": 16,
+          "blob": "7b19b96991abd8af876ca0b12595b4568ba5e53f",
+          "sha256": "98432ef989b7e3d4caa315fab6018de7cad1cc03c022036941719592979883f7",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/app/api/patients/[id]/intelligent-host/checkup-status/proposals/[proposalRef]/route.ts#L16-L16"
+        }
+      ]
+    },
+    {
+      "id": "webowner--writer",
+      "source": "webowner",
+      "target": "writer",
+      "kind": "composition",
+      "label": "compone il servizio di transizione",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-web-owner.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionInternalCandidateV1(",
+          "line": 79,
+          "endLine": 79,
+          "blob": "987ebed9759616664b6e0bde805d361794a65245",
+          "sha256": "13fd9b7430def7936009d35515abe9f56295463cf8250af0067b630e726055a7",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-web-owner.ts#L79-L79"
+        }
+      ]
+    },
+    {
+      "id": "writer--storage",
+      "source": "writer",
+      "target": "storage",
+      "kind": "composition",
+      "label": "compone la persistenza",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-production.ts",
+          "anchor": "createHeadlessCheckupStatusTransitionStorageV1(",
+          "line": 97,
+          "endLine": 97,
+          "blob": "edf75aa3516e70e67af2284ab845283229c537bd",
+          "sha256": "061d3fa4ee3f089dd1533a9cab8687d3775428ddccf7b80475721872304d5023",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-production.ts#L97-L97"
+        }
+      ]
+    },
+    {
+      "id": "storage--db",
+      "source": "storage",
+      "target": "db",
+      "kind": "import",
+      "label": "importa il database e la transazione",
+      "evidence": [
+        {
+          "path": "lib/security/headless-checkup-status-transition-storage.ts",
+          "anchor": "import { dbServer, runDbServerImmediateTransaction } from '../db-server';",
+          "line": 11,
+          "endLine": 11,
+          "blob": "fdcf192b353cb0eae9b2478f9f3a1a0452ee1c7a",
+          "sha256": "3edfc8ff94ac5b473f7fc89a7f89583f503ea4b382c049789158b76cd23651d2",
+          "url": "https://github.com/Wulfgardr/mediflow/blob/90fa7771fc0822475611c9affb9c22e212939399/lib/security/headless-checkup-status-transition-storage.ts#L11-L11"
+        }
+      ]
+    }
+  ],
+  "provenance": {
+    "generator": "tools/code-explorer/generate.mjs",
+    "curatedSha256": "9ca6677ca7a7cac456f216cf675ad241f6ebdf50da88db753264d3d5114fc309",
+    "sourceTree": "cde457594ff6c2cffd427e8a42c5ed3bfb3b86c8",
+    "proofKind": "curated_source_relationships",
+    "executionVerified": false
+  }
+}
