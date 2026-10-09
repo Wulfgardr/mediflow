@@ -197,7 +197,8 @@ for (const surface of ['web-legacy', 'web-fixed-preview-v1', 'v1'] as const) {
             actorType: event.actor_type, actorRef: event.actor_ref, sourceSurface: event.source_surface });
 
         const repeat = await create(surface, id);
-        assert.equal(repeat.status, 500);
+        assert.equal(repeat.status, 409);
+        assert.deepEqual(await repeat.json(), { error: 'Patient create conflict' });
         assert.deepEqual(readBack(id), snapshot);
     });
 }
@@ -257,13 +258,38 @@ for (const surface of ['web-legacy', 'web-fixed-preview-v1', 'v1'] as const) {
         const id = `c05-create-${surface}-competing`;
         const options = surface === 'web-fixed-preview-v1' ? { precondition: capturePreview() } : {};
         const [first, second] = await Promise.all([create(surface, id, options), create(surface, id, options)]);
-        assert.deepEqual([first.status, second.status].sort(), [201, 500]);
+        assert.deepEqual([first.status, second.status].sort(), [201, 409]);
         const snapshot = readBack(id);
         assert.ok(snapshot.patient);
         assert.equal(snapshot.memberships.length, 1);
         assert.equal(snapshot.audit.length, 1);
         const lostResponseRetry = await create(surface, id, options);
-        assert.equal(lostResponseRetry.status, 500);
+        assert.equal(lostResponseRetry.status, 409);
         assert.deepEqual(readBack(id), snapshot);
+    });
+}
+
+for (const surface of ['web-legacy', 'web-fixed-preview-v1', 'v1'] as const) {
+    test(`${surface} rejects original numeric create identity without fallback writes`, async () => {
+        reset(); newSession(`${surface}-invalid-id`);
+        const before = sql.prepare('SELECT (SELECT count(*) FROM patients) AS patients, (SELECT count(*) FROM patients_to_ambulatories) AS memberships, (SELECT count(*) FROM audit_events) AS audit').get();
+        const response = await create(surface, 'unused', { body: { id: 42 } });
+        assert.equal(response.status, 400);
+        assert.deepEqual(await response.json(), { error: 'Invalid id' });
+        assert.deepEqual(sql.prepare('SELECT (SELECT count(*) FROM patients) AS patients, (SELECT count(*) FROM patients_to_ambulatories) AS memberships, (SELECT count(*) FROM audit_events) AS audit').get(), before);
+    });
+}
+
+for (const surface of ['web-legacy', 'v1'] as const) {
+    test(`${surface} invalid destination precedes duplicate identity lookup`, async () => {
+        reset(); newSession(`${surface}-invalid-destination`);
+        const id = `c05-${surface}-existing`;
+        assert.equal((await create(surface, id)).status, 201);
+        const before = readBack(id);
+        state.selected = 'missing-destination';
+        const response = await create(surface, id, { body: { ambulatoryId: 'missing-destination' } });
+        assert.equal(response.status, 500);
+        assert.deepEqual(await response.json(), { error: 'Failed to create patient' });
+        assert.deepEqual(readBack(id), before);
     });
 }
