@@ -149,9 +149,11 @@ test('patient bulk schemas normalize IDs and reject malformed payloads', async (
     assert.deepEqual(await expectValid(patientAssignSchema, {
         patientIds: [' patient-1 ', 'patient-1', 'patient-2'],
         targetAmbulatoryId: ' ambulatory-1 ',
+        patientVersions: { 'patient-1': 1, 'patient-2': 2 },
     }), {
         patientIds: ['patient-1', 'patient-2'],
         targetAmbulatoryId: 'ambulatory-1',
+        patientVersions: { 'patient-1': 1, 'patient-2': 2 },
     });
     await expectValid(patientDuplicateSchema, {
         patientIds: ['patient-1'],
@@ -160,6 +162,7 @@ test('patient bulk schemas normalize IDs and reject malformed payloads', async (
     await expectValid(patientUnassignSchema, {
         patientIds: ['patient-1'],
         ambulatoryId: 'ambulatory-1',
+        patientVersions: { 'patient-1': 1 },
     });
     await expectInvalid400(patientAssignSchema, {
         patientIds: [],
