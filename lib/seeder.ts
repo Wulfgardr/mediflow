@@ -224,10 +224,32 @@ export interface SeedOptions {
     onProgress?: (current: number, total: number) => void;
 }
 
-export async function seedDatabase(options: SeedOptions): Promise<{ count: number }> {
+export interface SeederOutcome {
+    operation: 'seed' | 'cleanup';
+    confirmedPatients: number;
+    completedPatients: number;
+    confirmedRelatedRecords: number;
+}
+
+// Counts only acknowledged writes. A failed response may hide a committed write.
+export class SeederIncompleteError extends Error {
+    readonly outcome: Readonly<SeederOutcome>;
+
+    constructor(outcome: SeederOutcome, cause: unknown) {
+        const description = outcome.operation === 'seed'
+            ? `Generazione non completata. Salvataggi confermati: ${outcome.confirmedPatients} pazienti, ${outcome.confirmedRelatedRecords} dati collegati. Pazienti con generazione completata: ${outcome.completedPatients}. I dati già salvati restano presenti.`
+            : `Eliminazione non completata. Eliminazioni confermate: ${outcome.confirmedPatients} pazienti e ${outcome.confirmedRelatedRecords} dati collegati rimasti. Altri dati potrebbero essere già stati eliminati.`;
+        super(`${description} L’ultima operazione potrebbe essere stata applicata senza conferma. Ricarica l’elenco prima di decidere come proseguire.`, { cause });
+        this.name = 'SeederIncompleteError';
+        this.outcome = { ...outcome };
+    }
+}
+
+export async function seedDatabase(options: SeedOptions): Promise<{ count: number; outcome: SeederOutcome }> {
     const { patientCount, includeEntries, includeTherapies, includeConditions, onProgress } = options;
     console.log(`🚀 Starting ecosystem seeding for ${patientCount} patients...`);
 
+    const outcome: SeederOutcome = { operation: 'seed', confirmedPatients: 0, completedPatients: 0, confirmedRelatedRecords: 0 };
     for (let i = 0; i < patientCount; i++) {
         try {
             // 1. Basic Patient Info
@@ -273,6 +295,7 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
                     updatedAt: new Date(),
                     createdAt: new Date()
                 });
+                outcome.confirmedPatients++;
             } catch (addError) {
                 console.error(`Failed to add patient ${patientId} (${firstName} ${lastName}):`, addError);
                 throw new Error(`Failed to insert patient ${firstName} ${lastName}: ${addError}`);
@@ -294,6 +317,7 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
                                 startDate: randomDate(new Date(2023, 0, 1), new Date()),
                                 createdAt: new Date()
                             });
+                            outcome.confirmedRelatedRecords++;
                         }
                     }
                 }
@@ -349,6 +373,7 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
                             data: base64data,
                             createdAt: date
                         });
+                        outcome.confirmedRelatedRecords++;
                         content += ` [Allegato generato: Referto PDF]`;
                     } else if (type === 'scale') {
                         title = "Valutazione Multidimensionale";
@@ -374,6 +399,7 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
                             notes: "Valutazione periodica",
                             createdAt: date
                         });
+                        outcome.confirmedRelatedRecords++;
                     }
 
                     await db.entries.add({
@@ -386,13 +412,15 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
                         createdAt: new Date(),
                         updatedAt: new Date()
                     });
+                    outcome.confirmedRelatedRecords++;
                 }
             }
         } catch (innerError) {
             console.error(`Seeder: Error generating patient ${i}`, innerError);
-            throw innerError;
+            throw new SeederIncompleteError(outcome, innerError);
         }
 
+        outcome.completedPatients++;
         if (onProgress) onProgress(i + 1, patientCount);
 
         // Anti-overload delay
@@ -400,76 +428,63 @@ export async function seedDatabase(options: SeedOptions): Promise<{ count: numbe
     }
 
     console.log(`✅ Ecosystem seeding complete.`);
-    return { count: patientCount };
+    return { count: outcome.completedPatients, outcome };
 }
 
 // --- Nuke Function ---
 
 export async function nukeTestData(full: boolean = false): Promise<{ deleted: number }> {
-    console.log(`☢️ Nuking data (Full Mode: ${full})...`);
+    const outcome: SeederOutcome = { operation: 'cleanup', confirmedPatients: 0, completedPatients: 0, confirmedRelatedRecords: 0 };
+    try {
+        if (full) {
+            // Keep the existing reset operations. A rejected clear can itself be partial;
+            // its unacknowledged writes are deliberately not included in the counts.
+            const patients = await db.patients.toArray({ rejectAuthUnavailable: true });
+            await db.entries.clear();
+            await db.therapies.clear();
+            await db.checkups.clear();
+            await db.attachments.clear();
+            await db.patients.clear();
+            outcome.confirmedPatients = patients.length;
+            await db.conversations.clear();
+            await db.messages.clear();
+        } else {
+            const allPatients = await db.patients.toArray({ rejectAuthUnavailable: true });
+            const testPatients = allPatients.filter(p => p.taxCode?.startsWith('TEST'));
+            const testPatientIds = new Set(testPatients.map(p => p.id));
 
-    let deletedCount = 0;
-
-    if (full) {
-        // Delete EVERYTHING
-        const patients = await db.patients.toArray();
-        deletedCount = patients.length;
-
-        // Parallel nuke of all tables
-        // Note: For API tables, we might need bulkDelete or iterative
-        // Using iterative for safety as per existing pattern
-
-        await db.entries.clear();
-        await db.therapies.clear();
-        await db.checkups.clear();
-        await db.attachments.clear();
-        await db.patients.clear();
-        await db.conversations.clear();
-        await db.messages.clear();
-
-    } else {
-        // Delete Only TEST- patients
-        const allPatients = await db.patients.toArray();
-        const testPatients = allPatients.filter(p => p.taxCode?.startsWith('TEST'));
-        const testPatientIds = new Set(testPatients.map(p => p.id));
-
-        if (testPatientIds.size > 0) {
-            // 1. Delete Patients
-            for (const p of testPatients) {
-                await db.patients.delete(p.id, { version: p.version });
-            }
-            deletedCount = testPatients.length;
-
-            // 2. Cleanup Orphans (Client-side filtering strategy)
-            console.log("Seeder: Cleaning up orphans...");
-
-            const cleanupTable = async (table: any, tableName: string) => {
-                try {
-                    const items = await table.toArray();
-                    const toDelete = items.filter((item: any) => testPatientIds.has(item.patientId));
-                    for (const item of toDelete) {
-                        await table.delete(item.id, tableName === 'attachments'
-                            ? { attachmentPrecondition: captureAttachmentWritePrecondition(item) } : undefined);
-                    }
-                    console.log(`Cleaned ${toDelete.length} orphans from ${tableName}`);
-                } catch (e) {
-                    if (tableName === 'attachments') throw new Error('Attachment cleanup incomplete', { cause: e });
-                    console.error(`Failed to cleanup ${tableName}`, e);
+            if (testPatientIds.size > 0) {
+                for (const p of testPatients) {
+                    await db.patients.delete(p.id, { version: p.version });
+                    outcome.confirmedPatients++;
                 }
-            };
 
-            await Promise.all([
-                cleanupTable(db.entries, 'entries'),
-                cleanupTable(db.therapies, 'therapies'),
-                cleanupTable(db.checkups, 'checkups'),
-                cleanupTable(db.attachments, 'attachments'),
-                cleanupTable(db.conversations, 'conversations') // Assuming conversations might link to patients? Check schema. 
-                // schema says conversations don't have patientId directly, usually messages do or it's inferred. 
-                // Let's stick to clinical data.
-            ]);
+                const cleanupTable = async (table: typeof db.entries | typeof db.therapies | typeof db.checkups | typeof db.attachments | typeof db.conversations) => {
+                    const items = await table.toArray({ rejectAuthUnavailable: true });
+                    for (const item of items) {
+                        if (!('patientId' in item) || !testPatientIds.has(item.patientId)) continue;
+                        await table.delete(item.id, table === db.attachments
+                            ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Parameters<typeof captureAttachmentWritePrecondition>[0]) } : undefined);
+                        outcome.confirmedRelatedRecords++;
+                    }
+                };
+
+                // Wait for every already-started cleanup before reporting stable counts.
+                const results = await Promise.allSettled([
+                    cleanupTable(db.entries),
+                    cleanupTable(db.therapies),
+                    cleanupTable(db.checkups),
+                    cleanupTable(db.attachments),
+                    cleanupTable(db.conversations),
+                ]);
+                const failure = results.find(result => result.status === 'rejected');
+                if (failure?.status === 'rejected') throw failure.reason;
+            }
         }
+    } catch (error) {
+        // Bulk reset endpoints do not expose per-record counts; keep its generic warning.
+        if (full) throw error;
+        throw new SeederIncompleteError(outcome, error);
     }
-
-    console.log(`🔥 Nuked ${deletedCount} patients and related data.`);
-    return { deleted: deletedCount };
+    return { deleted: outcome.confirmedPatients };
 }

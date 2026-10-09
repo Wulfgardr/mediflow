@@ -57,7 +57,7 @@ test('seeder reports attachment cleanup failure after the earlier patient deleti
         assert.equal(id, item.id); assert.deepEqual(options.attachmentPrecondition, captureAttachmentWritePrecondition(item));
         throw new Error('synthetic conflict');
     });
-    await assert.rejects(nukeTestData(false), /Attachment cleanup incomplete/);
+    await assert.rejects(nukeTestData(false), /Eliminazione non completata/);
     assert.deepEqual(deleted, [item.patientId]);
 });
 

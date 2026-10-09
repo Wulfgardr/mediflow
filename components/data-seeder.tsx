@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { seedDatabase, nukeTestData } from '@/lib/seeder';
+import { seedDatabase, nukeTestData, SeederIncompleteError } from '@/lib/seeder';
 import { Database, Trash2, Plus, Settings2, FileText, Pill, Stethoscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
@@ -62,11 +62,11 @@ export default function DataSeeder() {
                 }
             });
             console.log("Seeder: Success", result);
-            showToast({ tone: 'success', title: 'Pazienti di test generati', description: `Generati ${patientCount} pazienti di test.` });
+            showToast({ tone: 'success', title: 'Pazienti di test generati', description: `Generati ${result.count} pazienti di test.` });
             window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error("Seeder Error Caught:", e);
-            const msg = e instanceof Error ? `${e.message}\n${e.stack ?? ''}` : JSON.stringify(e);
+            const msg = e instanceof SeederIncompleteError ? e.message : 'Generazione non completata. Alcuni dati potrebbero essere già stati salvati. Ricarica l’elenco prima di proseguire.';
             showToast({ tone: 'error', title: 'Errore durante la generazione', description: msg });
             // Do not clear progress on error so user can see where it failed
         } finally {
@@ -91,11 +91,11 @@ export default function DataSeeder() {
         setNuking(true);
         try {
             const result = await nukeTestData(nukeAll);
-            showToast({ tone: 'success', title: 'Eliminazione completata', description: `Eliminati ${result.deleted} record.` });
+            showToast({ tone: 'success', title: 'Eliminazione completata', description: `Eliminati ${result.deleted} pazienti e completata la pulizia dei dati collegati.` });
             window.setTimeout(() => window.location.reload(), 1200);
         } catch (e) {
             console.error(e);
-            showToast({ tone: 'error', title: "Eliminazione non completata", description: "Alcuni dati potrebbero essere già stati eliminati. Ricarica l’elenco prima di riprovare." });
+            showToast({ tone: 'error', title: "Eliminazione non completata", description: e instanceof SeederIncompleteError ? e.message : "Alcuni dati potrebbero essere già stati eliminati. Ricarica l’elenco prima di riprovare." });
         } finally {
             setNuking(false);
         }
