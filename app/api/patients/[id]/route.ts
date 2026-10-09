@@ -11,7 +11,7 @@ import { activePatients } from '@/lib/patient-lifecycle';
 /* @Codex */
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
 /* @Codex */
-import { parsePatientJsonObject } from '@/lib/patient-json-object';
+import { readPatientJsonObject } from '@/lib/patient-json-object';
 /* @Codex */
 import { updatePatientOperation } from '@/lib/patient-update-operation';
 /* @Codex */
@@ -48,8 +48,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const { id } = await params;
-        const parsed = await parsePatientJsonObject(() => request.json());
-        if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+        const parsed = await readPatientJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
         /* @Codex */
         const expectedVersion = parseExpectedVersion(body.version);
@@ -97,8 +97,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     try {
         const { id } = await params;
         /* @Codex */
-        const parsed = await parsePatientJsonObject(() => request.json());
-        if (!parsed.ok) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
+        const parsed = await readPatientJsonObject(request);
+        if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {

@@ -9,10 +9,15 @@ import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { ambulatories, patients, patientsToAmbulatories } from './schema';
+import { installNetworkPatientCookieFixture, syntheticNetworkPatientAuthority } from './network-patient-authority-test-fixture';
+import { clearAllSessions } from './security/server-session';
 
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c04-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
+const cleanupCookies = installNetworkPatientCookieFixture(dataDir, {
+    cookies: new Map([['ambulatory_id', 'c04-a']]),
+});
 const state = { webAllowed: true, v1Allowed: true, v1ActorLocal: true };
 const priorLocalApiToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c04-synthetic-local-token';
@@ -44,7 +49,7 @@ const { updatePatientOperation } = load('./patient-update-operation.ts') as type
 const sql = new Database(join(dataDir, 'medical.db'));
 
 test.after(() => {
-    sql.close(); dbServer.$client.close(); hooks.deregister();
+    clearAllSessions(); cleanupCookies(); sql.close(); dbServer.$client.close(); hooks.deregister();
     if (priorLocalApiToken === undefined) delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
     else process.env.MEDIFLOW_LOCAL_API_TOKEN = priorLocalApiToken;
     delete (globalThis as unknown as Record<symbol, typeof state>)[stateKey];
@@ -144,12 +149,10 @@ else { process.kill(process.pid, 'SIGKILL'); }
 
 function networkContext() {
     return {
-        request: new Request('http://127.0.0.1/api/network/patients/c04-patient', {
-            method: 'PUT', headers: { 'x-request-id': 'c04-network-request' },
+        ...syntheticNetworkPatientAuthority(dbServer, 'c04-a', {
+            clientId: 'c04-synthetic-client', userId: 'c04-synthetic-user', requestId: 'c04-network-request',
         }),
-        patientId: 'c04-patient', scopeAmbulatoryId: 'c04-a',
-        pairedClient: { clientId: 'c04-synthetic-client' } as never,
-        session: { userId: 'c04-synthetic-user' } as never,
+        patientId: 'c04-patient',
     };
 }
 
