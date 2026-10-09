@@ -71,6 +71,7 @@ una riga inserita; non apre una seconda connessione.
 | [purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | Purge rimuove paziente e figli clinici. | C05: lifecycle/versione, cascade, delete e audit nella stessa transazione immediata; errore audit ripristina tutte le righe. |
 | [attachment-web-create.ts](../lib/attachment-web-create.ts) | Creazione allegato Web e currentness host. | C05: insert verificato e audit `attachment.created` nella stessa transazione immediata, dopo parent attivo. |
 | [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), DELETE | Rimozione allegato Web. | C05: lookup, delete verificato e audit `attachment.deleted` nella stessa transazione immediata. |
+| [fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | Default emergenziale, relink e purge opzionale di figli orfani. | C05: lookup, mutazioni e audit richiesti nella stessa transazione immediata; audit per modifiche effettive, replay vuoto senza eventi. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), PUT | Modifica workflow, stato e tempi persistiti. | C05: esistenza, update e audit nella stessa transazione immediata. |
 | [siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts), DELETE | Eliminazione del workflow persistito. | C05: esistenza, delete e audit nella stessa transazione immediata. |
@@ -117,21 +118,20 @@ rimangono writer distinti da migrare.
 
 ## Writer clinici ancora al meglio: consegna a C05
 
-Queste due operazioni sono **obbligatorie**, ma il codice corrente può
+Questa operazione è **obbligatoria**, ma il codice corrente può
 committare la modifica prima dell'audit. C05 deve spostare l'evento nel writer
 che possiede la transazione, usando il contesto attore già derivato dall'host
 e la stessa interfaccia del pilota; un errore audit deve annullare gli effetti.
 
 | Punto di scrittura | Motivo | Stato da correggere in C05 |
 | --- | --- | --- |
-| [fix-orphans/route.ts:144](../app/api/system/fix-orphans/route.ts#L144) | Purge opzionale rimuove figli clinici orfani. | Audit dopo la transazione di cancellazione :142. |
 | [network-attachment-write.ts:126](../lib/network-attachment-write.ts#L126) | `attachment.created` attesta un nuovo allegato e la sua currentness. | Wrapper :120 chiamato da `createNetworkScopedAttachment` a :209, dopo il commit; catch assorbe l'errore. Adapter: [attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts). |
 
-Il ramo precedente di [fix-orphans:111–135](../app/api/system/fix-orphans/route.ts#L111)
-crea eventualmente un ambulatorio e associa pazienti **senza evento audit**.
-È un ulteriore writer da inserire nel roster C05: l'evento del purge successivo
-non attesta queste associazioni. Questa lista non sostituisce il censimento
-C05 delle operazioni che non chiamano affatto un writer audit.
+La riparazione orfani ora traccia anche default e relink, oltre al purge
+esplicito; le [prove SQLite composte](../lib/orphan-repair-required-audit.test.ts)
+verificano rollback fino all’ultimo evento. Il purge vuoto non produce un evento
+clinico né revoca locator. Questa lista non sostituisce il censimento C05 degli
+altri writer e dei caller indiretti.
 
 ## Telemetria operativa
 
