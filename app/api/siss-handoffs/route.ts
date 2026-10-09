@@ -128,7 +128,7 @@ export async function POST(request: Request) {
                     flags: [`action:${action}`, `outcome:${outcome}`],
                 }),
             });
-            return { status: 201, value: { id } } as const;
+            return { status: 201, value: { id, version: 1 } } as const;
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {

@@ -25,7 +25,12 @@ export const sissHandoffCreateSchema = z.object({
     correlationId: optionalTextSchema,
 });
 
-export const sissHandoffUpdateSchema = z.object({
+export const sissHandoffWritePreconditionSchema = z.object({
+    patientId: requiredTextSchema,
+    version: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+});
+
+export const sissHandoffUpdateSchema = sissHandoffWritePreconditionSchema.extend({
     action: requiredTextSchema.optional(),
     moduleLabel: requiredTextSchema.optional(),
     reason: optionalTextSchema,
