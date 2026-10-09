@@ -65,6 +65,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
             ['@/lib/schema', ${JSON.stringify(toDataModule(`export const ${[
                 'attachments', 'ambulatories', 'checkups', 'conversations', 'documentDiagnosisProposals',
+                'durableReviewCommandOperations', 'durableReviewCommandStates',
                 'durableReviewOperations', 'durableReviewPatientLinks', 'durableReviewRecords', 'drugs', 'entries',
                 'exemptions', 'exemptionImportReceipts', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
                 'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',

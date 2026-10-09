@@ -8,6 +8,8 @@ import {
     checkups,
     conversations,
     documentDiagnosisProposals,
+    durableReviewCommandOperations,
+    durableReviewCommandStates,
     durableReviewOperations,
     durableReviewPatientLinks,
     durableReviewRecords,
@@ -83,6 +85,8 @@ function buildBackupDataset(): BackupDataset {
         const attachmentsRows = tx.select().from(attachments).all();
         const conversationsRows = tx.select().from(conversations).all();
         const documentDiagnosisProposalRows = tx.select().from(documentDiagnosisProposals).all();
+        const durableReviewCommandOperationRows = tx.select().from(durableReviewCommandOperations).all();
+        const durableReviewCommandStateRows = tx.select().from(durableReviewCommandStates).all();
         const durableReviewRecordRows = tx.select().from(durableReviewRecords).all();
         const durableReviewOperationRows = tx.select().from(durableReviewOperations).all();
         const durableReviewPatientLinkRows = tx.select().from(durableReviewPatientLinks).all();
@@ -130,6 +134,8 @@ function buildBackupDataset(): BackupDataset {
             attachments: sortBackupRows(filterRowsByReference(attachmentsRows, 'patientId', patientIds)),
             conversations: sortBackupRows(conversationsRows),
             documentDiagnosisProposals: sortBackupRows(filterRowsByReference(documentDiagnosisProposalRows, 'patientId', patientIds)),
+            durableReviewCommandOperations: sortBackupRows(durableReviewCommandOperationRows),
+            durableReviewCommandStates: sortBackupRows(durableReviewCommandStateRows),
             durableReviewPatientLinks: sortBackupRows(
                 filterRowsByReference(durableReviewPatientLinkRows, 'patientId', patientIds)
                     .filter((link) => typeof link.reviewId === 'string' && durableReviewIds.has(link.reviewId)),
