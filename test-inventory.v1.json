@@ -1954,6 +1954,15 @@
       }
     },
     {
+      "path": "lib/attachment-client-preconditions.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/attachment-currentness-get-route.test.ts",
       "selection": {
         "state": "mapped",

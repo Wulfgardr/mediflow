@@ -155,3 +155,58 @@ Fermare il lavoro e mantenere il denial se:
 Questo ADR non aggiunge schema, migrazioni, runtime, route, UI, client,
 provider, esecuzione OCR, backup, restore, egress, dati clinici, apply,
 promozione o release. Le verifiche future usano soltanto fixture sintetiche.
+
+
+## Addendum WUL-720 C05-D — precondizioni delle scritture Web
+
+GET `/api/attachments`, anche con `metadata=true`, e GET
+`/api/attachments/[id]` espongono `currentness: { sourceRef, revision,
+freshnessEpoch }` dalla stessa query del record restituito. Il dettaglio include
+il payload; la lista metadata continua a ometterlo. GET
+`/api/attachments/[id]/content` conserva `{ currentness }`, senza patientId.
+I nomi interni `documentSourceRef`, `documentRevision` e
+`documentFreshnessEpoch` non vengono aggiunti alla risposta Web.
+
+PUT metadata `/api/attachments/[id]` richiede `patientId`, `expected` con
+esattamente i tre campi della tuple osservata e almeno un campo mutabile fra
+`summarySnapshot`, `parseEvidenceArtifactSnapshot`, `ocrQueueState`. DELETE
+richiede `patientId` e la stessa `expected`. Il JSON di entrambi è limitato a
+4 MiB. SourceRef deve essere 64 caratteri esadecimali minuscoli; revision e
+freshnessEpoch sono interi sicuri positivi. Lo stripping dei campi root ignoti
+rimane invariato; la tuple rifiuta campi aggiuntivi. I client precedenti privi
+delle precondizioni ricevono 400 e devono essere aggiornati insieme alla route.
+
+La transazione esterna IMMEDIATE rilegge parent e tuple prima del core o del
+DELETE, poi contiene anche l'audit richiesto. Parent diverso o allegato assente
+restituiscono 404; tuple superata restituisce 409; input non valido 400, JSON
+oltre soglia 413. Gli errori conservano `{ error: string }`. Non viene aggiunta
+una condizione di paziente attivo al metadata/delete: il cleanup successivo al
+tombstone del paziente mantiene la propria semantica. Il core currentness e le
+transizioni OCR restano invariati. Omissione conserva summary/evidence,
+`null` o stringa vuota li cancellano. Metadata risponde `{ success: true,
+currentness }`; DELETE conserva `{ success: true }`.
+
+Il replay metadata con la vecchia tuple riceve 409 senza incremento o audit.
+DELETE ripetuto riceve 404; dopo ricreazione dello stesso ID la sourceRef nuova
+fa rifiutare il vecchio comando con 409. Non viene introdotta una ricevuta
+idempotente di successo. I rifiuti e il fallimento dell'audit non lasciano
+mutazioni parziali nella singola operazione.
+
+La facade richiede una precondizione esplicita legata all'ID; non rilegge
+currentness dentro update/delete e non ritenta automaticamente un conflitto.
+La UI cattura il record prima della conferma; il recupero richiede rilettura
+dell'elenco e nuova azione. Clear usa il record della lista del proprio
+fallback, bulkDelete richiede record osservati espliciti. Il seeder propaga il
+record osservato e segnala un cleanup attachment fallito: le precedenti
+eliminazioni possono già essere state confermate e non vengono annullate.
+
+`no contract impact` per `/api/v1`: proiezioni paired, upload paired e client
+nativi restano invariati e non ricevono la tuple Web. Non viene aggiunto alcun
+writer metadata/delete v1 o paired. Il restore C15 resta fuori dal delta.
+
+Prove: `lib/attachment-metadata-currentness.test.ts`,
+`lib/attachment-web-create-currentness.test.ts`,
+`lib/attachment-web-put-currentness.test.ts`,
+`lib/attachment-client-preconditions.test.ts`; runner `scripts/run-strip-types.mjs
+--test` con MEDIFLOW_DATA_DIR sintetica esplicita. I risultati eseguiti restano
+associati alla revisione nella consegna, non dedotti dalla presenza dei test.

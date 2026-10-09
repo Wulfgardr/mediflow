@@ -3,7 +3,7 @@ import { writeAttachmentWebAudit } from '@/lib/attachment-web-audit';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
@@ -11,7 +11,7 @@ import {
     type DocumentOcrQueueState,
 } from '@/lib/domain/documents/document-ocr-queue';
 /* @Codex */
-import { attachmentUpdateSchema } from '@/lib/api-schemas/attachments';
+import { attachmentDeleteSchema, attachmentUpdateSchema, type AttachmentExpectedCurrentness } from '@/lib/api-schemas/attachments';
 /* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { isAttachmentCurrentnessHostError, isAttachmentMetadataCurrentnessHostError, transitionAttachmentMetadataCurrentness } from '@/lib/attachment-currentness-host';
@@ -31,6 +31,11 @@ const ATTACHMENT_DETAIL_RESPONSE_COLUMNS = {
     ocrQueueUpdatedAt: attachments.ocrQueueUpdatedAt,
     ocrReplayArtifactSnapshot: attachments.ocrReplayArtifactSnapshot,
     createdAt: attachments.createdAt,
+    currentness: {
+        sourceRef: attachments.documentSourceRef,
+        revision: attachments.documentRevision,
+        freshnessEpoch: attachments.documentFreshnessEpoch,
+    },
 } as const;
 
 /* STREAM B: full attachment retrieval INCLUDING the base64 `data` blob. The list
@@ -115,7 +120,8 @@ export async function PUT(
             return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
         }
 
-        dbServer.transaction((tx) => {
+        const updated = dbServer.transaction((tx) => {
+            assertAttachmentExpected(tx, id, payload.patientId, payload.expected);
             const currentness = transitionAttachmentMetadataCurrentness(id, {
                 summarySnapshot: updateData.summarySnapshot,
                 parseEvidenceArtifactSnapshot: updateData.parseEvidenceArtifactSnapshot,
@@ -123,9 +129,11 @@ export async function PUT(
             });
             writeAttachmentWebAudit(tx, request, session, 'attachment.updated', id,
                 { changedFields: Object.keys(updateData), resourceVersion: currentness.revision });
+            return currentness;
         }, { behavior: 'immediate' });
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, currentness: updated });
     } catch (error) {
+        if (error instanceof AttachmentPreconditionError) return error.response();
         if (isAttachmentMetadataCurrentnessHostError(error)) {
             if (error.code === 'ocr_queue_unavailable') return NextResponse.json({ error: 'Attachment is not in the OCR queue' }, { status: 409 });
             return NextResponse.json({ error: 'Invalid OCR queue state transition' }, { status: 409 });
@@ -150,17 +158,37 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        const deleted = dbServer.transaction((tx) => {
-            const attachment = tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get();
-            if (!attachment) return false;
-            const result = tx.delete(attachments).where(eq(attachments.id, attachment.id)).run();
+        const body = await readBoundedJsonBody(request, 4 * 1024 * 1024, 'request-json',
+            { signal: request.signal, deadline: Infinity });
+        if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'JSON payload too large' : 'Invalid payload' }, { status: body.status });
+        const parsed = parseApiBody(attachmentDeleteSchema, body.value);
+        if (!parsed.ok) return parsed.response;
+        const { patientId, expected } = parsed.data;
+        dbServer.transaction((tx) => {
+            assertAttachmentExpected(tx, id, patientId, expected);
+            const result = tx.delete(attachments).where(and(eq(attachments.id, id),
+                eq(attachments.patientId, patientId), eq(attachments.documentSourceRef, expected.sourceRef),
+                eq(attachments.documentRevision, expected.revision), eq(attachments.documentFreshnessEpoch, expected.freshnessEpoch))).run();
             if (result.changes !== 1) throw new Error('Attachment delete did not affect exactly one row');
-            writeAttachmentWebAudit(tx, request, session, 'attachment.deleted', attachment.id);
-            return true;
+            writeAttachmentWebAudit(tx, request, session, 'attachment.deleted', id);
         }, { behavior: 'immediate' });
-        if (!deleted) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (error instanceof AttachmentPreconditionError) return error.response();
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });
     }
+}
+
+class AttachmentPreconditionError extends Error {
+    constructor(private readonly status: 404 | 409) { super('Attachment precondition failed'); }
+    response() { return NextResponse.json({ error: this.status === 404 ? 'Not found' : 'Attachment changed; reload and retry' }, { status: this.status }); }
+}
+function assertAttachmentExpected(tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0], id: string,
+    patientId: string, expected: AttachmentExpectedCurrentness): void {
+    const row = tx.select({ patientId: attachments.patientId, sourceRef: attachments.documentSourceRef,
+        revision: attachments.documentRevision, freshnessEpoch: attachments.documentFreshnessEpoch })
+        .from(attachments).where(eq(attachments.id, id)).get();
+    if (!row || row.patientId !== patientId) throw new AttachmentPreconditionError(404);
+    if (row.sourceRef !== expected.sourceRef || row.revision !== expected.revision || row.freshnessEpoch !== expected.freshnessEpoch)
+        throw new AttachmentPreconditionError(409);
 }

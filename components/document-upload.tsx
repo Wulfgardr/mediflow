@@ -18,7 +18,7 @@ import {
     AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY,
     isAiDocumentSynthesisEnabledValue,
 } from '@/lib/ai-document-synthesis-kill-switch';
-import { db, type Attachment } from '@/lib/db';
+import { db, captureAttachmentWritePrecondition, type Attachment } from '@/lib/db';
 import { requestAnyDocDecryptedLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 import { createDocumentUploadQueue, readDocumentDataUrl, type DocumentUploadResult } from '@/lib/domain/documents/document-upload-queue';
 import { useLiveQueryState } from '@/lib/live-query';
@@ -134,13 +134,14 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         activeDelete.current = operation;
         setDeletingId(file.id); setDeleteErrorId(null);
         try {
+            const attachmentPrecondition = captureAttachmentWritePrecondition(file);
             const { confirmed } = await confirm({
                 title: 'Eliminare questo documento?',
                 message: 'Il documento verrà rimosso dagli allegati del paziente.',
                 confirmLabel: 'Elimina', tone: 'danger',
             });
             if (!confirmed || activeDelete.current !== operation) return;
-            await db.attachments.delete(file.id);
+            await db.attachments.delete(file.id, { attachmentPrecondition });
             if (activeDelete.current !== operation) return;
             if (activeExtraction.current?.attachmentId === file.id) {
                 activeExtraction.current.controller.abort(); activeExtraction.current = null; setExtractingId(null);
@@ -173,7 +174,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     useEffect(() => {
         const pending = activeExtraction.current;
         // Any refresh of the attachment view retires transient extraction. The ordinary
-        // list intentionally has no host currentness tuple, so do not invent one here.
+        // extraction lifecycle stays bound to its observed list snapshot.
         if (pending && (listError || listLoading || attachments !== pending.sourceSnapshot))
             pending.controller.abort();
     }, [attachments, listError, listLoading]);
