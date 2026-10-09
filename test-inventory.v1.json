@@ -3866,6 +3866,15 @@
       }
     },
     {
+      "path": "lib/orphan-repair-required-audit.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/patient-ambulatory-membership.test.ts",
       "selection": {
         "state": "mapped",
