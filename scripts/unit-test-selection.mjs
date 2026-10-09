@@ -3,6 +3,8 @@ import path from 'node:path';
 
 export const UNIT_TEST_GROUPS = Object.freeze(['lib', 'components']);
 export const UNIT_SCRIPT_TESTS = Object.freeze([
+  // Explicit route registration; do not discover every app/** test.
+  'app/api/patients/route.test.ts',
   'scripts/admin-route-auth-boundary.test.mjs',
   'scripts/check-never-regress-icd-who.test.mjs',
   'scripts/check-never-regress-ocr-retirement.test.mjs',
