@@ -1,4 +1,4 @@
-import { db, type Checkup } from '@/lib/db';
+import { db, captureAttachmentWritePrecondition, type Checkup } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 
@@ -448,10 +448,12 @@ export async function nukeTestData(full: boolean = false): Promise<{ deleted: nu
                     const items = await table.toArray();
                     const toDelete = items.filter((item: any) => testPatientIds.has(item.patientId));
                     for (const item of toDelete) {
-                        await table.delete(item.id);
+                        await table.delete(item.id, tableName === 'attachments'
+                            ? { attachmentPrecondition: captureAttachmentWritePrecondition(item) } : undefined);
                     }
                     console.log(`Cleaned ${toDelete.length} orphans from ${tableName}`);
                 } catch (e) {
+                    if (tableName === 'attachments') throw new Error('Attachment cleanup incomplete', { cause: e });
                     console.error(`Failed to cleanup ${tableName}`, e);
                 }
             };

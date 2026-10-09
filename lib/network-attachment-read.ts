@@ -64,9 +64,9 @@ function toIsoString(value: unknown): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-// Mirrors the host list projection (app/api/attachments/route.ts
-// ATTACHMENT_METADATA_COLUMNS): every attachment column except the base64
-// `data` blob, so a list never ships (or decrypts) attachment payloads.
+// Paired summaries retain their existing projection: no data blob and no
+// host currentness tuple. Web list/detail reads additionally expose nested
+// currentness for their ordinary metadata/delete preconditions.
 function toAttachmentSummary(row: AttachmentSummaryRow): AttachmentSummary {
     return {
         id: row.id,

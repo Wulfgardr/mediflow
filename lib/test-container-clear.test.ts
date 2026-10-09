@@ -128,7 +128,8 @@ test('a patient with test+live memberships survives and only loses the test link
 
         const row = selectLifecycleRow(db, 'patient-live');
         assert.equal(row?.deletedAt, null, 'live patient must never be tombstoned by the clear');
-        assert.equal(row?.version, 2, 'live patient version must be untouched');
+        assert.equal(row?.version, 3, 'membership removal bumps the live patient once');
+        assert.deepEqual(result.unlinkedPatients, [{ id: 'patient-live', version: 3 }]);
         assert.deepEqual(memberships(db, 'patient-live'), [LIVE_AMBULATORY]);
     } finally {
         sqlite.close();
@@ -258,7 +259,8 @@ test('an already-tombstoned member keeps its original tombstone and is not re-cl
 
         const row = selectLifecycleRow(db, 'patient-tombstoned');
         assert.equal(row?.deletionReason, 'web-delete', 'the original tombstone reason must survive');
-        assert.equal(row?.version, 6, 'no extra version bump on an existing tombstone');
+        assert.equal(row?.version, 7, 'membership removal bumps an existing tombstone once');
+        assert.deepEqual(result.unlinkedPatients, [{ id: 'patient-tombstoned', version: 7 }]);
         assert.equal(row?.deletedAt?.getTime(), earlier.getTime());
     } finally {
         sqlite.close();
@@ -272,6 +274,7 @@ test('clearing an empty test container is a no-op', () => {
         const result = clearTestContainerByMembership(db, TEST_AMBULATORY);
         assert.deepEqual(result, {
             clearedPatients: [],
+            unlinkedPatients: [],
             preservedLivePatientIds: [],
             removedMembershipRows: 0,
         });

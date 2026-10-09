@@ -62,16 +62,17 @@ una riga inserita; non apre una seconda connessione.
 | [ambulatory-write.ts:135](../lib/ambulatory-write.ts#L135) | Creazione ambulatorio: modifica il contenitore e lo scope clinico. | Transazione immediata host/paired. |
 | [ambulatory-write.ts:196](../lib/ambulatory-write.ts#L196) | Modifica ambulatorio e versione. | Transazione immediata host/paired. |
 | [ambulatory-write.ts:232](../lib/ambulatory-write.ts#L232) | Eliminazione ambulatorio: cambia lo scope persistito. | Transazione immediata host/paired. |
-| [ambulatory-write.ts:258](../lib/ambulatory-write.ts#L258) | Pulizia ambulatorio: evento per ciascun paziente eliminato logicamente. | Transazione della pulizia, anche per contenitori di test. |
+| [ambulatory-write.ts:258](../lib/ambulatory-write.ts#L258) | Pulizia ambulatorio: evento per ciascun paziente eliminato logicamente e patient.updated per i soli scollegati, con versione incrementata una volta. | Transazione della pulizia, anche per contenitori di test. |
 | [ambulatory-write.ts:261](../lib/ambulatory-write.ts#L261) | Evento complessivo `ambulatory.cleared`. | Stessa transazione degli effetti sui pazienti. |
 | [patients/assign/route.ts](../app/api/patients/assign/route.ts) | Associazione secondaria paziente/ambulatorio: cambia lo scope persistito. | C05: lookup, insert ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
-| [patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | Rimozione associazione secondaria, con primary e versione invariati. | C05: lookup, delete ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
+| [patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | Rimozione associazione secondaria, con primary invariato e bump versione. | C05: lookup, delete ed evento per modifica effettiva nella stessa transazione immediata; no-op senza evento. |
 | [patients/move/route.ts](../app/api/patients/move/route.ts) | Trasferimento batch: cambia associazioni, ambulatorio primario e versione. | C05: CAS, mutazioni ed evento per paziente nella stessa transazione immediata; rollback dell'intero batch al guasto audit. |
 | [patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | Duplicazione batch: crea pazienti e associazioni nel target. | C05: lookup, cloni, membership e un evento per clone nella stessa transazione immediata; guasto audit annulla l’intero batch. |
 | [purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | Purge rimuove paziente e figli clinici. | C05: lifecycle/versione, cascade, delete e audit nella stessa transazione immediata; errore audit ripristina tutte le righe. |
 | [attachment-web-create.ts](../lib/attachment-web-create.ts) | Creazione allegato Web e currentness host. | C05: insert verificato e audit `attachment.created` nella stessa transazione immediata, dopo parent attivo. |
 | [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), DELETE | Rimozione allegato Web. | C05: lookup, delete verificato e audit `attachment.deleted` nella stessa transazione immediata. |
 | [attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts), PUT e [attachment-content-cas-route.ts](../lib/attachment-content-cas-route.ts) | Metadata e contenuto allegato Web. | C05: transazione esterna immediata, savepoint currentness sulla stessa connessione e required `attachment.updated`; metadata audit solo nomi dei campi e revisione. |
+| [migrate-m2m/route.ts](../app/api/system/migrate-m2m/route.ts) | Relink amministrativo dal primario quando manca ogni membership. | Lookup, insert, bump paziente e required audit condividono la transazione immediata; no-op senza eventi. |
 | [fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | Default emergenziale, relink e purge opzionale di figli orfani. | C05: lookup, mutazioni e audit richiesti nella stessa transazione immediata; audit per modifiche effettive, replay vuoto senza eventi. |
 | [network-attachment-write.ts](../lib/network-attachment-write.ts) | `attachment.created` attesta allegato paired e currentness. | C05: scope/paziente attivo, insert verificato e required audit nella stessa transazione immediata; identità native/session e campi ENC conservati. |
 | [siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | Creazione del workflow locale riferito al paziente. | C05: controllo paziente e duplicati, insert e audit nella stessa transazione immediata. |
@@ -90,8 +91,7 @@ Assign e unassign leggono JSON fino a 256 KiB e validano gli schemi esistenti.
 Le [prove SQLite della famiglia](../lib/patient-membership-required-audit.test.ts)
 verificano rollback dell'intero batch se il secondo audit fallisce o viene
 ignorato, identità host, dinieghi senza effetti e replay immediato senza audit
-aggiuntivo. La versione del paziente e l'ambulatorio primario restano invariati;
-CAS e replay dopo operazioni interposte restano residui C05.
+aggiuntivo sui no-op correnti. Il precheck della mappa versioni precede tutti gli effetti; ogni membership mutata incrementa versione/updatedAt e registra resourceVersion. Il primario resta invariato. Repair e clear invalidano le versioni precedenti; restore e ricreazione della stessa identità restano residui distinti.
 
 Il trasferimento `move` applica gli stessi limiti JSON e conserva il CAS
 esistente. Le [prove SQLite del trasferimento](../lib/patient-move-required-audit.test.ts)
@@ -118,12 +118,14 @@ coprono il rollback di dati, currentness ed eventi al guasto audit; un insert
 ignorato non può produrre un audit orfano. Metadata/content Web aggiungono una transazione esterna con audit obbligatorio attorno al savepoint currentness esistente. Le prove [metadata](../lib/attachment-metadata-currentness.test.ts) e [content](../lib/attachment-web-put-currentness.test.ts) verificano il rollback di entrambe le parti; l’upload paired
 ha le proprie prove SQLite e conserva la propria autorità.
 
+Metadata e delete Web verificano patientId e currentness osservata nella stessa transazione dell’audit. La UI conserva la precondizione durante la conferma, la facade non la aggiorna automaticamente e il seeder segnala eliminazione incompleta se un allegato viene respinto. Le [prove client](../lib/attachment-client-preconditions.test.ts) collegano la snapshot al payload; il [contratto Web](./adr/0099-ocr-document-locator-and-source-currentness.md) distingue queste letture dalla proiezione paired.
+
 ## Residui della migrazione C05
 
 Le operazioni classificate sopra come audit obbligatorio sono state migrate
 alla transazione che possiede la scrittura. Restano i writer senza audit e le
 garanzie di input, versione e replay assegnati nel [roster C05](./clinical-write-roster.md),
-in particolare CAS/replay client metadata/delete e caller indiretti degli allegati Web. La classificazione delle
+in particolare caller indiretti degli allegati Web e ripristino. La classificazione delle
 chiamate audit non dimostra da sola la copertura di tutti i writer indiretti.
 
 La riparazione orfani ora traccia anche default e relink, oltre al purge

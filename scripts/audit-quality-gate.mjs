@@ -827,7 +827,7 @@ export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource,
     }
     const txName = callback.parameters[0].name.text;
     const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
-    const expectedAudits = spec.operation === 'clear' ? 2 : 1;
+    const expectedAudits = spec.operation === 'clear' ? 3 : 1;
     if (auditCalls.length !== expectedAudits || auditCalls.some((call) =>
         call.arguments.length !== 2 || !ts.isIdentifier(unwrap(call.arguments[0]))
         || unwrap(call.arguments[0]).text !== txName
@@ -862,8 +862,15 @@ export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource,
             || !ownerText.includes('clearTestContainerByMembership(tx, ambulatoryId)')
             || !ownerText.includes('for (const patient of result.clearedPatients)'))
             problems.push('clear must audit each tombstoned patient before the ambulatory event');
+        const unlinkedAudit = auditCalls.find((call) => call.getText(core.sourceFile).includes("'patient.updated'"));
+        if (!unlinkedAudit || unlinkedAudit.pos > mainEvent?.pos
+            || !ts.isExpressionStatement(unlinkedAudit.parent)
+            || !ownerText.includes('for (const patient of result.unlinkedPatients)')
+            || !unlinkedAudit.getText(core.sourceFile).includes('resourceVersion: patient.version'))
+            problems.push('clear must audit each unlinked patient with its committed version');
         const clear = clearSource ?? '';
-        if (!/tombstone\.changes\s*!==\s*1/u.test(clear)
+        if (!/updated\.changes\s*!==\s*1/u.test(clear)
+            || !/tombstone\.changes\s*!==\s*1/u.test(clear)
             || !/removedMembershipRows\s*!==\s*memberIds\.length/u.test(clear))
             problems.push('clear helper must guard every patient and membership DML');
     } else {
