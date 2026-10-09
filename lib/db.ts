@@ -642,7 +642,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             throw new Error(`Failed to clear table: ${res.status} ${res.statusText}`);
         }
 
-        const items = await this.toArray();
+        const items = await this.toArray({ rejectAuthUnavailable: true });
         const ids = items
             .map((item) => this.getItemIdentifier(item))
             .filter((value): value is string => Boolean(value));
@@ -651,7 +651,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
         }
 
-        await Promise.all(items.map((item) => {
+        const results = await Promise.allSettled(items.map(async (item) => {
             const id = this.getItemIdentifier(item);
             if (!id) {
                 throw new Error(`Failed to clear table ${this.tableName}: some records do not expose a supported identifier`);
@@ -662,7 +662,12 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             return this.delete(id, { suppressNotify: true, version,
                 ...(this.tableName === 'attachments' ? { attachmentPrecondition: captureAttachmentWritePrecondition(item as Attachment) } : {}) });
         }));
-        if (ids.length > 0) this.emitChange();
+        const confirmed = results.filter(result => result.status === 'fulfilled').length;
+        if (confirmed > 0) this.emitChange();
+        const failure = results.find(result => result.status === 'rejected');
+        if (failure?.status === 'rejected') {
+            throw new Error(`Clear incomplete for ${this.tableName}: ${confirmed}/${items.length} deletions confirmed; reload before retrying`, { cause: failure.reason });
+        }
     }
 
     /* @Codex */
