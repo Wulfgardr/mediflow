@@ -82,7 +82,9 @@ jobs:
           $env:MEDIFLOW_DATA_DIR = $fixture
           $env:MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1'
           try {
-            node scripts/run-strip-types.mjs --test lib/sqlite-durability.test.ts lib/sqlite-maintenance-admission.test.ts lib/sqlite-swap-recovery.test.ts lib/sqlite-repair.test.ts lib/backup-total-roundtrip.test.ts lib/scheduled-backup-runtime-contract.test.ts
+            # Each file owns multi-process drain/crash tests and synchronous volume flushes.
+            # Serialize files on the shared runner; concurrency inside those tests stays intact.
+            node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/sqlite-durability.test.ts lib/sqlite-maintenance-admission.test.ts lib/sqlite-swap-recovery.test.ts lib/sqlite-repair.test.ts lib/backup-total-roundtrip.test.ts lib/scheduled-backup-runtime-contract.test.ts
             if ($LASTEXITCODE -ne 0) { throw 'Windows SQLite durability and recovery tests failed' }
           } finally {
             Remove-Item -LiteralPath $fixture -Recurse -Force
