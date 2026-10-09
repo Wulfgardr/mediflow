@@ -21,7 +21,9 @@ import { decryptData, encryptData, generateMasterKey } from './security/security
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')).href;
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
-const NON_BACKUP_TABLES = new Set(['settings', 'users']);
+// WUL-730 / C15: duplicate intents are an operational local ledger, not exported.
+// Same-DB restore retains tokens; export/restore into a new DB loses historical tokens.
+const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents']);
 /* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
 const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations']);
 /* @Codex Command replay remains empty until append-only audit restore has a separate contract. */
@@ -920,4 +922,24 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
     } finally {
         fs.rmSync(workDir, { recursive: true, force: true });
     }
+});
+
+
+test('duplicate intent ledger is present and explicitly classified as local-only', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-duplicate-classification-'));
+    try {
+        bootstrapSchemaGuards(dir);
+        const db = new Database(path.join(dir, 'medical.db'));
+        try {
+            assert.deepEqual(schemaTables(db), [
+                ...NON_BACKUP_TABLES, ...LOCAL_ONLY_AUTHORITY_TABLES,
+                ...Object.values(BACKUP_TABLES), MEMBERSHIP_TABLE,
+            ].sort(), 'every actual table remains classified');
+            db.prepare('INSERT INTO patient_duplicate_intents(id) VALUES(?)').run('11cf2a9a-5448-44f2-81b1-4101267477ca');
+            assert.deepEqual(db.prepare('SELECT id FROM patient_duplicate_intents').all(), [{ id: '11cf2a9a-5448-44f2-81b1-4101267477ca' }]);
+            assert.equal(NON_BACKUP_TABLES.has('patient_duplicate_intents'), true);
+            assert.equal(new Set<string>(Object.values(BACKUP_TABLES)).has('patient_duplicate_intents'), false);
+            assert.deepEqual([...Object.keys(BACKUP_TABLES)].sort(), [...BACKUP_COLLECTIONS].sort());
+        } finally { db.close(); }
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

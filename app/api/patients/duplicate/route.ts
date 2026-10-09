@@ -1,5 +1,5 @@
 import { dbServer } from '@/lib/db-server';
-import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
+import { ambulatories, patients, patientsToAmbulatories, patientDuplicateIntents } from '@/lib/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,6 +13,7 @@ import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
 import { activePatients } from '@/lib/patient-lifecycle';
+import { buildPatientVersionConflictPayload } from '@/lib/patient-concurrency';
 
 const DUPLICATE_JSON_MAX_BYTES = 262_144;
 
@@ -27,12 +28,16 @@ export async function POST(request: Request) {
         if (!body.ok) return NextResponse.json({ error: body.status === 413 ? 'JSON payload too large' : 'Invalid JSON body' }, { status: body.status });
         const parsedBody = parseApiBody(patientDuplicateSchema, body.value);
         if (!parsedBody.ok) return parsedBody.response;
-        const { patientIds, targetAmbulatoryId } = parsedBody.data;
+        const { patientIds, patientVersions, sourceAmbulatoryId, targetAmbulatoryId, duplicateIntentId } = parsedBody.data;
 
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         // Resolve scope and clone the whole batch on the same authoritative snapshot.
         const result = dbServer.transaction((tx) => {
+            if (tx.select({ id: patientDuplicateIntents.id }).from(patientDuplicateIntents)
+                .where(eq(patientDuplicateIntents.id, duplicateIntentId)).get()) {
+                return { status: 409, value: { error: 'Duplicate intent already consumed' } };
+            }
             const target = tx.select({ id: ambulatories.id }).from(ambulatories)
                 .where(eq(ambulatories.id, targetAmbulatoryId)).get();
             if (!target) return { status: 404, value: { error: 'Target ambulatory not found' } };
@@ -44,6 +49,23 @@ export async function POST(request: Request) {
             if (missingPatientIds.length > 0) return {
                 status: 404, value: { error: 'Some patients were not found', missingPatientIds },
             };
+
+            const source = tx.select({ id: ambulatories.id }).from(ambulatories)
+                .where(eq(ambulatories.id, sourceAmbulatoryId)).get();
+            const memberships = tx.select({ patientId: patientsToAmbulatories.patientId }).from(patientsToAmbulatories)
+                .where(and(eq(patientsToAmbulatories.ambulatoryId, sourceAmbulatoryId),
+                    inArray(patientsToAmbulatories.patientId, patientIds))).all();
+            if (!source || new Set(memberships.map((row) => row.patientId)).size !== patientIds.length) {
+                return { status: 404, value: { error: 'Patients not found in source ambulatory' } };
+            }
+            for (const patient of originals) {
+                const expectedVersion = patientVersions[patient.id];
+                if (patient.version !== expectedVersion) return {
+                    status: 409, value: buildPatientVersionConflictPayload(expectedVersion, patient.id, patient),
+                };
+            }
+            const consumed = tx.insert(patientDuplicateIntents).values({ id: duplicateIntentId }).run();
+            if (consumed.changes !== 1) throw new Error('Duplicate intent did not insert exactly one row');
 
             let cloned = 0;
             for (const p of originals) {
