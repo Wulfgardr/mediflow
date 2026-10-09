@@ -192,6 +192,23 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
             return method === 'POST' ? collection.POST(request)
                 : item[method](request, { params: Promise.resolve({ id: 'c05-patient' }) });
         };
+        if (method === 'POST') test(`${name} create identity adapter preserves opaque IDs and generates only for omission`, async () => {
+            reset();
+            const body = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-IDENTITY' };
+            const invokeBody = (value: Record<string, unknown>) => invoke(new Request('http://localhost/api/patients', { method, body: JSON.stringify(value) }));
+            const before = fullSnapshot();
+            assert.equal((await invokeBody({ ...body, id: 42 })).status, 400);
+            assert.deepEqual(fullSnapshot(), before);
+            const id = ' opaque patient / 42 ';
+            const created = await invokeBody({ ...body, id });
+            assert.equal(created.status, 201);
+            assert.equal((await created.json()).id, id);
+            const omitted = await invokeBody(body);
+            assert.equal(omitted.status, 201);
+            const generated = (await omitted.json()).id;
+            assert.match(generated, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+            assert(sql.prepare('SELECT id FROM patients WHERE id=?').get(generated));
+        });
         test(`${name} ${method} admission precedes poisoned body access`, async () => {
             reset(); const before = fullSnapshot(); state[name === 'network' ? 'network' : name] = false;
             const request = new Request('http://localhost/api/patients', { method, body:'{}' });

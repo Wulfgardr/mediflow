@@ -1,8 +1,9 @@
+import { PatientCreateConflictError } from '@/lib/patient-create-service';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { patients, patientsToAmbulatories } from '@/lib/schema';
+import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, desc, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
@@ -76,10 +77,9 @@ export async function POST(request: Request) {
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
-        const newId = body.id || uuidv4();
 
         const normalized = normalizePatientCreateInput(body, {
-            id: typeof newId === 'string' ? newId : uuidv4(),
+            id: uuidv4,
             ambulatoryId: typeof body.ambulatoryId === 'string' ? body.ambulatoryId : null,
             allowArchivedOnCreate: true,
         });
@@ -93,6 +93,10 @@ export async function POST(request: Request) {
         const requestId = requestIdFromRequest(request);
 
         dbServer.transaction((tx) => {
+            // Destination admission precedes identity lookup; do not disclose collisions for an invalid parent.
+            if (normalized.values.ambulatoryId && !tx.select({ id: ambulatories.id }).from(ambulatories)
+                .where(eq(ambulatories.id, normalized.values.ambulatoryId)).get()) throw new Error('Invalid patient destination');
+            if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
             tx.insert(patients).values(normalized.values).run();
 
             if (normalized.values.ambulatoryId) {
@@ -117,6 +121,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
+        if (error instanceof PatientCreateConflictError) return NextResponse.json({ error: 'Patient create conflict' }, { status: 409 });
         console.error('API POST /api/v1/patients error:', error);
         return NextResponse.json({ error: 'Failed to create patient' }, { status: 500 });
     }
