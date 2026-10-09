@@ -147,7 +147,9 @@ test('descriptor-map prototype pollution denies unrelated keys and cannot overri
         const user = { id: 'synthetic-user-1', username: USERNAME, displayName: null, ambulatoryName: null, role: 'admin', passwordHash: 'synthetic-hash', encryptedMasterKey: 'synthetic-key', salt: 'synthetic-salt', failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null };
         const db = {
             select: () => ({ from: () => ({ where: () => ({ get: () => user }) }) }),
-            update: () => ({ set: () => ({ where: () => ({ run: () => ({ changes: 1 }) }) }) }),
+            update: () => ({ set: () => ({ where: () => ({
+                returning: () => ({ get: () => ({ id: user.id }) }),
+            }) }) }),
         } as unknown as HostCredentialVerifierDependencies['db'];
         const verified = await verifyHostCredentials({ username: USERNAME, pin: PIN }, { db, compare: async () => true, writeAuditEvent: async () => 'audit' });
         assert.equal(verified.kind, 'verified'); assert.equal(verified.account.username, USERNAME);
@@ -176,6 +178,83 @@ test('fifth failure locks exactly, while a stale window restarts at one', async 
         assert.equal(stale.kind, 'denied'); assert.equal(stale.failureClass, 'invalid_credentials');
         assert.equal(stale.status, 401); assert.equal(stale.body.failedLoginAttempts, 1);
     } finally { sqlite.close(); }
+});
+
+test('concurrent failed comparisons are counted once each and establish lockout at the threshold', async () => {
+    const { sqlite, db } = makeDatabase(); const now = new Date('2026-08-27T12:00:00.000Z');
+    try {
+        await seed(db);
+        const releases: Array<() => void> = [];
+        const compare = () => new Promise<boolean>((resolve) => {
+            releases.push(() => resolve(false));
+            if (releases.length === 5) {
+                for (const release of releases) release();
+            }
+        });
+        const attempts = await Promise.all(Array.from({ length: 5 }, () => verifyHostCredentials(
+            { username: USERNAME, pin: WRONG_PIN },
+            { db, now: () => now, compare, writeAuditEvent: async () => 'audit' },
+        )));
+
+        const stored = db.select().from(users).where(eq(users.username, USERNAME)).get();
+        assert.equal(stored?.failedLoginAttempts, 5);
+        assert.equal(stored?.lockedUntil?.getTime(), now.getTime() + (15 * 60 * 1000));
+        assert.equal(attempts.filter(
+            (attempt) => attempt.kind === 'denied' && attempt.status === 423,
+        ).length, 1);
+
+        let laterCompareCalls = 0;
+        const later = await verifyHostCredentials({ username: USERNAME, pin: PIN }, {
+            db,
+            now: () => now,
+            compare: async () => { laterCompareCalls += 1; return true; },
+            writeAuditEvent: async () => 'audit',
+        });
+        assert.equal(later.kind, 'denied');
+        assert.equal(later.failureClass, 'locked');
+        assert.equal(laterCompareCalls, 0);
+    } finally { sqlite.close(); }
+});
+
+test('a valid comparison already in flight cannot clear a lock established meanwhile', async () => {
+    const { sqlite, db } = makeDatabase(); const now = new Date('2026-08-27T12:00:00.000Z');
+    let releaseValid: (() => void) | undefined;
+    let signalValidStarted: (() => void) | undefined;
+    const validStarted = new Promise<void>((resolve) => { signalValidStarted = resolve; });
+    try {
+        await seed(db);
+        const validAttempt = verifyHostCredentials({ username: USERNAME, pin: PIN }, {
+            db,
+            now: () => now,
+            compare: () => new Promise<boolean>((resolve) => {
+                releaseValid = () => resolve(true);
+                signalValidStarted?.();
+            }),
+            writeAuditEvent: async () => 'audit',
+        });
+        await validStarted;
+
+        let fifth: Awaited<ReturnType<typeof verifyHostCredentials>> | undefined;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            fifth = await verifyHostCredentials({ username: USERNAME, pin: WRONG_PIN }, {
+                db, now: () => now, compare: async () => false, writeAuditEvent: async () => 'audit',
+            });
+        }
+        assert.equal(fifth?.kind, 'denied');
+        assert.equal(fifth?.failureClass, 'locked');
+
+        releaseValid?.();
+        const result = await validAttempt;
+        assert.equal(result.kind, 'denied');
+        assert.equal(result.failureClass, 'locked');
+        assert.equal(result.status, 423);
+        const stored = db.select().from(users).where(eq(users.username, USERNAME)).get();
+        assert.equal(stored?.failedLoginAttempts, 5);
+        assert.equal(stored?.lockedUntil?.getTime(), now.getTime() + (15 * 60 * 1000));
+    } finally {
+        releaseValid?.();
+        sqlite.close();
+    }
 });
 
 test('credential CAS denies hash changes before compare and before failure or reset updates', async () => {

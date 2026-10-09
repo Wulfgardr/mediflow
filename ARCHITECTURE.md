@@ -108,6 +108,38 @@ I valori protetti vengono salvati in questo formato:
 ENC:<iv_b64>:<cipher_b64>
 ```
 
+Lo swap di manutenzione conserva una snapshot SQLite autonoma dell'originale
+in `medical.db.swap-recovery` prima di rinominare il database. La snapshot
+include le pagine WAL tramite l'API di backup SQLite. Un journal locale lega
+target e digest delle due snapshot; dopo la riapertura e i controlli schema,
+il runtime sincronizza database/WAL e registra un commit persistente prima di
+restituire il controllo all'applicazione. Da quel punto un errore di pulizia
+non autorizza il ritorno all'originale: le scritture successive restano valide.
+
+All'avvio, l'assenza di residui produce `CLEAN`; un journal valido di un owner
+terminato consente `RECOVERED`, scegliendo l'originale prima del commit o il
+database corrente dopo il commit. Journal incompleti, target discordi, link,
+collisioni e residui legacy `.old-*`/`.repair-tmp*` senza provenienza verificata
+producono `HOLD` prima dell'apertura, della copia legacy e del bootstrap.
+L'operatore deve conservare l'intera directory, fermare gli accessi concorrenti
+e far verificare l'identità dell'archivio da recuperare; rinominare o cancellare
+residui solo per superare il blocco non è una procedura di recupero. Le build
+Next.js non ispezionano né recuperano l'archivio persistente.
+
+Questo protocollo riguarda lo swap locale e non è un backup completo della
+directory dati: export v1, custodia delle chiavi e ripristino dell'autorità
+restano contratti distinti. Il protocollo di ammissione descritto in
+[ADR 0142](docs/adr/0142-sqlite-maintenance-admission.md) registra lo scheduler
+prima dell'apertura SQLite e conserva il lease fino alla chiusura nativa.
+Un intent impedisce nuovi partecipanti e attende quelli già ammessi prima di
+eseguire la callback di manutenzione. Non prova il drain di operazioni Web
+asincrone o di tool non ancora integrati: il collegamento al repair online e al
+recovery di startup resta una tranche successiva, con requisito operativo HOLD.
+Non si cancellano marker in base a mtime o PID. Errori di sincronizzazione o file
+bloccati non vengono ignorati. Le prove con terminazione di processo e guasti
+iniettati non qualificano perdita di alimentazione, filesystem o installazioni
+Windows/Linux, e non attestano RPO zero.
+
 
 ### Confini di autenticazione
 

@@ -9,6 +9,7 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
     public let interpretation: String?
     public let content: String
     public let provenanceLabel: String?
+    public let interpretationVersion: String?
 
     public init(
         id: String,
@@ -17,7 +18,8 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
         scoreLabel: String?,
         interpretation: String?,
         content: String,
-        provenanceLabel: String? = nil
+        provenanceLabel: String? = nil,
+        interpretationVersion: String? = nil
     ) {
         self.id = id
         self.date = date
@@ -26,6 +28,7 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
         self.interpretation = interpretation
         self.content = content
         self.provenanceLabel = provenanceLabel
+        self.interpretationVersion = interpretationVersion
     }
 }
 
@@ -55,7 +58,8 @@ public enum ScaleHistoryPresentation {
             content: entry.content,
             provenanceLabel: ClinicalScales.tinettiHistoryNotice(
                 scaleId: metadata?.scaleId, title: title, instrument: metadata?.instrument
-            )
+            ) ?? metadata?.interpretationVersion.map { "Versione interpretazione: \($0)" },
+            interpretationVersion: metadata?.interpretationVersion
         )
     }
 
@@ -95,8 +99,9 @@ public enum ScaleHistoryPresentation {
         let score: Int?
         let interpretation: String?
         let instrument: ClinicalScaleInstrumentProvenance?
+        let interpretationVersion: String?
 
-        private enum CodingKeys: String, CodingKey { case title, scaleId, score, interpretation, instrument }
+        private enum CodingKeys: String, CodingKey { case title, scaleId, score, interpretation, instrument, interpretationVersion }
 
         init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -106,6 +111,9 @@ public enum ScaleHistoryPresentation {
             interpretation = try values.decodeIfPresent(String.self, forKey: .interpretation)
             // Bad provenance must not erase the other stored historical fields.
             instrument = try? values.decode(ClinicalScaleInstrumentProvenance.self, forKey: .instrument)
+            interpretationVersion = ClinicalScaleInterpretation.recordedVersion(
+                try? values.decode(String.self, forKey: .interpretationVersion)
+            )
         }
     }
 }
