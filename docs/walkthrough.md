@@ -276,6 +276,24 @@ GDPR esplicita resta un’azione amministrativa separata: `purge-patient` con
 dry-run e `restore-patient` per il ripristino. La purge agisce sul database
 live, non sui backup già esportati.
 
+### Recuperare un’eliminazione terapia nella web app
+
+Usare **Elimina** soltanto per un errore di inserimento; per interrompere una
+terapia scegliere **Sospendi** o **Concludi**. Se l’eliminazione viene rifiutata
+perché la terapia è cambiata, oppure la risposta non conferma l’esito, la vista
+conserva la motivazione e i dati precedenti. Non ripete automaticamente l’invio.
+
+**Rileggi terapia** verifica nuovamente la cartella nella sessione corrente.
+Solo una terapia ancora presente, leggibile e con versione valida permette
+il confronto e una nuova conferma. Una terapia assente non prova che il primo
+tentativo sia riuscito e non può essere eliminata di nuovo da quel recupero.
+
+**Annulla recupero e scarta la motivazione** chiude il recupero locale senza
+annullare un’eventuale eliminazione già registrata. Un altro tentativo sulla
+stessa terapia nella vista richiede comunque rilettura, confronto e una nuova
+motivazione. La motivazione conservata vive solo nella vista corrente: non
+è una bozza persistente e non sopravvive alla sua chiusura.
+
 ### Cifratura lato client (web)
 
 Il browser cifra prima della scrittura i campi previsti da `ENCRYPTED_FIELDS`
