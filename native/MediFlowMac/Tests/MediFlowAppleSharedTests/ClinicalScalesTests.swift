@@ -89,16 +89,21 @@ final class ClinicalScalesTests: XCTestCase {
     }
 
     func testMmseInterpretationThresholds() throws {
-        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 9), "Decadimento Grave (< 10)")
-        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 17), "Decadimento Moderato-Grave (10-17)")
-        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 23), "Decadimento Lieve-Moderato (18-23)")
-        XCTAssertEqual(try interpretation(ClinicalScales.mmse, at: 24), "Assenza di decadimento cognitivo (24-30)")
+        for total in [0, 9, 10, 17, 18, 23, 24, 30] {
+            let text = try interpretation(ClinicalScales.mmse, at: total)
+            XCTAssertTrue(text.contains("Screening cognitivo"))
+            XCTAssertTrue(text.contains("non conferma né esclude una demenza"))
+            XCTAssertFalse(text.contains("Assenza di decadimento"))
+        }
     }
 
     func testGdsInterpretationThresholds() throws {
-        XCTAssertEqual(try interpretation(ClinicalScales.gds, at: 5), "Normale (0-5)")
-        XCTAssertEqual(try interpretation(ClinicalScales.gds, at: 6), "Depressione Lieve (6-10)")
-        XCTAssertEqual(try interpretation(ClinicalScales.gds, at: 11), "Depressione Severa (11-15)")
+        for total in [0, 5, 6, 10, 11, 15] {
+            let text = try interpretation(ClinicalScales.gds, at: total)
+            XCTAssertTrue(text.contains("Screening dei sintomi depressivi"))
+            XCTAssertTrue(text.contains("non formula una diagnosi né stabilisce la gravità"))
+            XCTAssertFalse(text.contains("Depressione Severa"))
+        }
     }
 
     func testIadlInterpretationInterpolatesScore() throws {

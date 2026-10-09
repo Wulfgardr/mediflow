@@ -179,18 +179,42 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let model = await makeModel(source: source)
         await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
 
-        // @Codex: retain the less-than escaping regression using a complete, valid MMSE.
-        await model.submitScale(ClinicalScales.mmse, answers:
-            Dictionary(uniqueKeysWithValues: ClinicalScales.mmse.questions.map { ($0.id, 0) }))
+        // @Codex WUL-723: a new result persists the neutral wording and its version.
+        let answers = Dictionary(uniqueKeysWithValues: ClinicalScales.mmse.questions.map { ($0.id, 0) })
+        let interpretation = "Punteggio grezzo MMSE: 0/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Interpretazione clinica richiesta; nessuna correzione per età, scolarità o lingua applicata."
+        let version = "mediflow.mmse.screening-limits.v1"
+        await model.submitScale(ClinicalScales.mmse, answers: answers)
 
+        let createCount = await source.createEntryCalls
+        XCTAssertEqual(createCount, 1)
         let capturedPayload = await source.lastCreateEntryPayload
         let payload = try XCTUnwrap(capturedPayload)
+        XCTAssertTrue(payload.content.hasPrefix("ENC:"))
         let decrypted = try XCTUnwrap(CryptoService.decryptField(payload.content, masterKey: masterKey))
         let content = try XCTUnwrap(CryptoService.jsonDecodeString(decrypted))
         let stabilized = ClinicalRichText.render(document: ClinicalRichText.parse(html: content))
         XCTAssertEqual(content, stabilized)
-        XCTAssertTrue(content.contains("&lt; 10"))
-        XCTAssertFalse(content.contains("(< 10)"))
+        XCTAssertEqual(content, "Valutazione MMSE (Folstein) completata.\nPunteggio: 0\nInterpretazione: \(interpretation)\nVersione interpretazione: \(version)")
+
+        let sealedMetadata = try XCTUnwrap(payload.metadata)
+        XCTAssertTrue(sealedMetadata.hasPrefix("ENC:"))
+        let decryptedMetadata = try XCTUnwrap(CryptoService.decryptField(sealedMetadata, masterKey: masterKey))
+        let metadata = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(decryptedMetadata.utf8)) as? [String: Any])
+        XCTAssertEqual(metadata["scaleId"] as? String, "mmse")
+        XCTAssertEqual(metadata["score"] as? Int, 0)
+        XCTAssertEqual(metadata["answers"] as? [String: Int], answers)
+        XCTAssertEqual(metadata["interpretation"] as? String, interpretation)
+        XCTAssertEqual(metadata["interpretationVersion"] as? String, version)
+        XCTAssertNil(metadata["instrument"])
+    }
+
+    func testLegacyScaleContentEscapingRemainsFixedPoint() {
+        // Frozen synthetic legacy text: escaping must not depend on today's result policy.
+        let legacy = "Valutazione MMSE (Folstein) completata.\nPunteggio: 0\nInterpretazione: Decadimento Grave (< 10)"
+        let expected = "Valutazione MMSE (Folstein) completata.\nPunteggio: 0\nInterpretazione: Decadimento Grave (&lt; 10)"
+        let rendered = ClinicalRichText.render(document: ClinicalRichText.parse(html: legacy))
+        XCTAssertEqual(rendered, expected)
+        XCTAssertEqual(ClinicalRichText.render(document: ClinicalRichText.parse(html: rendered)), expected)
     }
 
     // @Codex MF085-003: exercises the real paired model -> createEntry writer, not just the validator.
