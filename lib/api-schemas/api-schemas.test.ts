@@ -156,8 +156,8 @@ test('patient bulk schemas normalize IDs and reject malformed payloads', async (
         patientVersions: { 'patient-1': 1, 'patient-2': 2 },
     });
     await expectValid(patientDuplicateSchema, {
-        patientIds: ['patient-1'],
-        targetAmbulatoryId: 'ambulatory-2',
+        patientIds: ['patient-1'], targetAmbulatoryId: 'ambulatory-2', sourceAmbulatoryId: 'ambulatory-1',
+        patientVersions: { 'patient-1': 4 }, duplicateIntentId: '11cf2a9a-5448-44f2-81b1-4101267477ca',
     });
     await expectValid(patientUnassignSchema, {
         patientIds: ['patient-1'],

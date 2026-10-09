@@ -4,6 +4,7 @@ export type ClipboardOperation = 'copy' | 'cut';
 export interface PatientClipboardState {
     patientIds: string[];
     patientVersions: Record<string, number>;
+    duplicateIntentId: string | null;
     operation: ClipboardOperation | null;
     sourceAmbulatoryId: string | null;
 }
@@ -31,8 +32,15 @@ export async function executePatientClipboardPaste(
     let endpoint: string;
     let body: Record<string, unknown>;
     if (isTestEnvironment) {
+        if (!clipboard.sourceAmbulatoryId || !clipboard.duplicateIntentId || !hasExactPatientVersions(clipboard)) return false;
         endpoint = '/api/patients/duplicate';
-        body = { patientIds: clipboard.patientIds, targetAmbulatoryId };
+        body = {
+            patientIds: clipboard.patientIds,
+            patientVersions: clipboard.patientVersions,
+            sourceAmbulatoryId: clipboard.sourceAmbulatoryId,
+            targetAmbulatoryId,
+            duplicateIntentId: clipboard.duplicateIntentId,
+        };
     } else if (clipboard.operation === 'copy') {
         if (!hasExactPatientVersions(clipboard)) return false;
         endpoint = '/api/patients/assign';
