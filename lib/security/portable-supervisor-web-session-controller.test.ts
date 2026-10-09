@@ -179,6 +179,40 @@ test('keeps an idle controller available across the initial patient selection', 
     assert.equal(current.acquisitions(), 1);
 });
 
+// @Codex: auth retirement must not dispose the never-bound login control plane.
+test('keeps login available across repeated lock and logout before capture acquisition', async () => {
+    const current = fixture();
+    for (const reason of ['application_lock', 'application_lock', 'logout', 'reselection'] as const) {
+        assert.equal(await current.controller.retire(reason), false);
+        assert.equal(current.checkupPort.attach(() => assert.fail('no authority before activation')), null);
+    }
+    assert.equal(current.acquisitions(), 0);
+    assert.equal(current.activations(), 0);
+    assert.equal(current.revocations(), 0);
+    assert.equal(current.disconnects(), 0);
+    assert.equal((await current.controller.activateCurrentSelection(INPUT)).state, 'active');
+    assert.equal(current.acquisitions(), 1);
+    assert.equal(await current.controller.retire('application_lock'), true);
+    await rejectsCode(current.controller.activateCurrentSelection(INPUT), 'session_terminal');
+    assert.equal(current.revocations(), 1);
+});
+
+// @Codex: explicit disposal remains terminal even before any capture exists.
+test('idle explicit close is terminal and a fresh controller is required to reopen', async () => {
+    const closed = fixture();
+    assert.equal(await closed.controller.retire('explicit'), false);
+    assert.equal(closed.disconnects(), 1);
+    for (const reason of ['application_lock', 'logout', 'explicit'] as const) {
+        assert.equal(await closed.controller.retire(reason), false);
+    }
+    assert.equal(closed.disconnects(), 1);
+    await rejectsCode(closed.controller.activateCurrentSelection(INPUT), 'session_terminal');
+    assert.equal(closed.acquisitions(), 0);
+    const reopened = fixture();
+    assert.equal(await reopened.controller.retire('application_lock'), false);
+    assert.equal((await reopened.controller.activateCurrentSelection(INPUT)).state, 'active');
+});
+
 test('fails closed when owner capture patient or epoch differs and revokes locally first', async () => {
     for (const drift of [
         { patientId: OTHER_PATIENT },
@@ -230,31 +264,34 @@ test('coalesces explicit retirement and orders local revocation before bridge IP
     assert.equal(current.revocations(), 1);
 });
 
-test('cuts retirement during owner acquisition and revokes a late owner only locally', async () => {
-    const current = fixture({ acquire: 'deferred' });
-    const activating = current.controller.activateCurrentSelection(INPUT);
-    const activationRejection = rejectsCode(activating, 'session_terminal');
-    const first = current.controller.retire('logout');
-    assert.equal(current.controller.retire('application_lock'), first);
-    const outcome = await Promise.race([
-        first,
-        new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
-    ]);
-    assert.equal(outcome, false);
-    const activationOutcome = await Promise.race([
-        activationRejection.then(() => 'rejected' as const),
-        new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
-    ]);
-    assert.equal(activationOutcome, 'rejected');
-    assert.equal(current.revocations(), 0);
-    assert.equal(current.disconnects(), 1);
-    current.acquisition.resolve();
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    assert.equal(current.activations(), 0);
-    assert.equal(current.events.includes('local:logout'), true);
-    assert.equal(current.revocations(), 0);
-    assert.equal(current.controller.retire('explicit'), first);
-});
+// @Codex: both auth terminals must cut an acquisition already in progress.
+for (const reason of ['logout', 'application_lock'] as const) {
+    test(`cuts ${reason} during owner acquisition and revokes a late owner only locally`, async () => {
+        const current = fixture({ acquire: 'deferred' });
+        const activating = current.controller.activateCurrentSelection(INPUT);
+        const activationRejection = rejectsCode(activating, 'session_terminal');
+        const first = current.controller.retire(reason);
+        assert.equal(current.controller.retire('application_lock'), first);
+        const outcome = await Promise.race([
+            first,
+            new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
+        ]);
+        assert.equal(outcome, false);
+        const activationOutcome = await Promise.race([
+            activationRejection.then(() => 'rejected' as const),
+            new Promise<'still_pending'>((resolve) => setImmediate(() => resolve('still_pending'))),
+        ]);
+        assert.equal(activationOutcome, 'rejected');
+        assert.equal(current.revocations(), 0);
+        assert.equal(current.disconnects(), 1);
+        current.acquisition.resolve();
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        assert.equal(current.activations(), 0);
+        assert.equal(current.events.includes(`local:${reason}`), true);
+        assert.equal(current.revocations(), 0);
+        assert.equal(current.controller.retire('explicit'), first);
+    });
+}
 
 test('propagates revoke timeout only after disconnect and never retries', async () => {
     const current = fixture({ revocation: 'deferred' });
@@ -267,6 +304,22 @@ test('propagates revoke timeout only after disconnect and never retries', async 
     assert.ok(current.events.indexOf('remote:explicit') < current.events.indexOf('transport:disconnect'));
     assert.equal(current.controller.retire('logout'), retiring);
     assert.equal(current.revocations(), 1);
+});
+
+// @Codex: an activation ACK cannot revive a controller locked after acquisition.
+test('lock during bridge activation rejects the late ACK and keeps dependent authority denied', async () => {
+    const current = fixture({ activation: 'deferred' });
+    const activating = current.controller.activateCurrentSelection(INPUT);
+    const denied = rejectsCode(activating, 'session_terminal');
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(current.activations(), 1);
+    assert.equal(await current.controller.retire('application_lock'), true);
+    current.activation.resolve(Object.freeze({ expiresAt: EXPIRES_AT - 1 }));
+    await denied;
+    assert.equal(current.checkupPort.attach(() => assert.fail('late ACK revived authority')), null);
+    assert.equal(current.revocations(), 1);
+    await rejectsCode(current.controller.activateCurrentSelection(INPUT), 'session_terminal');
+    assert.equal(current.acquisitions(), 1);
 });
 
 test('does not log or return sensitive bridge failure detail', async () => {
