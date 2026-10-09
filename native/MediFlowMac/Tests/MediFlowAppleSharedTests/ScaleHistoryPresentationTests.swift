@@ -3,6 +3,30 @@ import XCTest
 
 /* @Codex */
 final class ScaleHistoryPresentationTests: XCTestCase {
+    func testStoredScreeningTextAndVersionRemainIndependentOfCurrentPolicy() throws {
+        for (id, score, interpretation) in [("mmse", 24, "Assenza di decadimento cognitivo (24-30)"),
+                                           ("gds", 6, "Depressione Lieve (6-10)")] {
+            let raw = "{\"scaleId\":\"\(id)\",\"score\":\(score),\"interpretation\":\"\(interpretation)\"}"
+            let entry = makeEntry(type: "scale", title: id, content: "Storico originale", metadata: raw)
+            let item = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry))
+            XCTAssertEqual(item.interpretation, interpretation)
+            XCTAssertNil(item.interpretationVersion)
+            XCTAssertEqual(item.content, entry.content)
+            XCTAssertEqual(entry.metadata, raw)
+        }
+        let definition = ClinicalScales.gds
+        let submission = try ClinicalScales.prepareSubmission(definition: definition,
+            answers: ["g1": 1, "g2": 1, "g3": 1, "g4": 1, "g5": 1, "g6": 1, "g7": 0, "g8": 0,
+                      "g9": 0, "g10": 0, "g11": 0, "g12": 0, "g13": 0, "g14": 0, "g15": 0])
+        let entry = makeEntry(type: "scale", title: definition.title,
+            content: ClinicalScales.contentSummary(definition: definition, result: submission.result), metadata: submission.metadataJSON)
+        let item = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry))
+        XCTAssertEqual(item.interpretation, submission.result.interpretation)
+        XCTAssertEqual(item.interpretationVersion, "mediflow.gds15.screening-limits.v1")
+        XCTAssertEqual(item.provenanceLabel, "Versione interpretazione: mediflow.gds15.screening-limits.v1")
+        XCTAssertEqual(entry.metadata, submission.metadataJSON)
+    }
+
     func testRunnerMetadataBuildsHistoryItemWithNameAndScore() throws {
         let definition = ClinicalScales.adl
         let result = try definition.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])

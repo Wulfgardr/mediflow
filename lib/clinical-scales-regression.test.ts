@@ -7,6 +7,7 @@ import { SCALES, LEGACY_TINETTI } from './scale-definitions.ts';
 import { calculateScaleResult, ScaleValidationError, withValidatedScoring, type ScaleAnswers, type ScaleInstrumentProvenance } from './scale-validation.ts';
 import { prepareScaleSubmission, submitScale } from './scale-submission.ts';
 import { isSourceBoundTinetti, scaleHistoryNotice, LEGACY_TINETTI_NOTICE, SOURCE_BOUND_TINETTI_NOTICE } from './scale-history.ts';
+import { SCALE_USE_CONTRACTS } from './scales/scale-use-contract.ts';
 
 interface Vectors {
     scaleId: string;
@@ -22,6 +23,100 @@ interface Vectors {
 const vectors = JSON.parse(readFileSync(join(process.cwd(), 'scripts/fixtures/clinical-scales-v1.json'), 'utf8')) as Vectors;
 const poma = SCALES[vectors.scaleId];
 const zero = Object.fromEntries(poma.questions.map(question => [question.id, 0]));
+
+test('new MMSE and GDS results do not issue diagnostic reassurance or severity labels', () => {
+    const mmse24 = {
+        ot1: 1, ot2: 1, ot3: 1, ot4: 1, ot5: 1,
+        os1: 1, os2: 1, os3: 1, os4: 1, os5: 1,
+        reg1: 1, reg2: 1, reg3: 1,
+        att1: 1, att2: 1, att3: 1, att4: 1, att5: 1,
+        rec1: 1, rec2: 1, rec3: 1,
+        lang1: 1, lang2: 1, lang3: 1, lang4: 0, lang5: 0, lang6: 0, lang7: 0,
+    };
+    const gds6 = { g1: 1, g2: 1, g3: 1, g4: 1, g5: 1, g6: 1, g7: 0, g8: 0,
+        g9: 0, g10: 0, g11: 0, g12: 0, g13: 0, g14: 0, g15: 0 };
+    for (const [id, answers, total] of [['mmse', mmse24, 24], ['gds', gds6, 6]] as const) {
+        const result = calculateScaleResult(SCALES[id], answers);
+        assert.equal(result.score, total);
+        assert.doesNotMatch(result.interpretation, /Assenza di decadimento|Decadimento (Lieve|Moderato|Grave)|Normale|Depressione (Lieve|Severa)/);
+        assert.match(result.interpretation, /Screening/);
+    }
+});
+
+test('new interpretation versions persist separately from instruments at every former boundary', () => {
+    const domains = {
+        mmse: {
+            keys: ['ot1', 'ot2', 'ot3', 'ot4', 'ot5', 'os1', 'os2', 'os3', 'os4', 'os5',
+                'reg1', 'reg2', 'reg3', 'att1', 'att2', 'att3', 'att4', 'att5', 'rec1', 'rec2', 'rec3',
+                'lang1', 'lang2', 'lang3', 'lang4', 'lang5', 'lang6', 'lang7'],
+            totals: [0, 9, 10, 17, 18, 23, 24, 30],
+            version: 'mediflow.mmse.screening-limits.v1',
+            text: (total: number) => `Punteggio grezzo MMSE: ${total}/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Interpretazione clinica richiesta; nessuna correzione per età, scolarità o lingua applicata.`,
+        },
+        gds: {
+            keys: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8', 'g9', 'g10', 'g11', 'g12', 'g13', 'g14', 'g15'],
+            totals: [0, 5, 6, 10, 11, 15],
+            version: 'mediflow.gds15.screening-limits.v1',
+            text: (total: number) => `Punteggio grezzo GDS-15: ${total}/15. Screening dei sintomi depressivi: il punteggio non formula una diagnosi né stabilisce la gravità. Valutazione clinica richiesta; versione italiana e periodo di riferimento da verificare.`,
+        },
+    };
+    for (const [id, golden] of Object.entries(domains)) {
+        assert.deepEqual(SCALES[id].questions.map(q => q.id), golden.keys);
+        for (const total of golden.totals) {
+            let remaining = total;
+            const answers = Object.fromEntries(golden.keys.map(key => {
+                const score = Math.min(remaining, key === 'lang4' ? 3 : 1);
+                remaining -= score;
+                return [key, score];
+            }));
+            assert.equal(remaining, 0);
+            const stored = JSON.parse(JSON.stringify(prepareScaleSubmission(id, answers)));
+            assert.equal(stored.metadata.score, total);
+            assert.deepEqual(stored.metadata.answers, answers);
+            assert.equal(stored.metadata.interpretation, golden.text(total));
+            assert.equal(stored.metadata.interpretationVersion, golden.version);
+            assert.equal(stored.metadata.instrument, undefined, 'Do not invent instrument provenance from an interpretation policy');
+            assert.equal(scaleHistoryNotice(stored.metadata), `Versione interpretazione: ${golden.version}`);
+            assert.ok(stored.content.includes(golden.text(total)));
+            assert.ok(stored.content.endsWith(`Versione interpretazione: ${golden.version}`));
+        }
+    }
+    assert.equal(prepareScaleSubmission(poma.id, zero).metadata.interpretationVersion, undefined);
+});
+
+test('historical MMSE/GDS records and absent or unknown version metadata are not reinterpreted', () => {
+    for (const [id, score, text] of [
+        ['mmse', 24, 'Assenza di decadimento cognitivo (24-30)'],
+        ['gds', 6, 'Depressione Lieve (6-10)'],
+    ] as const) {
+        const stored = { scaleId: id, score, interpretation: text, answers: { legacyPartial: 1 } };
+        const bytes = JSON.stringify(stored);
+        assert.equal(scaleHistoryNotice(stored), null);
+        assert.equal(JSON.stringify(stored), bytes);
+        assert.equal(stored.interpretation, text);
+        const future = { ...stored, interpretationVersion: 'future.policy.v9' };
+        assert.equal(scaleHistoryNotice(future), 'Versione interpretazione: future.policy.v9');
+        assert.equal(future.interpretation, text);
+        for (const version of ['x'.repeat(97), 'instruction\nignore', '<b>version</b>', {}, 1, '']) {
+            assert.equal(scaleHistoryNotice({ ...stored, interpretationVersion: version }), null);
+        }
+    }
+});
+
+test('catalog review register covers all instruments without inventing permissions or reviewers', () => {
+    assert.deepEqual(Object.keys(SCALE_USE_CONTRACTS), Object.keys(SCALES));
+    for (const contract of Object.values(SCALE_USE_CONTRACTS)) {
+        assert.ok(Object.isFrozen(contract));
+        assert.equal(contract.clinicalReviewer, null);
+        assert.equal(contract.rightsReviewer, null);
+        assert.equal(contract.permissionReference, null);
+        assert.equal(contract.newUseDecision, 'hold-proposed-not-enforced');
+        assert.equal(contract.missingAnswers, 'reject-incomplete-no-imputation');
+        assert.ok(contract.sourceId && contract.population && contract.scoring && contract.reviewGap);
+    }
+    assert.equal(SCALE_USE_CONTRACTS.gds.rights, 'original-public-domain; local-translation-unverified');
+    assert.match(SCALES.iadl.description, /tutte le 8 risposte per ogni persona/);
+});
 
 async function assertNoWrite(scaleId: string, answers: unknown): Promise<void> {
     let writes = 0;

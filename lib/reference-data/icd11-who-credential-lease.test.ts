@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import {
     createIcd11WhoCredentialLeaseManager,
     ICD11_WHO_SECRET_RESOLVE_TIMEOUT_MS,
@@ -29,6 +30,26 @@ function deferred<T>() {
         resolve = resolveValue; reject = rejectValue;
     });
     return { promise, resolve, reject };
+}
+
+function resolvedSecret() {
+    return Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-who-resolved-secret.v1',
+        presentCredentials: (sink: { set(clientId: string, clientSecret: string): unknown }) => {
+            sink.set(CLIENT_ID, CLIENT_SECRET);
+        } });
+}
+
+function tokenResult(accessToken = ACCESS_TOKEN) {
+    return Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-who-token-result.v1',
+        tokenType: 'Bearer', accessToken, expiresInMs: 3_600_000 });
+}
+
+function observe(promise: Promise<unknown>) {
+    const outcome = { state: 'pending', error: undefined as unknown };
+    void promise.then(() => { outcome.state = 'resolved'; }, (error: unknown) => {
+        outcome.state = 'rejected'; outcome.error = error;
+    });
+    return outcome;
 }
 
 test('emette e consuma una lease token opaca senza esporre credenziali', async () => {
@@ -203,53 +224,169 @@ test('revoca un flight attivo e scarta il completamento tardivo', async () => {
     await manager.acquire();
 });
 
-test('applica timeout host-owned distinti a resolver e issuer', async () => {
-    const secretLate = deferred<Readonly<Record<string, unknown>>>();
+test('applica timeout host-owned distinti a resolver e issuer', async (context) => {
+    assert.equal(ICD11_WHO_SECRET_RESOLVE_TIMEOUT_MS, 1_000);
+    assert.equal(ICD11_WHO_TOKEN_ISSUE_TIMEOUT_MS, 5_000);
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    // Port deadlines use virtual timers; the injected clock governs only token/lease validity.
+    const secretLate = deferred<ReturnType<typeof resolvedSecret>>();
     let secretSignal: AbortSignal | null = null;
+    let secretIssueCalls = 0;
     const secretManager = createIcd11WhoCredentialLeaseManager({
         now: () => 1_000,
         resolveSecretReference: (request: { signal: AbortSignal }) => {
             secretSignal = request.signal; return secretLate.promise;
         },
-        issueToken: async () => { throw new Error('must not issue'); },
+        issueToken: async () => { secretIssueCalls += 1; return tokenResult(); },
     });
+    context.after(() => secretManager.dispose());
     configure(secretManager);
-    const secretStartedAt = Date.now();
-    await assert.rejects(secretManager.acquire(), (error: unknown) => (
-        error instanceof Icd11WhoCredentialLeaseError && error.code === 'secret_resolve_timeout'
-    ));
+    const secretOutcome = observe(secretManager.acquire());
+    // An event-loop turn drains Promise continuations and registers the port timer.
+    await nextTurn();
+    assert.ok(secretSignal);
+    context.mock.timers.tick(999);
+    await nextTurn();
+    assert.equal(secretOutcome.state, 'pending');
+    assert.equal((secretSignal as AbortSignal | null)?.aborted, false);
+    assert.equal(secretIssueCalls, 0);
+    context.mock.timers.tick(1);
+    await nextTurn();
+    assert.equal(secretOutcome.state, 'rejected');
+    assert.ok(secretOutcome.error instanceof Icd11WhoCredentialLeaseError);
+    assert.equal(secretOutcome.error.code, 'secret_resolve_timeout');
     assert.equal((secretSignal as AbortSignal | null)?.aborted, true);
-    assert.ok(Date.now() - secretStartedAt >= ICD11_WHO_SECRET_RESOLVE_TIMEOUT_MS);
-    secretLate.resolve(Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-who-resolved-secret.v1',
-        presentCredentials: () => undefined }));
+    secretLate.resolve(resolvedSecret());
+    await nextTurn();
+    assert.equal(secretIssueCalls, 0);
+    assert.equal(secretOutcome.state, 'rejected');
 
-    const tokenLate = deferred<Readonly<Record<string, unknown>>>();
-    const tokenStarted = deferred<void>();
-    let tokenSignal: AbortSignal | null = null;
+    const tokenLate = deferred<ReturnType<typeof tokenResult>>();
+    const tokenFresh = deferred<ReturnType<typeof tokenResult>>();
+    const tokenSignals: AbortSignal[] = [];
+    let resolveCalls = 0; let issueCalls = 0;
     const tokenManager = createIcd11WhoCredentialLeaseManager({
         now: () => 1_000,
-        resolveSecretReference: async () => Object.freeze({
-            schemaVersion: 'mediflow.reference-data.icd11-who-resolved-secret.v1',
-            presentCredentials: (sink: { set(clientId: string, clientSecret: string): unknown }) => {
-                sink.set(CLIENT_ID, CLIENT_SECRET);
-            },
-        }),
+        resolveSecretReference: async () => { resolveCalls += 1; return resolvedSecret(); },
         issueToken: (request: { signal: AbortSignal; presentCredentials: (sink: { set(clientId: string, clientSecret: string): unknown }) => void }) => {
-            tokenSignal = request.signal;
-            request.presentCredentials({ set() {} }); tokenStarted.resolve(); return tokenLate.promise;
+            issueCalls += 1; tokenSignals.push(request.signal);
+            request.presentCredentials({ set() {} });
+            return issueCalls === 1 ? tokenLate.promise : tokenFresh.promise;
         },
     });
+    context.after(() => tokenManager.dispose());
     configure(tokenManager);
-    const pendingToken = tokenManager.acquire();
-    await tokenStarted.promise;
-    const tokenStartedAt = Date.now();
-    await assert.rejects(pendingToken, (error: unknown) => (
-        error instanceof Icd11WhoCredentialLeaseError && error.code === 'token_issue_timeout'
+    const tokenOutcome = observe(tokenManager.acquire());
+    await nextTurn();
+    assert.deepEqual([resolveCalls, issueCalls], [1, 1]);
+    context.mock.timers.tick(4_999);
+    await nextTurn();
+    assert.equal(tokenOutcome.state, 'pending');
+    assert.equal(tokenSignals[0].aborted, false);
+    context.mock.timers.tick(1);
+    await nextTurn();
+    assert.equal(tokenOutcome.state, 'rejected');
+    assert.ok(tokenOutcome.error instanceof Icd11WhoCredentialLeaseError);
+    assert.equal(tokenOutcome.error.code, 'token_issue_timeout');
+    assert.equal(tokenSignals[0].aborted, true);
+
+    const fresh = tokenManager.acquire();
+    const freshOutcome = observe(fresh);
+    await nextTurn();
+    assert.deepEqual([resolveCalls, issueCalls], [2, 2]);
+    tokenLate.resolve(tokenResult(`${ACCESS_TOKEN}-late`));
+    await nextTurn();
+    assert.equal(tokenOutcome.state, 'rejected');
+    assert.equal(freshOutcome.state, 'pending');
+    assert.equal(tokenSignals[1].aborted, false);
+    const concurrent = tokenManager.acquire();
+    await nextTurn();
+    assert.deepEqual([resolveCalls, issueCalls], [2, 2]);
+    tokenFresh.resolve(tokenResult(`${ACCESS_TOKEN}-fresh`));
+    const freshLeases = await Promise.all([fresh, concurrent]);
+    freshLeases.push(await tokenManager.acquire());
+    for (const lease of freshLeases) {
+        await tokenManager.consume(lease, (inject) => {
+            inject({ set(name, value) { assert.equal(name, 'Authorization');
+                assert.equal(value, `Bearer ${ACCESS_TOKEN}-fresh`); } });
+        });
+    }
+    assert.deepEqual([resolveCalls, issueCalls], [2, 2]);
+});
+
+test('completa resolver e issuer prima dei rispettivi timeout e rimuove i timer', async (context) => {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    const secret = deferred<ReturnType<typeof resolvedSecret>>();
+    const token = deferred<ReturnType<typeof tokenResult>>();
+    const signals: AbortSignal[] = [];
+    let issueCalls = 0;
+    const manager = createIcd11WhoCredentialLeaseManager({
+        now: () => 1_000,
+        resolveSecretReference: (request: { signal: AbortSignal }) => {
+            signals.push(request.signal); return secret.promise;
+        },
+        issueToken: (request: { signal: AbortSignal; presentCredentials: CredentialPresenter }) => {
+            issueCalls += 1; signals.push(request.signal);
+            request.presentCredentials({ set() {} }); return token.promise;
+        },
+    });
+    context.after(() => manager.dispose());
+    configure(manager);
+    const pending = manager.acquire();
+    const outcome = observe(pending);
+    await nextTurn();
+    context.mock.timers.tick(999);
+    await nextTurn();
+    assert.equal(outcome.state, 'pending');
+    assert.equal(issueCalls, 0);
+    secret.resolve(resolvedSecret());
+    await nextTurn();
+    assert.equal(issueCalls, 1);
+    context.mock.timers.tick(4_999);
+    await nextTurn();
+    assert.equal(outcome.state, 'pending');
+    assert.equal(signals.every((signal) => !signal.aborted), true);
+    token.resolve(tokenResult());
+    await nextTurn();
+    assert.equal(outcome.state, 'resolved');
+    const lease = await pending;
+    context.mock.timers.tick(10_000);
+    await nextTurn();
+    assert.equal(signals.every((signal) => !signal.aborted), true);
+    await manager.consume(lease, (inject) => {
+        inject({ set(name, value) { assert.equal(name, 'Authorization');
+            assert.equal(value, `Bearer ${ACCESS_TOKEN}`); } });
+    });
+});
+
+test('ritira il presenter non usato anche al timeout issuer', async (context) => {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    const late = deferred<ReturnType<typeof tokenResult>>();
+    let presenter: CredentialPresenter | undefined;
+    let writes = 0;
+    const manager = createIcd11WhoCredentialLeaseManager({
+        now: () => 1_000, resolveSecretReference: async () => resolvedSecret(),
+        issueToken: (request: { presentCredentials: CredentialPresenter }) => {
+            presenter = request.presentCredentials; return late.promise;
+        },
+    });
+    context.after(() => manager.dispose());
+    configure(manager);
+    const outcome = observe(manager.acquire());
+    await nextTurn();
+    assert.ok(presenter);
+    context.mock.timers.tick(5_000);
+    await nextTurn();
+    assert.equal(outcome.state, 'rejected');
+    assert.ok(outcome.error instanceof Icd11WhoCredentialLeaseError);
+    assert.equal(outcome.error.code, 'token_issue_timeout');
+    assert.throws(() => presenter!({ set() { writes += 1; } }), (error: unknown) => (
+        error instanceof Icd11WhoCredentialLeaseError && error.code === 'token_unavailable'
     ));
-    assert.equal((tokenSignal as AbortSignal | null)?.aborted, true);
-    assert.ok(Date.now() - tokenStartedAt >= ICD11_WHO_TOKEN_ISSUE_TIMEOUT_MS);
-    tokenLate.resolve(Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-who-token-result.v1',
-        tokenType: 'Bearer', accessToken: ACCESS_TOKEN, expiresInMs: 3_600_000 }));
+    assert.equal(writes, 0);
+    late.resolve(tokenResult());
+    await nextTurn();
+    assert.equal(outcome.state, 'rejected');
 });
 
 test('nega Proxy, revoked Proxy, accessor e thenable senza leggerne dettagli', async () => {

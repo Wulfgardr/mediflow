@@ -90,6 +90,7 @@ for (const testFile of [
   'run-strip-types.test.mjs',
   'check-motion-budget.test.mjs',
   'node-runtime-contract.test.mjs',
+  'generate-runtime-payload-ledger.test.mjs',
   'chatgpt-account/account-service.test.ts',
   'chatgpt-account/account-browser.test.ts',
   'chatgpt-account/account-session-http.test.ts',

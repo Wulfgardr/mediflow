@@ -1,3 +1,4 @@
+import Combine
 import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
@@ -685,6 +686,46 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         }
         await model.lockSessionNow()
         await MainActor.run { XCTAssertNil(model.nativeOperatorConnection) }
+    }
+
+    /* @Codex */
+    func testActiveNativeSessionRetiresWhenAuthorityBindingChanges() async {
+        for binding in ["serverURL", "tlsPin", "pairedClientId", "pairedClientToken"] {
+            let source = LifecycleMockDataSource()
+            let model = await makeModel(source: source)
+            let patient = detail(id: "synthetic-patient", archived: false, version: 1)
+            await model.configurePairedOnlineForTests(
+                operatorId: "synthetic-operator",
+                masterKey: masterKey,
+                patients: [summary(id: "synthetic-patient", archived: false, version: 1)],
+                selectedPatient: patient
+            )
+            await MainActor.run {
+                model.password = String(repeating: "1", count: 4)
+                XCTAssertNotNil(model.nativeOperatorConnection, binding)
+                let invalidation = model.clinicalWorkspaceInvalidations.sink { _ in
+                    XCTAssertNil(model.nativeOperatorConnection, "Invalidation exposed retired authority: \(binding)")
+                }
+                defer { invalidation.cancel() }
+
+                switch binding {
+                case "serverURL": model.serverURL = "https://localhost:3444"
+                case "tlsPin": model.tlsPin = "sha256/synthetic-replacement"
+                case "pairedClientId": model.pairedClientId = "replacement-client"
+                default: model.pairedClientToken = "replacement-token"
+                }
+
+                XCTAssertNil(model.nativeOperatorConnection, binding)
+                XCTAssertNil(model.clinicalWorkspaceConnection, binding)
+                XCTAssertNil(model.operatorIdentity, binding)
+                XCTAssertNil(model.selectedPatient, binding)
+                XCTAssertTrue(model.patients.isEmpty, binding)
+                XCTAssertTrue(model.password.isEmpty, binding)
+                XCTAssertEqual(model.connectionState, .sessionExpired, binding)
+            }
+            let logoutCalls = await source.logoutCalls
+            XCTAssertEqual(logoutCalls, 0, "Authority changes retire locally without a network logout: \(binding)")
+        }
     }
 
     /* @Codex */
