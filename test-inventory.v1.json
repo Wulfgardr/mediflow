@@ -3974,6 +3974,15 @@
       }
     },
     {
+      "path": "lib/patient-duplicate-required-audit.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/patient-edit-session-schema.test.ts",
       "selection": {
         "state": "mapped",
