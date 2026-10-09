@@ -1,3 +1,4 @@
+import { readAmbulatoryJsonObject } from '@/lib/ambulatory-json-body';
 import { desc } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { createAmbulatory } from '@/lib/ambulatory-write';
@@ -20,8 +21,10 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     try {
+        const parsed = await readAmbulatoryJsonObject(request);
+        if (!parsed.ok) return parsed.response;
         /* @Codex: writer derives its required audit actor from this admitted session. */
-        const result = createAmbulatory({ request, session }, await request.json() as Record<string, unknown>);
+        const result = createAmbulatory({ request, session }, parsed.body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('API POST /ambulatories error:', error);
