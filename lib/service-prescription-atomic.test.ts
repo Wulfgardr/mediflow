@@ -247,3 +247,28 @@ test('host system actor and paired patient identity survive body spoofing', asyn
     const pairedEvent = snapshot(other).audit[0] as Record<string, unknown>;
     assert.equal(pairedEvent.actor_ref, pairedSession.userId); assert.equal(pairedEvent.source_surface, 'native');
 });
+
+
+test('duplicate service parent and item create IDs return conflict without effects', async () => {
+    for (const op of ['host-parent-create', 'paired-parent-create', 'host-item-create', 'paired-item-create'] as const) {
+        const ids = seed();
+        if (op.includes('item')) insertParent(ids);
+        assert.equal((await invoke(op, ids)).status, 201);
+        const before = snapshot(ids);
+        assert.deepEqual(await invoke(op, ids), { status: 409, value: { error: 'Prescription ID already exists' } });
+        assert.deepEqual(snapshot(ids), before);
+    }
+});
+test('service item ordinal defaults, omitted update and exact conversion survive SQLite', async () => {
+    const ids = seed(); insertParent(ids);
+    assert.equal((await invoke('host-item-create', ids)).status, 201);
+    assert.equal((snapshot(ids).item as Record<string, unknown>).ordinal, 0);
+    const host = { request, session, id: ids.itemId };
+    assert.equal((await writer.updateHostServicePrescriptionItem(host, { version: 1, ordinal: '02' })).status, 200);
+    assert.equal((snapshot(ids).item as Record<string, unknown>).ordinal, 2);
+    assert.equal((await writer.updateHostServicePrescriptionItem(host, { version: 2, notes: null })).status, 200);
+    assert.equal((snapshot(ids).item as Record<string, unknown>).ordinal, 2);
+    const before = snapshot(ids);
+    assert.equal((await writer.updateHostServicePrescriptionItem(host, { version: 3, ordinal: '2x' })).status, 400);
+    assert.deepEqual(snapshot(ids), before);
+});

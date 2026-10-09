@@ -265,6 +265,16 @@
       "change": "PUT /api/v1/network/patients/{id}/observations/{observationId} request.deletedAt changed",
       "trackingIssue": "WUL-720",
       "reason": "C05 observation contract alignment (ADR0015): represent the existing nonzero numeric date compatibility form within the JavaScript Date range, plus null/empty tombstone clear where applicable. Existing date-time string form remains valid; no new runtime date semantics. Structural schema changes are detected as breaking by the guard."
+    },
+    {
+      "change": "POST /api/v1/network/service-prescription-items request.ordinal changed",
+      "trackingIssue": "WUL-720",
+      "reason": "WUL-720 C05 prescription compatibility phase (ADR0010, spec 1.32.0): preserve current Web/Swift integer callers, zero and negative integers, and complete signed decimal integer strings within the safe-integer range. Reject fractions, partial strings and overflow previously truncated or accepted. This is a deliberate input restriction, not universal backwards compatibility; create omission remains 0 and update omission preserves the ordinal."
+    },
+    {
+      "change": "PUT /api/v1/network/service-prescription-items/{id} request.ordinal changed",
+      "trackingIssue": "WUL-720",
+      "reason": "WUL-720 C05 prescription compatibility phase (ADR0010, spec 1.32.0): preserve current Web/Swift integer callers, zero and negative integers, and complete signed decimal integer strings within the safe-integer range. Reject fractions, partial strings and overflow previously truncated or accepted. This is a deliberate input restriction, not universal backwards compatibility; create omission remains 0 and update omission preserves the ordinal."
     }
   ]
 }
