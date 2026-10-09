@@ -64,6 +64,41 @@ function seedAudit(db: Database.Database, row: typeof originalAudit): void {
         .run(...Object.values(row));
 }
 
+const commandReviewId = `review_${'a'.repeat(32)}`;
+const commandAudit: BackupAuditRow = {
+    ...originalAudit, eventId: `event_${'b'.repeat(32)}`, schemaVersion: 1,
+    eventType: 'ai.review.accepted', subjectType: 'ai_review', subjectRef: commandReviewId,
+    actorRef: `actor_${'c'.repeat(32)}`, requestId: null, redactedMetadata: null,
+};
+const commandStateInsert = 'INSERT INTO durable_review_command_states (review_id, review_state, revision, action, created_at) VALUES (?, ?, ?, ?, ?)';
+const commandStateValues = [commandReviewId, 'accepted', 2, 'accept', 1783000001];
+const commandOperationInsert = 'INSERT INTO durable_review_command_operations (id, review_id, idempotency_key, command_digest, result_snapshot, audit_event_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)';
+const commandOperationValues = [
+    'command-operation-synthetic', commandReviewId, 'idem_aaaaaaaaaaaaaaaa', 'a'.repeat(64),
+    JSON.stringify({ reviewId: commandReviewId, state: 'accepted', revision: 2, eventId: commandAudit.eventId }),
+    commandAudit.eventId, 1783000001,
+];
+
+const webBackupDatasetScript = [
+    "const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/system/backup-restore/route.ts','utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);",
+    "const functions = source.statements.filter(node => ts.isFunctionDeclaration(node) && ['sortBackupRows','filterRowsByReference','buildBackupDataset'].includes(node.name?.text)).map(node => node.getText(source)).join('\\n');",
+    "const schemaImport = source.statements.find(node => ts.isImportDeclaration(node) && node.moduleSpecifier.text === '@/lib/schema' && ts.isNamedImports(node.importClause?.namedBindings));",
+    "const names = schemaImport.importClause.namedBindings.elements.map(node => node.name.text);",
+    "const code = ts.transpileModule(functions, {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;",
+    "const buildWebBackupDataset = new Function('dbServer','tables','sql','snapshotBackupAudit','enrichBackupPatientsWithAmbulatoryLinks', 'const {' + names.join(',') + '} = tables; const backupSchema = tables; ' + code + '; return buildBackupDataset;')(dbServer,tables,sql,snapshotBackupAudit,enrichBackupPatientsWithAmbulatoryLinks);",
+].join('\n');
+
+const webBackupExportScript = [
+    "import fs from 'node:fs'; import ts from 'typescript'; import {sql} from 'drizzle-orm';",
+    "import {dbServer} from './lib/db-server.ts'; import * as tables from './lib/schema.ts';",
+    "import {snapshotBackupAudit} from './lib/backup-audit.ts';",
+    "import {enrichBackupPatientsWithAmbulatoryLinks} from './lib/backup-patient-ambulatory-links.ts';",
+    "import {serializeBackupArtifact} from './lib/backup-artifact.ts';",
+    webBackupDatasetScript,
+    "let artifact = null, error = null; try { artifact = JSON.parse(await serializeBackupArtifact(buildWebBackupDataset())); } catch (caught) { error = caught.message; }",
+    "console.log(JSON.stringify({artifact,error}));",
+].join('\n');
+
 function retainImage(db: Database.Database, label: string): Promise<void> {
     const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR;
     if (!evidence) return Promise.resolve();
@@ -284,7 +319,72 @@ test('scheduled snapshot restores original audits, preserves target history and 
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
 });
 
-test('manual and scheduled producers keep one SQLite snapshot across a concurrent clinical/audit commit', async () => {
+test('Web export rejects either durable command collection without changing source rows', async () => {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-web-command-export-'));
+    try {
+        for (const history of ['state', 'operation', 'both']) {
+            const dir = path.join(work, history); prepare(dir);
+            const db = new Database(path.join(dir, 'medical.db'));
+            try {
+                db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('command-amb','Synthetic command','synthetic')").run();
+                db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code,ambulatory_id,version) VALUES ('command-patient','Synthetic','Before','SYNTHETIC-COMMAND','command-amb',1)").run();
+                seedAudit(db, originalAudit);
+                seedAudit(db, commandAudit);
+                if (history !== 'operation') db.prepare(commandStateInsert).run(...commandStateValues);
+                if (history !== 'state') db.prepare(commandOperationInsert).run(...commandOperationValues);
+                const snapshot = () => db.transaction(() => Object.fromEntries(
+                    (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[])
+                        .map(({ name }) => [name, db.prepare('SELECT * FROM ' + JSON.stringify(name)).all()
+                            .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))]),
+                ))();
+                const before = snapshot();
+                const result = JSON.parse(evalNode(dir, webBackupExportScript));
+                assert.equal(result.artifact, null, history);
+                assert.match(result.error ?? '', /Durable review command state requires its append-only audit ledger\./, history);
+                assert.deepEqual(snapshot(), before, history);
+                assert.deepEqual(before.audit_events, db.prepare('SELECT * FROM audit_events ORDER BY event_id').all()
+                    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+                assert.equal((db.prepare("SELECT last_name FROM patients WHERE id='command-patient'").get() as { last_name: string }).last_name, 'Before');
+            } finally { db.close(); }
+        }
+    } finally { fs.rmSync(work, { recursive: true, force: true }); }
+});
+
+test('Web export rejects command history committed before the snapshot first read', () => {
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-web-command-first-read-'));
+    try {
+        prepare(work);
+        const db = new Database(path.join(work, 'medical.db'));
+        try {
+            db.prepare("INSERT INTO ambulatories (id,name,type) VALUES ('first-read-amb','Synthetic first read','synthetic')").run();
+            db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code,ambulatory_id,version) VALUES ('first-read-patient','Synthetic','Before','SYNTHETIC-FIRST-READ','first-read-amb',1)").run();
+            seedAudit(db, originalAudit);
+            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_states').get() as { n: number }).n, 0);
+            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_operations').get() as { n: number }).n, 0);
+            const script = [
+                "import path from 'node:path'; import Database from 'better-sqlite3';",
+                "const originalPrepare = Database.prototype.prepare; let fired = false;",
+                "Database.prototype.prepare = function(statement) { const prepared = originalPrepare.call(this, statement); if (!fired && /from\\s+[\"']?ambulatories[\"']?(?:\\s|$)/i.test(statement)) { fired = true; const other = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));",
+                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='first-read-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); other.prepare(process.env.SNAPSHOT_COMMAND_STATE_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_STATE_VALUES)); other.prepare(process.env.SNAPSHOT_COMMAND_OPERATION_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_OPERATION_VALUES)); })(); other.close(); } return prepared; };",
+                webBackupExportScript,
+            ].join('\n');
+            const result = JSON.parse(evalNode(work, script, {
+                SNAPSHOT_COMMAND_AUDIT_ROW: JSON.stringify(commandAudit),
+                SNAPSHOT_COMMAND_STATE_INSERT: commandStateInsert, SNAPSHOT_COMMAND_STATE_VALUES: JSON.stringify(commandStateValues),
+                SNAPSHOT_COMMAND_OPERATION_INSERT: commandOperationInsert, SNAPSHOT_COMMAND_OPERATION_VALUES: JSON.stringify(commandOperationValues),
+            }));
+            assert.equal(result.artifact, null);
+            assert.match(result.error ?? '', /Durable review command state requires its append-only audit ledger\./);
+            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_states').get() as { n: number }).n, 1);
+            assert.equal((db.prepare('SELECT COUNT(*) AS n FROM durable_review_command_operations').get() as { n: number }).n, 1);
+            assert.deepEqual(db.prepare('SELECT event_id FROM audit_events ORDER BY event_id').all(),
+                [commandAudit.eventId, originalAudit.eventId].sort().map(event_id => ({ event_id })));
+            assert.deepEqual(db.prepare("SELECT last_name, version FROM patients WHERE id='first-read-patient'").get(), { last_name: 'After', version: 2 });
+        } finally { db.close(); }
+    } finally { fs.rmSync(work, { recursive: true, force: true }); }
+});
+
+test('manual and scheduled producers keep one SQLite snapshot across a concurrent clinical/audit/command commit', async () => {
     const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-audit-snapshot-'));
     try {
         for (const producer of ['manual', 'scheduled']) {
@@ -305,29 +405,45 @@ test('manual and scheduled producers keep one SQLite snapshot across a concurren
                 "import {serializeBackupArtifact} from './lib/backup-artifact.ts';",
                 "const originalPrepare = Database.prototype.prepare; let fired = false;",
                 "Database.prototype.prepare = function(statement) { const prepared = originalPrepare.call(this, statement); if (!fired && /from\\s+[\"']?patients[\"']?(?:\\s|$)/i.test(statement)) { fired = true; const other = new Database(path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db'));",
-                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='snapshot-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_AUDIT_ROW))); })(); other.close(); } return prepared; };",
+                "other.transaction(() => { other.prepare(\"UPDATE patients SET last_name='After', version=2 WHERE id='snapshot-patient'\").run(); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_AUDIT_ROW))); other.prepare('INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(...Object.values(JSON.parse(process.env.SNAPSHOT_COMMAND_AUDIT_ROW))); other.prepare(process.env.SNAPSHOT_COMMAND_STATE_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_STATE_VALUES)); other.prepare(process.env.SNAPSHOT_COMMAND_OPERATION_INSERT).run(...JSON.parse(process.env.SNAPSHOT_COMMAND_OPERATION_VALUES)); })(); other.close(); } return prepared; };",
                 "if (process.env.SNAPSHOT_PRODUCER === 'scheduled') { process.argv[1] = path.resolve('scripts/run-scheduled-backup.mjs'); await import('./scripts/run-scheduled-backup.mjs'); } else {",
-                "const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/system/backup-restore/route.ts','utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);",
-                "const functions = source.statements.filter(node => ts.isFunctionDeclaration(node) && ['sortBackupRows','filterRowsByReference','buildBackupDataset'].includes(node.name?.text)).map(node => node.getText(source)).join('\\n');",
-                "const schemaImport = source.statements.find(node => ts.isImportDeclaration(node) && node.moduleSpecifier.text === '@/lib/schema' && ts.isNamedImports(node.importClause?.namedBindings));",
-                "const names = schemaImport.importClause.namedBindings.elements.map(node => node.name.text);",
-                "const code = ts.transpileModule(functions, {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;",
-                "const snapshot = new Function('dbServer','tables','sql','snapshotBackupAudit','enrichBackupPatientsWithAmbulatoryLinks', 'const {' + names.join(',') + '} = tables; const backupSchema = tables; ' + code + '; return buildBackupDataset();')(dbServer,tables,sql,snapshotBackupAudit,enrichBackupPatientsWithAmbulatoryLinks);",
-                "console.log(await serializeBackupArtifact(snapshot)); }",
+                webBackupDatasetScript,
+                "console.log(await serializeBackupArtifact(buildWebBackupDataset())); }",
             ].join('\n');
             const output = evalNode(dir, script, {
                 SNAPSHOT_PRODUCER: producer, SNAPSHOT_AUDIT_ROW: JSON.stringify(concurrentRow),
+                SNAPSHOT_COMMAND_AUDIT_ROW: JSON.stringify(commandAudit),
+                SNAPSHOT_COMMAND_STATE_INSERT: commandStateInsert, SNAPSHOT_COMMAND_STATE_VALUES: JSON.stringify(commandStateValues),
+                SNAPSHOT_COMMAND_OPERATION_INSERT: commandOperationInsert, SNAPSHOT_COMMAND_OPERATION_VALUES: JSON.stringify(commandOperationValues),
                 MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(dir, 'backups'),
             });
             const result = JSON.parse(output);
             const raw = producer === 'scheduled' ? JSON.parse(fs.readFileSync(result.artifactPath, 'utf8')) : result;
             const artifact = await parseBackupArtifact(raw);
             assert.equal(artifact.payload.patients[0].lastName, 'Before');
+            assert.equal(artifact.payload.patients[0].version, 1);
             assert.deepEqual(artifact.payload.auditEvents?.map(row => row.eventId), ['synthetic-before']);
+            assert.deepEqual(artifact.payload.durableReviewCommandStates, []);
+            assert.deepEqual(artifact.payload.durableReviewCommandOperations, []);
+            assert.equal(artifact.manifest.recordCounts.durableReviewCommandStates, 0);
+            assert.equal(artifact.manifest.recordCounts.durableReviewCommandOperations, 0);
             const observed = new Database(path.join(dir, 'medical.db'));
             try {
                 assert.equal((observed.prepare("SELECT last_name FROM patients WHERE id='snapshot-patient'").get() as { last_name: string }).last_name, 'After');
-                assert.equal((observed.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n, 2);
+                assert.equal((observed.prepare("SELECT version FROM patients WHERE id='snapshot-patient'").get() as { version: number }).version, 2);
+                assert.equal((observed.prepare('SELECT COUNT(*) AS n FROM audit_events').get() as { n: number }).n, 3);
+                const statesBefore = observed.prepare('SELECT * FROM durable_review_command_states').all();
+                const operationsBefore = observed.prepare('SELECT * FROM durable_review_command_operations').all();
+                const auditsBefore = observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all();
+                assert.equal(statesBefore.length, 1);
+                assert.equal(operationsBefore.length, 1);
+                const fresh = JSON.parse(evalNode(dir, webBackupExportScript));
+                assert.equal(fresh.artifact, null);
+                assert.match(fresh.error ?? '', /Durable review command state requires its append-only audit ledger\./);
+                assert.deepEqual(observed.prepare('SELECT * FROM durable_review_command_states').all(), statesBefore);
+                assert.deepEqual(observed.prepare('SELECT * FROM durable_review_command_operations').all(), operationsBefore);
+                assert.deepEqual(observed.prepare('SELECT * FROM audit_events ORDER BY event_id').all(), auditsBefore);
+                assert.equal((observed.prepare("SELECT last_name FROM patients WHERE id='snapshot-patient'").get() as { last_name: string }).last_name, 'After');
                 await retainImage(observed, producer + '-snapshot-current');
                 if (process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR) fs.writeFileSync(path.join(process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR, producer + '-snapshot.mediflow'), JSON.stringify(raw));
             } finally { observed.close(); }
