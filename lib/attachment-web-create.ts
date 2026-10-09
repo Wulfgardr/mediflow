@@ -58,7 +58,7 @@ export async function createWebAttachment(
             if (!patient) return 'missing';
             if (tx.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, id)).get()) return 'duplicate';
             const currentness = mintHostAttachmentCurrentness();
-            tx.insert(attachments).values({
+            const inserted = tx.insert(attachments).values({
                 id,
                 patientId: body.patientId,
                 name: body.name,
@@ -76,6 +76,7 @@ export async function createWebAttachment(
                 documentRevision: currentness.revision,
                 documentFreshnessEpoch: currentness.freshnessEpoch,
             }).run();
+            if (inserted.changes !== 1) throw new Error('Attachment insert did not affect exactly one row');
             writeAttachmentWebAudit(tx, request, session, 'attachment.created', id);
             return 'created';
         }, { behavior: 'immediate' });
