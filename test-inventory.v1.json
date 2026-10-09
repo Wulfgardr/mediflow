@@ -4073,6 +4073,15 @@
       }
     },
     {
+      "path": "lib/patient-purge-required-audit.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/patient-required-audit.test.ts",
       "selection": {
         "state": "mapped",
