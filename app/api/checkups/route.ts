@@ -107,14 +107,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Valid checkup date required' }, { status: 400 });
         }
 
-        // Allow client to generate ID or generate it here. 
-        // ApiTable shim might send an ID if it's "add" with specific ID, but usually it relies on return.
-        // However, if the client sends an ID, we should respect it or overwrite. 
-        // Let's see `entries` implementation: it generates new ID server side.
-        // But `ApiTable.add` might expect the ID back or might have generated one client side (Dexie style).
-        // If the body has an id, use it, otherwise generate one.
-
-        const newId = body.id || uuidv4();
+        const newId = body.id ?? uuidv4();
 
         const checkupValues = {
             id: newId,

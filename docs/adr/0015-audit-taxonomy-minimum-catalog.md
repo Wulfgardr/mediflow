@@ -785,6 +785,23 @@ La guardia strutturale verifica delega e ordine mutazione/audit, non sostituisce
 le prove comportamentali. Restano esclusi writer document-derived, direct-native
 e headless, schema database, CRUD generico, pubblicazione e accettazione clinica.
 
+### Identità create checkup (9 ottobre 2026)
+
+Questa correzione separata sostituisce la conservazione degli input ID e della
+risposta duplicati della tranche atomica precedente. Nei POST Web, v1 locale e
+paired, solo l'omissione dell'ID autorizza la generazione di un UUID. Un ID
+fornito deve essere stringa non vuota dopo trim; altrimenti la risposta è 400
+prima della scrittura, senza rigenerazione silenziosa. Gli ID opachi validi
+restano invariati, senza imporre formato UUID o una nuova normalizzazione.
+
+Il core verifica l'ID duplicato nella transazione IMMEDIATE, dopo padre attivo
+e scope paired: restituisce 409 senza dati del record esistente, nuova riga o
+nuovo audit. La precedente risposta 500 diventa quindi un conflitto esplicito;
+non viene introdotto replay idempotente. Padre non ammesso e scope errato
+conservano 404. Date, ENC, lifecycle, versioni e attribuzione audit non cambiano.
+OpenAPI 1.33.0 descrive la restrizione per la slice paired; il create v1 locale
+resta nella lista implementation-only con nota di contratto.
+
 ### Correzione separata dei tipi data (9 ottobre 2026)
 
 Il parser data condiviso accetta solo stringhe, numeri e istanze `Date`
