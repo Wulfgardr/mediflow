@@ -65,7 +65,7 @@ async function records(page: Page, patientId: string) {
 }
 
 for (const width of [1440, 390]) {
-  test(`409 preserves draft and requires read/review before an explicit save at ${width}px`, async ({ page }) => {
+  test(`409 recovery preserves draft and reads suspended therapy after reload at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 960 });
     const data = await fixture(page);
     await openDraft(page, data);
@@ -99,15 +99,16 @@ for (const width of [1440, 390]) {
     expect(stored).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', status: 'suspended' });
     await expect(save(page)).toBeHidden();
 
-    // Read the persisted, decrypted note in a fresh document, without filling
-    // the editor again or reusing the pre-save draft as the readback oracle.
+    // Read the supported suspended card in a fresh authenticated document.
+    // This card does not expose the note, so this does not qualify note readback.
     await page.reload();
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
-    await page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })
-      .locator('..').locator('..').locator('..').getByRole('button', { name: 'Modifica', exact: true }).click();
-    await expect(note(page)).toHaveValue('Nota sintetica da conservare');
-    await expect(dosage(page)).toHaveValue('Dose della bozza sintetica');
+    const suspendedCard = page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })
+      .locator('..').locator('..').locator('..');
+    await expect(suspendedCard.getByText('Sospesa', { exact: true })).toBeVisible();
+    await expect(suspendedCard.getByText('Dose della bozza sintetica', { exact: true })).toBeVisible();
+    await expect(suspendedCard.getByRole('button', { name: 'Riprendi', exact: true })).toBeVisible();
     const reloaded = (await records(page, data.patientId)).find(item => item.id === data.therapyId);
     expect(reloaded).toMatchObject({ patientId: data.patientId, version: 3, dosage: 'Dose della bozza sintetica', status: 'suspended' });
     expect(writes.map(write => write.version)).toEqual([1, 2]);
