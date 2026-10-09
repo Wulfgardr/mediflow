@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { WHO_CLOUD_REFERENCE } from './icd11-who-cloud-contract.ts';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
@@ -27,9 +28,9 @@ function fixture(environment: Readonly<Record<string, string | undefined>>, sear
         async search() {
             if (searchResult instanceof Error) throw searchResult;
             return searchResult ?? Object.freeze({
-                entries: Object.freeze([{ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11' }]),
-                receipt: Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1',
-                    operation: 'mediflow.reference_data.icd11.search.v1', releaseId: '2026-01', language: 'en',
+                entries: Object.freeze([{ code: 'BA00', description: 'Essential hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' }]),
+                receipt: Object.freeze({ ...WHO_CLOUD_REFERENCE, schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v3',
+                    operation: 'mediflow.reference_data.icd11.search.v3', releaseId: '2026-01', language: 'en',
                     source: 'live', resultCount: 1, latencyMs: 1, completedAt: '2027-01-15T08:00:00.000Z' }),
             });
         },
@@ -115,8 +116,8 @@ test('publishes available only after a successful search and unavailable after a
 test('forwards only the PHI-safe receipt to the audit port', () => {
     const current = fixture({});
     const audit = current.ports()?.audit as (receipt: unknown) => void;
-    const receipt = Object.freeze({ schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1',
-        operation: 'mediflow.reference_data.icd11.search.v1', releaseId: '2026-01', language: 'en', source: 'live',
+    const receipt = Object.freeze({ ...WHO_CLOUD_REFERENCE, schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v3',
+        operation: 'mediflow.reference_data.icd11.search.v3', releaseId: '2026-01', language: 'en', source: 'live',
         resultCount: 1, latencyMs: 2, completedAt: '2027-01-15T08:00:00.000Z' });
     audit(receipt);
     assert.deepEqual(current.audits, [receipt]);
