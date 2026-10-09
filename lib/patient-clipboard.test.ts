@@ -1,6 +1,7 @@
 /* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import {
     executePatientClipboardPaste,
     type PatientClipboardState,
@@ -118,7 +119,6 @@ test('copy rejects absent, partial or extra version maps before dispatch and ret
 });
 
 test('clipboard hook captures copy versions and passes the observed snapshot to live paste', async () => {
-    const { createRequire } = await import('node:module');
     const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
