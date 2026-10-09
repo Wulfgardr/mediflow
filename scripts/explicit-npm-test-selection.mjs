@@ -10,6 +10,16 @@ export const EXPLICIT_NPM_SUITES = Object.freeze([
   { script: 'test:lume-tokens', workflow: '.github/workflows/web-core.yml', job: 'web-core' },
 ].map(suite => Object.freeze({ ...suite, id: `npm:${suite.script}` })));
 
+export const GUARD_SELF_TEST_SUITES = Object.freeze([
+  { script: 'check:claims', file: 'scripts/check-claims-guard.mjs' },
+  { script: 'check:schema-writers', file: 'scripts/check-schema-writers.mjs' },
+  { script: 'check:ai-clinical-writes', file: 'scripts/check-ai-clinical-write-gate.mjs' },
+  { script: 'check:api-error-leak', file: 'scripts/check-api-error-leak.mjs' },
+  { script: 'check:openapi:drift', file: 'scripts/check-openapi-drift.mjs',
+    companionCall: 'check:openapi:drift -- --base-ref origin/main' },
+].map(suite => Object.freeze({ ...suite, id: `npm:${suite.script}:self-test`,
+  workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards', selfTest: true })));
+
 function regularFile(root, relative) {
   const file = path.join(root, relative);
   if (!fs.lstatSync(file).isFile()) throw new Error(`Not a regular file: ${relative}`);
@@ -54,16 +64,20 @@ function checkYamlTree(value, ancestors = new Set()) {
   for (const child of Object.values(value)) checkYamlTree(child, next);
 }
 
-function npmRunBlock(run, selfTestCall) {
+function npmRunBlock(run, selfTestCall, companionCall) {
   if (typeof run !== 'string') return null;
   const commands = [];
   for (const raw of run.split(/\r?\n/u)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    // Only the declared self-test invocation may carry arguments. Other lines
-    // retain the closed no-arguments grammar used by existing bindings.
+    // Argument-bearing calls must match a declared literal. The OpenAPI scan
+    // may accompany its self-test, but never satisfies the self-test binding.
     if (selfTestCall && line === `npm run ${selfTestCall}`) {
       commands.push(selfTestCall);
+      continue;
+    }
+    if (companionCall && line === `npm run ${companionCall}`) {
+      commands.push(companionCall);
       continue;
     }
     const match = /^npm run ([A-Za-z0-9_][A-Za-z0-9:_-]*)$/u.exec(line);
@@ -102,7 +116,7 @@ function ciBinding(root, suite) {
   const expectedCall = selfTestCall ?? suite.script;
   job.steps.forEach((step, index) => {
     if (!object(step)) return;
-    const commands = npmRunBlock(step.run, selfTestCall);
+    const commands = npmRunBlock(step.run, selfTestCall, suite.companionCall);
     for (const command of commands ?? []) if (command === expectedCall) matches.push({ step, index, commands });
   });
   if (matches.length !== 1) throw new Error(`Expected exactly one literal CI call: ${expectedCall}; found ${matches.length}`);
@@ -139,19 +153,24 @@ export function collectNpmScriptBinding(root, suite, expectedCommand) {
   return ciBinding(root, suite);
 }
 
-/** Model the Claims guard's declared self-test entrypoint without importing it. */
-export function collectClaimsSelfTestSelection(root) {
-  const file = 'scripts/check-claims-guard.mjs';
+/** Only stat the guard and inspect its npm/CI binding; never import its source. */
+function collectGuardSelfTestSelection(root, suite) {
   try {
-    regularFile(root, file);
-    const binding = collectNpmScriptBinding(root, {
-      script: 'check:claims', workflow: '.github/workflows/openapi-contract-guard.yml',
-      job: 'repository-guards', selfTest: true,
-    }, `node ${file}`);
-    return { files: [file], errors: [], binding };
+    regularFile(root, suite.file);
+    const binding = collectNpmScriptBinding(root, suite, `node ${suite.file}`);
+    return { files: [suite.file], errors: [], binding };
   } catch (error) {
     return { files: [], errors: [error.message], binding: null };
   }
+}
+
+export function collectClaimsSelfTestSelection(root) {
+  return collectGuardSelfTestSelection(root, GUARD_SELF_TEST_SUITES[0]);
+}
+
+export function collectGuardSelfTestSelections(root) {
+  return Object.fromEntries(GUARD_SELF_TEST_SUITES.map(suite =>
+    [suite.id, collectGuardSelfTestSelection(root, suite)]));
 }
 
 /** Required suites stay present with errors; invalid bindings never promote files. */
