@@ -230,3 +230,11 @@ test('service item ordinal accepts exact safe integers and decimal strings witho
     assert.equal((await expectValid(servicePrescriptionItemCreateSchema, { prescriptionId: 'synthetic-parent', serviceName: 'Synthetic' })).ordinal, undefined);
     assert.equal((await expectValid(servicePrescriptionItemUpdateSchema, { version: 1 })).ordinal, undefined);
 });
+
+
+test('checkup create IDs allow omission and preserve opaque strings but reject provided invalid IDs', async () => {
+    const body = { patientId: 'synthetic-patient', date: '2026-01-01T00:00:00Z', title: 'Synthetic checkup' };
+    assert.equal((await expectValid(checkupCreateSchema, body)).id, undefined);
+    assert.equal((await expectValid(checkupCreateSchema, { ...body, id: ' opaque-checkup ' })).id, ' opaque-checkup ');
+    for (const id of [null, 42, '', ' \t ']) await expectInvalid400(checkupCreateSchema, { ...body, id });
+});

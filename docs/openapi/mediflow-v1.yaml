@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.32.0
+  version: 1.33.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2903,6 +2903,12 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Checkup ID already exists. Returned only after current parent and scope admission, without existing-row details or a second write.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -6301,6 +6307,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Optional opaque ID preserved unchanged. Omit to generate a UUID; supplied non-string or blank IDs are invalid.
         date:
           type: string
           format: date-time
