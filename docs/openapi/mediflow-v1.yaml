@@ -1953,6 +1953,12 @@ paths:
           $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Create identity conflict after admission; no existing patient data is returned and no writes occur.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -7006,6 +7012,9 @@ components:
       properties:
         id:
           type: string
+          minLength: 1
+          pattern: '\S'
+          description: Omit to generate a UUID. Supplied IDs must be nonblank strings and are preserved exactly; an existing ID returns 409.
         firstName:
           type: string
         lastName:
