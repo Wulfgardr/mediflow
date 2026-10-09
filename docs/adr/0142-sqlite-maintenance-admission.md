@@ -91,13 +91,13 @@ base di un censimento incompleto. Non si presume approvata una nuova API,
 capability di autenticazione o rappresentazione delle credenziali.
 
 La distribuzione include esplicitamente la chiusura degli import del runner:
-otto sorgenti e diciotto file JavaScript/JSON delle dipendenze con SHA-256
+nove sorgenti e diciotto file JavaScript/JSON delle dipendenze con SHA-256
 fissati nel contratto `scripts/scheduled-backup-runtime-contract.mjs`, più il
 binario nativo SQLite. Le dipendenze sono `better-sqlite3`, `bindings` e
-`file-uri-to-path`. I 27 include letterali di Next sono confrontati nei test
+`file-uri-to-path`. I 28 include letterali di Next sono confrontati nei test
 con il roster canonico, senza aggiungere import alla superficie resolver
 protetta. Il contratto verifica il payload standalone e la copia `WebRuntime` del
-builder Mac, prima della rilocazione nativa. Gli otto sorgenti hanno regole
+builder Mac, prima della rilocazione nativa. I nove sorgenti hanno regole
 Git `eol=lf` esplicite, così la conversione CRLF del checkout non ne altera
 l'identità. Ogni modifica ai sorgenti fissati
 richiede un aggiornamento deliberato e revisionato dei relativi hash.
@@ -118,6 +118,40 @@ Il successo del drain dello
 scheduler non chiude da solo il requisito del repair esposto. L'accettazione
 operativa richiede un repair autorizzato completo, riavvio riuscito, verifica
 del nuovo archivio e successivo backup programmato riuscito.
+
+## Flush Windows su NTFS locale
+
+Su Windows Node 24 usa `FlushFileBuffers`, che richiede un handle con accesso
+in scrittura. I flush espliciti di file esistenti e directory usano quindi
+`r+`; POSIX conserva `r`. Non cambiano ordine delle scritture, journal, commit,
+rollback o propagazione degli errori di sincronizzazione.
+
+La garanzia della struttura di directory descritta da
+[MS-FSA 2.1.5.7](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/0de7dc40-9627-437e-a4df-c4696cdc3d02)
+è limitata a NTFS dalla [nota 80](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/4e3695bd-7574-4f24-a223-b4679c065b63).
+Un risultato positivo su altri filesystem non basta. Prima degli effetti,
+un controllo PowerShell fisso e di sola lettura ammette soltanto directory
+esistenti su un volume locale fisso NTFS, senza reparse point negli antenati.
+Il percorso è passato come dato, mai interpolato nel comando. UNC, device,
+filesystem ignoto, timeout o controllo non disponibile mantengono HOLD.
+Non si cambiano ACL, policy o configurazione del sistema.
+Dopo la validazione del normale percorso locale, il checker costruisce
+internamente il prefisso Windows esteso per non rimuovere spazi finali dai
+componenti: esistenza e attributi di ogni antenato devono riferirsi alla stessa
+directory vista da Node. Namespace forniti dal chiamante restano rifiutati.
+
+Il controllo precede la canonicalizzazione dell'ammissione e dello swap;
+include il parent del backup opzionale prima dello scambio. Si ripete alla
+chiusura del lease e al completamento del recupero, senza cache di processo.
+Non viene ripetuto a ogni polling del gate. Le directory private del protocollo
+restano soggette ai controlli di identità e link esistenti. Come le altre
+operazioni del protocollo, il controllo presuppone un sistema operativo fidato:
+non protegge da un amministratore che sostituisce volumi durante un'operazione.
+
+Fonti della mappatura: [libuv di Node 24.21](https://github.com/nodejs/node/blob/v24.21.0/deps/uv/src/win/fs.c)
+e [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers).
+La qualifica riguarda questi percorsi sul filesystem dichiarato; non aggiunge
+supporto a storage remoto né una promessa di RPO zero o perdita di alimentazione.
 
 ## Verifica
 

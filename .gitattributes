@@ -11,6 +11,7 @@ scripts/anydoc-pdf-renderer-profiles.json text eol=lf
 scripts/run-scheduled-backup.mjs text eol=lf
 scripts/scheduled-backup-date-fields.mjs text eol=lf
 lib/sqlite-maintenance-admission.mjs text eol=lf
+lib/sqlite-durability.mjs text eol=lf
 lib/backup-audit.ts text eol=lf
 lib/exemption-import-receipt.ts text eol=lf
 lib/exemption-import-contract.ts text eol=lf

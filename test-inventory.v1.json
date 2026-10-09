@@ -5787,6 +5787,15 @@
       }
     },
     {
+      "path": "lib/sqlite-durability.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/sqlite-maintenance-admission.test.ts",
       "selection": {
         "state": "mapped",

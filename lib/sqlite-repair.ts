@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'node:crypto';
+import { assertDurableDirectory } from './sqlite-durability.mjs';
 
 const SIDECAR_SUFFIXES = ['-wal', '-shm'] as const;
 
@@ -66,13 +67,14 @@ function digest(file: string): string {
 
 function syncFile(file: string): void {
     if (!regularFile(file)) throw new SqliteSwapRecoveryRequiredError();
-    const fd = fs.openSync(file, 'r');
+    // FlushFileBuffers needs write access even when no bytes are changed.
+    const fd = fs.openSync(file, process.platform === 'win32' ? 'r+' : 'r');
     try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
 }
 
 // Unsupported directory durability is an error, never silently downgraded.
 function syncDirectory(dir: string): void {
-    const fd = fs.openSync(dir, 'r');
+    const fd = fs.openSync(dir, process.platform === 'win32' ? 'r+' : 'r');
     try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
 }
 
@@ -210,6 +212,7 @@ export function recoverSqliteSwapArtifacts(file: string): SqliteSwapRecovery {
         const names = artifactNames(target);
         if (names.length === 0) return { status: 'CLEAN' };
         if (names.length !== 1 || names[0] !== path.basename(target) + RECOVERY_SUFFIX) return { status: 'HOLD' };
+        assertDurableDirectory(path.dirname(path.resolve(file)));
         const context = readContext(target);
         // A live/unknown owner might still be swapping. PID reuse is HOLD.
         try { process.kill(context.journal.pid, 0); return { status: 'HOLD' }; }
@@ -219,6 +222,7 @@ export function recoverSqliteSwapArtifacts(file: string): SqliteSwapRecovery {
             assertIntegrity(target);
         } else restoreOriginal(context);
         return { status: 'RECOVERED', complete: () => {
+            assertDurableDirectory(path.dirname(target));
             if (!commitExists(context)) commitSwap(context);
             cleanupCommitted(context);
         } };
@@ -315,6 +319,8 @@ export async function replaceSqliteDatabase(options: ReplaceSqliteDatabaseOption
     let reopening = false;
     let candidate: Database.Database | void = undefined;
     try {
+        assertDurableDirectory(path.dirname(path.resolve(destPath)));
+        if (backupPath) assertDurableDirectory(path.dirname(path.resolve(backupPath)));
         const target = canonicalTarget(destPath);
         if (artifactNames(target).length !== 0) throw new SqliteSwapRecoveryRequiredError();
         if (!regularFile(target) || path.resolve(sourcePath) === target) throw new SqliteSwapRecoveryRequiredError();
