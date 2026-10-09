@@ -11,8 +11,12 @@ import Database from 'better-sqlite3';
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-membership-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
+const authState = { role: 'admin', authChannel: 'web', authenticated: true };
+const authKey = Symbol.for(`membership-auth-${dataDir}`);
+(globalThis as unknown as Record<symbol, typeof authState>)[authKey] = authState;
 const authFile = join(dataDir, 'auth.cjs');
-writeFileSync(authFile, `exports.requireSession=async()=>({id:'synthetic-session',userId:'synthetic-member-user',role:'admin',authChannel:'web'});
+writeFileSync(authFile, `const state=globalThis[Symbol.for(${JSON.stringify(`membership-auth-${dataDir}`)})];
+exports.requireSession=async()=>state.authenticated?({id:'synthetic-session',userId:'synthetic-member-user',role:state.role,authChannel:state.authChannel}):null;
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
 exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`);
 const { registerHooks } = load('node:module') as {
@@ -35,6 +39,7 @@ let sequence = 0;
 let ids: string[];
 let requestId: string;
 function reset(operation: Operation) {
+    Object.assign(authState, { role: 'admin', authChannel: 'web', authenticated: true });
     sql.exec('DROP TRIGGER IF EXISTS membership_audit_fault');
     dbServer.delete(patientsToAmbulatories).run();
     dbServer.delete(patients).run();
@@ -70,8 +75,18 @@ function request(operation: Operation, body = JSON.stringify(payload(operation))
             'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed' }, body,
     }));
 }
+const migration = load('../app/api/system/migrate-m2m/route.ts') as typeof import('../app/api/system/migrate-m2m/route.ts');
+async function migrationSnapshot() {
+    const response = await migration.GET();
+    assert.equal(response.status, 200);
+    return (await response.json()).snapshot as { candidates: Array<{ patientId: string; patientVersion: number; primaryAmbulatoryId: string; ambulatoryVersion: number }> };
+}
+function migrate(body: unknown) {
+    return migration.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body: JSON.stringify(body) }));
+}
 test.after(() => {
     sql.close(); dbServer.$client.close(); hooks.deregister();
+    delete (globalThis as unknown as Record<symbol, typeof authState>)[authKey];
     rmSync(dataDir, { recursive: true, force: true });
 });
 for (const operation of ['assign', 'unassign'] as const) {
@@ -163,13 +178,15 @@ for (const repair of ['fix-orphans', 'migrate-m2m'] as const) {
         const route: { POST: (request: Request) => Promise<Response> } = repair === 'fix-orphans'
             ? load('../app/api/system/fix-orphans/route.ts')
             : load('../app/api/system/migrate-m2m/route.ts');
-        assert.equal((await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST' }))).status, 200);
+        assert.equal((await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST',
+            ...(repair === 'migrate-m2m' ? { body: JSON.stringify(await migrationSnapshot()) } : {}) }))).status, 200);
         const repaired = snapshot();
         assert.deepEqual(repaired.patients.map(p => p.version), [2, 2]);
         const events = repaired.events.slice(before.events.length);
         assert.equal(events.length, 2);
         assert.ok(events.every(e => JSON.parse(String(e.redacted_metadata)).resourceVersion === 2));
-        const repeated = await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST' }));
+        const repeated = await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST',
+            ...(repair === 'migrate-m2m' ? { body: JSON.stringify(await migrationSnapshot()) } : {}) }));
         assert.equal(repeated.status, 200);
         if (repair === 'migrate-m2m') assert.deepEqual(await repeated.json(), { success: true, migrated: 0, total: 2 });
         assert.deepEqual(snapshot(), repaired, 'empty repair has no effects');
@@ -201,7 +218,7 @@ test('migration: second required audit failure rolls back links, versions and ev
     sql.exec(`CREATE TRIGGER membership_audit_fault BEFORE INSERT ON audit_events
         WHEN NEW.subject_ref = '${ids[1]}' BEGIN SELECT RAISE(IGNORE); END`);
     const { POST } = load('../app/api/system/migrate-m2m/route.ts') as typeof import('../app/api/system/migrate-m2m/route.ts');
-    assert.equal((await POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST' }))).status, 500);
+    assert.equal((await POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body: JSON.stringify(await migrationSnapshot()) }))).status, 500);
     assert.deepEqual(snapshot(), before);
 });
 
@@ -228,5 +245,108 @@ test('shared patient: current no-op assign then clear rejects replay; clear audi
     assert.equal(events.length, 2);
     assert.ok(events.every(e => JSON.parse(String(e.redacted_metadata)).resourceVersion === 2));
     assert.equal((await request('assign')).status, 409);
+    assert.deepEqual(snapshot(), after);
+});
+
+
+test('migration snapshot rejects replay after interposed membership removal', async () => {
+    reset('assign');
+    sql.exec('DELETE FROM patients_to_ambulatories');
+    const body = JSON.stringify({ candidates: ids.map(patientId => ({ patientId, patientVersion: 1,
+        primaryAmbulatoryId: 'primary', ambulatoryVersion: 1 })) });
+    const route = load('../app/api/system/migrate-m2m/route.ts') as typeof import('../app/api/system/migrate-m2m/route.ts');
+    const execute = () => route.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body }));
+    assert.equal((await execute()).status, 200);
+    sql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=?').run(ids[0]);
+    const before = snapshot();
+    assert.equal((await execute()).status, 409);
+    assert.deepEqual(snapshot(), before);
+});
+
+
+test('migration preview binds the exact candidate set, versions and primary targets before effects', async () => {
+    for (const change of ['version', 'primary', 'target-version', 'new-patient', 'linked', 'missing-target', 'exhausted'] as const) {
+        reset('assign');
+        sql.exec('DELETE FROM patients_to_ambulatories');
+        const expected = await migrationSnapshot();
+        assert.equal(expected.candidates.length, 2);
+        if (change === 'version') sql.prepare('UPDATE patients SET version=2 WHERE id=?').run(ids[0]);
+        if (change === 'primary') sql.prepare("UPDATE patients SET ambulatory_id='target' WHERE id=?").run(ids[0]);
+        if (change === 'target-version') sql.exec("UPDATE ambulatories SET version=2 WHERE id='primary'");
+        if (change === 'new-patient') dbServer.insert(patients).values({ id: 'new-synthetic-candidate', firstName: 'Synthetic', lastName: 'Patient', taxCode: 'NEW', ambulatoryId: 'primary' }).run();
+        if (change === 'linked') dbServer.insert(patientsToAmbulatories).values({ patientId: ids[0], ambulatoryId: 'primary' }).run();
+        if (change === 'missing-target') {
+            sql.pragma('foreign_keys = OFF');
+            try { sql.prepare("UPDATE patients SET ambulatory_id='missing-target' WHERE id=?").run(ids[0]); }
+            finally { sql.pragma('foreign_keys = ON'); }
+        }
+        if (change === 'exhausted') sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, ids[0]);
+        const before = snapshot();
+        assert.equal((await migrate(expected)).status, 409, change);
+        assert.deepEqual(snapshot(), before, change);
+    }
+});
+test('migration rejects malformed snapshots and requires identical Web admin admission for preview and execute', async () => {
+    reset('assign');
+    sql.exec('DELETE FROM patients_to_ambulatories');
+    const expected = await migrationSnapshot();
+    const row = expected.candidates[0];
+    const before = snapshot();
+    for (const body of [null, [], {}, { candidates: null }, { candidates: [row, row] },
+        { candidates: [{ ...row, patientId: ' ' }] }, { candidates: [{ ...row, patientVersion: '1' }] },
+        { candidates: [{ ...row, ambulatoryVersion: Number.MAX_SAFE_INTEGER + 1 }] },
+        { ...expected, extra: true }, { candidates: [{ ...row, extra: true }] }]) {
+        assert.equal((await migrate(body)).status, 400);
+        assert.deepEqual(snapshot(), before);
+    }
+    for (const raw of ['', '{', ' '.repeat(65537)]) {
+        const result = await migration.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body: raw }));
+        assert.equal(result.status, raw.length > 65536 ? 413 : 400);
+        assert.deepEqual(snapshot(), before);
+    }
+    for (const candidate of [{ role: 'admin', authChannel: 'native', authenticated: true },
+        { role: 'admin', authChannel: 'system', authenticated: true },
+        { role: 'user', authChannel: 'web', authenticated: true },
+        { role: 'admin', authChannel: 'web', authenticated: false }]) {
+        Object.assign(authState, candidate);
+        assert.equal((await migration.GET()).status, candidate.authenticated ? 403 : 401);
+        assert.equal((await migrate(expected)).status, candidate.authenticated ? 403 : 401);
+        assert.deepEqual(snapshot(), before);
+    }
+    Object.assign(authState, { role: 'admin', authChannel: 'web', authenticated: true });
+});
+test('migration preview refuses a snapshot larger than the execution byte limit without truncation', async () => {
+    reset('assign');
+    sql.exec('DELETE FROM patients_to_ambulatories');
+    dbServer.insert(patients).values({ id: '界'.repeat(22000), firstName: 'Synthetic', lastName: 'Patient', taxCode: 'LARGE', ambulatoryId: 'primary' }).run();
+    const before = snapshot();
+    const response = await migration.GET();
+    assert.equal(response.status, 413);
+    const result = await response.json();
+    assert.match(result.error, /65536-byte/);
+    assert.equal(result.snapshot, undefined);
+    assert.deepEqual(snapshot(), before);
+});
+
+
+test('migration executes the complete preview including tombstones and the last safe increment; stale identity fails', async () => {
+    reset('assign');
+    sql.exec('DELETE FROM patients_to_ambulatories');
+    sql.prepare('UPDATE patients SET version=?, deleted_at=1 WHERE id=?').run(Number.MAX_SAFE_INTEGER - 1, ids[0]);
+    const expected = await migrationSnapshot();
+    const before = snapshot();
+    const wrong = { candidates: expected.candidates.map((row, i) => i ? row : { ...row, patientId: 'wrong-patient' }) };
+    assert.equal((await migrate(wrong)).status, 409);
+    assert.deepEqual(snapshot(), before);
+    assert.equal((await migrate({ candidates: [] })).status, 409);
+    assert.deepEqual(snapshot(), before);
+    const response = await migrate({ candidates: [...expected.candidates].reverse() });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { success: true, migrated: 2, total: 2 });
+    const after = snapshot();
+    assert.equal(after.patients.find(row => row.id === ids[0])?.version, Number.MAX_SAFE_INTEGER);
+    assert.equal(after.patients.find(row => row.id === ids[0])?.deleted_at, 1);
+    assert.equal(after.events.length, before.events.length + 2);
+    assert.equal((await migrate(expected)).status, 409);
     assert.deepEqual(snapshot(), after);
 });
