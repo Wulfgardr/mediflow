@@ -123,6 +123,27 @@ test('explicit manual force still creates a backup while automatic enablement is
     }
 });
 
+test('scheduled backups and a new destination are readable only by the owning account', { skip: process.platform === 'win32' }, () => {
+    withScheduledBackupFixture(({ destinationDir, setEnabled, run }) => {
+        setEnabled(true);
+        const first = run();
+        assert.equal(first.result.ok, true, first.result.message);
+        assert.equal(fs.statSync(destinationDir).mode & 0o777, 0o700);
+        assert.equal(fs.statSync(first.result.artifactPath!).mode & 0o777, 0o600);
+
+        // An artifact an earlier version left readable by everyone: the newest by date, so retention keeps it.
+        const earlier = path.join(destinationDir, 'mediflow-backup-v1-20260101-000000.mediflow');
+        fs.writeFileSync(earlier, '{}', { mode: 0o644 });
+        fs.chmodSync(earlier, 0o644);
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        fs.utimesSync(earlier, tomorrow, tomorrow);
+        const second = run(true);
+        assert.equal(second.result.ok, true, second.result.message);
+        assert.equal(fs.statSync(earlier).mode & 0o777, 0o600);
+        assert.equal(fs.statSync(second.result.artifactPath!).mode & 0o777, 0o600);
+    });
+});
+
 test('merges and sanitizes backup scheduler config', () => {
     const state = mergeBackupSchedulerConfig(getDefaultBackupSchedulerState(), {
         enabled: true,

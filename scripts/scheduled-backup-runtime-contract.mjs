@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 // Reviewed source identity, independent of the checkout used to run this gate.
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
-  ['scripts/run-scheduled-backup.mjs', 'd0446a62097d13a7c5ca1c6d0f3203d077e90997b4c920d47d2b554d5880c913'],
+  ['scripts/run-scheduled-backup.mjs', 'ff567378ae09ff5d73bbf8327193b1a18cf5e5237a68759c06d4ddf68a23d379'],
   ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
   ['lib/sqlite-maintenance-admission.mjs', 'd042bf1258a300bbd085593088c0051f51f975636eca33b29c9b11e9d3d3f556'],
   ['lib/sqlite-durability.mjs', '75dc15f8a383bf040d6a0b494a2889d136be248772f5ddca7cd29651d5a4a103'],
