@@ -28,7 +28,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
-const { POST } = load('../app/api/system/fix-orphans/route.ts') as typeof import('../app/api/system/fix-orphans/route.ts');
+const { GET, POST } = load('../app/api/system/fix-orphans/route.ts') as typeof import('../app/api/system/fix-orphans/route.ts');
 const { countOrphanedClinicalRows, totalPatientCascadeRows } = load('./patient-cascade.ts') as typeof import('./patient-cascade.ts');
 const { captureAttachmentExtractionLocatorGeneration, isCurrentAttachmentExtractionLocatorGeneration } =
     load('./domain/documents/attachment-extraction-locator-revocation.ts') as typeof import('./domain/documents/attachment-extraction-locator-revocation.ts');
@@ -63,11 +63,25 @@ function snapshot() {
         events: reopened.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
     }; } finally { reopened.close(); }
 }
-function request(body?: string) {
+function rawRequest(body?: string) {
     return POST(new Request('http://127.0.0.1/api/system/fix-orphans', {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-request-id': requestId,
             'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed' }, ...(body === undefined ? {} : { body }),
     }));
+}
+async function previewBody(purgeOrphanedClinicalRows = false) {
+    const response = await GET();
+    assert.equal(response.status, 200);
+    const preview = await response.json();
+    return JSON.stringify({ expectedSnapshot: preview.expectedSnapshot, purgeOrphanedClinicalRows });
+}
+async function request(body?: string) {
+    let parsed: unknown;
+    try { parsed = body === undefined ? {} : JSON.parse(body); } catch { return rawRequest(body); }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return rawRequest(body);
+    const preview = await GET();
+    if (preview.status !== 200) return rawRequest(body);
+    return rawRequest(JSON.stringify({ expectedSnapshot: (await preview.json()).expectedSnapshot, ...parsed }));
 }
 const purgeBody = JSON.stringify({ purgeOrphanedClinicalRows: true, actorRef: 'spoofed', notes: 'CLINICAL_SENTINEL' });
 test.after(() => {
@@ -141,7 +155,7 @@ test('repair: default, two relinks and explicit purge commit with minimal host e
     assert.deepEqual(snapshot(), after);
     assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration), true);
 });
-test('repair: absent body and false purge preserve orphan children; default or first target reused', async () => {
+test('repair: observed plan and false purge preserve orphan children; default or first target reused', async () => {
     for (const useDefault of [false, true]) {
         reset();
         dbServer.insert(ambulatories).values([{ id: 'first', name: 'First synthetic' },
@@ -163,8 +177,10 @@ test('repair: auth, malformed body, invalid flag and excessive bytes fail before
     const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
     try {
         admission.role = null;
+        assert.equal((await GET()).status, 401);
         assert.equal((await request('null')).status, 401);
         admission.role = 'doctor';
+        assert.equal((await GET()).status, 403);
         assert.equal((await request(purgeBody)).status, 403);
     } finally { admission.role = 'admin'; }
     for (const body of ['{', 'null', '[]', JSON.stringify({ purgeOrphanedClinicalRows: 'true' }),
@@ -175,4 +191,71 @@ test('repair: auth, malformed body, invalid flag and excessive bytes fail before
     assert.equal((await request(' '.repeat(65_537))).status, 413);
     assert.deepEqual(snapshot(), before);
     assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration), true);
+});
+
+test('repair: observed snapshot rejects interposed relink/unlink before every effect', async () => {
+    reset();
+    dbServer.insert(ambulatories).values({ id: 'stable-target', name: 'Synthetic', isDefault: true }).run();
+    const observed = await previewBody(false);
+    assert.equal((await rawRequest(observed)).status, 200);
+    // Another writer removes the repaired membership and advances the parent versions.
+    sql.exec('DELETE FROM patients_to_ambulatories; UPDATE patients SET version=version+1');
+    const before = snapshot();
+    const locator = captureAttachmentExtractionLocatorGeneration();
+    assert.equal((await rawRequest(observed)).status, 409);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locator), true);
+});
+
+test('repair: missing or malformed authority is 400 without effects', async () => {
+    reset();
+    const before = snapshot();
+    for (const body of [undefined, '{}', ...[null, 42, '', 'A'.repeat(64), 'f'.repeat(63)]
+        .map(expectedSnapshot => JSON.stringify({ expectedSnapshot }))]) {
+        assert.equal((await rawRequest(body)).status, 400);
+        assert.deepEqual(snapshot(), before);
+    }
+});
+test('repair: observed identities and target version fence equal-count changes', async () => {
+    for (const mutation of ['child', 'target', 'new-patient'] as const) {
+        reset();
+        dbServer.insert(ambulatories).values({ id: 'stable-target', name: 'Synthetic', isDefault: true }).run();
+        const observed = await previewBody(mutation !== 'child');
+        if (mutation === 'child') sql.exec("UPDATE entries SET id='replacement-orphan-entry'");
+        if (mutation === 'target') sql.exec('UPDATE ambulatories SET version=version+1');
+        if (mutation === 'new-patient') dbServer.insert(patients).values({ id: 'new-orphan', firstName: 'Ada', lastName: 'Synthetic', taxCode: 'new-orphan' }).run();
+        const before = snapshot();
+        const locator = captureAttachmentExtractionLocatorGeneration();
+        assert.equal((await rawRequest(observed)).status, 409);
+        assert.deepEqual(snapshot(), before);
+        assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locator), true);
+    }
+});
+test('repair: exhausted last candidate rejects the entire batch before default, links, purge or audit', async () => {
+    reset();
+    sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, ids[1]);
+    const observed = await previewBody(true);
+    const before = snapshot();
+    const locator = captureAttachmentExtractionLocatorGeneration();
+    assert.equal((await rawRequest(observed)).status, 409);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locator), true);
+});
+test('repair: preview is stable and stale immediate replay is rejected; refreshed no-op is inert', async () => {
+    reset();
+    const observed = await previewBody(true);
+    assert.equal(await previewBody(true), observed);
+    const preview = await (await GET()).json();
+    assert.match(preview.expectedSnapshot, /^[a-f0-9]{64}$/);
+    assert.equal(preview.orphanCount, 2, 'tombstone remains a candidate');
+    assert.equal(JSON.stringify(preview).includes('ENC:synthetic'), false);
+    assert.equal((await rawRequest(observed)).status, 200);
+    const before = snapshot();
+    const locator = captureAttachmentExtractionLocatorGeneration();
+    assert.equal((await rawRequest(observed)).status, 409);
+    const emptyPlan = await previewBody(true);
+    assert.equal((await rawRequest(emptyPlan)).status, 200);
+    assert.equal((await rawRequest(emptyPlan)).status, 200);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locator), true);
 });
