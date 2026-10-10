@@ -5,7 +5,6 @@ import {
     checkHasCanonicalHeadlessSoapEntryCommitSchema,
     checkHasCanonicalDurableReviewPatientLinkSchema,
     validateRecoveryAuditSchema,
-    initializeSqliteSchema,
 } from '@/lib/sqlite-schema';
 export { HeadlessSoapActiveRoleAttestationSchemaError, HeadlessSoapEntryCommitSchemaError } from '@/lib/sqlite-schema';
 export type { HeadlessSoapActiveRoleAttestationSchemaErrorCode, HeadlessSoapEntryCommitSchemaErrorCode } from '@/lib/sqlite-schema';
@@ -17,6 +16,7 @@ import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
 import { copySqliteDatabaseSync, recoverSqliteSwapArtifacts, replaceSqliteDatabase, SqliteSwapRecoveryRequiredError } from '@/lib/sqlite-repair';
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
+import { openVersionedSqliteDatabase } from '@/lib/sqlite-schema-open';
 
 // Import is inert; only an explicit open or use of the lazy client acquires SQLite.
 let sqlite: Database.Database;
@@ -66,10 +66,9 @@ export function openDbServer(): Database.Database {
 
         // WUL-268 (STREAM A): apply durable pragmas (WAL, busy_timeout, synchronous,
         // foreign_keys) right after every open (boot + swap). See lib/sqlite-pragmas.ts.
-        sqlite = new Database(dbPath);
-        initSqlitePragmas(sqlite);
+        sqlite = isNextProductionBuild ? new Database(':memory:') : openVersionedSqliteDatabase(dbPath);
+        if (isNextProductionBuild) initSqlitePragmas(sqlite);
         if (!isNextProductionBuild) {
-            initializeSqliteSchema(sqlite);
             if (swapRecovery.status === 'RECOVERED') {
                 validateRecoveryAuditSchema(sqlite);
                 swapRecovery.complete();
@@ -111,10 +110,8 @@ export async function swapDatabaseFromFile(sourcePath: string, backupPath: strin
         backupPath,
         connection: sqlite,
         reopenConnection: () => {
-            sqlite = new Database(dbPath);
+            sqlite = openVersionedSqliteDatabase(dbPath);
             try {
-                initSqlitePragmas(sqlite);
-                initializeSqliteSchema(sqlite);
                 validateRecoveryAuditSchema(sqlite);
                 return sqlite;
             } catch (error) {

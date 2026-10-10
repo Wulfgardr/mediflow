@@ -246,6 +246,9 @@ test('retired patient IDs backfill exact historical audit and survive reopen; ig
         db.prepare(`INSERT INTO audit_events
             (event_id, event_type, occurred_at, outcome, actor_type, actor_ref, subject_type, subject_ref, source_surface)
             VALUES ('ignored', 'patient.purged', 2, 'success', 'user', 'synthetic-user', 'patient', 'ignored-id', 'web')`).run();
+        // This case exercises an unversioned historical migration, not repair
+        // of a current-version archive (which now rejects schema drift first).
+        db.pragma('user_version = 0');
         db.exec('CREATE TRIGGER retired_id_ignore BEFORE INSERT ON patient_retired_ids BEGIN SELECT RAISE(IGNORE); END');
         db.close();
         const ignored = await runBootstrapWorker(dataDir);
