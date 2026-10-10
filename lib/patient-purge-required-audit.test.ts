@@ -25,7 +25,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
-const { POST } = load('../app/api/system/purge-patient/route.ts') as typeof import('../app/api/system/purge-patient/route.ts');
+const { GET, POST } = load('../app/api/system/purge-patient/route.ts') as typeof import('../app/api/system/purge-patient/route.ts');
 const { countPatientCascadeRows, totalPatientCascadeRows } = load('./patient-cascade.ts') as typeof import('./patient-cascade.ts');
 const { captureAttachmentExtractionLocatorGeneration, isCurrentAttachmentExtractionLocatorGeneration } =
     load('./domain/documents/attachment-extraction-locator-revocation.ts') as typeof import('./domain/documents/attachment-extraction-locator-revocation.ts');
@@ -59,7 +59,7 @@ function snapshot() {
         events: reopened.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
     }; } finally { reopened.close(); }
 }
-function request(body = JSON.stringify({ patientId })) {
+function request(body = JSON.stringify({ patientId, version: 7 })) {
     return POST(new Request('http://127.0.0.1/api/system/purge-patient', {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-request-id': requestId,
             'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed' }, body,
@@ -89,7 +89,7 @@ test('purge: tombstone and children removed with one host-attributed count event
     const childRowCounts = countPatientCascadeRows(dbServer, patientId);
     assert.equal(childRowCounts.entries, 1);
     assert.equal(childRowCounts.patientsToAmbulatories, 1);
-    const response = await request(JSON.stringify({ patientId, actorRef: 'spoofed', notes: 'CLINICAL_SENTINEL' }));
+    const response = await request(JSON.stringify({ patientId, version: 7, actorRef: 'spoofed', notes: 'CLINICAL_SENTINEL' }));
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { success: true, patientId, childRowCounts,
         totalChildRows: totalPatientCascadeRows(childRowCounts) });
@@ -122,7 +122,7 @@ test('purge: active and missing patients preserve rows, events and locator autho
     const before = snapshot();
     const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
     assert.equal((await request()).status, 409);
-    assert.equal((await request(JSON.stringify({ patientId: 'missing' }))).status, 404);
+    assert.equal((await request(JSON.stringify({ patientId: 'missing', version: 7 }))).status, 404);
     assert.deepEqual(snapshot(), before);
     assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration), true);
 });
@@ -137,4 +137,56 @@ test('purge: malformed envelope, wrong identifier type and oversized body fail b
     assert.equal((await request(' '.repeat(65_537))).status, 413);
     assert.deepEqual(snapshot(), before);
     assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration), true);
+});
+
+
+test('purge rejects an observed stale version before cascade or locator revocation', async () => {
+    reset();
+    const preview = await GET(new Request(`http://127.0.0.1/api/system/purge-patient?patientId=${patientId}`));
+    assert.equal(preview.status, 200);
+    const observed = await preview.json();
+    assert.equal(observed.version, 7);
+    sql.prepare('UPDATE patients SET version=8 WHERE id=?').run(patientId);
+    const before = snapshot();
+    const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
+    assert.equal((await request(JSON.stringify({ patientId: observed.patientId, version: observed.version }))).status, 409);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration), true);
+});
+
+
+test('purge preview reports lifecycle/version/counts without effects and requires a positive safe version', async () => {
+    reset();
+    const before = snapshot();
+    const locatorGeneration = captureAttachmentExtractionLocatorGeneration();
+    const preview = await GET(new Request(`http://127.0.0.1/api/system/purge-patient?patientId=${patientId}`));
+    assert.equal(preview.status, 200);
+    const body = await preview.json();
+    assert.equal(body.patientId, patientId);
+    assert.equal(body.version, 7);
+    assert.equal(body.deletedAt, '2025-01-01T00:00:00.000Z');
+    assert.equal(body.patientState, 'soft-deleted');
+    assert.deepEqual(body.childRowCounts, countPatientCascadeRows(dbServer, patientId));
+    for (const version of [undefined, null, '7', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        assert.equal((await request(JSON.stringify({ patientId, version }))).status, 400);
+        assert.deepEqual(snapshot(), before);
+        assert.equal(isCurrentAttachmentExtractionLocatorGeneration(locatorGeneration), true);
+    }
+    assert.equal((await request(JSON.stringify({ patientId: body.patientId, version: body.version }))).status, 200);
+    const after = snapshot();
+    const afterLocator = captureAttachmentExtractionLocatorGeneration();
+    assert.equal((await request(JSON.stringify({ patientId: body.patientId, version: body.version }))).status, 404);
+    assert.deepEqual(snapshot(), after);
+    assert.equal(isCurrentAttachmentExtractionLocatorGeneration(afterLocator), true);
+});
+test('purge permits MAX safe version without increment and preview describes active patients without authorizing purge', async () => {
+    reset(true);
+    const response = await GET(new Request(`http://127.0.0.1/api/system/purge-patient?patientId=${patientId}`));
+    const body = await response.json();
+    assert.equal(body.patientState, 'active');
+    assert.equal(body.deletedAt, null);
+    assert.equal((await request(JSON.stringify({ patientId, version: body.version }))).status, 409);
+    reset();
+    sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, patientId);
+    assert.equal((await request(JSON.stringify({ patientId, version: Number.MAX_SAFE_INTEGER }))).status, 200);
 });

@@ -8,6 +8,8 @@ import { collectUnitTestFiles } from './unit-test-selection.mjs';
 import { collectExplicitNpmSelections, collectNpmScriptBinding, collectGuardSelfTestSelections, collectSyntheticPluginSelections } from './explicit-npm-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
+import { collectSwiftInventorySelection, SWIFT_SUITE_ID } from './swift-test-selection.mjs';
+
 const headlessSuite = Object.freeze({ script: 'test:headless-portable', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts' });
 
 export async function collectHeadlessInventorySelection(root) {
@@ -234,6 +236,7 @@ async function cli(args) {
     'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
     ...collectGuardSelfTestSelections(root),
     ...collectSyntheticPluginSelections(root),
+    [SWIFT_SUITE_ID]: collectSwiftInventorySelection(root),
     'npm:test:e2e': collectPlaywrightInventorySelection(root) });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);

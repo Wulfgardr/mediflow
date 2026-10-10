@@ -1048,6 +1048,48 @@ Ogni fingerprint ha molteplicità uno. Nessun pattern generico o modifica allo
 scanner è introdotto; restano le prove negative e il divieto di hard delete.
 
 
+## C05-M — Purge con versione paziente osservata (WUL-720)
+
+La purge resta un'operazione globale riservata alla sessione Web admin:
+nessun ambulatorio target o cookie di scope viene aggiunto. Il GET esistente
+legge nella stessa transazione paziente e conteggi figli; espone anche
+`version` e `deletedAt` ISO/null. Può descrivere un paziente attivo, ma ciò non
+ne autorizza la purge. Il POST richiede `patientId` e `version` osservati:
+versione assente, non numerica, non positiva, frazionaria o unsafe produce
+`400`; resta il parser JSON oggetto limitato a 65536 byte (`413` oltre limite).
+MAX_SAFE_INTEGER è valido perché questa operazione elimina senza incrementare.
+
+Dopo lookup e controllo tombstone nella IMMEDIATE, la versione stale produce
+`409 VERSION_CONFLICT` prima del cascade: nessun cambiamento a dati/audit e
+nessuna revoca locator. Successo, cascade, DELETE condizionato e audit restano
+atomici; il replay dopo successo riceve `404`. Il rollback di un guasto dopo
+l'ingresso nel cascade conserva invece la revoca locator conservativa già
+prevista: non viene riattivata un'autorità invalidata.
+
+Procedura API: GET con `patientId`, ispezione dei dettagli e conteggi, decisione
+esplicita e POST `{patientId, version}` copiati dalla preview. Non aggiornare
+la versione tramite un refetch implicito prima dell'invio o del retry. Su
+conflitto serve una nuova ispezione e decisione. Non risultano consumer UI,
+hook o Swift collegati a questa API; la descrizione non consegna una nuova
+interfaccia o una doppia conferma UI. Endpoint fuori dal contratto v1.
+
+Il CAS riguarda **la riga paziente, non uno snapshot dei figli**. I conteggi
+GET sono coerenti all'istante della lettura, non precondizioni del POST. Nella
+lettura circoscritta dei writer del cascade rimangono esempi espliciti di
+mutazioni figlio senza rifiuto del parent tombstonato: PUT/DELETE Web allegati
+controllano ID paziente e currentness dell'allegato; PUT/DELETE SISS controllano
+ID paziente e versione handoff. Non incrementano la versione paziente.
+I writer amministrativi di membership (fix-orphans/migrate/clear) includono
+invece deliberatamente tombstone e incrementano la versione paziente. Questa
+annotazione non è una ricognizione esaustiva né modifica tali policy; i core
+ordinari entry/therapy/observation/checkup/PR/SP mantengono l'ammissione parent
+attivo. ABA dopo ricreazione identica, C15 e fix-orphans restano distinti e
+C05 complessivo non è chiuso da questa coorte.
+
+La suite purge SQLite riusa fault audit FAIL/IGNORE, successo e replay e
+aggiunge GET, stale senza revoca, binding versioni invalidi e versione MAX
+safe. Il baseline stale accettava la cancellazione con `200` anziché `409`.
+
 ### C05-D — Identità create allegato Web (2026-10-10)
 
 Il solo `POST /api/attachments` valida l'ID originale con lo schema attachment:

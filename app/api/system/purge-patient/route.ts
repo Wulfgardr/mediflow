@@ -15,6 +15,7 @@ import {
 } from '@/lib/patient-cascade';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
+import { requireExpectedVersion, buildVersionConflictPayload } from '@/lib/version-concurrency';
 
 const PURGE_JSON_MAX_BYTES = 65_536;
 
@@ -22,15 +23,6 @@ export const dynamic = 'force-dynamic';
 
 function cascadeCountFlags(prefix: string, counts: PatientCascadeCounts): string[] {
     return Object.entries(counts).map(([table, count]) => `${prefix}:${table}:${count}`);
-}
-
-// Purge deliberately bypasses the activePatients() read filter: it must see tombstones.
-function selectPatientLifecycleRow(patientId: string) {
-    return dbServer
-        .select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt })
-        .from(patients)
-        .where(eq(patients.id, patientId))
-        .get();
 }
 
 export async function GET(request: Request) {
@@ -45,20 +37,24 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'patientId is required' }, { status: 400 });
         }
 
-        const patient = await selectPatientLifecycleRow(patientId);
-        if (!patient) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const childRowCounts = countPatientCascadeRows(dbServer, patientId);
-        return NextResponse.json({
-            success: true,
-            dryRun: true,
-            patientId,
-            patientState: patient.deletedAt ? 'soft-deleted' : 'active',
-            childRowCounts,
-            totalChildRows: totalPatientCascadeRows(childRowCounts),
+        // Tombstone/version and child counts describe one coherent read snapshot.
+        const result = dbServer.transaction((tx) => {
+            const patient = tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt })
+                .from(patients).where(eq(patients.id, patientId)).get();
+            if (!patient) return { status: 404, value: { error: 'Not found' } };
+            const childRowCounts = countPatientCascadeRows(tx, patientId);
+            return { status: 200, value: {
+                success: true,
+                dryRun: true,
+                patientId,
+                version: patient.version,
+                deletedAt: patient.deletedAt?.toISOString() ?? null,
+                patientState: patient.deletedAt ? 'soft-deleted' : 'active',
+                childRowCounts,
+                totalChildRows: totalPatientCascadeRows(childRowCounts),
+            } };
         });
+        return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         console.error('[MediFlow] Purge patient dry-run failed:', error);
         return NextResponse.json({ error: 'Purge dry-run failed' }, { status: 500 });
@@ -83,6 +79,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'patientId is required' }, { status: 400 });
         }
 
+        const versionResult = requireExpectedVersion(body.version);
+        if (!versionResult.ok) return NextResponse.json(versionResult.value, { status: versionResult.status });
+        const { expectedVersion } = versionResult;
+
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {
@@ -92,6 +92,12 @@ export async function POST(request: Request) {
             // Erasure only follows an explicit operational soft-delete, reread under the write lock.
             if (!patient.deletedAt) return {
                 status: 409, value: { error: 'Patient is still active: soft-delete it before purging' },
+            };
+
+            if (patient.version !== expectedVersion) return { status: 409,
+                value: buildVersionConflictPayload('patient', expectedVersion, patientId, {
+                    ...patient, updatedAt: null,
+                }),
             };
 
             const childRowCounts = purgePatientCascade(tx, patientId);
