@@ -26,7 +26,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return specifier === '@/lib/security/server-auth'
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const create = load('../app/api/ambulatories/route.ts') as typeof import('../app/api/ambulatories/route.ts');
 const item = load('../app/api/ambulatories/[id]/route.ts') as typeof import('../app/api/ambulatories/[id]/route.ts');

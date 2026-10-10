@@ -31,7 +31,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     if (specifier === '@/lib/security/server-auth') return { url: pathToFileURL(authPath).href, shortCircuit: true };
     return next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { patients, sissHandoffEvents } = load('./schema.ts') as typeof import('./schema.ts');
 const createRoute = load('../app/api/siss-handoffs/route.ts') as typeof import('../app/api/siss-handoffs/route.ts');
 const itemRoute = load('../app/api/siss-handoffs/[id]/route.ts') as typeof import('../app/api/siss-handoffs/[id]/route.ts');

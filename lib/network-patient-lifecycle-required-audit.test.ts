@@ -12,7 +12,8 @@ import { ambulatories, entries, patients, patientsToAmbulatories } from './schem
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-network-lifecycle-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'c05-network-a']]) });
 const lifecycle = load('./network-patient-lifecycle.ts') as typeof import('./network-patient-lifecycle.ts');
 const sql = new Database(join(dataDir, 'medical.db'));

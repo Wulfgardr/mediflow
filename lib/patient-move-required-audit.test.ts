@@ -22,7 +22,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return specifier === '@/lib/security/server-auth'
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const { POST } = load('../app/api/patients/move/route.ts') as typeof import('../app/api/patients/move/route.ts');
 const sql = new Database(join(dataDir, 'medical.db'));

@@ -26,7 +26,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return specifier === '@/lib/security/server-auth'
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
 const { GET, POST } = load('../app/api/system/fix-orphans/route.ts') as typeof import('../app/api/system/fix-orphans/route.ts');
 const { countOrphanedClinicalRows, totalPatientCascadeRows } = load('./patient-cascade.ts') as typeof import('./patient-cascade.ts');
