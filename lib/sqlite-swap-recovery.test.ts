@@ -308,6 +308,9 @@ for (const mode of ['prepared-fsync', 'committed-fsync', 'prepared-directory-fsy
 test('production schema validation closes the failed candidate; restart retains original audit and append-only guards', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-swap-production-'));
     try {
+        // Fresh admission requires the directory to be empty before staging a replacement.
+        const initial = boot(dir);
+        assert.equal(initial.status, 0, initial.stderr);
         fixture(path.join(dir, 'replacement.db'), 'synthetic-incompatible-schema').close();
         const result = worker(dir, `
             import Database from 'better-sqlite3';
@@ -442,6 +445,9 @@ for (const fault of ['weakened-trigger', 'audit-index-failure', 'quoted-type', '
 test('production swap accepts the supported tracked migration baseline without weakening audit validation', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-swap-legacy-schema-'));
     try {
+        // Fresh admission requires the directory to be empty before staging a replacement.
+        const initial = boot(dir);
+        assert.equal(initial.status, 0, initial.stderr);
         const sourcePath = path.join(dir, 'replacement.db');
         const source = new Database(sourcePath);
         try {
