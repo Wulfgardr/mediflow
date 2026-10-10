@@ -73,6 +73,14 @@ export function classifyAuthHealthError(error: unknown): AuthHealthClassificatio
     const message = safeMessage(error);
     const code = errorCode(error);
 
+    if (code === 'SQLITE_SCHEMA_RECOVERY_REQUIRED') {
+        return {
+            code: 'DB_SCHEMA_MISSING', category: 'schema-missing', dbState: 'schema-missing',
+            message: 'L’archivio richiede una versione compatibile di MediFlow o un recupero esplicito.',
+            nextAction: 'Conserva l’archivio originale. Aprilo con la versione compatibile oppure recupera una copia verificata; non creare un database vuoto al suo posto.',
+        };
+    }
+
     const isNativeAbi =
         code === 'ERR_DLOPEN_FAILED' ||
         NATIVE_ABI_PATTERNS.some((re) => re.test(message));
