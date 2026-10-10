@@ -35,6 +35,8 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/generate-runtime-payload-ledger.test.mjs',
   'scripts/unit-test-selection.test.mjs',
   'scripts/test-inventory.test.mjs',
+  'scripts/native-decrypt-bridge-selection.test.mjs',
+  'scripts/exemption-lazy-support-binding.test.mjs',
   'scripts/explicit-npm-test-selection.test.mjs',
   // Portable Node suites use the same local/CI strip-types runner.
   'scripts/anydoc-desktop-renderer-trace.test.mjs',

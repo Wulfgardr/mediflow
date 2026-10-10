@@ -5,10 +5,23 @@ import { collectNpmScriptBinding, collectLiteralCiBinding } from './explicit-npm
 import { CLINICAL_HTTP_TEST_FILES } from './run-clinical-http-suite.mjs';
 
 const browserCall = 'CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"\nMEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \\\n  node scripts/chatgpt-product-focused-tests.mjs --browser-only';
+// Bounded lexical matching: comments disappear, quoted strings/templates stay
+// indivisible tokens. A code-shaped decoy inside a literal cannot supply a call.
+export function consumerTokens(source) {
+  return (source.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[A-Za-z_$][\w$]*|[0-9]+|[^\s]/gu) ?? [])
+    .filter(token => !token.startsWith('//') && !token.startsWith('/*'));
+}
 function source(root, file, fragments) {
   filesExist(root, [file, 'scripts/additional-test-selection.mjs']);
-  const content = fs.readFileSync(path.join(root, file), 'utf8');
-  for (const fragment of fragments) if (content.split(fragment).length !== 2) throw new Error(`Missing or duplicate consumer binding: ${file}: ${fragment}`);
+  const tokens = consumerTokens(fs.readFileSync(path.join(root, file), 'utf8'));
+  for (const fragment of fragments) {
+    const expected = consumerTokens(fragment);
+    let count = 0;
+    for (let i = 0; i <= tokens.length - expected.length; i++) {
+      if (expected.every((token, offset) => tokens[i + offset] === token)) count++;
+    }
+    if (count !== 1) throw new Error(`Missing or duplicate consumer binding: ${file}: ${fragment}`);
+  }
 }
 function filesExist(root, files) {
   if (!files.length || new Set(files).size !== files.length) throw new Error('Empty or duplicate additional selection');

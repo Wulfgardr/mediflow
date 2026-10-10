@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -103,6 +104,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const command = localTestCommands(root).find(item => item.id === process.argv[2]);
     if (!command) throw new Error('Unknown local recipe');
     console.log(`Local selection only: ${command.prerequisites}`);
+    assertNodeRuntime(readNodeContract(root));
     const result = spawnSync(command.executable, localInvocationArguments(command, process.argv.slice(3)), { cwd: root, stdio: 'inherit', shell: false,
       env: { ...process.env, ...command.env, PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH ?? ''}` } });
     if (result.error) throw result.error;
