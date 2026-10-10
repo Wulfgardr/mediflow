@@ -279,6 +279,8 @@ async function webRequest(cookieHeader, method, pathname, body) {
     return await request(method, pathname, {
         headers: {
             Cookie: cookieHeader,
+            Origin: BASE_URL,
+            'Sec-Fetch-Site': 'same-origin',
             'Cache-Control': 'no-store',
         },
         body,

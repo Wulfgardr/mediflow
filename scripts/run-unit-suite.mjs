@@ -4,11 +4,11 @@
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { acquireTestDataDir, cleanupTestDataDir } from './test-data-dir.mjs';
-import { unitTestArguments } from './unit-test-selection.mjs';
+import { unitTestInvocationArguments } from './unit-test-selection.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const node = process.execPath;
-const unitArgs = unitTestArguments(root);
+const unitInvocations = unitTestInvocationArguments(root);
 
 function run(args, env) {
   const result = spawnSync(node, args, { cwd: root, env, stdio: 'inherit' });
@@ -25,9 +25,12 @@ try {
   signal = bootstrap.signal;
   if (!signal && bootstrap.status !== 0) exitCode = bootstrap.status;
   else if (!signal) {
-    const unit = run(unitArgs, env);
-    signal = unit.signal;
-    exitCode = unit.status;
+    for (const unitArgs of unitInvocations) {
+      const unit = run(unitArgs, env);
+      signal = unit.signal;
+      exitCode = unit.status;
+      if (signal || exitCode !== 0) break;
+    }
   }
 } finally {
   cleanupTestDataDir({ dataDir, owned });

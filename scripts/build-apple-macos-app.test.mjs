@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { installPlistTestTools } from './fixtures/plist-tool-test-support.mjs';
 import { appRoot, assetParts, fixture, repositoryRoot, snapshot, syntheticFiles, write } from './fixtures/mac-packaging-test-support.mjs';
 
 function dependencies(web) {
@@ -131,6 +132,7 @@ function buildFixture(t) {
   const driverPath = write(path.join(root, 'tool-driver.mjs'), driver);
   write(path.join(root, 'scripts/generate-apple-xcodeproj.sh'), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" generate "$@"\n`, 0o755);
   const bin = path.join(root, 'test-bin');
+  installPlistTestTools(bin);
   for (const command of ['npm', 'xcodebuild', 'codesign', 'otool', 'install_name_tool', 'file', 'lipo']) {
     write(path.join(bin, command), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" ${command} "$@"\n`, 0o755);
   }
@@ -197,7 +199,7 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.deepEqual(fs.readFileSync(path.join(input.web, ...assetParts, 'codex')), syntheticFiles.codex);
     assert.equal(fs.existsSync(path.join(input.app, 'Contents/Resources/WebRuntime', ...assetParts, 'codex')), false);
     const stagedIdentity = Object.fromEntries(['MEDIFLOW_APP_REVISION', 'MEDIFLOW_APP_BRANCH', 'MEDIFLOW_APP_WORKTREE_HASH', 'MEDIFLOW_APP_SOURCE_FINGERPRINT', 'MEDIFLOW_APP_FINGERPRINT'].map(key => {
-      const result = spawnSync('/usr/libexec/PlistBuddy', ['-c', `Print :LSEnvironment:${key}`, path.join(input.app, 'Contents/Info.plist')], { encoding: 'utf8' });
+      const result = spawnSync(path.join(input.bin, 'PlistBuddy'), ['-c', `Print :LSEnvironment:${key}`, path.join(input.app, 'Contents/Info.plist')], { encoding: 'utf8' });
       assert.equal(result.status, 0, result.stderr);
       return [key, result.stdout.trim()];
     }));
@@ -207,13 +209,13 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.equal(stagedIdentity.MEDIFLOW_APP_SOURCE_FINGERPRINT, `main@${stagedIdentity.MEDIFLOW_APP_REVISION}:clean`);
     assert.equal(stagedIdentity.MEDIFLOW_APP_FINGERPRINT, stagedIdentity.MEDIFLOW_APP_SOURCE_FINGERPRINT);
     const plist = path.join(input.app, 'Contents/Info.plist');
-    assert.equal(spawnSync('plutil', ['-extract', 'MediFlowQAStorageNamespace', 'raw', plist]).status, 1);
-    assert.equal(spawnSync('plutil', ['-extract', 'CFBundleIdentifier', 'raw', plist], { encoding: 'utf8' }).stdout.trim(), 'com.mediflow.mobile');
-    assert.equal(spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0', plist], { encoding: 'utf8' }).stdout.trim(), 'mediflow');
-    const environment = spawnSync('plutil', ['-extract', 'LSEnvironment', 'raw', '-o', '-', plist], { encoding: 'utf8' });
+    assert.equal(spawnSync(path.join(input.bin, 'plutil'), ['-extract', 'MediFlowQAStorageNamespace', 'raw', plist]).status, 1);
+    assert.equal(spawnSync(path.join(input.bin, 'plutil'), ['-extract', 'CFBundleIdentifier', 'raw', plist], { encoding: 'utf8' }).stdout.trim(), 'com.mediflow.mobile');
+    assert.equal(spawnSync(path.join(input.bin, 'PlistBuddy'), ['-c', 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0', plist], { encoding: 'utf8' }).stdout.trim(), 'mediflow');
+    const environment = spawnSync(path.join(input.bin, 'plutil'), ['-extract', 'LSEnvironment', 'raw', '-o', '-', plist], { encoding: 'utf8' });
     assert.equal(environment.status, 0, environment.stderr);
     assert.match(environment.stdout, /EXISTING_NATIVE_ENV/u);
-    const preserved = spawnSync('/usr/libexec/PlistBuddy', ['-c', 'Print :LSEnvironment:EXISTING_NATIVE_ENV', plist], { encoding: 'utf8' });
+    const preserved = spawnSync(path.join(input.bin, 'PlistBuddy'), ['-c', 'Print :LSEnvironment:EXISTING_NATIVE_ENV', plist], { encoding: 'utf8' });
     assert.equal(preserved.status, 0, preserved.stderr);
     assert.equal(preserved.stdout.trim(), 'preserve-me');
     const targets = fs.readdirSync(path.join(input.app, 'Contents/Frameworks')).sort();
@@ -270,7 +272,7 @@ test('QA namespace is sealed with a separate bundle identity and no ordinary URL
   const input = buildFixture(t), namespace = '0123456789abcdef0123456789abcdef';
   pass(input.run({ MEDIFLOW_MAC_QA_NAMESPACE: namespace, MEDIFLOW_CODESIGN_IDENTITY: '-' }));
   const plist = path.join(input.app, 'Contents/Info.plist');
-  const read = key => spawnSync('plutil', ['-extract', key, 'raw', plist], { encoding: 'utf8' });
+  const read = key => spawnSync(path.join(input.bin, 'plutil'), ['-extract', key, 'raw', plist], { encoding: 'utf8' });
   assert.equal(read('MediFlowQAStorageNamespace').stdout.trim(), namespace);
   assert.equal(read('CFBundleIdentifier').stdout.trim(), `com.mediflow.qa.${namespace}`);
   assert.equal(read('CFBundleDisplayName').stdout.trim(), 'MediFlow QA');

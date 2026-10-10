@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { collectCiDispositionSelections } from './ci-disposition-selection.mjs';
+import { collectNativeDecryptBridgeSelection } from './native-decrypt-bridge-selection.mjs';
+import { collectExemptionLazySupportBinding } from './exemption-lazy-support-binding.mjs';
+import { collectNativeToolSelections } from './native-tool-test-selection.mjs';
+import { collectLocalTestSelections } from './local-test-selection.mjs';
+import { collectAdditionalInventorySelections } from './additional-inventory-selection.mjs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +76,18 @@ export function collectStaticSupportImports(source, importer) {
   while (rest) {
     const trivia = /^(?:\s+|\/\/[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)/u.exec(rest);
     if (trivia) { rest = rest.slice(trivia[0].length); continue; }
+    const strict = /^(['"])use strict\1\s*;/u.exec(rest);
+    if (strict) { rest = rest.slice(strict[0].length); continue; }
+    const required = new RegExp(String.raw`^const\s+(${clause})\s*=\s*require\(\s*(['"])([^'"\\\r\n]+)\2\s*\)\s*;`, 'u').exec(rest);
+    if (required) {
+      rest = rest.slice(required[0].length);
+      const specifier = required[3];
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        const target = path.posix.normalize(path.posix.join(path.posix.dirname(importer), specifier));
+        if (validPath(target)) imports.push(target);
+      }
+      continue;
+    }
     if (rest.startsWith('void import.meta.url;')) { rest = rest.slice('void import.meta.url;'.length); continue; }
     const match = declaration.exec(rest);
     if (!match) break;
@@ -102,16 +120,24 @@ export function discoverCandidates(paths, readSource) {
     const found = named ? ['conventional-test-name'] : [];
     for (const [name, pattern] of signals) if (pattern.test(source)) found.push(name);
     if (found.length) candidates.push({ path: relative, signals: found,
-      staticImports: collectStaticSupportImports(source, relative) });
+      staticImports: collectStaticSupportImports(source, relative).map(target => {
+        // Closed extensionless TS imports used by Playwright; ambiguous siblings fail.
+        if (/\.(?:[cm]?[jt]sx?)$/u.test(target)) return target;
+        const matches = paths.filter(file => file === target || ['.ts', '.js', '.mjs', '.cjs', '.tsx'].some(ext => file === target + ext));
+        return matches.length === 1 ? matches[0] : target;
+      }) });
   }
   return candidates.sort((a, b) => a.path.localeCompare(b.path, 'en'));
 }
 
 /** Compare explicit mappings with real selector output; unresolved is never waived. */
-export function checkInventory(candidates, manifest, selections) {
+export function checkInventory(candidates, manifest, selections, supportBindings = []) {
   const errors = [];
   const unresolved = [];
   const support = [];
+  const excludedNonTests = [];
+  const executionPrerequisites = [];
+  const suiteModes = {};
   const staticImports = new Map();
   const verifiedSuites = new Set();
   const conditionalSuites = [];
@@ -127,6 +153,14 @@ export function checkInventory(candidates, manifest, selections) {
     discovered.add(file);
     staticImports.set(file, new Set(candidate.staticImports ?? []));
   }
+  if (!Array.isArray(supportBindings)) { add('INVALID_SUPPORT_BINDINGS', 'expected array'); supportBindings = []; }
+  for (const binding of supportBindings) {
+    if (!validPath(binding?.importer) || !validPath(binding?.support) || !Array.isArray(binding?.errors)) {
+      add('INVALID_SUPPORT_BINDING', 'expected verified importer/support/errors'); continue;
+    }
+    for (const error of binding.errors) add('INCOMPLETE_SUPPORT_BINDING', `${binding.support}: ${error}`);
+    if (!binding.errors.length) staticImports.get(binding.importer)?.add(binding.support);
+  }
   if (!manifest || manifest.version !== 1 || !Array.isArray(manifest.entries)
     || Object.keys(manifest).some(key => !['version', 'entries'].includes(key))) {
     add('INVALID_MANIFEST', 'expected version 1 and entries only');
@@ -135,8 +169,21 @@ export function checkInventory(candidates, manifest, selections) {
     if (!validPath(entry?.path)) { add('INVALID_ENTRY_PATH', JSON.stringify(entry?.path)); continue; }
     if (entries.has(entry.path)) add('DUPLICATE_ENTRY', entry.path);
     entries.set(entry.path, entry);
-    if (Object.keys(entry).some(key => !['path', 'selection'].includes(key))) add('INVALID_ENTRY_FIELDS', entry.path);
+    if (Object.keys(entry).some(key => !['path', 'selection', 'execution'].includes(key))) add('INVALID_ENTRY_FIELDS', entry.path);
     const selection = entry.selection;
+    if (entry.execution !== undefined) {
+      const execution = entry.execution;
+      if (!execution || !['not-provisioned', 'conditional-ci', 'optional-profile'].includes(execution.state)
+        || typeof execution.owner !== 'string' || !execution.owner.trim()
+        || typeof execution.reason !== 'string' || !execution.reason.trim()
+        || !Array.isArray(execution.conditions) || !execution.conditions.length
+        || execution.conditions.some(condition => typeof condition !== 'string' || !condition.trim())
+        || new Set(execution.conditions).size !== execution.conditions.length
+        || Object.keys(execution).some(key => !['state', 'owner', 'reason', 'conditions', ...(execution.state === 'optional-profile' ? ['profile', 'ordinaryGate'] : [])].includes(key))
+        || (execution.state === 'optional-profile' && (typeof execution.profile !== 'string' || !/^[a-z][a-z0-9-]*$/u.test(execution.profile) || execution.ordinaryGate !== 'excluded'))
+        || selection?.state !== 'mapped') add('INVALID_EXECUTION_PREREQUISITES', entry.path);
+      else executionPrerequisites.push({ path: entry.path, ...execution });
+    }
     if (selection?.state === 'unresolved') {
       unresolved.push(entry.path);
       if (typeof selection.reason !== 'string' || !selection.reason.trim()
@@ -146,6 +193,11 @@ export function checkInventory(candidates, manifest, selections) {
         || selection.suiteIds.some(id => typeof id !== 'string' || !id.trim())
         || new Set(selection.suiteIds).size !== selection.suiteIds.length
         || Object.keys(selection).some(key => !['state', 'suiteIds'].includes(key))) add('INVALID_MAPPING', entry.path);
+    } else if (selection?.state === 'excluded-non-test') {
+      excludedNonTests.push(entry.path);
+      if (typeof selection.reason !== 'string' || !selection.reason.trim()
+        || typeof selection.owner !== 'string' || !selection.owner.trim()
+        || Object.keys(selection).some(key => !['state', 'reason', 'owner'].includes(key))) add('INVALID_NON_TEST', entry.path);
     } else if (selection?.state === 'support') {
       support.push(entry.path);
       if (typeof selection.reason !== 'string' || !selection.reason.trim()
@@ -160,7 +212,9 @@ export function checkInventory(candidates, manifest, selections) {
     add('INVALID_SELECTIONS', 'expected object'); selections = {};
   }
   for (const [id, selection] of Object.entries(selections)) {
-    if (selection?.conditional === true) conditionalSuites.push(id);
+    if (!['ordinary', 'conditional', 'local', 'child'].includes(selection?.mode)) add('INVALID_SUITE_MODE', id);
+    suiteModes[id] = selection?.mode ?? (selection?.conditional ? 'conditional' : 'unspecified');
+    if (selection?.conditional === true || selection?.mode === 'conditional') conditionalSuites.push(id);
     if (!selection || !Array.isArray(selection.files) || !Array.isArray(selection.errors)) {
       add('INVALID_SUITE', id); continue;
     }
@@ -186,6 +240,34 @@ export function checkInventory(candidates, manifest, selections) {
       else if (!suites.get(id).has(file)) add('MAPPED_NOT_SELECTED', `${id}: ${file}`);
     }
   }
+  for (const entry of executionPrerequisites) {
+    const mapping = entries.get(entry.path).selection;
+    if (entry.state === 'optional-profile') {
+      if (!mapping.suiteIds?.some(id => verifiedSuites.has(id) && suites.get(id).has(entry.path) && selections[id].mode === 'local')) {
+        add('OPTIONAL_PROFILE_RECIPE_NOT_BOUND', entry.path);
+      }
+      if ([...verifiedSuites].some(id => suites.get(id).has(entry.path) && selections[id].mode === 'ordinary')) {
+        add('OPTIONAL_PROFILE_SELECTED_BY_ORDINARY_GATE', entry.path);
+      }
+    }
+    if (entry.state !== 'conditional-ci') continue;
+    if (!mapping.suiteIds?.some(id => verifiedSuites.has(id) && suites.get(id).has(entry.path) && selections[id].mode === 'conditional')) {
+      add('EXECUTION_CONDITION_NOT_BOUND', entry.path);
+    }
+  }
+  for (const [id, selection] of Object.entries(selections)) {
+    if (selection?.mode !== 'child') continue;
+    const consumer = selection.binding?.consumer;
+    const parent = entries.get(consumer)?.selection;
+    if (selection.binding?.invocationVerified !== true || !validPath(consumer)
+      || parent?.state !== 'mapped' || !Array.isArray(parent.suiteIds)
+      || !parent.suiteIds.some(suite => suite !== id && verifiedSuites.has(suite) && suites.get(suite).has(consumer))) {
+      add('UNVERIFIED_CHILD_BINDING', `${id}: missing verified invocation or selected consumer`);
+    }
+  }
+  for (const file of excludedNonTests) {
+    if ([...suites.values()].some(files => files.has(file))) add('NON_TEST_SELECTED_AS_TEST', file);
+  }
   for (const file of support) {
     const selection = entries.get(file).selection;
     if ([...suites.values()].some(files => files.has(file))) add('SUPPORT_SELECTED_AS_TEST', file);
@@ -199,7 +281,7 @@ export function checkInventory(candidates, manifest, selections) {
       if (!staticImports.get(importer)?.has(file)) add('SUPPORT_IMPORT_MISSING', `${file}: ${importer}`);
     }
   }
-  return { errors, unresolved, support, conditionalSuites, integrityPassed: errors.length === 0,
+  return { errors, unresolved, support, excludedNonTests, executionPrerequisites, suiteModes, conditionalSuites, integrityPassed: errors.length === 0,
     selectionComplete: errors.length === 0 && unresolved.length === 0 };
 }
 
@@ -232,12 +314,20 @@ async function cli(args) {
   let unit;
   try { unit = { files: collectUnitTestFiles(root), errors: [] }; }
   catch (error) { unit = { files: [], errors: [error.message] }; }
-  const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
+  const legacySelections = { unit, ...collectExplicitNpmSelections(root),
     'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
     ...collectGuardSelfTestSelections(root),
     ...collectSyntheticPluginSelections(root),
     [SWIFT_SUITE_ID]: collectSwiftInventorySelection(root),
-    'npm:test:e2e': collectPlaywrightInventorySelection(root) });
+    'npm:test:e2e': collectPlaywrightInventorySelection(root) };
+  const bridgeRegistered = manifest.entries.some(entry => entry.path === 'lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs');
+  const lazySupport = manifest.entries.some(entry => entry.path === 'scripts/fixtures/exemption-import-session.ts')
+    ? [collectExemptionLazySupportBinding(root)] : [];
+  const result = checkInventory(candidates, manifest, {
+    ...Object.fromEntries(Object.entries(legacySelections).map(([id, selection]) => [id, { ...selection, mode: selection.conditional || id === 'npm:test:native-launcher' ? 'conditional' : 'ordinary' }])),
+    ...collectCiDispositionSelections(root), ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root), ...collectNativeToolSelections(root),
+    ...(bridgeRegistered ? { 'native:decrypt:child': collectNativeDecryptBridgeSelection(root) } : {}),
+  }, lazySupport);
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);
@@ -248,7 +338,14 @@ function printReport(result) {
   console.log(`Selection completeness: ${result.selectionComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
   console.log(`Unresolved selection: ${result.unresolved.length}`);
   console.log(`Support entrypoint exclusions: ${result.support.length}`);
-  if (result.conditionalSuites.length) console.log(`Conditional suites (workflow paths): ${result.conditionalSuites.join(', ')}`);
+  console.log(`Non-test entrypoint exclusions: ${result.excludedNonTests.length}`);
+  console.log(`Execution prerequisites not provisioned: ${result.executionPrerequisites.filter(entry => entry.state === 'not-provisioned').length}`);
+  console.log(`Optional profiles excluded from ordinary gate: ${result.executionPrerequisites.filter(entry => entry.state === 'optional-profile').length}`);
+  console.log(`Explicit conditional execution prerequisites: ${result.executionPrerequisites.filter(entry => entry.state === 'conditional-ci').length}`);
+  for (const mode of ['ordinary', 'conditional', 'local', 'child', 'unspecified']) {
+    console.log(`Selected suites (${mode}): ${Object.values(result.suiteModes).filter(value => value === mode).length}`);
+  }
+  if (result.conditionalSuites.length) console.log(`Conditional suites (workflow/platform): ${result.conditionalSuites.join(', ')}`);
   console.log('Execution evidence: NOT_ASSESSED');
   console.log('Npm CI bindings: configured literal calls only; reachability and lifecycle effects NOT_ASSESSED');
   console.log('C14 acceptance: NOT_ASSESSED');

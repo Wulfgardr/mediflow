@@ -143,7 +143,8 @@ jobs:
             [ -n "$f" ] || continue
             case "$f" in
               native/*) apple=true; continue ;;
-              scripts/swift-test-selection.mjs) apple=true; continue ;;
+              scripts/installability-v0-macos.test.mjs | scripts/build-installability-v0-macos.sh | scripts/installability-v0-macos-launcher.sh) apple=true; continue ;;
+              scripts/swift-test-selection.mjs | scripts/local-test-selection.mjs | scripts/local-test-recipes.json) apple=true; continue ;;
               # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
               # corregge quella gamba deve quindi attivarla sul push a main.
               .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh)
@@ -211,6 +212,25 @@ jobs:
         run: |
           set -o pipefail
           scripts/native-test.sh 2>&1 | tee "${RUNNER_TEMP}/swiftpm-tests.log"
+      - name: macOS installability launcher contracts
+        run: node scripts/local-test-selection.mjs test:installability-v0
+
+      - name: Prepare synthetic custodian data directory
+        id: custodian-data
+        run: |
+          custodian_data_dir="$(mktemp -d "${RUNNER_TEMP}/mediflow-custodian-data.XXXXXX")"
+          echo "directory=$custodian_data_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Execution custodian native qualification
+        env:
+          MEDIFLOW_DATA_DIR: ${{ steps.custodian-data.outputs.directory }}
+        run: npm run test:apple-custodian
+
+      - name: Clean synthetic custodian data directory
+        if: always() && steps.custodian-data.outputs.directory != ''
+        env:
+          CUSTODIAN_DATA_DIR: ${{ steps.custodian-data.outputs.directory }}
+        run: rm -rf -- "$CUSTODIAN_DATA_DIR"
 
       # Terza fase di `npm run check:terminology-parity`, sull'output della run
       # appena fatta invece che su un secondo `swift test --filter`: su un runner

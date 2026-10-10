@@ -11,15 +11,27 @@ import XCTest
 
 private final class NativeDecryptBridge: @unchecked Sendable {
     private let process = Process(), input = Pipe(), output = Pipe(), lock = NSLock()
+    private let lineTerminator: UInt8, maxLineBytes: Int
     init() throws {
         let environment = ProcessInfo.processInfo.environment
         var root = URL(fileURLWithPath: #filePath)
         for _ in 0..<5 { root.deleteLastPathComponent() }
         if let configured = environment["MEDIFLOW_NATIVE_SOURCE_TEST_ROOT"] { root = URL(fileURLWithPath: configured) }
-        let file = root.appendingPathComponent("lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs")
+        let contractFile = root.appendingPathComponent("lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.json")
+        guard FileManager.default.fileExists(atPath: contractFile.path) else { throw XCTSkip("NOT_RUN: bridge contract unavailable") }
+        let contract = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: contractFile)) as? [String: Any])
+        guard contract["version"] as? Int == 1, contract["nodeMajor"] as? Int == 24,
+              contract["protocol"] as? String == "json-lines", contract["lineTerminator"] as? Int == 10,
+              contract["maxLineBytes"] as? Int == 4 * 1024 * 1024 else { throw NativeOrdinaryContractError.invalid }
+        lineTerminator = UInt8(try XCTUnwrap(contract["lineTerminator"] as? Int))
+        maxLineBytes = try XCTUnwrap(contract["maxLineBytes"] as? Int)
+        let file = root.appendingPathComponent(try XCTUnwrap(contract["entrypoint"] as? String))
         guard FileManager.default.fileExists(atPath: file.path) else { throw XCTSkip("NOT_RUN: complete source root/bridge unavailable") }
-        process.executableURL = URL(fileURLWithPath: environment["MEDIFLOW_NODE24"] ?? "/usr/bin/env")
-        process.arguments = (environment["MEDIFLOW_NODE24"] == nil ? ["node"] : []) + [file.path]
+        let executableEnvironment = try XCTUnwrap(contract["executableEnvironment"] as? String)
+        let fallbackExecutable = try XCTUnwrap(contract["fallbackExecutable"] as? String)
+        let fallbackArguments = try XCTUnwrap(contract["fallbackArguments"] as? [String])
+        process.executableURL = URL(fileURLWithPath: environment[executableEnvironment] ?? fallbackExecutable)
+        process.arguments = (environment[executableEnvironment] == nil ? fallbackArguments : []) + [file.path]
         process.currentDirectoryURL = root; process.standardInput = input; process.standardOutput = output
         // No diagnostic includes request bodies, decrypted data, keys or PINs.
         process.standardError = FileHandle.nullDevice
@@ -28,12 +40,12 @@ private final class NativeDecryptBridge: @unchecked Sendable {
     func close() { try? input.fileHandleForWriting.close(); if process.isRunning { process.terminate() }; process.waitUntilExit() }
     func call(_ object: [String: Any]) throws -> [String: Any] {
         lock.lock(); defer { lock.unlock() }
-        var data = try JSONSerialization.data(withJSONObject: object); data.append(10)
+        var data = try JSONSerialization.data(withJSONObject: object); data.append(lineTerminator)
         try input.fileHandleForWriting.write(contentsOf: data)
         var line = Data()
-        while line.count <= 4 * 1024 * 1024 {
+        while line.count <= maxLineBytes {
             guard let byte = try output.fileHandleForReading.read(upToCount: 1), !byte.isEmpty else { throw NativeOrdinaryContractError.invalid }
-            if byte[0] == 10 { break }; line.append(byte)
+            if byte[0] == lineTerminator { break }; line.append(byte)
         }
         let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: line) as? [String: Any])
         guard envelope["ok"] as? Bool == true else { throw NativeOrdinaryContractError.invalid }

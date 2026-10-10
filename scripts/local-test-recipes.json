@@ -1,0 +1,754 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "test:attachment-currentness-writers",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/check-attachment-currentness-writers.test.mjs"
+      ],
+      "prerequisites": "Existing test:attachment-currentness-writers command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:installability-v0",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/installability-v0-macos.test.mjs"
+      ],
+      "prerequisites": "Existing test:installability-v0 command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:api-v1-contract-negative",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/api-v1-contract-negative-test.sh"
+      ],
+      "prerequisites": "Existing test:api-v1-contract-negative command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:api-v1-put-negative-routes",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/api-v1-put-negative-routes-test.sh"
+      ],
+      "prerequisites": "Existing test:api-v1-put-negative-routes command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:legacy-clinical-writes",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/legacy-clinical-writes-test.sh"
+      ],
+      "prerequisites": "Existing test:legacy-clinical-writes command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:backup-restore:date-fields",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/backup-restore-date-fields.test.mjs"
+      ],
+      "prerequisites": "Existing test:backup-restore:date-fields command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:backup-scheduler",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/backup-scheduler-test.sh"
+      ],
+      "prerequisites": "Existing test:backup-scheduler command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:backup-scheduler:collections",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/backup-scheduler-collections.test.mjs"
+      ],
+      "prerequisites": "Existing test:backup-scheduler:collections command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:document-router-benchmark",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/benchmark-document-router.test.ts"
+      ],
+      "prerequisites": "Existing test:document-router-benchmark command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:treatment-reasoning",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "lib/treatment-reasoning-contract.test.ts",
+        "lib/ai-treatment-reasoning-kill-switch.test.ts",
+        "lib/treatment-reasoning-context.test.ts",
+        "lib/treatment-reasoning-service.test.ts",
+        "lib/athena-mlx-runtime.test.ts",
+        "scripts/treatment-reasoning-route-boundary.test.mjs"
+      ],
+      "prerequisites": "Existing test:treatment-reasoning command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:patient-ambulatory-membership",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/patient-ambulatory-membership-test.sh"
+      ],
+      "prerequisites": "Existing test:patient-ambulatory-membership command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:patient-soft-delete",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/patient-soft-delete-test.sh"
+      ],
+      "prerequisites": "Existing test:patient-soft-delete command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:patient-cascade",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/patient-cascade.test.mjs"
+      ],
+      "prerequisites": "Existing test:patient-cascade command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:service-prescription-items-catalog-migration",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/service-prescription-items-catalog-migration-test.sh"
+      ],
+      "prerequisites": "Existing test:service-prescription-items-catalog-migration command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:document-intelligence-columns-migration",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/document-intelligence-columns-migration.test.mjs"
+      ],
+      "prerequisites": "Existing test:document-intelligence-columns-migration command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:audit",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/audit-test.sh"
+      ],
+      "prerequisites": "Existing test:audit command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:sqlite-repair",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/sqlite-repair-test.sh"
+      ],
+      "prerequisites": "Existing test:sqlite-repair command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:ai-model-parliament",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/benchmark-model-parliament.test.ts"
+      ],
+      "prerequisites": "Existing test:ai-model-parliament command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:ai-rollout-readiness",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/benchmark-rollout-readiness.test.ts",
+        "lib/ai-rollout-readiness-storage.test.ts",
+        "lib/ai-rollout-model-guard.test.ts",
+        "lib/ai-patient-insight-kill-switch.test.ts",
+        "lib/ai-smart-import-kill-switch.test.ts",
+        "lib/ai-document-synthesis-kill-switch.test.ts",
+        "lib/ai-ocr-kill-switch.test.ts"
+      ],
+      "prerequisites": "Existing test:ai-rollout-readiness command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:terminology-registry",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/terminology-registry-test.sh"
+      ],
+      "prerequisites": "Existing test:terminology-registry command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:siss-adapter",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/siss-adapter-test.sh"
+      ],
+      "prerequisites": "Existing test:siss-adapter command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:siss-prescription",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/siss-prescription-test.sh"
+      ],
+      "prerequisites": "Existing test:siss-prescription command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:openmed-redaction",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/openmed-redaction-test.sh"
+      ],
+      "prerequisites": "Existing test:openmed-redaction command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:pin-change",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/pin-change-test.sh"
+      ],
+      "prerequisites": "Existing test:pin-change command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:settings-navigation",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/settings-navigation-test.sh"
+      ],
+      "prerequisites": "Existing test:settings-navigation command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:local-provider-setup",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/local-provider-setup.test.ts"
+      ],
+      "prerequisites": "Existing test:local-provider-setup command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:fabric-settings-view",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/fabric-settings-view-test.sh"
+      ],
+      "prerequisites": "Existing test:fabric-settings-view command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:server-auth-policy",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/server-auth-policy-test.sh"
+      ],
+      "prerequisites": "Existing test:server-auth-policy command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:anydoc-local-only",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/check-anydoc-local-only.test.mjs"
+      ],
+      "prerequisites": "Existing test:anydoc-local-only command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "components/lock-screen-pin.browser.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "components/lock-screen-pin.browser.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "lib/chatgpt-execution/execution-mac-initialize.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "lib/chatgpt-execution/execution-mac-initialize.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "scripts/install-redaction-runtime.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/install-redaction-runtime.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "scripts/treatment-reasoning-portable-setup.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/treatment-reasoning-portable-setup.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "scripts/who-local-probe.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/who-local-probe.test.mjs"
+      ],
+      "prerequisites": "WHO opt-in service/platform cases preserve their existing skip policy; a skipped case is not qualification."
+    },
+    {
+      "id": "scripts/stage-chatgpt-execution-mac-assets.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/stage-chatgpt-execution-mac-assets.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "tools/code-explorer/extract-files.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "tools/code-explorer/extract-files.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "tools/code-explorer/generate.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "tools/code-explorer/generate.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "tests/ui06/component-browser.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "tests/ui06/component-browser.test.mjs"
+      ],
+      "prerequisites": "UI06 browser harness and installed browser required; browser prohibition remains in force for this task."
+    },
+    {
+      "id": "lib/chatgpt-execution/execution-mac-readback.test.mjs",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "lib/chatgpt-execution/execution-mac-readback.test.mjs"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "native/MediFlowMac/ExecutionCustodian/custodian.test.ts"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "scripts/chatgpt-account/account-host.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/chatgpt-account/account-host.test.ts"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "scripts/function-models/browser.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/function-models/browser.test.ts"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "mac-login",
+      "mode": "local",
+      "kind": "mac-login",
+      "files": [
+        "lib/chatgpt-execution/execution-mac-login-integration.test.mjs"
+      ],
+      "prerequisites": "Experimental VM modules and the existing mac-login loader; synthetic identity fixture, not real login."
+    },
+    {
+      "id": "scripts/launch-macos-synthetic.test.py",
+      "mode": "local",
+      "kind": "python",
+      "files": [
+        "scripts/launch-macos-synthetic.test.py"
+      ],
+      "prerequisites": "Python 3 unittest entrypoint; preserve macOS/Xcode fixture requirements and skips."
+    },
+    {
+      "id": "scripts/mobile-home-base-interop-xctestrun-test.py",
+      "mode": "local",
+      "kind": "python",
+      "files": [
+        "scripts/mobile-home-base-interop-xctestrun-test.py"
+      ],
+      "prerequisites": "Python 3 unittest entrypoint; preserve macOS/Xcode fixture requirements and skips."
+    },
+    {
+      "id": "scripts/api-v1-put-negative-routes.test.mjs",
+      "mode": "local",
+      "kind": "wrapped-node",
+      "files": [
+        "scripts/api-v1-put-negative-routes.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/legacy-clinical-writes.test.mjs",
+      "mode": "local",
+      "kind": "wrapped-node",
+      "files": [
+        "scripts/legacy-clinical-writes.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-account-pin.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-account-pin.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-aggregate-read.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-aggregate-read.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-ambulatory-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-ambulatory-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-catalog-read.test.mjs",
+      "mode": "local",
+      "kind": "network-fixed",
+      "files": [
+        "scripts/network-home-base-catalog-read.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-checkup-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-checkup-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-diary-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-diary-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-discovery-read.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-discovery-read.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-documents-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-documents-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-observation-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-observation-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-patient-lifecycle-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-patient-lifecycle-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-prescriptions-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-prescriptions-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-readonly.test.mjs",
+      "mode": "local",
+      "kind": "network-fixed",
+      "files": [
+        "scripts/network-home-base-readonly.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-therapy-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-therapy-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/anydoc-desktop-ocr-real.test.ts",
+      "mode": "local",
+      "kind": "strip-serial",
+      "files": [
+        "scripts/anydoc-desktop-ocr-real.test.ts"
+      ],
+      "prerequisites": "Real desktop OCR assets/OS required; preserves test concurrency=1 and all opt-ins. No OCR qualification claimed."
+    },
+    {
+      "id": "scripts/benchmark-document-router.ts",
+      "mode": "local",
+      "kind": "strip-self",
+      "files": [
+        "scripts/benchmark-document-router.ts"
+      ],
+      "prerequisites": "Synthetic router self-check mode; not a benchmark performance or live routing qualification."
+    },
+    {
+      "id": "scripts/chatgpt-account/account-ui-browser.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/chatgpt-account/account-ui-browser.mjs"
+      ],
+      "prerequisites": "Requires explicit temporary MEDIFLOW_DATA_DIR, esbuild and local browser; synthetic component fixture writes output artifacts. Browser remains unexecuted."
+    },
+    {
+      "id": "scripts/check-macos-web-runtime-native-payload.sh",
+      "mode": "local",
+      "kind": "bash-self",
+      "files": [
+        "scripts/check-macos-web-runtime-native-payload.sh"
+      ],
+      "prerequisites": "Existing synthetic native payload self-check; host tools must be present, not a shipped binary qualification."
+    },
+    {
+      "id": "scripts/check-standalone-runtime-bundle.mjs",
+      "mode": "local",
+      "kind": "node-self",
+      "files": [
+        "scripts/check-standalone-runtime-bundle.mjs"
+      ],
+      "prerequisites": "Existing synthetic standalone manifest self-check mode; product bundle qualification remains separate."
+    },
+    {
+      "id": "scripts/function-models/ui-browser.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/function-models/ui-browser.mjs"
+      ],
+      "prerequisites": "Requires explicit temporary MEDIFLOW_DATA_DIR, esbuild and local browser; synthetic component fixture writes output artifacts. Browser remains unexecuted."
+    },
+    {
+      "id": "scripts/generate-clinical-rich-text-fixtures.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/generate-clinical-rich-text-fixtures.mjs"
+      ],
+      "prerequisites": "Assertive fixture generator; rewrites the synthetic native contract fixtures. Not excluded as a non-test."
+    },
+    {
+      "id": "scripts/generate-fhir-golden-worker.ts",
+      "mode": "local",
+      "kind": "strip-script",
+      "files": [
+        "scripts/generate-fhir-golden-worker.ts"
+      ],
+      "prerequisites": "Assertive synthetic FHIR golden generator; rewrites fixtures and verifies round trips. Not excluded as a non-test."
+    },
+    {
+      "id": "scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/mediflow-headless-supervisor-standalone-smoke.mjs"
+      ],
+      "prerequisites": "Requires a built standalone runtime and synthetic smoke environment; no runtime/build qualification claimed."
+    },
+    {
+      "id": "scripts/mlx-chat-batch-runner-test.sh",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/mlx-chat-batch-runner-test.sh"
+      ],
+      "prerequisites": "Existing synthetic MLX shell harness; preserve its tool and platform prerequisites."
+    },
+    {
+      "id": "scripts/patient-concurrency.test.mjs",
+      "mode": "local",
+      "kind": "wrapped-node",
+      "files": [
+        "scripts/patient-concurrency.test.mjs"
+      ],
+      "prerequisites": "Existing patient-concurrency-smoke wrapper owns the synthetic server/bootstrap."
+    },
+    {
+      "id": "scripts/run-visit-recording-synthetic-benchmark.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/run-visit-recording-synthetic-benchmark.mjs"
+      ],
+      "prerequisites": "macOS synthetic voices, local transcription assets and runtime required; no microphone/real patient data, not a CI qualification."
+    },
+    {
+      "id": "app/api/ai/local-provider/onboarding/route.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "app/api/ai/local-provider/onboarding/route.test.ts"
+      ],
+      "prerequisites": "Requires MEDIFLOW_DATA_DIR in a fresh local-onboarding temporary directory, prebootstrapped with node scripts/prepare-e2e-db.mjs under that same variable. Real DB imports happen at module load; no fixture preparation or execution is attested by selection."
+    },
+    {
+      "id": "scripts/native-test.sh",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/native-test.sh"
+      ],
+      "prerequisites": "Existing native orchestrator; Darwin/SwiftPM/Xcode tools and mode-specific fixtures required. Local wrapper selection is not qualification of all branches or extra Swift test cases."
+    },
+    {
+      "id": "experiments/rust-boundary/compare.mjs",
+      "mode": "local",
+      "kind": "rust-compare",
+      "files": [
+        "experiments/rust-boundary/compare.mjs"
+      ],
+      "prerequisites": "Synthetic research codec comparator. Supply the built Rust binary and output JSON path; requires local cargo build --release --manifest-path experiments/rust-boundary/Cargo.toml first. No product/CI/performance qualification.",
+      "parameters": [
+        "rust-binary",
+        "output"
+      ]
+    },
+    {
+      "id": "plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs",
+      "mode": "local",
+      "kind": "node-parameters",
+      "files": [
+        "plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs"
+      ],
+      "prerequisites": "Explicit opt-in real Codex smoke; supply absolute marketplace JSON path, installed enabled synthetic plugin and authenticated Codex CLI. No persistent configuration changes or CI claim.",
+      "parameters": [
+        "--marketplace"
+      ]
+    },
+    {
+      "id": "scripts/mobile-home-base-interop-cas-relay.mjs",
+      "mode": "local",
+      "kind": "node-parameters",
+      "files": [
+        "scripts/mobile-home-base-interop-cas-relay.mjs"
+      ],
+      "prerequisites": "Assertive live synthetic mobile CAS scenario. Supply case JSON and two private mode-0700 participant directories backed by running synthetic contenders. Hardware/simulator and coordinated client events required; no execution claim.",
+      "parameters": [
+        "--case",
+        "--contender-directory",
+        "--peer-directory"
+      ]
+    },
+    {
+      "id": "scripts/mobile-home-base-interop-module-verifier.mjs",
+      "mode": "local",
+      "kind": "node-parameters",
+      "files": [
+        "scripts/mobile-home-base-interop-module-verifier.mjs"
+      ],
+      "prerequisites": "Assertive synthetic mobile module scenario. Supply descriptor, ios/ipados client, private mode-0700 exchange directory and run ID; running synthetic client/server producers required. No execution or hardware qualification.",
+      "parameters": [
+        "--descriptor",
+        "--client",
+        "--directory",
+        "--run-id"
+      ]
+    }
+  ]
+}
