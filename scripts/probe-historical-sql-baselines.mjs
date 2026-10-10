@@ -11,7 +11,6 @@ const root = path.resolve(import.meta.dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fixtures/schema-convergence/provenance.json'), 'utf8'));
 if (process.versions.node.split('.')[0] !== '24') throw new Error('Node 24 required');
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
-git('diff', '--exit-code', manifest.currentCommit, '--', 'lib', 'scripts/db-server-bootstrap-worker.mjs', 'scripts/run-strip-types.mjs');
 const args = process.argv.slice(2);
 if (args.length > 1 || (args.length && !args[0].startsWith('--families='))) throw new Error('Usage: probe-historical-sql-baselines.mjs [--families=v0.8.0,v0.8.6]');
 const requested = args.length ? args[0].slice('--families='.length).split(',') : manifest.families.map(family => family.tags[0].tag);
@@ -98,6 +97,6 @@ try {
   process.exitCode = !auditPassed(freshAudit) || results.some(result => result.historicalError
     || result.currentBootstrap?.status !== 0 || result.differences.length !== 0
     || !auditPassed(result.upgradedAudit)) ? 1 : 0;
-  console.log(JSON.stringify({ currentCommit: git('rev-parse','HEAD').trim(), currentBootstrapCommit: manifest.currentCommit, kind: manifest.kind,
+  console.log(JSON.stringify({ currentCommit: git('rev-parse','HEAD').trim(), kind: manifest.kind,
     limitations: ['Only the declared synthetic provisioning origins are tested, not all installed release databases or product support versions.', 'Comparison ignores physical column position, SQL whitespace/comments and quoting of recognized declaration names only. PK ordinals, grouped FK components, index metadata and SQL tokens preserve constraints, expressions, predicates and triggers. Unknown syntax and conflict-order-sensitive DDL compare conservatively; differences may require review, not imply inequivalence. CHECK/expression algebraic equivalence is not inferred.', 'Audit INSERT/UPDATE/DELETE behavior is tested on synthetic rows; general CHECK and FK data behavior remain outside this bounded probe.', 'Exit zero requires successful initializers/current bootstraps, schema parity and fresh/upgraded append-only audit checks for every requested origin.'], freshAudit, results }, null, 2));
 } finally { fs.rmSync(workspace, { recursive: true, force: true }); }

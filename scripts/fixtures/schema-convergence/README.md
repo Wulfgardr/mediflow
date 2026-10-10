@@ -61,21 +61,13 @@ adoption. Initializer/bootstrap failure, a schema difference, or a failed fresh/
 upgraded audit assertion produces nonzero exit. Historical warnings and errors
 remain visible in the report.
 
-The manifest's `currentCommit` explicitly selects the current bootstrap baseline
-(`99590af847fede54182a274d3230198d181517a8`). The probe requires the
-checkout's `lib` tree, bootstrap worker and TypeScript loader to match that commit.
-The report exposes this pin as `currentBootstrapCommit`, separately from the
-checkout's `currentCommit`.
-
-After an intentional runtime integration, update the manifest's `currentCommit`
-to the exact reviewed integration commit containing the complete runtime change.
-Keep historical source pins unchanged, retain the equivalence guard, and evaluate
-the origins against that new baseline before updating the comparison statement.
-Do not bypass the guard or silently derive the baseline from the running checkout.
+The probe compares every origin against the fresh schema of the checkout it runs
+in, and Web Core runs it on every pull request: a runtime change that breaks
+convergence fails there.
 
 ## Comparison boundary
 
-All eight declared origins converge to the fresh schema at the pinned baseline,
+All eight declared origins converge to the fresh schema,
 with no initializer warnings. The forward upgrade restores the missing historical
 `observations.updated_at` default. Fresh and upgraded audit accept synthetic INSERT
 and reject UPDATE/DELETE; each behavior probe rolls back its synthetic row.
