@@ -1,4 +1,4 @@
-import { PatientCreateConflictError } from '@/lib/patient-create-service';
+import { PatientCreateConflictError, PatientCreateDestinationNotFoundError } from '@/lib/patient-create-service';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
@@ -77,6 +77,10 @@ export async function POST(request: Request) {
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
+        if (body.ambulatoryId !== undefined && body.ambulatoryId !== null &&
+            (typeof body.ambulatoryId !== 'string' || body.ambulatoryId.trim().length === 0)) {
+            return NextResponse.json({ error: 'Invalid ambulatoryId' }, { status: 400 });
+        }
 
         const normalized = normalizePatientCreateInput(body, {
             id: uuidv4,
@@ -95,7 +99,7 @@ export async function POST(request: Request) {
         dbServer.transaction((tx) => {
             // Destination admission precedes identity lookup; do not disclose collisions for an invalid parent.
             if (normalized.values.ambulatoryId && !tx.select({ id: ambulatories.id }).from(ambulatories)
-                .where(eq(ambulatories.id, normalized.values.ambulatoryId)).get()) throw new Error('Invalid patient destination');
+                .where(eq(ambulatories.id, normalized.values.ambulatoryId)).get()) throw new PatientCreateDestinationNotFoundError();
             if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
             tx.insert(patients).values(normalized.values).run();
 
@@ -121,6 +125,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
+        if (error instanceof PatientCreateDestinationNotFoundError) return NextResponse.json({ error: 'Ambulatory not found' }, { status: 404 });
         if (error instanceof PatientCreateConflictError) return NextResponse.json({ error: 'Patient create conflict' }, { status: 409 });
         console.error('API POST /api/v1/patients error:', error);
         return NextResponse.json({ error: 'Failed to create patient' }, { status: 500 });
