@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 2** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 3** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
 ottobre 2026.
 
@@ -164,7 +164,7 @@ locali salvano ciò che ricevono.
 
 - Cifrate: `content`, `metadata`, `attachment_base64`
 - In chiaro: `id`, `conversation_id`, `role`, `attachment_type`, `created_at`
-- Leggibile senza chiave: ruolo e tipo di allegato. Il contratto elenca anche `reasoning`, che non è una colonna.
+- Leggibile senza chiave: ruolo e tipo di allegato.
 
 ### `observations` — osservazioni e valori di laboratorio
 
@@ -306,10 +306,11 @@ Leonardo.
    file.
 7. **Le rotte Web locali non controllano l'involucro**: un client che invia
    un campo del contratto in chiaro lo vede salvato così.
-8. **Contratto e schema non coincidono**: `messages.reasoning` è nel contratto
-   ma non è una colonna; `attachments.ocr_replay_artifact_snapshot` e i
-   `payload` delle proposte di diagnosi sono colonne senza writer e fuori dal
-   contratto.
+8. **Contratto e schema non coincidono**:
+   `attachments.ocr_replay_artifact_snapshot` e i `payload` delle proposte di
+   diagnosi sono colonne senza writer e fuori dal contratto. Il campo
+   `messages.reasoning`, nel contratto senza essere una colonna, è stato tolto
+   nella versione 3.
 9. **Copie del database e residui** (`.old-*`, WAL, pagine libere) conservano
    valori precedenti.
 10. **File temporanei e log** non sono coperti da una prova.
@@ -324,3 +325,4 @@ cambia una classificazione.
 | --- | --- |
 | 1 | Prima stesura sul codice di `main` `bcb7af46a`. |
 | 2 | Backup pianificati `0600` e directory dati predefinita `0700`. |
+| 3 | Tolto dal contratto `messages.reasoning`, che non era una colonna. |
