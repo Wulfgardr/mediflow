@@ -1,0 +1,147 @@
+[
+  {
+    "path": "components/settings/settings-presentation.test-support.ts",
+    "reason": "WUL-729: JSX mounting and inspection helpers; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/anydoc-consumer-diagnostic.ts",
+    "reason": "WUL-729: Assertion/diagnostic functions invoked by the OCR recovery spec, no standalone registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/anydoc-project-response.ts",
+    "reason": "WUL-729: response projection oracle imported by the selected OCR recovery spec; no standalone registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/chatgpt-browser-response.contract.ts",
+    "reason": "WUL-729: Contract assertions are registered by the exported helper under the browser harness.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/chatgpt-browser-response.ts",
+    "reason": "WUL-729: Response oracle factory imported by the browser harness, no standalone entrypoint.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/document-flow-real-route.acceptance.ts",
+    "reason": "WUL-729: Shared route assertion function invoked by the Playwright spec.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/fixtures/isolated-runtime.ts",
+    "reason": "WUL-729: Playwright fixture/test extension consumed by the route spec, no standalone spec.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/ordinary-chatgpt-ui-fixture.ts",
+    "reason": "WUL-729: Synthetic transport and UI helper imported by the four-functions spec.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/utils.ts",
+    "reason": "WUL-729: Session bootstrap and UI assertions consumed by specs, no standalone registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/chatgpt-execution/ordinary-content.test-support.ts",
+    "reason": "WUL-729: Synthetic content factories and shared assertions invoked by publication tests; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/chatgpt-execution/ordinary-module.test-support.ts",
+    "reason": "WUL-729: Process-local module doubles and cleanup hooks used by tests; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/chatgpt-product/fixtures/native-client-decrypt-host.cjs",
+    "reason": "WUL-729: Synthetic native decrypt host fixture required by the selected CJS harness.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs",
+    "reason": "WUL-728: synthetic decrypt bridge launched by NativeOrdinaryClientDecryptionTests.swift, which the Swift suite selects; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/domain/documents/anydoc-pdf-child-process-owner.ts",
+    "reason": "WUL-729: Production PDF child-process supervisor; --self-test is a worker argument managed by production code, not a standalone assertion entrypoint.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/security/headless-soap-command-binding-test-fixture.ts",
+    "reason": "WUL-729: Synthetic binding and proof factories used by lifecycle tests; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/security/native-ordinary.test-support.cjs",
+    "reason": "WUL-729: Shared synthetic security fixture required by the selected inference harness.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "playwright.config.ts",
+    "reason": "WUL-729: Playwright configuration imports defineConfig/devices; @playwright/test import is configuration rather than a test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "plugins/mediflow-synthetic/scripts/codex-agent-contract.mjs",
+    "reason": "WUL-729: Agent protocol assertion helper imported by the plugin contract suite.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/anydoc-pdf-page-worker.mjs",
+    "reason": "WUL-729: Production PDF worker process; supports synthetic fault modes but does not register an independent test suite.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/build-screenshots.mjs",
+    "reason": "WUL-729: Synthetic screenshot build/capture tool using the Playwright browser API, not a test runner.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/build-usage-dashboard.mjs",
+    "reason": "WUL-729: Dashboard builder and chart helper imported by its selected test; CLI is a build tool.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/capture-readme-screenshots.mjs",
+    "reason": "WUL-729: README image capture tool using Playwright browser APIs, not a test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/check-test-selection.mjs",
+    "reason": "WUL-728: selection check; its framework patterns are text it searches for, not tests it runs.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/explicit-npm-test-selection.mjs",
+    "reason": "WUL-729: Selection adapter imported by contract tests; literal self-test names are data, not standalone tests.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/fixtures/exemption-import-session.ts",
+    "reason": "WUL-729: synthetic session fixture loaded lazily after isolated SQLite bootstrap by the selected AIFA route test; verified by the dedicated lazy-edge adapter.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/test-support/checkup-parent-lifecycle-assertions.mjs",
+    "reason": "WUL-729: Shared behavioral assertion functions called by the lifecycle tests; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "scripts/test-support/checkup-parent-lifecycle-harness.mjs",
+    "reason": "WUL-729: Harness factory used by lifecycle tests; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "tests/ui06/browser-harness.mjs",
+    "reason": "WUL-729: Browser lifecycle/React fixture helper imported by the local component suite.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "tools/runtime-twin-086/seed.mjs",
+    "reason": "WUL-729: Synthetic runtime-twin fixture producer; guarded seeding operation, not an assertion suite.",
+    "owner": "@Wulfgardr"
+  }
+]

@@ -52,9 +52,9 @@ collega ciascun ingresso a validazione, transazione, audit, prove e lavori C05.
 La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice colonna per colonna e
 file per file che cosa si legge senza la chiave, e quali esposizioni restano da decidere in C06.
 
-L’[inventario incrementale dei test](./test-inventory.md) descrive il controllo
-delle omissioni nei selettori e il debito ancora aperto; non attesta la
-completezza di C14 né l’esecuzione delle prove sulle piattaforme installate.
+La [selezione dei test](./test-selection.md) descrive il controllo che impedisce
+a un file di test di restare fuori da ogni suite; non attesta l’esecuzione delle
+prove sulle piattaforme installate.
 
 La 0.9.0 consolida il prodotto attuale; servizi condivisi, Rust,
 interoperabilità e distribuzione nativa hanno tappe successive distinte.

@@ -31,8 +31,8 @@ una mutazione clinica. Il request ID resta correlazione, non idempotenza.
 - [Route della capability map](./capability-mapping/sources/web-http-routes.v1.json)
   e [code explorer](../tools/code-explorer/curated-map.json): indici di sorgenti
   su baseline precedenti. L'explorer copre due esempi, non tutti i writer.
-- [Inventario test](./test-inventory.md) e [manifest test](../test-inventory.v1.json):
-  distinguono presenza, selezione ed esecuzione. Le prove sotto sono riferimenti,
+- [Selezione dei test](./test-selection.md):
+  distingue presenza e selezione dall'esecuzione. Le prove sotto sono riferimenti,
   non nuovi PASS. La classificazione degli obblighi è nell’[elenco audit C04](./audit-writers.md).
 
 **Superfici.** Web usa la sessione ammessa dall'adapter; v1 usa l'autorità locale
