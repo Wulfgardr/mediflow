@@ -20,7 +20,6 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
         if (key.startsWith('MEDIFLOW_') || key.startsWith('NODE_TEST') || key === 'NODE_OPTIONS') delete env[key];
     }
     env.PATH = `${path.dirname(process.execPath)}${path.delimiter}${env.PATH || ''}`;
-    env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1';
     if (options.callerDataDir) env.MEDIFLOW_DATA_DIR = options.callerDataDir;
     const result = spawnSync(process.execPath, [
         'scripts/run-strip-types.mjs', 'scripts/backup-restore-drill.mjs',
@@ -94,4 +93,27 @@ test('drill prepares owned fixtures without changing the caller data directory',
     assert.equal(hashFile(callerDbPath), before);
     assert.deepEqual(fs.readdirSync(callerDataDir), ['medical.db']);
     assert.equal(fs.existsSync(workDir), false);
+}));
+
+test('the drill never lets the database preparer copy a database from the checkout', { skip: process.platform === 'win32' }, () => withFixture((root) => {
+    // A stand-in `node` first on PATH records what the drill hands to the preparer, then runs the real one.
+    const bin = path.join(root, 'bin');
+    const seen = path.join(root, 'preparer-environment.log');
+    fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'node'), `#!/bin/sh\nprintf '%s\\n' "$MEDIFLOW_E2E_DISABLE_LEGACY_COPY" >> ${JSON.stringify(seen)}\nexec ${JSON.stringify(process.execPath)} "$@"\n`, { mode: 0o755 });
+    const env = { ...process.env };
+    for (const key of Object.keys(env)) {
+        if (key.startsWith('MEDIFLOW_') || key.startsWith('NODE_TEST') || key === 'NODE_OPTIONS') delete env[key];
+    }
+    env.PATH = `${bin}${path.delimiter}${env.PATH || ''}`;
+    // The caller asks for the legacy copy; the drill must not pass that on.
+    env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '0';
+    const result = spawnSync(process.execPath, [
+        'scripts/run-strip-types.mjs', 'scripts/backup-restore-drill.mjs',
+        '--work-dir', path.join(root, 'work'), '--report', path.join(root, 'report.json'),
+    ], { cwd: ROOT, env, encoding: 'utf8', timeout: 30_000 });
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const handed = fs.readFileSync(seen, 'utf8').trim().split('\n');
+    assert.ok(handed.length >= 2, 'both preparer runs go through the stand-in');
+    assert.deepEqual([...new Set(handed)], ['1']);
 }));
