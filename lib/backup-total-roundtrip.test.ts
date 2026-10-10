@@ -23,7 +23,9 @@ const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loade
 const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 // WUL-730 / C15: duplicate intents are an operational local ledger, not exported.
 // Same-DB restore retains tokens; export/restore into a new DB loses historical tokens.
-const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents']);
+// C05: retired patient IDs are current-DB identity state, not an exported collection.
+// Their historical audit backfill does not qualify export/restore continuity (C15).
+const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents', 'patient_retired_ids']);
 /* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
 const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations']);
 /* @Codex Command replay remains empty until append-only audit restore has a separate contract. */
@@ -925,7 +927,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
 });
 
 
-test('duplicate intent ledger is present and explicitly classified as local-only', () => {
+test('patient identity ledgers are present and explicitly classified as local-only', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-duplicate-classification-'));
     try {
         bootstrapSchemaGuards(dir);
@@ -939,6 +941,8 @@ test('duplicate intent ledger is present and explicitly classified as local-only
             assert.deepEqual(db.prepare('SELECT id FROM patient_duplicate_intents').all(), [{ id: '11cf2a9a-5448-44f2-81b1-4101267477ca' }]);
             assert.equal(NON_BACKUP_TABLES.has('patient_duplicate_intents'), true);
             assert.equal(new Set<string>(Object.values(BACKUP_TABLES)).has('patient_duplicate_intents'), false);
+            assert.equal(NON_BACKUP_TABLES.has('patient_retired_ids'), true);
+            assert.equal(new Set<string>(Object.values(BACKUP_TABLES)).has('patient_retired_ids'), false);
             assert.deepEqual([...Object.keys(BACKUP_TABLES)].sort(), [...BACKUP_COLLECTIONS].sort());
         } finally { db.close(); }
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
