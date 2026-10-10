@@ -2,7 +2,7 @@
 
 Date: 2026-10-10
 
-Status: Proposed — nessun codice cambia con questo documento
+Status: Accepted — 10 ottobre 2026, con le opzioni raccomandate; nessun codice cambia con questo documento
 
 ## Problema e contesto
 
@@ -145,14 +145,38 @@ client della 0.9.6, una revisione per sistema.
   storico resta leggibile perché la master key non cambia.
 - I client nativi devono seguire la stessa tabella di versioni.
 
-## Da decidere, con una raccomandazione
+## Decisioni
 
-| Decisione | Opzioni | Raccomandazione |
+Il 10 ottobre 2026 Leonardo, davanti alle quattro scelte che questo documento
+lasciava aperte, ha dato mandato di procedere nel modo migliore. Chi esegue
+adotta le opzioni raccomandate; cambiarne una riapre il punto corrispondente.
+
+| Decisione | Scelta | Perché |
 | --- | --- | --- |
-| Copie precedenti del database | **A.** Riavvolgere soltanto: una copia di `medical.db` fatta prima della migrazione (`.old-*`, Time Machine, copie a mano) conserva l'involucro del PIN della stessa master key e resta attaccabile; la migrazione elimina le copie che il prodotto possiede e dice al medico di eliminare le altre. **B.** Ruotare la master key ricifrando ogni campo. | A nella 0.9.0: B è una migrazione dei dati clinici, con il rischio che il criterio 4 di WUL-721 chiede di evitare. I backup non sono toccati: non contengono l'involucro. |
-| Conferme di revisione e di ruolo | **A.** Chiedono la passphrase. **B.** Un PIN di conferma separato, verificato dal server con blocco, che non deriva né avvolge alcuna chiave. | B: la conferma protegge dall'uso a computer sbloccato, non dal furto del file; quindici caratteri a ogni conferma spingerebbero a una passphrase debole. |
-| Lunghezza minima | 12, 15 o 20 caratteri. | 15. |
-| Formato del kit | File dedicato, oppure dentro il backup. | File dedicato: chi copia un backup non deve trovare accanto il modo di aprirlo. |
+| Copie precedenti del database | Riavvolgere soltanto. La migrazione elimina le copie che il prodotto possiede (`.old-*`, copie di riparazione) e dice al medico di eliminare le altre: Time Machine e copie a mano conservano l'involucro del PIN della stessa master key. | Ruotare la master key vuol dire ricifrare ogni campo clinico: una migrazione dei dati, con il rischio che il criterio 4 di WUL-721 chiede di evitare. I backup non sono toccati: non contengono l'involucro. |
+| Conferme di revisione e di ruolo | Un PIN di conferma separato, verificato dal server con blocco, che non deriva né avvolge alcuna chiave. | La conferma protegge dall'uso a computer sbloccato, non dal furto del file; quindici caratteri a ogni conferma spingerebbero a una passphrase debole. |
+| Lunghezza minima | 15 caratteri. | È il minimo che regge il confronto della tabella sopra senza regole di composizione. |
+| Formato del kit | File dedicato, distinto dal backup. | Chi copia un backup non deve trovare accanto il modo di aprirlo. |
+
+Resta da misurare il costo di derivazione sui profili Windows e Omarchy prima
+di fissare le iterazioni della versione 3.
+
+## Ordine di consegna
+
+Ogni passo è una PR a sé, provata prima di collegare il successivo.
+
+1. **Primitive.** Policy della passphrase, derivazione versione 3, chiave
+   dell'involucro e verificatore con HKDF: funzioni e test, non ancora usate.
+2. **Server.** Colonne per verificatore e involucro di recupero; accesso con il
+   verificatore accanto a quello con il PIN.
+3. **Migrazione.** Passaggio atomico dal PIN alla passphrase con il kit di
+   recupero, provato con interruzioni iniettate; profilo transitorio dichiarato.
+4. **PIN di conferma.** Le conferme di revisione e di ruolo passano al PIN
+   separato.
+5. **Chiave solo in memoria.** Via la copia in `sessionStorage`, con
+   l'adattamento della navigazione e della suite E2E.
+6. **Recupero.** Ripristino su un computer nuovo con backup, kit e chiave di
+   recupero: chiude il criterio 1 di WUL-730.
 
 ## Come si prova
 
