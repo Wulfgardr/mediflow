@@ -101,10 +101,13 @@ raggiunge.
 
 ### Chiavi e PIN
 
-Il PIN **non viene mai salvato**. Da PIN e salt viene derivata la chiave che
-protegge la master key, chiamata key-encryption key (KEK). La master key è
-conservata cifrata e viene decifrata solo **in memoria**, durante una sessione
-attiva.
+Il PIN **non viene salvato in chiaro**: il server locale lo riceve a ogni accesso
+e ne conserva un hash. Da PIN e salt viene derivata la chiave che protegge la
+master key, chiamata key-encryption key (KEK). La master key è conservata
+cifrata; durante una sessione attiva il browser la tiene decifrata e oggi la
+scrive anche nel proprio `sessionStorage`. La
+[matrice dei dati a riposo](./docs/data-at-rest-matrix.md) elenca che cosa
+resta leggibile senza la chiave e le esposizioni ancora aperte.
 
 > Se cambi il modello PIN / key derivation, devi scrivere prima un ADR.
 

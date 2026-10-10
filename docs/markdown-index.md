@@ -44,6 +44,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [analysis/2026-09-26-090-first-tranche.md](./analysis/2026-09-26-090-first-tranche.md) | Prima tranche locale 0.9.0: inventario, aggiornamento paziente atomico, audit pilota e riparazioni dei test. | Per distinguere candidati verificati, limiti e lavoro ancora aperto dalla release. |
 | [audit-writers.md](./audit-writers.md) | Classificazione dei writer audit correnti e residui clinici C05. | Prima di modificare un writer o verificare i criteri C04. |
 | [clinical-write-roster.md](./clinical-write-roster.md) | Operazioni cliniche per superficie, garanzie e residui C05. | Prima di modificare una scrittura, il suo parser o la sua prova. |
+| [data-at-rest-matrix.md](./data-at-rest-matrix.md) | Matrice versionata di ciò che resta in chiaro o cifrato a riposo, custodia delle chiavi ed esposizioni aperte C06. | Prima di cambiare schema, contratto dei campi cifrati, backup, export o un testo sulla protezione dei dati. |
 | [test-inventory.md](./test-inventory.md) | Inventario incrementale dei test, selettori verificati e omissioni; debito unresolved distinto dall’esecuzione e dall’accettazione C14. | Per aggiornare candidati e binding senza trasformare selezione statica o integrità in qualifica della release. |
 
 ## 📚 Come usare questo indice

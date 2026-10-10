@@ -2871,6 +2871,15 @@
       }
     },
     {
+      "path": "lib/data-at-rest-matrix.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/db-server-attachment-currentness-bootstrap.test.ts",
       "selection": {
         "state": "mapped",
