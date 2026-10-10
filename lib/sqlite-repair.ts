@@ -259,6 +259,42 @@ export function copySqliteDatabaseSync(sourcePath: string, destPath: string): vo
     }
 }
 
+/**
+ * Preserve an original before schema changes. The caller must already hold its
+ * writer exclusion (BEGIN IMMEDIATE). This helper never opens the source for writes.
+ * Publication is exclusive: the final name links only to a verified, fsynced file.
+ * A failure after publication may leave that complete snapshot; never remove a
+ * destination here, and never let a failed directory sync authorize migration.
+ */
+export function createVerifiedSqliteSnapshotSync(sourcePath: string, destinationPath: string): void {
+    const source = canonicalTarget(sourcePath);
+    const destination = canonicalTarget(destinationPath);
+    const parent = path.dirname(destination);
+    assertDurableDirectory(parent);
+    if ([destination, ...SIDECAR_SUFFIXES.map(suffix => destination + suffix)].some(regularFile)) {
+        throw new Error('SQLITE_SNAPSHOT_DESTINATION_EXISTS');
+    }
+    // An exclusively owned directory avoids touching another operation's files.
+    // Its prefix is deliberately outside the swap recovery artifact vocabulary.
+    const temporaryDirectory = fs.mkdtempSync(path.join(parent, '.schema-snapshot-'));
+    const temporary = path.join(temporaryDirectory, 'original.db');
+    try {
+        copySqliteDatabaseSync(source, temporary);
+        fs.chmodSync(temporary, 0o600);
+        sealSnapshot(temporary);
+        syncDirectory(temporaryDirectory);
+        if (SIDECAR_SUFFIXES.some(suffix => regularFile(destination + suffix))) {
+            throw new Error('SQLITE_SNAPSHOT_DESTINATION_EXISTS');
+        }
+        // rename would overwrite a racing destination on POSIX; link fails EEXIST.
+        fs.linkSync(temporary, destination);
+        fs.unlinkSync(temporary);
+        syncDirectory(parent);
+    } finally {
+        fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
+}
+
 /** Removes -wal/-shm sidecar files so a swapped-in DB cannot inherit stale WAL pages. */
 export function removeSqliteSidecars(dbPath: string): void {
     for (const suffix of SIDECAR_SUFFIXES) {
