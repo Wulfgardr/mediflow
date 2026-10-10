@@ -131,7 +131,7 @@ test('real Web legacy, fixed-preview, and v1 create have one host-attributed eve
     assert.equal(afterV1.memberships[0].ambulatory_id, target.id);
 
     const duplicate = await request('POST', '/api/v1/patients', { headers: v1Headers, body: bodyFor(v1Id, target.id) });
-    assert.equal(duplicate.response.status, 500);
+    assert.equal(duplicate.response.status, 409);
     assert.deepEqual(snapshot(v1Id), afterV1);
     const concurrent = [];
     for (const surface of ['web-legacy', 'web-fixed-preview-v1', 'v1']) {
@@ -148,13 +148,13 @@ test('real Web legacy, fixed-preview, and v1 create have one host-attributed eve
         }
         const body = bodyFor(id, target.id);
         const responses = await Promise.all([0, 1].map(() => request('POST', pathname, { headers, body })));
-        assert.deepEqual(responses.map(item => item.response.status).sort(), [201, 500]);
+        assert.deepEqual(responses.map(item => item.response.status).sort(), [201, 409]);
         const state = checkEvent(id, surface === 'v1' ? 'local-api' : user.id,
             surface === 'v1' ? 'system' : 'user', surface === 'v1' ? 'api' : 'web');
         const retry = await request('POST', pathname, { headers, body });
-        assert.equal(retry.response.status, 500);
+        assert.equal(retry.response.status, 409);
         assert.deepEqual(snapshot(id), state);
-        concurrent.push({ surface, statuses: [201, 500], retryStatus: retry.response.status, auditCount: 1 });
+        concurrent.push({ surface, statuses: [201, 409], retryStatus: retry.response.status, auditCount: 1 });
     }
     observations.push({ names: ['Web legacy', 'Web fixed-preview-v1', 'API-v1'],
         successStatuses: [legacy.response.status, fixed.response.status, v1.response.status],

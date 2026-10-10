@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { collectUnitTestFiles, unitTestArguments, UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS } from './unit-test-selection.mjs';
+import { collectUnitTestFiles, unitTestArguments, UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS, UNIT_SERIAL_SCRIPT_TESTS, unitTestInvocationArguments } from './unit-test-selection.mjs';
 
 test('registration: route, behavior and private-loader suites each occur once in required units', () => {
   const selection = collectUnitTestFiles(path.resolve(import.meta.dirname, '..'));
@@ -85,4 +85,59 @@ test('the real runner rejects incomplete selection before bootstrap or suite lau
   assert.equal(result.status, 1, result.stdout + result.stderr);
   assert.match(result.stderr, /Cannot read required unit test file scripts\/check-never-regress-tinetti-provenance\.test\.mjs/);
   assert.equal(fs.existsSync(marker), false);
+});
+
+test('portable script cohort is selected exactly once through the common runner', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const expected = [
+    'scripts/anydoc-desktop-renderer-trace.test.mjs',
+    'scripts/anydoc-pdf-smoke-diagnostics.test.mjs',
+    'scripts/anydoc-windows-icu-preflight.test.mjs',
+    'scripts/anydoc-windows-icu-text-smoke.test.mjs',
+    'scripts/attachments-runtime-columns-migration.test.mjs',
+    'scripts/build-apple-macos-app.test.mjs',
+    'scripts/build-mobile-sim-app.test.mjs',
+    'scripts/check-capability-mapping.test.mjs',
+    'scripts/check-fabric-headless-plane-inventories.test.mjs',
+    'scripts/check-headless-semantic-plane.test.mjs',
+    'scripts/check-standalone-runtime-bundle.test.mjs',
+    'scripts/check-who-local-sidecar-manifest.test.mjs',
+    'scripts/icd-docker-packaging-retirement.test.mjs',
+    'scripts/icd-docker-runtime-retirement.test.mjs',
+    'scripts/launch-bundled-headless-supervisor.test.mjs',
+    'scripts/mediflow-headless-supervisor.test.mjs',
+    'scripts/patient-insight-revision-lifecycle.test.mjs',
+    'scripts/patient-reference-lifecycle.test.mjs',
+    'scripts/portable-supervisor-child-shutdown.test.mjs',
+    'scripts/portable-supervisor-import-urls.test.mjs',
+    'scripts/run-mini-desktop-acceptance.test.mjs',
+    'scripts/seed-performance-baseline-currentness.test.mjs',
+    'scripts/web-auth-control-test-client.test.mjs',
+    'scripts/web-session-resource-reclamation.test.mjs',
+    'scripts/mobile-home-base-interop-cas-relay.test.mjs',
+    'scripts/mobile-home-base-interop-module-verifier.test.mjs',
+    'scripts/mobile-home-base-interop-response-proxy.test.mjs',
+    'scripts/mobile-home-base-interop.test.mjs',
+    'scripts/who-local-loopback-transport.test.mjs',
+    'scripts/who-local-onboarding-portability.test.mjs',
+    'scripts/who-local-onboarding.test.mjs',
+    'scripts/who-local-platform.test.mjs',
+    'scripts/who-local-setup.test.mjs',
+    'scripts/document-evidence-backfill-currentness-cas.test.ts',
+    'scripts/local-chat-runtime.test.ts',
+  ];
+  const selected = collectUnitTestFiles(root);
+  const args = unitTestArguments(root);
+  assert.deepEqual(args.slice(0, 2), ['scripts/run-strip-types.mjs', '--test']);
+  for (const file of expected) {
+    assert.equal(selected.filter(candidate => candidate === file).length, 1, file);
+    assert.equal(args.filter(candidate => candidate === file).length, 1, file);
+  }
+});
+
+test('serial WHO invocations partition the complete selection exactly once', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const invocations = unitTestInvocationArguments(root);
+  assert.deepEqual(invocations.slice(1), UNIT_SERIAL_SCRIPT_TESTS.map(file => ['scripts/run-strip-types.mjs', '--test', file]));
+  assert.deepEqual(invocations.flatMap(args => args.slice(2)).sort(), unitTestArguments(root).slice(2).sort());
 });

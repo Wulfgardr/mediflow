@@ -42,15 +42,20 @@ function fixture(t) {
     const doubles = {
         'server-only': {}, '../db-server': databasePort, '../../db-server': databasePort,
         '../../athena-mlx-runtime': { generateWithAthenaMlx: unavailable, isAthenaMlxModelAvailable: unavailable },
-        '../../security/server-auth': { acquireAuthenticatedWebSessionProjectionOwnerContext: unavailable },
-        '../../security/server-session': { registerServerSessionResource: unavailable },
+        '../../security/ordinary-application-context': { acquireOrdinaryApplicationContext: unavailable, registerOrdinaryApplicationResource: unavailable },
+        '../../security/web-auth-lifecycle-owner-adapter': { mintResourcePort: unavailable, registerPrivateResource: unavailable, releaseResourcePort: unavailable, unregisterPrivateResource: unavailable },
+        '../../chatgpt-product/ordinary-flow': { isOrdinaryFunctionSelected: unavailable },
+        './treatment-reasoning-chatgpt-production': { createTreatmentReasoningChatGptService: unavailable },
+        './function-model-dispatch': { captureFunctionModelTransportGuard: unavailable, captureTreatmentReasoningDispatch: unavailable },
+        './treatment-reasoning-portable-runtime': { createTreatmentReasoningPortableRuntime: () => Object.freeze({}) },
+        './treatment-reasoning-portable-provisioning': { createPortableProvisioning: () => Object.freeze({}) },
         './provider-lifecycle-service': { createHostProviderLifecycleService: () => ({ service: Object.freeze({}) }) },
         './treatment-reasoning-authenticated-projection': { createTreatmentReasoningAuthenticatedProjectionBroker(sources) {
             readTreatment = sources.readPatientVersion; return Object.freeze({});
         } },
         './treatment-reasoning-production-operation': { createTreatmentReasoningProductionService: () => ({ acquireIngest: unavailable, acquirePreview: unavailable }) },
     };
-    const allowed = new Set([STORE, PORTABLE, TREATMENT, 'lib/schema.ts', 'lib/patient-lifecycle.ts',
+    const allowed = new Set([STORE, PORTABLE, TREATMENT, 'lib/schema.ts', 'lib/patient-lifecycle.ts', 'lib/version-concurrency.ts',
         'lib/ai-treatment-reasoning-kill-switch.ts', 'lib/ai-lane-kill-switch.ts']);
     const cache = new Map();
     function load(relative) {
