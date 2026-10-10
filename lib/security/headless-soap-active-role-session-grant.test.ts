@@ -1,3 +1,4 @@
+import { soapChildArguments } from '../../scripts/additional-test-selection.mjs';
 /* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -98,7 +99,7 @@ test('private owner rejects an async disposer whose public prototype is spoofed'
     await Promise.resolve(); assert.equal(completed, false);
 });
 test('private owner rolls back and terminalizes an apply-then-throw dependent attach', () => {
-    const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts'], { cwd: process.cwd(), encoding: 'utf8' });
+    const result = spawnSync(process.execPath, soapChildArguments('attach'), { cwd: process.cwd(), encoding: 'utf8' });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 test('private continuations linearize attach and use before queued revocation', async () => {
@@ -139,7 +140,7 @@ test('private continuations poison nested asynchronous grant work', async () => 
     assert.ok(nested); assert.equal(denied('lifecycle_unavailable')(await nested), true); assert.equal(publications, 1); assert.equal(disposals, 1); assert.equal(owner.service.dispose(attachedGrant), false);
 });
 test('private continuations observe rejected native Promise results', () => {
-    const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'lib/security/headless-soap-active-role-session-grant-rejection-fixture.ts'], { cwd: process.cwd(), encoding: 'utf8' });
+    const result = spawnSync(process.execPath, soapChildArguments('rejection'), { cwd: process.cwd(), encoding: 'utf8' });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 test('private dependent drain follows Web owner retirement before the next use', async () => {

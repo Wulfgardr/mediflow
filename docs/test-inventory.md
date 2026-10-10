@@ -244,3 +244,71 @@ path also activates Apple on PR and push. Other filters remain unchanged.
 An inventory PASS verifies the declared conditional selection and configured
 binding. It cannot certify that the conditional job ran or passed: authoritative
 SwiftPM comparison and execution evidence come from that job when selected.
+
+### WUL-729: disposition and execution are separate
+
+The original 170 unresolved candidates now have a bounded disposition. A mapping
+means that a real command selects the file; it is never evidence that the command
+ran or passed. The report separates ordinary CI, conditional CI and local
+selections. The two SOAP assertion fixtures have a child binding: their parent uses the shared
+argv and checks child exit status, and must itself be selected. No child
+execution is inferred from a filename or from the parent's passing status.
+
+`node scripts/local-test-selection.mjs <recipe-id>` executes one explicit recipe
+from `scripts/local-test-recipes.json`. Inventory discovery reads that same
+registry without executing it. Node commands use `process.execPath`; supported
+loaders, VM flags, serial test flags, shell wrappers and Python entrypoints have
+closed argv forms. There is no shell command evaluation, implicit file glob or
+run-all switch. Each recipe states its prerequisites. Browser, platform, model,
+server and fixture requirements remain in force, and skips do not qualify them.
+The network recipes keep the existing owned synthetic HTTP wrappers. This
+registry adds local selection, not an npm lifecycle or CI binding.
+
+The ChatGPT focused runner, prototype runner, patient soft-delete runner and UI06
+domain runner consume `scripts/additional-test-selection.mjs` directly. Their
+original ordering, loader, bootstrap, quarantine and invocation options remain
+unchanged. The inventory checks their bounded consumer bindings. The ChatGPT
+browser branch and `test:clinical-http` have literal workflow bindings; the
+nonbrowser ChatGPT, prototype, soft-delete and UI06 domain commands are reported
+as local. Prototype tests remain active assertions, not exclusions.
+
+`support` requires a concrete reason, owner and selected importer. Leading ESM
+imports and CommonJS `const ... = require(...)` are verified; extensionless
+imports resolve only when a single source sibling exists. Comments, arbitrary
+strings, type-only imports, dynamic imports and function bodies are not treated
+as support evidence. `excluded-non-test` is distinct: it identifies reviewed
+production implementation, configuration or fixture/capture tools, with a
+specific reason and owner **@Wulfgardr (WUL-729)**. Neither disposition may be
+selected as a test. Assertive generators, benchmark self-checks and SOAP child
+fixtures remain test mappings, even when they also produce fixtures. Renamed,
+missing and newly discovered files continue to fail integrity.
+
+The remaining six records are not waived:
+
+- Two Rust test source files need Cargo target/source authority. The real command
+  is `cargo test --manifest-path experiments/rust-boundary/Cargo.toml`; the current
+  manifest relies on Cargo's implicit `src/lib.rs`/`src/main.rs` targets. The local
+  Node comparator has its own closed command and built-binary/output parameters.
+- One Swift-to-Node stdin bridge needs a shared cross-language invocation binding
+  with `NativeOrdinaryClientDecryptionTests.swift`. Its executable and JSON stdin
+  protocol are constructed by Swift, not selected by a Node test command.
+- Two Xcode UI test files need the actual Xcode scheme/target source authority;
+  they are separate from the 106 SwiftPM files. Simulator/OS execution is an
+  additional prerequisite, not the reason for leaving selection unresolved.
+- One exemption fixture is dynamically imported after synthetic database setup
+  inside `lib/aifa-update-guide-route.test.ts`. Hoisting it could change module
+  initialization order; a verified lazy consumer edge remains to be implemented.
+
+The Codex, Rust comparator and mobile scenario recipes require exactly their
+registered parameter values, appended after the fixed Node entrypoint. They do
+not accept extra flags or shell expressions. Their marketplace, built binary,
+private exchange directories and synthetic client/server prerequisites are
+explicit; adding selection does not start these tools. The onboarding route
+recipe requires a fresh `local-onboarding` data directory prepared with the
+existing `scripts/prepare-e2e-db.mjs`. The native shell wrapper is local selection
+of the orchestrator, not qualification of every Xcode/SwiftPM branch.
+
+These are six files with several shared binding decisions, not six demonstrated
+product defects. They keep selection completeness incomplete. Local mappings
+also leave execution coverage open for criterion 5. The inventory continues to
+print `Execution evidence: NOT_ASSESSED` and `C14 acceptance: NOT_ASSESSED`.

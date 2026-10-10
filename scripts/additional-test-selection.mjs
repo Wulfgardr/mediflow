@@ -42,3 +42,12 @@ export const SOFT_DELETE_ROUTE_FILES = Object.freeze([
 ]);
 
 export const UI06_DOMAIN_FILES = Object.freeze(['tests/ui06/scale-behavior.test.ts', 'tests/ui06/workspace-counters.test.ts', 'lib/patient-workspace.test.ts']);
+
+export const SOAP_CHILD_FILES = Object.freeze({
+  attach: 'lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts',
+  rejection: 'lib/security/headless-soap-active-role-session-grant-rejection-fixture.ts',
+});
+export function soapChildArguments(kind) {
+  if (!Object.hasOwn(SOAP_CHILD_FILES, kind)) throw new Error('Unknown SOAP child');
+  return ['scripts/run-strip-types.mjs', SOAP_CHILD_FILES[kind]];
+}

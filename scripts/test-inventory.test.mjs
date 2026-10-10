@@ -1,3 +1,5 @@
+import { localTestCommands, localInvocationArguments, collectLocalTestSelections } from './local-test-selection.mjs';
+import { collectAdditionalInventorySelections } from './additional-inventory-selection.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -17,7 +19,7 @@ const mapped = file => ({ path: file, selection: { state: 'mapped', suiteIds: ['
 const debt = file => ({ path: file, selection: { state: 'unresolved', reason: 'Selector not verified' } });
 const candidates = files => files.map(file => ({ path: file, signals: ['synthetic'] }));
 const manifest = entries => ({ version: 1, entries });
-const selections = files => ({ unit: { files, errors: [] } });
+const selections = files => ({ unit: { mode: 'ordinary', files, errors: [] } });
 const check = (files, entries, selected = files) => checkInventory(candidates(files), manifest(entries), selections(selected));
 const headlessId = 'npm:test:headless-portable';
 const headlessFixtureFiles = [
@@ -72,7 +74,7 @@ test('invalid schema, duplicate entries and incomplete selectors fail closed wit
   assert.match(check(['a.test.ts'], [mapped('a.test.ts'), mapped('a.test.ts')]).errors.join('\n'), /DUPLICATE_ENTRY/);
   assert.match(check(['a.test.ts'], [{ ...mapped('a.test.ts'), optional: true }]).errors.join('\n'), /INVALID_ENTRY_FIELDS/);
   assert.match(check(['a.test.ts'], [{ path: 'a.test.ts', selection: { state: 'deferred', reason: 'old debt' } }]).errors.join('\n'), /INVALID_SELECTION_STATE/);
-  assert.match(checkInventory(candidates(['a.test.ts']), manifest([mapped('a.test.ts')]), { unit: { files: ['a.test.ts'], errors: ['required group missing'] } }).errors.join('\n'), /INCOMPLETE_SELECTION/);
+  assert.match(checkInventory(candidates(['a.test.ts']), manifest([mapped('a.test.ts')]), { unit: { mode: 'ordinary', files: ['a.test.ts'], errors: ['required group missing'] } }).errors.join('\n'), /INCOMPLETE_SELECTION/);
   assert.match(check(['a.test.ts'], [mapped('a.test.ts')], ['a.test.ts', 'a.test.ts']).errors.join('\n'), /DUPLICATE_SELECTED_PATH/);
   assert.match(check(['a.test.ts'], [], ['a.test.ts']).errors.join('\n'), /SELECTED_WITHOUT_ENTRY/);
 });
@@ -461,7 +463,7 @@ test('support links use only runtime imports in the closed prologue, never comme
   for (const source of [`// ${statement}`, `/* ${statement} */`, `const text = \`${statement}\`;`,
     `function hidden() { ${statement} }`, "import type { Shape } from './support.mjs';",
     "import { type Shape } from './support.mjs';", "await import('./support.mjs');",
-    "const helper = require('./support.mjs');", `const before = 1;\n${statement}`]) {
+    `const before = 1;\n${statement}`]) {
     assert.deepEqual(collectStaticSupportImports(source, file), [], source);
   }
 });
@@ -499,7 +501,7 @@ test('support importer must exist, be mapped and actually selected by an error-f
     assert.match(checkSupport(input).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED|SUPPORT_IMPORT_MISSING/);
   }
   assert.match(checkSupport(supportCase(), selections([])).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
-  assert.match(checkSupport(supportCase(), { unit: { files: ['lib/entry.test.ts'], errors: ['broken binding'] } }).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
+  assert.match(checkSupport(supportCase(), { unit: { mode: 'ordinary', files: ['lib/entry.test.ts'], errors: ['broken binding'] } }).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
   assert.match(checkSupport(supportCase(), selections(['lib/entry.test.ts', 'lib/support.mjs'])).errors.join('\n'), /SUPPORT_SELECTED_AS_TEST/);
 });
 
@@ -585,7 +587,7 @@ test('plugin test rename cannot silently change the manifest and reports conditi
   const root = fixture(t);
   const good = run(root, 'complete');
   assert.equal(good.status, 0, good.stderr);
-  assert.match(good.stdout, /Conditional suites \(workflow paths\): npm:synthetic-plugin:test/);
+  assert.match(good.stdout, /Conditional suites \(workflow\/platform\): .*npm:synthetic-plugin:test/);
   fs.renameSync(path.join(root, 'plugins/mediflow-synthetic/test/plugin.test.mjs'), path.join(root, 'plugins/mediflow-synthetic/test/renamed.test.mjs'));
   const result = run(root);
   assert.equal(result.status, 1);
@@ -677,4 +679,133 @@ test('Swift CI and verified runner drift cannot retain a successful inventory bi
     const selection = collectSwiftInventorySelection(root);
     assert.deepEqual(selection.files, []); assert.equal(selection.errors.length, 1);
   }
+});
+
+test('closed support grammar accepts leading CommonJS only and unambiguous extensionless TS', () => {
+  assert.deepEqual(collectStaticSupportImports("'use strict'; const { test } = require('node:test'); const helper = require('./fixture.cjs');", 'lib/a.test.cjs'), ['lib/fixture.cjs']);
+  for (const source of ["// const helper = require('./fixture.cjs');", "/* const helper = require('./fixture.cjs'); */", "const text = \"require('./fixture.cjs')\";", "const setup = 1; const helper = require('./fixture.cjs');"]) {
+    assert.deepEqual(collectStaticSupportImports(source, 'lib/a.test.cjs'), []);
+  }
+  const source = "import { check } from './route.acceptance'; import test from 'node:test';";
+  const input = { 'e2e/a.spec.ts': source, 'e2e/route.acceptance.ts': 'import assert from "node:assert";' };
+  assert.deepEqual(discoverCandidates(Object.keys(input), file => input[file])[0].staticImports, ['e2e/route.acceptance.ts']);
+  input['e2e/route.acceptance.js'] = '';
+  assert.deepEqual(discoverCandidates(Object.keys(input), file => input[file])[0].staticImports, ['e2e/route.acceptance']);
+});
+
+test('non-test dispositions need owner/reason and may never be selected as tests', () => {
+  const entry = { path: 'tools/capture.mjs', selection: { state: 'excluded-non-test', owner: '@Wulfgardr', reason: 'WUL-729: screenshot producer, no registered tests' } };
+  const run = value => checkInventory(candidates([entry.path]), manifest([value]), {});
+  assert.equal(run(entry).selectionComplete, true);
+  assert.deepEqual(run(entry).excludedNonTests, [entry.path]);
+  for (const field of ['owner', 'reason']) {
+    const bad = structuredClone(entry); delete bad.selection[field];
+    assert.match(run(bad).errors.join('\n'), /INVALID_NON_TEST/);
+  }
+  assert.match(checkInventory(candidates([entry.path]), manifest([entry]), selections([entry.path])).errors.join('\n'), /NON_TEST_SELECTED_AS_TEST/);
+});
+
+function localFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-local-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'scripts'));
+  fs.writeFileSync(path.join(root, 'scripts/example.test.mjs'), 'throw new Error("must never execute discovery");');
+  const recipe = { id: 'example', mode: 'local', kind: 'node-test', files: ['scripts/example.test.mjs'], prerequisites: 'Synthetic fixture only' };
+  const write = value => fs.writeFileSync(path.join(root, 'scripts/local-test-recipes.json'), JSON.stringify({ version: 1, recipes: [value] }));
+  write(recipe); return { root, recipe, write };
+}
+
+test('local dispatcher and inventory use the same closed argv without executing sources', t => {
+  const { root } = localFixture(t);
+  const command = localTestCommands(root)[0];
+  assert.equal(command.executable, process.execPath);
+  assert.deepEqual(command.args, ['--test', 'scripts/example.test.mjs']);
+  assert.deepEqual(collectLocalTestSelections(root)['local:example'].files, command.files);
+  assert.equal(collectLocalTestSelections(root)['local:example'].mode, 'local');
+});
+
+test('local recipes reject missing mode/selector/prerequisite, shell input and renamed files', t => {
+  const { root, recipe, write } = localFixture(t);
+  for (const field of ['mode', 'kind', 'files', 'prerequisites']) {
+    const bad = structuredClone(recipe); delete bad[field]; write(bad);
+    assert.throws(() => localTestCommands(root), /Invalid local recipe/);
+  }
+  for (const patch of [{ mode: 'ordinary' }, { kind: 'sh -c' }, { files: [] }, { files: ['../escape.test.mjs'] }, { files: ['scripts/example.test.mjs;touch evil'] }]) {
+    write({ ...recipe, ...patch }); assert.throws(() => localTestCommands(root));
+  }
+  write(recipe); fs.renameSync(path.join(root, recipe.files[0]), path.join(root, 'scripts/renamed.test.mjs'));
+  assert.throws(() => localTestCommands(root), /ENOENT/);
+  assert.ok(collectLocalTestSelections(root)['local:invalid'].errors.length);
+});
+
+test('wrapper recipes fail when the actual selector or invocation disappears', t => {
+  const { root, write } = localFixture(t);
+  const file = 'scripts/network-home-base-write.test.mjs';
+  fs.writeFileSync(path.join(root, file), 'throw new Error("not executed");');
+  const recipe = { id: 'network', mode: 'local', kind: 'network-write', files: [file], prerequisites: 'Owned synthetic HTTP fixture' };
+  write(recipe);
+  const wrapper = path.join(root, 'scripts/network-home-base-write-smoke.sh');
+  const selector = 'TEST_SCRIPT="${MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT:-scripts/network-home-base-write.test.mjs}"';
+  const call = 'node --test --test-concurrency=1 "$TEST_SCRIPT"';
+  fs.writeFileSync(wrapper, `${selector}\n${call}\n`);
+  assert.deepEqual(localTestCommands(root)[0].env, { MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT: file });
+  for (const content of [selector, call, `${selector}\n${call}\n${call}`]) {
+    fs.writeFileSync(wrapper, content); assert.throws(() => localTestCommands(root), /Wrapper/);
+  }
+});
+
+test('shared runner bindings reject a removed consumer and keep local distinct from ordinary CI', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-consumer-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'scripts'));
+  fs.writeFileSync(path.join(root, 'scripts/additional-test-selection.mjs'), 'export const PROTOTYPE_TEST_FILES = [];');
+  fs.writeFileSync(path.join(root, 'scripts/check-09x-prototypes.mjs'), 'const tests = [];');
+  const selected = collectAdditionalInventorySelections(root)['prototype:local'];
+  assert.equal(selected.mode, 'local');
+  assert.match(selected.errors.join('\n'), /consumer binding/);
+  assert.match(checkInventory([], manifest([]), { bad: { files: [], errors: [], mode: 'PASS' } }).errors.join('\n'), /INVALID_SUITE_MODE/);
+});
+
+ test('selection mode is mandatory and declaring a child never proves invocation', () => {
+  const files = ['a.test.mjs'];
+  const entries = manifest([mapped(files[0])]);
+  assert.match(checkInventory(candidates(files), entries, { unit: { files, errors: [] } }).errors.join('\n'), /INVALID_SUITE_MODE/);
+  assert.match(checkInventory(candidates(files), entries, { unit: { files, errors: [], mode: 'child' } }).errors.join('\n'), /UNVERIFIED_CHILD_BINDING/);
+});
+
+test('parameterized local commands preserve the entrypoint and reject missing or extra values', t => {
+  const { root, recipe, write } = localFixture(t);
+  write({ ...recipe, kind: 'node-parameters', parameters: ['--case', '--directory'] });
+  const command = localTestCommands(root)[0];
+  assert.deepEqual(localInvocationArguments(command, ['/tmp/synthetic.json', '/tmp/owned']), ['scripts/example.test.mjs', '--case', '/tmp/synthetic.json', '--directory', '/tmp/owned']);
+  for (const values of [[], ['one'], ['one', 'two', 'three'], ['--eval', 'x'], ['x', 'bad\nvalue']]) assert.throws(() => localInvocationArguments(command, values));
+  write({ ...recipe, kind: 'node-parameters' }); assert.throws(() => localTestCommands(root), /parameters/);
+  write({ ...recipe, parameters: ['--case'] }); assert.throws(() => localTestCommands(root), /parameters/);
+});
+
+test('SOAP child binding requires shared selector, parent invocation, exit oracle and selected parent', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-child-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repo = fileURLToPath(new URL('..', import.meta.url));
+  const parent = 'lib/security/headless-soap-active-role-session-grant.test.ts';
+  const children = ['attach-failure', 'rejection'].map(kind => `lib/security/headless-soap-active-role-session-grant-${kind}-fixture.ts`);
+  for (const file of [parent, ...children, 'scripts/additional-test-selection.mjs']) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.copyFileSync(path.join(repo, file), path.join(root, file));
+  }
+  const selected = collectAdditionalInventorySelections(root)['soap:child'];
+  assert.deepEqual(selected.errors, []); assert.deepEqual(selected.files, children);
+  const entries = [mapped(parent), ...children.map(file => ({ path: file, selection: { state: 'mapped', suiteIds: ['soap:child'] } }))];
+  const input = candidates([parent, ...children]);
+  const all = { unit: { files: [parent], errors: [], mode: 'ordinary' }, 'soap:child': selected };
+  assert.equal(checkInventory(input, manifest(entries), all).integrityPassed, true);
+  assert.match(checkInventory(input, manifest(entries), { 'soap:child': selected }).errors.join('\n'), /UNVERIFIED_CHILD_BINDING/);
+  const source = fs.readFileSync(path.join(root, parent), 'utf8');
+  for (const changed of [source.replace("soapChildArguments('attach')", '[]'), source.replace('assert.equal(result.status, 0,', 'assert.equal(result.status, 1,')]) {
+    fs.writeFileSync(path.join(root, parent), changed);
+    assert.match(collectAdditionalInventorySelections(root)['soap:child'].errors.join('\n'), /consumer binding/);
+  }
+  fs.writeFileSync(path.join(root, parent), source);
+  fs.rmSync(path.join(root, 'scripts/additional-test-selection.mjs'));
+  assert.ok(collectAdditionalInventorySelections(root)['soap:child'].errors.length);
 });

@@ -1,11 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { collectChatgptFocusedTests, PROTOTYPE_TEST_FILES, SOFT_DELETE_TS_FILES, SOFT_DELETE_ROUTE_FILES, UI06_DOMAIN_FILES } from './additional-test-selection.mjs';
+import { collectChatgptFocusedTests, SOAP_CHILD_FILES, soapChildArguments, PROTOTYPE_TEST_FILES, SOFT_DELETE_TS_FILES, SOFT_DELETE_ROUTE_FILES, UI06_DOMAIN_FILES } from './additional-test-selection.mjs';
 import { collectNpmScriptBinding, collectLiteralCiBinding } from './explicit-npm-test-selection.mjs';
 import { CLINICAL_HTTP_TEST_FILES } from './run-clinical-http-suite.mjs';
 
 const browserCall = 'CHATGPT_PRODUCT_DATA_DIR="$(mktemp -d "${RUNNER_TEMP}/mediflow-chatgpt-product.XXXXXX")"\nMEDIFLOW_DATA_DIR="${CHATGPT_PRODUCT_DATA_DIR}" \\\n  node scripts/chatgpt-product-focused-tests.mjs --browser-only';
 function source(root, file, fragments) {
+  filesExist(root, [file, 'scripts/additional-test-selection.mjs']);
   const content = fs.readFileSync(path.join(root, file), 'utf8');
   for (const fragment of fragments) if (content.split(fragment).length !== 2) throw new Error(`Missing or duplicate consumer binding: ${file}: ${fragment}`);
 }
@@ -46,11 +47,19 @@ export function collectAdditionalInventorySelections(root) {
   ]) {
     const [id, consumer, symbol, variable, files, call] = item;
     add(id, 'local', consumer, () => {
-      const module = consumer.startsWith('scripts/') ? './additional-test-selection.mjs' : '../../scripts/additional-test-selection.mjs';
-      source(root, consumer, [`import { ${symbol} } from '${module}';`, `const ${variable} = ${symbol};`, call]);
+      const selectorModule = consumer.startsWith('scripts/') ? './additional-test-selection.mjs' : '../../scripts/additional-test-selection.mjs';
+      source(root, consumer, [`import { ${symbol} } from '${selectorModule}';`, `const ${variable} = ${symbol};`, call]);
       if (id === 'soft-delete:local') source(root, consumer, ["import { SOFT_DELETE_TS_FILES } from './additional-test-selection.mjs';", 'const typeScriptTests = SOFT_DELETE_TS_FILES;', "run(['scripts/run-strip-types.mjs', '--test', ...typeScriptTests], env)"]);
       return { files, binding: { command: `node ${consumer}`, prerequisites: id.startsWith('prototype:') ? 'Synthetic research suite; not release qualification.' : 'Existing owned synthetic fixture/bootstrap and loader retained.' } };
     });
   }
+  const parent = 'lib/security/headless-soap-active-role-session-grant.test.ts';
+  add('soap:child', 'child', parent, () => {
+    source(root, parent, ["import { soapChildArguments } from '../../scripts/additional-test-selection.mjs';"]);
+    for (const kind of Object.keys(SOAP_CHILD_FILES)) source(root, parent, [
+      `    const result = spawnSync(process.execPath, soapChildArguments('${kind}'), { cwd: process.cwd(), encoding: 'utf8' });\n    assert.equal(result.status, 0, ` + '`${result.stdout}\\n${result.stderr}`);',
+    ]);
+    return { files: Object.keys(SOAP_CHILD_FILES).map(kind => soapChildArguments(kind)[1]), binding: { consumer: parent, invocationVerified: true, command: 'Parent spawnSync with shared argv and exit status assertion' } };
+  });
   return out;
 }

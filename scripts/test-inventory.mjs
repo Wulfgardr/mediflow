@@ -118,7 +118,7 @@ export function discoverCandidates(paths, readSource) {
     if (found.length) candidates.push({ path: relative, signals: found,
       staticImports: collectStaticSupportImports(source, relative).map(target => {
         // Closed extensionless TS imports used by Playwright; ambiguous siblings fail.
-        if (path.posix.extname(target)) return target;
+        if (/\.(?:[cm]?[jt]sx?)$/u.test(target)) return target;
         const matches = paths.filter(file => file === target || ['.ts', '.js', '.mjs', '.cjs', '.tsx'].some(ext => file === target + ext));
         return matches.length === 1 ? matches[0] : target;
       }) });
@@ -186,9 +186,9 @@ export function checkInventory(candidates, manifest, selections) {
     add('INVALID_SELECTIONS', 'expected object'); selections = {};
   }
   for (const [id, selection] of Object.entries(selections)) {
-    if (selection?.mode !== undefined && !['ordinary', 'conditional', 'local', 'child'].includes(selection.mode)) add('INVALID_SUITE_MODE', id);
+    if (!['ordinary', 'conditional', 'local', 'child'].includes(selection?.mode)) add('INVALID_SUITE_MODE', id);
     suiteModes[id] = selection?.mode ?? (selection?.conditional ? 'conditional' : 'unspecified');
-    if (selection?.conditional === true) conditionalSuites.push(id);
+    if (selection?.conditional === true || selection?.mode === 'conditional') conditionalSuites.push(id);
     if (!selection || !Array.isArray(selection.files) || !Array.isArray(selection.errors)) {
       add('INVALID_SUITE', id); continue;
     }
@@ -212,6 +212,16 @@ export function checkInventory(candidates, manifest, selections) {
     for (const id of entry.selection.suiteIds) {
       if (!suites.has(id)) add('UNKNOWN_SUITE', `${file}: ${String(id)}`);
       else if (!suites.get(id).has(file)) add('MAPPED_NOT_SELECTED', `${id}: ${file}`);
+    }
+  }
+  for (const [id, selection] of Object.entries(selections)) {
+    if (selection?.mode !== 'child') continue;
+    const consumer = selection.binding?.consumer;
+    const parent = entries.get(consumer)?.selection;
+    if (selection.binding?.invocationVerified !== true || !validPath(consumer)
+      || parent?.state !== 'mapped' || !Array.isArray(parent.suiteIds)
+      || !parent.suiteIds.some(suite => suite !== id && verifiedSuites.has(suite) && suites.get(suite).has(consumer))) {
+      add('UNVERIFIED_CHILD_BINDING', `${id}: missing verified invocation or selected consumer`);
     }
   }
   for (const file of excludedNonTests) {
@@ -270,7 +280,7 @@ async function cli(args) {
     [SWIFT_SUITE_ID]: collectSwiftInventorySelection(root),
     'npm:test:e2e': collectPlaywrightInventorySelection(root) };
   const result = checkInventory(candidates, manifest, {
-    ...Object.fromEntries(Object.entries(legacySelections).map(([id, selection]) => [id, { ...selection, mode: selection.conditional ? 'conditional' : 'ordinary' }])),
+    ...Object.fromEntries(Object.entries(legacySelections).map(([id, selection]) => [id, { ...selection, mode: selection.conditional || id === 'npm:test:native-launcher' ? 'conditional' : 'ordinary' }])),
     ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root),
   });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
@@ -287,7 +297,7 @@ function printReport(result) {
   for (const mode of ['ordinary', 'conditional', 'local', 'child', 'unspecified']) {
     console.log(`Selected suites (${mode}): ${Object.values(result.suiteModes).filter(value => value === mode).length}`);
   }
-  if (result.conditionalSuites.length) console.log(`Conditional suites (workflow paths): ${result.conditionalSuites.join(', ')}`);
+  if (result.conditionalSuites.length) console.log(`Conditional suites (workflow/platform): ${result.conditionalSuites.join(', ')}`);
   console.log('Execution evidence: NOT_ASSESSED');
   console.log('Npm CI bindings: configured literal calls only; reachability and lifecycle effects NOT_ASSESSED');
   console.log('C14 acceptance: NOT_ASSESSED');
