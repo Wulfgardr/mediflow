@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import Database from 'better-sqlite3';
+import { schemaSnapshot, schemaDifferences } from '../lib/sqlite-schema-shape.ts';
 import { initializerProgram, readPinnedSource, replayInitializers } from './historical-schema-initializers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -26,22 +27,9 @@ for (const family of families) {
   }
 }
 const workspace = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-historical-sql-baselines-')));
-const omit = (row, key) => { const copy = { ...row }; delete copy[key]; return copy; };
-const quote = name => '"' + name.replaceAll('"', '""') + '"';
 function snapshot(file) {
   const db = new Database(file, { readonly: true, fileMustExist: true });
-  try {
-    return Object.fromEntries(db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT GLOB 'sqlite_*' ORDER BY name").all().map(({ name }) => [name, {
-      definition: db.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name=?").get(name).sql,
-      triggers: db.prepare("SELECT name, sql FROM sqlite_schema WHERE type='trigger' AND tbl_name=? ORDER BY name").all(name),
-      columns: db.pragma(`table_xinfo(${quote(name)})`).map(column => omit(column, 'cid')).sort((a,b) => a.name.localeCompare(b.name)),
-      foreignKeys: db.pragma(`foreign_key_list(${quote(name)})`).map(key => omit(key, 'id')).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
-      indices: db.pragma(`index_list(${quote(name)})`).map(index => ({ name: index.origin === 'c' ? index.name : null, unique: index.unique, origin: index.origin, partial: index.partial,
-        definition: index.origin === 'c' ? db.prepare("SELECT sql FROM sqlite_schema WHERE type='index' AND name=?").get(index.name)?.sql ?? null : null,
-        columns: db.pragma(`index_xinfo(${quote(index.name)})`).map(column => omit(column, 'cid')),
-      })).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))),
-    }]));
-  } finally { db.close(); }
+  try { return schemaSnapshot(db); } finally { db.close(); }
 }
 function auditBehavior(file) {
   const db = new Database(file);
@@ -96,17 +84,8 @@ try {
       const historicalAudit = auditBehavior(file);
       const currentBootstrap = historicalError ? null : bootstrap(directory);
       const after = snapshot(file);
-      const differences = [];
-      const definitionDifferences = [];
-      for (const table of historicalError ? [] : [...new Set([...Object.keys(reference), ...Object.keys(after)])].sort()) {
-        for (const aspect of ['columns','foreignKeys','indices']) {
-          const metadata = value => aspect === 'indices' ? value?.map(index => Object.fromEntries(Object.entries(index).filter(([key]) => !['definition', 'triggers'].includes(key)))) : value;
-          if (JSON.stringify(metadata(reference[table]?.[aspect])) !== JSON.stringify(metadata(after[table]?.[aspect]))) differences.push({table,aspect,fresh:metadata(reference[table]?.[aspect]) ?? null,upgradedOrigin:metadata(after[table]?.[aspect]) ?? null});
-        }
-        for (const aspect of ['definition', 'indices', 'triggers']) {
-          if (JSON.stringify(reference[table]?.[aspect]) !== JSON.stringify(after[table]?.[aspect])) definitionDifferences.push({ table, aspect });
-        }
-      }
+      const differences = historicalError ? [] : schemaDifferences(reference, after);
+      const definitionDifferences = differences.filter(({ aspect }) => ['definition', 'indices', 'triggers'].includes(aspect)).map(({ table, aspect }) => ({ table, aspect }));
       results.push({ tags: family.tags, origin, initializerProvenance: programs[familyIndex].provenance,
         warnings, historicalError, initialTableCount: Object.keys(before).length,
         initialObservations: before.observations?.columns, historicalAudit, currentBootstrap,
@@ -115,5 +94,5 @@ try {
   }
   process.exitCode = results.some(result => result.historicalError || result.currentBootstrap?.status !== 0) ? 1 : 0;
   console.log(JSON.stringify({ currentCommit: git('rev-parse','HEAD').trim(), currentBootstrapCommit: manifest.currentCommit, kind: manifest.kind,
-    limitations: ['Only the declared synthetic provisioning origins are tested, not all installed release databases or product support versions.', 'Table DDL is compared textually only: definition differences are not semantic CHECK equivalence. Explicit index SQL preserves partial predicates but is not parsed for semantic equivalence.', 'Audit INSERT/UPDATE/DELETE behavior is tested on synthetic rows; general CHECK and FK data behavior remain outside this bounded probe.', 'Exit zero means all requested initializers/current bootstraps completed, not schema parity or release support.'], freshAudit: auditBehavior(path.join(freshDirectory, 'medical.db')), results }, null, 2));
+    limitations: ['Only the declared synthetic provisioning origins are tested, not all installed release databases or product support versions.', 'Comparison ignores physical column position, SQL whitespace/comments and quoting of recognized declaration names only. PK ordinals, grouped FK components, index metadata and SQL tokens preserve constraints, expressions, predicates and triggers. Unknown syntax and conflict-order-sensitive DDL compare conservatively; differences may require review, not imply inequivalence. CHECK/expression algebraic equivalence is not inferred.', 'Audit INSERT/UPDATE/DELETE behavior is tested on synthetic rows; general CHECK and FK data behavior remain outside this bounded probe.', 'Exit zero means all requested initializers/current bootstraps completed, not schema parity or release support.'], freshAudit: auditBehavior(path.join(freshDirectory, 'medical.db')), results }, null, 2));
 } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
