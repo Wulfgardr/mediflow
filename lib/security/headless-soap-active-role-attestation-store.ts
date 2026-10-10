@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { types } from 'node:util';
 
-import { openDbServer, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, runDbServerImmediateTransaction } from '../db-server';
+import { getInitialDbServerHandle, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, runDbServerImmediateTransaction } from '../db-server';
 
 const SCHEMA_VERSION = 'mediflow.headless-soap-active-role-attestation.v1' as const;
 const ROLE = 'physician' as const;
@@ -20,13 +20,13 @@ const regexpTest = RegExp.prototype.test, refPattern = /^hsar_[0-9a-f]{32}$/, is
 const isProxy = types.isProxy, entropy = randomBytes, eventEntropy = randomUUID, transaction = runDbServerImmediateTransaction;
 const canonicalSchema = hasCanonicalHeadlessSoapActiveRoleAttestationSchema;
 const errors = new WeakSet<object>(), brandError = WeakSet.prototype.add.bind(errors), hasError = WeakSet.prototype.has.bind(errors);
-// Capture the intrinsic now, but bind only once to the first concrete connection.
+// Capture the intrinsic now, but bind only once to the first successfully opened connection.
 // A later swap must not silently retarget this owner's captured SQL authority.
 const prepareIntrinsic = Function.prototype.call.bind(Database.prototype.prepare);
 let boundPrepare: ((query: string) => Database.Statement) | undefined;
 const prepare = (query: string): Database.Statement => {
     if (!boundPrepare) {
-        const client = openDbServer();
+        const client = getInitialDbServerHandle();
         boundPrepare = (sql: string) => prepareIntrinsic(client, sql);
     }
     return boundPrepare(query);
