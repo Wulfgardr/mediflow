@@ -914,3 +914,24 @@ test('execution prerequisite dispositions require individual ownership and never
   ci.unit.errors.push('CI invocation missing');
   assert.match(checkInventory(found, manifest([conditional]), ci).errors.join('\n'), /EXECUTION_CONDITION_NOT_BOUND/);
 });
+
+
+test('optional profiles exclude only the ordinary gate and retain a verified local recipe', () => {
+  const entry = { ...mapped('lib/a.test.ts'), execution: { state: 'optional-profile', profile: 'synthetic-device', ordinaryGate: 'excluded', owner: '@Wulfgardr', reason: 'WUL-729: coordinated synthetic device qualification', conditions: ['Prepared synthetic device'] } };
+  const found = candidates([entry.path]);
+  const local = { unit: { files: [entry.path], errors: [], mode: 'local' } };
+  const result = checkInventory(found, manifest([entry]), local);
+  assert.equal(result.selectionComplete, true);
+  assert.equal(result.executionPrerequisites[0].state, 'optional-profile');
+  assert.equal(result.excludedNonTests.length, 0);
+  for (const key of ['profile', 'ordinaryGate', 'owner', 'reason', 'conditions']) {
+    const invalid = structuredClone(entry); delete invalid.execution[key];
+    assert.match(checkInventory(found, manifest([invalid]), local).errors.join('\n'), /INVALID_EXECUTION_PREREQUISITES/);
+  }
+  const ordinary = { unit: { ...local.unit, mode: 'ordinary' } };
+  assert.match(checkInventory(found, manifest([entry]), ordinary).errors.join('\n'), /OPTIONAL_PROFILE_RECIPE_NOT_BOUND/);
+  assert.match(checkInventory(found, manifest([entry]), { ...local, ci: ordinary.unit }).errors.join('\n'), /OPTIONAL_PROFILE_SELECTED_BY_ORDINARY_GATE/);
+  assert.match(checkInventory(found, manifest([entry]), { unit: { ...local.unit, errors: ['missing consumer'] } }).errors.join('\n'), /OPTIONAL_PROFILE_RECIPE_NOT_BOUND/);
+  const invalid = structuredClone(entry); invalid.execution.ordinaryGate = 'passed';
+  assert.match(checkInventory(found, manifest([invalid]), local).errors.join('\n'), /INVALID_EXECUTION_PREREQUISITES/);
+});

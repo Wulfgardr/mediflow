@@ -346,25 +346,32 @@ selected Node binary directory to child `PATH`.
 | `scripts/native-test.sh` | Apple Native / native-build-test | Existing invocation retained once; shared SwiftPM selection verifier precedes the same 106 source tests |
 
 Among the original 170 candidates, unique dispositions are 135 ordinary CI,
-four conditional CI, three children of selected tests, six local-only active
+four conditional CI, three children of selected tests, six optional-profile active
 tests, 16 supports and six non-tests. These counts assign each file once; a file
 can retain both its local invocation and CI suite membership. They are not counts
 of executed tests or independent defects.
 
-The six local-only active tests retain `execution.state: not-provisioned`, owner
-`@Wulfgardr`, WUL-729 reason and individual conditions in the manifest:
+The six active optional-profile tests use `execution.state: optional-profile`,
+`ordinaryGate: excluded`, a named profile, owner `@Wulfgardr`, WUL-729 reason
+and individual conditions in the same manifest consumed locally and in CI:
 
 - `plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs`: authorized authenticated Codex CLI and enabled plugin marketplace.
 - `scripts/mobile-home-base-interop-cas-relay.mjs`: two synthetic participants and separate private exchange directories/receipts.
 - `scripts/mobile-home-base-interop-module-verifier.mjs`: running synthetic iOS/iPadOS server, scenario descriptor and private exchange directory.
 - `scripts/mlx-chat-batch-runner-test.sh`: provisioned Apple MLX environment, including modules required even by its dry-run.
-- `scripts/run-visit-recording-synthetic-benchmark.mjs`: provisioned synthetic voices and local transcription assets; no real recordings or model installation is implied.
+- `scripts/run-visit-recording-synthetic-benchmark.mjs`: macOS 26, configured compatible Xcode, the five synthetic voices and installed Italian SpeechTranscriber assets. Availability must be verified; missing qualification does not prove assets absent.
 - `scripts/anydoc-desktop-ocr-real.test.ts`: pinned Tesseract, OCR assets and matching rendering environment with serial execution.
 
-These are precise unmet execution prerequisites, not approved exclusions or PASS.
+These are explicit exclusions from the ordinary gate for optional qualification
+profiles, not non-tests, disabled capabilities or PASS. Their original recipes
+remain available. The guard requires a verified local selection and rejects
+contradictory ordinary-gate membership; missing profile, exclusion marker, owner,
+reason or conditions fails integrity. Ordinary shared suites remain mandatory.
+No local receipt or transient host state is embedded in this contract.
 The custodian and native wrapper instead have `execution.state: conditional-ci`,
 which requires a verified conditional suite. Missing owner, reason, conditions or
 conditional binding fails integrity. Local functional receipts supplied by runner
 authors do not replace the eventual candidate CI, and existing skips do not
-establish qualification of the skipped branches. Criterion 5 remains subject to
-that CI evidence and disposition of these six limitations.
+establish qualification of the skipped branches. Criterion 5 uses this same inventory and the same six profile exclusions locally
+and in CI; candidate CI evidence remains necessary. Inventory reporting retains
+`Execution evidence: NOT_ASSESSED` and never turns an optional profile into PASS.
