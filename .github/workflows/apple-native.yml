@@ -143,6 +143,7 @@ jobs:
             [ -n "$f" ] || continue
             case "$f" in
               native/*) apple=true; continue ;;
+              scripts/installability-v0-macos.test.mjs | scripts/build-installability-v0-macos.sh | scripts/installability-v0-macos-launcher.sh) apple=true; continue ;;
               scripts/swift-test-selection.mjs | scripts/local-test-selection.mjs | scripts/local-test-recipes.json) apple=true; continue ;;
               # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
               # corregge quella gamba deve quindi attivarla sul push a main.
@@ -211,6 +212,9 @@ jobs:
         run: |
           set -o pipefail
           scripts/native-test.sh 2>&1 | tee "${RUNNER_TEMP}/swiftpm-tests.log"
+      - name: macOS installability launcher contracts
+        run: node scripts/local-test-selection.mjs test:installability-v0
+
       - name: Prepare synthetic custodian data directory
         id: custodian-data
         run: |

@@ -8437,7 +8437,17 @@
         "state": "mapped",
         "suiteIds": [
           "local:test:installability-v0",
-          "npm:test:portable-local"
+          "apple:installability-v0"
+        ]
+      },
+      "execution": {
+        "state": "conditional-ci",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Real macOS launcher contracts require system lockf; the unchanged local recipe runs in the Apple lane instead of Linux. No lock substitute or skip qualifies this profile.",
+        "conditions": [
+          "macOS with real system lockf and Node 24",
+          "Apple change filter includes test, build script and launcher on pull requests and pushes",
+          "Test-owned synthetic app bundle and isolated data directories"
         ]
       }
     },

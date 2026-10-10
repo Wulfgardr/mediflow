@@ -336,17 +336,18 @@ selected Node binary directory to child `PATH`.
 
 | Shared command | Existing CI lane | Selection and conditions |
 | --- | --- | --- |
-| `npm run test:portable-local` | Web Core / web-core | 47 recipes, 112 unique selected files, including 64 of the original local debt; ordinary lane, existing per-test platform/opt-in skips remain visible |
+| `npm run test:portable-local` | Web Core / web-core | 46 recipes, 111 unique selected files, including 63 of the original local debt; ordinary lane, existing per-test platform/opt-in skips remain visible |
 | `npm run test:owned-http` | Web Core / web-core | 17 owned synthetic invocations, 19 files; wrapper and child share one invocation |
 | `npm run test:owned-http-standalone` | Web Core / web-core | One supervisor file after the existing real standalone build; no dev-server fallback |
 | `npm run test:fixture-generators` | Web Core / web-core | Two generators in a disposable tracked workspace; verify generated JSON and clean outputs |
 | `npm run test:research-boundary` | Web Core / web-core | Original Cargo test including doctests, release binary, then comparator; three inventory files |
 | `npm run test:inventory-browser` | E2E / e2e | Four synthetic browser contracts using installed locked Playwright; no added retries or quarantine |
+| `node scripts/local-test-selection.mjs test:installability-v0` | Apple Native / native-build-test | Real macOS launcher tests with system `lockf`; test, build script and launcher changes activate the lane on PR and push |
 | `npm run test:apple-custodian` | Apple Native / native-build-test | Canonical Node recipe on the existing macOS/Xcode lane and Apple change condition |
 | `scripts/native-test.sh` | Apple Native / native-build-test | Existing invocation retained once; shared SwiftPM selection verifier precedes the same 106 source tests |
 
-Among the original 170 candidates, unique dispositions are 135 ordinary CI,
-four conditional CI, three children of selected tests, six optional-profile active
+Among the original 170 candidates, unique dispositions are 134 ordinary CI,
+five conditional CI, three children of selected tests, six optional-profile active
 tests, 16 supports and six non-tests. These counts assign each file once; a file
 can retain both its local invocation and CI suite membership. They are not counts
 of executed tests or independent defects.
@@ -368,7 +369,7 @@ remain available. The guard requires a verified local selection and rejects
 contradictory ordinary-gate membership; missing profile, exclusion marker, owner,
 reason or conditions fails integrity. Ordinary shared suites remain mandatory.
 No local receipt or transient host state is embedded in this contract.
-The custodian and native wrapper instead have `execution.state: conditional-ci`,
+The installability launcher, custodian and native wrapper instead have `execution.state: conditional-ci`,
 which requires a verified conditional suite. Missing owner, reason, conditions or
 conditional binding fails integrity. Local functional receipts supplied by runner
 authors do not replace the eventual candidate CI, and existing skips do not
