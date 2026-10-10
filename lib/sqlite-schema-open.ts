@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import reservation from '../scripts/native-first-install-contract.json' with { type: 'json' };
 import { checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema, initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
@@ -10,6 +9,9 @@ import { initSqlitePragmas } from './sqlite-pragmas';
 import { upgradeObservationTimestampDefault } from './sqlite-observation-schema-upgrade';
 
 export const CURRENT_SQLITE_SCHEMA_VERSION = 1;
+// Same values as scripts/native-first-install-contract.json, which the native
+// helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
+const reservation = { applicationId: 1296451154, userVersion: 0 };
 
 export class SqliteSchemaRecoveryRequiredError extends Error {
     readonly code = 'SQLITE_SCHEMA_RECOVERY_REQUIRED';
