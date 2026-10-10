@@ -137,8 +137,10 @@ flowchart LR
   MK --> Encrypt
 ```
 
-Il PIN non viene salvato; la master key resta nella RAM della sessione e i
-campi sensibili persistono cifrati secondo il contratto. Il file SQLite non è
+Il PIN non viene salvato in chiaro; durante la sessione il browser tiene la
+master key decifrata, oggi anche nel `sessionStorage`, e i campi sensibili
+persistono cifrati secondo il contratto. La
+[matrice dei dati a riposo](./data-at-rest-matrix.md) classifica ogni colonna e ogni file. Il file SQLite non è
 cifrato integralmente: lo schema relazionale sottostante va letto mantenendo
 questa distinzione.
 
