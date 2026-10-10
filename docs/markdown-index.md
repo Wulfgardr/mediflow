@@ -45,6 +45,7 @@ versione o risalire alla provenienza di un’interfaccia.
 | [audit-writers.md](./audit-writers.md) | Classificazione dei writer audit correnti e residui clinici C05. | Prima di modificare un writer o verificare i criteri C04. |
 | [clinical-write-roster.md](./clinical-write-roster.md) | Operazioni cliniche per superficie, garanzie e residui C05. | Prima di modificare una scrittura, il suo parser o la sua prova. |
 | [data-at-rest-matrix.md](./data-at-rest-matrix.md) | Matrice versionata di ciò che resta in chiaro o cifrato a riposo, custodia delle chiavi ed esposizioni aperte C06. | Prima di cambiare schema, contratto dei campi cifrati, backup, export o un testo sulla protezione dei dati. |
+| [backup-restore-drill.md](./backup-restore-drill.md) | Istruzioni per eseguire la prova sintetica di ripristino e leggerne l'esito. | Prima di affidarsi a un backup, o dopo aver cambiato backup e ripristino. |
 | [test-selection.md](./test-selection.md) | Controllo che ogni file di test sia preso da una suite; come aggiungere un test o escludere un helper. | Prima di aggiungere, rinominare o spostare un test o un suo supporto. |
 
 ## 📚 Come usare questo indice

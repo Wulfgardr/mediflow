@@ -37,6 +37,11 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
     assert.equal(report.scenario, 'synthetic-local-restore-drill');
     assert.equal(report.localOnly, true);
     assert.equal(report.restore.mode, 'sandbox-payload-materialization');
+    // The backup taken from the source archive is restored by the real executor and exported again.
+    assert.equal(report.realRestore.mode, 'sqlite-restore-and-reexport');
+    assert.deepEqual(report.realRestore.differences, []);
+    assert.ok(report.realRestore.recordsCompared >= 5, 'the seeded synthetic records take part in the comparison');
+    assert.equal(report.realRestore.sealedValuesReadable, 8);
     assert.equal(report.preflight.ok, true);
     assert.deepEqual(report.failures, []);
     assert.deepEqual(report.retention, {
