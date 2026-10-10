@@ -53,10 +53,10 @@ test('patient GET and PUT handlers hide soft-deleted patients (404 contract)', (
     }
 });
 
-test('db-server keeps the additive ensureColumn guards for the tombstone columns', () => {
-    const source = read('lib/db-server.ts');
-    assert.match(source, /ensureColumn\('patients', 'deleted_at', 'deleted_at INTEGER'\)/);
-    assert.match(source, /ensureColumn\('patients', 'deletion_reason', 'deletion_reason TEXT'\)/);
+test('the schema owner keeps the additive ensureColumn guards for the tombstone columns', () => {
+    const source = read('lib/sqlite-schema.ts');
+    assert.match(source, /ensureColumn\(sqlite, 'patients', 'deleted_at', 'deleted_at INTEGER'\)/);
+    assert.match(source, /ensureColumn\(sqlite, 'patients', 'deletion_reason', 'deletion_reason TEXT'\)/);
 });
 
 test('primary patient list reads exclude soft-deleted patients', () => {
