@@ -111,6 +111,10 @@ I pin e l'ordine preciso sono nel [manifest delle origini](../../scripts/fixture
 Questa lista non autorizza schemi modificati a mano o ogni possibile storia
 di provisioning: l'ammissione richiede che la migrazione in avanti raggiunga
 lo schema canonico, compresi indici, FK, CHECK e trigger; viste inattese sono negate.
+Righe orfane già presenti e tabelle che MediFlow non possiede non impediscono
+l'apertura: l'archivio era utilizzabile prima e resta tale. La migrazione non
+può aggiungere violazioni di chiave esterna, e l'originale conservato le
+mantiene come le ha trovate. La corruzione (`integrity_check`) resta bloccante.
 
 Per un'origine ammessa l'originale `medical.db.schema-original-v0-<uuid>.db`
 è verificato e pubblicato prima della prima modifica. Schema e versione si

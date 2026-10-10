@@ -14,6 +14,7 @@ const migrationDb = new Database(path.join(dataDir, 'medical.db'));
 for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((file) => file.endsWith('.sql')).sort()) migrationDb.exec(fs.readFileSync(path.join(root, 'drizzle', name), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
 migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
+(await import('./db-server.ts')).openDbServer();
 const requireCurrent = createRequire(import.meta.url);
 const adapter = requireCurrent('./attachment-currentness-get-route') as typeof import('./attachment-currentness-get-route');
 const ref = 'a'.repeat(64);

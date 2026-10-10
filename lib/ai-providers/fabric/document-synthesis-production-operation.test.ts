@@ -14,6 +14,7 @@ for (const file of readdirSync(path.resolve('drizzle')).filter((name) => name.en
     bootstrap.exec(readFileSync(path.join(path.resolve('drizzle'), file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
 }
 bootstrap.close();
+(await import('../../db-server.ts')).openDbServer();
 const { createFullPortProjectionOwnerFactory } = await import('../../security/server-session-projection-owner.ts');
 const { clearAllSessions } = await import('../../security/server-session.ts');
 const {

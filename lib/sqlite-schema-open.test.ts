@@ -90,7 +90,7 @@ test('failed snapshot publication and unsupported schema roll back without claim
         const link = fs.linkSync;
         try {
             const db = seed(w.file, true);
-            if (scenario === 'schema') db.exec('CREATE TABLE unsupported_schema (id TEXT)');
+            if (scenario === 'schema') db.exec('ALTER TABLE settings ADD COLUMN unsupported_column TEXT');
             if (scenario === 'view') db.exec('CREATE VIEW unsupported_view AS SELECT value FROM settings');
             db.close();
             if (scenario === 'snapshot') fs.linkSync = ((source, destination) => {
@@ -102,12 +102,30 @@ test('failed snapshot publication and unsupported schema roll back without claim
             assert.equal(after.pragma('user_version', { simple: true }), 0);
             assert.equal(columns(after).includes('monitoring_profile'), false);
             assert.equal(after.prepare('SELECT value FROM settings WHERE key=?').pluck().get('synthetic-original'), 'preserved');
-            if (scenario === 'schema') assert.ok(after.prepare("SELECT name FROM sqlite_schema WHERE name='unsupported_schema'").get());
+            if (scenario === 'schema') assert.ok((after.pragma('table_info(settings)') as { name: string }[]).some(row => row.name === 'unsupported_column'));
             if (scenario === 'view') assert.ok(after.prepare("SELECT name FROM sqlite_schema WHERE name='unsupported_view'").get());
             after.close();
             assert.deepEqual(originals(w.directory), [], scenario);
         } finally { fs.linkSync = link; w.cleanup(); }
     }
+});
+
+test('an archive with an orphan row and a table MediFlow does not own still opens and keeps both', () => {
+    const w = workspace();
+    try {
+        const db = seed(w.file, true);
+        db.exec('CREATE TABLE operator_scratch (id TEXT)');
+        db.pragma('foreign_keys = OFF');
+        db.prepare("INSERT INTO entries (id, patient_id, type, date, content) VALUES ('orphan-entry', 'missing-patient', 'note', 0, 'synthetic')").run();
+        db.close();
+        for (let start = 0; start < 2; start += 1) {
+            const opened = openVersionedSqliteDatabase(w.file);
+            assert.equal(opened.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+            assert.equal(opened.prepare("SELECT count(*) FROM entries WHERE id='orphan-entry'").pluck().get(), 1);
+            assert.ok(opened.prepare("SELECT 1 FROM sqlite_schema WHERE name='operator_scratch'").get());
+            opened.close();
+        }
+    } finally { w.cleanup(); }
 });
 
 test('another writer blocks migration without a snapshot or DDL', () => {

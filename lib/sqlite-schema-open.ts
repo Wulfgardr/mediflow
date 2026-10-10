@@ -24,13 +24,20 @@ function deny(reason: string): never { throw new SqliteSchemaRecoveryRequiredErr
 function assertIntegrity(connection: Database.Database): void {
     const integrity = connection.pragma('integrity_check') as { integrity_check: string }[];
     if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') deny('integrity check failed');
-    if ((connection.pragma('foreign_key_check') as unknown[]).length !== 0) deny('foreign key check failed');
+}
+
+// Orphan rows already in an archive are repairable data, not a reason to lock
+// the clinician out. Migration must not add any.
+function foreignKeyViolations(connection: Database.Database): string {
+    return JSON.stringify(connection.pragma('foreign_key_check'));
 }
 
 function assertCanonical(connection: Database.Database, canonical: Database.Database): void {
     // Views are outside the supported schema; never omit them from admission.
     if (connection.prepare("SELECT 1 FROM sqlite_schema WHERE type='view' LIMIT 1").get()) deny('unsupported view');
-    const differences = schemaDifferences(schemaSnapshot(canonical), schemaSnapshot(connection));
+    // Every product table must match exactly; a table MediFlow does not own is left alone.
+    const expected = schemaSnapshot(canonical);
+    const differences = schemaDifferences(expected, schemaSnapshot(connection)).filter(({ table }) => table in expected);
     if (differences.length) deny(`unsupported schema (${differences[0].table}.${differences[0].aspect})`);
 }
 
@@ -107,10 +114,12 @@ export function openVersionedSqliteDatabase(databasePath: string): Database.Data
                     const afterCopy = fs.lstatSync(databasePath);
                     if (afterCopy.dev !== before.dev || afterCopy.ino !== before.ino) deny('database identity changed during snapshot');
                 }
+                const violationsBefore = foreignKeyViolations(connection);
                 initializeSqliteSchema(connection);
                 upgradeObservationTimestampDefault(connection, canonical);
                 assertCanonical(connection, canonical);
                 assertIntegrity(connection);
+                if (foreignKeyViolations(connection) !== violationsBefore) deny('migration changed foreign key violations');
                 // The native reservation is consumed atomically with the schema.
                 connection.pragma('application_id = 0');
                 connection.pragma(`user_version = ${CURRENT_SQLITE_SCHEMA_VERSION}`);

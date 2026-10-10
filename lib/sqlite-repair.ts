@@ -97,10 +97,14 @@ function assertIntegrity(file: string): void {
     } finally { db.close(); }
 }
 
-function sealSnapshot(file: string): void {
+function sealSnapshot(file: string, foreignKeys: 'clean' | 'as-found' = 'clean'): void {
     const snapshot = new Database(file, { fileMustExist: true });
-    try { snapshot.pragma('journal_mode = DELETE'); } finally { snapshot.close(); }
-    assertIntegrity(file);
+    try {
+        snapshot.pragma('journal_mode = DELETE');
+        // A preserved original keeps the orphans its source already had.
+        if (foreignKeys === 'as-found' && String(snapshot.pragma('integrity_check', { simple: true })) !== 'ok') throw new SqliteSwapRecoveryRequiredError();
+    } finally { snapshot.close(); }
+    if (foreignKeys === 'clean') assertIntegrity(file);
     for (const suffix of SIDECAR_SUFFIXES) {
         if (regularFile(file + suffix)) throw new SqliteSwapRecoveryRequiredError();
     }
@@ -281,7 +285,7 @@ export function createVerifiedSqliteSnapshotSync(sourcePath: string, destination
     try {
         copySqliteDatabaseSync(source, temporary);
         fs.chmodSync(temporary, 0o600);
-        sealSnapshot(temporary);
+        sealSnapshot(temporary, 'as-found');
         syncDirectory(temporaryDirectory);
         if (SIDECAR_SUFFIXES.some(suffix => regularFile(destination + suffix))) {
             throw new Error('SQLITE_SNAPSHOT_DESTINATION_EXISTS');

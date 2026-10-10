@@ -37,6 +37,7 @@ const AUTHORITY_DB_PATH = path.join(AUTHORITY_DATA_DIR, 'medical.db');
     sqlite.close();
 }
 process.env.MEDIFLOW_DATA_DIR = AUTHORITY_DATA_DIR;
+(await import('./db-server.ts')).openDbServer();
 
 const authoritySessions: ServerSession[] = [];
 let authoritySessionSequence = 0;

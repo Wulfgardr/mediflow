@@ -11,6 +11,7 @@ import { after, test } from 'node:test';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-current-review-locator-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], { env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir } });
+(await import('../../db-server.ts')).openDbServer();
 
 const { createDurableCurrentReviewLocator, DurableCurrentReviewLocatorError } = await import('./durable-current-review-locator.ts');
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');

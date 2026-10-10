@@ -341,7 +341,7 @@ test('verified schema snapshot includes committed WAL, schema version and valid 
     } finally { source.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('verified schema snapshot rejects invalid FK and corrupt input before publication without changing source', () => {
+test('verified schema snapshot keeps existing orphans and rejects corrupt input without changing source', () => {
     const dir = makeTempDir();
     try {
         for (const invalid of ['foreign-key', 'corrupt']) {
@@ -354,9 +354,10 @@ test('verified schema snapshot rejects invalid FK and corrupt input before publi
                 db.close();
             }
             const before = fs.readFileSync(source);
-            assert.throws(() => createVerifiedSqliteSnapshotSync(source, destination));
+            if (invalid === 'corrupt') assert.throws(() => createVerifiedSqliteSnapshotSync(source, destination));
+            else createVerifiedSqliteSnapshotSync(source, destination);
             assert.deepEqual(fs.readFileSync(source), before);
-            assert.equal(fs.existsSync(destination), false);
+            assert.equal(fs.existsSync(destination), invalid === 'foreign-key');
             assert.deepEqual(fs.readdirSync(dir).filter(name => name.startsWith('.schema-snapshot-')), []);
         }
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
