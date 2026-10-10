@@ -42,6 +42,9 @@ import { assertBackupAuditSnapshots, backupAuditCoverage, backupAuditsEqual, can
     type BackupAuditCoverage, type BackupAuditRow } from './backup-audit';
 import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links';
 import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
+import { DATE_FIELDS } from '../scripts/scheduled-backup-date-fields.mjs';
+
+export { DATE_FIELDS };
 
 const CLEAR_ORDER: BackupCollectionName[] = [
     'headlessSoapEntryCommits',
@@ -156,32 +159,6 @@ function chunk<T>(items: T[], size: number): T[][] {
     }
     return chunks;
 }
-
-export const DATE_FIELDS = new Set([
-    'assignedAt',
-    'birthDate',
-    'collaudoAt',
-    'decidedAt',
-    'createdAt',
-    'date',
-    'endDate',
-    'importedAt',
-    'observedAt',
-    'ocrQueueUpdatedAt',
-    'performedAt',
-    'prescribedAt',
-    'reportReceivedAt',
-    'scheduledAt',
-    'startDate',
-    'startedAt',
-    'completedAt',
-    'committedAt',
-    'expiresAt',
-    'activatedAt',
-    'revokedAt',
-    'deletedAt',
-    'updatedAt',
-]);
 
 function normalizeDateValue(value: unknown): unknown {
     if (value === null || value === undefined || value === '') return null;

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['scripts/run-scheduled-backup.mjs', 'd0446a62097d13a7c5ca1c6d0f3203d077e90997b4c920d47d2b554d5880c913'],
-  ['scripts/scheduled-backup-date-fields.mjs', '508ca02d04a291113d6f714eb6169420d7e16d760a7981ce600edc312393403c'],
+  ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
   ['lib/sqlite-maintenance-admission.mjs', 'd042bf1258a300bbd085593088c0051f51f975636eca33b29c9b11e9d3d3f556'],
   ['lib/sqlite-durability.mjs', '75dc15f8a383bf040d6a0b494a2889d136be248772f5ddca7cd29651d5a4a103'],
   ['lib/backup-audit.ts', 'd58f0e13136e8be04823839f4a61394bb85404da9603803f9a0b27c396243c56'],
