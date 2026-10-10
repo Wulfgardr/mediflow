@@ -220,3 +220,18 @@ test('paired delete and restore reject exhaustion and allow the last safe increm
         assert.equal(readBack(id).patient?.version, Number.MAX_SAFE_INTEGER);
     }
 });
+
+
+test('paired create denies a retired identity only after scope admission', async () => {
+    const id = 'c05-network-retired';
+    setup(id, 'absent');
+    sql.prepare('INSERT INTO patient_retired_ids (id) VALUES (?)').run(id);
+    const before = readBack(id);
+    const body = { id, firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTHETIC-RETIRED' };
+    const ctx = context(id);
+    const denied = await lifecycle.createNetworkScopedPatient({ ...ctx, scopeAmbulatoryId: 'other-scope' }, body);
+    assert.equal(denied.status, 403);
+    const conflict = await lifecycle.createNetworkScopedPatient(ctx, body);
+    assert.deepEqual(conflict, { status: 409, value: { error: 'Patient create conflict' } });
+    assert.deepEqual(readBack(id), before);
+});

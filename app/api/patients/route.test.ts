@@ -12,7 +12,7 @@ import test from 'node:test';
 import BetterSqlite3 from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
-import { patients, ambulatories, patientsToAmbulatories } from '../../../lib/schema.ts';
+import { patients, ambulatories, patientsToAmbulatories, patientRetiredIds } from '../../../lib/schema.ts';
 import type * as Owner from '@mediflow/web-auth-lifecycle-owner';
 import type { PatientCreatePreviewContext } from '../../../lib/security/patient-create-context.ts';
 
@@ -55,8 +55,8 @@ test('actual patient HTTP route boundaries on synthetic SQL', async t => {
     sql.pragma('foreign_keys = ON');
     const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
     // All columns/types are read from the unchanged schema. Drizzle applies its
-    // declared defaults to INSERTs; only these three synthetic tables are created.
-    for (const table of [ambulatories, patients, patientsToAmbulatories]) {
+    // declared defaults to INSERTs; only these four synthetic tables are created.
+    for (const table of [ambulatories, patients, patientsToAmbulatories, patientRetiredIds]) {
         const config = getTableConfig(table);
         const columns = config.columns.map(column => `${quote(column.name)} ${column.getSQLType()}${column.primary ? ' PRIMARY KEY' : ''}${column.notNull ? ' NOT NULL' : ''}`);
         if (table === patients) columns.push('FOREIGN KEY(ambulatory_id) REFERENCES ambulatories(id)');

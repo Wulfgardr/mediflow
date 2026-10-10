@@ -3,7 +3,7 @@
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
-import { patients } from '@/lib/schema';
+import { patients, patientRetiredIds } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
@@ -100,6 +100,11 @@ export async function POST(request: Request) {
                 }),
             };
 
+            tx.insert(patientRetiredIds).values({ id: patientId }).onConflictDoNothing().run();
+            if (!tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds)
+                .where(eq(patientRetiredIds.id, patientId)).get()) {
+                throw new Error('Patient identity retirement failed');
+            }
             const childRowCounts = purgePatientCascade(tx, patientId);
             const deleted = tx.delete(patients).where(and(eq(patients.id, patientId),
                 eq(patients.version, patient.version), eq(patients.deletedAt, patient.deletedAt))).run();

@@ -1134,3 +1134,25 @@ clear con membro test-only/live/tombstonato e versione contenitore esaurita,
 rollback audit e ultimo incremento safe. Non cambia alcun caller/UI.
 Altre operazioni ambulatory (default/delete), fix-orphans, purge, C15 e ABA
 restano fuori da questa correzione. La coorte non chiude C05 complessivo.
+
+
+### C05 — Identità paziente ritirata dal purge (2026-10-10)
+
+Il registro `patient_retired_ids` conserva l'ID opaco, senza FK né dati clinici.
+Il purge ritira l'ID nella stessa transazione IMMEDIATE di cascade, cancellazione
+e audit; un inserimento ignorato senza entry verificabile annulla l'operazione.
+Una entry preesistente resta valida e non impedisce di completare un purge.
+I create Web (legacy e fixed-preview), v1 locale e paired rifiutano con il
+409 di conflitto esistente un ID ritirato, dopo ammissione di destinazione/scope.
+Omissione UUID e rappresentazione degli ID opachi validi restano invariate.
+Così la sequenza purge/ricreazione/replay non può creare una nuova incarnazione
+del paziente sotto l'ID osservato dal vecchio PUT.
+
+Schema tipizzato, guard runtime e SQL storico sono allineati. A ogni apertura
+il guard importa soltanto gli ID non blank dei `patient.purged` riusciti con
+subject type patient e subject ref stringa, conservando i byte originali;
+la verifica dell'entry impedisce un backfill silenziosamente ignorato.
+L'audit è fonte del backfill storico, non il ledger consultato dai create.
+Purge anteriori senza eventi disponibili non sono ricostruibili. La qualifica
+vale sull'archivio corrente attraverso riaperture; export/restore/sostituzione
+con archivi anteriori restano nel confine C15, qui non qualificato.
