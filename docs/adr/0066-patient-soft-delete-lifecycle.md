@@ -153,7 +153,10 @@ senza effetti; replay di un piano superato, anche dopo relink/unlink che aumenta
 la versione, è 409. Il digest è una precondizione, non una ricevuta consumabile:
 non introduce registro token né garantisce contro ABA con ricreazione delle
 stesse identità/versioni. Purge-patient e snapshot dei suoi figli, altri writer,
-restore C15 e garanzie globali restano fuori da questo intervento.
+restore C15 e garanzie globali restano fuori da questo intervento. La successiva
+protezione degli ID paziente ritirati dal purge è descritta in
+[ADR 0015](0015-audit-taxonomy-minimum-catalog.md): protegge il database corrente,
+non attribuisce al digest una garanzia globale sulle altre identità.
 
 Prove: `lib/orphan-repair-required-audit.test.ts` conserva successo composto e
 rollback audit/purge, aggiungendo autorità obbligatoria, replay immediato e
