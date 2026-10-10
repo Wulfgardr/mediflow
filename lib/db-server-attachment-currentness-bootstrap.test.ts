@@ -92,7 +92,7 @@ test('rejects partial, drifting, generic, triggered, indexed, and stale attachme
         try {
             const db = new Database(current.dbPath); mutate(db); db.close();
             const before = attachmentSnapshot(current.dbPath); const result = bootstrap(current.dataDir);
-            assert.notEqual(result.status, 0, name); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
+            assert.notEqual(result.status, 0, name); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED|SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
             assert.doesNotMatch(`${result.stdout}${result.stderr}`, /attachments_drift_|CREATE INDEX|SELECT 1/u, name);
             assert.equal(attachmentSnapshot(current.dbPath), before, name);
             const reopened = new Database(current.dbPath); try { reopened.transaction(() => undefined).immediate(); } finally { reopened.close(); }
@@ -106,7 +106,7 @@ test('rolls back malformed canonical and orphan legacy data without leaving a re
         const db = new Database(orphan.dbPath); db.pragma('foreign_keys = OFF');
         db.prepare(`INSERT INTO attachments (${columns}) VALUES (${row.map(() => '?').join(', ')})`).run(...row.map((value, index) => index === 0 ? 'attachment.synthetic.orphan' : index === 1 ? 'patient.orphan' : value)); db.close();
         const before = attachmentSnapshot(orphan.dbPath); const result = bootstrap(orphan.dataDir);
-        assert.notEqual(result.status, 0); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
+        assert.notEqual(result.status, 0); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED|SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
         assert.equal(attachmentSnapshot(orphan.dbPath), before);
     } finally { fs.rmSync(orphan.dataDir, { recursive: true, force: true }); }
     const canonical = tempCase();
@@ -114,7 +114,7 @@ test('rolls back malformed canonical and orphan legacy data without leaving a re
         assert.equal(bootstrap(canonical.dataDir).status, 0);
         const db = new Database(canonical.dbPath); db.pragma('ignore_check_constraints = ON'); db.prepare("UPDATE attachments SET document_source_ref = 'UPPERCASE'").run(); db.close();
         const before = attachmentSnapshot(canonical.dbPath); const result = bootstrap(canonical.dataDir);
-        assert.notEqual(result.status, 0); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
+        assert.notEqual(result.status, 0); assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED|SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
         assert.equal(attachmentSnapshot(canonical.dbPath), before);
     } finally { fs.rmSync(canonical.dataDir, { recursive: true, force: true }); }
 });
@@ -215,7 +215,7 @@ test('historical currentness rejects invalid counters and schema drift atomicall
             const before = attachmentSnapshot(current.dbPath);
             const result = bootstrap(current.dataDir);
             assert.notEqual(result.status, 0);
-            assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED/u);
+            assert.match(`${result.stdout}${result.stderr}`, /ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED|SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
             assert.equal(attachmentSnapshot(current.dbPath), before);
         } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
     }

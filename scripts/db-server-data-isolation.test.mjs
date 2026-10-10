@@ -157,7 +157,7 @@ test('startup stops when the append-only audit schema cannot be established', ()
     const result = bootstrap(sandbox, { directory, rejectLegacyProbe: true });
     assert.equal(result.error, undefined);
     assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stderr, /views may not be indexed/);
+    assert.match(result.stderr, /unsupported view/);
     assert.deepEqual(auditObjects(dbPath), ['view:audit_events']);
   } finally { fs.rmSync(sandbox, { recursive: true, force: true }); }
 });

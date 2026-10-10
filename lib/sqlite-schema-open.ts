@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import reservation from '../scripts/native-first-install-contract.json' with { type: 'json' };
-import { initializeSqliteSchema } from './sqlite-schema';
+import { checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema, initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
 import { initSqlitePragmas } from './sqlite-pragmas';
@@ -106,6 +106,8 @@ export function openVersionedSqliteDatabase(databasePath: string): Database.Data
                 if (version === CURRENT_SQLITE_SCHEMA_VERSION) {
                     // Repeated starts validate without DDL, backfill or another snapshot.
                     assertCanonical(connection, canonical);
+                    // Clinical orphans are tolerated; a role attestation without its actor never is.
+                    if (!checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(connection)) deny('role attestation without its actor');
                     return;
                 }
                 if (!fresh) {

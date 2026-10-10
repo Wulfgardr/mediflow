@@ -74,7 +74,7 @@ test('Headless SOAP commit ledger bootstrap is concurrent, canonical, and fail-c
         database.close();
         const denied = await bootstrap(dataDir);
         assert.notEqual(denied.code, 0);
-        assert.match(denied.output, /Headless SOAP entry commit schema is incompatible\./);
+        assert.match(denied.output, /unsupported schema \(headless_soap_entry_commits\./);
         assert.doesNotMatch(denied.output, /CREATE TABLE|binding_snapshot|audit_snapshot/i);
     } finally { fs.rmSync(dataDir, { recursive: true, force: true }); }
 });

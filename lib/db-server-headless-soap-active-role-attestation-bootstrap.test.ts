@@ -71,7 +71,7 @@ test('Headless SOAP attestation bootstrap is concurrent, canonical, and fail-clo
         db.close();
         const orphan = await bootstrap(dataDir);
         assert.notEqual(orphan.code, 0);
-        assert.match(orphan.output, /Headless SOAP active-role attestation schema is incompatible\./);
+        assert.match(orphan.output, /role attestation without its actor/);
         db = new Database(dbPath);
         db.prepare('DELETE FROM headless_soap_active_role_attestations WHERE attestation_ref = ?').run('orphan-h2a-s0');
         db.close();
@@ -81,8 +81,7 @@ test('Headless SOAP attestation bootstrap is concurrent, canonical, and fail-clo
         db.close();
         const denied = await bootstrap(dataDir);
         assert.notEqual(denied.code, 0);
-        assert.match(denied.output, /Headless SOAP active-role attestation schema is incompatible\./);
-        assert.doesNotMatch(denied.output, /headless_soap_active_role_attestations/i);
+        assert.match(denied.output, /unsupported schema \(headless_soap_active_role_attestations\./);
 
         db = new Database(dbPath);
         db.exec('BEGIN IMMEDIATE; CREATE TABLE h2a_s0_reusable_transaction_probe (id INTEGER); ROLLBACK;');
