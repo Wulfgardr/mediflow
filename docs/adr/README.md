@@ -123,4 +123,4 @@ prima porzione di lavoro verificabile:
 
 - [0138-explicit-data-directory-bootstrap.md](./0138-explicit-data-directory-bootstrap.md): impedisce la copia legacy implicita nelle cartelle dati scelte, preservando la migrazione storica verso il default.
 
-- [0143-strong-unlock-credential.md](./0143-strong-unlock-credential.md): propone passphrase di almeno 15 caratteri, verificatore che non espone il segreto al server, chiave solo in memoria e kit di recupero, con i tempi di derivazione misurati.
+- [0143-strong-unlock-credential.md](./0143-strong-unlock-credential.md): stabilisce passphrase di almeno 15 caratteri, verificatore che non espone il segreto al server, chiave solo in memoria, PIN di conferma separato e kit di recupero, con i tempi di derivazione misurati e l'ordine di consegna.
