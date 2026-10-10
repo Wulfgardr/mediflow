@@ -372,3 +372,19 @@ test('concurrent handler calls serialize one 200, one 409, and no retry audit', 
     assert.equal(retry.status, 409);
     assert.deepEqual(readBack(id), after);
 });
+
+
+test('admin restore rejects exhausted database versions without effects', async () => {
+    const id = 'synthetic-version-exhaustion';
+    for (const version of [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER + 1, 0, -1]) {
+        reset(id);
+        sql.prepare('UPDATE patients SET version=? WHERE id=?').run(version, id);
+        const before = readBack(id);
+        assert.equal((await post(JSON.stringify({ patientId: id }))).status, 409);
+        assert.deepEqual(readBack(id), before);
+    }
+    reset(id);
+    sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER - 1, id);
+    assert.equal((await post(JSON.stringify({ patientId: id }))).status, 200);
+    assert.equal((readBack(id).patient as {version:number}).version, Number.MAX_SAFE_INTEGER);
+});

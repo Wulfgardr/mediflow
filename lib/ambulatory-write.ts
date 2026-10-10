@@ -1,3 +1,4 @@
+import { canIncrementVersion, VersionExhaustedError } from './version-concurrency';
 import { and, desc, eq, ne } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { dbServer } from './db-server';
@@ -256,33 +257,40 @@ export async function clearAmbulatory(
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
     if (context.session.role !== 'admin') return { status: 403, value: { error: 'Forbidden' } };
-    return dbServer.transaction((tx): AmbulatoryMutationResponse => {
-        const target = selectAmbulatory(tx, ambulatoryId);
-        if (!target) return { status: 404, value: { error: 'Ambulatory not found' } };
-        if (target.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
-        if (target.type !== 'test') return { status: 403, value: { error: 'Safety Check: Cannot clear a LIVE ambulatory' } };
-        const guarded = tx.update(ambulatories).set({ version: target.version + 1 })
-            .where(and(eq(ambulatories.id, ambulatoryId), eq(ambulatories.version, parsedVersion))).run();
-        if (guarded.changes !== 1) throw new Error('Test-container version guard did not update exactly one row');
-        const result = clearTestContainerByMembership(tx, ambulatoryId);
-        for (const patient of result.clearedPatients) {
-            writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.deleted', 'patient', patient.id,
-                { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version }));
-        }
-        for (const patient of result.unlinkedPatients) {
-            writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.updated', 'patient', patient.id,
-                { changedFields: ['ambulatoryMemberships'], resourceVersion: patient.version, flags: ['membership:unassigned'] }));
-        }
-        writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.cleared', 'ambulatory', ambulatoryId,
-            { resourceVersion: target.version + 1 }));
-        return {
-            status: 200,
-            value: {
-                success: true, message: 'Test container cleared', version: target.version + 1,
-                clearedPatients: result.clearedPatients.length,
-                preservedLivePatients: result.preservedLivePatientIds.length,
-                removedMembershipRows: result.removedMembershipRows,
-            },
-        };
-    }, { behavior: 'immediate' });
+    try {
+        return dbServer.transaction((tx): AmbulatoryMutationResponse => {
+            const target = selectAmbulatory(tx, ambulatoryId);
+            if (!target) return { status: 404, value: { error: 'Ambulatory not found' } };
+            if (target.version !== parsedVersion) return { status: 409, value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
+            if (target.type !== 'test') return { status: 403, value: { error: 'Safety Check: Cannot clear a LIVE ambulatory' } };
+            if (!canIncrementVersion(target.version)) return { status: 409,
+                value: buildAmbulatoryVersionConflictPayload(parsedVersion, ambulatoryId, conflictSnapshot(target)) };
+            const guarded = tx.update(ambulatories).set({ version: target.version + 1 })
+                .where(and(eq(ambulatories.id, ambulatoryId), eq(ambulatories.version, parsedVersion))).run();
+            if (guarded.changes !== 1) throw new Error('Test-container version guard did not update exactly one row');
+            const result = clearTestContainerByMembership(tx, ambulatoryId);
+            for (const patient of result.clearedPatients) {
+                writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.deleted', 'patient', patient.id,
+                    { reasonCode: TEST_CONTAINER_CLEAR_REASON, resourceVersion: patient.version }));
+            }
+            for (const patient of result.unlinkedPatients) {
+                writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'patient.updated', 'patient', patient.id,
+                    { changedFields: ['ambulatoryMemberships'], resourceVersion: patient.version, flags: ['membership:unassigned'] }));
+            }
+            writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.cleared', 'ambulatory', ambulatoryId,
+                { resourceVersion: target.version + 1 }));
+            return {
+                status: 200,
+                value: {
+                    success: true, message: 'Test container cleared', version: target.version + 1,
+                    clearedPatients: result.clearedPatients.length,
+                    preservedLivePatients: result.preservedLivePatientIds.length,
+                    removedMembershipRows: result.removedMembershipRows,
+                },
+            };
+        }, { behavior: 'immediate' });
+    } catch (error) {
+        if (error instanceof VersionExhaustedError) return { status: 409, value: { error: 'Patient version cannot advance safely' } };
+        throw error;
+    }
 }

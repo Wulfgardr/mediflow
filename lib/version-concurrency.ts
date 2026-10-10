@@ -45,6 +45,16 @@ export function parseExpectedVersion(value: unknown): number | null {
     return Number.isSafeInteger(value) && typeof value === 'number' && value > 0 ? value : null;
 }
 
+// MAX remains a valid observed version, but cannot be incremented safely.
+export function canIncrementVersion(value: unknown): value is number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value < Number.MAX_SAFE_INTEGER;
+}
+
+// Throw inside a transaction; translate only after rollback, never after partial writes.
+export class VersionExhaustedError extends Error {
+    constructor() { super('Version cannot advance safely'); }
+}
+
 /* @Codex */
 export function requireExpectedVersion(value: unknown):
     | { ok: true; expectedVersion: number }

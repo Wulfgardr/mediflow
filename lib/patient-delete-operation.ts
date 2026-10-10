@@ -5,6 +5,7 @@ import { buildPatientVersionConflictPayload } from './patient-concurrency';
 import { activePatients, buildPatientTombstoneValues } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { patients } from './schema';
+import { canIncrementVersion } from './version-concurrency';
 
 type PatientDeleteOperationInput = {
     patientId: string;
@@ -20,9 +21,13 @@ export type PatientDeleteOperationResult =
 /* @Codex: IMMEDIATE acquires the writer lock before the active/version read. */
 export function deletePatientOperation(input: PatientDeleteOperationInput): PatientDeleteOperationResult {
     return dbServer.transaction((tx): PatientDeleteOperationResult => {
-        const existing = tx.select({ id: patients.id }).from(patients)
+        const existing = tx.select({ id: patients.id, version: patients.version,
+            updatedAt: patients.updatedAt, isArchived: patients.isArchived }).from(patients)
             .where(and(eq(patients.id, input.patientId), activePatients())).get();
         if (!existing) return { status: 404, value: { error: 'Not found' } };
+        if (existing.version !== input.expectedVersion || !canIncrementVersion(existing.version)) return {
+            status: 409, value: buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing),
+        };
 
         const deleted = tx.update(patients)
             .set(buildPatientTombstoneValues(input.expectedVersion, input.deletionReason))

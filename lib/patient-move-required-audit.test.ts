@@ -143,3 +143,22 @@ test('move: malformed JSON, invalid versions and oversized input fail before eff
     assert.equal((await request(' '.repeat(262_145))).status, 413);
     assert.deepEqual(snapshot(), before);
 });
+
+
+test('move preflights an exhausted batch member before any membership or audit effects', async () => {
+    reset();
+    sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, ids[1]);
+    const before = snapshot();
+    const body = payload({ patientVersions: { [ids[0]]: 1, [ids[1]]: Number.MAX_SAFE_INTEGER } });
+    const response = await request(JSON.stringify(body));
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).recordId, ids[1]);
+    assert.deepEqual(snapshot(), before);
+    sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER - 1, ids[1]);
+    const last = payload({ patientVersions: { [ids[0]]: 1, [ids[1]]: Number.MAX_SAFE_INTEGER - 1 } });
+    assert.equal((await request(JSON.stringify(last))).status, 200);
+    assert.equal(snapshot().patients.find(row => row.id === ids[1])?.version, Number.MAX_SAFE_INTEGER);
+    const after = snapshot();
+    assert.equal((await request(JSON.stringify(last))).status, 409);
+    assert.deepEqual(snapshot(), after);
+});

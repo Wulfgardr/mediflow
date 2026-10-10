@@ -1089,3 +1089,38 @@ C05 complessivo non è chiuso da questa coorte.
 La suite purge SQLite riusa fault audit FAIL/IGNORE, successo e replay e
 aggiunge GET, stale senza revoca, binding versioni invalidi e versione MAX
 safe. Il baseline stale accettava la cancellazione con `200` anziché `409`.
+
+
+## C05 — Esaurimento versione lifecycle, move e clear (WUL-720)
+
+Nei percorsi qui delimitati, un incremento richiede una versione corrente
+positiva, safe e strettamente inferiore a `Number.MAX_SAFE_INTEGER`.
+MAX resta una versione osservata valida al parser: non viene trasformata in
+input `400`, ma il tentativo di incrementarla riceve `409` senza effetti.
+MAX−1 → MAX rimane consentito. Valori DB unsafe, frazionari o non positivi
+non vengono incrementati. Ammissione, missing/scope e stale mantengono la loro
+precedenza; dove esiste una versione attesa il conflitto usa il payload
+canonico della relativa entità (expected e current possono coincidere).
+
+Il controllo copre DELETE paziente Web/local-v1, DELETE/restore paired,
+restore amministrativo, move batch e clear test-container. Il restore admin
+non acquisisce un nuovo campo versione client: rifiuta la versione corrente
+non incrementabile dopo lookup/tombstone, prima della scrittura. Move esegue
+il controllo su tutto il batch dopo il precheck stale e prima della prima
+modifica membership. I builder lifecycle rifiutano anche chiamate interne
+non incrementabili, così non producono tombstone o restore con bump unsafe.
+
+Clear verifica versione/tipo del contenitore e la sua incrementabilità;
+l'helper seleziona e precontrolla tutti i pazienti che saranno tombstonati o
+soltanto scollegati, inclusi tombstone esistenti. Se un paziente non può essere
+incrementato, l'errore tipizzato esce dalla transazione: viene tradotto in
+`409` soltanto dopo il rollback, annullando anche il precedente bump del
+contenitore. Non si inventa una versione attesa client per quei pazienti.
+Gli errori audit continuano a propagarsi e annullare l'intero commit.
+
+Le prove sintetiche esistenti coprono baseline admin restore MAX (prima 200,
+dopo 409), builder condivisi, rappresentanti Web/local-v1/paired, batch move,
+clear con membro test-only/live/tombstonato e versione contenitore esaurita,
+rollback audit e ultimo incremento safe. Non cambia alcun caller/UI.
+Altre operazioni ambulatory (default/delete), fix-orphans, purge, C15 e ABA
+restano fuori da questa correzione. La coorte non chiude C05 complessivo.

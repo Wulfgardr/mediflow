@@ -1590,11 +1590,49 @@ export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSour
             const status = props?.get('status')?.initializer;
             return status && ts.isNumericLiteral(status) && status.text === '404';
         });
+    // C05 exhaustion adds exactly one pre-DML conflict return, not a generic allowance.
+    const incrementable = importedBinding(core.sourceFile, core.checker, './version-concurrency', 'canIncrementVersion');
+    const existingDeclaration = callback.body.statements.filter(ts.isVariableStatement)
+        .flatMap(statement => [...statement.declarationList.declarations])
+        .find(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === 'existing');
+    const existingSymbol = existingDeclaration && core.checker.getSymbolAtLocation(existingDeclaration.name);
+    const isExisting = expression => {
+        const node = expression && unwrap(expression);
+        return Boolean(node && ts.isIdentifier(node) && existingSymbol
+            && core.checker.getSymbolAtLocation(node) === existingSymbol);
+    };
+    const isExistingVersion = expression => {
+        const node = expression && unwrap(expression);
+        return Boolean(node && ts.isPropertyAccessExpression(node) && node.name.text === 'version' && isExisting(node.expression));
+    };
+    const preflight = updateIndex > 0 ? callback.body.statements[updateIndex - 1] : null;
+    const preflightCondition = preflight && ts.isIfStatement(preflight) ? unwrap(preflight.expression) : null;
+    const stale = preflightCondition && ts.isBinaryExpression(preflightCondition)
+        && preflightCondition.operatorToken.kind === ts.SyntaxKind.BarBarToken ? unwrap(preflightCondition.left) : null;
+    const exhausted = stale ? unwrap(preflightCondition.right) : null;
+    const incrementCall = exhausted && ts.isPrefixUnaryExpression(exhausted)
+        && exhausted.operator === ts.SyntaxKind.ExclamationToken && incrementable
+        ? boundCall(exhausted.operand, incrementable, 1) : null;
+    const preflightReturn = preflight && ts.isIfStatement(preflight) && !preflight.elseStatement
+        && ts.isReturnStatement(preflight.thenStatement) ? preflight.thenStatement : null;
+    const preflightValue = preflightReturn?.expression && unwrap(preflightReturn.expression);
+    const preflightProps = preflightValue && ts.isObjectLiteralExpression(preflightValue)
+        ? exactPropertyAssignments(preflightValue, ['status', 'value']) : null;
+    const preflightStatus = preflightProps?.get('status')?.initializer;
+    const preflightConflict = boundCall(preflightProps?.get('value')?.initializer, conflict, 3);
+    const approvedPreflight = stale && ts.isBinaryExpression(stale)
+        && stale.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+        && isExistingVersion(stale.left) && inputPath(stale.right, ['expectedVersion'])
+        && incrementCall && isExistingVersion(incrementCall.arguments[0])
+        && preflightStatus && ts.isNumericLiteral(preflightStatus) && preflightStatus.text === '409'
+        && preflightConflict && inputPath(preflightConflict.arguments[0], ['expectedVersion'])
+        && inputPath(preflightConflict.arguments[1], ['patientId']) && isExisting(preflightConflict.arguments[2])
+        && notFound && preflight.pos > notFound.pos;
     if (!cas || cas.pos <= (runCall?.pos ?? Infinity) || cas.pos >= audit.pos
         || conflicts?.length !== 1 || !conflictReturn || !status409
         || casReturns.length !== 1 || casReturns[0] !== status409 || !onlyCasBeforeAudit
-        || preAuditReturns.length !== 2 || !preAuditReturns.includes(notFound)
-        || !preAuditReturns.includes(status409)) {
+        || !approvedPreflight || preAuditReturns.length !== 3 || !preAuditReturns.includes(preflightReturn)
+        || !preAuditReturns.includes(notFound) || !preAuditReturns.includes(status409)) {
         problems.push('delete CAS miss must return the version conflict before audit');
     }
     const success = callback.body.statements.find((statement) => ts.isReturnStatement(statement)

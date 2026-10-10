@@ -199,3 +199,24 @@ test('paired duplicate admission denial precedes global identity conflict', asyn
     assert.doesNotMatch(JSON.stringify(denied.value), /c05-network-duplicate-denied|Patient create conflict/);
     assert.deepEqual(readBack(id), before);
 });
+
+
+test('paired delete and restore reject exhaustion and allow the last safe increment', async () => {
+    for (const operation of ['delete', 'restore'] as const) {
+        const id = `synthetic-exhaustion-${operation}`;
+        setup(id, operation === 'delete' ? 'active' : 'deleted');
+        const ctx = context(id);
+        const invoke = (version: number) => operation === 'delete'
+            ? lifecycle.deleteNetworkScopedPatient(ctx, { version, deletionReason: sealed })
+            : lifecycle.restoreNetworkScopedPatient(ctx, { version });
+        sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, id);
+        const before = readBack(id);
+        assert.equal((await invoke(Number.MAX_SAFE_INTEGER)).status, 409);
+        assert.deepEqual(readBack(id), before);
+        assert.equal((await invoke(Number.MAX_SAFE_INTEGER - 1)).status, 409);
+        assert.deepEqual(readBack(id), before);
+        sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER - 1, id);
+        assert.equal((await invoke(Number.MAX_SAFE_INTEGER - 1)).status, 200);
+        assert.equal(readBack(id).patient?.version, Number.MAX_SAFE_INTEGER);
+    }
+});
