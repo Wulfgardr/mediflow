@@ -20,6 +20,7 @@ for (const name of fs.readdirSync('drizzle').filter((file) => file.endsWith('.sq
     migrationDb.exec(fs.readFileSync(path.join('drizzle', name), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gm, ''));
 migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
+(await import('../../db-server.ts')).openDbServer();
 
 const { composeAnyDocCurrentSourceExtraction } = await import('./anydoc-current-source-composition.ts');
 const { issueSyntheticWebSession, retireSyntheticWebSession } = await import('../../security/web-auth-lifecycle-owner-test-fixture.ts');
