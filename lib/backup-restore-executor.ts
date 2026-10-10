@@ -299,6 +299,22 @@ function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void 
     insertRows(dbServer, headlessSoapEntryCommits, rows);
 }
 
+/* A restore must not hand authority back (ADR 0097): an activation is a time-boxed grant of this host
+   and returns inactive, pending a new enrollment; a revocation recorded here is terminal and outlives the backup. */
+function soapAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+    const revokedHere = dbServer.select().from(headlessSoapActiveRoleAttestations)
+        .where(eq(headlessSoapActiveRoleAttestations.status, 'revoked')).all();
+    const actors = new Set<unknown>(revokedHere.map(row => row.actorRef));
+    const refs = new Set<unknown>(revokedHere.map(row => row.attestationRef));
+    return [
+        ...revokedHere,
+        ...rows.filter(row => !actors.has(row.actorRef) && !refs.has(row.attestationRef))
+            .map(row => row.status === 'active'
+                ? { ...row, status: 'inactive', issuerRef: null, expiresAt: null, activatedAt: null }
+                : row),
+    ];
+}
+
 export type BackupRestoreResult = {
     sourceChecksum: string;
     audit: { coverage: BackupAuditCoverage; inserted: number; reused: number };
@@ -345,6 +361,7 @@ export function restoreBackupArtifact(
             : headlessSoapRows.map(row => parseHeadlessSoapAuditSnapshot(row.auditSnapshot)));
         if (coverage === 'included') assertBackupAuditSnapshots(rows, headlessSoapRows.map(row => row.auditSnapshot));
         const plan = planBackupAuditRestore(rows);
+        const soapAttestations = soapAttestationsWithoutRestoredAuthority(artifact.payload.headlessSoapActiveRoleAttestations ?? []);
         runMutationFence(beforeMutation);
         for (const collection of CLEAR_ORDER) {
             dbServer.delete(TABLE_LOOKUP[collection]).run();
@@ -352,7 +369,8 @@ export function restoreBackupArtifact(
         dbServer.delete(patientsToAmbulatories).run();
 
         for (const collection of INSERT_ORDER) {
-            insertRows(dbServer, TABLE_LOOKUP[collection], artifact.payload[collection] ?? []);
+            insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'headlessSoapActiveRoleAttestations'
+                ? soapAttestations : artifact.payload[collection] ?? []);
         }
 
         insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
