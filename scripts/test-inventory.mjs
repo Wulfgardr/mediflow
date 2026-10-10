@@ -173,13 +173,14 @@ export function checkInventory(candidates, manifest, selections, supportBindings
     const selection = entry.selection;
     if (entry.execution !== undefined) {
       const execution = entry.execution;
-      if (!execution || !['not-provisioned', 'conditional-ci'].includes(execution.state)
+      if (!execution || !['not-provisioned', 'conditional-ci', 'optional-profile'].includes(execution.state)
         || typeof execution.owner !== 'string' || !execution.owner.trim()
         || typeof execution.reason !== 'string' || !execution.reason.trim()
         || !Array.isArray(execution.conditions) || !execution.conditions.length
         || execution.conditions.some(condition => typeof condition !== 'string' || !condition.trim())
         || new Set(execution.conditions).size !== execution.conditions.length
-        || Object.keys(execution).some(key => !['state', 'owner', 'reason', 'conditions'].includes(key))
+        || Object.keys(execution).some(key => !['state', 'owner', 'reason', 'conditions', ...(execution.state === 'optional-profile' ? ['profile', 'ordinaryGate'] : [])].includes(key))
+        || (execution.state === 'optional-profile' && (typeof execution.profile !== 'string' || !/^[a-z][a-z0-9-]*$/u.test(execution.profile) || execution.ordinaryGate !== 'excluded'))
         || selection?.state !== 'mapped') add('INVALID_EXECUTION_PREREQUISITES', entry.path);
       else executionPrerequisites.push({ path: entry.path, ...execution });
     }
@@ -240,8 +241,16 @@ export function checkInventory(candidates, manifest, selections, supportBindings
     }
   }
   for (const entry of executionPrerequisites) {
-    if (entry.state !== 'conditional-ci') continue;
     const mapping = entries.get(entry.path).selection;
+    if (entry.state === 'optional-profile') {
+      if (!mapping.suiteIds?.some(id => verifiedSuites.has(id) && suites.get(id).has(entry.path) && selections[id].mode === 'local')) {
+        add('OPTIONAL_PROFILE_RECIPE_NOT_BOUND', entry.path);
+      }
+      if ([...verifiedSuites].some(id => suites.get(id).has(entry.path) && selections[id].mode === 'ordinary')) {
+        add('OPTIONAL_PROFILE_SELECTED_BY_ORDINARY_GATE', entry.path);
+      }
+    }
+    if (entry.state !== 'conditional-ci') continue;
     if (!mapping.suiteIds?.some(id => verifiedSuites.has(id) && suites.get(id).has(entry.path) && selections[id].mode === 'conditional')) {
       add('EXECUTION_CONDITION_NOT_BOUND', entry.path);
     }
@@ -331,6 +340,7 @@ function printReport(result) {
   console.log(`Support entrypoint exclusions: ${result.support.length}`);
   console.log(`Non-test entrypoint exclusions: ${result.excludedNonTests.length}`);
   console.log(`Execution prerequisites not provisioned: ${result.executionPrerequisites.filter(entry => entry.state === 'not-provisioned').length}`);
+  console.log(`Optional profiles excluded from ordinary gate: ${result.executionPrerequisites.filter(entry => entry.state === 'optional-profile').length}`);
   console.log(`Explicit conditional execution prerequisites: ${result.executionPrerequisites.filter(entry => entry.state === 'conditional-ci').length}`);
   for (const mode of ['ordinary', 'conditional', 'local', 'child', 'unspecified']) {
     console.log(`Selected suites (${mode}): ${Object.values(result.suiteModes).filter(value => value === mode).length}`);
