@@ -105,6 +105,29 @@ test('explicit A and B data roots start empty without probing the legacy source 
   });
 });
 
+test('the default data root is closed to other accounts and an explicit one keeps the mode its operator set', { skip: process.platform === 'win32' }, () => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-data-root-mode-'));
+  const mode = (directory) => fs.statSync(directory).mode & 0o777;
+  try {
+    // Created readable by everyone, as an earlier version did.
+    const defaultRoot = path.join(sandbox, 'synthetic-home', process.platform === 'darwin' ? 'Library/Application Support/MediFlow' : '.mediflow');
+    fs.mkdirSync(defaultRoot, { recursive: true });
+    fs.chmodSync(defaultRoot, 0o755);
+    expectReady(bootstrap(sandbox, { disableLegacy: true }));
+    assert.equal(mode(defaultRoot), 0o700);
+
+    const chosen = path.join(sandbox, 'chosen');
+    fs.mkdirSync(chosen);
+    fs.chmodSync(chosen, 0o755);
+    expectReady(bootstrap(sandbox, { directory: chosen, disableLegacy: true }));
+    assert.equal(mode(chosen), 0o755);
+
+    const created = path.join(sandbox, 'created');
+    expectReady(bootstrap(sandbox, { directory: created, disableLegacy: true }));
+    assert.equal(mode(created), 0o700);
+  } finally { fs.rmSync(sandbox, { recursive: true, force: true }); }
+});
+
 test('relative explicit data root also excludes implicit legacy import', () => {
   withLegacy((sandbox) => {
     expectReady(bootstrap(sandbox, { directory: './relative-context', rejectLegacyProbe: true }));

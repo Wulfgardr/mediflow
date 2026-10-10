@@ -293,6 +293,15 @@ function releaseBackupLock(lockPath) {
   if (lockPath) fs.rmSync(lockPath, { force: true });
 }
 
+// A backup holds names, identifiers and therapies in clear: only the owning account may read it.
+// Artifacts written before this rule keep the mode they were created with until tightened here.
+function restrictManagedBackupFiles(destinationDir) {
+  if (process.platform === 'win32') return;
+  for (const file of listManagedBackupFiles(destinationDir)) {
+    if ((fs.statSync(file.path).mode & 0o077) !== 0) fs.chmodSync(file.path, 0o600);
+  }
+}
+
 function applyBackupRetention(config, options = {}) {
   const preservePaths = new Set((options.preservePaths ?? []).map((value) => path.resolve(value)));
   const nowMs = options.nowMs ?? Date.now();
@@ -495,7 +504,7 @@ async function main() {
       throw new Error('Backup automatico disabilitato.');
     }
 
-    fs.mkdirSync(destinationDir, { recursive: true });
+    fs.mkdirSync(destinationDir, { recursive: true, mode: 0o700 });
     backupLockPath = acquireBackupLock(destinationDir);
 
     const createdAt = new Date();
@@ -506,8 +515,9 @@ async function main() {
     const finalPath = path.join(destinationDir, fileName);
     const tempPath = `${finalPath}.tmp`;
 
-    fs.writeFileSync(tempPath, artifact, 'utf8');
+    fs.writeFileSync(tempPath, artifact, { encoding: 'utf8', mode: 0o600 });
     fs.renameSync(tempPath, finalPath);
+    restrictManagedBackupFiles(destinationDir);
 
     const backedUpState = {
       ...currentState,
