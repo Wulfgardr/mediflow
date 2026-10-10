@@ -98,9 +98,15 @@ const unavailable = 'export const createHostProviderLifecycleService = () => ({ 
 const forbid = name => 'export const ' + name + ' = () => { throw new Error("UNEXPECTED_OTHER_LANE_ACQUISITION"); };';
 const leaves = new Map([
     ['lib/db-server.ts', 'const chain = { from: () => chain, where: () => chain, all: () => { globalThis.__trComposition.observed.databaseReads++; return []; } }; export const dbServer = { select: () => chain, insert: () => { throw new Error("DB_WRITE_FORBIDDEN"); } }; export const runDbServerImmediateTransaction = () => { throw new Error("TRANSACTION_FORBIDDEN"); };'],
-    ['lib/schema.ts', 'export const settings = { key: "key", value: "value" }; export const patients = { id: "id", version: "version" }; export const patientsToAmbulatories = { patientId: "patientId", ambulatoryId: "ambulatoryId" };'],
+    ['lib/schema.ts', 'export const ambulatories = { id: "id", type: "type" }; export const settings = { key: "key", value: "value" }; export const patients = { id: "id", version: "version" }; export const patientsToAmbulatories = { patientId: "patientId", ambulatoryId: "ambulatoryId" };'],
     ['lib/security/server-auth.ts', 'export const requireSession = async () => null; export const requireSessionOrLocalToken = async () => globalThis.__trComposition.allowStatus ? { id: "synthetic-status-reader" } : null; export const unauthorizedResponse = () => Response.json({ error: "unauthorized" }, { status: 401 }); export const acquireAuthenticatedWebSessionProjectionOwnerContext = async () => { throw new Error("CLINICAL_CONTEXT_FORBIDDEN"); };'],
-    ['lib/security/server-session.ts', forbid('registerServerSessionResource')],
+    ['lib/security/server-session.ts', forbid('registerServerSessionResource') + forbid('getSession') + forbid('peekSession')],
+    ['lib/security/native-inference-environment.ts', forbid('withCurrentNativeInferenceEnvironment')],
+    ['lib/security/server-session-clinical-context-native-sources.ts', forbid('nativeOrdinaryHostSourcesAreCurrent') + forbid('readNativeOrdinaryHostSource')],
+    ['lib/security/ordinary-application-context.ts', forbid('acquireOrdinaryApplicationContext') + forbid('registerOrdinaryApplicationResource')],
+    ['lib/chatgpt-product/ordinary-flow.ts', forbid('isOrdinaryFunctionSelected') + forbid('bindOrdinaryApplicationContext')],
+    ['lib/chatgpt-product/native-ordinary-composition.ts', forbid('getNativeOrdinaryApplicationContext')],
+    ['lib/ai-providers/fabric/treatment-reasoning-chatgpt-production.ts', forbid('createTreatmentReasoningChatGptService')],
     ['lib/patient-lifecycle.ts', forbid('activePatients')],
     ['lib/athena-mlx-runtime.ts', 'export const defaultAthenaMlxModelDir = () => "synthetic-unavailable-mlx"; export const isAthenaMlxModelAvailable = () => false; export const generateWithAthenaMlx = () => { throw new Error("INFERENCE_FORBIDDEN"); };'],
     ['lib/ai-providers/fabric/provider-lifecycle-service.ts', unavailable],

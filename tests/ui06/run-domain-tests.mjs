@@ -12,7 +12,7 @@ const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const temporary = await mkdtemp(path.join(tmpdir(), 'mediflow-ui06-domain-'));
 const entries = UI06_DOMAIN_FILES;
-const files = [...entries, 'tests/ui06/synthetic-scale.ts', 'lib/scale-validation.ts', 'lib/scale-submission.ts', 'lib/scale-definitions.ts', 'lib/scale-history.ts', 'lib/scales/tinetti-poma28-v1.ts', 'lib/patient-workspace.ts'];
+const files = [...entries, 'tests/ui06/synthetic-scale.ts', 'lib/scale-validation.ts', 'lib/scales/scale-use-contract.ts', 'lib/scale-submission.ts', 'lib/scale-definitions.ts', 'lib/scale-history.ts', 'lib/scales/tinetti-poma28-v1.ts', 'lib/patient-workspace.ts'];
 try {
     // Never reuse a user data directory. This runner owns both data and emitted code.
     const dataDir = path.join(temporary, 'synthetic-data'); await mkdir(dataDir);
