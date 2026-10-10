@@ -1,6 +1,6 @@
 {
-  "kind": "historical-sql-baselines-not-installed-schemas",
-  "currentCommit": "ba20a618e9c08a74c4160158ecd14228c9ebe295",
+  "kind": "historical-explicit-origin-schema-fixtures",
+  "currentCommit": "8ca89433412aab7b259a2d8a21dc0a144494ab1d",
   "families": [
     {
       "tags": [
@@ -18,11 +18,38 @@
         "392b8a7afbbbda54824b4a00b9670ba049c98305",
         "d52225ff2164fc18c0196923428abc686b76247a"
       ],
-      "runtimeSourcesNotReplayed": [
-        "61d83501f69f07fef46d0285d4d8d584dc3654b1",
-        "f91bf78e57feb983a2abb8f761e2db0dcf882140",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "f91bf78e57feb983a2abb8f761e2db0dcf882140",
+          "sha256": "58541a7388135864e9eb54a77eaaa1f62cda149bd0be5b166f776021a5078e18",
+          "declarations": [
+            "ensureColumn"
+          ],
+          "topLevelTryBlocks": true
+        }
+      ],
+      "entrypoint": "top-level-guards",
+      "initializePragmas": false,
+      "origins": [
+        "published-sql-then-same-tag-guards"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "8e709f4e0119bcd52e61a6080555b09a6393320f",
+        "sha256": "2a35721375e36c0c158b9b184a3a03daa06af5961d8a54579e16d61e967bce3e",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     },
     {
       "tags": [
@@ -47,11 +74,38 @@
         "7515057920b4c66d82554fd1438ead9eb1acebfa",
         "1b64847ceda22971b88330e06dcea53dfa2f1aee"
       ],
-      "runtimeSourcesNotReplayed": [
-        "17a965d7f2fe788590d58eafd4b441c8e31cece7",
-        "9b44437613c1e2fe2f55883acebf77e0f1d5e62a",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "9b44437613c1e2fe2f55883acebf77e0f1d5e62a",
+          "sha256": "99bcf174f29682ddf44748d778adad2acb52232fff92b2e6ea19854e2723990b",
+          "declarations": [
+            "ensureColumn"
+          ],
+          "topLevelTryBlocks": true
+        }
+      ],
+      "entrypoint": "top-level-guards",
+      "initializePragmas": false,
+      "origins": [
+        "published-sql-then-same-tag-guards"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "8e709f4e0119bcd52e61a6080555b09a6393320f",
+        "sha256": "2a35721375e36c0c158b9b184a3a03daa06af5961d8a54579e16d61e967bce3e",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     },
     {
       "tags": [
@@ -78,11 +132,39 @@
         "f4f6e7e0ac3f9814f6c945410b4dfb6fe1b4af1b",
         "4da1e95d865b3f603b1d031bf8e20a3036bf76ec"
       ],
-      "runtimeSourcesNotReplayed": [
-        "182e772a4a0e75f48dc22fc2022dda10db0fa07c",
-        "594cec8fc43702e1b36996125c40452af4dfd427",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "594cec8fc43702e1b36996125c40452af4dfd427",
+          "sha256": "75dd9de174e7e1609a8d23647bf3d5879e808fdd485ee23ac69d885abd4fba0d",
+          "declarations": [
+            "ensureColumn",
+            "applySchemaGuards"
+          ],
+          "topLevelTryBlocks": false
+        }
+      ],
+      "entrypoint": "applySchemaGuards",
+      "initializePragmas": false,
+      "origins": [
+        "published-sql-then-same-tag-guards"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "8e709f4e0119bcd52e61a6080555b09a6393320f",
+        "sha256": "2a35721375e36c0c158b9b184a3a03daa06af5961d8a54579e16d61e967bce3e",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     },
     {
       "tags": [
@@ -114,11 +196,48 @@
         "9d0ca1355e4b50c467eb3fc1b8fbde97c1fc3cce",
         "1ea0bc002175c427203210c304cd9989d408d0cf"
       ],
-      "runtimeSourcesNotReplayed": [
-        "774a2acc3b03d62dedcc2a18e837fe04d9f851fa",
-        "99559cb6312369a11ddb6b6469835b4dec556adc",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/security/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/sqlite-pragmas.ts",
+          "blob": "c1f238d224b11275f1ed201553d160f571588281",
+          "sha256": "e01d21de3d34649ff675b127fcffef144d3e2a4d2229620110719978e8778942",
+          "declarations": [
+            "initSqlitePragmas"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "99559cb6312369a11ddb6b6469835b4dec556adc",
+          "sha256": "012745ce5e70728a28cfcf1595bbce2c9671d455f11ebba9fc8ac4e5e5424d0c",
+          "declarations": [
+            "ensureColumn",
+            "applySchemaGuards"
+          ],
+          "topLevelTryBlocks": false
+        }
+      ],
+      "entrypoint": "applySchemaGuards",
+      "initializePragmas": true,
+      "origins": [
+        "published-sql-then-same-tag-guards"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "8e709f4e0119bcd52e61a6080555b09a6393320f",
+        "sha256": "2a35721375e36c0c158b9b184a3a03daa06af5961d8a54579e16d61e967bce3e",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     },
     {
       "tags": [
@@ -151,11 +270,48 @@
         "1ea0bc002175c427203210c304cd9989d408d0cf",
         "3859aabad04ff35cc11d17ff5e28e54072793f49"
       ],
-      "runtimeSourcesNotReplayed": [
-        "054014ed70f100e27635902a61aba69aa87537ff",
-        "f62367f1b3d7630e790e8dc1aab885cf4fb83352",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/security/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/sqlite-pragmas.ts",
+          "blob": "c1f238d224b11275f1ed201553d160f571588281",
+          "sha256": "e01d21de3d34649ff675b127fcffef144d3e2a4d2229620110719978e8778942",
+          "declarations": [
+            "initSqlitePragmas"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "f62367f1b3d7630e790e8dc1aab885cf4fb83352",
+          "sha256": "011e00da487f0712466d4a7b57385c00841c439da33bfc1d8ea29fb07a8d9783",
+          "declarations": [
+            "ensureColumn",
+            "applySchemaGuards"
+          ],
+          "topLevelTryBlocks": false
+        }
+      ],
+      "entrypoint": "applySchemaGuards",
+      "initializePragmas": true,
+      "origins": [
+        "published-sql-then-same-tag-guards"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "8e709f4e0119bcd52e61a6080555b09a6393320f",
+        "sha256": "2a35721375e36c0c158b9b184a3a03daa06af5961d8a54579e16d61e967bce3e",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     },
     {
       "tags": [
@@ -195,11 +351,63 @@
         "3d7076496095384596948dea5611f877f40f3aae",
         "6d2742612b4e55d5e082dae8ccf33195bd8ef68b"
       ],
-      "runtimeSourcesNotReplayed": [
-        "13afdaa8d0adc7add0e95bf8fd629355089ade68",
-        "bc9f07d2aa34ca4b43b6ce5ab9b3cf21109a0d71",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/security/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/sqlite-pragmas.ts",
+          "blob": "b03a135acc0ee3205c0b97fae7db314e7a05e300",
+          "sha256": "b2001fd51639771a0c244137f661d962a45612d30d53f98917691056b668fa27",
+          "declarations": [
+            "SQLITE_LOCK_RETRY_MS",
+            "SQLITE_LOCK_TIMEOUT_MS",
+            "sqliteLockWaiter",
+            "isSqliteLockError",
+            "enableWalWithBoundedRetry",
+            "initSqlitePragmas"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/aifa-catalog.ts",
+          "blob": "a00cde15aa0b21909b65f471788fddb1d3d3a6ec",
+          "sha256": "bb70238ef5f9fd2ed73046b543824cd36033c28378d60cbbb2a66bccf0a10d26",
+          "declarations": [
+            "normalizeAifaSearchText"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "bc9f07d2aa34ca4b43b6ce5ab9b3cf21109a0d71",
+          "sha256": "649859489a601304be3b0cf0fb8a30f51202547fcab593a4de16e5d8bd1647f3",
+          "declarations": [
+            "ensureColumn",
+            "applySchemaGuards",
+            "applySchemaGuardsSerially"
+          ],
+          "topLevelTryBlocks": false
+        }
+      ],
+      "entrypoint": "applySchemaGuardsSerially",
+      "initializePragmas": true,
+      "origins": [
+        "published-sql-then-same-tag-guards"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "8e709f4e0119bcd52e61a6080555b09a6393320f",
+        "sha256": "2a35721375e36c0c158b9b184a3a03daa06af5961d8a54579e16d61e967bce3e",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     },
     {
       "tags": [
@@ -244,14 +452,132 @@
         "6b4b777e60c1ea34fc780c6ea59857ed8744ca1a",
         "f125768422427691089f2f3ecf91e42d6aae1b96"
       ],
-      "runtimeSourcesNotReplayed": [
-        "acb10e82846cdf74045a0f701b5d4df65119ab47",
-        "93a725ef99149c574f3e46574c3cfeec584a27fe",
-        "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
-        "846600554f2ff11d678d3ed9edb68b091e5a7f8d",
-        "bffa4fe63f1d6a9143be613773bb403da9f9db06",
-        "aafbab718e6f29469c05fdc0391751160cd45a2b"
-      ]
+      "runtimeSources": [
+        {
+          "path": "lib/security/audit-db.ts",
+          "blob": "6398cb75e0efbfbacf69794fa8b0af975cf5c492",
+          "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5",
+          "declarations": [
+            "AUDIT_APPEND_ONLY_ERROR",
+            "ensureAuditSqliteSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/sqlite-pragmas.ts",
+          "blob": "58e897435683338fde78c2d2f2988c8f6bd22718",
+          "sha256": "faa7ddbce6affc340e65d8e04364c8f6e623e59740bdc37533800556b4996447",
+          "declarations": [
+            "SQLITE_LOCK_RETRY_MS",
+            "SQLITE_LOCK_TIMEOUT_MS",
+            "sqliteLockWaiter",
+            "isSqliteLockError",
+            "enableWalWithBoundedRetry",
+            "initSqlitePragmas"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/aifa-catalog.ts",
+          "blob": "a00cde15aa0b21909b65f471788fddb1d3d3a6ec",
+          "sha256": "bb70238ef5f9fd2ed73046b543824cd36033c28378d60cbbb2a66bccf0a10d26",
+          "declarations": [
+            "normalizeAifaSearchText"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/sqlite-new-database-bootstrap.ts",
+          "blob": "846600554f2ff11d678d3ed9edb68b091e5a7f8d",
+          "sha256": "c884c0b29cfcde2c2a5e909863a85bb6bd421f49f30754ef0874412fc22ab95f",
+          "declarations": [
+            "NEW_DATABASE_BASE_SCHEMA",
+            "bootstrapEmptySqliteDatabase"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/exemption-catalog-schema.ts",
+          "blob": "bffa4fe63f1d6a9143be613773bb403da9f9db06",
+          "sha256": "f32abeeb243a6dac3ec1355c996c5a641278ef38f752dc2f4e06ff669509d614",
+          "declarations": [
+            "EXEMPTION_RECEIPTS_SQL",
+            "ensureExemptionImportSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/reference-data/prosthetics-catalog-schema.ts",
+          "blob": "aafbab718e6f29469c05fdc0391751160cd45a2b",
+          "sha256": "74a0821c9a005128abc1b218c97ba59e7f812cef3dc1e4a9b790337aff3b69bf",
+          "declarations": [
+            "PROSTHETICS_CATALOG_SQL",
+            "ensureProstheticsCatalogSchema"
+          ],
+          "topLevelTryBlocks": false
+        },
+        {
+          "path": "lib/db-server.ts",
+          "blob": "93a725ef99149c574f3e46574c3cfeec584a27fe",
+          "sha256": "ade600c99b53690cfda592fe542824e894e16edd01f2e692e93bc0e12f1616d6",
+          "declarations": [
+            "PHYSICIAN_REVIEW_ATTESTATIONS_DDL",
+            "PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL",
+            "normalizeSchemaSql",
+            "PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA",
+            "PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA",
+            "HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL",
+            "HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA",
+            "HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL",
+            "HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA",
+            "HeadlessSoapActiveRoleAttestationSchemaError",
+            "HEADLESS_SOAP_ENTRY_COMMITS_DDL",
+            "HEADLESS_SOAP_ENTRY_COMMITS_SCHEMA",
+            "HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES",
+            "HeadlessSoapEntryCommitSchemaError",
+            "DURABLE_REVIEW_PATIENT_LINKS_DDL",
+            "DURABLE_REVIEW_PATIENT_LINKS_SCHEMA",
+            "physicianReviewAttestationSchemaEquals",
+            "hasCanonicalPhysicianReviewAttestationSchema",
+            "headlessSoapActiveRoleAttestationSchemaEquals",
+            "hasNoHeadlessSoapActiveRoleAttestationOrphans",
+            "hasCanonicalHeadlessSoapActiveRoleAttestationSchema",
+            "hasCanonicalHeadlessCheckupActiveRoleAttestationSchema",
+            "ensureHeadlessCheckupActiveRoleAttestationSchema",
+            "ensureHeadlessSoapActiveRoleAttestationSchema",
+            "hasCanonicalHeadlessSoapEntryCommitSchema",
+            "ensureHeadlessSoapEntryCommitSchema",
+            "hasCanonicalDurableReviewPatientLinkSchema",
+            "migrateP2aPhysicianReviewAttestationSchema",
+            "ensureColumn",
+            "ATTACHMENT_CURRENTNESS_LEGACY_DDL",
+            "ATTACHMENT_CURRENTNESS_CANONICAL_DDL",
+            "ATTACHMENT_CURRENTNESS_HISTORICAL_DDL",
+            "ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA",
+            "ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA",
+            "ATTACHMENT_CURRENTNESS_COLUMNS",
+            "ATTACHMENT_CURRENTNESS_ERROR",
+            "denyAttachmentCurrentnessMigration",
+            "attachmentCurrentnessSchemaMatches",
+            "upgradeLegacyAttachmentCurrentness",
+            "applySchemaGuards",
+            "applySchemaGuardsSerially"
+          ],
+          "topLevelTryBlocks": false
+        }
+      ],
+      "entrypoint": "applySchemaGuardsSerially",
+      "initializePragmas": true,
+      "origins": [
+        "published-sql-then-same-tag-guards",
+        "empty-database-historical-bootstrap"
+      ],
+      "provisioningSource": {
+        "path": "scripts/prepare-e2e-db.mjs",
+        "blob": "b8b7172d750aaacad91a9a1827b075ce3866f744",
+        "sha256": "8ffa1f030537d00fec69c0ca9a1e54ba13c7eaf124004f2418494a0ada0e6eef",
+        "role": "provenance-only: ordered SQL provisioning; not imported or executed"
+      }
     }
   ],
   "sourcesByBlob": {
@@ -283,18 +609,6 @@
       "path": "drizzle/0005_user_auth_lockout.sql",
       "sha256": "d28a9aaac5e9c97a7b82305e9d98723d7f5b938bd481d3976028ff5d1b9e5db7"
     },
-    "61d83501f69f07fef46d0285d4d8d584dc3654b1": {
-      "path": "lib/schema.ts",
-      "sha256": "b3ae03eb241bfc91156c1079cdf09f656f3c8a60288f19bb362c6a7a02e9c33c"
-    },
-    "f91bf78e57feb983a2abb8f761e2db0dcf882140": {
-      "path": "lib/db-server.ts",
-      "sha256": "58541a7388135864e9eb54a77eaaa1f62cda149bd0be5b166f776021a5078e18"
-    },
-    "6398cb75e0efbfbacf69794fa8b0af975cf5c492": {
-      "path": "lib/security/audit-db.ts",
-      "sha256": "68b4906c4e315af42683ca26049ebc2631bb683b358811cfc7477a023abebeb5"
-    },
     "ee102c8dfb91abdda2f826f27b747e93e8b4bfd5": {
       "path": "drizzle/0006_prosthetic_prescriptions.sql",
       "sha256": "65618b4d4d9611bb7e03c30a92a65184e69846b8148b7dbccb459092fd8965d5"
@@ -323,14 +637,6 @@
       "path": "drizzle/0012_observations_version_concurrency.sql",
       "sha256": "22783b1a5634e402947c45a8528fdd2441f9e522f568f4bf06cad60936a4d47d"
     },
-    "17a965d7f2fe788590d58eafd4b441c8e31cece7": {
-      "path": "lib/schema.ts",
-      "sha256": "886f20edeffd169c34b17d4591c2678183c4a30cac4f894c27c120c86d3ec117"
-    },
-    "9b44437613c1e2fe2f55883acebf77e0f1d5e62a": {
-      "path": "lib/db-server.ts",
-      "sha256": "99bcf174f29682ddf44748d778adad2acb52232fff92b2e6ea19854e2723990b"
-    },
     "f4f6e7e0ac3f9814f6c945410b4dfb6fe1b4af1b": {
       "path": "drizzle/0013_service_prescriptions.sql",
       "sha256": "8b7241cd9faa8ae25da57322646f4a1434fd76dfd00ea9c6c3f6ba58c2a98c97"
@@ -338,14 +644,6 @@
     "4da1e95d865b3f603b1d031bf8e20a3036bf76ec": {
       "path": "drizzle/0014_service_prescription_items_catalog.sql",
       "sha256": "2329ee5484c6da738cc7d769762c84a68c11dd5c6b0aa5bbf0e0146a2491744c"
-    },
-    "182e772a4a0e75f48dc22fc2022dda10db0fa07c": {
-      "path": "lib/schema.ts",
-      "sha256": "73132cc1f4f946c44d95df78eec7fcdae40af006708c6e2815cc63619e34c747"
-    },
-    "594cec8fc43702e1b36996125c40452af4dfd427": {
-      "path": "lib/db-server.ts",
-      "sha256": "75dd9de174e7e1609a8d23647bf3d5879e808fdd485ee23ac69d885abd4fba0d"
     },
     "bbd0aefef42c8f222d6a56c2e1eff13cba8d2bee": {
       "path": "drizzle/0015_document_intelligence_runtime_columns.sql",
@@ -367,25 +665,9 @@
       "path": "drizzle/0020_ambulatory_version.sql",
       "sha256": "f32306afa7557949171c06c636f07110fda4544266ce2ed329f23f18e939afe2"
     },
-    "774a2acc3b03d62dedcc2a18e837fe04d9f851fa": {
-      "path": "lib/schema.ts",
-      "sha256": "09bfa25c0fb3c0d5b573837c37fdfe7eea8c95c8f54a4af6f568409c3867b296"
-    },
-    "99559cb6312369a11ddb6b6469835b4dec556adc": {
-      "path": "lib/db-server.ts",
-      "sha256": "012745ce5e70728a28cfcf1595bbce2c9671d455f11ebba9fc8ac4e5e5424d0c"
-    },
     "3859aabad04ff35cc11d17ff5e28e54072793f49": {
       "path": "drizzle/0021_observations_service_prescription_item_link.sql",
       "sha256": "137170f12978269e6191d99bf5c2900452cd5c455b2376bf38d601a931aaafb9"
-    },
-    "054014ed70f100e27635902a61aba69aa87537ff": {
-      "path": "lib/schema.ts",
-      "sha256": "c70677fea80ac10d7caf3a1bc675aeecfadab652685f6c07b1d306b2e647a110"
-    },
-    "f62367f1b3d7630e790e8dc1aab885cf4fb83352": {
-      "path": "lib/db-server.ts",
-      "sha256": "011e00da487f0712466d4a7b57385c00841c439da33bfc1d8ea29fb07a8d9783"
     },
     "1253cc852cd20840f3e0e4023e739152813bd3cf": {
       "path": "drizzle/0022_aifa_catalog_search_indices.sql",
@@ -398,14 +680,6 @@
     "6d2742612b4e55d5e082dae8ccf33195bd8ef68b": {
       "path": "drizzle/0024_document_diagnosis_proposals.sql",
       "sha256": "befbe8a2bfbe2d007f8ed9037a8de3267135a29495d4db0083a0ccfc0cc5348d"
-    },
-    "13afdaa8d0adc7add0e95bf8fd629355089ade68": {
-      "path": "lib/schema.ts",
-      "sha256": "56f78562daea36e7bbefdcc821cc2522688fda014ab6eb2d44f2fa5dc8753542"
-    },
-    "bc9f07d2aa34ca4b43b6ce5ab9b3cf21109a0d71": {
-      "path": "lib/db-server.ts",
-      "sha256": "649859489a601304be3b0cf0fb8a30f51202547fcab593a4de16e5d8bd1647f3"
     },
     "0c8e48493a7f79a5912224d30a7263c6d6e83208": {
       "path": "drizzle/0025_physician_review_attestations.sql",
@@ -442,26 +716,6 @@
     "f125768422427691089f2f3ecf91e42d6aae1b96": {
       "path": "drizzle/0034_prosthetics_catalog.sql",
       "sha256": "5501ce39d7294e6ce3cc76913c62c61f53cf29b8a4e7903aecd4d713864a4ad3"
-    },
-    "acb10e82846cdf74045a0f701b5d4df65119ab47": {
-      "path": "lib/schema.ts",
-      "sha256": "4dcda17dff2a208b2078cfc5549bc0eaac946891295ede9a23d4526238ac20e7"
-    },
-    "93a725ef99149c574f3e46574c3cfeec584a27fe": {
-      "path": "lib/db-server.ts",
-      "sha256": "ade600c99b53690cfda592fe542824e894e16edd01f2e692e93bc0e12f1616d6"
-    },
-    "846600554f2ff11d678d3ed9edb68b091e5a7f8d": {
-      "path": "lib/sqlite-new-database-bootstrap.ts",
-      "sha256": "c884c0b29cfcde2c2a5e909863a85bb6bd421f49f30754ef0874412fc22ab95f"
-    },
-    "bffa4fe63f1d6a9143be613773bb403da9f9db06": {
-      "path": "lib/exemption-catalog-schema.ts",
-      "sha256": "f32abeeb243a6dac3ec1355c996c5a641278ef38f752dc2f4e06ff669509d614"
-    },
-    "aafbab718e6f29469c05fdc0391751160cd45a2b": {
-      "path": "lib/reference-data/prosthetics-catalog-schema.ts",
-      "sha256": "74a0821c9a005128abc1b218c97ba59e7f812cef3dc1e4a9b790337aff3b69bf"
     }
   }
 }
