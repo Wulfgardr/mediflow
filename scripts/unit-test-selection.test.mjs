@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { collectUnitTestFiles, unitTestArguments, UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS } from './unit-test-selection.mjs';
+import { collectUnitTestFiles, unitTestArguments, UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS, UNIT_SERIAL_SCRIPT_TESTS, unitTestInvocationArguments } from './unit-test-selection.mjs';
 
 test('registration: route, behavior and private-loader suites each occur once in required units', () => {
   const selection = collectUnitTestFiles(path.resolve(import.meta.dirname, '..'));
@@ -133,4 +133,11 @@ test('portable script cohort is selected exactly once through the common runner'
     assert.equal(selected.filter(candidate => candidate === file).length, 1, file);
     assert.equal(args.filter(candidate => candidate === file).length, 1, file);
   }
+});
+
+test('serial WHO invocations partition the complete selection exactly once', () => {
+  const root = path.resolve(import.meta.dirname, '..');
+  const invocations = unitTestInvocationArguments(root);
+  assert.deepEqual(invocations.slice(1), UNIT_SERIAL_SCRIPT_TESTS.map(file => ['scripts/run-strip-types.mjs', '--test', file]));
+  assert.deepEqual(invocations.flatMap(args => args.slice(2)).sort(), unitTestArguments(root).slice(2).sort());
 });

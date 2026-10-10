@@ -78,6 +78,12 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/chatgpt-account/account-transport.test.ts',
 ]);
 
+// These two suites exercise the real fixed WHO loopback port and must not overlap.
+export const UNIT_SERIAL_SCRIPT_TESTS = Object.freeze([
+  'scripts/who-local-onboarding-portability.test.mjs',
+  'scripts/who-local-onboarding.test.mjs',
+]);
+
 function walk(root, relative) {
   const files = [];
   for (const entry of fs.readdirSync(path.join(root, relative), { withFileTypes: true })) {
@@ -113,4 +119,10 @@ export function unitTestArguments(root) {
   // Preserve the old glob expansion's absolute group paths and literal script paths.
   return ['scripts/run-strip-types.mjs', '--test', ...collectUnitTestFiles(root).map(file =>
     UNIT_TEST_GROUPS.some(group => file.startsWith(`${group}/`)) ? path.resolve(root, file) : file)];
+}
+
+export function unitTestInvocationArguments(root) {
+  const args = unitTestArguments(root);
+  return [args.filter(file => !UNIT_SERIAL_SCRIPT_TESTS.includes(file)),
+    ...UNIT_SERIAL_SCRIPT_TESTS.map(file => ['scripts/run-strip-types.mjs', '--test', file])];
 }
