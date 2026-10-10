@@ -130,6 +130,12 @@ export const patientDuplicateIntents = sqliteTable('patient_duplicate_intents', 
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
+// Retired patient identities survive purge; no foreign key to the removed patient.
+export const patientRetiredIds = sqliteTable('patient_retired_ids', {
+    id: text('id').primaryKey().notNull(),
+    retiredAt: integer('retired_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // --- Patient <-> Ambulatory (Many-to-Many) ---
 export const patientsToAmbulatories = sqliteTable('patients_to_ambulatories', {
     patientId: text('patient_id').references(() => patients.id, { onDelete: 'cascade' }).notNull(),

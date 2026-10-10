@@ -1,7 +1,7 @@
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
+import { patients, ambulatories, patientRetiredIds, patientsToAmbulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
@@ -154,7 +154,8 @@ export async function POST(request: Request) {
                 transaction: operation => dbServer.transaction(tx => operation({
                     targetExists: id => Boolean(tx.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.id, id)).get()),
                     insertPatient: values => {
-                        if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, values.id)).get()) throw new PatientCreateConflictError();
+                        if (tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, values.id)).get()
+                            || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, values.id)).get()) throw new PatientCreateConflictError();
                         tx.insert(patients).values(values).run();
                     },
                     insertMembership: (patientId, targetId) => {
@@ -169,7 +170,8 @@ export async function POST(request: Request) {
                 // Destination admission precedes identity lookup; do not disclose collisions for an invalid parent.
                 if (normalized.values.ambulatoryId && !tx.select({ id: ambulatories.id }).from(ambulatories)
                     .where(eq(ambulatories.id, normalized.values.ambulatoryId)).get()) throw new PatientCreateDestinationNotFoundError();
-                if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
+                if (tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, normalized.values.id)).get()
+                    || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
                 tx.insert(patients).values(normalized.values).run();
 
                 /* @Codex */
