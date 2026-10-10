@@ -1,7 +1,8 @@
 # C09 explicit historical schema origins
 
-This artifact reconstructs synthetic SQLite origins. It does not qualify every
-installed database, every historical SQLite engine, or product-supported versions.
+This artifact reconstructs the synthetic upgrade origins declared in
+[ADR0080](../../../docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md#emendamento-2026-10-10-apertura-esplicita-e-schema-versionato-c09).
+It does not qualify every installed database or historical SQLite engine.
 Eight published tags form seven source families; v0.8.0 and v0.8.2 share sources.
 Historical SQL and DDL stay in Git history rather than a duplicated fixture corpus.
 
@@ -56,11 +57,12 @@ node scripts/probe-historical-sql-baselines.mjs --families=v0.8.0,v0.8.6
 The filter accepts canonical family names; v0.8.0 includes v0.8.2. Databases are
 synthetic, created under a fresh temporary directory and removed in `finally`.
 The current bootstrap worker receives isolated data paths and disables legacy
-adoption. Initializer/bootstrap failures produce nonzero exit; zero does not
-assert schema parity. Historical warnings and errors remain visible in the report.
+adoption. Initializer/bootstrap failure, a schema difference, or a failed fresh/
+upgraded audit assertion produces nonzero exit. Historical warnings and errors
+remain visible in the report.
 
 The manifest's `currentCommit` explicitly selects the current bootstrap baseline
-(initially `8ca89433412aab7b259a2d8a21dc0a144494ab1d`). The probe requires the
+(`99590af847fede54182a274d3230198d181517a8`). The probe requires the
 checkout's `lib` tree, bootstrap worker and TypeScript loader to match that commit.
 The report exposes this pin as `currentBootstrapCommit`, separately from the
 checkout's `currentCommit`.
@@ -73,17 +75,23 @@ Do not bypass the guard or silently derive the baseline from the running checkou
 
 ## Comparison boundary
 
-Against the initial baseline, the seven SQL+guard origins retain one structural
-metadata difference: `observations.updated_at` lacks the fresh `unixepoch()`
-default. The historical fresh v0.8.6 origin has no column/FK/index metadata
-difference, but retains a textual table DDL difference on `siss_handoff_events`.
-These statements are baseline-specific, not permanent migration guarantees.
+All eight declared origins converge to the fresh schema at the pinned baseline,
+with no initializer warnings. The forward upgrade restores the missing historical
+`observations.updated_at` default. Fresh and upgraded audit accept synthetic INSERT
+and reject UPDATE/DELETE; each behavior probe rolls back its synthetic row.
 
-Structural comparison omits physical column order and covers columns, foreign
-keys and index structure. Raw table/index/trigger SQL is reported separately;
-textual differences do not establish semantic CHECK equivalence. Index SQL
-retains partial predicates and expressions without a general SQL equivalence
-parser. Audit behavior is checked using synthetic INSERT and rejected UPDATE/
-DELETE operations, then rolled back. General CHECK behavior and FK behavior
-under historical data remain unqualified. Product support policy and arbitrary
-legacy provisioning histories are outside this artifact.
+`lib/sqlite-schema-shape.ts` ignores physical column position, comments and
+whitespace. Its closed grammar normalizes known declaration quoting, simple
+index order syntax and the observed `INTEGER DEFAULT 1 NOT NULL` spelling.
+PK order, grouped FK components, defaults, CHECK tokens, index expressions and
+predicates remain significant. Trigger headers normalize known names; trigger
+bodies and string literals stay exact. Unknown SQL compares conservatively.
+Real SQLite counterexamples ensure weakened CHECKs, changed defaults, partial
+indexes, FK/PK order and the `current_date`/quoted-column distinction remain
+observable. The runtime separately rejects views.
+
+These are source-derived provisioning origins with synthetic data. They do not
+cover arbitrary manual schema edits or claim algebraic equivalence of general
+SQL expressions. Runtime admission also checks integrity and foreign keys and
+requires exact canonical convergence before committing version 1. Other origins
+follow the preservation/recovery path in ADR0080.

@@ -6044,6 +6044,15 @@
       }
     },
     {
+      "path": "lib/sqlite-observation-schema-upgrade.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/sqlite-pragmas.test.ts",
       "selection": {
         "state": "mapped",
@@ -6054,6 +6063,15 @@
     },
     {
       "path": "lib/sqlite-repair.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/sqlite-schema-open.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -8610,6 +8628,15 @@
       "selection": {
         "state": "unresolved",
         "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+      }
+    },
+    {
+      "path": "scripts/sqlite-schema-shape.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {

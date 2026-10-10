@@ -357,8 +357,12 @@ Documentazione tecnica:
 
 ## 🗄️ Modifiche database (Drizzle / SQLite)
 
-Nel runtime dev/server, i controlli che aggiungono elementi allo schema di
-`lib/db-server.ts` sono serializzati in una transazione SQLite `IMMEDIATE`.
+Nel runtime dev/server, `lib/db-server.ts` apre esplicitamente la connessione
+tramite `lib/sqlite-schema-open.ts`. L'inizializzatore corrente in
+`lib/sqlite-schema.ts` e lo stamp della versione sono serializzati nella stessa
+transazione SQLite `IMMEDIATE`, dopo la verifica di un originale recuperabile.
+Gli import non aprono né migrano archivi. Ordine e origini supportate sono in
+[ADR0080](./docs/adr/0080-serialize-sqlite-schema-guards-at-bootstrap.md#emendamento-2026-10-10-apertura-esplicita-e-schema-versionato-c09).
 La raccolta dei metadati Next durante la sola fase
 `NEXT_PHASE=phase-production-build` usa invece SQLite in memoria: non apre,
 copia, recupera o migra il database clinico persistente. Questa separazione
@@ -370,8 +374,9 @@ Le regressioni dedicate,
 sintetici.
 
 Fonti autorevoli:
-- Schema: `lib/schema.ts`
-- Migrazioni: `drizzle/`
+- Schema runtime corrente: `lib/sqlite-schema.ts` e helper richiamati
+- Dichiarazioni ORM: `lib/schema.ts`
+- Migrazioni storiche: `drizzle/` (nessun replay runtime)
 
 Linee guida:
 - Preferisci **migrazioni esplicite** invece di patch schema runtime.

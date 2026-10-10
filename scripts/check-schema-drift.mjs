@@ -2,13 +2,12 @@
 
 // WUL-268 (STREAM A): schema drift check.
 //
-// The runtime guards in lib/db-server.ts (applySchemaGuards) are the operative
+// The runtime initializer in lib/sqlite-schema.ts are the operative
 // migration mechanism: drizzle/*.sql files are historical artifacts and are
 // never applied at runtime (there is no migrator import and no db:migrate
 // script). This check makes that contract enforceable: it bootstraps a FRESH
 // temp SQLite database through the REAL db-server bootstrap path (by pointing
-// MEDIFLOW_DATA_DIR at a throwaway directory and importing lib/db-server, which
-// runs applySchemaGuards as an import side effect), introspects sqlite_master,
+// MEDIFLOW_DATA_DIR at a throwaway directory and explicitly calling openDbServer), introspects sqlite_master,
 // and compares the live tables / columns / indices against the drizzle
 // declarations in lib/schema.ts. It exits 1 with a readable diff on drift.
 //
