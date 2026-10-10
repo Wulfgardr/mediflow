@@ -1,7 +1,8 @@
+import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, notInArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
@@ -10,6 +11,8 @@ import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 // WUL-306 (ADR 0066): historical orphan child rows (patient_id no longer resolves)
 import {
     countOrphanedClinicalRows,
+    PATIENT_CHILD_TABLES,
+    type PatientCascadeCounts,
     purgeOrphanedClinicalRows,
     totalPatientCascadeRows,
 } from '@/lib/patient-cascade';
@@ -20,6 +23,31 @@ const REPAIR_JSON_MAX_BYTES = 65_536;
 
 export const dynamic = 'force-dynamic';
 
+// A single transaction snapshot defines both preview and execution authority.
+// Only identities/version metadata enter the digest, never clinical payloads.
+function inspectRepair(tx: Pick<typeof dbServer, 'select'>) {
+    const target = tx.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1).get()
+        ?? tx.select().from(ambulatories).limit(1).get();
+    const allPatients = tx.select({ id: patients.id, version: patients.version }).from(patients).all();
+    const linkedPids = new Set(tx.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories).all().map(link => link.pid));
+    const orphanPatients = allPatients.filter(patient => !linkedPids.has(patient.id));
+    const orphanChildren = PATIENT_CHILD_TABLES.map(child => {
+        const identity = 'id' in child.table ? child.table.id
+            : 'reviewId' in child.table ? child.table.reviewId : child.table.ambulatoryId;
+        const rows = tx.select({ id: identity, patientId: child.patientId }).from(child.table)
+            .where(notInArray(child.patientId, tx.select({ id: patients.id }).from(patients))).all();
+        return [child.name, rows.map(row => JSON.stringify([row.id, row.patientId])).sort()] as const;
+    });
+    const plan = {
+        target: target ? [target.id, target.version, target.isDefault] : null,
+        patients: orphanPatients.map(patient => JSON.stringify([patient.id, patient.version])).sort(),
+        children: orphanChildren.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
+    };
+    const expectedSnapshot = createHash('sha256').update(JSON.stringify(plan)).digest('hex');
+    return { target, allPatients, orphanPatients, expectedSnapshot,
+        orphanChildRowCounts: Object.fromEntries(orphanChildren.map(([name, rows]) => [name, rows.length])) as PatientCascadeCounts };
+}
+
 /* @Codex */
 export async function GET() {
     /* @Codex */
@@ -28,22 +56,15 @@ export async function GET() {
     if (!isWebAdminSession(session)) return forbiddenResponse();
 
     try {
-        const defaults = await dbServer.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1);
-        const targetAmb = defaults[0] ?? (await dbServer.select().from(ambulatories).limit(1))[0] ?? null;
-
-        const allPatients = await dbServer.select({ id: patients.id }).from(patients);
-        const allLinks = await dbServer.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories);
-        const linkedPids = new Set(allLinks.map(l => l.pid));
-        const orphanCount = allPatients.filter(p => !linkedPids.has(p.id)).length;
-
-        // WUL-306 (ADR 0066): report child rows whose patient_id does not resolve.
-        const orphanChildRowCounts = countOrphanedClinicalRows(dbServer);
+        const { target: targetAmb, allPatients, orphanPatients, expectedSnapshot, orphanChildRowCounts } =
+            dbServer.transaction(tx => inspectRepair(tx));
 
         return NextResponse.json({
             success: true,
             dryRun: true,
             totalPatients: allPatients.length,
-            orphanCount,
+            orphanCount: orphanPatients.length,
+            expectedSnapshot,
             orphanChildRowCounts,
             totalOrphanChildRows: totalPatientCascadeRows(orphanChildRowCounts),
             targetAmbulatoryId: targetAmb?.id ?? null,
@@ -76,6 +97,9 @@ export async function POST(request: Request) {
         if (Object.hasOwn(body, 'purgeOrphanedClinicalRows') && typeof body.purgeOrphanedClinicalRows !== 'boolean') {
             return NextResponse.json({ error: 'purgeOrphanedClinicalRows must be a boolean' }, { status: 400 });
         }
+        if (typeof body.expectedSnapshot !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedSnapshot)) {
+            return NextResponse.json({ error: 'Invalid repair snapshot' }, { status: 400 });
+        }
         const purgeRequested = body.purgeOrphanedClinicalRows === true;
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
@@ -83,14 +107,17 @@ export async function POST(request: Request) {
             sourceSurface: auditContext.sourceSurface, requestId };
 
         const result = dbServer.transaction((tx) => {
-            const target = tx.select().from(ambulatories).where(eq(ambulatories.isDefault, true)).limit(1).get()
-                ?? tx.select().from(ambulatories).limit(1).get();
+            const current = inspectRepair(tx);
+            if (current.expectedSnapshot !== body.expectedSnapshot) {
+                return { error: 'Repair snapshot changed; inspect again' };
+            }
+            const { target, orphanPatients } = current;
+            if (orphanPatients.some(patient => !Number.isSafeInteger(patient.version)
+                || patient.version <= 0 || patient.version >= Number.MAX_SAFE_INTEGER)) {
+                return { error: 'Repair candidate is not eligible' };
+            }
             const targetAmbId = target?.id ?? uuidv4();
             const targetAmbName = target?.name ?? 'Sede Principale';
-            const allPatients = tx.select({ id: patients.id, version: patients.version }).from(patients).all();
-            const allLinks = tx.select({ pid: patientsToAmbulatories.patientId }).from(patientsToAmbulatories).all();
-            const linkedPids = new Set(allLinks.map(link => link.pid));
-            const orphanPatients = allPatients.filter(patient => !linkedPids.has(patient.id));
 
             if (!target) {
                 const inserted = tx.insert(ambulatories).values({
@@ -152,7 +179,7 @@ export async function POST(request: Request) {
                     : 'No orphan patients to relink.',
             };
         }, { behavior: 'immediate' });
-        return NextResponse.json(result);
+        return NextResponse.json(result, { status: 'error' in result ? 409 : 200 });
 
     } catch (error) {
         console.error("Fix Orphan Error:", error);
