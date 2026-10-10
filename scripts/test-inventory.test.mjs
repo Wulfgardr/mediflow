@@ -10,6 +10,7 @@ import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.m
 import { EXPLICIT_NPM_SUITES, GUARD_SELF_TEST_SUITES, collectSyntheticPluginSelections } from './explicit-npm-test-selection.mjs';
 import { collectPlaywrightTestFiles, playwrightTestSelection } from './playwright-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
+import { collectSwiftTestSources, collectSwiftInventorySelection, verifySwiftPackageDescription, SWIFT_SUITE_ID, SWIFT_PACKAGE } from './swift-test-selection.mjs';
 
 const cli = fileURLToPath(new URL('./test-inventory.mjs', import.meta.url));
 const mapped = file => ({ path: file, selection: { state: 'mapped', suiteIds: ['unit'] } });
@@ -141,6 +142,7 @@ function fixture(t, withDebt = false) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), JSON.stringify(workflow));
   }
+  addSwiftFixture(root, entries);
   fs.writeFileSync(path.join(root, 'test-inventory.v1.json'), JSON.stringify(manifest(entries)));
   return root;
 }
@@ -589,4 +591,90 @@ test('plugin test rename cannot silently change the manifest and reports conditi
   assert.equal(result.status, 1);
   assert.match(result.stderr, /STALE_ENTRY: plugins\/mediflow-synthetic\/test\/plugin.test.mjs/);
   assert.match(result.stderr, /SELECTED_WITHOUT_ENTRY: npm:synthetic-plugin:test: plugins\/mediflow-synthetic\/test\/renamed.test.mjs/);
+});
+
+
+function addSwiftFixture(root, entries = []) {
+  // Fixture infrastructure is not a synthetic test candidate. The real repository
+  // still tracks this wrapper as unresolved; do not invent an execution mapping.
+  fs.writeFileSync(path.join(root, '.gitignore'), 'scripts/native-test.sh\n');
+  const definition = { MediFlowCoreTests: ['CoreTests.swift'], MediFlowAppleSharedTests: ['AppleTests.swift'] };
+  for (const [target, sources] of Object.entries(definition)) {
+    for (const source of sources) {
+      const file = `${SWIFT_PACKAGE}/Tests/${target}/${source}`;
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      fs.writeFileSync(path.join(root, file), 'import XCTest\nfinal class SyntheticTests: XCTestCase {}');
+      entries.push({ path: file, selection: { state: 'mapped', suiteIds: [SWIFT_SUITE_ID] } });
+    }
+  }
+  fs.writeFileSync(path.join(root, SWIFT_PACKAGE, 'test-sources.json'), JSON.stringify(definition));
+  for (const file of ['scripts/native-test.sh', '.github/workflows/apple-native.yml']) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.copyFileSync(fileURLToPath(new URL(`../${file}`, import.meta.url)), path.join(root, file));
+  }
+  return definition;
+}
+
+function swiftDescription(definition) {
+  return { targets: Object.entries(definition).map(([name, sources]) => ({ name, type: 'test', path: `Tests/${name}`, sources })) };
+}
+
+test('Swift sources are shared, conditional and checked against official package description without running tests', t => {
+  const root = fixture(t);
+  const definition = collectSwiftTestSources(root);
+  const selection = collectSwiftInventorySelection(root);
+  assert.deepEqual(selection.errors, []);
+  assert.equal(selection.conditional, true);
+  assert.equal(selection.binding.job, 'native-build-test');
+  assert.equal(verifySwiftPackageDescription(root, swiftDescription(definition), 'darwin'), 2);
+  assert.equal(verifySwiftPackageDescription(root, swiftDescription({ MediFlowCoreTests: definition.MediFlowCoreTests }), 'linux'), 1);
+  const realRoot = fileURLToPath(new URL('../', import.meta.url));
+  assert.equal(collectSwiftInventorySelection(realRoot).files.length, 106);
+});
+
+test('Swift missing, renamed, new, empty, duplicate and unsafe sources fail closed', t => {
+  const changes = [
+    root => fs.unlinkSync(path.join(root, SWIFT_PACKAGE, 'Tests/MediFlowCoreTests/CoreTests.swift')),
+    root => fs.renameSync(path.join(root, SWIFT_PACKAGE, 'Tests/MediFlowCoreTests/CoreTests.swift'), path.join(root, SWIFT_PACKAGE, 'Tests/MediFlowCoreTests/RenamedTests.swift')),
+    root => fs.writeFileSync(path.join(root, SWIFT_PACKAGE, 'Tests/MediFlowCoreTests/NewTests.swift'), 'import XCTest'),
+    ...[[], ['CoreTests.swift', 'CoreTests.swift'], ['../outside.swift']].map(sources => root => {
+      const file = path.join(root, SWIFT_PACKAGE, 'test-sources.json');
+      const definition = JSON.parse(fs.readFileSync(file)); definition.MediFlowCoreTests = sources;
+      fs.writeFileSync(file, JSON.stringify(definition));
+    }),
+  ];
+  for (const change of changes) {
+    const root = fixture(t); change(root);
+    const selection = collectSwiftInventorySelection(root);
+    assert.deepEqual(selection.files, []); assert.equal(selection.errors.length, 1);
+    assert.equal(run(root).status, 1);
+  }
+});
+
+test('SwiftPM target, path and source differences cannot validate a declared roster', t => {
+  const root = fixture(t), definition = collectSwiftTestSources(root);
+  for (const mutate of [
+    description => description.targets.pop(),
+    description => description.targets.push({ ...description.targets[0] }),
+    description => { description.targets[0].sources = []; },
+    description => { description.targets[0].sources = ['OtherTests.swift']; },
+    description => { description.targets[0].path = 'Elsewhere'; },
+  ]) {
+    const description = swiftDescription(definition); mutate(description);
+    assert.throws(() => verifySwiftPackageDescription(root, description, 'darwin'), /SwiftPM test/);
+  }
+});
+
+test('Swift CI and verified runner drift cannot retain a successful inventory binding', t => {
+  for (const [file, before, after] of [
+    ['.github/workflows/apple-native.yml', 'scripts/native-test.sh 2>&1', 'scripts/native-test.sh --filter Partial 2>&1'],
+    ['.github/workflows/apple-native.yml', "needs.changes.outputs.apple == 'true'", 'false'],
+    ['scripts/native-test.sh', 'node "$ROOT_DIR/scripts/swift-test-selection.mjs" --verify', ':'],
+    ['scripts/native-test.sh', 'swift test --package-path "$PACKAGE_DIR"', 'swift test --package-path "$PACKAGE_DIR" --filter Partial'],
+  ]) {
+    const root = fixture(t), filename = path.join(root, file);
+    fs.writeFileSync(filename, fs.readFileSync(filename, 'utf8').replace(before, after));
+    const selection = collectSwiftInventorySelection(root);
+    assert.deepEqual(selection.files, []); assert.equal(selection.errors.length, 1);
+  }
 });
