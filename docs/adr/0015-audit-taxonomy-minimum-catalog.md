@@ -976,3 +976,73 @@ stesso archivio conserva i token locali, mentre un import in un archivio nuovo
 non ricostruisce i consumi precedenti. Restore/swap a una storia precedente e
 portabilità dei token restano un residuo C15 esplicito; questa coorte non
 modifica il restore né promette protezione attraverso tali operazioni.
+
+
+## C05-M — Preview e CAS amministrativo migrate-m2m (WUL-720)
+
+`GET /api/system/migrate-m2m` legge in una transazione coerente i pazienti con
+primario non vuoto e senza alcuna membership, includendo i tombstone secondo
+ADR0066. Restituisce `{success:true,dryRun:true,total,snapshot:{candidates}}`.
+Ogni candidato contiene soltanto `patientId`, `patientVersion`,
+`primaryAmbulatoryId`, `ambulatoryVersion`. Nessun campo clinico è esposto.
+Il primario deve esistere; le versioni devono essere interi positivi safe e
+quella paziente deve essere incrementabile (MAX escluso). Un candidato non
+ammissibile produce `409`, senza una preview parziale.
+
+Procedura operativa API (non è una UI consegnata):
+
+1. Con sessione Web admin, inviare GET e ispezionare l'intero `snapshot`.
+2. Inviare quell'oggetto `snapshot` come body JSON del POST sullo stesso URL.
+   Non inviare il wrapper della risposta GET e non aggiornare implicitamente
+   versioni o candidati dopo una modifica interposta.
+3. Su `409` fermare il tentativo: una nuova GET e una nuova decisione esplicita
+   sono necessarie per approvare uno snapshot diverso.
+
+Il POST richiede oggetti/campi esatti, ID non vuoti, versioni numeriche safe e
+nessun ID paziente duplicato; ordine dei candidati irrilevante. Body assente,
+malformed, null, array, campi extra o binding invalidi ricevono `400`.
+Il limite request-json è 65536 byte UTF-8. GET misura il JSON compatto dello
+snapshot destinato al POST e restituisce `413` con limite esplicito quando
+non entra: nessun troncamento, batching o esecuzione parziale è disponibile.
+Il wrapper della preview non fa parte del payload di esecuzione misurato.
+
+Nella IMMEDIATE il POST rilegge tutti i candidati e confronta insieme esatto,
+versioni paziente, primari e versioni ambulatorio prima di qualsiasi effetto.
+Mismatch `409`; poi insert membership, bump versione/updatedAt e audit
+obbligatorio condividono il commit. La risposta `{success:true,migrated,total}`
+resta invariata. Un vecchio snapshot dopo commit riceve `409`; anche rimuovere
+nuovamente una membership non riabilita le versioni precedenti. Una nuova
+preview vuota può essere eseguita come no-op senza eventi.
+
+GET e POST richiedono `isWebAdminSession`: il precedente POST controllava
+soltanto il ruolo admin; ora native/system admin non ereditano questa
+manutenzione Web. È l'allineamento alla policy amministrativa Web esistente,
+non un ampliamento di autorità. Non risultano caller UI/Swift o script
+operativi collegati: i consumer repository aggiornati sono i test diretti.
+
+Questa coorte non introduce token persistenti. Eliminazione e ricreazione
+dello stesso ID/versione (ABA), restore C15, purge e fix-orphans restano
+residui distinti. Le prove SQLite nella suite membership coprono successo,
+stale/interposto, target, rollback audit, tombstone, ultimo incremento safe,
+input/auth e preview oltre limite; non attestano quei residui.
+
+
+Raccordo degli oracoli delle coorti precedenti: il test statico soft-delete
+registra i quattro lookup esatti dell'identità create (due rami Web, uno
+local-v1 e uno paired), ciascuno con molteplicità uno. Includono volutamente
+i tombstone per impedire il riuso dell'ID dopo l'ammissione. L'oracolo clear
+segue ora la delega route/core (`result.value`/`result.status`) e il loop di
+audit sui pazienti effettivamente cancellati logicamente, conservando controllo
+del tipo test, stale version, versione audit e divieto hard-delete. I negativi
+AST per sostituzione/duplicazione e le prove SQLite di famiglia non cambiano.
+Questo raccordo test/documenti non modifica la produzione delle coorti già
+revisionate e non qualifica automaticamente tutti gli altri lookup del guard.
+
+Le ulteriori classificazioni esatte del medesimo guard comprendono: lookup
+SISS del parent con rifiuto immediato del tombstone; GET e POST fix-orphans
+separati (uno ciascuno), amministrativamente comprensivi dei tombstone;
+lookup POST purge con controllo tombstone/versione nella IMMEDIATE; lookup
+clear dei soli membri residui selezionati, inclusi tombstone già presenti,
+per invalidare la vecchia autorità membership senza riscrivere il lifecycle.
+Ogni fingerprint ha molteplicità uno. Nessun pattern generico o modifica allo
+scanner è introdotto; restano le prove negative e il divieto di hard delete.
