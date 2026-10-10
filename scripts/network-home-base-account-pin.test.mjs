@@ -105,10 +105,13 @@ test('paired account PIN rotation preserves the master key and sealed patient fi
         ]);
         const raceResponses = [changeA, changeB];
         assert.equal(raceResponses.filter(({ response }) => response.status === 200).length, 1);
+        // The loser is refused at the credential write or, when the winner has already retired the
+        // session authority, one step earlier: both are a 409 that changes nothing.
+        const refusals = ['PIN_CHANGE_CONFLICT', 'PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED'];
         assert.equal(
-            raceResponses.filter(({ response, json }) => response.status === 409 && json?.code === 'PIN_CHANGE_CONFLICT').length,
+            raceResponses.filter(({ response, json }) => response.status === 409 && refusals.includes(json?.code)).length,
             1,
-            `Expected one PIN_CHANGE_CONFLICT response, got ${JSON.stringify(raceResponses.map(({ response, json }) => ({ status: response.status, json })) )}`,
+            `Expected one refused rotation, got ${JSON.stringify(raceResponses.map(({ response, json }) => ({ status: response.status, json })) )}`,
         );
         const winner = changeA.response.status === 200 ? raceA : raceB;
         const winnerLogin = await login(winner.pin);
