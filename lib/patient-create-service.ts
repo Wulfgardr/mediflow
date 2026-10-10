@@ -41,3 +41,5 @@ export function createPatientAtPreviewDestination(database: PatientCreateDatabas
 }
 
 export class PatientCreateConflictError extends Error {}
+
+export class PatientCreateDestinationNotFoundError extends Error {}
