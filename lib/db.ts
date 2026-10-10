@@ -27,6 +27,7 @@ import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 import type { DocumentEvidencePack } from './domain/documents/document-evidence-pack';
 import type { HostDocumentOcrQueueReason, DocumentOcrQueueState } from './domain/documents/document-ocr-queue';
 /* @Codex */
+import { assertBackupReadableWithKey, BackupRestoreKeyError } from './backup-restore-key-check';
 import {
     buildApiTableFetchErrorMessage,
     isApiTableAuthUnavailableStatus,
@@ -1013,6 +1014,13 @@ class MedicalApiClient {
     }
 
     /* @Codex */
+    async assertBackupReadable(artifactJson: string): Promise<void> {
+        const key = this.masterKey;
+        await assertBackupReadableWithKey(artifactJson, key, ENCRYPTED_FIELDS);
+        // A lock or key change while the check ran voids its answer.
+        if (this.masterKey !== key) throw new BackupRestoreKeyError('Ripristino non avviato: la sessione è stata bloccata durante il controllo. Sblocca e riprova.');
+    }
+
     setKey(key: CryptoKey | null) {
         const previousReads = this.sessionReads;
         this.masterKey = key;
@@ -1064,6 +1072,7 @@ export async function exportRawDatabase() {
 }
 
 export async function importRawDatabase(jsonString: string) {
+    await db.assertBackupReadable(jsonString);
     const response = await fetch('/api/system/backup-restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
