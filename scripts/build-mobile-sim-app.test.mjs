@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { installPlistTestTools } from './fixtures/plist-tool-test-support.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const simulatorId = '11111111-2222-3333-4444-555555555555';
@@ -22,12 +23,18 @@ function fixture(t) {
   for (const script of ['build-mobile-sim-app.sh', 'mobile-home-base-paired-smoke.sh']) {
     fs.copyFileSync(path.join(repoRoot, 'scripts', script), path.join(scripts, script));
   }
+  installPlistTestTools(bin);
+  // Bind only the copied script's three absolute Apple-tool calls to the fixture.
+  const builder = path.join(scripts, 'build-mobile-sim-app.sh');
+  const builderSource = fs.readFileSync(builder, 'utf8');
+  assert.equal(builderSource.split('/usr/libexec/PlistBuddy').length - 1, 3);
+  fs.writeFileSync(builder, builderSource.replaceAll('/usr/libexec/PlistBuddy', '"' + path.join(bin, 'PlistBuddy') + '"'));
   fs.writeFileSync(path.join(project, 'project.pbxproj'), 'tracked project fixture');
   fs.writeFileSync(path.join(data, 'medical.db'), 'synthetic tooling fixture; no database contents');
   fs.writeFileSync(path.join(data, 'local-api-token'), 'synthetic-tooling-token');
   fs.writeFileSync(path.join(root, 'devices.json'), JSON.stringify({ devices: { [iOS]: [bootedDevice] } }));
 
-  // All Apple/process/backend commands are fake; Node and plist parsing are real.
+  // All Apple/process/backend commands are fake; Node and Python stdlib plist parsing are real.
   const fakeTool = `#!${process.execPath}
 import fs from 'node:fs';
 import path from 'node:path';
