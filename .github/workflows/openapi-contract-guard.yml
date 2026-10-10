@@ -30,12 +30,11 @@ jobs:
       - name: Install dependencies
         id: install
         run: npm ci
-      - name: Test inventory integrity and negative fixtures
+      - name: Test selection check and negative fixtures
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
-          npm run test:test-inventory
-          npm run check:test-inventory-integrity
-          npm run check:test-inventory-complete
+          npm run test:test-selection
+          npm run check:test-selection
       - name: Claims guard and self-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

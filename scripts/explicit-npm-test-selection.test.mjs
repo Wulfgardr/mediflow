@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { collectExplicitNpmNodeTests, collectExplicitNpmSelections, collectNpmScriptBinding, collectClaimsSelfTestSelection, collectGuardSelfTestSelections, GUARD_SELF_TEST_SUITES, EXPLICIT_NPM_SUITES } from './explicit-npm-test-selection.mjs';
 import { collectUnitTestFiles } from './unit-test-selection.mjs';
-import { checkInventory } from './test-inventory.mjs';
+import { checkTestSelection } from './check-test-selection.mjs';
 
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const target = 'test:launcher-helpers';
@@ -225,16 +225,14 @@ test('missing, nonregular, duplicate and escaping files fail', t => {
   }
 });
 
-test('removing one file from a nonempty command breaks its mapping; additions require records', t => {
+test('a test file no command names stays unselected until a command names it', t => {
   const root = fixture(t);
   write(root, 'synthetic/second.test.mjs', 'throw 2;');
   const files = ['synthetic/test-0.test.mjs', 'synthetic/second.test.mjs'];
-  const manifest = { version: 1, entries: files.map(file => ({ path: file, selection: { state: 'mapped', suiteIds: [suiteId] } })) };
-  const result = checkInventory(files.map(file => ({ path: file })), manifest, { [suiteId]: collectExplicitNpmSelections(root)[suiteId] });
-  assert.match(result.errors.join('\n'), /MAPPED_NOT_SELECTED.*second/);
+  const check = () => checkTestSelection(files, { [suiteId]: collectExplicitNpmSelections(root)[suiteId] }, []).errors.join('\n');
+  assert.match(check(), /TEST_NOT_SELECTED: synthetic\/second/);
   change(root, 'package.json', pkg => { pkg.scripts[target] += ' synthetic/second.test.mjs'; });
-  manifest.entries.pop();
-  assert.match(checkInventory(files.map(file => ({ path: file })), manifest, { [suiteId]: collectExplicitNpmSelections(root)[suiteId] }).errors.join('\n'), /SELECTED_WITHOUT_ENTRY/);
+  assert.equal(check(), '');
 });
 
 test('CI requires a unique complete literal run block, never a substring', t => {
