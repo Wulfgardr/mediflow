@@ -278,3 +278,16 @@ console.log(JSON.stringify({status:result.status}));
         await Promise.allSettled(children.map(child => child.done));
     }
 });
+
+
+test('Web and local-v1 delete reject version exhaustion before tombstone or audit', async () => {
+    for (const route of [web, v1]) {
+        reset();
+        sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, id);
+        const before = snapshot();
+        const response = await del(route, JSON.stringify({ version: Number.MAX_SAFE_INTEGER }));
+        assert.equal(response.status, 409);
+        assert.equal((await response.json()).code, 'VERSION_CONFLICT');
+        assert.deepEqual(snapshot(), before);
+    }
+});

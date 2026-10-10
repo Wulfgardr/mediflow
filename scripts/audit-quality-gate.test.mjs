@@ -1145,6 +1145,19 @@ test('patient-delete audit guard binds both DELETE routes to one tombstone and r
     const route = fs.readFileSync(path.join(process.cwd(), routes[0]), 'utf8');
     const auditStart = '        writeAuditEventInTransaction(tx, {';
     const mutations = [
+        ['preflight exhaustion removed', replaceOnce(core,
+            'existing.version !== input.expectedVersion || !canIncrementVersion(existing.version)',
+            'existing.version !== input.expectedVersion')],
+        ['preflight wrong boolean', replaceOnce(core,
+            'existing.version !== input.expectedVersion || !canIncrementVersion(existing.version)',
+            'existing.version !== input.expectedVersion && !canIncrementVersion(existing.version)')],
+        ['preflight wrong version', replaceOnce(core, '!canIncrementVersion(existing.version)', '!canIncrementVersion(1)')],
+        ['preflight shadowed predicate', replaceOnce(core,
+            '        if (existing.version !== input.expectedVersion',
+            '        const canIncrementVersion = () => true;\n        if (existing.version !== input.expectedVersion')],
+        ['preflight wrong conflict identity', replaceOnce(core,
+            'buildPatientVersionConflictPayload(input.expectedVersion, input.patientId, existing)',
+            'buildPatientVersionConflictPayload(input.expectedVersion, input.otherId, existing)')],
         ['missing writer', replaceOnce(core, auditStart, '        missingAuditWriter(tx, {')],
         ['late writer', replaceOnce(core, auditStart,
             '        return { status: 200, value: { success: true } };\n        writeAuditEventInTransaction(tx, {')],

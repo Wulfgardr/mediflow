@@ -226,3 +226,13 @@ test('archive reason fields are writeable and cleared on restore from archive', 
     assert.equal(restored.values.archiveReason, null);
     assert.equal(restored.values.archiveNote, null);
 });
+
+
+test('lifecycle builders reject non-incrementable versions and allow the last safe increment', () => {
+    for (const version of [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER + 1, 0, -1, 1.5, NaN, Infinity]) {
+        assert.throws(() => buildPatientTombstoneValues(version, 'synthetic'), /Version cannot advance safely/);
+        assert.throws(() => buildPatientRestoreValues(version), /Version cannot advance safely/);
+    }
+    assert.equal(buildPatientTombstoneValues(Number.MAX_SAFE_INTEGER - 1, 'synthetic').version, Number.MAX_SAFE_INTEGER);
+    assert.equal(buildPatientRestoreValues(Number.MAX_SAFE_INTEGER - 1).version, Number.MAX_SAFE_INTEGER);
+});

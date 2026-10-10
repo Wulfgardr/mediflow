@@ -1,3 +1,4 @@
+import { canIncrementVersion } from '@/lib/version-concurrency';
 // WUL-306 (ADR 0066): explicit admin restore of a soft-deleted patient.
 import { NextResponse } from 'next/server';
 import { and, desc, eq, isNotNull } from 'drizzle-orm';
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
             if (!patient.deletedAt) {
                 return { status: 409, value: { error: 'Patient is not soft-deleted' } } as const;
             }
+
+            if (!canIncrementVersion(patient.version)) return { status: 409, value: { error: 'Patient version cannot advance safely' } } as const;
 
             const restored = tx.update(patients)
                 .set(buildPatientRestoreValues(patient.version))
