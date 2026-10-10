@@ -1,3 +1,4 @@
+import { canIncrementVersion } from './version-concurrency';
 /* @Codex */
 import { randomUUID } from 'node:crypto';
 /* @Codex */
@@ -290,6 +291,10 @@ export async function deleteNetworkScopedPatient(
             return { status: 404, value: { error: 'Not found' } };
         }
 
+        if (existing.patient.version !== expectedVersion || !canIncrementVersion(existing.patient.version)) return {
+            status: 409, value: buildPatientVersionConflictPayload(expectedVersion, context.patientId, existing.patient),
+        };
+
         const updateResult = tx
             .update(patients)
             .set(buildPatientTombstoneValues(expectedVersion, deletionReason))
@@ -345,6 +350,10 @@ export async function restoreNetworkScopedPatient(
         if (!existing) {
             return { status: 404, value: { error: 'Not found' } };
         }
+
+        if (existing.patient.version !== expectedVersion || !canIncrementVersion(existing.patient.version)) return {
+            status: 409, value: buildPatientVersionConflictPayload(expectedVersion, context.patientId, existing.patient),
+        };
 
         const updateResult = tx
             .update(patients)

@@ -818,13 +818,49 @@ export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource,
     const options = transaction?.arguments[1] && unwrap(transaction.arguments[1]);
     const behavior = options && ts.isObjectLiteralExpression(options)
         ? exactPropertyAssignments(options, ['behavior'])?.get('behavior')?.initializer : null;
+    // Only clear may translate this one typed failure after the transaction rolls back.
+    const txReturn = transaction?.parent;
+    const tryBlock = txReturn?.parent;
+    const wrapper = tryBlock?.parent;
+    let approvedClearWrapper = false;
+    if (spec.operation === 'clear' && wrapper && ts.isTryStatement(wrapper)
+        && wrapper.parent === owner.body && wrapper.tryBlock === tryBlock
+        && tryBlock.statements.length === 1 && tryBlock.statements[0] === txReturn
+        && !wrapper.finallyBlock && owner.body.statements.at(-1) === wrapper) {
+        const caught = wrapper.catchClause;
+        const errorName = caught?.variableDeclaration?.name;
+        const errorSymbol = errorName && ts.isIdentifier(errorName) ? core.checker.getSymbolAtLocation(errorName) : null;
+        const isCaught = node => node && ts.isIdentifier(node) && errorSymbol
+            && core.checker.getSymbolAtLocation(node) === errorSymbol;
+        const exhausted = importedBinding(core.sourceFile, core.checker, './version-concurrency', 'VersionExhaustedError');
+        const [guard, rethrow] = caught?.block.statements ?? [];
+        const condition = guard && ts.isIfStatement(guard) ? unwrap(guard.expression) : null;
+        const result = guard && ts.isIfStatement(guard) && !guard.elseStatement
+            && ts.isReturnStatement(guard.thenStatement) ? guard.thenStatement.expression : null;
+        const props = result && ts.isObjectLiteralExpression(result) ? exactPropertyAssignments(result, ['status', 'value']) : null;
+        const status = props?.get('status')?.initializer;
+        const value = props?.get('value')?.initializer;
+        const message = value && ts.isObjectLiteralExpression(value)
+            ? exactPropertyAssignments(value, ['error'])?.get('error')?.initializer : null;
+        approvedClearWrapper = Boolean(caught?.block.statements.length === 2
+            && condition && ts.isBinaryExpression(condition)
+            && condition.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword && isCaught(condition.left)
+            && exhausted && ts.isIdentifier(condition.right)
+            && resolvesToBinding(core.checker, core.checker.getSymbolAtLocation(condition.right), exhausted.symbol)
+            && status && ts.isNumericLiteral(status) && status.text === '409'
+            && message && ts.isStringLiteral(message) && message.text === 'Patient version cannot advance safely'
+            && rethrow && ts.isThrowStatement(rethrow) && isCaught(rethrow.expression));
+    }
     if (!transaction || transaction.arguments.length !== 2 || !ts.isReturnStatement(transaction.parent)
-        || transaction.parent.parent !== owner.body || !isReachableCall(transaction, owner)
+        || (spec.operation === 'clear' ? !approvedClearWrapper : transaction.parent.parent !== owner.body)
+        || !isReachableCall(transaction, owner)
         || !callback || !ts.isArrowFunction(callback) || !ts.isBlock(callback.body)
         || callback.parameters.length !== 1 || !ts.isIdentifier(callback.parameters[0].name)
         || !behavior || !ts.isStringLiteral(behavior) || behavior.text !== 'immediate') {
         return [...problems, 'ambulatory owner must directly return one synchronous immediate transaction'];
     }
+    if (callback.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword))
+        problems.push('ambulatory transaction callback must be synchronous');
     const txName = callback.parameters[0].name.text;
     const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
     const expectedAudits = spec.operation === 'clear' ? 3 : 1;
@@ -854,6 +890,17 @@ export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource,
     if (domainCalls.length !== expectedDml || guards < expectedDml
         || domainCalls.some((call) => call.pos < callback.body.pos || call.end > mainEvent?.pos)) {
         problems.push('ambulatory DML must be guarded before mandatory audit');
+    }
+    if (spec.operation === 'clear') {
+        const firstWrite = domainCalls[0];
+        const unsafeReturns = [];
+        const inspect = node => {
+            if (ts.isCatchClause(node) || (ts.isReturnStatement(node)
+                && node !== statements.at(-1) && firstWrite && node.pos > firstWrite.pos)) unsafeReturns.push(node);
+            ts.forEachChild(node, inspect);
+        };
+        inspect(callback.body);
+        if (unsafeReturns.length) problems.push('clear must propagate transaction failures without a partial-commit return');
     }
     if (spec.operation === 'clear') {
         const patientAudit = auditCalls.find((call) => call.getText(core.sourceFile).includes("'patient.deleted'"));
@@ -1590,11 +1637,49 @@ export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSour
             const status = props?.get('status')?.initializer;
             return status && ts.isNumericLiteral(status) && status.text === '404';
         });
+    // C05 exhaustion adds exactly one pre-DML conflict return, not a generic allowance.
+    const incrementable = importedBinding(core.sourceFile, core.checker, './version-concurrency', 'canIncrementVersion');
+    const existingDeclaration = callback.body.statements.filter(ts.isVariableStatement)
+        .flatMap(statement => [...statement.declarationList.declarations])
+        .find(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === 'existing');
+    const existingSymbol = existingDeclaration && core.checker.getSymbolAtLocation(existingDeclaration.name);
+    const isExisting = expression => {
+        const node = expression && unwrap(expression);
+        return Boolean(node && ts.isIdentifier(node) && existingSymbol
+            && core.checker.getSymbolAtLocation(node) === existingSymbol);
+    };
+    const isExistingVersion = expression => {
+        const node = expression && unwrap(expression);
+        return Boolean(node && ts.isPropertyAccessExpression(node) && node.name.text === 'version' && isExisting(node.expression));
+    };
+    const preflight = updateIndex > 0 ? callback.body.statements[updateIndex - 1] : null;
+    const preflightCondition = preflight && ts.isIfStatement(preflight) ? unwrap(preflight.expression) : null;
+    const stale = preflightCondition && ts.isBinaryExpression(preflightCondition)
+        && preflightCondition.operatorToken.kind === ts.SyntaxKind.BarBarToken ? unwrap(preflightCondition.left) : null;
+    const exhausted = stale ? unwrap(preflightCondition.right) : null;
+    const incrementCall = exhausted && ts.isPrefixUnaryExpression(exhausted)
+        && exhausted.operator === ts.SyntaxKind.ExclamationToken && incrementable
+        ? boundCall(exhausted.operand, incrementable, 1) : null;
+    const preflightReturn = preflight && ts.isIfStatement(preflight) && !preflight.elseStatement
+        && ts.isReturnStatement(preflight.thenStatement) ? preflight.thenStatement : null;
+    const preflightValue = preflightReturn?.expression && unwrap(preflightReturn.expression);
+    const preflightProps = preflightValue && ts.isObjectLiteralExpression(preflightValue)
+        ? exactPropertyAssignments(preflightValue, ['status', 'value']) : null;
+    const preflightStatus = preflightProps?.get('status')?.initializer;
+    const preflightConflict = boundCall(preflightProps?.get('value')?.initializer, conflict, 3);
+    const approvedPreflight = stale && ts.isBinaryExpression(stale)
+        && stale.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+        && isExistingVersion(stale.left) && inputPath(stale.right, ['expectedVersion'])
+        && incrementCall && isExistingVersion(incrementCall.arguments[0])
+        && preflightStatus && ts.isNumericLiteral(preflightStatus) && preflightStatus.text === '409'
+        && preflightConflict && inputPath(preflightConflict.arguments[0], ['expectedVersion'])
+        && inputPath(preflightConflict.arguments[1], ['patientId']) && isExisting(preflightConflict.arguments[2])
+        && notFound && preflight.pos > notFound.pos;
     if (!cas || cas.pos <= (runCall?.pos ?? Infinity) || cas.pos >= audit.pos
         || conflicts?.length !== 1 || !conflictReturn || !status409
         || casReturns.length !== 1 || casReturns[0] !== status409 || !onlyCasBeforeAudit
-        || preAuditReturns.length !== 2 || !preAuditReturns.includes(notFound)
-        || !preAuditReturns.includes(status409)) {
+        || !approvedPreflight || preAuditReturns.length !== 3 || !preAuditReturns.includes(preflightReturn)
+        || !preAuditReturns.includes(notFound) || !preAuditReturns.includes(status409)) {
         problems.push('delete CAS miss must return the version conflict before audit');
     }
     const success = callback.body.statements.find((statement) => ts.isReturnStatement(statement)
