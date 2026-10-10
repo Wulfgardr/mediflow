@@ -325,7 +325,7 @@ export async function seedPerformanceDatabase(options) {
   }
 
   process.env.MEDIFLOW_DATA_DIR = options.dataDir;
-  await import('@/lib/db-server');
+  (await import('@/lib/db-server')).openDbServer();
 
   const db = new Database(dbPath);
   try {

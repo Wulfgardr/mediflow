@@ -31,7 +31,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     if (specifier === '@/lib/security/server-auth') return { url: pathToFileURL(authPath).href, shortCircuit: true };
     return next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { patients, sissHandoffEvents } = load('./schema.ts') as typeof import('./schema.ts');
 const createRoute = load('../app/api/siss-handoffs/route.ts') as typeof import('../app/api/siss-handoffs/route.ts');
 const itemRoute = load('../app/api/siss-handoffs/[id]/route.ts') as typeof import('../app/api/siss-handoffs/[id]/route.ts');
@@ -207,7 +208,8 @@ test('fresh and legacy bootstraps converge on version 1 without losing rows or v
             db.prepare("INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at, notes) VALUES ('synthetic-row', 'synthetic-parent', 'menu.open', 'Menu', 123, 'preserved')").run();
             const fresh = db.prepare('SELECT * FROM siss_handoff_events').get() as Record<string, unknown>;
             assert.equal(fresh.version, 1);
-            db.exec('ALTER TABLE siss_handoff_events DROP COLUMN version');
+            // An archive from before versioned admission: unstamped, column missing.
+            db.exec('ALTER TABLE siss_handoff_events DROP COLUMN version; PRAGMA user_version = 0');
             result = bootstrap(); assert.equal(result.status, 0, result.stderr);
             assert.deepEqual(db.prepare('SELECT * FROM siss_handoff_events').get(), fresh);
             result = bootstrap(); assert.equal(result.status, 0, result.stderr);

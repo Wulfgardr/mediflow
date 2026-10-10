@@ -80,6 +80,63 @@ Il bootstrap serializzato deve coprire anche il primo avvio senza un
 - La regressione usa una directory dati realmente vuota e la guardia anti-drift
   ora verifica lo stesso percorso di bootstrap del prodotto.
 
+## Emendamento 2026-10-10: apertura esplicita e schema versionato (C09)
+
+Questo emendamento sostituisce le precedenti descrizioni dell'apertura durante
+l'import e dell'ammissione di qualsiasi database vuoto.
+
+| Responsabilità | Owner e ordine |
+| --- | --- |
+| Import e connessione applicativa | `lib/db-server.ts`: import inerte; `openDbServer()` risolve l'archivio, riconcilia il journal di swap, considera l'eventuale adozione legacy consentita e chiama l'apertura versionata. La build usa soltanto memoria. |
+| Ammissione e migrazione | `lib/sqlite-schema-open.ts`: timeout e FK ON, transazione IMMEDIATE, identità/versione/integrità, originale verificato, inizializzatore, convergenza, validazione e stamp atomico. WAL segue il commit. |
+| Definizione runtime corrente | `lib/sqlite-schema.ts`: `initializeSqliteSchema()` orchestra base fresh, guard additive e upgrade della currentness allegati. Il DDL prima incorporato in `db-server` è qui; gli helper di dominio restano richiamati da questo owner. |
+| Convergenza del default storico | `lib/sqlite-observation-schema-upgrade.ts`: sotto la transazione del chiamante ricostruisce soltanto la forma riconosciuta di `observations` senza default `updated_at`, mantenendo dati e FK attive. |
+| Originale recuperabile | `lib/sqlite-repair.ts`: snapshot SQLite autonomo, integrità/FK verificate, pubblicazione senza sovrascrittura e sincronizzazione durevole prima del DDL. |
+| Prima installazione nativa | `scripts/native-first-install.mjs`: prenota un database senza tabelle tramite l'header condiviso in `native-first-install-contract.json`; il runtime consuma la prenotazione insieme allo schema. |
+| Storia e dichiarazioni ORM | `drizzle/*.sql` resta immutato e non viene replayato dal runtime; `lib/schema.ts` descrive l'ORM e viene confrontato con il bootstrap reale. |
+| Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
+
+La versione SQLite corrente è `user_version=1`. La prima installazione ammette
+un file creato esclusivamente dal processo in una directory senza residui di
+un database precedente (sidecar, originali conservati, artefatti di swap),
+oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
+SQLite vuoto senza prenotazione non diventa un archivio nuovo. Un processo
+concorrente attende il primo writer entro il limite esistente di cinque secondi.
+
+Le origini di aggiornamento dichiarate sono gli schemi non versionati
+(`user_version=0`) delle release sorgente v0.5.0, v0.6.0, v0.7.0, v0.7.2,
+v0.7.3, v0.8.0, v0.8.2 e v0.8.6 ricostruiti dai rispettivi SQL pubblicati e
+dalle guard dello stesso tag; per v0.8.6 è coperto anche il bootstrap fresh.
+I pin e l'ordine preciso sono nel [manifest delle origini](../../scripts/fixtures/schema-convergence/README.md).
+Questa lista non autorizza schemi modificati a mano o ogni possibile storia
+di provisioning: l'ammissione richiede che la migrazione in avanti raggiunga
+lo schema canonico, compresi indici, FK, CHECK e trigger; viste inattese sono negate.
+Righe orfane già presenti e tabelle che MediFlow non possiede non impediscono
+l'apertura: l'archivio era utilizzabile prima e resta tale. La migrazione non
+può aggiungere violazioni di chiave esterna, e l'originale conservato le
+mantiene come le ha trovate. La corruzione (`integrity_check`) resta bloccante.
+
+Per un'origine ammessa l'originale `medical.db.schema-original-v0-<uuid>.db`
+è verificato e pubblicato prima della prima modifica. Schema e versione si
+confermano insieme. Al riavvio, la versione 1 viene validata senza DDL,
+backfill o nuove copie; un suo drift non viene riparato automaticamente.
+Interruzione prima del commit conserva lo schema precedente tramite rollback;
+un originale già pubblicato resta disponibile. Dopo un rifiuto con rollback
+l'archivio è invariato e la copia di quel tentativo viene rimossa. Versione futura, corruzione,
+lock persistente o schema non riconosciuto impediscono l'apertura operativa.
+
+### Percorso per archivi non ammessi
+
+Conservare l'archivio e gli eventuali sidecar originali, senza azzerare la
+versione, cancellare marker o creare un database vuoto al loro posto. Fermare
+l'app e i processi che possiedono connessioni prima di un recupero offline.
+Un archivio più recente richiede la versione compatibile di MediFlow. Per
+origini non riconosciute, l'ispezione va eseguita su una copia integra in sola
+lettura con strumenti compatibili; l'eventuale recupero passa dal percorso
+esplicito di backup/ripristino dopo verifica della copia e dell'audit.
+L'apertura ordinaria non autorizza una sostituzione automatica né una migrazione
+all'indietro. La validazione C09 usa esclusivamente fixture sintetiche isolate.
+
 ## Conseguenze
 
 Build e avvii multiprocesso non eseguono piu migrazioni concorrenti sullo stesso

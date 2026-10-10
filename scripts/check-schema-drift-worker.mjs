@@ -2,9 +2,9 @@
 // WUL-268 (STREAM A): schema drift check worker.
 //
 // Runs under the strip-types loader + the "@/" resolve hook (see
-// check-schema-drift.mjs). Importing "@/lib/db-server" executes the REAL
+// check-schema-drift.mjs). Explicitly opening "@/lib/db-server" executes the REAL
 // bootstrap: it opens the temp SQLite database at MEDIFLOW_DATA_DIR/medical.db
-// and runs applySchemaGuards() as an import side effect. We then introspect
+// and runs applySchemaGuards(). We then introspect
 // sqlite_master and compare the live tables / columns / indices against the
 // drizzle declarations in "@/lib/schema.ts". Drift => exit 1 with a diff.
 
@@ -16,10 +16,11 @@ import * as schema from '@/lib/schema';
 
 import { collectAuditAppendOnlyProblems } from './schema-drift-audit-append-only.mjs';
 
-// Importing db-server exercises the real brand-new database path: the empty
+// Explicitly opening db-server exercises the real brand-new database path: the empty
 // database receives its minimal base schema and then the runtime guards layer
 // on additive columns, guard-owned tables, constraints, and indices.
-const { hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
+const { openDbServer, hasCanonicalDurableReviewPatientLinkSchema, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, hasCanonicalPhysicianReviewAttestationSchema } = await import('@/lib/db-server');
+openDbServer();
 
 function collectExpected() {
     const expectedTables = new Map();

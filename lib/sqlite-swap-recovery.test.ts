@@ -27,7 +27,7 @@ function contents(dir: string): Record<string, string> {
 
 function boot(dir: string, extraEnv: Record<string, string> = {}) {
     return spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '-e',
-        "await import('./lib/db-server.ts'); console.log('SYNTHETIC_BOOT_OK');"], {
+        "(await import('./lib/db-server.ts')).openDbServer(); console.log('SYNTHETIC_BOOT_OK');"], {
         cwd: root, encoding: 'utf8', timeout: 30_000,
         env: { ...process.env, MEDIFLOW_DATA_DIR: dir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', ...extraEnv },
     });
@@ -308,12 +308,16 @@ for (const mode of ['prepared-fsync', 'committed-fsync', 'prepared-directory-fsy
 test('production schema validation closes the failed candidate; restart retains original audit and append-only guards', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-swap-production-'));
     try {
+        // Fresh admission requires the directory to be empty before staging a replacement.
+        const initial = boot(dir);
+        assert.equal(initial.status, 0, initial.stderr);
         fixture(path.join(dir, 'replacement.db'), 'synthetic-incompatible-schema').close();
         const result = worker(dir, `
             import Database from 'better-sqlite3';
             import path from 'node:path';
             import { sql } from 'drizzle-orm';
-            import { dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+            import { dbServer, swapDatabaseFromFile, openDbServer } from './lib/db-server.ts';
+            openDbServer();
             dbServer.run(sql.raw("INSERT INTO audit_events VALUES ('synthetic-swap-audit',1,'patient.updated',1700000000,'success','user','synthetic-operator','patient','synthetic-patient','web','synthetic-request','{}',1700000001)"));
             let rejected = false, closed = false;
             try { await swapDatabaseFromFile(path.join(process.env.MEDIFLOW_DATA_DIR,'replacement.db'), null); } catch { rejected = true; }
@@ -355,7 +359,7 @@ for (const mode of ['staging-only', 'corrupt-live', 'unreadable-directory']) {
                     if (String(file) === fs.realpathSync(process.env.MEDIFLOW_DATA_DIR)) throw Object.assign(new Error('SYNTHETIC_PERMISSION_DENIED'), {code:'EACCES'});
                     return read.call(this, file, ...args);
                 };
-                await import('./lib/db-server.ts');
+                (await import('./lib/db-server.ts')).openDbServer();
             `) : boot(dir);
             assert.notEqual(result.status, 0);
             assert.match(result.stderr, /SQLITE_SWAP_RECOVERY_REQUIRED/);
@@ -411,7 +415,8 @@ for (const fault of ['weakened-trigger', 'audit-index-failure', 'quoted-type', '
                 import fs from 'node:fs';
                 import path from 'node:path';
                 import { sql } from 'drizzle-orm';
-                import { dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+                import { dbServer, swapDatabaseFromFile, openDbServer } from './lib/db-server.ts';
+            openDbServer();
                 const dir = process.env.MEDIFLOW_DATA_DIR, sourcePath = path.join(dir,'replacement.db');
                 const live = new Database(path.join(dir,'medical.db'));
                 await live.backup(sourcePath); live.close();
@@ -440,6 +445,9 @@ for (const fault of ['weakened-trigger', 'audit-index-failure', 'quoted-type', '
 test('production swap accepts the supported tracked migration baseline without weakening audit validation', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-swap-legacy-schema-'));
     try {
+        // Fresh admission requires the directory to be empty before staging a replacement.
+        const initial = boot(dir);
+        assert.equal(initial.status, 0, initial.stderr);
         const sourcePath = path.join(dir, 'replacement.db');
         const source = new Database(sourcePath);
         try {
@@ -452,7 +460,8 @@ test('production swap accepts the supported tracked migration baseline without w
         const result = worker(dir, `
             import path from 'node:path';
             import { sql } from 'drizzle-orm';
-            import { dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+            import { dbServer, swapDatabaseFromFile, openDbServer } from './lib/db-server.ts';
+            openDbServer();
             await swapDatabaseFromFile(path.join(process.env.MEDIFLOW_DATA_DIR,'replacement.db'), null);
             const audit = dbServer.all(sql.raw('SELECT * FROM audit_events'));
             console.log('RESULT:' + JSON.stringify(audit));
@@ -460,5 +469,35 @@ test('production swap accepts the supported tracked migration baseline without w
         assert.equal(result.status, 0, result.stderr);
         assert.equal(JSON.parse(result.stdout.split('RESULT:')[1])[0].event_id, 'synthetic-legacy-audit');
         assert.equal(fs.existsSync(path.join(dir, 'medical.db.swap-recovery')), false);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('SOAP imported before first open cannot acquire replacement authority on its first use after swap', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-soap-initial-handle-'));
+    try {
+        const result = worker(dir, `
+            import assert from 'node:assert/strict';
+            import path from 'node:path';
+            import Database from 'better-sqlite3';
+            import { sql } from 'drizzle-orm';
+            import { createHeadlessSoapActiveRoleAttestationStore, isHeadlessSoapActiveRoleAttestationStoreError } from './lib/security/headless-soap-active-role-attestation-store.ts';
+            import './lib/security/headless-soap-entry-commit-owner.ts';
+            import { openDbServer, dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+            const initial = openDbServer();
+            const replacementPath = path.join(process.env.MEDIFLOW_DATA_DIR, 'replacement.db');
+            await initial.backup(replacementPath);
+            const replacement = new Database(replacementPath);
+            replacement.prepare("INSERT INTO users (id,username,password_hash,encrypted_master_key,salt) VALUES ('replacement-only','replacement-user','synthetic-hash','synthetic-key','synthetic-salt')").run();
+            replacement.close();
+            await swapDatabaseFromFile(replacementPath, null);
+            assert.equal(initial.open, false);
+            assert.throws(() => initial.prepare('SELECT 1'), /not open/);
+            assert.equal(dbServer.get(sql.raw("SELECT count(*) AS count FROM users WHERE id='replacement-only'")).count, 1);
+            assert.throws(() => createHeadlessSoapActiveRoleAttestationStore().createInactive('replacement-only'),
+                error => isHeadlessSoapActiveRoleAttestationStoreError(error) && error.code === 'storage_unavailable');
+            assert.equal(dbServer.get(sql.raw('SELECT count(*) AS count FROM headless_soap_active_role_attestations')).count, 0);
+            assert.equal(dbServer.get(sql.raw('SELECT count(*) AS count FROM audit_events')).count, 0);
+        `);
+        assert.equal(result.status, 0, result.stderr);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

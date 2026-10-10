@@ -1,10 +1,11 @@
 /* @Codex */
 import 'server-only';
+import Database from 'better-sqlite3';
 
 import { randomBytes, randomUUID } from 'node:crypto';
 import { types } from 'node:util';
 
-import { dbServer, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, runDbServerImmediateTransaction } from '../db-server';
+import { getInitialDbServerHandle, hasCanonicalHeadlessSoapActiveRoleAttestationSchema, runDbServerImmediateTransaction } from '../db-server';
 
 const SCHEMA_VERSION = 'mediflow.headless-soap-active-role-attestation.v1' as const;
 const ROLE = 'physician' as const;
@@ -19,8 +20,20 @@ const regexpTest = RegExp.prototype.test, refPattern = /^hsar_[0-9a-f]{32}$/, is
 const isProxy = types.isProxy, entropy = randomBytes, eventEntropy = randomUUID, transaction = runDbServerImmediateTransaction;
 const canonicalSchema = hasCanonicalHeadlessSoapActiveRoleAttestationSchema;
 const errors = new WeakSet<object>(), brandError = WeakSet.prototype.add.bind(errors), hasError = WeakSet.prototype.has.bind(errors);
-const client = dbServer.$client, prepare = client.prepare.bind(client);
-const statementPrototype = objectGetPrototypeOf(prepare('SELECT 1')) as { get: (...args: unknown[]) => unknown; all: (...args: unknown[]) => unknown; run: (...args: unknown[]) => unknown };
+// Capture the intrinsic now, but bind only once to the first successfully opened connection.
+// A later swap must not silently retarget this owner's captured SQL authority.
+const prepareIntrinsic = Function.prototype.call.bind(Database.prototype.prepare);
+let boundPrepare: ((query: string) => Database.Statement) | undefined;
+const prepare = (query: string): Database.Statement => {
+    if (!boundPrepare) {
+        const client = getInitialDbServerHandle();
+        boundPrepare = (sql: string) => prepareIntrinsic(client, sql);
+    }
+    return boundPrepare(query);
+};
+const prototypeProbe = new Database(':memory:');
+const statementPrototype = objectGetPrototypeOf(prepareIntrinsic(prototypeProbe, 'SELECT 1')) as { get: (...args: unknown[]) => unknown; all: (...args: unknown[]) => unknown; run: (...args: unknown[]) => unknown };
+prototypeProbe.close();
 const invoke = Function.prototype.call.bind(Function.prototype.call);
 const get = (query: string, value: string): unknown => invoke(statementPrototype.get, prepare(query), value);
 const all = (query: string, value: string): unknown => invoke(statementPrototype.all, prepare(query), value);

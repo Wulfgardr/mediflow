@@ -46,7 +46,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const web = load('../app/api/patients/route.ts') as typeof import('../app/api/patients/route.ts');
 const v1 = load('../app/api/v1/patients/route.ts') as typeof import('../app/api/v1/patients/route.ts');

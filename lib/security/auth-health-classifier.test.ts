@@ -63,3 +63,13 @@ test('handles non-Error inputs without throwing', () => {
     assert.equal(result.code, 'DB_QUERY_FAILED');
     assert.equal(result.message, 'Impossibile leggere il database locale.');
 });
+
+
+test('schema admission requests explicit recovery without exposing archive details', () => {
+    const error = Object.assign(new Error('private archive path and schema reason'), { code: 'SQLITE_SCHEMA_RECOVERY_REQUIRED' });
+    const result = classifyAuthHealthError(error);
+    assert.equal(result.code, 'DB_SCHEMA_MISSING');
+    assert.equal(result.dbState, 'schema-missing');
+    assert.match(result.nextAction ?? '', /Conserva l’archivio originale/);
+    assert.doesNotMatch(JSON.stringify(result), /private archive path|schema reason/);
+});

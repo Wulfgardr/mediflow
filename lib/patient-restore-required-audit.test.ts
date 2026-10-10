@@ -30,7 +30,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     if (specifier === '@/lib/security/server-auth') return { url: pathToFileURL(authPath).href, shortCircuit: true };
     return next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, entries, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const route = load('../app/api/system/restore-patient/route.ts') as typeof import('../app/api/system/restore-patient/route.ts');
 const sql = new Database(join(dataDir, 'medical.db'));

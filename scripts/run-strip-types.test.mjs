@@ -182,11 +182,12 @@ import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'unexpecte
   });
 }
 
-test('explicit synthetic directory receives eager DB initialization; default stays absent', (t) => {
+test('explicit synthetic directory receives requested DB initialization; default stays absent', (t) => {
   const directory = fixture(t);
   const dataDir = path.join(directory, 'explicit data');
   const target = path.join(directory, 'db.test.ts');
-  fs.writeFileSync(target, `import '@/lib/db-server';
+  fs.writeFileSync(target, `import { openDbServer } from '@/lib/db-server';
+openDbServer();
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { resolveDataPath } from '@/lib/data-dir';
 test('explicit target', () => assert.equal(resolveDataPath('medical.db'), ${JSON.stringify(path.join(dataDir, 'medical.db'))}));`);

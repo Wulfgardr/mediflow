@@ -15,6 +15,7 @@ const migrationDb = new Database(dbPath); migrationDb.pragma('foreign_keys = OFF
 for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((file) => file.endsWith('.sql')).sort())
     migrationDb.exec(fs.readFileSync(path.join(root, 'drizzle', name), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gm, ''));
 migrationDb.close(); process.env.MEDIFLOW_DATA_DIR = dataDir;
+(await import('../../db-server.ts')).openDbServer();
 
 const dbModule = await import('../../db-server.ts');
 const ownerModule = await import('../../security/server-session-projection-owner-production.ts');

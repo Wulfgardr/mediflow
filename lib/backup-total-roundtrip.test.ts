@@ -79,7 +79,7 @@ function prepareDatabase(dataDir: string): void {
 function bootstrapSchemaGuards(dataDir: string): void {
     const dbServerUrl = pathToFileURL(path.join(ROOT, 'lib/db-server.ts')).href;
     runNode(
-        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', `await import(${JSON.stringify(dbServerUrl)});`],
+        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', `(await import(${JSON.stringify(dbServerUrl)})).openDbServer();`],
         { MEDIFLOW_DATA_DIR: dataDir },
     );
 }

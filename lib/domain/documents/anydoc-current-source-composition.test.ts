@@ -19,6 +19,7 @@ for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((file) => f
     migrationDb.exec(fs.readFileSync(path.join(root, 'drizzle', name), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gm, ''));
 migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
+(await import('../../db-server.ts')).openDbServer();
 
 const compositionModule = await import('./anydoc-current-source-composition.ts');
 const productionOwnerModule = await import('../../security/server-session-projection-owner-production.ts');
