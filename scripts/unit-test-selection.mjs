@@ -21,6 +21,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/prepare-e2e-db.test.mjs',
   'scripts/db-server-data-isolation.test.mjs',
   'scripts/native-first-install.test.mjs',
+  'scripts/sqlite-schema-shape.test.mjs',
   'scripts/native-network-bounded-json.test.mjs',
   'scripts/native-network-attachment-budget.test.mjs',
   'scripts/checkup-parent-lifecycle.test.mjs',

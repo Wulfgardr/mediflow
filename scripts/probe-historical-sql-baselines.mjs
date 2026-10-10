@@ -92,7 +92,12 @@ try {
         upgradedAudit: auditBehavior(file), differences, definitionDifferences });
     }
   }
-  process.exitCode = results.some(result => result.historicalError || result.currentBootstrap?.status !== 0) ? 1 : 0;
+  const freshAudit = auditBehavior(path.join(freshDirectory, 'medical.db'));
+  const auditPassed = audit => audit.insert === true && audit.updateRejected === true && audit.deleteRejected === true;
+  // This is a qualification gate: bootstrap success alone cannot hide drift.
+  process.exitCode = !auditPassed(freshAudit) || results.some(result => result.historicalError
+    || result.currentBootstrap?.status !== 0 || result.differences.length !== 0
+    || !auditPassed(result.upgradedAudit)) ? 1 : 0;
   console.log(JSON.stringify({ currentCommit: git('rev-parse','HEAD').trim(), currentBootstrapCommit: manifest.currentCommit, kind: manifest.kind,
-    limitations: ['Only the declared synthetic provisioning origins are tested, not all installed release databases or product support versions.', 'Comparison ignores physical column position, SQL whitespace/comments and quoting of recognized declaration names only. PK ordinals, grouped FK components, index metadata and SQL tokens preserve constraints, expressions, predicates and triggers. Unknown syntax and conflict-order-sensitive DDL compare conservatively; differences may require review, not imply inequivalence. CHECK/expression algebraic equivalence is not inferred.', 'Audit INSERT/UPDATE/DELETE behavior is tested on synthetic rows; general CHECK and FK data behavior remain outside this bounded probe.', 'Exit zero means all requested initializers/current bootstraps completed, not schema parity or release support.'], freshAudit: auditBehavior(path.join(freshDirectory, 'medical.db')), results }, null, 2));
+    limitations: ['Only the declared synthetic provisioning origins are tested, not all installed release databases or product support versions.', 'Comparison ignores physical column position, SQL whitespace/comments and quoting of recognized declaration names only. PK ordinals, grouped FK components, index metadata and SQL tokens preserve constraints, expressions, predicates and triggers. Unknown syntax and conflict-order-sensitive DDL compare conservatively; differences may require review, not imply inequivalence. CHECK/expression algebraic equivalence is not inferred.', 'Audit INSERT/UPDATE/DELETE behavior is tested on synthetic rows; general CHECK and FK data behavior remain outside this bounded probe.', 'Exit zero requires successful initializers/current bootstraps, schema parity and fresh/upgraded append-only audit checks for every requested origin.'], freshAudit, results }, null, 2));
 } finally { fs.rmSync(workspace, { recursive: true, force: true }); }
