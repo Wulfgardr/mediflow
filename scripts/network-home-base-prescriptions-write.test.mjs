@@ -195,6 +195,11 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
             events: itemDb.prepare('SELECT event_type, actor_ref, source_surface, redacted_metadata FROM audit_events WHERE subject_ref=? ORDER BY rowid').all(itemId),
         });
         try {
+            // The route opens and admits the archive before the fault trigger exists:
+            // admission refuses an archive that already carries a foreign audit trigger.
+            await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
+                headers: { ...pairedHeaders(writerClient), Cookie: cookieHeader }, body: { version: 999, status: 'performed' },
+            });
             const beforeItem = itemState();
             itemDb.exec("CREATE TRIGGER synthetic_paired_item_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='service.prescription_item.updated' BEGIN SELECT RAISE(FAIL, 'synthetic audit fault'); END");
             const failedUpdate = await request('PUT', `/api/v1/network/service-prescription-items/${itemId}`, {
