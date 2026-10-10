@@ -127,11 +127,11 @@ test('a bootstrapped DB has no patient_id table outside the canonical cascade', 
       sqlite.exec(sql);
     }
 
-    // Raw-SQL tables that exist only in lib/db-server.ts must be covered too.
-    const dbServerSource = fs.readFileSync(path.join(ROOT_DIR, 'lib/db-server.ts'), 'utf8');
+    // Raw-SQL tables that exist only in lib/sqlite-schema.ts must be covered too.
+    const dbServerSource = fs.readFileSync(path.join(ROOT_DIR, 'lib/sqlite-schema.ts'), 'utf8');
     const createStatements = (dbServerSource.match(/CREATE TABLE IF NOT EXISTS[\s\S]*?\n\s*\)/g) ?? [])
       .filter((statement) => /^CREATE TABLE IF NOT EXISTS [A-Za-z_]/.test(statement));
-    assert.ok(createStatements.length > 0, 'expected raw CREATE TABLE statements in lib/db-server.ts');
+    assert.ok(createStatements.length > 0, 'expected raw CREATE TABLE statements in lib/sqlite-schema.ts');
     for (const statement of createStatements) {
       sqlite.exec(statement);
     }

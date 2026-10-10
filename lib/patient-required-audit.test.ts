@@ -41,7 +41,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     if (specifier === '@/lib/security/local-api-auth') return { url: pathToFileURL(tokenPath).href, shortCircuit: true };
     return next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
 const { updateNetworkScopedPatient } = load('./network-patient-write.ts') as typeof import('./network-patient-write.ts');

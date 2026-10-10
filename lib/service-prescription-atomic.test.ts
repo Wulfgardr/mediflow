@@ -10,7 +10,8 @@ import type { ServerSession } from './security/server-session.ts';
 
 const dir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'service-atomic-'));
 process.env.MEDIFLOW_DATA_DIR = dir;
-const { dbServer } = await import('./db-server.ts');
+const { dbServer, openDbServer } = await import('./db-server.ts');
+openDbServer();
 const { patients, ambulatories, patientsToAmbulatories, servicePrescriptions, servicePrescriptionItems } = await import('./schema.ts');
 const writer = await import('./service-prescription-write.ts');
 const sql = new Database(join(dir, 'medical.db'));

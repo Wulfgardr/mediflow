@@ -8,7 +8,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import test from 'node:test';
-import Database from 'better-sqlite3';
 import { createAifaUpdateGuide, type AifaGuideState } from './aifa-update-guide';
 import type { AifaImportClientResult } from './aifa-importer';
 
@@ -19,8 +18,6 @@ test('actual route + guide: abort preserves the catalog, explicit retry succeeds
     const parent = process.env.MEDIFLOW_DATA_DIR!;
     const directory = fs.mkdtempSync(path.join(parent, 'aifa-guide-route-'));
     process.env.MEDIFLOW_DATA_DIR = directory;
-    // Precreate the isolated database: db-server must not consider a legacy database in cwd.
-    new Database(path.join(directory, 'medical.db')).close();
     const { dbServer } = await import('./db-server.ts');
     const catalog = await import('./aifa-catalog-server.ts');
     const auth = requireCurrent('./security/server-auth.ts') as typeof import('./security/server-auth');

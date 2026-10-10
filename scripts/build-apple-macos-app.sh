@@ -153,6 +153,7 @@ for (const [relative, message] of [
   ['Resources/local-api-tls-proxy.mjs', 'Nonphysical proxy destination'],
   ['Resources/mediflow-headless-supervisor.mjs', 'Nonphysical Headless launcher destination'],
   ['Resources/WebRuntime/native-first-install.mjs', 'Nonphysical native first-install destination'],
+  ['Resources/WebRuntime/native-first-install-contract.json', 'Nonphysical native first-install contract destination'],
 ]) {
   const destination = path.join(app, 'Contents', relative);
   try {
@@ -297,6 +298,11 @@ node "$ROOT_DIR/scripts/scheduled-backup-runtime-contract.mjs" --runtime-root "$
 # The helper has a direct-Node packaged mode, so no source tree or TS loader ships.
 # `preflight_app_destination` above and here reject a pre-existing symlink before this copy.
 preflight_app_destination
+cp "$ROOT_DIR/scripts/native-first-install-contract.json" "$WEB/native-first-install-contract.json"
+cmp -s "$ROOT_DIR/scripts/native-first-install-contract.json" "$WEB/native-first-install-contract.json" || {
+  echo "Native first-install contract copy mismatch" >&2
+  exit 1
+}
 cp "$ROOT_DIR/scripts/native-first-install.mjs" "$WEB/native-first-install.mjs"
 cmp -s "$ROOT_DIR/scripts/native-first-install.mjs" "$WEB/native-first-install.mjs" || {
   echo "Native first-install helper was not copied intact into WebRuntime." >&2; exit 1;

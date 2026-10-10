@@ -9,8 +9,8 @@ import Database from 'better-sqlite3';
 import { collectAuditAppendOnlyProblems } from './schema-drift-audit-append-only.mjs';
 
 // WUL-268 (STREAM A): happy-path test for the schema drift check. On a clean
-// checkout, lib/schema.ts and the runtime bootstrap (drizzle migrations +
-// applySchemaGuards) agree, so the check must exit 0 and print an OK line.
+// checkout, lib/schema.ts and the current runtime initializer agree, so the
+// check must exit 0 and print an OK line. Historical SQL is not replayed.
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CHECK_SCRIPT = path.join(HERE, 'check-schema-drift.mjs');

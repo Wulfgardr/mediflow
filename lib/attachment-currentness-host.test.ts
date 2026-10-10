@@ -21,6 +21,7 @@ process.env.MEDIFLOW_DATA_DIR = dataDir;
 const requireCurrent = createRequire(import.meta.url);
 const host = requireCurrent('./attachment-currentness-host') as typeof import('./attachment-currentness-host');
 const databaseHost = requireCurrent('./db-server') as typeof import('./db-server');
+databaseHost.openDbServer();
 
 const ref = 'a'.repeat(64); const expected = () => ({ sourceRef: ref, revision: 1, freshnessEpoch: 1 });
 function reset(values: { revision?: number; freshnessEpoch?: number; sourceRef?: string; data?: string | null } = {}) {

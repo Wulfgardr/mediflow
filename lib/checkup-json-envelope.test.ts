@@ -34,7 +34,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     const url = replacements[specifier];
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, checkups } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/checkups/route.ts') as typeof import('../app/api/checkups/route.ts');
 const webItem = load('../app/api/checkups/[id]/route.ts') as typeof import('../app/api/checkups/[id]/route.ts');

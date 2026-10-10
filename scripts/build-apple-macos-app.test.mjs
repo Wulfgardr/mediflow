@@ -119,7 +119,7 @@ function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
   for (const file of ['package.json', 'scripts/build-apple-macos-app.sh', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
-    'scripts/native-first-install.mjs', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
+    'scripts/native-first-install.mjs', 'scripts/native-first-install-contract.json', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
     ...['execution-mac-assets.ts', 'execution-mac-config.ts', 'execution-mac-native.ts', 'execution-mac-state.ts', 'execution-sandbox.ts', 'execution-contract.ts'].map(name => 'lib/chatgpt-execution/' + name)]) {
     const destination = path.join(root, file); fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -195,6 +195,7 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     const helper = path.join(input.app, 'Contents/Helpers/mediflow-chatgpt-codex');
     assert.deepEqual(fs.readFileSync(helper), syntheticFiles.codex);
     assert.deepEqual(fs.readFileSync(path.join(input.app, 'Contents/Resources/WebRuntime/native-first-install.mjs')), fs.readFileSync(path.join(input.root, 'scripts/native-first-install.mjs')));
+    assert.deepEqual(fs.readFileSync(path.join(input.app, 'Contents/Resources/WebRuntime/native-first-install-contract.json')), fs.readFileSync(path.join(input.root, 'scripts/native-first-install-contract.json')));
     assert.deepEqual(fs.readFileSync(path.join(input.web, ...assetParts, 'codex')), syntheticFiles.codex);
     assert.equal(fs.existsSync(path.join(input.app, 'Contents/Resources/WebRuntime', ...assetParts, 'codex')), false);
     const stagedIdentity = Object.fromEntries(['MEDIFLOW_APP_REVISION', 'MEDIFLOW_APP_BRANCH', 'MEDIFLOW_APP_WORKTREE_HASH', 'MEDIFLOW_APP_SOURCE_FINGERPRINT', 'MEDIFLOW_APP_FINGERPRINT'].map(key => {

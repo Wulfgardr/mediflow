@@ -10,6 +10,7 @@ import { after, test } from 'node:test';
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-review-patient-link-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], { env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir } });
+(await import('../db-server.ts')).openDbServer();
 
 const { createDurableReviewPatientLinkStore, DurableReviewPatientLinkStoreError } = await import('./durable-review-patient-link-store.ts');
 

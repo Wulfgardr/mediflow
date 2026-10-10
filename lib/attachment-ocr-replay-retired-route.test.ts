@@ -12,6 +12,7 @@ const migrationDb = new Database(dbPath); migrationDb.pragma('foreign_keys = OFF
 for (const file of fs.readdirSync(path.join(root, 'drizzle')).filter((name) => name.endsWith('.sql')).sort())
     migrationDb.exec(fs.readFileSync(path.join(root, 'drizzle', file), 'utf8').replace(/^-->\s+statement-breakpoint\s*$/gmu, ''));
 migrationDb.close(); process.env.MEDIFLOW_DATA_DIR = dataDir;
+(await import('./db-server.ts')).openDbServer();
 const route = await import('../app/api/attachments/[id]/ocr-replay/route.ts');
 const post = route.POST as (...args: unknown[]) => Promise<Response>;
 const requireCurrent = createRequire(import.meta.url);

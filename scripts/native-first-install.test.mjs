@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import Database from 'better-sqlite3';
+import reservationContract from './native-first-install-contract.json' with { type: 'json' };
 
 const root = process.cwd();
 const helper = path.join(root, 'scripts/native-first-install.mjs');
@@ -14,13 +16,25 @@ function withDirectory(run) {
     try { run(directory); } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }
 
-function reserve(directory, cwd = root) {
-    return spawnSync(process.execPath, [helper, '--create-empty-only'], {
+function reserve(directory, cwd = root, executable = helper) {
+    return spawnSync(process.execPath, [executable, '--create-empty-only'], {
         cwd,
         env: { ...process.env, MEDIFLOW_DATA_DIR: directory, MEDIFLOW_DB_PATH: path.join(directory, 'medical.db') },
         encoding: 'utf8',
         timeout: 5_000,
     });
+}
+
+function assertReservation(database) {
+    assert.ok(fs.statSync(database).size > 0);
+    const db = new Database(database, { readonly: true, fileMustExist: true });
+    try {
+        assert.equal(db.pragma('application_id', { simple: true }), 0x4d464652);
+        assert.equal(reservationContract.applicationId, 0x4d464652);
+        assert.equal(db.pragma('user_version', { simple: true }), 0);
+        assert.deepEqual(db.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
+        assert.deepEqual(db.prepare("SELECT name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").all(), []);
+    } finally { db.close(); }
 }
 
 test('packaged first install reserves only a genuinely empty synthetic directory', () => {
@@ -29,18 +43,18 @@ test('packaged first install reserves only a genuinely empty synthetic directory
         assert.equal(result.status, 0, result.stderr);
         const database = path.join(directory, 'medical.db');
         assert.ok(fs.existsSync(database));
-        assert.equal(fs.statSync(database).size, 0);
+        assertReservation(database);
         assert.deepEqual(fs.readdirSync(directory), ['medical.db']);
     });
 });
 
-test('the zero-byte reservation reaches the existing auth bootstrap as a ready empty account', () => {
+test('the SQLite reservation reaches the existing auth bootstrap as a ready empty account', () => {
     withDirectory((directory) => {
         assert.equal(process.versions.node.split('.', 1)[0], '24', 'run this source-route test with the project Node 24 runtime');
         const reservation = reserve(directory);
         assert.equal(reservation.status, 0, reservation.stderr);
         const database = path.join(directory, 'medical.db');
-        assert.equal(fs.statSync(database).size, 0);
+        assertReservation(database);
 
         const authCheck = spawnSync(process.execPath, [
             path.join(root, 'scripts/run-strip-types.mjs'),
@@ -56,7 +70,8 @@ test('the zero-byte reservation reaches the existing auth bootstrap as a ready e
         });
 
         assert.equal(authCheck.status, 0, authCheck.stderr || authCheck.stdout);
-        assert.ok(fs.statSync(database).size > 0, 'auth bootstrap must materialize the reserved SQLite file');
+        const initialized = new Database(database, { readonly: true });
+        try { assert.ok(initialized.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'users'").get()); } finally { initialized.close(); }
     });
 });
 
@@ -96,7 +111,7 @@ test('a legacy file in cwd cannot bypass the selected native directory checks', 
         const fresh = path.join(sandbox, 'fresh');
         const result = reserve(fresh, sandbox);
         assert.equal(result.status, 0, result.stderr);
-        assert.equal(fs.statSync(path.join(fresh, 'medical.db')).size, 0);
+        assertReservation(path.join(fresh, 'medical.db'));
 
         const incomplete = path.join(sandbox, 'incomplete');
         fs.mkdirSync(incomplete);
@@ -107,5 +122,47 @@ test('a legacy file in cwd cannot bypass the selected native directory checks', 
         assert.deepEqual(fs.readdirSync(incomplete), ['recovery-marker']);
         assert.equal(fs.readFileSync(path.join(incomplete, 'recovery-marker'), 'utf8'), 'synthetic-recovery');
         assert.deepEqual(fs.readFileSync(legacy), original);
+    });
+});
+
+test('an existing truncated zero-byte archive is never promoted to a fresh reservation', () => {
+    withDirectory((directory) => {
+        const database = path.join(directory, 'medical.db');
+        fs.writeFileSync(database, '');
+        const result = reserve(directory);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(fs.statSync(database).size, 0);
+        assert.deepEqual(fs.readdirSync(directory), ['medical.db']);
+    });
+});
+
+test('the packaged helper resolves the relocated SQLite binding and adjacent contract', () => {
+    withDirectory((sandbox) => {
+        const contents = path.join(sandbox, 'Synthetic.app/Contents');
+        const web = path.join(contents, 'Resources/WebRuntime');
+        const frameworks = path.join(contents, 'Frameworks');
+        const packageSource = path.join(root, 'node_modules/better-sqlite3');
+        const packageTarget = path.join(web, 'node_modules/better-sqlite3');
+        fs.mkdirSync(packageTarget, { recursive: true });
+        fs.mkdirSync(frameworks, { recursive: true });
+        fs.cpSync(path.join(packageSource, 'lib'), path.join(packageTarget, 'lib'), { recursive: true });
+        fs.copyFileSync(path.join(packageSource, 'package.json'), path.join(packageTarget, 'package.json'));
+        fs.copyFileSync(path.join(packageSource, 'build/Release/better_sqlite3.node'), path.join(frameworks, 'mediflow-web-better-sqlite3.node'));
+        const loaderPath = path.join(packageTarget, 'lib/database.js');
+        const original = "require('bindings')('better_sqlite3.node')";
+        const relocated = "require('../../../../../Frameworks/mediflow-web-better-sqlite3.node')";
+        // Match the packaging contract exactly, then exercise its real native addon.
+        assert.ok(fs.readFileSync(path.join(root, 'scripts/check-macos-web-runtime-native-payload.sh'), 'utf8').includes(relocated));
+        const loader = fs.readFileSync(loaderPath, 'utf8');
+        assert.equal(loader.split(original).length - 1, 1);
+        fs.writeFileSync(loaderPath, loader.replace(original, relocated));
+        const packagedHelper = path.join(web, 'native-first-install.mjs');
+        fs.copyFileSync(helper, packagedHelper);
+        fs.copyFileSync(path.join(root, 'scripts/native-first-install-contract.json'), path.join(web, 'native-first-install-contract.json'));
+        const directory = path.join(sandbox, 'data');
+        const result = reserve(directory, sandbox, packagedHelper);
+        assert.equal(result.status, 0, result.stderr);
+        assertReservation(path.join(directory, 'medical.db'));
+        assert.deepEqual(fs.readdirSync(directory), ['medical.db']);
     });
 });
