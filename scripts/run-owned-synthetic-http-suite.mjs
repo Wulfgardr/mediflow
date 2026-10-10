@@ -138,6 +138,10 @@ async function run() {
             if (code !== 0 || timedOut || interrupted) {
                 failures.push(recipe.id);
                 console.error(`[owned-http] FAIL ${recipe.id}; exit=${code}; timeout=${timedOut}; log=${logPath}`);
+                // CI runners are ephemeral: retain the failed child's actual assertion in the job log.
+                console.error(`[owned-http] BEGIN failure output: ${recipe.id}`);
+                process.stderr.write(fs.readFileSync(logPath));
+                console.error(`[owned-http] END failure output: ${recipe.id}`);
             } else console.log(`[owned-http] PASS ${recipe.id}`);
         }
         if (interrupted || failures.length) throw new Error(`Owned HTTP failed: ${interrupted ? 'interrupted' : failures.join(', ')}`);
