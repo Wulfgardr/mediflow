@@ -25,7 +25,8 @@ function seam(name: string, source: string) {
 const auth = seam('auth.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-create-seam-${dataDir}`)})];
 exports.requireSession=async()=>s.session;
 exports.requireLocalApiActorSession=async()=>({id:'local-api',userId:'local-api',role:'admin'});
-exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});`);
+exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
+exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`);
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-create-synthetic-token'
   ?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-create-synthetic-token';`);
@@ -321,4 +322,39 @@ test('v1 validates original destination and preserves omitted, null and opaque d
     assert.equal((snapshot.patient as { ambulatory_id: string }).ambulatory_id, ambulatoryId);
     assert.equal((snapshot.memberships[0] as { ambulatory_id: string }).ambulatory_id, ambulatoryId);
     assert.equal(snapshot.audit.length, 1);
+});
+
+
+test('purged patient identity cannot be recreated by Web or v1 and old PUT remains absent', async () => {
+    reset(); newSession('retired-identity');
+    const detail = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
+    const purge = load('../app/api/system/purge-patient/route.ts') as typeof import('../app/api/system/purge-patient/route.ts');
+    const id = 'c05-retired-identity';
+    const params = { params: Promise.resolve({ id }) };
+    const request = (method: string, body: Record<string, unknown>) => new Request(`http://127.0.0.1/api/patients/${id}`, {
+        method, headers: { 'content-type': 'application/json', 'x-request-id': 'synthetic-aba' }, body: JSON.stringify(body),
+    });
+    assert.equal((await create('web-legacy', id)).status, 201);
+    const observed = await detail.GET(new Request(`http://127.0.0.1/api/patients/${id}`), params);
+    const original = await observed.json() as { version: number };
+    assert.equal(original.version, 1);
+    const oldPut = () => detail.PUT(request('PUT', { version: original.version, firstName: 'OldRequest' }), params);
+    assert.equal((await oldPut()).status, 200);
+    assert.equal((await detail.DELETE(request('DELETE', { version: 2 }), params)).status, 200);
+    assert.equal((await purge.POST(request('POST', { patientId: id, version: 3 }))).status, 200);
+    const before = readBack(id);
+    assert.equal(before.patient, null);
+    assert.equal(before.audit.length, 4);
+    for (const surface of ['web-legacy', 'web-fixed-preview-v1', 'v1'] as const) {
+        const recreated = await create(surface, id);
+        assert.equal(recreated.status, 409);
+        assert.deepEqual(await recreated.json(), { error: 'Patient create conflict' });
+        assert.deepEqual(readBack(id), before);
+    }
+    assert.equal((await oldPut()).status, 404);
+    assert.deepEqual(readBack(id), before);
+    state.selected = 'missing-destination';
+    assert.equal((await create('web-legacy', id)).status, 404);
+    assert.equal((await create('v1', id, { body: { ambulatoryId: 'missing-destination' } })).status, 404);
+    assert.deepEqual(readBack(id), before);
 });

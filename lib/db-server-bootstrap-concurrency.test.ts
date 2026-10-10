@@ -196,3 +196,47 @@ test('schema guards serialize across Next-style build workers', { timeout: 30_00
         fs.rmSync(dataDir, { recursive: true, force: true });
     }
 });
+
+
+test('retired patient IDs backfill exact historical audit and survive reopen; ignored backfill denies open', { timeout: 30_000 }, async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-retired-patient-bootstrap-'));
+    const dbPath = path.join(dataDir, 'medical.db');
+    try {
+        applyBaseMigrations(dbPath);
+        let db = new Database(dbPath);
+        db.exec('DROP TABLE patient_retired_ids');
+        const audit = db.prepare(`INSERT INTO audit_events
+            (event_id, event_type, occurred_at, outcome, actor_type, actor_ref, subject_type, subject_ref, source_surface)
+            VALUES (?, ?, 1, ?, 'user', 'synthetic-user', ?, ?, 'web')`);
+        for (const [eventId, type, outcome, subjectType, ref] of [
+            ['retired', 'patient.purged', 'success', 'patient', ' retired opaque id '],
+            ['failed', 'patient.purged', 'failure', 'patient', 'failed-id'],
+            ['other-type', 'patient.created', 'success', 'patient', 'created-id'],
+            ['other-subject', 'patient.purged', 'success', 'attachment', 'other-id'],
+            ['null', 'patient.purged', 'success', 'patient', null],
+            ['blank', 'patient.purged', 'success', 'patient', ' \t\n'],
+        ]) audit.run(eventId, type, outcome, subjectType, ref);
+        db.close();
+        const first = await runBootstrapWorker(dataDir);
+        assert.equal(first.code, 0, first.output);
+        db = new Database(dbPath);
+        const before = db.prepare('SELECT * FROM patient_retired_ids').all();
+        assert.deepEqual(before.map(row => (row as { id: string }).id), [' retired opaque id ']);
+        db.close();
+        const reopened = await runBootstrapWorker(dataDir);
+        assert.equal(reopened.code, 0, reopened.output);
+        db = new Database(dbPath);
+        assert.deepEqual(db.prepare('SELECT * FROM patient_retired_ids').all(), before);
+        db.prepare(`INSERT INTO audit_events
+            (event_id, event_type, occurred_at, outcome, actor_type, actor_ref, subject_type, subject_ref, source_surface)
+            VALUES ('ignored', 'patient.purged', 2, 'success', 'user', 'synthetic-user', 'patient', 'ignored-id', 'web')`).run();
+        db.exec('CREATE TRIGGER retired_id_ignore BEFORE INSERT ON patient_retired_ids BEGIN SELECT RAISE(IGNORE); END');
+        db.close();
+        const ignored = await runBootstrapWorker(dataDir);
+        assert.notEqual(ignored.code, 0);
+        assert.match(ignored.output, /Patient identity retirement backfill failed/);
+        db = new Database(dbPath, { readonly: true });
+        assert.deepEqual(db.prepare('SELECT * FROM patient_retired_ids').all(), before);
+        db.close();
+    } finally { fs.rmSync(dataDir, { recursive: true, force: true }); }
+});
