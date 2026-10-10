@@ -465,3 +465,33 @@ test('production swap accepts the supported tracked migration baseline without w
         assert.equal(fs.existsSync(path.join(dir, 'medical.db.swap-recovery')), false);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('SOAP imported before first open cannot acquire replacement authority on its first use after swap', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-soap-initial-handle-'));
+    try {
+        const result = worker(dir, `
+            import assert from 'node:assert/strict';
+            import path from 'node:path';
+            import Database from 'better-sqlite3';
+            import { sql } from 'drizzle-orm';
+            import { createHeadlessSoapActiveRoleAttestationStore, isHeadlessSoapActiveRoleAttestationStoreError } from './lib/security/headless-soap-active-role-attestation-store.ts';
+            import './lib/security/headless-soap-entry-commit-owner.ts';
+            import { openDbServer, dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+            const initial = openDbServer();
+            const replacementPath = path.join(process.env.MEDIFLOW_DATA_DIR, 'replacement.db');
+            await initial.backup(replacementPath);
+            const replacement = new Database(replacementPath);
+            replacement.prepare("INSERT INTO users (id,username,password_hash,encrypted_master_key,salt) VALUES ('replacement-only','replacement-user','synthetic-hash','synthetic-key','synthetic-salt')").run();
+            replacement.close();
+            await swapDatabaseFromFile(replacementPath, null);
+            assert.equal(initial.open, false);
+            assert.throws(() => initial.prepare('SELECT 1'), /not open/);
+            assert.equal(dbServer.get(sql.raw("SELECT count(*) AS count FROM users WHERE id='replacement-only'")).count, 1);
+            assert.throws(() => createHeadlessSoapActiveRoleAttestationStore().createInactive('replacement-only'),
+                error => isHeadlessSoapActiveRoleAttestationStoreError(error) && error.code === 'storage_unavailable');
+            assert.equal(dbServer.get(sql.raw('SELECT count(*) AS count FROM headless_soap_active_role_attestations')).count, 0);
+            assert.equal(dbServer.get(sql.raw('SELECT count(*) AS count FROM audit_events')).count, 0);
+        `);
+        assert.equal(result.status, 0, result.stderr);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

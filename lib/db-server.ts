@@ -16,6 +16,8 @@ import { ensureProstheticsCatalogSchema } from '@/lib/reference-data/prosthetics
 
 // Import is inert; only an explicit open or use of the lazy client acquires SQLite.
 let sqlite: Database.Database;
+// Assigned only by the first successful open, never by swap/reopen.
+let initialSqlite: Database.Database;
 let dbPath: string;
 let openState: 'unopened' | 'opening' | 'opened' | 'failed' = 'unopened';
 let openFailure: unknown;
@@ -1095,6 +1097,7 @@ export function openDbServer(): Database.Database {
                 swapRecovery.complete();
             }
         }
+        initialSqlite = sqlite;
         openState = 'opened';
         return sqlite;
     } catch (error) {
@@ -1103,6 +1106,12 @@ export function openDbServer(): Database.Database {
         if (sqlite?.open) sqlite.close();
         throw error;
     }
+}
+
+/** Lazy access for owners whose authority remains tied to the first connection. */
+export function getInitialDbServerHandle(): Database.Database {
+    openDbServer();
+    return initialSqlite;
 }
 
 /**

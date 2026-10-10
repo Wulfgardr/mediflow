@@ -9,7 +9,7 @@ import { getTableName } from 'drizzle-orm';
 
 import {
     dbServer,
-    openDbServer,
+    getInitialDbServerHandle,
     hasCanonicalHeadlessSoapEntryCommitSchema,
     runDbServerImmediateTransaction,
 } from '../db-server';
@@ -88,13 +88,13 @@ const AUDIT_REF = /^hsea_[0-9a-f]{64}$/u;
 const HASH = /^[0-9a-f]{64}$/u;
 const ACTOR_REF = /^hsa_[0-9a-f]{64}$/u;
 const isProxy = types.isProxy;
-// Capture the intrinsic now, but bind only once to the first concrete connection.
+// Capture the intrinsic now, but bind only once to the first successfully opened connection.
 // A later swap must not silently retarget this owner's captured SQL authority.
 const prepareIntrinsic = Function.prototype.call.bind(Database.prototype.prepare);
 let boundPrepare: ((query: string) => Database.Statement) | undefined;
 const prepare = (query: string): Database.Statement => {
     if (!boundPrepare) {
-        const client = openDbServer();
+        const client = getInitialDbServerHandle();
         boundPrepare = (sql: string) => prepareIntrinsic(client, sql);
     }
     return boundPrepare(query);
