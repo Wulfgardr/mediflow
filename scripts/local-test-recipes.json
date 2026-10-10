@@ -1,0 +1,430 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "id": "test:attachment-currentness-writers",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/check-attachment-currentness-writers.test.mjs"
+      ],
+      "prerequisites": "Existing test:attachment-currentness-writers command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:installability-v0",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/installability-v0-macos.test.mjs"
+      ],
+      "prerequisites": "Existing test:installability-v0 command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:api-v1-contract-negative",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/api-v1-contract-negative-test.sh"
+      ],
+      "prerequisites": "Existing test:api-v1-contract-negative command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:api-v1-put-negative-routes",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/api-v1-put-negative-routes-test.sh"
+      ],
+      "prerequisites": "Existing test:api-v1-put-negative-routes command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:legacy-clinical-writes",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/legacy-clinical-writes-test.sh"
+      ],
+      "prerequisites": "Existing test:legacy-clinical-writes command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:backup-restore:date-fields",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/backup-restore-date-fields.test.mjs"
+      ],
+      "prerequisites": "Existing test:backup-restore:date-fields command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:backup-scheduler",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/backup-scheduler-test.sh"
+      ],
+      "prerequisites": "Existing test:backup-scheduler command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:backup-scheduler:collections",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/backup-scheduler-collections.test.mjs"
+      ],
+      "prerequisites": "Existing test:backup-scheduler:collections command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:document-router-benchmark",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/benchmark-document-router.test.ts"
+      ],
+      "prerequisites": "Existing test:document-router-benchmark command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:treatment-reasoning",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "lib/treatment-reasoning-contract.test.ts",
+        "lib/ai-treatment-reasoning-kill-switch.test.ts",
+        "lib/treatment-reasoning-context.test.ts",
+        "lib/treatment-reasoning-service.test.ts",
+        "lib/athena-mlx-runtime.test.ts",
+        "scripts/treatment-reasoning-route-boundary.test.mjs"
+      ],
+      "prerequisites": "Existing test:treatment-reasoning command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:patient-ambulatory-membership",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/patient-ambulatory-membership-test.sh"
+      ],
+      "prerequisites": "Existing test:patient-ambulatory-membership command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:patient-soft-delete",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/patient-soft-delete-test.sh"
+      ],
+      "prerequisites": "Existing test:patient-soft-delete command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:patient-cascade",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/patient-cascade.test.mjs"
+      ],
+      "prerequisites": "Existing test:patient-cascade command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:service-prescription-items-catalog-migration",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/service-prescription-items-catalog-migration-test.sh"
+      ],
+      "prerequisites": "Existing test:service-prescription-items-catalog-migration command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:document-intelligence-columns-migration",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/document-intelligence-columns-migration.test.mjs"
+      ],
+      "prerequisites": "Existing test:document-intelligence-columns-migration command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:audit",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/audit-test.sh"
+      ],
+      "prerequisites": "Existing test:audit command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:sqlite-repair",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/sqlite-repair-test.sh"
+      ],
+      "prerequisites": "Existing test:sqlite-repair command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:ai-model-parliament",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/benchmark-model-parliament.test.ts"
+      ],
+      "prerequisites": "Existing test:ai-model-parliament command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:ai-rollout-readiness",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/benchmark-rollout-readiness.test.ts",
+        "lib/ai-rollout-readiness-storage.test.ts",
+        "lib/ai-rollout-model-guard.test.ts",
+        "lib/ai-patient-insight-kill-switch.test.ts",
+        "lib/ai-smart-import-kill-switch.test.ts",
+        "lib/ai-document-synthesis-kill-switch.test.ts",
+        "lib/ai-ocr-kill-switch.test.ts"
+      ],
+      "prerequisites": "Existing test:ai-rollout-readiness command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:terminology-registry",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/terminology-registry-test.sh"
+      ],
+      "prerequisites": "Existing test:terminology-registry command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:siss-adapter",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/siss-adapter-test.sh"
+      ],
+      "prerequisites": "Existing test:siss-adapter command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:siss-prescription",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/siss-prescription-test.sh"
+      ],
+      "prerequisites": "Existing test:siss-prescription command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:openmed-redaction",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/openmed-redaction-test.sh"
+      ],
+      "prerequisites": "Existing test:openmed-redaction command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:pin-change",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/pin-change-test.sh"
+      ],
+      "prerequisites": "Existing test:pin-change command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:settings-navigation",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/settings-navigation-test.sh"
+      ],
+      "prerequisites": "Existing test:settings-navigation command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:local-provider-setup",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/local-provider-setup.test.ts"
+      ],
+      "prerequisites": "Existing test:local-provider-setup command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:fabric-settings-view",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/fabric-settings-view-test.sh"
+      ],
+      "prerequisites": "Existing test:fabric-settings-view command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:server-auth-policy",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/server-auth-policy-test.sh"
+      ],
+      "prerequisites": "Existing test:server-auth-policy command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "test:anydoc-local-only",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/check-anydoc-local-only.test.mjs"
+      ],
+      "prerequisites": "Existing test:anydoc-local-only command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
+    },
+    {
+      "id": "components/lock-screen-pin.browser.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "components/lock-screen-pin.browser.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "lib/chatgpt-execution/execution-mac-initialize.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "lib/chatgpt-execution/execution-mac-initialize.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "scripts/install-redaction-runtime.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/install-redaction-runtime.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "scripts/treatment-reasoning-portable-setup.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/treatment-reasoning-portable-setup.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "scripts/who-local-probe.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/who-local-probe.test.mjs"
+      ],
+      "prerequisites": "WHO opt-in service/platform cases preserve their existing skip policy; a skipped case is not qualification."
+    },
+    {
+      "id": "scripts/stage-chatgpt-execution-mac-assets.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "scripts/stage-chatgpt-execution-mac-assets.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "tools/code-explorer/extract-files.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "tools/code-explorer/extract-files.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "tools/code-explorer/generate.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "tools/code-explorer/generate.test.mjs"
+      ],
+      "prerequisites": "Node 24 and existing platform/compiler/opt-in prerequisites in this test; no execution or OS qualification claimed."
+    },
+    {
+      "id": "tests/ui06/component-browser.test.mjs",
+      "mode": "local",
+      "kind": "node-test",
+      "files": [
+        "tests/ui06/component-browser.test.mjs"
+      ],
+      "prerequisites": "UI06 browser harness and installed browser required; browser prohibition remains in force for this task."
+    },
+    {
+      "id": "lib/chatgpt-execution/execution-mac-readback.test.mjs",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "lib/chatgpt-execution/execution-mac-readback.test.mjs"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "native/MediFlowMac/ExecutionCustodian/custodian.test.ts"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "scripts/chatgpt-account/account-host.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/chatgpt-account/account-host.test.ts"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "scripts/function-models/browser.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "scripts/function-models/browser.test.ts"
+      ],
+      "prerequisites": "Canonical TypeScript loader; synthetic data and the platform/browser prerequisites declared by the test are required. No OS/browser qualification claimed."
+    },
+    {
+      "id": "mac-login",
+      "mode": "local",
+      "kind": "mac-login",
+      "files": [
+        "lib/chatgpt-execution/execution-mac-login-integration.test.mjs"
+      ],
+      "prerequisites": "Experimental VM modules and the existing mac-login loader; synthetic identity fixture, not real login."
+    },
+    {
+      "id": "scripts/launch-macos-synthetic.test.py",
+      "mode": "local",
+      "kind": "python",
+      "files": [
+        "scripts/launch-macos-synthetic.test.py"
+      ],
+      "prerequisites": "Python 3 unittest entrypoint; preserve macOS/Xcode fixture requirements and skips."
+    },
+    {
+      "id": "scripts/mobile-home-base-interop-xctestrun-test.py",
+      "mode": "local",
+      "kind": "python",
+      "files": [
+        "scripts/mobile-home-base-interop-xctestrun-test.py"
+      ],
+      "prerequisites": "Python 3 unittest entrypoint; preserve macOS/Xcode fixture requirements and skips."
+    }
+  ]
+}

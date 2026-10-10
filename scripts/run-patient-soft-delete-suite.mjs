@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { SOFT_DELETE_ROUTE_FILES } from './additional-test-selection.mjs';
+import { SOFT_DELETE_TS_FILES } from './additional-test-selection.mjs';
 /* @Codex: run the existing soft-delete tests with the canonical TypeScript loader and an isolated data root. */
 
 import path from 'node:path';
@@ -7,15 +9,8 @@ import { acquireTestDataDir, cleanupTestDataDir } from './test-data-dir.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const node = process.execPath;
-const typeScriptTests = [
-    'lib/patient-lifecycle.test.ts',
-    'lib/patient-cascade.test.ts',
-    'lib/test-container-clear.test.ts',
-];
-const routeWiringTests = [
-    'scripts/patient-soft-delete.test.mjs',
-    'scripts/patient-cascade.test.mjs',
-];
+const typeScriptTests = SOFT_DELETE_TS_FILES;
+const routeWiringTests = SOFT_DELETE_ROUTE_FILES;
 
 function run(args, env) {
     const result = spawnSync(node, args, { cwd: root, env, stdio: 'inherit' });

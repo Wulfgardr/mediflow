@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { collectChatgptFocusedTests } from './additional-test-selection.mjs';
 /* @Codex — no installer, network dependency resolution, personal home or DB smoke. */
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -78,21 +79,7 @@ function rejectInstalledExtras(path = ownerRoot, child = '') {
     }
 }
 rejectInstalledExtras();
-const tests = [];
-if (browserOnly) {
-    tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
-} else {
-    for (const folder of ['lib/chatgpt-product', 'lib/chatgpt-account', 'lib/chatgpt-execution']) {
-        for (const entry of readdirSync(join(root, folder)).sort()) {
-            if (!entry.endsWith('.test.ts') && !entry.endsWith('.test.cjs')) continue;
-            if (entry === 'execution-egress-proxy.test.ts' && !args.includes('--loopback-proxy')) continue;
-            tests.push(`${folder}/${entry}`);
-        }
-    }
-    tests.push('lib/security/native-inference.test.cjs', 'lib/security/native-ordinary-content.test.cjs', 'lib/security/native-ordinary-host-sources.test.cjs');
-    tests.push('lib/ai-providers/fabric/chatgpt-synthetic-synthesis-binding.test.ts', 'components/settings/chatgpt-synthesis-panel.test.ts');
-    if (args.includes('--browser')) tests.push('e2e/chatgpt-synthesis-product.spec.ts', 'lib/chatgpt-account/account-product.browser.test.mjs');
-}
+const tests = collectChatgptFocusedTests(root, { browserOnly, browser: args.includes('--browser'), loopbackProxy: args.includes('--loopback-proxy') });
 const command = [join(root, 'scripts/run-strip-types.mjs'), '--test', '--test-concurrency=1', ...tests];
 console.log(JSON.stringify({ node: process.version, ownerVersion: pinned.version, ownerArchiveIntegrity: digest,
     testData: 'explicit-run-owned-synthetic', selectedTests: tests, loopbackProxy: args.includes('--loopback-proxy'),
