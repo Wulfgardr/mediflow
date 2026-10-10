@@ -46,6 +46,25 @@ for (const [handler, mode, operation, route] of cases) {
             assert.notDeepEqual(check(core, mutant), []);
         }
         if (operation === 'clear') {
+            const catchGuard = "if (error instanceof VersionExhaustedError) return { status: 409, value: { error: 'Patient version cannot advance safely' } };";
+            const mutations = [
+                core.replace(catchGuard, catchGuard.replace('VersionExhaustedError', 'Error')),
+                core.replace(catchGuard, catchGuard.replace('409', '200')),
+                core.replace('throw error;', 'return { status: 409, value: { error: "anything" } };'),
+                core.replace('throw error;\n    }', 'throw error;\n    } finally { return { status: 200, value: {} }; }'),
+                core.replace('const result = clearTestContainerByMembership(tx, ambulatoryId);',
+                    'let result; try { result = clearTestContainerByMembership(tx, ambulatoryId); } catch (error) { ' + catchGuard + ' throw error; }'),
+                core.replace('const result = clearTestContainerByMembership(tx, ambulatoryId);',
+                    'if (true) return { status: 409, value: {} }; const result = clearTestContainerByMembership(tx, ambulatoryId);'),
+                core.replaceAll('return dbServer.transaction((tx): AmbulatoryMutationResponse => {',
+                    'return dbServer.transaction(async (tx): AmbulatoryMutationResponse => {'),
+                core.replace(catchGuard, 'const VersionExhaustedError = Error; ' + catchGuard),
+            ];
+            for (const mutant of mutations) {
+                assert.notEqual(mutant, core);
+                assert.notDeepEqual(check(mutant), [], `clear mutation ${mutations.indexOf(mutant)}`);
+            }
+
             assert.notDeepEqual(check(core.replace("'patient.updated', 'patient', patient.id", "'patient.deleted', 'patient', patient.id")), []);
             assert.notDeepEqual(check(core.replace('result.unlinkedPatients', 'result.clearedPatients')), []);
             assert.notDeepEqual(check(core, adapter, routeSource, clear.replace('updated.changes !== 1', 'updated.changes === 1')), []);

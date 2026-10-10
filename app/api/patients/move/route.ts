@@ -1,3 +1,4 @@
+import { canIncrementVersion } from '@/lib/version-concurrency';
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -71,6 +72,12 @@ export async function POST(request: Request) {
                         value: buildPatientVersionConflictPayload(expectedVersion, patient.id, patient),
                     };
                 }
+            }
+
+            // Complete batch preflight before deleting or inserting any membership.
+            for (const patient of existingPatients) {
+                if (!canIncrementVersion(patient.version)) return { status: 409,
+                    value: buildPatientVersionConflictPayload(patientVersions[patient.id], patient.id, patient) };
             }
 
             /* @Codex */
