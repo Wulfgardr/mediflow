@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { load, JSON_SCHEMA } from 'js-yaml';
 import { ownedHttpInvocations } from './run-owned-synthetic-http-suite.mjs';
 import { consumerTokens } from './additional-inventory-selection.mjs';
 import { portableLocalTestCommands } from './portable-local-test-selection.mjs';
@@ -24,6 +25,23 @@ export function verifyDispositionConsumer(source, fragments) {
     }
     if (count !== 1) throw new Error('Shared disposition consumer is missing or duplicated');
   }
+}
+export function collectAppleInstallabilityBinding(root) {
+  const workflow = '.github/workflows/apple-native.yml';
+  const binding = collectLiteralCiBinding(root, { script: 'apple:installability-v0', workflow, job: 'native-build-test',
+    ciCall: 'node scripts/local-test-selection.mjs test:installability-v0' });
+  if (binding.jobIf !== "${{ needs.changes.outputs.apple == 'true' }}" || binding.stepIf !== null || binding.runsOn !== 'macos-15') throw new Error('Apple installability condition changed');
+  const yaml = load(fs.readFileSync(path.join(root, workflow), 'utf8'), { schema: JSON_SCHEMA });
+  const filters = yaml.jobs?.changes?.steps?.filter(step => typeof step.run === 'string' && step.run.includes('done < changed.txt'));
+  if (filters?.length !== 1) throw new Error('Apple change filter missing or duplicated');
+  const run = filters[0].run;
+  // Match the first unconditional case before the existing event-specific branch.
+  // No shell execution or general shell parser is used for inventory discovery.
+  const unconditional = run.split('if [ "$EVENT" != push ]; then')[0];
+  const expected = 'scripts/installability-v0-macos.test.mjs | scripts/build-installability-v0-macos.sh | scripts/installability-v0-macos-launcher.sh) apple=true; continue ;;';
+  const cases = [...unconditional.matchAll(/case "\$f" in([\s\S]*?)esac/gu)];
+  if (cases.length !== 1 || cases[0][1].split('\n').map(line => line.trim()).filter(line => line === expected).length !== 1) throw new Error('Installability scripts must activate Apple CI on pull requests and pushes');
+  return binding;
 }
 export function collectCiDispositionSelections(root) {
   // Small synthetic inventory fixtures do not contain the shared registry.
@@ -71,6 +89,12 @@ export function collectCiDispositionSelections(root) {
       out[`npm:${script}`] = { files: ownedHttpInvocations(root, standalone).flatMap(recipe => recipe.coveredFiles), mode: 'ordinary', errors: [], binding };
     } catch (error) { out[`npm:${script}`] = { files: [], mode: 'ordinary', errors: [error.message] }; }
   }
+  try {
+    const binding = collectAppleInstallabilityBinding(root);
+    const recipe = localTestCommands(root).find(command => command.id === 'test:installability-v0');
+    if (!recipe || recipe.kind !== 'node-test' || recipe.files.length !== 1 || recipe.files[0] !== 'scripts/installability-v0-macos.test.mjs') throw new Error('Installability recipe changed');
+    out['apple:installability-v0'] = { files: recipe.files, mode: 'conditional', conditional: true, errors: [], binding };
+  } catch (error) { out['apple:installability-v0'] = { files: [], mode: 'conditional', errors: [error.message] }; }
   const swift = collectSwiftInventorySelection(root);
   out['ci:apple-native-entrypoint'] = { ...swift, files: swift.errors.length ? [] : ['scripts/native-test.sh'], mode: 'conditional' };
   try {

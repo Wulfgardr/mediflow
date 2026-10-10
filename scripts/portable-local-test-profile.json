@@ -27,7 +27,6 @@
     "local:test:document-intelligence-columns-migration",
     "local:test:fabric-settings-view",
     "local:scripts/function-models/browser.test.ts",
-    "local:test:installability-v0",
     "local:scripts/launch-macos-synthetic.test.py",
     "local:test:local-provider-setup",
     "local:scripts/mobile-home-base-interop-xctestrun-test.py",
