@@ -12,6 +12,7 @@ export const UNLOCK_KDF_ITERATIONS = 2_000_000;
 const KEK_INFO = 'mediflow.unlock.kek.v3';
 const VERIFIER_INFO = 'mediflow.unlock.verifier.v3';
 const RECOVERY_INFO = 'mediflow.recovery.kek.v1';
+const RECOVERY_VERIFIER_INFO = 'mediflow.recovery.verifier.v1';
 const RECOVERY_PREFIX = 'r1:';
 const RECOVERY_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford base32: no I, L, O, U
 const SALT_BYTES = 16;
@@ -120,26 +121,39 @@ function recoveryKeyBytes(recoveryKey: string): Uint8Array {
     return Uint8Array.from(bits.matchAll(/.{8}/gu), ([chunk]) => Number.parseInt(chunk, 2));
 }
 
-async function recoveryKek(recoveryKey: string, salt: Uint8Array): Promise<CryptoKey> {
+/** The same split as the passphrase: a wrapping key, and a verifier that proves possession to the server. */
+async function recoveryMaterial(recoveryKey: string, salt: Uint8Array): Promise<{ kek: CryptoKey; verifier: string }> {
     // The key carries 160 bits of entropy of its own: it needs separation, not stretching.
-    const root = await subtle().importKey('raw', recoveryKeyBytes(recoveryKey) as unknown as BufferSource, 'HKDF', false, ['deriveKey']);
-    return aesKey(root, RECOVERY_INFO, requireSalt(salt));
+    const root = await subtle().importKey(
+        'raw', recoveryKeyBytes(recoveryKey) as unknown as BufferSource, 'HKDF', false, ['deriveKey', 'deriveBits'],
+    );
+    requireSalt(salt);
+    return {
+        kek: await aesKey(root, RECOVERY_INFO, salt),
+        verifier: toBase64(await subtle().deriveBits(expand(RECOVERY_VERIFIER_INFO, salt), root, 256)),
+    };
 }
 
 /**
  * The second wrapping of the master key. The recovery key is made here, so it is always
  * random, and is shown to the person once; the wrapping and its salt go into the recovery kit.
+ * The verifier lets the server accept a new passphrase from whoever holds the recovery key.
  */
 export async function createRecoveryWrapping(
     masterKey: CryptoKey,
-): Promise<{ recoveryKey: string; wrappedMasterKey: string; salt: string }> {
+): Promise<{ recoveryKey: string; wrappedMasterKey: string; salt: string; verifier: string }> {
     const recoveryKey = generateRecoveryKey();
     const salt = newSalt();
-    const wrapped = await wrapMasterKey(masterKey, await recoveryKek(recoveryKey, salt));
-    return { recoveryKey, wrappedMasterKey: `${RECOVERY_PREFIX}${wrapped}`, salt: toBase64(salt) };
+    const { kek, verifier } = await recoveryMaterial(recoveryKey, salt);
+    return { recoveryKey, wrappedMasterKey: `${RECOVERY_PREFIX}${await wrapMasterKey(masterKey, kek)}`, salt: toBase64(salt), verifier };
 }
 
-export async function openRecoveryWrapping(wrappedMasterKey: string, salt: string, recoveryKey: string): Promise<CryptoKey> {
+export async function openRecoveryWrapping(
+    wrappedMasterKey: string,
+    salt: string,
+    recoveryKey: string,
+): Promise<{ masterKey: CryptoKey; verifier: string }> {
     if (!wrappedMasterKey.startsWith(RECOVERY_PREFIX)) throw new Error('Not a recovery wrapping');
-    return unwrapMasterKey(wrappedMasterKey.slice(RECOVERY_PREFIX.length), await recoveryKek(recoveryKey, fromBase64(salt)));
+    const { kek, verifier } = await recoveryMaterial(recoveryKey, fromBase64(salt));
+    return { masterKey: await unwrapMasterKey(wrappedMasterKey.slice(RECOVERY_PREFIX.length), kek), verifier };
 }
