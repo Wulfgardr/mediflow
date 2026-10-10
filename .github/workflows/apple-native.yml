@@ -143,6 +143,7 @@ jobs:
             [ -n "$f" ] || continue
             case "$f" in
               native/*) apple=true; continue ;;
+              scripts/swift-test-selection.mjs) apple=true; continue ;;
               # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
               # corregge quella gamba deve quindi attivarla sul push a main.
               .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh)
