@@ -812,6 +812,78 @@ test('rolls back a SOAP attestation restore when its local actor is absent', asy
     }
 });
 
+/* Drives the real attestation owner on the restored archive, so the row is judged by its only reader. */
+function exerciseSoapAttestationStore(dataDir: string, actorRef: string, steps: Array<'read' | 'activate' | 'revoke'>): string[] {
+    const storeUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-active-role-attestation-store.ts')).href;
+    const source = `
+        const { createHeadlessSoapActiveRoleAttestationStore } = await import(${JSON.stringify(storeUrl)});
+        const store = createHeadlessSoapActiveRoleAttestationStore(), actorRef = process.env.W7_ACTOR_REF;
+        const outcomes = JSON.parse(process.env.W7_ATTESTATION_STEPS).map((step) => {
+            try {
+                if (step === 'revoke') {
+                    const { attestationRef } = store.read(actorRef);
+                    return store.revoke(actorRef, { attestationRef, attestationVersion: 1, revocationGeneration: 0 }).status;
+                }
+                return store[step](actorRef).status;
+            } catch (error) { return error?.code ?? 'failed'; }
+        });
+        process.stdout.write(JSON.stringify(outcomes));
+    `;
+    return JSON.parse(runNode(
+        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
+        { MEDIFLOW_DATA_DIR: dataDir, W7_ACTOR_REF: actorRef, W7_ATTESTATION_STEPS: JSON.stringify(steps) },
+    )) as string[];
+}
+
+test('restores a SOAP role attestation without its activation and keeps a later revocation', async () => {
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-soap-attestation-authority-'));
+    const targetDataDir = path.join(workDir, 'target');
+    const artifactPath = path.join(workDir, 'active-attestation.mediflow');
+    try {
+        prepareDatabase(targetDataDir);
+        const targetDb = new Database(path.join(targetDataDir, 'medical.db'));
+        try {
+            const actorRef = alignSyntheticAuthorityActor(targetDb);
+            const attestationRef = `hsar_${'a'.repeat(32)}`;
+            // Activated a minute ago: the backup carries an activation that is still inside its eight hours.
+            const activatedAt = Math.floor(Date.now() / 1000) - 60, expiresAt = activatedAt + (8 * 60 * 60);
+            const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
+            const payload = createEmptyDataset();
+            payload.headlessSoapActiveRoleAttestations = [{
+                attestationRef, actorRef,
+                schemaVersion: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
+                operationId: 'mediflow.clinical_diary.append_soap.v1', policyVersion: 'clinician_confirmed_single_use.v1',
+                status: 'active', attestationVersion: 1, issuerRef: `hsari_${'b'.repeat(32)}`,
+                expiresAt: iso(expiresAt), activatedAt: iso(activatedAt), revocationGeneration: 0, revokedAt: null,
+                createdAt: iso(activatedAt), updatedAt: iso(activatedAt),
+            }];
+            fs.writeFileSync(artifactPath, await serializeBackupArtifact(payload));
+
+            restoreArtifact(targetDataDir, artifactPath);
+            assert.deepEqual(readOrderedRows(targetDb, 'headless_soap_active_role_attestations'), [{
+                attestation_ref: attestationRef, actor_ref: actorRef,
+                schema_version: 'mediflow.headless-soap-active-role-attestation.v1', role: 'physician',
+                operation_id: 'mediflow.clinical_diary.append_soap.v1', policy_version: 'clinician_confirmed_single_use.v1',
+                status: 'inactive', attestation_version: 1, issuer_ref: null, expires_at: null, activated_at: null,
+                revocation_generation: 0, revoked_at: null, created_at: activatedAt, updated_at: activatedAt,
+            }]);
+            // A new enrollment still works on the restored row, and the physician can then revoke it.
+            assert.deepEqual(exerciseSoapAttestationStore(targetDataDir, actorRef, ['read', 'activate', 'revoke']),
+                ['inactive', 'active', 'revoked']);
+
+            const revoked = readOrderedRows(targetDb, 'headless_soap_active_role_attestations');
+            restoreArtifact(targetDataDir, artifactPath);
+            assert.deepEqual(readOrderedRows(targetDb, 'headless_soap_active_role_attestations'), revoked);
+            assert.deepEqual(exerciseSoapAttestationStore(targetDataDir, actorRef, ['read', 'activate']),
+                ['revoked', 'attestation_conflict']);
+        } finally {
+            targetDb.close();
+        }
+    } finally {
+        fs.rmSync(workDir, { recursive: true, force: true });
+    }
+});
+
 test('scheduled backup restores every clinical table and preserves ciphertext bytes', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-roundtrip-'));
     const sourceDataDir = path.join(workDir, 'source');
@@ -891,8 +963,12 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             for (const table of clinicalTables) {
                 const sourceRows = readOrderedRows(sourceDb, table);
                 const targetRows = readOrderedRows(targetDb, table);
+                // The activation is a grant of the source host: the attestation reaches the target inactive.
+                const expectedRows: Array<Record<string, unknown>> = table === 'headless_soap_active_role_attestations'
+                    ? sourceRows.map((row) => ({ ...row, status: 'inactive', issuer_ref: null, expires_at: null, activated_at: null }))
+                    : sourceRows;
                 assert.equal(targetRows.length, sourceRows.length, `${table} count must survive restore`);
-                assert.deepEqual(targetRows, sourceRows, `${table} rows must survive restore byte-for-byte`);
+                assert.deepEqual(targetRows, expectedRows, `${table} rows must survive restore byte-for-byte`);
 
                 for (let rowIndex = 0; rowIndex < sourceRows.length; rowIndex += 1) {
                     for (const [column, value] of Object.entries(sourceRows[rowIndex])) {
