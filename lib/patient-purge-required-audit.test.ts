@@ -35,6 +35,7 @@ let patientId: string;
 let requestId: string;
 function reset(active = false) {
     sql.exec('DROP TRIGGER IF EXISTS purge_audit_fault');
+    sql.exec('DROP TRIGGER IF EXISTS retired_id_ignore');
     dbServer.delete(entries).run();
     dbServer.delete(patientsToAmbulatories).run();
     dbServer.delete(patients).run();
@@ -54,6 +55,7 @@ function snapshot() {
     const reopened = new Database(join(dataDir, 'medical.db'), { readonly: true });
     try { return {
         patients: reopened.prepare('SELECT * FROM patients ORDER BY id').all(),
+        retired: reopened.prepare('SELECT * FROM patient_retired_ids ORDER BY id').all() as Array<{ id: string }>,
         entries: reopened.prepare('SELECT * FROM entries ORDER BY id').all(),
         memberships: reopened.prepare('SELECT * FROM patients_to_ambulatories ORDER BY patient_id, ambulatory_id').all(),
         events: reopened.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
@@ -95,6 +97,7 @@ test('purge: tombstone and children removed with one host-attributed count event
         totalChildRows: totalPatientCascadeRows(childRowCounts) });
     const after = snapshot();
     assert.equal(after.patients.length, 0);
+    assert.equal(after.retired.some(row => row.id === patientId), true);
     assert.equal(after.entries.length, 0);
     assert.equal(after.memberships.length, 0);
     const events = after.events.slice(before.events.length);
@@ -189,4 +192,17 @@ test('purge permits MAX safe version without increment and preview describes act
     reset();
     sql.prepare('UPDATE patients SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, patientId);
     assert.equal((await request(JSON.stringify({ patientId, version: Number.MAX_SAFE_INTEGER }))).status, 200);
+});
+
+
+test('purge denies ignored retirement but accepts an already retired historical identity', async () => {
+    reset();
+    const before = snapshot();
+    sql.exec('CREATE TRIGGER retired_id_ignore BEFORE INSERT ON patient_retired_ids BEGIN SELECT RAISE(IGNORE); END');
+    assert.equal((await request()).status, 500);
+    assert.deepEqual(snapshot(), before);
+    sql.exec('DROP TRIGGER retired_id_ignore');
+    sql.prepare('INSERT INTO patient_retired_ids (id) VALUES (?)').run(patientId);
+    assert.equal((await request()).status, 200);
+    assert.equal(snapshot().retired.filter(row => row.id === patientId).length, 1);
 });

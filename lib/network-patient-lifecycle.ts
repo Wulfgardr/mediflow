@@ -16,7 +16,7 @@ import {
 /* @Codex */
 import { normalizePatientCreateInput } from './patient-write-normalization';
 /* @Codex */
-import { patients, patientsToAmbulatories } from './schema';
+import { patients, patientRetiredIds, patientsToAmbulatories } from './schema';
 /* @Codex */
 import {
     NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS,
@@ -238,7 +238,8 @@ export async function createNetworkScopedPatient(
     const denied = dbServer.transaction((tx) => {
         const denied = authorizeCommit(tx);
         if (denied) return denied;
-        if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) {
+        if (tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, normalized.values.id)).get()
+            || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) {
             return { status: 409 as const, value: { error: 'Patient create conflict' } };
         }
         tx.insert(patients).values(normalized.values).run();

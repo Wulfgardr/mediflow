@@ -3,7 +3,7 @@ import { readPatientJsonObject } from '@/lib/patient-json-object';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
-import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
+import { ambulatories, patients, patientRetiredIds, patientsToAmbulatories } from '@/lib/schema';
 import { and, desc, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
@@ -100,7 +100,8 @@ export async function POST(request: Request) {
             // Destination admission precedes identity lookup; do not disclose collisions for an invalid parent.
             if (normalized.values.ambulatoryId && !tx.select({ id: ambulatories.id }).from(ambulatories)
                 .where(eq(ambulatories.id, normalized.values.ambulatoryId)).get()) throw new PatientCreateDestinationNotFoundError();
-            if (tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
+            if (tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, normalized.values.id)).get()
+                || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
             tx.insert(patients).values(normalized.values).run();
 
             if (normalized.values.ambulatoryId) {

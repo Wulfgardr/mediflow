@@ -1003,6 +1003,21 @@ function applySchemaGuards() {
     // Not best-effort: without the audit table and its append-only triggers the
     // store must not open, so a failure here aborts the schema transaction.
     ensureAuditSqliteSchema(sqlite);
+    sqlite.exec(`CREATE TABLE IF NOT EXISTS patient_retired_ids (
+        id TEXT PRIMARY KEY NOT NULL,
+        retired_at INTEGER NOT NULL DEFAULT (unixepoch())
+    )`);
+    // Historical audit is a bootstrap source, not the create admission ledger.
+    const retiredIds = sqlite.prepare(`SELECT DISTINCT subject_ref AS id FROM audit_events
+        WHERE event_type = 'patient.purged' AND outcome = 'success'
+        AND subject_type = 'patient' AND typeof(subject_ref) = 'text'`).all() as Array<{ id: string }>;
+    const retire = sqlite.prepare('INSERT INTO patient_retired_ids (id) VALUES (?) ON CONFLICT(id) DO NOTHING');
+    const retired = sqlite.prepare('SELECT id FROM patient_retired_ids WHERE id = ?');
+    for (const { id } of retiredIds) {
+        if (!id.trim()) continue;
+        retire.run(id);
+        if (!retired.get(id)) throw new Error('Patient identity retirement backfill failed');
+    }
     /* @Codex */
     ensureHeadlessSoapEntryCommitSchema();
 }
