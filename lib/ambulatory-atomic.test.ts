@@ -9,7 +9,8 @@ import type { ServerSession } from './security/server-session.ts';
 
 const dataDir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'ambulatory-atomic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-const { dbServer } = await import('./db-server.ts');
+const { dbServer, openDbServer } = await import('./db-server.ts');
+openDbServer();
 const schema = await import('./schema.ts');
 const host = await import('./ambulatory-write.ts');
 const paired = await import('./network-ambulatory-write.ts');

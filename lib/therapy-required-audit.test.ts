@@ -43,7 +43,8 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     const url = replacements[specifier];
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('../lib/db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('../lib/db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, therapies } = load('./schema.ts') as typeof import('../lib/schema.ts');
 const webCreate = load('../app/api/therapies/route.ts') as typeof import('../app/api/therapies/route.ts');
 const webItem = load('../app/api/therapies/[id]/route.ts') as typeof import('../app/api/therapies/[id]/route.ts');

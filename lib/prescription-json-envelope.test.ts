@@ -31,7 +31,8 @@ const { registerHooks } = load('node:module') as {
 const hooks = registerHooks({ resolve(specifier, context, next) {
     return replacements[specifier] ? { url: replacements[specifier], shortCircuit: true } : next(specifier, context);
 } });
-const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, prostheticPrescriptions } = load('./schema.ts') as typeof import('./schema.ts');
 const web = load('../app/api/prosthetic-prescriptions/[id]/route.ts') as typeof import('../app/api/prosthetic-prescriptions/[id]/route.ts');
 const network = load('../app/api/v1/network/service-prescriptions/route.ts') as typeof import('../app/api/v1/network/service-prescriptions/route.ts');
