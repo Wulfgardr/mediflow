@@ -41,6 +41,10 @@ jobs:
       - name: Clinical HTTP synthetic harnesses
         timeout-minutes: 20
         run: npm run test:clinical-http
+      - name: Synthetic fixture generators
+        run: npm run test:fixture-generators
+      - name: Rust boundary contract and comparator
+        run: npm run test:research-boundary
       - name: Cleanup synthetic test data directory
         if: always()
         run: |

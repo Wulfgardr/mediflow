@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { conditionalGroupPlan, conditionalLocalGroups, collectConditionalLocalSelections } from './conditional-local-groups.mjs';
+import { conditionalChildEnvironment, conditionalGroupPlan, conditionalLocalGroups, collectConditionalLocalSelections } from './conditional-local-groups.mjs';
 import { localTestCommands, localInvocationArguments } from './local-test-selection.mjs';
 import { cargoTestCommand } from './native-tool-test-selection.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -59,4 +59,11 @@ test('selection exposes generator artifacts, Cargo targets and eight individuall
   assert.equal(conditions.length, 8);
   assert.equal(new Set(conditions.map(item => item.file)).size, 8);
   assert.ok(conditions.every(item => item.owner === '@Wulfgardr' && item.status === 'proposed-condition-not-approved-exclusion' && item.reason && item.condition));
+});
+
+test('nested bash and node children retain the selected Node runtime before inherited PATH', () => {
+  const env = conditionalChildEnvironment({ SYNTHETIC: '1' }, { PATH: '/other-node/bin', HOME: '/synthetic' });
+  assert.equal(env.PATH, `${path.dirname(process.execPath)}${path.delimiter}/other-node/bin`);
+  assert.equal(env.SYNTHETIC, '1');
+  assert.equal(env.HOME, '/synthetic');
 });

@@ -9,8 +9,12 @@ const expected = Object.freeze({ version: 1, entrypoint: 'lib/chatgpt-product/fi
 
 // Lexical binding only: preserve quoted literals, discard comments/spacing. No Swift or bridge execution.
 function compact(source) {
-  return (source.match(/#+"""[\s\S]*?"""#+|#+"[^\n]*?"#+|"""[\s\S]*?"""|`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[^\s]/g) ?? [])
-    .filter(token => !token.startsWith('//') && !token.startsWith('/*'));
+  const tokens = (source.match(/#+"""[\s\S]*?"""#+|#+"[^\n]*?"#+|"""[\s\S]*?"""|`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[^\s]/g) ?? [])
+    ;
+  // Swift permits nested comments. This closed grammar rejects them rather
+  // than exposing the outer comment tail as executable tokens.
+  if (tokens.some(token => token.startsWith('/*') && token.slice(2).includes('/*'))) throw new Error('Nested block comments are unsupported in bridge consumers');
+  return tokens.filter(token => !token.startsWith('//') && !token.startsWith('/*'));
 }
 function requireOnce(source, snippet) {
   const value = compact(snippet);

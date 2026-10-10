@@ -159,7 +159,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:components/lock-screen-pin.browser.test.mjs"
+          "local:components/lock-screen-pin.browser.test.mjs",
+          "npm:test:inventory-browser"
         ]
       }
     },
@@ -924,7 +925,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:experiments/rust-boundary/compare.mjs"
+          "local:experiments/rust-boundary/compare.mjs",
+          "npm:test:research-boundary"
         ]
       }
     },
@@ -933,7 +935,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "cargo:boundary:local"
+          "cargo:boundary:local",
+          "npm:test:research-boundary"
         ]
       }
     },
@@ -942,7 +945,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "cargo:boundary:local"
+          "cargo:boundary:local",
+          "npm:test:research-boundary"
         ]
       }
     },
@@ -6333,7 +6337,18 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:native/MediFlowMac/ExecutionCustodian/custodian.test.ts"
+          "local:native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
+          "npm:test:apple-custodian"
+        ]
+      },
+      "execution": {
+        "state": "conditional-ci",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Apple toolchain qualification is selected by the existing Apple change-filtered CI job; no non-Apple execution is claimed.",
+        "conditions": [
+          "Apple path filter selects native-build-test",
+          "macOS runner with selected Xcode and Node 24",
+          "Canonical custodian recipe compiles and tests the native synthetic helper"
         ]
       }
     },
@@ -7515,6 +7530,16 @@
         "suiteIds": [
           "local:plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs"
         ]
+      },
+      "execution": {
+        "state": "not-provisioned",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Real opt-in Codex app-server session requires authenticated local tooling; it is not an unattended synthetic unit invocation.",
+        "conditions": [
+          "Authenticated Codex CLI explicitly authorized for this smoke",
+          "Installed enabled mediflow-synthetic plugin",
+          "Absolute personal marketplace JSON path; no credential fabrication or installation for this task"
+        ]
       }
     },
     {
@@ -7596,6 +7621,16 @@
         "state": "mapped",
         "suiteIds": [
           "local:scripts/anydoc-desktop-ocr-real.test.ts"
+        ]
+      },
+      "execution": {
+        "state": "not-provisioned",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Real desktop OCR acceptance requires pinned engine/assets and matching renderer profile, not a passing missing-assets skip.",
+        "conditions": [
+          "Provisioned pinned Tesseract engine and OCR artifacts",
+          "Matching desktop renderer/native profile",
+          "Same serial TypeScript recipe; missing assets remain unexecuted, not PASS"
         ]
       }
     },
@@ -7891,7 +7926,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/chatgpt-account/account-ui-browser.mjs"
+          "local:scripts/chatgpt-account/account-ui-browser.mjs",
+          "npm:test:inventory-browser"
         ]
       }
     },
@@ -8121,6 +8157,24 @@
       }
     },
     {
+      "path": "scripts/ci-disposition-selection.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "scripts/conditional-local-groups.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "scripts/db-server-data-isolation.test.mjs",
       "selection": {
         "state": "mapped",
@@ -8228,7 +8282,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/function-models/ui-browser.mjs"
+          "local:scripts/function-models/ui-browser.mjs",
+          "npm:test:inventory-browser"
         ]
       }
     },
@@ -8237,7 +8292,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/generate-clinical-rich-text-fixtures.mjs"
+          "local:scripts/generate-clinical-rich-text-fixtures.mjs",
+          "npm:test:fixture-generators"
         ]
       }
     },
@@ -8246,7 +8302,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/generate-fhir-golden-worker.ts"
+          "local:scripts/generate-fhir-golden-worker.ts",
+          "npm:test:fixture-generators"
         ]
       }
     },
@@ -8419,6 +8476,16 @@
         "suiteIds": [
           "local:scripts/mlx-chat-batch-runner-test.sh"
         ]
+      },
+      "execution": {
+        "state": "not-provisioned",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Dry-run still imports mlx.core and mlx_lm and needs the existing local MLX environment.",
+        "conditions": [
+          "Provisioned compatible Apple/MLX runtime",
+          "Existing .venv_mlx/bin/python3 with mlx and mlx_lm",
+          "No model/runtime installation performed solely to clear inventory"
+        ]
       }
     },
     {
@@ -8427,6 +8494,16 @@
         "state": "mapped",
         "suiteIds": [
           "local:scripts/mobile-home-base-interop-cas-relay.mjs"
+        ]
+      },
+      "execution": {
+        "state": "not-provisioned",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: CAS relay consumes events from two coordinated synthetic mobile participants, rather than generating those events itself.",
+        "conditions": [
+          "Reviewed synthetic CAS case descriptor",
+          "Two running contender/peer device or simulator clients",
+          "Distinct private mode-0700 exchange directories and matching participant receipts"
         ]
       }
     },
@@ -8445,6 +8522,16 @@
         "state": "mapped",
         "suiteIds": [
           "local:scripts/mobile-home-base-interop-module-verifier.mjs"
+        ]
+      },
+      "execution": {
+        "state": "not-provisioned",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: End-to-end mobile module verifier requires a running synthetic client/server scenario beyond its imported unit helpers.",
+        "conditions": [
+          "Reviewed synthetic module descriptor",
+          "Running ios/ipados client and synthetic server producers",
+          "Private mode-0700 exchange directory and unique matching run ID"
         ]
       }
     },
@@ -8525,7 +8612,18 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/native-test.sh"
+          "local:scripts/native-test.sh",
+          "ci:apple-native-entrypoint"
+        ]
+      },
+      "execution": {
+        "state": "conditional-ci",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Apple toolchain qualification is selected by the existing Apple change-filtered CI job; no non-Apple execution is claimed.",
+        "conditions": [
+          "Apple path filter selects native-build-test",
+          "macOS runner with selected Xcode and Node 24",
+          "Existing SwiftPM invocation"
         ]
       }
     },
@@ -8869,6 +8967,16 @@
         "suiteIds": [
           "local:scripts/run-visit-recording-synthetic-benchmark.mjs"
         ]
+      },
+      "execution": {
+        "state": "not-provisioned",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Synthetic speech benchmark needs local voices and transcription assets; a mapped command is not audio/runtime qualification.",
+        "conditions": [
+          "Compatible macOS with required synthetic say voices",
+          "Provisioned local transcription runtime and model assets",
+          "Synthetic audio only; no microphone, patient recording or ad-hoc model installation"
+        ]
       }
     },
     {
@@ -9172,7 +9280,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:tests/ui06/component-browser.test.mjs"
+          "local:tests/ui06/component-browser.test.mjs",
+          "npm:test:inventory-browser"
         ]
       }
     },
