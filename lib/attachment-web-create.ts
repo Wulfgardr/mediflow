@@ -51,7 +51,7 @@ export async function createWebAttachment(
             return NextResponse.json({ error: 'Attachment payload too large' }, { status: 413 });
         }
 
-        const id = body.id || uuidv4();
+        const id = body.id ?? uuidv4();
         const created = dbServer.transaction((tx): 'created' | 'missing' | 'duplicate' => {
             const patient = tx.select({ id: patients.id }).from(patients)
                 .where(and(eq(patients.id, body.patientId), activePatients())).get();

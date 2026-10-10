@@ -151,6 +151,12 @@ function ciBinding(root, suite) {
   };
 }
 
+/** Reuse the same closed YAML binding for a literal non-npm runner call. */
+export function collectLiteralCiBinding(root, suite) {
+  if (typeof suite.ciCall !== 'string' || !suite.ciCall.trim()) throw new Error('Literal CI call required');
+  return ciBinding(root, suite);
+}
+
 /** Verify a known runner entrypoint without launching npm or parsing its source. */
 export function collectNpmScriptBinding(root, suite, expectedCommand) {
   const pkg = JSON.parse(readText(root, suite.packageFile ?? 'package.json'));

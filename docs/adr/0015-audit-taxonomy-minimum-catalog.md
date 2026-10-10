@@ -1090,6 +1090,16 @@ La suite purge SQLite riusa fault audit FAIL/IGNORE, successo e replay e
 aggiunge GET, stale senza revoca, binding versioni invalidi e versione MAX
 safe. Il baseline stale accettava la cancellazione con `200` anziché `409`.
 
+### C05-D — Identità create allegato Web (2026-10-10)
+
+Il solo `POST /api/attachments` valida l'ID originale con lo schema attachment:
+omissione genera UUID; null, tipo non stringa o stringa vuota dopo trim danno
+400 prima di currentness, insert e audit. Gli ID opachi validi sono conservati
+byte per byte, senza trim. Il duplicato resta 409 dopo ammissione del parent
+attivo. `optionalIdSchema` comune non cambia; upload paired e API v1 non
+acquisiscono nuovi contratti. Prove nel parser API e nella famiglia SQLite
+`lib/attachment-web-create-currentness.test.ts`, inclusa assenza di effetti
+attachment/audit sui rifiuti.
 
 ## C05 — Esaurimento versione lifecycle, move e clear (WUL-720)
 

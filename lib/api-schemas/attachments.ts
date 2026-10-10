@@ -2,7 +2,6 @@
 import { z } from 'zod';
 import { types } from 'node:util';
 import {
-    optionalIdSchema,
     optionalTextSchema,
     requiredTextSchema,
 } from './common';
@@ -15,7 +14,7 @@ const ocrQueueStateSchema = z.enum(DOCUMENT_OCR_QUEUE_STATES).optional();
 const ocrQueueReasonSchema = z.enum(DOCUMENT_OCR_QUEUE_REASONS).optional();
 
 export const attachmentCreateSchema = z.object({
-    id: optionalIdSchema,
+    id: requiredTextSchema.optional(),
     patientId: requiredTextSchema,
     name: requiredTextSchema,
     type: requiredTextSchema,

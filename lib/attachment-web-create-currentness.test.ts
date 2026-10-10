@@ -84,16 +84,21 @@ test.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
 
 test('web creation persists a production lower-hex initial host tuple', async () => {
     reset();
-    const response = await invoke(request(payload({ id: 'attachment.synthetic.currentness' })));
+    const response = await invoke(request(payload({ id: ' attachment.synthetic.currentness ' })));
 
     assert.equal(response.status, 201);
-    assert.deepEqual(await response.json(), { id: 'attachment.synthetic.currentness' });
+    assert.deepEqual(await response.json(), { id: ' attachment.synthetic.currentness ' });
     const [created] = rows();
-    assert.equal(created?.id, 'attachment.synthetic.currentness');
+    assert.equal(created?.id, ' attachment.synthetic.currentness ');
     assert.equal(created?.patient_id, patientId);
     assert.match(created?.document_source_ref as string, /^[0-9a-f]{64}$/u);
     assert.equal(created?.document_revision, 1);
     assert.equal(created?.document_freshness_epoch, 1);
+    const omitted = await invoke(request(payload()));
+    assert.equal(omitted.status, 201);
+    const generated = await omitted.json() as { id: string };
+    assert.match(generated.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+    assert.equal(rows().some(row => row.id === generated.id), true);
 });
 
 test('web creation reserves the WAL writer before validating the active patient', async () => {
@@ -343,6 +348,8 @@ test('create rejects malformed, non-object, wrong-type and oversized JSON before
     process.env.MEDIFLOW_ATTACHMENT_MAX_BYTES = '1024';
     try {
         for (const body of ['{', '', 'null', '[]', '17', JSON.stringify(payload({ size: '1' })),
+            JSON.stringify(payload({ id: '' })), JSON.stringify(payload({ id: '   ' })),
+            JSON.stringify(payload({ id: null })), JSON.stringify(payload({ id: 42 })),
             JSON.stringify(payload({ patientId: 17 })), JSON.stringify(payload({ name: ' ' })),
             JSON.stringify(payload({ ocrQueueState: 'unknown' })), JSON.stringify(payload({ actorRef: 'injected' }))]) {
             const before = snapshot();
