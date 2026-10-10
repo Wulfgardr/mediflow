@@ -19,6 +19,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Fetch frozen capability mapping sources
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const manifest = JSON.parse(readFileSync('docs/capability-mapping/source-manifest.v1.json', 'utf8'));
+          const commits = [...new Set(manifest.sources.map(source => source.commit))];
+          if (!commits.length || commits.some(commit => typeof commit !== 'string' || !/^[0-9a-f]{40}$/.test(commit))) {
+            throw new Error('Frozen capability source commits must be exact SHA-1 object IDs');
+          }
+          execFileSync('git', ['fetch', '--no-tags', 'origin', ...commits], { stdio: 'inherit' });
+          for (const commit of commits) execFileSync('git', ['cat-file', '-e', `${commit}^{commit}`]);
+          NODE
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build

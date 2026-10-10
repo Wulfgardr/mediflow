@@ -375,3 +375,10 @@ authors do not replace the eventual candidate CI, and existing skips do not
 establish qualification of the skipped branches. Criterion 5 uses this same inventory and the same six profile exclusions locally
 and in CI; candidate CI evidence remains necessary. Inventory reporting retains
 `Execution evidence: NOT_ASSESSED` and never turns an optional profile into PASS.
+
+The frozen capability-mapping check also reads the exact Git commits in
+`docs/capability-mapping/source-manifest.v1.json`. Some are retained objects from
+merged or deleted source branches, so a full fetch of current branches alone is
+insufficient. Web Core fetches those exact object IDs from `origin` before the
+shared unit suite; local clones require the same source objects. No source
+validation is skipped when an object is missing.
