@@ -9,12 +9,13 @@ const expected = Object.freeze({ version: 1, entrypoint: 'lib/chatgpt-product/fi
 
 // Lexical binding only: preserve quoted literals, discard comments/spacing. No Swift or bridge execution.
 function compact(source) {
-  return (source.match(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[^\s]/g) ?? [])
-    .filter(token => !token.startsWith('//') && !token.startsWith('/*')).join('');
+  return (source.match(/#+"""[\s\S]*?"""#+|#+"[^\n]*?"#+|"""[\s\S]*?"""|`(?:\\.|[^`\\])*`|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*[\s\S]*?\*\/|\/\/[^\n]*|[^\s]/g) ?? [])
+    .filter(token => !token.startsWith('//') && !token.startsWith('/*'));
 }
 function requireOnce(source, snippet) {
   const value = compact(snippet);
-  if (source.split(value).length !== 2) throw new Error(`Native decrypt bridge binding missing or duplicated: ${snippet}`);
+  const count = source.filter((_, index) => value.every((token, offset) => source[index + offset] === token)).length;
+  if (count !== 1) throw new Error(`Native decrypt bridge binding missing or duplicated: ${snippet}`);
 }
 
 export function collectNativeDecryptBridgeSelection(root) {
