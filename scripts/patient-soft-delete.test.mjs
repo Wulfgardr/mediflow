@@ -121,9 +121,8 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     ['app/api/system/fix-orphans/route.ts', 'tx.select({ id: patients.id, version: patients.version }).from(patients).all()', 1],
     ['app/api/system/migrate/route.ts', 'dbServer.select().from(patients).where(isNull(patients.ambulatoryId))', 1],
     ['app/api/system/migrate-m2m/route.ts', 'tx.select({ id: patients.id, version: patients.version, ambulatoryId: patients.ambulatoryId }) .from(patients).where(isNotNull(patients.ambulatoryId)).all()', 1],
-    // Admin purge rereads tombstone/version in the write transaction before cascade and guarded delete.
-    ['app/api/system/purge-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 1],
-    ['app/api/system/purge-patient/route.ts', 'dbServer .select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients) .where(eq(patients.id, patientId)) .get()', 1],
+    // Admin purge previews tombstone/version in a read transaction and rereads them before cascade in the write transaction.
+    ['app/api/system/purge-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 2],
     ['app/api/system/restore-patient/route.ts', 'dbServer .select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, deletedAt: patients.deletedAt, deletionReason: patients.deletionReason, version: patients.version, }) .from(patients) .where(isNotNull(patients.deletedAt)) .orderBy(desc(patients.deletedAt))', 1],
     // @Codex: admin restore reads this tombstone inside its IMMEDIATE transaction.
     ['app/api/system/restore-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 1],
