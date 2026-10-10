@@ -51,6 +51,10 @@ test('attachment schemas accept expected payloads and reject malformed payloads 
         size: '1234',
     });
 
+    await expectInvalid400(attachmentCreateSchema, {
+        id: '   ', patientId: 'patient-1', name: 'referto.pdf', type: 'application/pdf', size: 1,
+    });
+
     await expectValid(attachmentOcrReplaySchema, {
         ocrText: 'Testo OCR sintetico',
         documentSha256: 'abc123',

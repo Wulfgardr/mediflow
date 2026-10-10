@@ -1046,3 +1046,15 @@ clear dei soli membri residui selezionati, inclusi tombstone già presenti,
 per invalidare la vecchia autorità membership senza riscrivere il lifecycle.
 Ogni fingerprint ha molteplicità uno. Nessun pattern generico o modifica allo
 scanner è introdotto; restano le prove negative e il divieto di hard delete.
+
+
+### C05-D — Identità create allegato Web (2026-10-10)
+
+Il solo `POST /api/attachments` valida l'ID originale con lo schema attachment:
+omissione genera UUID; null, tipo non stringa o stringa vuota dopo trim danno
+400 prima di currentness, insert e audit. Gli ID opachi validi sono conservati
+byte per byte, senza trim. Il duplicato resta 409 dopo ammissione del parent
+attivo. `optionalIdSchema` comune non cambia; upload paired e API v1 non
+acquisiscono nuovi contratti. Prove nel parser API e nella famiglia SQLite
+`lib/attachment-web-create-currentness.test.ts`, inclusa assenza di effetti
+attachment/audit sui rifiuti.
