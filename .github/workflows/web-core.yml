@@ -51,6 +51,10 @@ jobs:
             printf 'MEDIFLOW_WEB_CORE_DATA_DIR=%s\n' "${DATA_DIR}"
           } >> "${GITHUB_ENV}"
       - run: npm run test:unit
+      - name: Historical schema origins converge to the fresh schema
+        run: |
+          node scripts/probe-historical-sql-baselines.mjs > "$RUNNER_TEMP/schema-convergence.json" \
+            || { cat "$RUNNER_TEMP/schema-convergence.json"; exit 1; }
       - name: Clinical HTTP synthetic harnesses
         timeout-minutes: 20
         run: npm run test:clinical-http
