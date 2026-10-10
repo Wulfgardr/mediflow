@@ -1,5 +1,5 @@
-// Keep in sync with DATE_FIELDS in lib/backup-restore-executor.ts
-// (enforced by scripts/backup-restore-date-fields.test.mjs).
+// The one date-field contract for backup producers and restore
+// (lib/backup-restore-executor.ts imports it).
 export const DATE_FIELDS = new Set([
   'assignedAt',
   'birthDate',
