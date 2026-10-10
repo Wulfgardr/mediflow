@@ -122,3 +122,5 @@ prima porzione di lavoro verificabile:
 - [0130-node-test-data-dir-preflight.md](./0130-node-test-data-dir-preflight.md): verifica preventivamente la directory dati del launcher dei test Node e interrompe il percorso se i requisiti non sono rispettati.
 
 - [0138-explicit-data-directory-bootstrap.md](./0138-explicit-data-directory-bootstrap.md): impedisce la copia legacy implicita nelle cartelle dati scelte, preservando la migrazione storica verso il default.
+
+- [0143-strong-unlock-credential.md](./0143-strong-unlock-credential.md): propone passphrase di almeno 15 caratteri, verificatore che non espone il segreto al server, chiave solo in memoria e kit di recupero, con i tempi di derivazione misurati.
