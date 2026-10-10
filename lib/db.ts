@@ -219,7 +219,7 @@ const ENCRYPTED_FIELDS: Record<string, string[]> = {
     /* @Codex */
     siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
     conversations: ['title'],
-    messages: ['content', 'metadata', 'attachmentBase64', 'reasoning'],
+    messages: ['content', 'metadata', 'attachmentBase64'],
     /* @Codex */
     attachments: ['name', 'path', 'data', 'summarySnapshot', 'parseEvidenceArtifactSnapshot']
 };
@@ -1112,7 +1112,6 @@ export interface Message {
     attachmentBase64?: string;
     createdAt: Date;
     metadata?: string;
-    reasoning?: string;
 }
 
 export interface Checkup {

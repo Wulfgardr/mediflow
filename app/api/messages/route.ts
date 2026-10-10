@@ -9,7 +9,7 @@ import { normalizeStoredMessagePayload } from '@/lib/message-persistence';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 
-// content/metadata/attachmentBase64/reasoning are ENC:. Only createdAt sortable.
+// content/metadata/attachmentBase64 are ENC:. Only createdAt sortable.
 const MESSAGE_SORT_COLUMNS = {
     createdAt: messages.createdAt,
 } as const;
