@@ -37,7 +37,9 @@ function timed(name, timings, fn) {
 function command(args, env = {}) {
   return execFileSync(args[0], args.slice(1), {
     cwd: ROOT,
-    env: { ...process.env, ...env },
+    // The drill works only on archives it creates: nothing it starts may seed itself from a
+    // medical.db found in the checkout, whatever the caller's environment says.
+    env: { ...process.env, ...env, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
