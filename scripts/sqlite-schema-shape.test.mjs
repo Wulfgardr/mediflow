@@ -80,3 +80,15 @@ test('Drizzle quoting, type spelling and explicit default FK actions are equival
   assert.equal(differs(plain, drizzle.replace('ON DELETE no action', 'ON DELETE RESTRICT')), true);
   assert.equal(differs(plain, drizzle.replace('`patients`(`id`)', '`patients`(`other_id`)')), true);
 });
+
+test('bounded full-schema spellings preserve CHECK, trigger body, key direction and conflict semantics', () => {
+  const plain = `CREATE TABLE t(actor_ref TEXT REFERENCES users(id) CHECK(length(actor_ref)>0), status TEXT,
+    version INTEGER NOT NULL DEFAULT 1, CONSTRAINT status_check CHECK(status <> 'OFF'), PRIMARY KEY(actor_ref));
+    CREATE INDEX ix ON t(actor_ref DESC);
+    CREATE TRIGGER no_update BEFORE UPDATE ON t BEGIN SELECT RAISE(ABORT,'append-only'); END;`;
+  const quoted = "CREATE TABLE `t` (`actor_ref` text REFERENCES `users`(`id`) CHECK(length(`actor_ref`)>0), `status` text, `version` integer DEFAULT 1 NOT NULL, CONSTRAINT `status_check` CHECK(`status` <> 'OFF'), PRIMARY KEY(`actor_ref`)); CREATE INDEX `ix` ON `t`(`actor_ref` DESC); CREATE TRIGGER `no_update` BEFORE UPDATE ON `t` BEGIN SELECT RAISE(ABORT,'append-only'); END;";
+  assert.equal(differs(plain, quoted), false);
+  for (const changed of [quoted.replace("'OFF'", "'off'"), quoted.replace('>0', '>1'), quoted.replace('DESC', 'ASC'),
+    quoted.replace('ABORT', 'FAIL'), quoted.replace("'append-only'", "'append only'"), quoted.replace('BEFORE UPDATE','BEFORE DELETE'),
+    quoted.replace('DEFAULT 1 NOT NULL', 'DEFAULT 1 NOT NULL ON CONFLICT IGNORE')]) assert.equal(differs(plain, changed), true);
+});

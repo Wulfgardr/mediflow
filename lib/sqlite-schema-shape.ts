@@ -86,22 +86,68 @@ function referenceClause(tokens: string[]): unknown | null {
   }
   return { references: table, columns: list.names, actions };
 }
-function columnClause(tokens: string[]): unknown {
-  const normalized = [...tokens];
-  // These exact built-in declared types have case-insensitive spelling.
+function checkIdentifiers(tokens: string[], columns: Column[]): string[] {
+  const names = new Set(columns.map(column => column.name));
+  // Only observed, unambiguous bare column spellings are admitted. Other quoted
+  // identifiers, functions, CAST types and collations remain conservative.
+  return tokens.map((token, i) => {
+    const name = identifier(token);
+    if (name === null || !names.has(name) || !/^(?:[a-z][a-z0-9]*_[a-z0-9_]+|status|role|capability)$/.test(name)
+        || tokens[i + 1] === '(' || ['AS', 'COLLATE'].includes(tokens[i - 1]?.toUpperCase())) return token;
+    return name;
+  });
+}
+function normalizeChecks(tokens: string[], columns: Column[]): string[] {
+  const result = [...tokens];
+  let outer = 0;
+  for (let i = 0; i < result.length; i++) {
+    if (outer === 0 && result[i].toUpperCase() === 'CHECK' && result[i + 1] === '(') {
+      let end = i + 2; let depth = 1;
+      for (; end < result.length; end++) {
+        if (result[end] === '(') depth++;
+        if (result[end] === ')' && --depth === 0) break;
+      }
+      if (depth !== 0) return tokens;
+      result.splice(i + 2, end - i - 2, ...checkIdentifiers(result.slice(i + 2, end), columns));
+      i = end; continue;
+    }
+    if (result[i] === '(') outer++;
+    if (result[i] === ')') outer--;
+  }
+  return result;
+}
+function columnClause(tokens: string[], columns: Column[]): unknown {
+  const normalized = normalizeChecks(tokens, columns);
   if (['TEXT', 'INTEGER'].includes(normalized[0]?.toUpperCase())) normalized[0] = normalized[0].toUpperCase();
+  // Exact independent constraints only; no general constraint reordering.
+  if (JSON.stringify(normalized) === JSON.stringify(['INTEGER', 'DEFAULT', '1', 'NOT', 'NULL']))
+    return ['INTEGER', 'NOT', 'NULL', 'DEFAULT', '1'];
   let depth = 0;
   for (let i = 0; i < normalized.length; i++) {
     if (normalized[i] === '(') depth++;
     if (normalized[i] === ')') depth--;
     if (depth === 0 && normalized[i].toUpperCase() === 'REFERENCES') {
-      const reference = referenceClause(normalized.slice(i));
-      if (reference !== null) return { prefix: normalized.slice(0, i), reference };
+      let end = normalized.length; let nested = 0;
+      for (let j = i + 1; j < normalized.length; j++) {
+        if (normalized[j] === '(') nested++;
+        if (normalized[j] === ')') nested--;
+        if (nested === 0 && normalized[j].toUpperCase() === 'CHECK') { end = j; break; }
+      }
+      const reference = referenceClause(normalized.slice(i, end));
+      if (reference !== null) return { prefix: normalized.slice(0, i), reference, suffix: normalized.slice(end) };
     }
   }
   return normalized;
 }
-function constraintClause(tokens: string[]): unknown {
+function constraintClause(input: string[], columns: Column[]): unknown {
+  const tokens = normalizeChecks(input, columns);
+  if (tokens[0]?.toUpperCase() === 'CONSTRAINT' && identifier(tokens[1]) !== null) {
+    return { name: identifier(tokens[1]), constraint: constraintClause(tokens.slice(2), columns) };
+  }
+  if (tokens[0]?.toUpperCase() === 'PRIMARY' && tokens[1]?.toUpperCase() === 'KEY') {
+    const list = identifierList(tokens, 2);
+    if (list && list.end === tokens.length && list.names.every(name => columns.some(column => column.name === name))) return { primaryKey: list.names };
+  }
   if (tokens[0]?.toUpperCase() !== 'FOREIGN' || tokens[1]?.toUpperCase() !== 'KEY') return tokens;
   const list = identifierList(tokens, 2);
   const reference = list && referenceClause(tokens.slice(list.end));
@@ -114,11 +160,31 @@ function indexDefinition(sql: string | null, index: string, table: string, colum
   if (tokens[i++]?.toUpperCase() !== 'CREATE') return tokens;
   const unique = tokens[i]?.toUpperCase() === 'UNIQUE'; if (unique) i++;
   if (tokens[i++]?.toUpperCase() !== 'INDEX' || identifier(tokens[i++]) !== index
-      || tokens[i++]?.toUpperCase() !== 'ON' || identifier(tokens[i++]) !== table) return tokens;
-  const list = identifierList(tokens, i);
-  // Expressions, predicates, COLLATE and ordering clauses remain untouched.
-  if (!list || list.end !== tokens.length || list.names.some(name => !columns.some(column => column.name === name))) return tokens;
-  return { index, table, unique, columns: list.names };
+      || tokens[i++]?.toUpperCase() !== 'ON' || identifier(tokens[i++]) !== table || tokens[i++] !== '(') return tokens;
+  const keys = [];
+  for (;;) {
+    const name = identifier(tokens[i++]);
+    if (name === null || !columns.some(column => column.name === name)) return tokens;
+    let direction = 'ASC';
+    if (['ASC', 'DESC'].includes(tokens[i]?.toUpperCase())) direction = tokens[i++].toUpperCase();
+    keys.push({ name, direction });
+    if (tokens[i] === ')') { i++; break; }
+    if (tokens[i++] !== ',') return tokens;
+  }
+  // Expressions, predicates and COLLATE remain untouched.
+  if (i !== tokens.length) return tokens;
+  return { index, table, unique, columns: keys };
+}
+function triggerDefinition(sql: string, name: string, table: string): unknown {
+  const tokens = sqlTokens(sql)!;
+  // Only the two identifier positions of this simple header are normalized.
+  // Event, timing and the entire body (including RAISE literal) remain exact.
+  if (tokens[0] === 'CREATE' && tokens[1] === 'TRIGGER' && identifier(tokens[2]) === name
+      && tokens[3] === 'BEFORE' && ['UPDATE', 'DELETE'].includes(tokens[4])
+      && tokens[5] === 'ON' && identifier(tokens[6]) === table && tokens[7] === 'BEGIN') {
+    return { name, table, timing: tokens[3], event: tokens[4], body: tokens.slice(7) };
+  }
+  return tokens;
 }
 
 function tableDefinition(sql: string, name: string, columns: Column[]) {
@@ -139,8 +205,8 @@ function tableDefinition(sql: string, name: string, columns: Column[]) {
   const declarations: [string, unknown][] = []; const constraints: unknown[] = [];
   for (const clause of clauses) {
     const column = declarationName(clause[0]);
-    if (column !== undefined && names.has(column)) declarations.push([column, columnClause(clause.slice(1))]);
-    else constraints.push(constraintClause(clause));
+    if (column !== undefined && names.has(column)) declarations.push([column, columnClause(clause.slice(1), columns)]);
+    else constraints.push(constraintClause(clause, columns));
   }
   if (declarations.length !== names.size || new Set(declarations.map(([column]) => column)).size !== names.size)
     return { conservative: tokens };
@@ -163,7 +229,7 @@ export function schemaSnapshot(db: Database.Database): Shape {
       definition: index.origin === 'c' ? indexDefinition((db.prepare("SELECT sql FROM sqlite_schema WHERE type='index' AND name=?").get(index.name) as { sql: string } | undefined)?.sql ?? null, index.name, name, columns) : null,
       columns: (db.pragma(`index_xinfo(${quote(index.name)})`) as (Row & { cid: number })[]).map(column => ({ ...without(column, 'cid'), source: column.cid < 0 ? column.cid : 'column' })),
     })));
-    const triggers = (db.prepare("SELECT name, sql FROM sqlite_schema WHERE type='trigger' AND tbl_name=? ORDER BY name").all(name) as { name: string; sql: string }[]).map(trigger => ({ name: trigger.name, definition: sqlTokens(trigger.sql) }));
+    const triggers = (db.prepare("SELECT name, sql FROM sqlite_schema WHERE type='trigger' AND tbl_name=? ORDER BY name").all(name) as { name: string; sql: string }[]).map(trigger => ({ name: trigger.name, definition: triggerDefinition(trigger.sql, trigger.name, name) }));
     return [name, { columns, foreignKeys, indices, definition: tableDefinition(sql, name, columns), triggers }];
   }));
 }
