@@ -1,4 +1,4 @@
-/* @Codex: actual Next route + Drizzle/better-sqlite3 + physical owner 0.8.7.
+/* @Codex: actual Next route + Drizzle/better-sqlite3 + physical owner 0.8.9-local.3f2e6f2a.
  * Test-only HTTP context/cookie/audit seams are NOT a real middleware/login proof.
  * No production fault flag, alternate owner or real database. Original runner required. */
 import assert from 'node:assert/strict';
@@ -39,7 +39,7 @@ const fencedHeaders = (preview: PatientCreatePreviewContext) => ({
 });
 
 test('actual patient HTTP route boundaries on synthetic SQL', async t => {
-    assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.7');
+    assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.9-local.3f2e6f2a');
     assert.equal(createHash('sha256').update(readFileSync(ownerPath)).digest('hex'), '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5');
     // Register cleanup before acquiring resources. Run every disposer even if an
     // import/assertion (or another disposer) fails; never swallow cleanup errors.
@@ -91,7 +91,11 @@ if (!state) throw new Error('Synthetic route fixture is no longer active');
             exports.listChangedFields=(body,excluded)=>Object.keys(body).filter(key=>!excluded.includes(key));
             exports.requestIdFromRequest=()=>null;
             exports.withAuditContextMetadata=(_context,metadata)=>metadata;
-            exports.writeAuditEvent=async event=>{state.audit.push(event)};`,
+            exports.writeAuditEventInTransaction=(tx,event)=>{
+                if (!state.database.$client.inTransaction || typeof tx.insert!=='function')
+                    throw new Error('Synthetic audit seam requires the active SQLite transaction');
+                state.audit.push(event);
+            };`,
     };
     const fixtureUrls = new Map<string, string>();
     const ownedModulePaths = new Set<string>();
