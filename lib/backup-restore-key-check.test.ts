@@ -41,3 +41,25 @@ test('the client restore sends nothing when the unlocked key cannot read the bac
         assert.equal(requests.length, 1);
     } finally { db.setKey(null); }
 });
+
+test('the client tells a blocked restore from a failed one and verifies through the route that cannot write', async t => {
+    const { BackupRestoreBlockedError, db, importRawDatabase, verifyRawDatabase } = await import('./db.ts');
+    const urls: string[] = [];
+    let answer = (): Response => Response.json({});
+    t.mock.method(globalThis, 'fetch', async (url: unknown) => { urls.push(String(url)); return answer(); });
+    const key = await generateMasterKey();
+    const artifact = await artifactSealedWith(key);
+    try {
+        db.setKey(key);
+        answer = () => Response.json({ success: false, code: 'restore_blocked', reason: 'durable_review_commands', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' }, { status: 409 });
+        await assert.rejects(importRawDatabase(artifact),
+            (error: unknown) => error instanceof BackupRestoreBlockedError && error.reason === 'durable_review_commands');
+        answer = () => Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['patients', 'entries'], counts: { patients: 2, entries: 3 } });
+        assert.deepEqual(await verifyRawDatabase(artifact), { createdAt: '2026-10-10T08:00:00.000Z', collections: 2, records: 5 });
+        assert.deepEqual(urls, ['/api/system/backup-restore', '/api/system/backup-restore/verify']);
+        // A different key stops the verification before any request, as it stops the restore.
+        db.setKey(await generateMasterKey());
+        await assert.rejects(verifyRawDatabase(artifact), /chiave diversa/);
+        assert.equal(urls.length, 2);
+    } finally { db.setKey(null); }
+});

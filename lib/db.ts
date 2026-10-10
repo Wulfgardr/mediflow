@@ -1071,27 +1071,55 @@ export async function exportRawDatabase() {
     return await response.text();
 }
 
-export async function importRawDatabase(jsonString: string) {
+/* The server stopped the restore before changing anything; `reason` says why. */
+export class BackupRestoreBlockedError extends Error {
+    constructor(message: string, readonly reason: string | null) {
+        super(message);
+        this.name = 'BackupRestoreBlockedError';
+    }
+}
+
+export type BackupVerification = { createdAt: string | null; collections: number; records: number };
+
+async function postBackup(url: string, jsonString: string, failure: string): Promise<Response> {
     await db.assertBackupReadable(jsonString);
-    const response = await fetch('/api/system/backup-restore', {
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: jsonString,
     });
+    if (response.ok) return response;
 
-    if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const errorMessage = typeof payload?.error === 'string'
-            ? payload.error
-            : `Restore failed: ${response.status} ${response.statusText}`;
-        if (payload?.preflight && typeof payload.preflight === 'object') {
-            throw new BackupRestorePreflightError(
-                errorMessage,
-                payload.preflight as BackupRestorePreflightResult,
-            );
-        }
-        throw new Error(errorMessage);
+    const payload = await response.json().catch(() => null);
+    const errorMessage = typeof payload?.error === 'string'
+        ? payload.error
+        : `${failure}: ${response.status} ${response.statusText}`;
+    if (payload?.preflight && typeof payload.preflight === 'object') {
+        throw new BackupRestorePreflightError(
+            errorMessage,
+            payload.preflight as BackupRestorePreflightResult,
+        );
     }
+    if (response.status === 409 && payload?.code === 'restore_blocked') {
+        throw new BackupRestoreBlockedError(errorMessage, typeof payload.reason === 'string' ? payload.reason : null);
+    }
+    throw new Error(errorMessage);
+}
+
+export async function importRawDatabase(jsonString: string) {
+    await postBackup('/api/system/backup-restore', jsonString, 'Restore failed');
+}
+
+/* Same key check and preflight as a restore, through a route that cannot write. */
+export async function verifyRawDatabase(jsonString: string): Promise<BackupVerification> {
+    const response = await postBackup('/api/system/backup-restore/verify', jsonString, 'Verify failed');
+    const payload = await response.json() as { createdAt?: unknown; collections?: unknown; counts?: unknown };
+    const counts = payload.counts && typeof payload.counts === 'object' ? Object.values(payload.counts as Record<string, unknown>) : [];
+    return {
+        createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : null,
+        collections: Array.isArray(payload.collections) ? payload.collections.length : 0,
+        records: counts.reduce<number>((total, count) => total + (typeof count === 'number' ? count : 0), 0),
+    };
 }
 
 export interface Conversation {

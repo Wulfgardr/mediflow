@@ -335,6 +335,15 @@
       }
     },
     {
+      "path": "e2e/backup-verify.spec.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:e2e"
+        ]
+      }
+    },
+    {
       "path": "e2e/chatgpt-browser-response.contract.ts",
       "selection": {
         "state": "support",
