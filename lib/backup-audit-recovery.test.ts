@@ -56,7 +56,7 @@ function evalNode(dataDir: string, source: string, extra: Record<string, string>
 
 function prepare(dataDir: string): void {
     runNode(dataDir, ['scripts/prepare-e2e-db.mjs']);
-    evalNode(dataDir, "await import('./lib/db-server.ts');");
+    evalNode(dataDir, "(await import('./lib/db-server.ts')).openDbServer();");
 }
 
 function seedAudit(db: Database.Database, row: typeof originalAudit): void {
