@@ -931,15 +931,19 @@
     {
       "path": "experiments/rust-boundary/src/lib.rs",
       "selection": {
-        "state": "unresolved",
-        "reason": "WUL-729: Cargo-discovered active Rust tests; no authoritative Cargo target/source introspection adapter in this inventory. Requires Rust toolchain; not product CI coverage. Owner @Wulfgardr."
+        "state": "mapped",
+        "suiteIds": [
+          "cargo:boundary:local"
+        ]
       }
     },
     {
       "path": "experiments/rust-boundary/src/main.rs",
       "selection": {
-        "state": "unresolved",
-        "reason": "WUL-729: Cargo-discovered active binary tests; no authoritative Cargo target/source introspection adapter in this inventory. Requires Rust toolchain; not product CI coverage. Owner @Wulfgardr."
+        "state": "mapped",
+        "suiteIds": [
+          "cargo:boundary:local"
+        ]
       }
     },
     {
@@ -2553,8 +2557,10 @@
     {
       "path": "lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "WUL-729: Assertive stdin bridge launched by NativeOrdinaryClientDecryptionTests.swift; Swift Process argument construction is outside the closed import/argv grammar. Conditional child execution not attested here. Owner @Wulfgardr."
+        "state": "mapped",
+        "suiteIds": [
+          "native:decrypt:child"
+        ]
       }
     },
     {
@@ -2730,15 +2736,6 @@
     },
     {
       "path": "lib/checkup-json-envelope.test.ts",
-      "selection": {
-        "state": "mapped",
-        "suiteIds": [
-          "unit"
-        ]
-      }
-    },
-    {
-      "path": "lib/prescription-json-envelope.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -4421,6 +4418,15 @@
     },
     {
       "path": "lib/prescription-delete-concurrency.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/prescription-json-envelope.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -6307,15 +6313,19 @@
     {
       "path": "native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/MediFlowMobileAppUITests.swift",
       "selection": {
-        "state": "unresolved",
-        "reason": "WUL-729: Active Xcode UI target, separate from the 106 SwiftPM sources; simulator/scheme selection is conditional and not verified by the SwiftPM adapter. Owner @Wulfgardr."
+        "state": "mapped",
+        "suiteIds": [
+          "xcode:mobile-ui"
+        ]
       }
     },
     {
       "path": "native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/MobilePairedStatusOverrideUITests.swift",
       "selection": {
-        "state": "unresolved",
-        "reason": "WUL-729: Active Xcode UI target, separate from the 106 SwiftPM sources; simulator/scheme selection is conditional and not verified by the SwiftPM adapter. Owner @Wulfgardr."
+        "state": "mapped",
+        "suiteIds": [
+          "xcode:mobile-ui"
+        ]
       }
     },
     {
@@ -8156,6 +8166,15 @@
       }
     },
     {
+      "path": "scripts/exemption-lazy-support-binding.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "scripts/explicit-npm-test-selection.mjs",
       "selection": {
         "state": "support",
@@ -8187,8 +8206,12 @@
     {
       "path": "scripts/fixtures/exemption-import-session.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "WUL-729: Synthetic support consumed through await import inside lib/aifa-update-guide-route.test.ts; not a leading static import/require, so the current verified support grammar cannot discharge it. Owner @Wulfgardr."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: synthetic session fixture loaded lazily after isolated SQLite bootstrap by the selected AIFA route test; verified by the dedicated lazy-edge adapter.",
+        "importers": [
+          "lib/aifa-update-guide-route.test.ts"
+        ]
       }
     },
     {
@@ -8454,6 +8477,15 @@
     },
     {
       "path": "scripts/mobile-home-base-interop.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "scripts/native-decrypt-bridge-selection.test.mjs",
       "selection": {
         "state": "mapped",
         "suiteIds": [

@@ -1,3 +1,4 @@
+import { cargoTestCommand, collectNativeToolSelections, collectXcodeUiSelection } from './native-tool-test-selection.mjs';
 import { localTestCommands, localInvocationArguments, collectLocalTestSelections } from './local-test-selection.mjs';
 import { collectAdditionalInventorySelections } from './additional-inventory-selection.mjs';
 import assert from 'node:assert/strict';
@@ -808,4 +809,91 @@ test('SOAP child binding requires shared selector, parent invocation, exit oracl
   fs.writeFileSync(path.join(root, parent), source);
   fs.rmSync(path.join(root, 'scripts/additional-test-selection.mjs'));
   assert.ok(collectAdditionalInventorySelections(root)['soap:child'].errors.length);
+});
+
+test('consumer token guards reject code that survives only in comments or quoted decoys', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-decoy-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repo = fileURLToPath(new URL('..', import.meta.url));
+  const parent = 'lib/security/headless-soap-active-role-session-grant.test.ts';
+  const files = [parent, 'scripts/additional-test-selection.mjs', ...['attach-failure', 'rejection'].map(kind => `lib/security/headless-soap-active-role-session-grant-${kind}-fixture.ts`)];
+  for (const file of files) { fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.copyFileSync(path.join(repo, file), path.join(root, file)); }
+  const original = fs.readFileSync(path.join(root, parent), 'utf8');
+  const statement = "const result = spawnSync(process.execPath, soapChildArguments('attach'), { cwd: process.cwd(), encoding: 'utf8' });";
+  for (const replacement of [`/* ${statement} */`, `// ${statement}`, `const decoy = ${JSON.stringify(statement)};`, 'const decoy = `' + statement + '`;']) {
+    fs.writeFileSync(path.join(root, parent), original.replace(statement, replacement));
+    assert.match(collectAdditionalInventorySelections(root)['soap:child'].errors.join('\n'), /consumer binding/);
+  }
+});
+
+function nativeToolFixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'inventory-native-tool-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const repo = fileURLToPath(new URL('..', import.meta.url));
+  const files = ['experiments/rust-boundary/Cargo.toml', 'experiments/rust-boundary/src/lib.rs', 'experiments/rust-boundary/src/main.rs',
+    'native/MediFlowAppleApp/project.yml', '.github/workflows/apple-native.yml', 'scripts/generate-apple-xcodeproj.sh',
+    'native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/MediFlowMobileAppUITests.swift',
+    'native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/MobilePairedStatusOverrideUITests.swift'];
+  for (const file of files) { fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.copyFileSync(path.join(repo, file), path.join(root, file)); }
+  return root;
+}
+
+test('Cargo reads explicit real targets and retains the original command including doctests', t => {
+  const root = nativeToolFixture(t);
+  const selection = cargoTestCommand(root);
+  assert.deepEqual(selection.files, ['experiments/rust-boundary/src/lib.rs', 'experiments/rust-boundary/src/main.rs']);
+  assert.deepEqual(selection.args, ['test', '--manifest-path', 'experiments/rust-boundary/Cargo.toml']);
+  assert.equal(collectNativeToolSelections(root)['cargo:boundary:local'].mode, 'local');
+  const manifestPath = path.join(root, 'experiments/rust-boundary/Cargo.toml');
+  const original = fs.readFileSync(manifestPath, 'utf8');
+  for (const changed of [original.replace('[lib]', '[disabled]'), original.replace('path = "src/lib.rs"', 'path = "../outside.rs"'),
+    original.replace('[lib]', '[lib]\ntest = false'), original + '\n[[bin]]\nname = "extra"\npath = "src/main.rs"\n',
+    original.replace('path = "src/main.rs"', 'path = "src/missing.rs"')]) {
+    fs.writeFileSync(manifestPath, changed); assert.throws(() => cargoTestCommand(root));
+  }
+});
+
+test('Xcode UI membership comes from the generated scheme and preserves conditional idiom filters', t => {
+  const root = nativeToolFixture(t);
+  const selection = collectXcodeUiSelection(root);
+  assert.equal(selection.mode, 'conditional'); assert.equal(selection.files.length, 2);
+  assert.equal(selection.binding.ipadOnlyTesting.length, 4);
+  assert.ok(selection.binding.ipadOnlyTesting.every(name => name.startsWith('MediFlowMobileAppUITests/MediFlowMobileAppUITests/')));
+  assert.match(selection.binding.jobIf, /github.event_name != 'pull_request'/);
+  assert.ok(selection.binding.generation.stepIndex < selection.binding.stepIndex);
+  const specFile = path.join(root, 'native/MediFlowAppleApp/project.yml');
+  const original = fs.readFileSync(specFile, 'utf8');
+  for (const changed of [original.replace('path: Tests/MediFlowMobileAppUITests', 'path: Tests/missing'),
+    original.replace('path: Tests/MediFlowMobileAppUITests', 'path: Tests/MediFlowMobileAppUITests\n        excludes: ["*.swift"]'),
+    original.replace('        - MediFlowMobileAppUITests', '        - OtherTests')]) {
+    fs.writeFileSync(specFile, changed); assert.throws(() => collectXcodeUiSelection(root));
+  }
+  fs.writeFileSync(specFile, original);
+  fs.rmSync(path.join(root, selection.files[0])); fs.rmSync(path.join(root, selection.files[1]));
+  assert.throws(() => collectXcodeUiSelection(root), /Empty/);
+});
+
+test('Xcode generator order, condition, invocation and filter drift fail closed', t => {
+  const root = nativeToolFixture(t);
+  const workflowFile = path.join(root, '.github/workflows/apple-native.yml');
+  const original = fs.readFileSync(workflowFile, 'utf8');
+  for (const changed of [original.replaceAll('run: scripts/generate-apple-xcodeproj.sh', 'run: echo not-generated'),
+    original.replace("github.event_name != 'pull_request'", "github.event_name == 'pull_request'"),
+    original.replaceAll('-only-testing:', '-skip-testing:'), original.replace('"${only_testing[@]}"', '"ignored"')]) {
+    fs.writeFileSync(workflowFile, changed); assert.throws(() => collectXcodeUiSelection(root));
+  }
+  fs.writeFileSync(workflowFile, original);
+  const generatorFile = path.join(root, 'scripts/generate-apple-xcodeproj.sh');
+  const generator = fs.readFileSync(generatorFile, 'utf8');
+  fs.writeFileSync(generatorFile, generator.replace('( cd "$PROJECT_DIR" && xcodegen generate --spec project.yml )', '# ( cd "$PROJECT_DIR" && xcodegen generate --spec project.yml )'));
+  assert.throws(() => collectXcodeUiSelection(root), /consumer binding/);
+});
+
+test('verified lazy support edges remain subordinate to selection and fail on adapter errors', () => {
+  const input = supportCase(); input.sources['lib/entry.test.ts'] = "import test from 'node:test';";
+  const bound = { importer: 'lib/entry.test.ts', support: 'lib/support.mjs', errors: [] };
+  const discovered = discoverCandidates(Object.keys(input.sources), file => input.sources[file]);
+  assert.equal(checkInventory(discovered, manifest(input.entries), selections(['lib/entry.test.ts']), [bound]).integrityPassed, true);
+  assert.match(checkInventory(discovered, manifest(input.entries), selections(['lib/entry.test.ts']), [{ ...bound, errors: ['bootstrap changed'] }]).errors.join('\n'), /INCOMPLETE_SUPPORT_BINDING/);
+  assert.match(checkInventory(discovered, manifest(input.entries), {}, [bound]).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
 });

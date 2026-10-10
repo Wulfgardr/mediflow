@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { collectNativeDecryptBridgeSelection } from './native-decrypt-bridge-selection.mjs';
+import { collectExemptionLazySupportBinding } from './exemption-lazy-support-binding.mjs';
+import { collectNativeToolSelections } from './native-tool-test-selection.mjs';
 import { collectLocalTestSelections } from './local-test-selection.mjs';
 import { collectAdditionalInventorySelections } from './additional-inventory-selection.mjs';
 import path from 'node:path';
@@ -127,7 +130,7 @@ export function discoverCandidates(paths, readSource) {
 }
 
 /** Compare explicit mappings with real selector output; unresolved is never waived. */
-export function checkInventory(candidates, manifest, selections) {
+export function checkInventory(candidates, manifest, selections, supportBindings = []) {
   const errors = [];
   const unresolved = [];
   const support = [];
@@ -147,6 +150,14 @@ export function checkInventory(candidates, manifest, selections) {
     if (discovered.has(file)) add('DUPLICATE_CANDIDATE', file);
     discovered.add(file);
     staticImports.set(file, new Set(candidate.staticImports ?? []));
+  }
+  if (!Array.isArray(supportBindings)) { add('INVALID_SUPPORT_BINDINGS', 'expected array'); supportBindings = []; }
+  for (const binding of supportBindings) {
+    if (!validPath(binding?.importer) || !validPath(binding?.support) || !Array.isArray(binding?.errors)) {
+      add('INVALID_SUPPORT_BINDING', 'expected verified importer/support/errors'); continue;
+    }
+    for (const error of binding.errors) add('INCOMPLETE_SUPPORT_BINDING', `${binding.support}: ${error}`);
+    if (!binding.errors.length) staticImports.get(binding.importer)?.add(binding.support);
   }
   if (!manifest || manifest.version !== 1 || !Array.isArray(manifest.entries)
     || Object.keys(manifest).some(key => !['version', 'entries'].includes(key))) {
@@ -279,10 +290,14 @@ async function cli(args) {
     ...collectSyntheticPluginSelections(root),
     [SWIFT_SUITE_ID]: collectSwiftInventorySelection(root),
     'npm:test:e2e': collectPlaywrightInventorySelection(root) };
+  const bridgeRegistered = manifest.entries.some(entry => entry.path === 'lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs');
+  const lazySupport = manifest.entries.some(entry => entry.path === 'scripts/fixtures/exemption-import-session.ts')
+    ? [collectExemptionLazySupportBinding(root)] : [];
   const result = checkInventory(candidates, manifest, {
     ...Object.fromEntries(Object.entries(legacySelections).map(([id, selection]) => [id, { ...selection, mode: selection.conditional || id === 'npm:test:native-launcher' ? 'conditional' : 'ordinary' }])),
-    ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root),
-  });
+    ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root), ...collectNativeToolSelections(root),
+    ...(bridgeRegistered ? { 'native:decrypt:child': collectNativeDecryptBridgeSelection(root) } : {}),
+  }, lazySupport);
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);

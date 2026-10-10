@@ -283,21 +283,34 @@ selected as a test. Assertive generators, benchmark self-checks and SOAP child
 fixtures remain test mappings, even when they also produce fixtures. Renamed,
 missing and newly discovered files continue to fail integrity.
 
-The remaining six records are not waived:
+All original candidates now have verified selection or a reviewed non-test/support
+disposition. The final bindings use these authorities:
 
-- Two Rust test source files need Cargo target/source authority. The real command
-  is `cargo test --manifest-path experiments/rust-boundary/Cargo.toml`; the current
-  manifest relies on Cargo's implicit `src/lib.rs`/`src/main.rs` targets. The local
-  Node comparator has its own closed command and built-binary/output parameters.
-- One Swift-to-Node stdin bridge needs a shared cross-language invocation binding
-  with `NativeOrdinaryClientDecryptionTests.swift`. Its executable and JSON stdin
-  protocol are constructed by Swift, not selected by a Node test command.
-- Two Xcode UI test files need the actual Xcode scheme/target source authority;
-  they are separate from the 106 SwiftPM files. Simulator/OS execution is an
-  additional prerequisite, not the reason for leaving selection unresolved.
-- One exemption fixture is dynamically imported after synthetic database setup
-  inside `lib/aifa-update-guide-route.test.ts`. Hoisting it could change module
-  initialization order; a verified lazy consumer edge remains to be implemented.
+- Cargo consumes explicit `[lib].path` and `[[bin]].name/path` in the existing
+  `experiments/rust-boundary/Cargo.toml`, equivalent to its previous default
+  `src/lib.rs` and `src/main.rs` targets. The closed adapter rejects unsupported
+  target options, duplicate/missing target stanzas and unsafe/missing paths. Its
+  local dispatcher retains `cargo test --manifest-path …`, including doctests;
+  it does not restrict execution to `--lib`/`--bin` or claim Cargo ran.
+- Xcode UI membership comes from `project.yml` sources and scheme test targets.
+  The conditional workflow actually regenerates that spec with XcodeGen before
+  invoking Xcode. The adapter verifies generation order, command, matrix and job
+  condition: the iPhone leg selects the whole target; iPad retains its four
+  `only-testing` identifiers. Method skips and non-PR eligibility remain explicit.
+- The Swift decrypt parent and Node bridge consume a shared invocation/protocol
+  descriptor. The child adapter verifies those consumers and requires the Swift
+  parent itself to belong to a verified selected suite. It does not run Swift or
+  the bridge or promote conditional native coverage to every push.
+- The exemption support adapter verifies the actual lazy import after isolated
+  SQLite bootstrap. Neither fixture nor importer was hoisted or executed during
+  discovery. An invalid lazy edge fails integrity even when its parent is mapped.
+
+Consumer binding guards discard comments and keep strings/templates indivisible,
+so a code-shaped quoted decoy cannot replace the actual shared-selector call.
+New adapter tests belong to the existing unit selector. Repository guards run
+both inventory integrity and completeness: a newly declared unresolved record
+can no longer leave that gate green. Dispatcher runtime validation occurs only
+when executing a recipe, before spawn; pure collection never starts a runtime.
 
 The Codex, Rust comparator and mobile scenario recipes require exactly their
 registered parameter values, appended after the fixed Node entrypoint. They do
@@ -308,7 +321,7 @@ recipe requires a fresh `local-onboarding` data directory prepared with the
 existing `scripts/prepare-e2e-db.mjs`. The native shell wrapper is local selection
 of the orchestrator, not qualification of every Xcode/SwiftPM branch.
 
-These are six files with several shared binding decisions, not six demonstrated
-product defects. They keep selection completeness incomplete. Local mappings
-also leave execution coverage open for criterion 5. The inventory continues to
-print `Execution evidence: NOT_ASSESSED` and `C14 acceptance: NOT_ASSESSED`.
+Selection completeness is now separate from execution completeness. Local
+mappings still leave execution coverage open for criterion 5. The inventory
+continues to print `Execution evidence: NOT_ASSESSED` and
+`C14 acceptance: NOT_ASSESSED`; a complete mapping is not a passing test run.
