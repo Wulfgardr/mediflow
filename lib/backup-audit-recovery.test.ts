@@ -115,6 +115,8 @@ const restoreScript = [
     "const before = snapshot(); let result = null, error = null, fence = 0;",
     "const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR; if (evidence) { fs.mkdirSync(evidence, {recursive:true}); await db.backup(path.join(evidence, process.env.AUDIT_RESTORE_MODE + '-before-initialized.db')); }",
     "const mode = process.env.AUDIT_RESTORE_MODE;",
+    // The product opens and admits the archive before the fault trigger exists.
+    "(await import('./lib/db-server.ts')).openDbServer();",
     "if (mode === 'abort' || mode === 'ignore') db.exec(\"CREATE TRIGGER audit_recovery_owned_fault BEFORE INSERT ON audit_events WHEN NEW.event_id = 'synthetic-history-1' BEGIN SELECT RAISE(\" + (mode === 'abort' ? \"ABORT, 'SYNTHETIC_AUDIT_ABORT'\" : 'IGNORE') + \"); END\");",
     "try { const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(process.env.AUDIT_ARTIFACT_PATH, 'utf8'))); if (mode === 'negative-zero-occurredAt' || mode === 'negative-zero-createdAt') artifact.payload.auditEvents[0][mode.slice('negative-zero-'.length)] = -0; result = restoreBackupArtifact(artifact, () => { fence++; return false; }); } catch (caught) { error = caught.message; }",
     "const after = snapshot();",

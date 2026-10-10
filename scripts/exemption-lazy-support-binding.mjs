@@ -40,7 +40,7 @@ export function collectExemptionLazySupportBinding(root) {
     if (source !== undefined) {
         const ast = ts.createSourceFile(importer, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
         if (ast.parseDiagnostics.length) deny('invalid importer syntax');
-        for (const [name, module] of [['test', 'node:test'], ['Database', 'better-sqlite3'], ['fs', 'node:fs'], ['path', 'node:path']]) {
+        for (const [name, module] of [['test', 'node:test'], ['fs', 'node:fs'], ['path', 'node:path']]) {
             if (!ast.statements.some(statement => ts.isImportDeclaration(statement)
                 && literal(statement.moduleSpecifier, module) && !statement.importClause?.isTypeOnly
                 && identifier(statement.importClause?.name, name))) deny(`missing runtime ${name} import`);
@@ -77,18 +77,10 @@ export function collectExemptionLazySupportBinding(root) {
                     && ts.isBinaryExpression(s.expression) && s.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
                     && property(s.expression.left, 'MEDIFLOW_DATA_DIR') && property(s.expression.left.expression, 'env')
                     && identifier(s.expression.left.expression.expression, 'process') && identifier(s.expression.right, 'directory'));
-                const precreate = statements.findIndex(s => {
-                    if (!ts.isExpressionStatement(s) || !call(s.expression, 0) || !property(s.expression.expression, 'close')) return false;
-                    const created = s.expression.expression.expression;
-                    return ts.isNewExpression(created) && identifier(created.expression, 'Database')
-                        && created.arguments?.length === 1 && namedCall(created.arguments[0], 'path', 'join', 2)
-                        && identifier(created.arguments[0].arguments[0], 'directory')
-                        && literal(created.arguments[0].arguments[1], 'medical.db');
-                });
                 const database = statements.findIndex(s => awaitedImport(s, 'dbServer', './db-server.ts'));
                 const fixture = statements.findIndex(s => awaitedImport(s, 'syntheticExemptionSession', specifier));
-                if (!(parent >= 0 && parent < directory && directory < environment && environment < precreate
-                    && precreate < database && database < fixture)) deny('lazy import must follow isolated DB bootstrap');
+                if (!(parent >= 0 && parent < directory && directory < environment
+                    && environment < database && database < fixture)) deny('lazy import must follow isolated DB bootstrap');
                 // Reject a branch/return wrapping or bypassing the direct initialization path.
                 if (fixture >= 0 && statements.slice(0, fixture).some(s =>
                     !ts.isVariableStatement(s) && !ts.isExpressionStatement(s))) deny('conditional or interrupted bootstrap');

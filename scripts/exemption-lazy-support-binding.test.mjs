@@ -44,7 +44,6 @@ test('removed, hoisted, redirected, conditional and textual pseudo-imports fail 
         original.replace(lazy, `// ${lazy}`),
         original.replace(lazy, `const description = ${JSON.stringify(lazy)};`),
         original.replace(lazy, '').replace("const { dbServer } = await import('./db-server.ts');", `${lazy}\n    const { dbServer } = await import('./db-server.ts');`),
-        original.replace("new Database(path.join(directory, 'medical.db')).close();", ''),
         original.replace('process.env.MEDIFLOW_DATA_DIR = directory;', ''),
         original.replace(lazy, `return;\n    ${lazy}`),
         original.replace(lazy, `process.env.MEDIFLOW_DATA_DIR = 'another-directory';\n    ${lazy}`),

@@ -214,7 +214,8 @@ test('duplicate intent schema is identical on fresh bootstrap and upgrade withou
         const columns = fresh.prepare('PRAGMA table_info(patient_duplicate_intents)').all();
         fresh.prepare('INSERT INTO patients(id, first_name, last_name, tax_code) VALUES(?,?,?,?)')
             .run('synthetic-upgrade', 'Synthetic', 'Patient', 'SYN-UPGRADE');
-        fresh.exec('DROP TABLE patient_duplicate_intents'); fresh.close();
+        // An archive from before versioned admission: unstamped, ledger missing.
+        fresh.exec('DROP TABLE patient_duplicate_intents; PRAGMA user_version = 0'); fresh.close();
         boot();
         const upgraded = new Database(join(dir, 'medical.db'));
         try {
