@@ -22,6 +22,7 @@ XCODE_DESTINATION="${MEDIFLOW_XCODE_DESTINATION:-platform=macOS,arch=arm64}"
 
 run_swift_tests() {
   echo "Running SwiftPM tests..."
+  node "$ROOT_DIR/scripts/swift-test-selection.mjs" --verify
   swift test --package-path "$PACKAGE_DIR"
 }
 
