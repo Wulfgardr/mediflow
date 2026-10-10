@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -73,8 +74,12 @@ function copyTrackedWorkspace(root, target) {
   fs.symlinkSync(fs.realpathSync(modules), path.join(target, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
 }
 
+export function conditionalChildEnvironment(environment = {}, inherited = process.env) {
+  return { ...inherited, ...environment, PATH: `${path.dirname(process.execPath)}${path.delimiter}${inherited.PATH ?? ''}` };
+}
+
 export function runConditionalGroup(root, groupId, { keepOutput = false } = {}) {
-  if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error('Node 24 is required');
+  assertNodeRuntime(readNodeContract(root));
   const ownedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-conditional-local-'));
   try {
     // Validate selection and platform before copying or launching any command.
@@ -87,7 +92,7 @@ export function runConditionalGroup(root, groupId, { keepOutput = false } = {}) 
     for (const command of plan.commands) {
       console.log(`[${groupId}] ${command.label}`);
       const result = spawnSync(command.executable, command.args, {
-        cwd: workspace, env: { ...process.env, ...command.env }, stdio: 'inherit',
+        cwd: workspace, env: conditionalChildEnvironment(command.env), stdio: 'inherit',
       });
       if (result.error) throw result.error;
       if (result.status !== 0) throw new Error(`${command.label} failed: ${result.signal ?? result.status}`);

@@ -211,6 +211,8 @@ jobs:
         run: |
           set -o pipefail
           scripts/native-test.sh 2>&1 | tee "${RUNNER_TEMP}/swiftpm-tests.log"
+      - name: Execution custodian native qualification
+        run: npm run test:apple-custodian
 
       # Terza fase di `npm run check:terminology-parity`, sull'output della run
       # appena fatta invece che su un secondo `swift test --filter`: su un runner

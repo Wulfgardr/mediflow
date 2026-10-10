@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { collectCiDispositionSelections } from './ci-disposition-selection.mjs';
 import { collectNativeDecryptBridgeSelection } from './native-decrypt-bridge-selection.mjs';
 import { collectExemptionLazySupportBinding } from './exemption-lazy-support-binding.mjs';
 import { collectNativeToolSelections } from './native-tool-test-selection.mjs';
@@ -135,6 +136,7 @@ export function checkInventory(candidates, manifest, selections, supportBindings
   const unresolved = [];
   const support = [];
   const excludedNonTests = [];
+  const executionPrerequisites = [];
   const suiteModes = {};
   const staticImports = new Map();
   const verifiedSuites = new Set();
@@ -167,8 +169,20 @@ export function checkInventory(candidates, manifest, selections, supportBindings
     if (!validPath(entry?.path)) { add('INVALID_ENTRY_PATH', JSON.stringify(entry?.path)); continue; }
     if (entries.has(entry.path)) add('DUPLICATE_ENTRY', entry.path);
     entries.set(entry.path, entry);
-    if (Object.keys(entry).some(key => !['path', 'selection'].includes(key))) add('INVALID_ENTRY_FIELDS', entry.path);
+    if (Object.keys(entry).some(key => !['path', 'selection', 'execution'].includes(key))) add('INVALID_ENTRY_FIELDS', entry.path);
     const selection = entry.selection;
+    if (entry.execution !== undefined) {
+      const execution = entry.execution;
+      if (!execution || !['not-provisioned', 'conditional-ci'].includes(execution.state)
+        || typeof execution.owner !== 'string' || !execution.owner.trim()
+        || typeof execution.reason !== 'string' || !execution.reason.trim()
+        || !Array.isArray(execution.conditions) || !execution.conditions.length
+        || execution.conditions.some(condition => typeof condition !== 'string' || !condition.trim())
+        || new Set(execution.conditions).size !== execution.conditions.length
+        || Object.keys(execution).some(key => !['state', 'owner', 'reason', 'conditions'].includes(key))
+        || selection?.state !== 'mapped') add('INVALID_EXECUTION_PREREQUISITES', entry.path);
+      else executionPrerequisites.push({ path: entry.path, ...execution });
+    }
     if (selection?.state === 'unresolved') {
       unresolved.push(entry.path);
       if (typeof selection.reason !== 'string' || !selection.reason.trim()
@@ -225,6 +239,13 @@ export function checkInventory(candidates, manifest, selections, supportBindings
       else if (!suites.get(id).has(file)) add('MAPPED_NOT_SELECTED', `${id}: ${file}`);
     }
   }
+  for (const entry of executionPrerequisites) {
+    if (entry.state !== 'conditional-ci') continue;
+    const mapping = entries.get(entry.path).selection;
+    if (!mapping.suiteIds?.some(id => verifiedSuites.has(id) && suites.get(id).has(entry.path) && selections[id].mode === 'conditional')) {
+      add('EXECUTION_CONDITION_NOT_BOUND', entry.path);
+    }
+  }
   for (const [id, selection] of Object.entries(selections)) {
     if (selection?.mode !== 'child') continue;
     const consumer = selection.binding?.consumer;
@@ -251,7 +272,7 @@ export function checkInventory(candidates, manifest, selections, supportBindings
       if (!staticImports.get(importer)?.has(file)) add('SUPPORT_IMPORT_MISSING', `${file}: ${importer}`);
     }
   }
-  return { errors, unresolved, support, excludedNonTests, suiteModes, conditionalSuites, integrityPassed: errors.length === 0,
+  return { errors, unresolved, support, excludedNonTests, executionPrerequisites, suiteModes, conditionalSuites, integrityPassed: errors.length === 0,
     selectionComplete: errors.length === 0 && unresolved.length === 0 };
 }
 
@@ -295,7 +316,7 @@ async function cli(args) {
     ? [collectExemptionLazySupportBinding(root)] : [];
   const result = checkInventory(candidates, manifest, {
     ...Object.fromEntries(Object.entries(legacySelections).map(([id, selection]) => [id, { ...selection, mode: selection.conditional || id === 'npm:test:native-launcher' ? 'conditional' : 'ordinary' }])),
-    ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root), ...collectNativeToolSelections(root),
+    ...collectCiDispositionSelections(root), ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root), ...collectNativeToolSelections(root),
     ...(bridgeRegistered ? { 'native:decrypt:child': collectNativeDecryptBridgeSelection(root) } : {}),
   }, lazySupport);
   for (const error of result.errors) process.stderr.write(`${error}\n`);
@@ -309,6 +330,8 @@ function printReport(result) {
   console.log(`Unresolved selection: ${result.unresolved.length}`);
   console.log(`Support entrypoint exclusions: ${result.support.length}`);
   console.log(`Non-test entrypoint exclusions: ${result.excludedNonTests.length}`);
+  console.log(`Execution prerequisites not provisioned: ${result.executionPrerequisites.filter(entry => entry.state === 'not-provisioned').length}`);
+  console.log(`Explicit conditional execution prerequisites: ${result.executionPrerequisites.filter(entry => entry.state === 'conditional-ci').length}`);
   for (const mode of ['ordinary', 'conditional', 'local', 'child', 'unspecified']) {
     console.log(`Selected suites (${mode}): ${Object.values(result.suiteModes).filter(value => value === mode).length}`);
   }

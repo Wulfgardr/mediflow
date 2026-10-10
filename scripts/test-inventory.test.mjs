@@ -897,3 +897,20 @@ test('verified lazy support edges remain subordinate to selection and fail on ad
   assert.match(checkInventory(discovered, manifest(input.entries), selections(['lib/entry.test.ts']), [{ ...bound, errors: ['bootstrap changed'] }]).errors.join('\n'), /INCOMPLETE_SUPPORT_BINDING/);
   assert.match(checkInventory(discovered, manifest(input.entries), {}, [bound]).errors.join('\n'), /SUPPORT_IMPORTER_NOT_SELECTED/);
 });
+
+test('execution prerequisite dispositions require individual ownership and never imply CI or PASS', () => {
+  const entry = { ...mapped('lib/a.test.ts'), execution: { state: 'not-provisioned', owner: '@Wulfgardr', reason: 'WUL-729: explicit synthetic device participant required', conditions: ['Running authorized synthetic device client'] } };
+  const found = candidates([entry.path]);
+  const local = { unit: { files: [entry.path], errors: [], mode: 'local' } };
+  assert.equal(checkInventory(found, manifest([entry]), local).integrityPassed, true);
+  for (const key of ['owner', 'reason', 'conditions']) {
+    const invalid = structuredClone(entry); delete invalid.execution[key];
+    assert.match(checkInventory(found, manifest([invalid]), local).errors.join('\n'), /INVALID_EXECUTION_PREREQUISITES/);
+  }
+  const conditional = structuredClone(entry); conditional.execution.state = 'conditional-ci';
+  assert.match(checkInventory(found, manifest([conditional]), local).errors.join('\n'), /EXECUTION_CONDITION_NOT_BOUND/);
+  const ci = { unit: { ...local.unit, mode: 'conditional', conditional: true } };
+  assert.equal(checkInventory(found, manifest([conditional]), ci).integrityPassed, true);
+  ci.unit.errors.push('CI invocation missing');
+  assert.match(checkInventory(found, manifest([conditional]), ci).errors.join('\n'), /EXECUTION_CONDITION_NOT_BOUND/);
+});

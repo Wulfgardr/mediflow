@@ -222,7 +222,11 @@
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test",
     "build:usage-dashboard": "node scripts/build-usage-dashboard.mjs",
     "check:usage-dashboard": "node scripts/build-usage-dashboard.mjs --check",
-    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs"
+    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs",
+    "test:inventory-browser": "node scripts/conditional-local-groups.mjs --group headless-browser",
+    "test:fixture-generators": "node scripts/conditional-local-groups.mjs --group fixture-generators",
+    "test:research-boundary": "node scripts/conditional-local-groups.mjs --group research-toolchain",
+    "test:apple-custodian": "node scripts/local-test-selection.mjs native/MediFlowMac/ExecutionCustodian/custodian.test.ts"
   },
   "dependencies": {
     "@firecrawl/anydoc": "0.2.4",
