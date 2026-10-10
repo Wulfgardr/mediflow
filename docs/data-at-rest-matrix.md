@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 1** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 2** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
 ottobre 2026.
 
@@ -258,10 +258,10 @@ locali salvano ciò che ricevono.
 
 | Artefatto | Dove | Che cosa contiene | Protezione | Fonte |
 | --- | --- | --- | --- | --- |
-| Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file creato `0600`. La directory nasce con i permessi predefiniti del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts` |
+| Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file creato `0600`. La directory predefinita è `0700`, anche se esisteva già; una directory scelta con `MEDIFLOW_DATA_DIR` resta com'è se esisteva, nasce `0700` se la crea il prodotto. Su Windows valgono le regole di accesso del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts` |
 | `medical.db-wal`, `medical.db-shm` | Accanto al database. | Le stesse pagine, compresi valori precedenti finché non vengono riassorbiti. | Come il database. | SQLite |
 | Copie di manutenzione `medical.db.old-*`, `.repair-tmp*` | Directory dati. | Copie integrali del database. | Come il database; restano finché non vengono rimosse. | `lib/sqlite-repair.ts` |
-| Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file e directory con i permessi predefiniti del sistema. | `scripts/run-scheduled-backup.mjs` |
+| Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file `0600`, compresi quelli lasciati da versioni precedenti; una destinazione nuova nasce `0700`, una già esistente resta com'è. | `scripts/run-scheduled-backup.mjs` |
 | Backup scaricato dall'interfaccia | Dove lo salva il browser. | Come il backup pianificato. | Campi cifrati. | `app/api/system/backup-restore/route.ts` |
 | Export FHIR del paziente | Dove lo salva il browser. | La scheda decifrata; il nome del file contiene cognome e nome. | Nessuna. | `app/patients/[id]/edit/page.tsx` |
 | Moduli scaricati o condivisi | Dove li salva il browser. | Il modulo compilato, in chiaro. | Nessuna. | `app/patients/[id]/modules/page.tsx` |
@@ -272,7 +272,7 @@ locali salvano ciò che ricevono.
 | Radice temporanea dell'OCR | `mediflow-vision-ocr-*` nella directory temporanea del sistema. | Area di lavoro del riconoscimento Apple Vision; rimossa a fine corsa. | Contenuto non ancora provato da un test. | `lib/domain/documents/anydoc-apple-vision-ocr.ts` |
 | Copia della cronologia del browser | `mediflow-siss-atlas-history-*` nella directory temporanea del sistema. | Copia del file `History` usata per osservare la sessione SISS. | Nessuna. | `lib/siss-session-observer.ts` |
 | Home dell'account ChatGPT | `mediflow-chatgpt-account-*` nella directory temporanea del sistema. | Configurazione isolata dell'integrazione facoltativa. | Directory `0700`, file `0600`. | `lib/chatgpt-account/account-host.ts` |
-| Log | Output del processo; `.pm2/logs` per il runner MLX. | Ciò che il codice scrive, entro le regole di SECURITY.md. | Nessuna prova automatica che non contengano dati clinici. | `ecosystem.config.js`, [SECURITY.md](../SECURITY.md) |
+| Log | Output del processo; `<directory dati>/logs` per il backup pianificato su macOS; `.pm2/logs` per il runner MLX. | Ciò che il codice scrive, entro le regole di SECURITY.md. | Nessuna prova automatica che non contengano dati clinici. | `lib/backup-scheduler.ts`, `ecosystem.config.js`, [SECURITY.md](../SECURITY.md) |
 | Chiavi dei provider remoti | Variabili d'ambiente `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`. | Il prodotto le legge e non le scrive. | Fuori dal prodotto. | `lib/ai-providers/v2/provider-secret-broker.ts` |
 | Stato della manutenzione | `medical.db.maintenance-admission/` accanto al database. | Lease e intent; nessun dato clinico. | — | [ADR 0142](./adr/0142-sqlite-maintenance-admission.md) |
 
@@ -281,7 +281,7 @@ locali salvano ciò che ricevono.
 | Minaccia | Campi cifrati | Tutto il resto |
 | --- | --- | --- |
 | T1, T2 | Protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Il backup non contiene hash né involucro. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
-| T3 | Il database è `0600`. | Backup pianificati e directory dati dipendono dai permessi predefiniti del sistema. |
+| T3 | Il database è `0600`. | Directory dati predefinita `0700` e backup pianificati `0600` su macOS e Linux. Restano come le ha impostate l'operatore una directory dati o una destinazione dei backup scelte da lui e già esistenti. |
 | T4 | — | Non provato: manca il test con la sentinella del criterio 3. |
 
 ## Esposizioni da decidere
@@ -299,7 +299,9 @@ Leonardo.
 3. **Master key nel `sessionStorage`**: la decisione del 9 ottobre la vuole
    solo in memoria.
 4. **Il server riceve il PIN** a ogni accesso.
-5. **Permessi** dei backup pianificati e della directory dati.
+5. **Permessi** dei backup pianificati e della directory dati: chiusi dalla
+   versione 2 di questa matrice. Resta da decidere se verificare, e come
+   segnalare, una directory scelta dall'operatore e leggibile da altri account.
 6. **Export FHIR e moduli** in chiaro, con il nome del paziente nel nome del
    file.
 7. **Le rotte Web locali non controllano l'involucro**: un client che invia
@@ -317,3 +319,8 @@ Leonardo.
 Chi aggiunge una tabella, una colonna, un file scritto dal prodotto o un campo
 al contratto aggiorna questa pagina nella stessa PR e alza la versione quando
 cambia una classificazione.
+
+| Versione | Che cosa è cambiato |
+| --- | --- |
+| 1 | Prima stesura sul codice di `main` `bcb7af46a`. |
+| 2 | Backup pianificati `0600` e directory dati predefinita `0700`. |
