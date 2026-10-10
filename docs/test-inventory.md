@@ -209,3 +209,38 @@ source changes, never automatic acceptance of a test omission.
 Keep execution outcomes separate: selected files may still contain skipped,
 filtered, cancelled or empty tests. Pass/fail/skip/flaky results and qualified
 platforms come from the corresponding suite receipts, not this static inventory.
+
+## Conditional SwiftPM sources
+
+`swiftpm:apple-native` reads `native/MediFlowMac/test-sources.json`, the same
+source arrays passed to `testTarget.sources` by `Package.swift`. It selects the
+28 Core and 78 AppleShared files for the existing conditional macOS job, not
+for every push. The Apple target remains platform-conditional and Core's
+`Fixtures` directory remains excluded. The filtered tri-OS suites and Xcode UI
+suite are not represented by this mapping.
+
+The Node selector validates the two non-empty groups, paths, duplicates and
+regular files. It also rejects newly added Swift sources absent from the shared
+definition. New, renamed or deleted candidates still require inventory changes.
+No Swift source or manifest is parsed or executed by inventory discovery.
+
+Before `swift test`, `scripts/native-test.sh` now runs the same local verification
+available as `node scripts/swift-test-selection.mjs --verify`. It obtains official
+`swift package --disable-automatic-resolution describe --type json` output and
+compares the test targets, target paths and complete source sets with the shared
+definition. On macOS both targets must match; elsewhere only Core exists. This
+checks selection without building or running tests. Node and repository npm
+dependencies must be available, as they already are in the Apple CI job.
+
+The static CI adapter verifies the existing literal pipefail/tee invocation,
+macOS runner, changes dependency and Apple job condition using the shared YAML
+binding checks. It checks the small runner function containing verification and
+test invocation literally; it does not interpret arbitrary shell control flow.
+The official SwiftPM comparison, rather than a JavaScript parser of Package.swift
+or source hashes, verifies that the package actually consumes the definition.
+The existing path filter covers the definition under `native/`; the new verifier
+path also activates Apple on PR and push. Other filters remain unchanged.
+
+An inventory PASS verifies the declared conditional selection and configured
+binding. It cannot certify that the conditional job ran or passed: authoritative
+SwiftPM comparison and execution evidence come from that job when selected.
