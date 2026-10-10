@@ -400,7 +400,7 @@ async function main() {
     assert.equal(authenticatedCheck.status, 200);
     assert.equal((await authenticatedCheck.json()).hasSession, true);
     const logout = await fetch(new URL('/api/auth/logout', BASE_URL), {
-      method: 'POST', headers: { Cookie: cookieHeader },
+      method: 'POST', headers: webMutationHeaders(cookieHeader, false),
     });
     assert.equal(logout.status, 204);
     assert.equal(await withTimeout(exit, 'Supervisor terminal exit'), 0);
