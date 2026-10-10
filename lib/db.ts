@@ -27,6 +27,7 @@ import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 import type { DocumentEvidencePack } from './domain/documents/document-evidence-pack';
 import type { HostDocumentOcrQueueReason, DocumentOcrQueueState } from './domain/documents/document-ocr-queue';
 /* @Codex */
+import { assertBackupReadableWithKey } from './backup-restore-key-check';
 import {
     buildApiTableFetchErrorMessage,
     isApiTableAuthUnavailableStatus,
@@ -1013,6 +1014,10 @@ class MedicalApiClient {
     }
 
     /* @Codex */
+    assertBackupReadable(artifactJson: string): Promise<void> {
+        return assertBackupReadableWithKey(artifactJson, this.masterKey);
+    }
+
     setKey(key: CryptoKey | null) {
         const previousReads = this.sessionReads;
         this.masterKey = key;
@@ -1064,6 +1069,7 @@ export async function exportRawDatabase() {
 }
 
 export async function importRawDatabase(jsonString: string) {
+    await db.assertBackupReadable(jsonString);
     const response = await fetch('/api/system/backup-restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
