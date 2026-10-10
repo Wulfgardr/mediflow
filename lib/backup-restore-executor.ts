@@ -143,12 +143,22 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
+export type BackupRestoreBlockedReason = 'durable_review_commands' | 'audit' | 'runtime_fence';
+
+/* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
+export class BackupRestoreBlockedError extends Error {
+    constructor(readonly reason: BackupRestoreBlockedReason, detail: string) {
+        super(`Restore blocked: ${detail}`);
+        this.name = 'BackupRestoreBlockedError';
+    }
+}
+
 /* @Codex v1 cannot restore command replay receipts without their append-only audit ledger. */
 function assertCommandRecoveryIsRepresentable(): void {
     const state = dbServer.select({ reviewId: durableReviewCommandStates.reviewId }).from(durableReviewCommandStates).get();
     const operation = dbServer.select({ id: durableReviewCommandOperations.id }).from(durableReviewCommandOperations).get();
     if (state || operation) {
-        throw new Error('Restore blocked: durable review commands require the append-only audit ledger.');
+        throw new BackupRestoreBlockedError('durable_review_commands', 'durable review commands require the append-only audit ledger.');
     }
 }
 
@@ -208,7 +218,7 @@ const HEADLESS_SOAP_AUDIT_KEYS = [
 
 /* @Codex */
 function parseHeadlessSoapAuditSnapshot(value: unknown): Record<string, unknown> {
-    if (typeof value !== 'string') throw new Error('Restore blocked: invalid H7b audit snapshot.');
+    if (typeof value !== 'string') throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
     try {
         const parsed = JSON.parse(value) as unknown;
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)
@@ -219,7 +229,7 @@ function parseHeadlessSoapAuditSnapshot(value: unknown): Record<string, unknown>
         }
         return parsed as Record<string, unknown>;
     } catch {
-        throw new Error('Restore blocked: invalid H7b audit snapshot.');
+        throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
     }
 }
 
@@ -246,10 +256,10 @@ function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): 
     for (const row of rows) {
         const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);
         const eventId = audit.eventId;
-        if (typeof eventId !== 'string') throw new Error('Restore blocked: invalid H7b audit snapshot.');
+        if (typeof eventId !== 'string') throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
         const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, eventId)).get();
         if (existing && JSON.stringify(snapshotStoredAudit(existing)) !== row.auditSnapshot) {
-            throw new Error('Restore blocked: H7b audit collision.');
+            throw new BackupRestoreBlockedError('audit', 'H7b audit collision.');
         }
     }
 }
@@ -257,14 +267,14 @@ function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): 
 /* @Codex Restore must synchronously retire volatile authority before the first destructive write. */
 function runMutationFence(fence: BackupRestoreMutationFence): void {
     if (typeof fence !== 'function') {
-        throw new Error('Restore blocked: runtime mutation fence unavailable.');
+        throw new BackupRestoreBlockedError('runtime_fence', 'runtime mutation fence unavailable.');
     }
     try {
         if (typeof fence() !== 'boolean') {
             throw new Error('invalid fence result');
         }
     } catch {
-        throw new Error('Restore blocked: runtime mutation fence unavailable.');
+        throw new BackupRestoreBlockedError('runtime_fence', 'runtime mutation fence unavailable.');
     }
 }
 
@@ -276,7 +286,7 @@ function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void 
         const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, eventId)).get();
         if (existing) {
             if (JSON.stringify(snapshotStoredAudit(existing)) !== row.auditSnapshot) {
-                throw new Error('Restore blocked: H7b audit collision.');
+                throw new BackupRestoreBlockedError('audit', 'H7b audit collision.');
             }
         } else {
             dbServer.insert(auditEvents).values({
@@ -326,7 +336,7 @@ function planBackupAuditRestore(rows: BackupAuditRow[]): AuditRestorePlan {
     return rows.map(row => {
         const existing = dbServer.select().from(auditEvents).where(eq(auditEvents.eventId, row.eventId)).get();
         if (existing && !backupAuditsEqual(snapshotBackupAudit(existing), row)) {
-            throw new Error('Restore blocked: audit collision.');
+            throw new BackupRestoreBlockedError('audit', 'audit collision.');
         }
         return { row, reused: !!existing };
     });
@@ -340,7 +350,7 @@ function insertBackupAudits(plan: AuditRestorePlan): void {
             occurredAt: new Date(row.occurredAt * 1000),
             createdAt: row.createdAt === null ? null : new Date(row.createdAt * 1000),
         }).run();
-        if (result.changes !== 1) throw new Error('Restore blocked: audit insertion did not persist.');
+        if (result.changes !== 1) throw new BackupRestoreBlockedError('audit', 'audit insertion did not persist.');
     }
 }
 
