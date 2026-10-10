@@ -13,6 +13,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/audit/route.ts', handlers: ['GET'] },
     { file: 'app/api/system/backup-restore/route.ts', handlers: ['GET', 'POST'] },
+    { file: 'app/api/system/backup-restore/verify/route.ts', handlers: ['POST'] },
     { file: 'app/api/system/backup-scheduler/route.ts', handlers: ['GET', 'POST'] },
     { file: 'app/api/system/cloud-provider-probe/route.ts', handlers: ['POST'] },
     { file: 'app/api/system/fix-orphans/route.ts', handlers: ['GET', 'POST'] },
@@ -54,7 +55,7 @@ test('admin system routes require a web admin session instead of local-token adm
     }
 });
 
-test('backup restore rejects cross-port and text/plain transport before preflight, fence, or database mutation', () => {
+test('backup restore rejects cross-port and text/plain transport before preflight, fence, or database mutation, and reports a blocked restore as blocked', () => {
     const routeUrl = pathToFileURL(path.join(ROOT, 'app/api/system/backup-restore/route.ts')).href;
     const transportUrl = pathToFileURL(path.join(ROOT, 'lib/security/request-transport.ts')).href;
     const toDataModule = (source) => `data:text/javascript,${encodeURIComponent(source)}`;
@@ -79,7 +80,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export async function serializeBackupArtifact() { return '{}'; }"))}],
             ['@/lib/backup-patient-ambulatory-links', ${JSON.stringify(toDataModule("export function enrichBackupPatientsWithAmbulatoryLinks(rows) { return rows; }"))}],
             ['@/lib/backup-restore-preflight', ${JSON.stringify(toDataModule("export async function runBackupRestorePreflight() { globalThis.preflightCalls = (globalThis.preflightCalls ?? 0) + 1; return { artifact: { format: 'mediflow-backup', version: 1, manifest: { recordCounts: {} } }, result: { ok: true } }; }"))}],
-            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; fence(); }"))}],
+            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export class BackupRestoreBlockedError extends Error { constructor(reason, detail) { super(detail); this.reason = reason; } } export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; if (globalThis.blockRestore) throw new BackupRestoreBlockedError('durable_review_commands', 'synthetic block'); fence(); }"))}],
             ['@/lib/api-error-response', ${JSON.stringify(toDataModule("export function apiFailure(code, error, status) { const response = Response.json({ error, code }, { status }); response.headers.set('Cache-Control', 'no-store'); return response; } export function apiInternalError() { return Response.json({ error: 'internal' }, { status: 500 }); }"))}],
             ['@/lib/security/headless-checkup-status-transition-web-production', ${JSON.stringify(toDataModule("export function disposeCheckupStatusTransitionForHostV1() { globalThis.fenceCalls = (globalThis.fenceCalls ?? 0) + 1; return true; }"))}],
             ['@/lib/security/request-transport', ${JSON.stringify(toDataModule(`export { isTrustedWebMutationRequest } from ${JSON.stringify(transportUrl)};`))}],
@@ -113,11 +114,28 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const expectedCounters = { sessionCalls: 3, adminCalls: 3, preflightCalls: 0,
             restoreCalls: 0, fenceCalls: 0, dbCalls: 0 };
         if (JSON.stringify(counters) !== JSON.stringify(expectedCounters)) throw new Error(JSON.stringify(counters));
+        // A restore the executor blocks is reported as blocked, with its reason, not as a generic failure.
+        globalThis.blockRestore = true;
+        const blocked = await POST(new Request('http://127.0.0.1:3000/api/system/backup-restore', {
+            method: 'POST', body: '{}',
+            headers: { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+        }));
+        const blockedObserved = { status: blocked.status, cacheControl: blocked.headers.get('cache-control'), body: await blocked.json() };
+        const blockedExpected = { status: 409, cacheControl: 'no-store', body: { success: false, code: 'restore_blocked',
+            reason: 'durable_review_commands', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' } };
+        if (JSON.stringify(blockedObserved) !== JSON.stringify(blockedExpected)) throw new Error(JSON.stringify(blockedObserved));
     `;
     const child = spawnSync(process.execPath, [
         '--experimental-strip-types', '--input-type=module', '--eval', program,
     ], { cwd: ROOT, encoding: 'utf8' });
     assert.equal(child.status, 0, child.stderr || child.stdout);
+});
+
+test('backup verification cannot write: its route imports the preflight and no executor or database', () => {
+    const source = readSource('app/api/system/backup-restore/verify/route.ts');
+    assert.match(source, /runBackupRestorePreflight/);
+    assert.match(source, /isTrustedWebMutationRequest\(request\)/);
+    assert.doesNotMatch(source, /backup-restore-executor|restoreBackupArtifact|db-server|@\/lib\/schema/);
 });
 
 /* @Codex */
