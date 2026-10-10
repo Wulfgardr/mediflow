@@ -6,7 +6,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:app/api/ai/local-provider/onboarding/route.test.ts"
+          "local:app/api/ai/local-provider/onboarding/route.test.ts",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -205,7 +206,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -964,7 +966,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1036,7 +1039,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1045,7 +1049,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1108,7 +1113,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1945,7 +1951,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1954,7 +1961,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1963,7 +1971,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1981,7 +1990,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2125,7 +2135,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2305,7 +2316,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2314,7 +2326,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2323,7 +2336,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2341,7 +2355,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2350,7 +2365,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2368,7 +2384,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2377,7 +2394,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2386,7 +2404,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2395,7 +2414,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:lib/chatgpt-execution/execution-mac-initialize.test.mjs"
+          "local:lib/chatgpt-execution/execution-mac-initialize.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2404,7 +2424,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:mac-login"
+          "local:mac-login",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2413,7 +2434,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2422,7 +2444,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2431,7 +2454,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2440,7 +2464,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:lib/chatgpt-execution/execution-mac-readback.test.mjs"
+          "local:lib/chatgpt-execution/execution-mac-readback.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2449,7 +2474,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2458,7 +2484,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2467,7 +2494,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2476,7 +2504,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2496,7 +2525,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2516,7 +2546,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2525,7 +2556,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2534,7 +2566,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2543,7 +2576,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2572,7 +2606,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2581,7 +2616,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2590,7 +2626,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2599,7 +2636,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2608,7 +2646,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2617,7 +2656,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2626,7 +2666,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2635,7 +2676,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2644,7 +2686,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2653,7 +2696,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2662,7 +2706,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2671,7 +2716,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2680,7 +2726,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2689,7 +2736,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2698,7 +2746,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2707,7 +2756,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2716,7 +2766,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -3201,7 +3252,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -4155,7 +4207,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -4272,7 +4325,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -4371,7 +4425,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -5381,7 +5436,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -5399,7 +5455,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -5408,7 +5465,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "chatgpt:local"
+          "chatgpt:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6184,7 +6242,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6229,7 +6288,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6238,7 +6298,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6247,7 +6308,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6357,7 +6419,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs"
+          "local:native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7583,7 +7646,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7701,7 +7765,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:api-v1-contract-negative"
+          "local:test:api-v1-contract-negative",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7755,7 +7820,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:audit"
+          "local:test:audit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7764,7 +7830,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:backup-restore:date-fields"
+          "local:test:backup-restore:date-fields",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7773,7 +7840,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:backup-scheduler:collections"
+          "local:test:backup-scheduler:collections",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7782,7 +7850,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:backup-scheduler"
+          "local:test:backup-scheduler",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7791,7 +7860,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:document-router-benchmark"
+          "local:test:document-router-benchmark",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7800,7 +7870,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/benchmark-document-router.ts"
+          "local:scripts/benchmark-document-router.ts",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7809,7 +7880,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:ai-model-parliament"
+          "local:test:ai-model-parliament",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7818,7 +7890,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:ai-rollout-readiness"
+          "local:test:ai-rollout-readiness",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7890,7 +7963,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/chatgpt-account/account-host.test.ts"
+          "local:scripts/chatgpt-account/account-host.test.ts",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7945,7 +8019,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:anydoc-local-only"
+          "local:test:anydoc-local-only",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -7963,7 +8038,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:attachment-currentness-writers"
+          "local:test:attachment-currentness-writers",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8035,7 +8111,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/check-macos-web-runtime-native-payload.sh"
+          "local:scripts/check-macos-web-runtime-native-payload.sh",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8107,7 +8184,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/check-standalone-runtime-bundle.mjs"
+          "local:scripts/check-standalone-runtime-bundle.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8197,7 +8275,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:document-intelligence-columns-migration"
+          "local:test:document-intelligence-columns-migration",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8253,7 +8332,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:fabric-settings-view"
+          "local:test:fabric-settings-view",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8273,7 +8353,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/function-models/browser.test.ts"
+          "local:scripts/function-models/browser.test.ts",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8339,7 +8420,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/install-redaction-runtime.test.mjs"
+          "local:scripts/install-redaction-runtime.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8348,7 +8430,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:installability-v0"
+          "local:test:installability-v0",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8384,7 +8467,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/launch-macos-synthetic.test.py"
+          "local:scripts/launch-macos-synthetic.test.py",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8438,7 +8522,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:local-provider-setup"
+          "local:test:local-provider-setup",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8558,7 +8643,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/mobile-home-base-interop-xctestrun-test.py"
+          "local:scripts/mobile-home-base-interop-xctestrun-test.py",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8776,7 +8862,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:openmed-redaction"
+          "local:test:openmed-redaction",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8785,7 +8872,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:patient-ambulatory-membership"
+          "local:test:patient-ambulatory-membership",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8794,7 +8882,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:patient-cascade"
+          "local:test:patient-cascade",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8848,7 +8937,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8857,7 +8947,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:patient-soft-delete"
+          "local:test:patient-soft-delete",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8866,7 +8957,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "soft-delete:local"
+          "soft-delete:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -8875,7 +8967,17 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:pin-change"
+          "local:test:pin-change",
+          "npm:test:portable-local"
+        ]
+      }
+    },
+    {
+      "path": "scripts/portable-local-test-selection.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
         ]
       }
     },
@@ -8993,7 +9095,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:server-auth-policy"
+          "local:test:server-auth-policy",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9011,7 +9114,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:service-prescription-items-catalog-migration"
+          "local:test:service-prescription-items-catalog-migration",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9020,7 +9124,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:settings-navigation"
+          "local:test:settings-navigation",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9029,7 +9134,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:siss-adapter"
+          "local:test:siss-adapter",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9038,7 +9144,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:siss-prescription"
+          "local:test:siss-prescription",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9047,7 +9154,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:sqlite-repair"
+          "local:test:sqlite-repair",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9056,7 +9164,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/stage-chatgpt-execution-mac-assets.test.mjs"
+          "local:scripts/stage-chatgpt-execution-mac-assets.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9065,7 +9174,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9074,7 +9184,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9083,7 +9194,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9092,7 +9204,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:terminology-registry"
+          "local:test:terminology-registry",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9161,7 +9274,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/treatment-reasoning-portable-setup.test.mjs"
+          "local:scripts/treatment-reasoning-portable-setup.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9170,7 +9284,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:treatment-reasoning"
+          "local:test:treatment-reasoning",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9188,7 +9303,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "prototype:local"
+          "prototype:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9251,7 +9367,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/who-local-probe.test.mjs"
+          "local:scripts/who-local-probe.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9290,7 +9407,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "ui06:domain:local"
+          "ui06:domain:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9299,7 +9417,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "ui06:domain:local"
+          "ui06:domain:local",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9308,7 +9427,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:tools/code-explorer/extract-files.test.mjs"
+          "local:tools/code-explorer/extract-files.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -9317,7 +9437,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:tools/code-explorer/generate.test.mjs"
+          "local:tools/code-explorer/generate.test.mjs",
+          "npm:test:portable-local"
         ]
       }
     },

@@ -3,15 +3,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { collectCiDispositionSelections } from './ci-disposition-selection.mjs';
+import { collectCiDispositionSelections, verifyDispositionConsumer } from './ci-disposition-selection.mjs';
 import { collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 
 test('shared group selections have actual ordinary or Apple conditional CI consumers', () => {
   const selections = collectCiDispositionSelections(root);
-  assert.equal(Object.keys(selections).length, 5);
+  assert.equal(Object.keys(selections).length, 6);
   for (const selection of Object.values(selections)) assert.deepEqual(selection.errors, []);
-  for (const [id, count] of [['npm:test:inventory-browser', 4], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3]]) {
+  for (const [id, count] of [['npm:test:inventory-browser', 4], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3], ['npm:test:portable-local', 112]]) {
     assert.equal(selections[id].mode, 'ordinary');
     assert.equal(selections[id].files.length, count);
     assert.equal(selections[id].binding.jobIf, null);
@@ -43,4 +43,13 @@ test('shared npm CI boundary rejects missing command, disabled step and duplicat
     reset(); fs.writeFileSync(path.join(temp, workflow), change(original)); assert.throws(collect);
   }
   reset(); fs.writeFileSync(path.join(temp, 'package.json'), JSON.stringify({ scripts: { [script]: 'node other.mjs' } })); assert.throws(collect);
+});
+
+test('consumer evidence rejects comment-only and quoted decoys without executing sources', () => {
+  const fragment = 'spawn(command.executable, command.args,';
+  verifyDispositionConsumer(`${fragment} {});`, [fragment]);
+  for (const decoy of [`// ${fragment}`, `/* ${fragment} */`, JSON.stringify(fragment), '`' + fragment + '`']) {
+    assert.throws(() => verifyDispositionConsumer(decoy, [fragment]));
+  }
+  assert.throws(() => verifyDispositionConsumer(`${fragment} {}); ${fragment} {});`, [fragment]));
 });

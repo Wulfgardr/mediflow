@@ -3,6 +3,7 @@ import path from 'node:path';
 
 export const UNIT_TEST_GROUPS = Object.freeze(['lib', 'components']);
 export const UNIT_SCRIPT_TESTS = Object.freeze([
+  'scripts/portable-local-test-selection.test.mjs',
   'scripts/conditional-local-groups.test.mjs',
   'scripts/ci-disposition-selection.test.mjs',
   // Explicit route registration; do not discover every app/** test.
