@@ -211,8 +211,22 @@ jobs:
         run: |
           set -o pipefail
           scripts/native-test.sh 2>&1 | tee "${RUNNER_TEMP}/swiftpm-tests.log"
+      - name: Prepare synthetic custodian data directory
+        id: custodian-data
+        run: |
+          custodian_data_dir="$(mktemp -d "${RUNNER_TEMP}/mediflow-custodian-data.XXXXXX")"
+          echo "directory=$custodian_data_dir" >> "$GITHUB_OUTPUT"
+
       - name: Execution custodian native qualification
+        env:
+          MEDIFLOW_DATA_DIR: ${{ steps.custodian-data.outputs.directory }}
         run: npm run test:apple-custodian
+
+      - name: Clean synthetic custodian data directory
+        if: always() && steps.custodian-data.outputs.directory != ''
+        env:
+          CUSTODIAN_DATA_DIR: ${{ steps.custodian-data.outputs.directory }}
+        run: rm -rf -- "$CUSTODIAN_DATA_DIR"
 
       # Terza fase di `npm run check:terminology-parity`, sull'output della run
       # appena fatta invece che su un secondo `swift test --filter`: su un runner
