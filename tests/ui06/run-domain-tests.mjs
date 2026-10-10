@@ -1,3 +1,4 @@
+import { UI06_DOMAIN_FILES } from '../../scripts/additional-test-selection.mjs';
 /* @Codex UI06: transpile real pure modules into a disposable tree, not a typecheck. */
 import { createRequire } from 'node:module';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
@@ -10,8 +11,8 @@ const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const temporary = await mkdtemp(path.join(tmpdir(), 'mediflow-ui06-domain-'));
-const entries = ['tests/ui06/scale-behavior.test.ts', 'tests/ui06/workspace-counters.test.ts', 'lib/patient-workspace.test.ts'];
-const files = [...entries, 'tests/ui06/synthetic-scale.ts', 'lib/scale-validation.ts', 'lib/scale-submission.ts', 'lib/scale-definitions.ts', 'lib/scale-history.ts', 'lib/scales/tinetti-poma28-v1.ts', 'lib/patient-workspace.ts'];
+const entries = UI06_DOMAIN_FILES;
+const files = [...entries, 'tests/ui06/synthetic-scale.ts', 'lib/scale-validation.ts', 'lib/scales/scale-use-contract.ts', 'lib/scale-submission.ts', 'lib/scale-definitions.ts', 'lib/scale-history.ts', 'lib/scales/tinetti-poma28-v1.ts', 'lib/patient-workspace.ts'];
 try {
     // Never reuse a user data directory. This runner owns both data and emitted code.
     const dataDir = path.join(temporary, 'synthetic-data'); await mkdir(dataDir);

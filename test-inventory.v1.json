@@ -4,8 +4,11 @@
     {
       "path": "app/api/ai/local-provider/onboarding/route.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:app/api/ai/local-provider/onboarding/route.test.ts",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -155,8 +158,11 @@
     {
       "path": "components/lock-screen-pin.browser.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:components/lock-screen-pin.browser.test.mjs",
+          "npm:test:inventory-browser"
+        ]
       }
     },
     {
@@ -200,7 +206,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -308,36 +315,54 @@
     {
       "path": "e2e/anydoc-consumer-diagnostic.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Assertion/diagnostic functions invoked by the OCR recovery spec, no standalone registration.",
+        "importers": [
+          "e2e/document-upload-ocr-recovery.spec.ts"
+        ]
       }
     },
     {
       "path": "e2e/anydoc-project-response.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: response projection oracle imported by the selected OCR recovery spec; no standalone registration.",
+        "importers": [
+          "e2e/document-upload-ocr-recovery.spec.ts"
+        ]
       }
     },
     {
       "path": "e2e/chatgpt-browser-response.contract.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Contract assertions are registered by the exported helper under the browser harness.",
+        "importers": [
+          "e2e/chatgpt-synthesis-product.spec.ts"
+        ]
       }
     },
     {
       "path": "e2e/chatgpt-browser-response.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Response oracle factory imported by the browser harness, no standalone entrypoint.",
+        "importers": [
+          "e2e/chatgpt-synthesis-product.spec.ts"
+        ]
       }
     },
     {
       "path": "e2e/chatgpt-synthesis-product.spec.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:browser"
+        ]
       }
     },
     {
@@ -379,8 +404,12 @@
     {
       "path": "e2e/document-flow-real-route.acceptance.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Shared route assertion function invoked by the Playwright spec.",
+        "importers": [
+          "e2e/document-flow-real-route.spec.ts"
+        ]
       }
     },
     {
@@ -467,8 +496,12 @@
     {
       "path": "e2e/fixtures/isolated-runtime.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Playwright fixture/test extension consumed by the route spec, no standalone spec.",
+        "importers": [
+          "e2e/document-flow-real-route.spec.ts"
+        ]
       }
     },
     {
@@ -645,8 +678,12 @@
     {
       "path": "e2e/ordinary-chatgpt-ui-fixture.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Synthetic transport and UI helper imported by the four-functions spec.",
+        "importers": [
+          "e2e/ordinary-chatgpt-four-functions.spec.ts"
+        ]
       }
     },
     {
@@ -823,8 +860,12 @@
     {
       "path": "e2e/utils.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Session bootstrap and UI assertions consumed by specs, no standalone registration.",
+        "importers": [
+          "e2e/document-flow-real-route.spec.ts"
+        ]
       }
     },
     {
@@ -884,22 +925,31 @@
     {
       "path": "experiments/rust-boundary/compare.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:experiments/rust-boundary/compare.mjs",
+          "npm:test:research-boundary"
+        ]
       }
     },
     {
       "path": "experiments/rust-boundary/src/lib.rs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "cargo:boundary:local",
+          "npm:test:research-boundary"
+        ]
       }
     },
     {
       "path": "experiments/rust-boundary/src/main.rs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "cargo:boundary:local",
+          "npm:test:research-boundary"
+        ]
       }
     },
     {
@@ -916,7 +966,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -988,7 +1039,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -997,7 +1049,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1060,7 +1113,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1897,7 +1951,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1906,7 +1961,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1915,7 +1971,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -1933,7 +1990,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2077,7 +2135,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2257,7 +2316,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2266,7 +2326,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2275,15 +2336,18 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
     {
       "path": "lib/chatgpt-account/account-product.browser.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:browser"
+        ]
       }
     },
     {
@@ -2291,7 +2355,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2300,7 +2365,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2318,7 +2384,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2327,7 +2394,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2336,22 +2404,29 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
     {
       "path": "lib/chatgpt-execution/execution-mac-initialize.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:lib/chatgpt-execution/execution-mac-initialize.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-execution/execution-mac-login-integration.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:mac-login",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -2359,7 +2434,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2368,7 +2444,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2377,15 +2454,19 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
     {
       "path": "lib/chatgpt-execution/execution-mac-readback.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:lib/chatgpt-execution/execution-mac-readback.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -2393,7 +2474,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2402,7 +2484,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2411,7 +2494,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2420,7 +2504,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2440,7 +2525,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2460,7 +2546,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2469,7 +2556,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2478,7 +2566,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2487,64 +2576,89 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
     {
       "path": "lib/chatgpt-product/fixtures/native-client-decrypt-host.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Synthetic native decrypt host fixture required by the selected CJS harness.",
+        "importers": [
+          "lib/chatgpt-product/native-client-decrypt.test.cjs"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "native:decrypt:child"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/native-client-decrypt-http.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/native-client-decrypt.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/native-document-synthesis-composition.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/native-ordinary-contract.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/native-ordinary-function-sources.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/chatgpt-product/native-ordinary-ingress.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -2552,7 +2666,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2561,7 +2676,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2570,7 +2686,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2579,7 +2696,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2588,7 +2706,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2597,7 +2716,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2606,7 +2726,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2615,7 +2736,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2624,7 +2746,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2633,7 +2756,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2642,7 +2766,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -2666,15 +2791,6 @@
     },
     {
       "path": "lib/checkup-json-envelope.test.ts",
-      "selection": {
-        "state": "mapped",
-        "suiteIds": [
-          "unit"
-        ]
-      }
-    },
-    {
-      "path": "lib/prescription-json-envelope.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -2883,8 +2999,9 @@
     {
       "path": "lib/domain/documents/anydoc-pdf-child-process-owner.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "excluded-non-test",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Production PDF child-process supervisor; --self-test is a worker argument managed by production code, not a standalone assertion entrypoint."
       }
     },
     {
@@ -3133,8 +3250,11 @@
     {
       "path": "lib/domain/documents/document-quality-corpus.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -4087,7 +4207,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -4204,7 +4325,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -4303,7 +4425,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -4354,6 +4477,15 @@
     },
     {
       "path": "lib/prescription-delete-concurrency.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "lib/prescription-json-envelope.test.ts",
       "selection": {
         "state": "mapped",
         "suiteIds": [
@@ -4868,8 +5000,10 @@
     {
       "path": "lib/security/headless-soap-active-role-session-grant-attach-failure-fixture.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "soap:child"
+        ]
       }
     },
     {
@@ -4893,8 +5027,10 @@
     {
       "path": "lib/security/headless-soap-active-role-session-grant-rejection-fixture.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "soap:child"
+        ]
       }
     },
     {
@@ -5298,8 +5434,11 @@
     {
       "path": "lib/security/native-inference.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -5314,22 +5453,32 @@
     {
       "path": "lib/security/native-ordinary-content.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/security/native-ordinary-host-sources.test.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "chatgpt:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "lib/security/native-ordinary.test-support.cjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Shared synthetic security fixture required by the selected inference harness.",
+        "importers": [
+          "lib/security/native-inference.test.cjs"
+        ]
       }
     },
     {
@@ -6093,7 +6242,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6138,7 +6288,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6147,7 +6298,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6156,7 +6308,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "unit"
+          "unit",
+          "npm:test:portable-local"
         ]
       }
     },
@@ -6226,29 +6379,49 @@
     {
       "path": "native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/MediFlowMobileAppUITests.swift",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "xcode:mobile-ui"
+        ]
       }
     },
     {
       "path": "native/MediFlowAppleApp/Tests/MediFlowMobileAppUITests/MobilePairedStatusOverrideUITests.swift",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "xcode:mobile-ui"
+        ]
       }
     },
     {
       "path": "native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
+          "npm:test:apple-custodian"
+        ]
+      },
+      "execution": {
+        "state": "conditional-ci",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Apple toolchain qualification is selected by the existing Apple change-filtered CI job; no non-Apple execution is claimed.",
+        "conditions": [
+          "Apple path filter selects native-build-test",
+          "macOS runner with selected Xcode and Node 24",
+          "Canonical custodian recipe compiles and tests the native synthetic helper"
+        ]
       }
     },
     {
       "path": "native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -7388,8 +7561,9 @@
     {
       "path": "playwright.config.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "excluded-non-test",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Playwright configuration imports defineConfig/devices; @playwright/test import is configuration rather than a test registration."
       }
     },
     {
@@ -7404,15 +7578,33 @@
     {
       "path": "plugins/mediflow-synthetic/scripts/codex-agent-contract.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Agent protocol assertion helper imported by the plugin contract suite.",
+        "importers": [
+          "plugins/mediflow-synthetic/test/codex-agent-contract.test.mjs"
+        ]
       }
     },
     {
       "path": "plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs"
+        ]
+      },
+      "execution": {
+        "state": "optional-profile",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Real opt-in agent routing qualification uses an authenticated Codex provider session and enabled local plugin; excluded from the ordinary offline synthetic gate.",
+        "conditions": [
+          "Authenticated Codex CLI explicitly authorized for this smoke",
+          "Installed enabled mediflow-synthetic plugin",
+          "Absolute personal marketplace JSON path; no credential fabrication or installation for this task"
+        ],
+        "profile": "codex-authenticated-provider",
+        "ordinaryGate": "excluded"
       }
     },
     {
@@ -7454,8 +7646,11 @@
     {
       "path": "prototypes/longitudinal-review/model.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -7489,15 +7684,31 @@
     {
       "path": "scripts/anydoc-desktop-ocr-real.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/anydoc-desktop-ocr-real.test.ts"
+        ]
+      },
+      "execution": {
+        "state": "optional-profile",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Real desktop OCR qualification uses the pinned engine, language artifacts and renderer profile; excluded from the ordinary gate and available through its unchanged explicit recipe.",
+        "conditions": [
+          "Provisioned pinned Tesseract engine and OCR artifacts",
+          "Matching desktop renderer/native profile",
+          "Same serial TypeScript recipe; missing assets remain unexecuted, not PASS"
+        ],
+        "profile": "desktop-ocr-provisioned",
+        "ordinaryGate": "excluded"
       }
     },
     {
       "path": "scripts/anydoc-desktop-renderer-trace.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -7521,57 +7732,75 @@
     {
       "path": "scripts/anydoc-pdf-page-worker.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "excluded-non-test",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Production PDF worker process; supports synthetic fault modes but does not register an independent test suite."
       }
     },
     {
       "path": "scripts/anydoc-pdf-smoke-diagnostics.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/anydoc-windows-icu-preflight.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/anydoc-windows-icu-text-smoke.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/api-v1-contract-negative-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:api-v1-contract-negative",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/api-v1-put-negative-routes-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:api-v1-put-negative-routes",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/api-v1-put-negative-routes.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/api-v1-put-negative-routes.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/attachments-runtime-columns-migration.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -7595,85 +7824,118 @@
     {
       "path": "scripts/audit-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:audit",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/backup-restore-date-fields.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:backup-restore:date-fields",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/backup-scheduler-collections.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:backup-scheduler:collections",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/backup-scheduler-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:backup-scheduler",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/benchmark-document-router.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:document-router-benchmark",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/benchmark-document-router.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/benchmark-document-router.ts",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/benchmark-model-parliament.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:ai-model-parliament",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/benchmark-rollout-readiness.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:ai-rollout-readiness",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/build-apple-macos-app.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/build-mobile-sim-app.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/build-screenshots.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "excluded-non-test",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Synthetic screenshot build/capture tool using the Playwright browser API, not a test runner."
       }
     },
     {
       "path": "scripts/build-usage-dashboard.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Dashboard builder and chart helper imported by its selected test; CLI is a build tool.",
+        "importers": [
+          "scripts/build-usage-dashboard.test.mjs"
+        ]
       }
     },
     {
@@ -7688,8 +7950,9 @@
     {
       "path": "scripts/capture-readme-screenshots.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "excluded-non-test",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: README image capture tool using Playwright browser APIs, not a test registration."
       }
     },
     {
@@ -7704,8 +7967,11 @@
     {
       "path": "scripts/chatgpt-account/account-host.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/chatgpt-account/account-host.test.ts",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -7738,8 +8004,11 @@
     {
       "path": "scripts/chatgpt-account/account-ui-browser.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/chatgpt-account/account-ui-browser.mjs",
+          "npm:test:inventory-browser"
+        ]
       }
     },
     {
@@ -7754,8 +8023,11 @@
     {
       "path": "scripts/check-anydoc-local-only.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:anydoc-local-only",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -7770,15 +8042,20 @@
     {
       "path": "scripts/check-attachment-currentness-writers.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:attachment-currentness-writers",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/check-capability-mapping.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -7802,8 +8079,10 @@
     {
       "path": "scripts/check-fabric-headless-plane-inventories.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -7818,8 +8097,10 @@
     {
       "path": "scripts/check-headless-semantic-plane.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -7834,8 +8115,11 @@
     {
       "path": "scripts/check-macos-web-runtime-native-payload.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/check-macos-web-runtime-native-payload.sh",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -7904,29 +8188,38 @@
     {
       "path": "scripts/check-standalone-runtime-bundle.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/check-standalone-runtime-bundle.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/check-standalone-runtime-bundle.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/check-who-local-sidecar-manifest.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/checkup-local-bounded-json.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:clinical-http"
+        ]
       }
     },
     {
@@ -7948,6 +8241,24 @@
       }
     },
     {
+      "path": "scripts/ci-disposition-selection.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "scripts/conditional-local-groups.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "scripts/db-server-data-isolation.test.mjs",
       "selection": {
         "state": "mapped",
@@ -7959,15 +8270,20 @@
     {
       "path": "scripts/document-evidence-backfill-currentness-cas.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/document-intelligence-columns-migration.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:document-intelligence-columns-migration",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -7982,15 +8298,30 @@
     {
       "path": "scripts/entry-required-audit-http.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:clinical-http"
+        ]
+      }
+    },
+    {
+      "path": "scripts/exemption-lazy-support-binding.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/explicit-npm-test-selection.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "Self-test argument literal is an inclusive discovery signal in this selector adapter. This helper candidate is not assigned an executable test suite; semantic classification and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Selection adapter imported by contract tests; literal self-test names are data, not standalone tests.",
+        "importers": [
+          "scripts/explicit-npm-test-selection.test.mjs"
+        ]
       }
     },
     {
@@ -8005,43 +8336,62 @@
     {
       "path": "scripts/fabric-settings-view-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:fabric-settings-view",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/fixtures/exemption-import-session.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: synthetic session fixture loaded lazily after isolated SQLite bootstrap by the selected AIFA route test; verified by the dedicated lazy-edge adapter.",
+        "importers": [
+          "lib/aifa-update-guide-route.test.ts"
+        ]
       }
     },
     {
       "path": "scripts/function-models/browser.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/function-models/browser.test.ts",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/function-models/ui-browser.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/function-models/ui-browser.mjs",
+          "npm:test:inventory-browser"
+        ]
       }
     },
     {
       "path": "scripts/generate-clinical-rich-text-fixtures.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/generate-clinical-rich-text-fixtures.mjs",
+          "npm:test:fixture-generators"
+        ]
       }
     },
     {
       "path": "scripts/generate-fhir-golden-worker.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/generate-fhir-golden-worker.ts",
+          "npm:test:fixture-generators"
+        ]
       }
     },
     {
@@ -8056,29 +8406,49 @@
     {
       "path": "scripts/icd-docker-packaging-retirement.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/icd-docker-runtime-retirement.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/install-redaction-runtime.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/install-redaction-runtime.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/installability-v0-macos.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:installability-v0",
+          "apple:installability-v0"
+        ]
+      },
+      "execution": {
+        "state": "conditional-ci",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Real macOS launcher contracts require system lockf; the unchanged local recipe runs in the Apple lane instead of Linux. No lock substitute or skip qualifies this profile.",
+        "conditions": [
+          "macOS with real system lockf and Node 24",
+          "Apple change filter includes test, build script and launcher on pull requests and pushes",
+          "Test-owned synthetic app bundle and isolated data directories"
+        ]
       }
     },
     {
@@ -8102,15 +8472,20 @@
     {
       "path": "scripts/launch-bundled-headless-supervisor.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/launch-macos-synthetic.test.py",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/launch-macos-synthetic.test.py",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -8134,29 +8509,40 @@
     {
       "path": "scripts/legacy-clinical-writes-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:legacy-clinical-writes",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/legacy-clinical-writes.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/legacy-clinical-writes.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/local-chat-runtime.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/local-provider-setup.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:local-provider-setup",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -8171,71 +8557,138 @@
     {
       "path": "scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
+          "npm:test:owned-http-standalone"
+        ]
       }
     },
     {
       "path": "scripts/mediflow-headless-supervisor.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/mlx-chat-batch-runner-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/mlx-chat-batch-runner-test.sh"
+        ]
+      },
+      "execution": {
+        "state": "optional-profile",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: MLX dry-run qualifies configuration using a pre-provisioned Apple MLX virtual environment; that optional runtime is outside the ordinary gate, without disabling its recipe or requiring a model.",
+        "conditions": [
+          "Provisioned compatible Apple/MLX runtime",
+          "Existing .venv_mlx/bin/python3 with mlx and mlx_lm",
+          "No model/runtime installation performed solely to clear inventory"
+        ],
+        "profile": "mlx-provisioned-venv",
+        "ordinaryGate": "excluded"
       }
     },
     {
       "path": "scripts/mobile-home-base-interop-cas-relay.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/mobile-home-base-interop-cas-relay.mjs"
+        ]
+      },
+      "execution": {
+        "state": "optional-profile",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Mobile 1.0 CAS qualification requires two coordinated synthetic participants and private receipts; this explicit integration profile is outside the ordinary gate.",
+        "conditions": [
+          "Reviewed synthetic CAS case descriptor",
+          "Two running contender/peer device or simulator clients",
+          "Distinct private mode-0700 exchange directories and matching participant receipts"
+        ],
+        "profile": "mobile-1-0-cas",
+        "ordinaryGate": "excluded"
       }
     },
     {
       "path": "scripts/mobile-home-base-interop-cas-relay.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/mobile-home-base-interop-module-verifier.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/mobile-home-base-interop-module-verifier.mjs"
+        ]
+      },
+      "execution": {
+        "state": "optional-profile",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Mobile 1.0 module qualification requires a coordinated native client, synthetic server and private receipts; this explicit integration profile is outside the ordinary gate.",
+        "conditions": [
+          "Reviewed synthetic module descriptor",
+          "Running ios/ipados client and synthetic server producers",
+          "Private mode-0700 exchange directory and unique matching run ID"
+        ],
+        "profile": "mobile-1-0-modules",
+        "ordinaryGate": "excluded"
       }
     },
     {
       "path": "scripts/mobile-home-base-interop-module-verifier.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/mobile-home-base-interop-response-proxy.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/mobile-home-base-interop-xctestrun-test.py",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/mobile-home-base-interop-xctestrun-test.py",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/mobile-home-base-interop.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
+      "path": "scripts/native-decrypt-bridge-selection.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -8268,8 +8721,21 @@
     {
       "path": "scripts/native-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/native-test.sh",
+          "ci:apple-native-entrypoint"
+        ]
+      },
+      "execution": {
+        "state": "conditional-ci",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Apple toolchain qualification is selected by the existing Apple change-filtered CI job; no non-Apple execution is claimed.",
+        "conditions": [
+          "Apple path filter selects native-build-test",
+          "macOS runner with selected Xcode and Node 24",
+          "Existing SwiftPM invocation"
+        ]
       }
     },
     {
@@ -8284,99 +8750,141 @@
     {
       "path": "scripts/network-home-base-account-pin.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-account-pin.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-aggregate-read.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-aggregate-read.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-ambulatory-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-ambulatory-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-catalog-read.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-catalog-read.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-checkup-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-checkup-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-diary-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-diary-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-discovery-read.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-discovery-read.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-documents-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-documents-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-observation-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-observation-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-patient-lifecycle-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-patient-lifecycle-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-prescriptions-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-prescriptions-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-readonly.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-readonly.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-therapy-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-therapy-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/network-home-base-write.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/network-home-base-write.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
@@ -8391,99 +8899,153 @@
     {
       "path": "scripts/openmed-redaction-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:openmed-redaction",
+          "npm:test:portable-local"
+        ]
+      }
+    },
+    {
+      "path": "scripts/owned-synthetic-http-suite.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/patient-ambulatory-membership-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:patient-ambulatory-membership",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/patient-cascade.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:patient-cascade",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/patient-concurrency.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/patient-concurrency.test.mjs",
+          "npm:test:owned-http"
+        ]
       }
     },
     {
       "path": "scripts/patient-create-required-audit-http.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:clinical-http"
+        ]
       }
     },
     {
       "path": "scripts/patient-insight-revision-lifecycle.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/patient-reference-lifecycle.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/patient-restore-required-audit-http.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:clinical-http"
+        ]
       }
     },
     {
       "path": "scripts/patient-rights-dry-run.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/patient-soft-delete-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:patient-soft-delete",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/patient-soft-delete.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "soft-delete:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/pin-change-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:pin-change",
+          "npm:test:portable-local"
+        ]
+      }
+    },
+    {
+      "path": "scripts/portable-local-test-selection.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/portable-supervisor-child-shutdown.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/portable-supervisor-import-urls.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -8516,8 +9078,10 @@
     {
       "path": "scripts/run-mini-desktop-acceptance.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
@@ -8550,22 +9114,41 @@
     {
       "path": "scripts/run-visit-recording-synthetic-benchmark.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/run-visit-recording-synthetic-benchmark.mjs"
+        ]
+      },
+      "execution": {
+        "state": "optional-profile",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Speech benchmark qualification requires macOS 26, configured compatible Xcode, synthetic voices and provisioned Italian Speech assets; this optional platform benchmark is outside the ordinary gate. Asset presence must be verified, not inferred.",
+        "conditions": [
+          "macOS 26 with configured compatible Xcode toolchain",
+          "Five specified synthetic Italian say voices and installed Italian SpeechTranscriber locale, verified before qualification",
+          "Synthetic audio only; no microphone, patient recording or implicit asset installation"
+        ],
+        "profile": "macos-speech-benchmark",
+        "ordinaryGate": "excluded"
       }
     },
     {
       "path": "scripts/seed-performance-baseline-currentness.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/server-auth-policy-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:server-auth-policy",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -8580,71 +9163,101 @@
     {
       "path": "scripts/service-prescription-items-catalog-migration-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:service-prescription-items-catalog-migration",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/settings-navigation-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:settings-navigation",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/siss-adapter-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:siss-adapter",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/siss-prescription-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:siss-prescription",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/sqlite-repair-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:sqlite-repair",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/stage-chatgpt-execution-mac-assets.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/stage-chatgpt-execution-mac-assets.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/synthetic-cohort-analysis.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/synthetic-followup-projection.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/synthetic-handoff-packet.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/terminology-registry-test.sh",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:terminology-registry",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -8659,8 +9272,12 @@
     {
       "path": "scripts/test-inventory.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Inventory discovery/check implementation imported by contract tests; detected source signal describes discovery.",
+        "importers": [
+          "scripts/test-inventory.test.mjs"
+        ]
       }
     },
     {
@@ -8697,22 +9314,30 @@
     {
       "path": "scripts/therapy-required-audit-http.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "npm:test:clinical-http"
+        ]
       }
     },
     {
       "path": "scripts/treatment-reasoning-portable-setup.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/treatment-reasoning-portable-setup.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/treatment-reasoning-route-boundary.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:test:treatment-reasoning",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
@@ -8727,113 +9352,153 @@
     {
       "path": "scripts/verify-fhir-validator-cache.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "prototype:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/web-auth-control-test-client.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/web-session-resource-reclamation.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/who-local-loopback-transport.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/who-local-onboarding-portability.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/who-local-onboarding.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/who-local-platform.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "scripts/who-local-probe.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:scripts/who-local-probe.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "scripts/who-local-setup.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
       }
     },
     {
       "path": "tests/ui06/browser-harness.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "support",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Browser lifecycle/React fixture helper imported by the local component suite.",
+        "importers": [
+          "tests/ui06/component-browser.test.mjs"
+        ]
       }
     },
     {
       "path": "tests/ui06/component-browser.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:tests/ui06/component-browser.test.mjs",
+          "npm:test:inventory-browser"
+        ]
       }
     },
     {
       "path": "tests/ui06/scale-behavior.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "ui06:domain:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "tests/ui06/workspace-counters.test.ts",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "ui06:domain:local",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "tools/code-explorer/extract-files.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:tools/code-explorer/extract-files.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "tools/code-explorer/generate.test.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "mapped",
+        "suiteIds": [
+          "local:tools/code-explorer/generate.test.mjs",
+          "npm:test:portable-local"
+        ]
       }
     },
     {
       "path": "tools/runtime-twin-086/seed.mjs",
       "selection": {
-        "state": "unresolved",
-        "reason": "No verified selector adapter for this candidate in the incremental inventory. Execution and C14 acceptance remain unassessed."
+        "state": "excluded-non-test",
+        "owner": "@Wulfgardr",
+        "reason": "WUL-729: Synthetic runtime-twin fixture producer; guarded seeding operation, not an assertion suite."
       }
     }
   ]

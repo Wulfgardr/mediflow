@@ -166,7 +166,7 @@ test('real checker still exits 1 on an intentionally incomplete physical package
   fs.mkdirSync(path.join(directory, 'synthetic-data'));
   for (const name of [
     'check-standalone-runtime-bundle.mjs', 'anydoc-pdf-smoke-diagnostics.mjs',
-    'node-runtime-contract.mjs', 'anydoc-pdf-page-worker.mjs',
+    'node-runtime-contract.mjs', 'scheduled-backup-runtime-contract.mjs', 'anydoc-pdf-page-worker.mjs',
     'anydoc-pdf-renderer-profiles.json', 'anydoc-tesseract-artifacts.json',
     'treatment-reasoning-portable-setup.mjs',
   ]) {

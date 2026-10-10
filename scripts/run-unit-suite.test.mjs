@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS } from './unit-test-selection.mjs';
+import { UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS, UNIT_SERIAL_SCRIPT_TESTS } from './unit-test-selection.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const source = fs.readFileSync(path.join(root, 'scripts', 'run-unit-suite.mjs'), 'utf8');
@@ -19,7 +19,7 @@ function fixture(unit, { preserveUnitArgs = false } = {}) {
   fs.writeFileSync(path.join(scripts, 'test-data-dir.mjs'), dataDirSource.replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
   fs.writeFileSync(path.join(scripts, 'unit-test-selection.mjs'), selectionSource);
   const runnerSource = preserveUnitArgs ? source
-    : source.replace(/const unitArgs = .*;\n/u, `const unitArgs = ['--eval', ${JSON.stringify(unit)}];\n`);
+    : source.replace(/const unitInvocations = .*;\n/u, `const unitInvocations = [['--eval', ${JSON.stringify(unit)}]];\n`);
   fs.writeFileSync(path.join(scripts, 'run-unit-suite.mjs'), runnerSource.replaceAll('os.tmpdir()', JSON.stringify(sandbox)));
   return { sandbox, runner: path.join(scripts, 'run-unit-suite.mjs') };
 }
@@ -72,7 +72,7 @@ function defaultSelectionFixture(testFile) {
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 const args = process.argv.slice(2);
-fs.writeFileSync('selected-args.json', JSON.stringify(args));
+fs.appendFileSync('selected-args.jsonl', JSON.stringify(args) + '\\n');
 const files = args.filter(arg => arg === ${JSON.stringify(`scripts/${testFile}`)} && fs.existsSync(arg));
 if (!files.length) process.exit(0);
 const env = { ...process.env };
@@ -109,6 +109,7 @@ for (const testFile of [
   'chatgpt-account/account-browser.test.ts',
   'chatgpt-account/account-session-http.test.ts',
   'chatgpt-account/account-transport.test.ts',
+  ...UNIT_SERIAL_SCRIPT_TESTS.map(file => file.slice('scripts/'.length)),
 ]) {
   test(`default unit selection executes ${testFile} exactly once`, () => {
     const value = defaultSelectionFixture(testFile);
@@ -116,7 +117,10 @@ for (const testFile of [
       const result = execute(value);
       assert.equal(result.status, 0, result.stderr + result.stdout);
       assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
-      const selected = JSON.parse(fs.readFileSync(path.join(value.sandbox, 'selected-args.json'), 'utf8'));
+      const invocations = fs.readFileSync(path.join(value.sandbox, 'selected-args.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+      assert.equal(invocations.length, 3);
+      assert.deepEqual(invocations.slice(1), UNIT_SERIAL_SCRIPT_TESTS.map(file => ['--test', file]));
+      const selected = invocations.flat();
       assert.equal(selected.filter(arg => arg === `scripts/${testFile}`).length, 1);
       assert.deepEqual(implicitDirs(value), []);
     } finally {
@@ -130,6 +134,9 @@ for (const testFile of [
       const result = execute(value, { TEST_SELECTED_REGRESSION_FAIL: '1' });
       assert.equal(result.status, 1, result.stderr + result.stdout);
       assert.match(result.stdout, /seeded selected regression failure/);
+      const invocations = fs.readFileSync(path.join(value.sandbox, 'selected-args.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+      const serialIndex = UNIT_SERIAL_SCRIPT_TESTS.indexOf(`scripts/${testFile}`);
+      assert.equal(invocations.length, serialIndex === -1 ? 1 : serialIndex + 2, 'failure stops later invocations');
       assert.equal(fs.readFileSync(path.join(value.sandbox, 'selected-test-ran'), 'utf8'), 'once\n');
       assert.deepEqual(implicitDirs(value), []);
     } finally {
