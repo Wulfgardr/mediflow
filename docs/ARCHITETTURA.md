@@ -73,7 +73,8 @@ alla distribuzione.
 
 Sbloccare la cartella e leggere un campo sensibile sono passaggi collegati,
 ma non coincidono con la cifratura dell’intero database. Il PIN deriva la KEK;
-la KEK apre la master key in RAM; questa permette al client di cifrare i campi
+la KEK apre la master key, che il browser tiene in memoria e oggi anche nel
+`sessionStorage`; questa permette al client di cifrare i campi
 in `AES-256-GCM` prima di salvarli come `ENC:<iv_b64>:<cipher_b64>`.
 
 La stessa protezione riguarda gli snapshot documentali sensibili, compresi

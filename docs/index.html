@@ -150,7 +150,7 @@
 ## 1. Vision & Filosofia
 
 > [!IMPORTANT]
-> **Zero-Knowledge by Design**: Il server non può mai leggere i dati clinici del paziente. La chiave di decifrazione esiste solo nella memoria volatile del browser.
+> **Cifratura dei campi sensibili, non dell'intero database**: il browser cifra i campi clinici sensibili prima di salvarli e il server non li decifra. Nomi, identificativi e terapie restano in chiaro; il server riceve il PIN a ogni accesso. La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice che cosa si legge senza la chiave.
 
 MediFlow nasce con tre principi fondamentali:
 
@@ -347,13 +347,13 @@ sequenceDiagram
 
     Medico->>Browser: Inserisce PIN
     Browser->>Browser: Deriva chiave (PBKDF2)
-    Browser->>API: POST /api/auth/login {username, PIN hash}
+    Browser->>API: POST /api/auth/login {PIN}
     API->>DB: Verifica credenziali
     DB-->>API: encryptedMasterKey
     API-->>Browser: {ok: true, encryptedMasterKey}
     Browser->>Browser: Decifra MasterKey con PIN
     Browser->>SessionStorage: Salva MasterKey (JWK)
-    Note over Browser,SessionStorage: La chiave esiste SOLO in RAM/SessionStorage
+    Note over Browser,SessionStorage: La chiave sbloccata sta in memoria e nel SessionStorage
 
     loop Per ogni richiesta dati
         Browser->>Browser: Recupera MasterKey da Session
