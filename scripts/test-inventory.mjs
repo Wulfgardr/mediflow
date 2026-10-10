@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
+import { collectLocalTestSelections } from './local-test-selection.mjs';
+import { collectAdditionalInventorySelections } from './additional-inventory-selection.mjs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +72,18 @@ export function collectStaticSupportImports(source, importer) {
   while (rest) {
     const trivia = /^(?:\s+|\/\/[^\r\n]*(?:\r?\n|$)|\/\*[\s\S]*?\*\/)/u.exec(rest);
     if (trivia) { rest = rest.slice(trivia[0].length); continue; }
+    const strict = /^(['"])use strict\1\s*;/u.exec(rest);
+    if (strict) { rest = rest.slice(strict[0].length); continue; }
+    const required = new RegExp(String.raw`^const\s+(${clause})\s*=\s*require\(\s*(['"])([^'"\\\r\n]+)\2\s*\)\s*;`, 'u').exec(rest);
+    if (required) {
+      rest = rest.slice(required[0].length);
+      const specifier = required[3];
+      if (specifier.startsWith('./') || specifier.startsWith('../')) {
+        const target = path.posix.normalize(path.posix.join(path.posix.dirname(importer), specifier));
+        if (validPath(target)) imports.push(target);
+      }
+      continue;
+    }
     if (rest.startsWith('void import.meta.url;')) { rest = rest.slice('void import.meta.url;'.length); continue; }
     const match = declaration.exec(rest);
     if (!match) break;
@@ -102,7 +116,12 @@ export function discoverCandidates(paths, readSource) {
     const found = named ? ['conventional-test-name'] : [];
     for (const [name, pattern] of signals) if (pattern.test(source)) found.push(name);
     if (found.length) candidates.push({ path: relative, signals: found,
-      staticImports: collectStaticSupportImports(source, relative) });
+      staticImports: collectStaticSupportImports(source, relative).map(target => {
+        // Closed extensionless TS imports used by Playwright; ambiguous siblings fail.
+        if (path.posix.extname(target)) return target;
+        const matches = paths.filter(file => file === target || ['.ts', '.js', '.mjs', '.cjs', '.tsx'].some(ext => file === target + ext));
+        return matches.length === 1 ? matches[0] : target;
+      }) });
   }
   return candidates.sort((a, b) => a.path.localeCompare(b.path, 'en'));
 }
@@ -112,6 +131,8 @@ export function checkInventory(candidates, manifest, selections) {
   const errors = [];
   const unresolved = [];
   const support = [];
+  const excludedNonTests = [];
+  const suiteModes = {};
   const staticImports = new Map();
   const verifiedSuites = new Set();
   const conditionalSuites = [];
@@ -146,6 +167,11 @@ export function checkInventory(candidates, manifest, selections) {
         || selection.suiteIds.some(id => typeof id !== 'string' || !id.trim())
         || new Set(selection.suiteIds).size !== selection.suiteIds.length
         || Object.keys(selection).some(key => !['state', 'suiteIds'].includes(key))) add('INVALID_MAPPING', entry.path);
+    } else if (selection?.state === 'excluded-non-test') {
+      excludedNonTests.push(entry.path);
+      if (typeof selection.reason !== 'string' || !selection.reason.trim()
+        || typeof selection.owner !== 'string' || !selection.owner.trim()
+        || Object.keys(selection).some(key => !['state', 'reason', 'owner'].includes(key))) add('INVALID_NON_TEST', entry.path);
     } else if (selection?.state === 'support') {
       support.push(entry.path);
       if (typeof selection.reason !== 'string' || !selection.reason.trim()
@@ -160,6 +186,8 @@ export function checkInventory(candidates, manifest, selections) {
     add('INVALID_SELECTIONS', 'expected object'); selections = {};
   }
   for (const [id, selection] of Object.entries(selections)) {
+    if (selection?.mode !== undefined && !['ordinary', 'conditional', 'local', 'child'].includes(selection.mode)) add('INVALID_SUITE_MODE', id);
+    suiteModes[id] = selection?.mode ?? (selection?.conditional ? 'conditional' : 'unspecified');
     if (selection?.conditional === true) conditionalSuites.push(id);
     if (!selection || !Array.isArray(selection.files) || !Array.isArray(selection.errors)) {
       add('INVALID_SUITE', id); continue;
@@ -186,6 +214,9 @@ export function checkInventory(candidates, manifest, selections) {
       else if (!suites.get(id).has(file)) add('MAPPED_NOT_SELECTED', `${id}: ${file}`);
     }
   }
+  for (const file of excludedNonTests) {
+    if ([...suites.values()].some(files => files.has(file))) add('NON_TEST_SELECTED_AS_TEST', file);
+  }
   for (const file of support) {
     const selection = entries.get(file).selection;
     if ([...suites.values()].some(files => files.has(file))) add('SUPPORT_SELECTED_AS_TEST', file);
@@ -199,7 +230,7 @@ export function checkInventory(candidates, manifest, selections) {
       if (!staticImports.get(importer)?.has(file)) add('SUPPORT_IMPORT_MISSING', `${file}: ${importer}`);
     }
   }
-  return { errors, unresolved, support, conditionalSuites, integrityPassed: errors.length === 0,
+  return { errors, unresolved, support, excludedNonTests, suiteModes, conditionalSuites, integrityPassed: errors.length === 0,
     selectionComplete: errors.length === 0 && unresolved.length === 0 };
 }
 
@@ -232,12 +263,16 @@ async function cli(args) {
   let unit;
   try { unit = { files: collectUnitTestFiles(root), errors: [] }; }
   catch (error) { unit = { files: [], errors: [error.message] }; }
-  const result = checkInventory(candidates, manifest, { unit, ...collectExplicitNpmSelections(root),
+  const legacySelections = { unit, ...collectExplicitNpmSelections(root),
     'npm:test:headless-portable': await collectHeadlessInventorySelection(root),
     ...collectGuardSelfTestSelections(root),
     ...collectSyntheticPluginSelections(root),
     [SWIFT_SUITE_ID]: collectSwiftInventorySelection(root),
-    'npm:test:e2e': collectPlaywrightInventorySelection(root) });
+    'npm:test:e2e': collectPlaywrightInventorySelection(root) };
+  const result = checkInventory(candidates, manifest, {
+    ...Object.fromEntries(Object.entries(legacySelections).map(([id, selection]) => [id, { ...selection, mode: selection.conditional ? 'conditional' : 'ordinary' }])),
+    ...collectLocalTestSelections(root), ...collectAdditionalInventorySelections(root),
+  });
   for (const error of result.errors) process.stderr.write(`${error}\n`);
   printReport(result);
   return mode === 'complete' ? Number(!result.selectionComplete) : Number(!result.integrityPassed);
@@ -248,6 +283,10 @@ function printReport(result) {
   console.log(`Selection completeness: ${result.selectionComplete ? 'COMPLETE' : 'INCOMPLETE'}`);
   console.log(`Unresolved selection: ${result.unresolved.length}`);
   console.log(`Support entrypoint exclusions: ${result.support.length}`);
+  console.log(`Non-test entrypoint exclusions: ${result.excludedNonTests.length}`);
+  for (const mode of ['ordinary', 'conditional', 'local', 'child', 'unspecified']) {
+    console.log(`Selected suites (${mode}): ${Object.values(result.suiteModes).filter(value => value === mode).length}`);
+  }
   if (result.conditionalSuites.length) console.log(`Conditional suites (workflow paths): ${result.conditionalSuites.join(', ')}`);
   console.log('Execution evidence: NOT_ASSESSED');
   console.log('Npm CI bindings: configured literal calls only; reachability and lifecycle effects NOT_ASSESSED');
