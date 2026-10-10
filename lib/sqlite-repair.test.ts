@@ -8,6 +8,7 @@ import {
     SqliteSwapInProgressError,
     backupSqliteDatabase,
     copySqliteDatabaseSync,
+    createVerifiedSqliteSnapshotSync,
     removeSqliteSidecars,
     replaceSqliteDatabase,
 } from './sqlite-repair';
@@ -311,4 +312,69 @@ test('removeSqliteSidecars deletes -wal and -shm files and tolerates missing one
     } finally {
         fs.rmSync(dir, { recursive: true, force: true });
     }
+});
+
+
+test('verified schema snapshot includes committed WAL, schema version and valid references', () => {
+    const dir = makeTempDir(), sourcePath = path.join(dir, 'source.db'), destination = path.join(dir, 'original.db');
+    const source = createDatabase(sourcePath, ['synthetic-original'], 'wal');
+    try {
+        source.pragma('user_version = 7');
+        source.exec('CREATE TABLE child_fixture (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES patients_fixture(id)); INSERT INTO child_fixture VALUES (1, 1)');
+        assert.ok(fs.statSync(sourcePath + '-wal').size > 0);
+        createVerifiedSqliteSnapshotSync(sourcePath, destination);
+        const snapshot = new Database(destination, { readonly: true, fileMustExist: true });
+        try {
+            assert.equal(snapshot.pragma('integrity_check', { simple: true }), 'ok');
+            assert.deepEqual(snapshot.pragma('foreign_key_check'), []);
+            assert.equal(snapshot.pragma('user_version', { simple: true }), 7);
+            assert.equal(snapshot.pragma('journal_mode', { simple: true }), 'delete');
+            assert.deepEqual(snapshot.prepare('SELECT * FROM child_fixture').all(), [{ id: 1, parent_id: 1 }]);
+            assert.deepEqual(snapshot.prepare('SELECT name FROM patients_fixture').all(), [{ name: 'synthetic-original' }]);
+        } finally { snapshot.close(); }
+        assert.equal(fs.statSync(destination).nlink, 1);
+        assert.equal(fs.existsSync(destination + '-wal'), false);
+        assert.equal(fs.existsSync(destination + '-shm'), false);
+        assert.deepEqual(fs.readdirSync(dir).filter(name => name.startsWith('.schema-snapshot-')), []);
+        source.prepare("UPDATE patients_fixture SET name = 'synthetic-new'").run();
+        assert.deepEqual(readNames(destination), ['synthetic-original']);
+    } finally { source.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('verified schema snapshot rejects invalid FK and corrupt input before publication without changing source', () => {
+    const dir = makeTempDir();
+    try {
+        for (const invalid of ['foreign-key', 'corrupt']) {
+            const source = path.join(dir, invalid + '.db'), destination = path.join(dir, invalid + '-snapshot.db');
+            if (invalid === 'corrupt') fs.writeFileSync(source, 'SYNTHETIC-NOT-SQLITE');
+            else {
+                const db = createDatabase(source, ['synthetic-original'], 'delete');
+                db.pragma('foreign_keys = OFF');
+                db.exec('CREATE TABLE child_fixture (parent_id INTEGER REFERENCES patients_fixture(id)); INSERT INTO child_fixture VALUES (99)');
+                db.close();
+            }
+            const before = fs.readFileSync(source);
+            assert.throws(() => createVerifiedSqliteSnapshotSync(source, destination));
+            assert.deepEqual(fs.readFileSync(source), before);
+            assert.equal(fs.existsSync(destination), false);
+            assert.deepEqual(fs.readdirSync(dir).filter(name => name.startsWith('.schema-snapshot-')), []);
+        }
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('verified schema snapshot preserves an existing destination', () => {
+    const dir = makeTempDir(), sourcePath = path.join(dir, 'source.db'), destination = path.join(dir, 'original.db');
+    const source = createDatabase(sourcePath, ['synthetic-source'], 'delete'); source.close();
+    try {
+        fs.writeFileSync(destination, 'SYNTHETIC-EXISTING-DESTINATION');
+        const before = fs.readFileSync(sourcePath);
+        assert.throws(() => createVerifiedSqliteSnapshotSync(sourcePath, destination), /SQLITE_SNAPSHOT_DESTINATION_EXISTS/);
+        assert.equal(fs.readFileSync(destination, 'utf8'), 'SYNTHETIC-EXISTING-DESTINATION');
+        assert.deepEqual(fs.readFileSync(sourcePath), before);
+        assert.deepEqual(fs.readdirSync(dir).sort(), ['original.db', 'source.db']);
+        fs.renameSync(destination, destination + '-wal');
+        assert.throws(() => createVerifiedSqliteSnapshotSync(sourcePath, destination), /SQLITE_SNAPSHOT_DESTINATION_EXISTS/);
+        assert.equal(fs.existsSync(destination), false);
+        assert.equal(fs.readFileSync(destination + '-wal', 'utf8'), 'SYNTHETIC-EXISTING-DESTINATION');
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
