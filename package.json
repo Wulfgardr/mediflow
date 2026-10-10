@@ -227,7 +227,9 @@
     "test:fixture-generators": "node scripts/conditional-local-groups.mjs --group fixture-generators",
     "test:research-boundary": "node scripts/conditional-local-groups.mjs --group research-toolchain",
     "test:apple-custodian": "node scripts/local-test-selection.mjs native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
-    "test:portable-local": "node scripts/run-portable-local-tests.mjs"
+    "test:portable-local": "node scripts/run-portable-local-tests.mjs",
+    "test:owned-http": "node scripts/run-owned-synthetic-http-suite.mjs",
+    "test:owned-http-standalone": "node scripts/run-owned-synthetic-http-suite.mjs --standalone"
   },
   "dependencies": {
     "@firecrawl/anydoc": "0.2.4",

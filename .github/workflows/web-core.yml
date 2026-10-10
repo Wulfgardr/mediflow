@@ -41,6 +41,10 @@ jobs:
       - name: Clinical HTTP synthetic harnesses
         timeout-minutes: 20
         run: npm run test:clinical-http
+      - name: Owned synthetic HTTP contracts
+        run: npm run test:owned-http
+      - name: Owned standalone supervisor contract
+        run: npm run test:owned-http-standalone
       - name: Portable synthetic recipes
         run: npm run test:portable-local
       - name: Synthetic fixture generators

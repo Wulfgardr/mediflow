@@ -1,8 +1,9 @@
 import fs from 'node:fs';
+import { ownedHttpInvocations } from './run-owned-synthetic-http-suite.mjs';
 import { consumerTokens } from './additional-inventory-selection.mjs';
 import { portableLocalTestCommands } from './portable-local-test-selection.mjs';
 import path from 'node:path';
-import { collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
+import { collectNpmScriptBinding, collectLiteralCiBinding } from './explicit-npm-test-selection.mjs';
 import { collectConditionalLocalSelections } from './conditional-local-groups.mjs';
 import { collectSwiftInventorySelection } from './swift-test-selection.mjs';
 import { localTestCommands } from './local-test-selection.mjs';
@@ -52,6 +53,24 @@ export function collectCiDispositionSelections(root) {
     if (binding.jobIf !== null || binding.stepIf !== null) throw new Error('Portable CI hook acquired a condition');
     out['npm:test:portable-local'] = { files: portableLocalTestCommands(root).flatMap(command => command.files), mode: 'ordinary', errors: [], binding };
   } catch (error) { out['npm:test:portable-local'] = { files: [], mode: 'ordinary', errors: [error.message] }; }
+  for (const standalone of [false, true]) {
+    const script = standalone ? 'test:owned-http-standalone' : 'test:owned-http';
+    try {
+      verifyDispositionConsumer(fs.readFileSync(path.join(root, 'scripts/run-owned-synthetic-http-suite.mjs'), 'utf8'), [
+        'const invocations = ownedHttpInvocations(root, standalone);',
+        'for (const recipe of invocations)',
+        'spawn(recipe.executable, recipe.args,',
+      ]);
+      const binding = collectNpmScriptBinding(root, { script, workflow: '.github/workflows/web-core.yml', job: 'web-core' },
+        `node scripts/run-owned-synthetic-http-suite.mjs${standalone ? ' --standalone' : ''}`);
+      if (binding.jobIf !== null || binding.stepIf !== null) throw new Error('HTTP CI hook acquired a condition');
+      if (standalone) {
+        const build = collectLiteralCiBinding(root, { script: 'build', workflow: binding.workflow, job: binding.job, ciCall: 'npm run build' });
+        if (build.stepIndex >= binding.stepIndex || build.stepIf !== null) throw new Error('Standalone HTTP requires the preceding unconditional build');
+      }
+      out[`npm:${script}`] = { files: ownedHttpInvocations(root, standalone).flatMap(recipe => recipe.coveredFiles), mode: 'ordinary', errors: [], binding };
+    } catch (error) { out[`npm:${script}`] = { files: [], mode: 'ordinary', errors: [error.message] }; }
+  }
   const swift = collectSwiftInventorySelection(root);
   out['ci:apple-native-entrypoint'] = { ...swift, files: swift.errors.length ? [] : ['scripts/native-test.sh'], mode: 'conditional' };
   try {

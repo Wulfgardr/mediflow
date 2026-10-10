@@ -318,10 +318,53 @@ not accept extra flags or shell expressions. Their marketplace, built binary,
 private exchange directories and synthetic client/server prerequisites are
 explicit; adding selection does not start these tools. The onboarding route
 recipe requires a fresh `local-onboarding` data directory prepared with the
-existing `scripts/prepare-e2e-db.mjs`. The native shell wrapper is local selection
-of the orchestrator, not qualification of every Xcode/SwiftPM branch.
+existing `scripts/prepare-e2e-db.mjs`. The native shell wrapper is also bound to its existing conditional Apple CI
+invocation; that does not qualify every alternate Xcode/SwiftPM branch.
 
 Selection completeness is now separate from execution completeness. Local
 mappings still leave execution coverage open for criterion 5. The inventory
 continues to print `Execution evidence: NOT_ASSESSED` and
 `C14 acceptance: NOT_ASSESSED`; a complete mapping is not a passing test run.
+
+
+The execution contribution preserves that registry and adds shared consumers in
+existing CI jobs. `ci-disposition-selection.mjs` verifies the literal npm command,
+actual runner/selector consumption, job conditions and standalone build order.
+A comment or quoted decoy cannot satisfy a consumer. Discovery does not run these
+commands. Node dispatch uses the repository runtime contract and prepends the
+selected Node binary directory to child `PATH`.
+
+| Shared command | Existing CI lane | Selection and conditions |
+| --- | --- | --- |
+| `npm run test:portable-local` | Web Core / web-core | 47 recipes, 112 unique selected files, including 64 of the original local debt; ordinary lane, existing per-test platform/opt-in skips remain visible |
+| `npm run test:owned-http` | Web Core / web-core | 17 owned synthetic invocations, 19 files; wrapper and child share one invocation |
+| `npm run test:owned-http-standalone` | Web Core / web-core | One supervisor file after the existing real standalone build; no dev-server fallback |
+| `npm run test:fixture-generators` | Web Core / web-core | Two generators in a disposable tracked workspace; verify generated JSON and clean outputs |
+| `npm run test:research-boundary` | Web Core / web-core | Original Cargo test including doctests, release binary, then comparator; three inventory files |
+| `npm run test:inventory-browser` | E2E / e2e | Four synthetic browser contracts using installed locked Playwright; no added retries or quarantine |
+| `npm run test:apple-custodian` | Apple Native / native-build-test | Canonical Node recipe on the existing macOS/Xcode lane and Apple change condition |
+| `scripts/native-test.sh` | Apple Native / native-build-test | Existing invocation retained once; shared SwiftPM selection verifier precedes the same 106 source tests |
+
+Among the original 170 candidates, unique dispositions are 135 ordinary CI,
+four conditional CI, three children of selected tests, six local-only active
+tests, 16 supports and six non-tests. These counts assign each file once; a file
+can retain both its local invocation and CI suite membership. They are not counts
+of executed tests or independent defects.
+
+The six local-only active tests retain `execution.state: not-provisioned`, owner
+`@Wulfgardr`, WUL-729 reason and individual conditions in the manifest:
+
+- `plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs`: authorized authenticated Codex CLI and enabled plugin marketplace.
+- `scripts/mobile-home-base-interop-cas-relay.mjs`: two synthetic participants and separate private exchange directories/receipts.
+- `scripts/mobile-home-base-interop-module-verifier.mjs`: running synthetic iOS/iPadOS server, scenario descriptor and private exchange directory.
+- `scripts/mlx-chat-batch-runner-test.sh`: provisioned Apple MLX environment, including modules required even by its dry-run.
+- `scripts/run-visit-recording-synthetic-benchmark.mjs`: provisioned synthetic voices and local transcription assets; no real recordings or model installation is implied.
+- `scripts/anydoc-desktop-ocr-real.test.ts`: pinned Tesseract, OCR assets and matching rendering environment with serial execution.
+
+These are precise unmet execution prerequisites, not approved exclusions or PASS.
+The custodian and native wrapper instead have `execution.state: conditional-ci`,
+which requires a verified conditional suite. Missing owner, reason, conditions or
+conditional binding fails integrity. Local functional receipts supplied by runner
+authors do not replace the eventual candidate CI, and existing skips do not
+establish qualification of the skipped branches. Criterion 5 remains subject to
+that CI evidence and disposition of these six limitations.
