@@ -67,3 +67,16 @@ test('unknown quoted SQL and deferred foreign-key clauses retain their identity'
   const parent = 'CREATE TABLE p(id PRIMARY KEY);';
   assert.equal(differs(parent+'CREATE TABLE t(a REFERENCES p(id) DEFERRABLE INITIALLY DEFERRED)', parent+'CREATE TABLE t(a REFERENCES p(id) NOT DEFERRABLE)'), true);
 });
+
+test('Drizzle quoting, type spelling and explicit default FK actions are equivalent', () => {
+  const plain = `CREATE TABLE observations(id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL,
+    source TEXT DEFAULT 'manual', linked TEXT REFERENCES items(id) ON DELETE SET NULL,
+    FOREIGN KEY(patient_id) REFERENCES patients(id));
+    CREATE INDEX observations_patient_idx ON observations(patient_id);`;
+  const drizzle = "CREATE TABLE `observations` (`id` text PRIMARY KEY NOT NULL, `patient_id` text NOT NULL, `source` text DEFAULT 'manual', `linked` text REFERENCES `items`(`id`) ON DELETE SET NULL, FOREIGN KEY (`patient_id`) REFERENCES `patients`(`id`) ON UPDATE no action ON DELETE no action); CREATE INDEX `observations_patient_idx` ON `observations`(`patient_id`);";
+  assert.equal(differs(plain, drizzle), false);
+  assert.equal(differs(plain, drizzle.replace("'manual'", "'MANUAL'")), true);
+  assert.equal(differs(plain, drizzle.replace('ON DELETE no action', 'ON DELETE CASCADE')), true);
+  assert.equal(differs(plain, drizzle.replace('ON DELETE no action', 'ON DELETE RESTRICT')), true);
+  assert.equal(differs(plain, drizzle.replace('`patients`(`id`)', '`patients`(`other_id`)')), true);
+});

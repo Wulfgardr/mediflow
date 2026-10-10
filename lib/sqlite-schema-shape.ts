@@ -52,6 +52,75 @@ function declarationName(token: string | undefined) {
   return token;
 }
 
+// Closed identifier/list grammar: never reinterpret expression or string tokens.
+function identifier(token: string | undefined): string | null {
+  const name = declarationName(token);
+  return name !== undefined && (token?.startsWith('"') || token?.startsWith('`') || token?.startsWith('[') || /^[A-Za-z_][A-Za-z_0-9]*$/.test(token ?? '')) ? name : null;
+}
+function identifierList(tokens: string[], start: number): { names: string[]; end: number } | null {
+  if (tokens[start] !== '(') return null;
+  const names: string[] = []; let i = start + 1;
+  for (;;) {
+    const name = identifier(tokens[i++]);
+    if (name === null) return null;
+    names.push(name);
+    if (tokens[i] === ')') return { names, end: i + 1 };
+    if (tokens[i++] !== ',') return null;
+  }
+}
+function referenceClause(tokens: string[]): unknown | null {
+  if (tokens[0]?.toUpperCase() !== 'REFERENCES') return null;
+  const table = identifier(tokens[1]); const list = identifierList(tokens, 2);
+  if (table === null || !list) return null;
+  let i = list.end; const actions: Record<string, string> = { UPDATE: 'NO ACTION', DELETE: 'NO ACTION' };
+  const seen = new Set<string>();
+  while (i < tokens.length) {
+    if (tokens[i++]?.toUpperCase() !== 'ON') return null;
+    const event = tokens[i++]?.toUpperCase();
+    if (!['UPDATE', 'DELETE'].includes(event) || seen.has(event)) return null;
+    seen.add(event);
+    let action = tokens[i++]?.toUpperCase();
+    if (action === 'NO' || action === 'SET') action += ' ' + tokens[i++]?.toUpperCase();
+    if (!['NO ACTION', 'RESTRICT', 'CASCADE', 'SET NULL', 'SET DEFAULT'].includes(action)) return null;
+    actions[event] = action;
+  }
+  return { references: table, columns: list.names, actions };
+}
+function columnClause(tokens: string[]): unknown {
+  const normalized = [...tokens];
+  // These exact built-in declared types have case-insensitive spelling.
+  if (['TEXT', 'INTEGER'].includes(normalized[0]?.toUpperCase())) normalized[0] = normalized[0].toUpperCase();
+  let depth = 0;
+  for (let i = 0; i < normalized.length; i++) {
+    if (normalized[i] === '(') depth++;
+    if (normalized[i] === ')') depth--;
+    if (depth === 0 && normalized[i].toUpperCase() === 'REFERENCES') {
+      const reference = referenceClause(normalized.slice(i));
+      if (reference !== null) return { prefix: normalized.slice(0, i), reference };
+    }
+  }
+  return normalized;
+}
+function constraintClause(tokens: string[]): unknown {
+  if (tokens[0]?.toUpperCase() !== 'FOREIGN' || tokens[1]?.toUpperCase() !== 'KEY') return tokens;
+  const list = identifierList(tokens, 2);
+  const reference = list && referenceClause(tokens.slice(list.end));
+  return reference ? { foreignKey: list!.names, reference } : tokens;
+}
+function indexDefinition(sql: string | null, index: string, table: string, columns: Column[]): unknown {
+  const tokens = sqlTokens(sql);
+  if (!tokens) return null;
+  let i = 0;
+  if (tokens[i++]?.toUpperCase() !== 'CREATE') return tokens;
+  const unique = tokens[i]?.toUpperCase() === 'UNIQUE'; if (unique) i++;
+  if (tokens[i++]?.toUpperCase() !== 'INDEX' || identifier(tokens[i++]) !== index
+      || tokens[i++]?.toUpperCase() !== 'ON' || identifier(tokens[i++]) !== table) return tokens;
+  const list = identifierList(tokens, i);
+  // Expressions, predicates, COLLATE and ordering clauses remain untouched.
+  if (!list || list.end !== tokens.length || list.names.some(name => !columns.some(column => column.name === name))) return tokens;
+  return { index, table, unique, columns: list.names };
+}
+
 function tableDefinition(sql: string, name: string, columns: Column[]) {
   const tokens = sqlTokens(sql)!;
   // Only ordinary CREATE TABLE with an explicit column list is decomposed.
@@ -67,11 +136,11 @@ function tableDefinition(sql: string, name: string, columns: Column[]) {
   }
   if (end < 0) return { conservative: tokens };
   const names = new Set(columns.map(column => column.name));
-  const declarations: [string, string[]][] = []; const constraints: string[][] = [];
+  const declarations: [string, unknown][] = []; const constraints: unknown[] = [];
   for (const clause of clauses) {
     const column = declarationName(clause[0]);
-    if (column !== undefined && names.has(column)) declarations.push([column, clause.slice(1)]);
-    else constraints.push(clause);
+    if (column !== undefined && names.has(column)) declarations.push([column, columnClause(clause.slice(1))]);
+    else constraints.push(constraintClause(clause));
   }
   if (declarations.length !== names.size || new Set(declarations.map(([column]) => column)).size !== names.size)
     return { conservative: tokens };
@@ -91,7 +160,7 @@ export function schemaSnapshot(db: Database.Database): Shape {
     const foreignKeys = order([...groups.values()].map(rows => rows.sort((a, b) => Number(a.seq) - Number(b.seq))));
     const indices = order((db.pragma(`index_list(${quote(name)})`) as Index[]).map(index => ({
       name: index.origin === 'c' ? index.name : null, unique: index.unique, origin: index.origin, partial: index.partial,
-      definition: index.origin === 'c' ? sqlTokens((db.prepare("SELECT sql FROM sqlite_schema WHERE type='index' AND name=?").get(index.name) as { sql: string } | undefined)?.sql ?? null) : null,
+      definition: index.origin === 'c' ? indexDefinition((db.prepare("SELECT sql FROM sqlite_schema WHERE type='index' AND name=?").get(index.name) as { sql: string } | undefined)?.sql ?? null, index.name, name, columns) : null,
       columns: (db.pragma(`index_xinfo(${quote(index.name)})`) as (Row & { cid: number })[]).map(column => ({ ...without(column, 'cid'), source: column.cid < 0 ? column.cid : 'column' })),
     })));
     const triggers = (db.prepare("SELECT name, sql FROM sqlite_schema WHERE type='trigger' AND tbl_name=? ORDER BY name").all(name) as { name: string; sql: string }[]).map(trigger => ({ name: trigger.name, definition: sqlTokens(trigger.sql) }));
