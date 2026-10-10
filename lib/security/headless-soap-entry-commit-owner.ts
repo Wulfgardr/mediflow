@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import Database from 'better-sqlite3';
 
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
@@ -8,6 +9,7 @@ import { getTableName } from 'drizzle-orm';
 
 import {
     dbServer,
+    openDbServer,
     hasCanonicalHeadlessSoapEntryCommitSchema,
     runDbServerImmediateTransaction,
 } from '../db-server';
@@ -86,8 +88,17 @@ const AUDIT_REF = /^hsea_[0-9a-f]{64}$/u;
 const HASH = /^[0-9a-f]{64}$/u;
 const ACTOR_REF = /^hsa_[0-9a-f]{64}$/u;
 const isProxy = types.isProxy;
-const client = dbServer.$client;
-const prepare = client.prepare.bind(client);
+// Capture the intrinsic now, but bind only once to the first concrete connection.
+// A later swap must not silently retarget this owner's captured SQL authority.
+const prepareIntrinsic = Function.prototype.call.bind(Database.prototype.prepare);
+let boundPrepare: ((query: string) => Database.Statement) | undefined;
+const prepare = (query: string): Database.Statement => {
+    if (!boundPrepare) {
+        const client = openDbServer();
+        boundPrepare = (sql: string) => prepareIntrinsic(client, sql);
+    }
+    return boundPrepare(query);
+};
 const entryTable = getTableName(entries);
 const auditTable = getTableName(auditEvents);
 const ledgerTable = getTableName(headlessSoapEntryCommits);

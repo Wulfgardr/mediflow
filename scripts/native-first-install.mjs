@@ -29,7 +29,7 @@ if (path.resolve(selectedDatabase) === path.resolve(database)) {
             // performs its existing schema bootstrap on its first auth check.
             console.log('Fresh native database file reserved for packaged runtime bootstrap.');
         } else {
-            await import('../lib/db-server.ts');
+            (await import('../lib/db-server.ts')).openDbServer();
             console.log('Fresh native database initialized; no operator account created.');
         }
     } else if (!fs.existsSync(database)) {
