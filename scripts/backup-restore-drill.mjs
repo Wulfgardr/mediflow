@@ -73,6 +73,95 @@ function configureSchedulerState(dataDir, backupDir) {
   }
 }
 
+const LOADER = pathToFileURL(path.join(ROOT, 'scripts', 'register-strip-types-loader.mjs')).href;
+const moduleUrl = (...segments) => pathToFileURL(path.join(ROOT, ...segments)).href;
+
+// Gives the source archive records with sealed fields, so the restore carries more than an empty schema.
+// The product opens the archive first: the prepared fixture reaches the current schema only then.
+async function seedSealedRecords(sourceDataDir) {
+  command(
+    [process.execPath, '--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval',
+      `(await import(${JSON.stringify(moduleUrl('lib', 'db-server.ts'))})).openDbServer();`],
+    { MEDIFLOW_DATA_DIR: sourceDataDir },
+  );
+  const { encryptData, generateMasterKey } = await import(moduleUrl('lib', 'security', 'security.ts'));
+  const masterKey = await generateMasterKey();
+  const seal = async (label) => {
+    const sealed = await encryptData(`SYNTHETIC_RESTORE_DRILL:${label}`, masterKey);
+    return `ENC:${sealed.iv}:${sealed.data}`;
+  };
+  const now = 1_783_000_000;
+  const db = new Database(path.join(sourceDataDir, 'medical.db'));
+  try {
+    db.prepare('INSERT INTO ambulatories (id, name, type, is_default, version, created_at) VALUES (?, ?, ?, 0, 1, ?)')
+      .run('drill-source-amb', 'Ambulatorio sintetico drill', 'synthetic', now);
+    db.prepare(`INSERT INTO patients (id, first_name, last_name, tax_code, address, notes, ambulatory_id, is_archived, version, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)`)
+      .run('drill-source-patient', 'Synthetic', 'RestoreDrill', 'SYNTHETIC-DRILL', await seal('patients.address'), await seal('patients.notes'), 'drill-source-amb', now, now);
+    db.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id, assigned_at) VALUES (?, ?, ?)')
+      .run('drill-source-patient', 'drill-source-amb', now);
+    db.prepare(`INSERT INTO entries (id, patient_id, type, date, title, content, version, created_at, updated_at)
+      VALUES (?, ?, 'note', ?, ?, ?, 1, ?, ?)`)
+      .run('drill-source-entry', 'drill-source-patient', now, await seal('entries.title'), await seal('entries.content'), now, now);
+    db.prepare(`INSERT INTO therapies (id, patient_id, drug_name, dosage, status, start_date, motivation, version, created_at, updated_at)
+      VALUES (?, ?, 'Farmaco sintetico', '1 unita', 'active', ?, ?, 1, ?, ?)`)
+      .run('drill-source-therapy', 'drill-source-patient', now, await seal('therapies.motivation'), now, now);
+    db.prepare(`INSERT INTO attachments (id, patient_id, name, type, size, path, data, created_at, document_source_ref, document_revision, document_freshness_epoch)
+      VALUES (?, ?, ?, 'application/pdf', 128, ?, ?, ?, ?, 1, 1)`)
+      .run('drill-source-attachment', 'drill-source-patient', await seal('attachments.name'), await seal('attachments.path'), await seal('attachments.data'), now, 'd'.repeat(64));
+  } finally {
+    db.close();
+  }
+  return masterKey;
+}
+
+// The same executor the product uses, against the synthetic target archive.
+function restoreIntoTarget(targetDataDir, artifactPath) {
+  const source = `
+    import fs from 'node:fs';
+    import { parseBackupArtifact } from ${JSON.stringify(moduleUrl('lib', 'backup-artifact.ts'))};
+    import { restoreBackupArtifact } from ${JSON.stringify(moduleUrl('lib', 'backup-restore-executor.ts'))};
+    const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(process.env.MEDIFLOW_RESTORE_DRILL_ARTIFACT, 'utf8')));
+    process.stdout.write(JSON.stringify(restoreBackupArtifact(artifact, () => false)));
+  `;
+  return JSON.parse(command(
+    [process.execPath, '--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
+    { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_RESTORE_DRILL_ARTIFACT: artifactPath },
+  ));
+}
+
+// Every collection the backup carries must come back equal; the audit history may only grow.
+function compareRestoredPayload(artifactModule, exported, restored) {
+  const differences = [];
+  let recordsCompared = 0;
+  for (const collection of exported.manifest.collections) {
+    const before = exported.payload[collection] ?? [];
+    const after = restored.payload[collection] ?? [];
+    recordsCompared += before.length;
+    const same = collection === 'auditEvents'
+      ? before.every((event) => after.some((candidate) => artifactModule.stableStringify(candidate) === artifactModule.stableStringify(event)))
+      : artifactModule.stableStringify(before) === artifactModule.stableStringify(after);
+    if (!same) differences.push(collection);
+  }
+  return { collectionsCompared: exported.manifest.collections.length, recordsCompared, differences };
+}
+
+async function countReadableSealedValues(payload, masterKey) {
+  const { decryptData } = await import(moduleUrl('lib', 'security', 'security.ts'));
+  let readable = 0;
+  for (const collection of ['patients', 'entries', 'therapies', 'attachments']) {
+    for (const row of payload[collection] ?? []) {
+      if (typeof row.id !== 'string' || !row.id.startsWith('drill-source-')) continue;
+      for (const value of Object.values(row)) {
+        if (typeof value !== 'string' || !value.startsWith('ENC:')) continue;
+        const [, iv, data] = value.split(':');
+        if (String(await decryptData(data, iv, masterKey)).startsWith('SYNTHETIC_RESTORE_DRILL:')) readable += 1;
+      }
+    }
+  }
+  return readable;
+}
+
 function createDrillDataset(artifactModule) {
   const payload = artifactModule.createEmptyDataset();
   payload.ambulatories.push({
@@ -172,6 +261,7 @@ async function main() {
       command(['node', 'scripts/prepare-e2e-db.mjs'], { MEDIFLOW_DATA_DIR: sourceDataDir, MEDIFLOW_E2E_DATA_DIR: sourceDataDir });
       configureSchedulerState(sourceDataDir, backupDir);
     });
+    const masterKey = await seedSealedRecords(sourceDataDir);
     timed('prepareTargetDbMs', timings, () => command(['node', 'scripts/prepare-e2e-db.mjs'], { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_E2E_DATA_DIR: targetDataDir }));
 
     const staleArtifact = path.join(backupDir, 'mediflow-backup-v1-2026-03-17T00-00-00.000Z.mediflow');
@@ -214,6 +304,30 @@ async function main() {
     if (!retention.staleArtifactRemoved || !retention.staleTempRemoved || !retention.unrelatedFilePreserved) {
       failures.push({ step: 'retention', message: 'Retention evidence did not match keep-last-N expectations.', remediation: 'Check applyBackupRetention before trusting cleanup.' });
     }
+    const realRestoreStartedAt = process.hrtime.bigint();
+    const realRestore = await (async () => {
+      const restoreResult = restoreIntoTarget(targetDataDir, schedulerResult.artifactPath);
+      const reexport = JSON.parse(command(
+        [process.execPath, '--experimental-strip-types', 'scripts/run-scheduled-backup.mjs'],
+        { MEDIFLOW_DATA_DIR: targetDataDir, MEDIFLOW_BACKUP_DEST_DIR: path.join(options.workDir, 'restored-backups'), MEDIFLOW_BACKUP_FORCE: '1' },
+      ));
+      if (!reexport.ok || !reexport.artifactPath) throw new Error(reexport.message || 'The restored archive could not be exported again.');
+      const restoredArtifact = await artifactModule.parseBackupArtifact(JSON.parse(fs.readFileSync(reexport.artifactPath, 'utf8')));
+      return {
+        mode: 'sqlite-restore-and-reexport',
+        ...compareRestoredPayload(artifactModule, parsedArtifact, restoredArtifact),
+        sealedValuesReadable: await countReadableSealedValues(restoredArtifact.payload, masterKey),
+        auditCoverage: restoreResult.audit.coverage,
+        notCovered: ['unlock key and recovery material', 'durable review commands', 'local accounts and settings'],
+      };
+    })();
+    timings.realRestoreAndReexportMs = Math.round(Number(process.hrtime.bigint() - realRestoreStartedAt) / 1_000_000);
+    if (realRestore.differences.length > 0) {
+      failures.push({ step: 'real-restore', message: `Restored collections differ from the backup: ${realRestore.differences.join(', ')}.`, remediation: 'Compare the exported and the re-exported artifact kept with --keep-work-dir.' });
+    }
+    if (realRestore.sealedValuesReadable !== 8) {
+      failures.push({ step: 'real-restore', message: 'Sealed synthetic values did not come back readable with their key.', remediation: 'Check that restore leaves encrypted values byte-identical.' });
+    }
     if (!syntheticOnly(drillArtifact)) failures.push({ step: 'phi-safe', message: 'Drill artifact contains a real-data shaped token.', remediation: 'Use synthetic identifiers only.' });
 
     report = {
@@ -245,6 +359,7 @@ async function main() {
         restoredPayloadSnapshotHash: sha256File(restoredPayloadPath),
         note: 'First thin slice validates restore readiness and materializes the parsed synthetic payload in an isolated sandbox without touching the operational database.',
       },
+      realRestore,
       timings,
       failures,
     };
