@@ -33,6 +33,9 @@ test('missing descriptor, altered executable/argv/framing and comment-only bindi
     [NATIVE_DECRYPT_BRIDGE_CONSUMER, value => value.replace('+ [file.path]', '+ ["other.cjs"]')],
     [NATIVE_DECRYPT_BRIDGE_CONSUMER, value => value.replace('data.append(lineTerminator)', 'data.append(0)')],
     [NATIVE_DECRYPT_BRIDGE_CONSUMER, value => value.replace('try process.run()', '// try process.run()')],
+    [NATIVE_DECRYPT_BRIDGE_CONSUMER, value => value.replace('try process.run()', 'let decoy = #"try process.run()"#')],
+    [bridge, value => value.replace('run(JSON.parse(line))', '`run(JSON.parse(line))`')],
+    [bridge, value => value.replace('run(JSON.parse(line))', '"run(JSON.parse(line))"')],
     [bridge, value => value.replace('input:process.stdin', 'input:process.stderr')],
     [bridge, value => value.replace('line.length<=contract.maxLineBytes', 'true')],
   ];
