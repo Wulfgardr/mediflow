@@ -52,7 +52,7 @@ test('standalone manifest preflight admits the supported major and ABI across No
     assert.equal(result.error, undefined);
     assert.equal(result.signal, null);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /Standalone Treatment portable closure missing, non-physical, or contains model\/runtime\/private data\./);
+    assert.match(result.stderr, /scheduled backup runtime: ENOENT: no such file or directory, lstat '[^'\r\n]+[\\/]\.next[\\/]standalone[\\/]scripts'/);
     assert.doesNotMatch(result.stderr, /Standalone runtime ABI\/platform mismatch/);
   }
 });

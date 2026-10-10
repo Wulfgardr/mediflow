@@ -32,7 +32,7 @@ function fixture(t) {
     const doubles = {
         'server-only': {},
         '../../db-server': { dbServer },
-        '../../security/server-auth': { acquireAuthenticatedWebSessionProjectionOwnerContext: unavailable },
+        '../../security/ordinary-application-context': { acquireOrdinaryApplicationContext: unavailable, registerOrdinaryApplicationResource: unavailable },
         '../host-local-provider-binding': { createHostLocalProviderBindingService: () => Object.freeze({}) },
         '../host-local-provider-readiness': { observeClinical: unavailable },
         './provider-lifecycle-service': { createHostProviderLifecycleService: () => ({ service: Object.freeze({}) }) },
@@ -45,7 +45,7 @@ function fixture(t) {
             },
         },
     };
-    const allowed = new Set([PRODUCTION, 'lib/patient-lifecycle.ts', 'lib/schema.ts', 'lib/ai-patient-insight-kill-switch.ts', 'lib/ai-lane-kill-switch.ts']);
+    const allowed = new Set([PRODUCTION, 'lib/patient-lifecycle.ts', 'lib/version-concurrency.ts', 'lib/schema.ts', 'lib/ai-patient-insight-kill-switch.ts', 'lib/ai-lane-kill-switch.ts']);
     const cache = new Map();
     function load(relative) {
         assert.ok(allowed.has(relative), `unexpected production import: ${relative}`);
