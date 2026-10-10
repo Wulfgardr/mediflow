@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "groups": {
+    "headless-browser": {
+      "recipes": [
+        "components/lock-screen-pin.browser.test.mjs",
+        "scripts/chatgpt-account/account-ui-browser.mjs",
+        "scripts/function-models/ui-browser.mjs",
+        "tests/ui06/component-browser.test.mjs"
+      ],
+      "prerequisites": [
+        "Node 24 and npm ci dependencies including Playwright, Chromium and esbuild; browser provisioning belongs to the CI lane.",
+        "Loopback fixture servers only; no real accounts or application server."
+      ],
+      "outputArguments": [
+        "scripts/chatgpt-account/account-ui-browser.mjs",
+        "scripts/function-models/ui-browser.mjs"
+      ]
+    },
+    "fixture-generators": {
+      "recipes": [
+        "scripts/generate-clinical-rich-text-fixtures.mjs",
+        "scripts/generate-fhir-golden-worker.ts"
+      ],
+      "prerequisites": [
+        "Node 24, installed dependencies and Git tracked sources copied into an owned disposable checkout."
+      ],
+      "artifacts": [
+        "native/contracts/clinical-rich-text-fixtures.v1.json",
+        "native/contracts/fhir-golden-input.v1.json",
+        "native/contracts/fhir-golden-bundle.v1.json"
+      ]
+    },
+    "research-toolchain": {
+      "recipes": [
+        "experiments/rust-boundary/compare.mjs"
+      ],
+      "prerequisites": [
+        "Cargo/Rust and locked dependencies provisioned by the lane; Node 24.",
+        "Cargo tests include their standard doctests; release comparator timings are observations, not performance qualification."
+      ]
+    },
+    "apple-native": {
+      "recipes": [
+        "scripts/native-test.sh"
+      ],
+      "platform": "darwin",
+      "prerequisites": [
+        "Darwin with full Xcode/XCTest and SwiftPM; only the default Swift selection is claimed."
+      ],
+      "existingLane": ".github/workflows/apple-native.yml",
+      "existingInvocation": "scripts/native-test.sh 2>&1 | tee"
+    }
+  },
+  "externalConditions": [
+    {
+      "file": "plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Requires a real authenticated Codex CLI and the installed, enabled mediflow-synthetic plugin; no credentials are synthesized.",
+      "condition": "Retain exact recipes; record per-file CI condition or owned exclusion with these concrete prerequisites. Do not fabricate credentials/client events."
+    },
+    {
+      "file": "scripts/mobile-home-base-interop-cas-relay.mjs",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Requires coordinated running synthetic mobile/simulator participants, an explicit scenario and private exchange directories; no participant events are fabricated.",
+      "condition": "Retain exact recipes; record per-file CI condition or owned exclusion with these concrete prerequisites. Do not fabricate credentials/client events."
+    },
+    {
+      "file": "scripts/mobile-home-base-interop-module-verifier.mjs",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Requires coordinated running synthetic mobile/simulator module participants and their private exchange directories; Node execution alone cannot provide them.",
+      "condition": "Retain exact recipes; record per-file CI condition or owned exclusion with these concrete prerequisites. Do not fabricate credentials/client events."
+    },
+    {
+      "file": "native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Requires non-root Darwin, Apple compiler/SDK, codesign and sandbox facilities; its canonical strip-test recipe needs an explicit Apple lane hook.",
+      "condition": "Bind existing Apple lane to the same recipes/default Swift selection. Record platform skips; do not claim Xcode modes from default Swift invocation."
+    },
+    {
+      "file": "scripts/native-test.sh",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Requires Darwin, full Xcode/XCTest and SwiftPM; the existing Apple lane invokes the default Swift entrypoint, not alternate Xcode modes.",
+      "condition": "Bind existing Apple lane to the same recipes/default Swift selection. Record platform skips; do not claim Xcode modes from default Swift invocation."
+    },
+    {
+      "file": "scripts/mlx-chat-batch-runner-test.sh",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Dry-run still imports mlx.core/mlx_lm and requires .venv_mlx/bin/python3; the lane must provision that runtime explicitly.",
+      "condition": "Use an explicitly provisioned Apple/model lane or per-file owner-approved exclusion; dry-run alone does not remove MLX imports."
+    },
+    {
+      "file": "scripts/run-visit-recording-synthetic-benchmark.mjs",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Requires macOS say voices and the local transcription runtime/assets; synthetic input does not remove those runtime prerequisites.",
+      "condition": "Use an explicitly provisioned Apple/model lane or per-file owner-approved exclusion; dry-run alone does not remove MLX imports."
+    },
+    {
+      "file": "scripts/anydoc-desktop-ocr-real.test.ts",
+      "owner": "@Wulfgardr",
+      "status": "proposed-condition-not-approved-exclusion",
+      "reason": "Forces real Tesseract and imports the desktop OCR suite; requires pinned OCR assets and a matching renderer profile. Missing assets are not a passing skip.",
+      "condition": "Attach to provisioned OCR lane using same serial recipe, or explicitly own the asset-dependent exclusion. No generic local-only exclusion."
+    }
+  ]
+}

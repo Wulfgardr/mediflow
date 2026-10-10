@@ -135,6 +135,9 @@ jobs:
           E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
         run: npm run test:e2e
 
+      - name: Synthetic component browser contracts
+        run: npm run test:inventory-browser
+
       # This browser harness uses node:test and top-level await, so it is not
       # collectable by Playwright. Keep it in its canonical runner with an
       # independent marked synthetic directory.

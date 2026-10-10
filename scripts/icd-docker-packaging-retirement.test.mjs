@@ -20,9 +20,9 @@ test('current setup documents the server-only WHO boundary and honest readiness'
     assert.match(setup, /MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST/u);
     assert.match(setup, /MEDIFLOW_ICD_WHO_LOCAL_DATASET_ID/u);
     assert.match(setup, /manifesto.*fallisce intenzionalmente/iu);
-    assert.match(setup, /configured` non equivale a `available/u);
+    assert.match(setup, /configured` non equivale ad `available/u);
     assert.match(setup, /server-only/u);
-    assert.match(setup, /Non esiste fallback a\s+ICD-9/iu);
+    assert.match(setup, /senza ripiego su ICD-9, JSON WHO grezzo o servizio WHO remoto/iu);
     assert.doesNotMatch(setup, /docker run|127\.0\.0\.1:8888/iu);
 
     const index = source('docs/markdown-index.md');

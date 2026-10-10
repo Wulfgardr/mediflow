@@ -2,14 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TMP_DIR="$ROOT_DIR/tmp-backup-scheduler-test"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-backup-scheduler-test.XXXXXX")"
+trap 'rm -rf "$TMP_DIR"' EXIT
 DATA_DIR="$TMP_DIR/data"
 OUT_DIR="$TMP_DIR/out"
 
 rm -rf "$TMP_DIR"
 mkdir -p "$OUT_DIR"
 
-MEDIFLOW_E2E_DATA_DIR="$DATA_DIR" node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
+MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_E2E_DATA_DIR="$DATA_DIR" node "$ROOT_DIR/scripts/prepare-e2e-db.mjs"
 
 DATA_DIR="$DATA_DIR" node --input-type=module <<'NODE'
 import Database from 'better-sqlite3';

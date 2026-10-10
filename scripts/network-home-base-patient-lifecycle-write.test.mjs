@@ -172,7 +172,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
             headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
             body: { id: patientId, firstName: 'Lifecycle', lastName: 'Writer', taxCode: `LCW${suffix}` },
         });
-        assert.equal(duplicateCreate.response.status, 500);
+        assert.equal(duplicateCreate.response.status, 409);
         assert.deepEqual(patientMutationSnapshot(patientId), afterCreate);
 
         const detail = await request('GET', `/api/v1/network/patients/${patientId}`, {
@@ -391,7 +391,7 @@ test('concurrent HTTP deletes and restores have one winner and no replay audit',
         const creates = await Promise.all([0, 1].map(() => request('POST', '/api/v1/network/patients', {
             headers, body: createBody,
         })));
-        assert.deepEqual(creates.map(item => item.response.status).sort(), [201, 500]);
+        assert.deepEqual(creates.map(item => item.response.status).sort(), [201, 409]);
         const afterCreate = patientMutationSnapshot(patientId);
         assert.equal(afterCreate.patient.version, 1);
         assert.equal(afterCreate.memberships.length, 1);

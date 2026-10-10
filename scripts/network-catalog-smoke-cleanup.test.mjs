@@ -12,7 +12,11 @@ test('catalog smoke waits for the server writer before removing its workspace', 
   const bin = join(root, 'bin');
   const scripts = join(root, 'scripts');
   const cli = join(root, 'node_modules/next/dist/bin');
-  for (const path of [bin, scripts, cli, data]) mkdirSync(path, { recursive: true });
+  // Satisfy the wrapper's dependency-directory preflight without installing or
+  // running packages: the synthetic Next CLI below owns the real child writer.
+  const dependencyDirectories = ['typescript', '@types/react', '@types/node']
+    .map(name => join(root, 'node_modules', name));
+  for (const path of [bin, scripts, cli, data, ...dependencyDirectories]) mkdirSync(path, { recursive: true });
   const stopped = join(data, 'writer-stopped.json');
   const pidFile = join(data, 'controller.pid');
   t.after(async () => {

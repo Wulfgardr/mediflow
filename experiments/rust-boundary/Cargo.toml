@@ -6,3 +6,11 @@ publish = false
 
 [dependencies]
 serde_json = "=1.0.145"
+
+# Explicit equivalents of Cargo's existing implicit target paths.
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "mediflow-rust-boundary-experiment"
+path = "src/main.rs"

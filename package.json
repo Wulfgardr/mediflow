@@ -6,6 +6,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "test:clinical-http": "node scripts/run-clinical-http-suite.mjs",
     "preinstall": "node scripts/node-runtime-contract.mjs verify-node",
     "postinstall": "node scripts/node-runtime-contract.mjs verify",
     "predev": "node scripts/node-runtime-contract.mjs verify",
@@ -221,7 +222,14 @@
     "test:api-error-leak": "node scripts/check-api-error-leak.mjs --self-test",
     "build:usage-dashboard": "node scripts/build-usage-dashboard.mjs",
     "check:usage-dashboard": "node scripts/build-usage-dashboard.mjs --check",
-    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs"
+    "test:usage-dashboard": "node --test scripts/build-usage-dashboard.test.mjs",
+    "test:inventory-browser": "node scripts/conditional-local-groups.mjs --group headless-browser",
+    "test:fixture-generators": "node scripts/conditional-local-groups.mjs --group fixture-generators",
+    "test:research-boundary": "node scripts/conditional-local-groups.mjs --group research-toolchain",
+    "test:apple-custodian": "node scripts/local-test-selection.mjs native/MediFlowMac/ExecutionCustodian/custodian.test.ts",
+    "test:portable-local": "node scripts/run-portable-local-tests.mjs",
+    "test:owned-http": "node scripts/run-owned-synthetic-http-suite.mjs",
+    "test:owned-http-standalone": "node scripts/run-owned-synthetic-http-suite.mjs --standalone"
   },
   "dependencies": {
     "@firecrawl/anydoc": "0.2.4",

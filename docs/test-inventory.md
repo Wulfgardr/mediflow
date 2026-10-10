@@ -244,3 +244,142 @@ path also activates Apple on PR and push. Other filters remain unchanged.
 An inventory PASS verifies the declared conditional selection and configured
 binding. It cannot certify that the conditional job ran or passed: authoritative
 SwiftPM comparison and execution evidence come from that job when selected.
+
+### WUL-729: disposition and execution are separate
+
+The original 170 unresolved candidates now have a bounded disposition. A mapping
+means that a real command selects the file; it is never evidence that the command
+ran or passed. The report separates ordinary CI, conditional CI and local
+selections. The two SOAP assertion fixtures have a child binding: their parent uses the shared
+argv and checks child exit status, and must itself be selected. No child
+execution is inferred from a filename or from the parent's passing status.
+
+`node scripts/local-test-selection.mjs <recipe-id>` executes one explicit recipe
+from `scripts/local-test-recipes.json`. Inventory discovery reads that same
+registry without executing it. Node commands use `process.execPath`; supported
+loaders, VM flags, serial test flags, shell wrappers and Python entrypoints have
+closed argv forms. There is no shell command evaluation, implicit file glob or
+run-all switch. Each recipe states its prerequisites. Browser, platform, model,
+server and fixture requirements remain in force, and skips do not qualify them.
+The network recipes keep the existing owned synthetic HTTP wrappers. This
+registry adds local selection, not an npm lifecycle or CI binding.
+
+The ChatGPT focused runner, prototype runner, patient soft-delete runner and UI06
+domain runner consume `scripts/additional-test-selection.mjs` directly. Their
+original ordering, loader, bootstrap, quarantine and invocation options remain
+unchanged. The inventory checks their bounded consumer bindings. The ChatGPT
+browser branch and `test:clinical-http` have literal workflow bindings; the
+nonbrowser ChatGPT, prototype, soft-delete and UI06 domain commands are reported
+as local. Prototype tests remain active assertions, not exclusions.
+
+`support` requires a concrete reason, owner and selected importer. Leading ESM
+imports and CommonJS `const ... = require(...)` are verified; extensionless
+imports resolve only when a single source sibling exists. Comments, arbitrary
+strings, type-only imports, dynamic imports and function bodies are not treated
+as support evidence. `excluded-non-test` is distinct: it identifies reviewed
+production implementation, configuration or fixture/capture tools, with a
+specific reason and owner **@Wulfgardr (WUL-729)**. Neither disposition may be
+selected as a test. Assertive generators, benchmark self-checks and SOAP child
+fixtures remain test mappings, even when they also produce fixtures. Renamed,
+missing and newly discovered files continue to fail integrity.
+
+All original candidates now have verified selection or a reviewed non-test/support
+disposition. The final bindings use these authorities:
+
+- Cargo consumes explicit `[lib].path` and `[[bin]].name/path` in the existing
+  `experiments/rust-boundary/Cargo.toml`, equivalent to its previous default
+  `src/lib.rs` and `src/main.rs` targets. The closed adapter rejects unsupported
+  target options, duplicate/missing target stanzas and unsafe/missing paths. Its
+  local dispatcher retains `cargo test --manifest-path …`, including doctests;
+  it does not restrict execution to `--lib`/`--bin` or claim Cargo ran.
+- Xcode UI membership comes from `project.yml` sources and scheme test targets.
+  The conditional workflow actually regenerates that spec with XcodeGen before
+  invoking Xcode. The adapter verifies generation order, command, matrix and job
+  condition: the iPhone leg selects the whole target; iPad retains its four
+  `only-testing` identifiers. Method skips and non-PR eligibility remain explicit.
+- The Swift decrypt parent and Node bridge consume a shared invocation/protocol
+  descriptor. The child adapter verifies those consumers and requires the Swift
+  parent itself to belong to a verified selected suite. It does not run Swift or
+  the bridge or promote conditional native coverage to every push.
+- The exemption support adapter verifies the actual lazy import after isolated
+  SQLite bootstrap. Neither fixture nor importer was hoisted or executed during
+  discovery. An invalid lazy edge fails integrity even when its parent is mapped.
+
+Consumer binding guards discard comments and keep strings/templates indivisible,
+so a code-shaped quoted decoy cannot replace the actual shared-selector call.
+New adapter tests belong to the existing unit selector. Repository guards run
+both inventory integrity and completeness: a newly declared unresolved record
+can no longer leave that gate green. Dispatcher runtime validation occurs only
+when executing a recipe, before spawn; pure collection never starts a runtime.
+
+The Codex, Rust comparator and mobile scenario recipes require exactly their
+registered parameter values, appended after the fixed Node entrypoint. They do
+not accept extra flags or shell expressions. Their marketplace, built binary,
+private exchange directories and synthetic client/server prerequisites are
+explicit; adding selection does not start these tools. The onboarding route
+recipe requires a fresh `local-onboarding` data directory prepared with the
+existing `scripts/prepare-e2e-db.mjs`. The native shell wrapper is also bound to its existing conditional Apple CI
+invocation; that does not qualify every alternate Xcode/SwiftPM branch.
+
+Selection completeness is now separate from execution completeness. Local
+mappings still leave execution coverage open for criterion 5. The inventory
+continues to print `Execution evidence: NOT_ASSESSED` and
+`C14 acceptance: NOT_ASSESSED`; a complete mapping is not a passing test run.
+
+
+The execution contribution preserves that registry and adds shared consumers in
+existing CI jobs. `ci-disposition-selection.mjs` verifies the literal npm command,
+actual runner/selector consumption, job conditions and standalone build order.
+A comment or quoted decoy cannot satisfy a consumer. Discovery does not run these
+commands. Node dispatch uses the repository runtime contract and prepends the
+selected Node binary directory to child `PATH`.
+
+| Shared command | Existing CI lane | Selection and conditions |
+| --- | --- | --- |
+| `npm run test:portable-local` | Web Core / web-core | 46 recipes, 111 unique selected files, including 63 of the original local debt; ordinary lane, existing per-test platform/opt-in skips remain visible |
+| `npm run test:owned-http` | Web Core / web-core | 17 owned synthetic invocations, 19 files; wrapper and child share one invocation |
+| `npm run test:owned-http-standalone` | Web Core / web-core | One supervisor file after the existing real standalone build; no dev-server fallback |
+| `npm run test:fixture-generators` | Web Core / web-core | Two generators in a disposable tracked workspace; verify generated JSON and clean outputs |
+| `npm run test:research-boundary` | Web Core / web-core | Original Cargo test including doctests, release binary, then comparator; three inventory files |
+| `npm run test:inventory-browser` | E2E / e2e | Four synthetic browser contracts using installed locked Playwright; no added retries or quarantine |
+| `node scripts/local-test-selection.mjs test:installability-v0` | Apple Native / native-build-test | Real macOS launcher tests with system `lockf`; test, build script and launcher changes activate the lane on PR and push |
+| `npm run test:apple-custodian` | Apple Native / native-build-test | Canonical Node recipe on the existing macOS/Xcode lane and Apple change condition |
+| `scripts/native-test.sh` | Apple Native / native-build-test | Existing invocation retained once; shared SwiftPM selection verifier precedes the same 106 source tests |
+
+Among the original 170 candidates, unique dispositions are 134 ordinary CI,
+five conditional CI, three children of selected tests, six optional-profile active
+tests, 16 supports and six non-tests. These counts assign each file once; a file
+can retain both its local invocation and CI suite membership. They are not counts
+of executed tests or independent defects.
+
+The six active optional-profile tests use `execution.state: optional-profile`,
+`ordinaryGate: excluded`, a named profile, owner `@Wulfgardr`, WUL-729 reason
+and individual conditions in the same manifest consumed locally and in CI:
+
+- `plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs`: authorized authenticated Codex CLI and enabled plugin marketplace.
+- `scripts/mobile-home-base-interop-cas-relay.mjs`: two synthetic participants and separate private exchange directories/receipts.
+- `scripts/mobile-home-base-interop-module-verifier.mjs`: running synthetic iOS/iPadOS server, scenario descriptor and private exchange directory.
+- `scripts/mlx-chat-batch-runner-test.sh`: provisioned Apple MLX environment, including modules required even by its dry-run.
+- `scripts/run-visit-recording-synthetic-benchmark.mjs`: macOS 26, configured compatible Xcode, the five synthetic voices and installed Italian SpeechTranscriber assets. Availability must be verified; missing qualification does not prove assets absent.
+- `scripts/anydoc-desktop-ocr-real.test.ts`: pinned Tesseract, OCR assets and matching rendering environment with serial execution.
+
+These are explicit exclusions from the ordinary gate for optional qualification
+profiles, not non-tests, disabled capabilities or PASS. Their original recipes
+remain available. The guard requires a verified local selection and rejects
+contradictory ordinary-gate membership; missing profile, exclusion marker, owner,
+reason or conditions fails integrity. Ordinary shared suites remain mandatory.
+No local receipt or transient host state is embedded in this contract.
+The installability launcher, custodian and native wrapper instead have `execution.state: conditional-ci`,
+which requires a verified conditional suite. Missing owner, reason, conditions or
+conditional binding fails integrity. Local functional receipts supplied by runner
+authors do not replace the eventual candidate CI, and existing skips do not
+establish qualification of the skipped branches. Criterion 5 uses this same inventory and the same six profile exclusions locally
+and in CI; candidate CI evidence remains necessary. Inventory reporting retains
+`Execution evidence: NOT_ASSESSED` and never turns an optional profile into PASS.
+
+The frozen capability-mapping check also reads the exact Git commits in
+`docs/capability-mapping/source-manifest.v1.json`. Some are retained objects from
+merged or deleted source branches, so a full fetch of current branches alone is
+insufficient. Web Core fetches those exact object IDs from `origin` before the
+shared unit suite; local clones require the same source objects. No source
+validation is skipped when an object is missing.

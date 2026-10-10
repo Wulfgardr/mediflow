@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "entrypoint": "lib/chatgpt-product/fixtures/native-client-decrypt-swift-bridge.cjs",
+  "nodeMajor": 24,
+  "executableEnvironment": "MEDIFLOW_NODE24",
+  "fallbackExecutable": "/usr/bin/env",
+  "fallbackArguments": [
+    "node"
+  ],
+  "protocol": "json-lines",
+  "lineTerminator": 10,
+  "maxLineBytes": 4194304
+}
