@@ -18,7 +18,7 @@ test('rebuilds from migrations when the legacy database has no users table', () 
 
     const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'prepare-e2e-db.mjs')], {
       cwd: sandbox,
-      env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir },
+      env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '0' },
       encoding: 'utf8',
     });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);

@@ -172,6 +172,12 @@ function childEnvironment() {
       delete env[key];
     }
   }
+  // A test never seeds itself from the checkout's own medical.db: the E2E preparer copies that file
+  // unless told otherwise, and in a developer checkout it can be a real archive. A test of the
+  // legacy copy sets the variable to '0' for the process it starts.
+  if (options.includes('--test') && env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY === undefined) {
+    env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1';
+  }
   return env;
 }
 
