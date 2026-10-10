@@ -1,21 +1,58 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
-import { BackupRestorePreflightError, exportRawDatabase, importRawDatabase } from '@/lib/db';
+import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
+import { BackupRestoreBlockedError, BackupRestorePreflightError, exportRawDatabase, importRawDatabase, verifyRawDatabase } from '@/lib/db';
+import { BackupRestoreKeyError } from '@/lib/backup-restore-key-check';
 import { useSecurity } from './security-provider';
 
 // WUL-297: parola chiave richiesta per confermare il restore.
 const RESTORE_CONFIRM_KEYWORD = 'RIPRISTINA';
 
+// Each outcome names its state and says what to do next: a created backup is not a verified one,
+// a verified one is not a proven restore, and a blocked restore has changed nothing.
+type Outcome = {
+    type: 'success' | 'error' | 'info';
+    title?: string;
+    message: string;
+    nextStep?: string;
+    preflight?: BackupRestorePreflightError['preflight'];
+};
+
+const BLOCKED_NEXT_STEP: Record<string, string> = {
+    durable_review_commands: 'Questo archivio contiene comandi di revisione che un backup non sa rappresentare: finché esistono, il ripristino resta bloccato di proposito.',
+    audit: 'Lo storico di audit del backup è in conflitto con quello di questo archivio. Controlla di aver scelto un backup di questo studio.',
+    runtime_fence: 'Riavvia MediFlow e riprova.',
+};
+
+function failedOutcome(err: unknown, action: 'verify' | 'restore'): Outcome {
+    const message = err instanceof Error ? err.message : 'Il file potrebbe essere corrotto.';
+    if (err instanceof BackupRestorePreflightError) {
+        return {
+            type: 'error', message, preflight: err.preflight,
+            title: action === 'verify' ? 'Backup non valido' : 'Ripristino bloccato',
+            nextStep: action === 'verify'
+                ? 'Non usarlo per un ripristino: crea un backup nuovo.'
+                : 'I dati attuali non sono stati modificati. Scegli un altro backup o crea un backup nuovo.',
+        };
+    }
+    if (err instanceof BackupRestoreKeyError) {
+        return {
+            type: 'error', message,
+            title: action === 'verify' ? 'Backup non leggibile con questa chiave' : 'Ripristino bloccato',
+            nextStep: 'Sblocca MediFlow con le credenziali dello studio che ha creato il backup.',
+        };
+    }
+    if (err instanceof BackupRestoreBlockedError) {
+        return { type: 'error', title: 'Ripristino bloccato', message, nextStep: BLOCKED_NEXT_STEP[err.reason ?? ''] ?? 'Riprova; se si ripete, conserva il backup e segnala il problema.' };
+    }
+    return { type: 'error', title: action === 'verify' ? 'Verifica non riuscita' : 'Ripristino non riuscito', message };
+}
+
 export default function BackupRestoreUI() {
     const { isAuthenticated, lock } = useSecurity();
     const [isLoading, setIsLoading] = useState(false);
-    const [status, setStatus] = useState<{
-        type: 'success' | 'error' | 'info';
-        message: string;
-        preflight?: BackupRestorePreflightError['preflight'];
-    } | null>(null);
+    const [status, setStatus] = useState<Outcome | null>(null);
     const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
     const [restoreConfirmText, setRestoreConfirmText] = useState('');
 
@@ -35,10 +72,37 @@ export default function BackupRestoreUI() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            setStatus({ type: 'success', message: 'Backup scaricato con successo! Conservalo al sicuro.' });
+            setStatus({
+                type: 'success', title: 'Backup creato', message: 'Il file è stato scaricato.',
+                nextStep: 'Non è ancora verificato: selezionalo con «Verifica un backup» e conservane una copia fuori da questo computer.',
+            });
         } catch (e) {
             console.error(e);
-            setStatus({ type: 'error', message: 'Errore durante l\'export del backup.' });
+            setStatus({ type: 'error', title: 'Backup non creato', message: 'Errore durante l\'export del backup.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Same key check and preflight as a restore, through a route that cannot write.
+    const handleVerifyFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || isLoading) return;
+
+        setIsLoading(true);
+        setStatus({ type: 'info', message: 'Verifica in corso...' });
+        try {
+            const verified = await verifyRawDatabase(await file.text());
+            const created = verified.createdAt ? `, creato il ${new Date(verified.createdAt).toLocaleString('it-IT')}` : '';
+            setStatus({
+                type: 'success', title: 'Backup verificato',
+                message: `Formato e integrità sono validi e la chiave sbloccata lo legge: ${verified.records.toLocaleString('it-IT')} record in ${verified.collections} collezioni${created}.`,
+                nextStep: 'Verificato non significa provato: che un backup si ripristini lo dimostra la prova di ripristino, descritta qui sotto.',
+            });
+        } catch (err) {
+            console.error(err);
+            setStatus(failedOutcome(err, 'verify'));
         } finally {
             setIsLoading(false);
         }
@@ -72,7 +136,7 @@ export default function BackupRestoreUI() {
         try {
             const text = await pendingRestoreFile.text();
             await importRawDatabase(text);
-            setStatus({ type: 'success', message: 'Ripristino completato! L\'applicazione verrà bloccata per ricaricare le chiavi.' });
+            setStatus({ type: 'success', title: 'Ripristino completato', message: 'I dati sono stati sostituiti con quelli del backup. L\'applicazione si blocca per ricaricare le chiavi.' });
 
             // Wait a sec then lock/reload
             setTimeout(() => {
@@ -82,11 +146,7 @@ export default function BackupRestoreUI() {
 
         } catch (err) {
             console.error(err);
-            const preflight = err instanceof BackupRestorePreflightError ? err.preflight : undefined;
-            const message = err instanceof Error
-                ? err.message
-                : 'Errore durante il ripristino. Il file potrebbe essere corrotto.';
-            setStatus({ type: 'error', message, preflight });
+            setStatus(failedOutcome(err, 'restore'));
         } finally {
             setIsLoading(false);
             setPendingRestoreFile(null);
@@ -117,6 +177,23 @@ export default function BackupRestoreUI() {
                     {isLoading ? <RefreshCw className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                     Scarica Backup
                 </button>
+                <label className="mf-btn-secondary lume-press ml-2 w-fit cursor-pointer">
+                    <ShieldCheck className="w-4 h-4" />
+                    Verifica un backup
+                    <input
+                        type="file"
+                        accept=".mediflow,.json"
+                        onChange={handleVerifyFileSelected}
+                        disabled={isLoading}
+                        data-testid="backup-verify-input"
+                        className="hidden"
+                    />
+                </label>
+                <p className="mt-4 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
+                    <strong>Verificare</strong> controlla formato, integrità e chiave senza toccare i dati.{' '}
+                    <strong>Provare un ripristino</strong> è un passo diverso: la prova sintetica ripristina un backup in un archivio
+                    di prova e lo confronta, con <code>npm run test:backup-restore:drill</code> dalla cartella del progetto.
+                </p>
             </div>
 
             <div className="mf-section lume-focal p-6 md:p-7">
@@ -206,8 +283,10 @@ export default function BackupRestoreUI() {
                     }`}>
                     {status.type === 'success' && <CheckCircle className="w-5 h-5" />}
                     {status.type === 'error' && <AlertTriangle className="w-5 h-5" />}
-                    <div className="space-y-3">
+                    <div className="space-y-3" data-testid="backup-outcome">
+                        {status.title && <p className="font-bold">{status.title}</p>}
                         <p className="font-medium">{status.message}</p>
+                        {status.nextStep && <p className="text-sm">{status.nextStep}</p>}
                         {status.preflight && (
                             <div className="space-y-3 text-sm">
                                 <div className="rounded-lg border border-current/15 bg-white/50 px-3 py-2">

@@ -46,7 +46,7 @@ import {
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
 import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
-import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
+import { BackupRestoreBlockedError, restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 import { apiFailure, apiInternalError } from '@/lib/api-error-response';
 import { disposeCheckupStatusTransitionForHostV1 } from
@@ -217,6 +217,16 @@ export async function POST(request: Request) {
             ...restored,
         });
     } catch (error) {
+        /* Un blocco non e' un guasto: la transazione si e' chiusa senza cambiare
+           nulla e l'interfaccia deve poterlo dire, con il motivo. */
+        if (error instanceof BackupRestoreBlockedError) {
+            const response = NextResponse.json({
+                success: false, code: 'restore_blocked', reason: error.reason,
+                error: 'Ripristino bloccato: i dati attuali non sono stati modificati.',
+            }, { status: 409 });
+            response.headers.set('Cache-Control', 'no-store');
+            return response;
+        }
         /* La distinzione 400/500 resta: un artefatto malformato e' colpa del
            chiamante, il resto no. Cio' che non torna piu' e' il dettaglio, che
            su un restore contiene percorsi e struttura del manifest. */
