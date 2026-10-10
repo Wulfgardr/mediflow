@@ -41,6 +41,8 @@ jobs:
       - name: Clinical HTTP synthetic harnesses
         timeout-minutes: 20
         run: npm run test:clinical-http
+      - name: Portable synthetic recipes
+        run: npm run test:portable-local
       - name: Synthetic fixture generators
         run: npm run test:fixture-generators
       - name: Rust boundary contract and comparator

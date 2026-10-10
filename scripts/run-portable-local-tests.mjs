@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -25,7 +26,7 @@ export function runPortableLocalCommands(root, commands, { spawn = spawnSync, en
 const root = fileURLToPath(new URL('..', import.meta.url));
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.versions.node.split('.')[0] !== '24') throw new Error('Node 24 required');
+    assertNodeRuntime(readNodeContract(root));
     const commands = portableLocalTestCommands(root);
     const requested = process.argv.slice(2);
     if (new Set(requested).size !== requested.length || requested.some(id => !commands.some(command => command.id === id))) throw new Error('Unknown or duplicate recipe ID');
