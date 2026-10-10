@@ -3,6 +3,7 @@ import path from 'node:path';
 
 export const UNIT_TEST_GROUPS = Object.freeze(['lib', 'components']);
 export const UNIT_SCRIPT_TESTS = Object.freeze([
+  'scripts/owned-synthetic-http-suite.test.mjs',
   'scripts/portable-local-test-selection.test.mjs',
   'scripts/conditional-local-groups.test.mjs',
   'scripts/ci-disposition-selection.test.mjs',

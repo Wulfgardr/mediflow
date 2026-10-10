@@ -9,9 +9,9 @@ const root = path.resolve(import.meta.dirname, '..');
 
 test('shared group selections have actual ordinary or Apple conditional CI consumers', () => {
   const selections = collectCiDispositionSelections(root);
-  assert.equal(Object.keys(selections).length, 6);
+  assert.equal(Object.keys(selections).length, 8);
   for (const selection of Object.values(selections)) assert.deepEqual(selection.errors, []);
-  for (const [id, count] of [['npm:test:inventory-browser', 4], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3], ['npm:test:portable-local', 112]]) {
+  for (const [id, count] of [['npm:test:inventory-browser', 4], ['npm:test:fixture-generators', 2], ['npm:test:research-boundary', 3], ['npm:test:portable-local', 112], ['npm:test:owned-http', 19], ['npm:test:owned-http-standalone', 1]]) {
     assert.equal(selections[id].mode, 'ordinary');
     assert.equal(selections[id].files.length, count);
     assert.equal(selections[id].binding.jobIf, null);

@@ -7775,7 +7775,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:api-v1-put-negative-routes"
+          "local:test:api-v1-put-negative-routes",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -7784,7 +7785,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/api-v1-put-negative-routes.test.mjs"
+          "local:scripts/api-v1-put-negative-routes.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8495,7 +8497,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:test:legacy-clinical-writes"
+          "local:test:legacy-clinical-writes",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8504,7 +8507,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/legacy-clinical-writes.test.mjs"
+          "local:scripts/legacy-clinical-writes.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8541,7 +8545,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/mediflow-headless-supervisor-standalone-smoke.mjs"
+          "local:scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
+          "npm:test:owned-http-standalone"
         ]
       }
     },
@@ -8727,7 +8732,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-account-pin.test.mjs"
+          "local:scripts/network-home-base-account-pin.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8736,7 +8742,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-aggregate-read.test.mjs"
+          "local:scripts/network-home-base-aggregate-read.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8745,7 +8752,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-ambulatory-write.test.mjs"
+          "local:scripts/network-home-base-ambulatory-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8754,7 +8762,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-catalog-read.test.mjs"
+          "local:scripts/network-home-base-catalog-read.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8763,7 +8772,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-checkup-write.test.mjs"
+          "local:scripts/network-home-base-checkup-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8772,7 +8782,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-diary-write.test.mjs"
+          "local:scripts/network-home-base-diary-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8781,7 +8792,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-discovery-read.test.mjs"
+          "local:scripts/network-home-base-discovery-read.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8790,7 +8802,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-documents-write.test.mjs"
+          "local:scripts/network-home-base-documents-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8799,7 +8812,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-observation-write.test.mjs"
+          "local:scripts/network-home-base-observation-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8808,7 +8822,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-patient-lifecycle-write.test.mjs"
+          "local:scripts/network-home-base-patient-lifecycle-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8817,7 +8832,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-prescriptions-write.test.mjs"
+          "local:scripts/network-home-base-prescriptions-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8826,7 +8842,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-readonly.test.mjs"
+          "local:scripts/network-home-base-readonly.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8835,7 +8852,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-therapy-write.test.mjs"
+          "local:scripts/network-home-base-therapy-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8844,7 +8862,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/network-home-base-write.test.mjs"
+          "local:scripts/network-home-base-write.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
@@ -8864,6 +8883,15 @@
         "suiteIds": [
           "local:test:openmed-redaction",
           "npm:test:portable-local"
+        ]
+      }
+    },
+    {
+      "path": "scripts/owned-synthetic-http-suite.test.mjs",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
         ]
       }
     },
@@ -8892,7 +8920,8 @@
       "selection": {
         "state": "mapped",
         "suiteIds": [
-          "local:scripts/patient-concurrency.test.mjs"
+          "local:scripts/patient-concurrency.test.mjs",
+          "npm:test:owned-http"
         ]
       }
     },
