@@ -1,6 +1,21 @@
 // swift-tools-version: 5.9
 // @Codex
 import PackageDescription
+import Foundation
+
+// One source definition for SwiftPM and the cross-platform test inventory.
+let testSourcesURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    .appendingPathComponent("test-sources.json")
+let testSources = try JSONDecoder().decode([String: [String]].self, from: Data(contentsOf: testSourcesURL))
+precondition(Set(testSources.keys) == ["MediFlowCoreTests", "MediFlowAppleSharedTests"], "Unexpected test source targets")
+for (target, sources) in testSources {
+    precondition(!sources.isEmpty && Set(sources).count == sources.count, "Empty or duplicate test sources")
+    precondition(sources.allSatisfy { source in
+        source.hasSuffix(".swift") && source.split(separator: "/", omittingEmptySubsequences: false)
+            .allSatisfy { !$0.isEmpty && $0 != "." && $0 != ".." }
+            && !source.contains("\\") && !(target == "MediFlowCoreTests" && source.hasPrefix("Fixtures/"))
+    }, "Invalid test source path")
+}
 
 // ADR 0071 Fase 1: the platform-free core (MediFlowCore) builds on every OS; the
 // Apple targets (SwiftUI/AppKit/UIKit) only exist when the manifest is evaluated
@@ -36,7 +51,8 @@ var targets: [Target] = [
         name: "MediFlowCoreTests",
         dependencies: ["MediFlowCore"],
         // The fixture DB + its generator are read via #filePath, not bundled.
-        exclude: ["Fixtures"]
+        exclude: ["Fixtures"],
+        sources: testSources["MediFlowCoreTests"]!
     )
 ]
 
@@ -46,7 +62,8 @@ var targets: [Target] = [
 // MediFlowAppleSync + MediFlowAppleUI.
 products.append(.library(name: "MediFlowAppleShared", targets: ["MediFlowAppleShared"]))
 targets.append(.target(name: "MediFlowAppleShared", dependencies: ["MediFlowCore"]))
-targets.append(.testTarget(name: "MediFlowAppleSharedTests", dependencies: ["MediFlowAppleShared"]))
+targets.append(.testTarget(name: "MediFlowAppleSharedTests", dependencies: ["MediFlowAppleShared"],
+                           sources: testSources["MediFlowAppleSharedTests"]!))
 #endif
 
 let package = Package(
