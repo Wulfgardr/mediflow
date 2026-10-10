@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { discoverCandidates, collectStaticSupportImports, checkInventory, collectHeadlessInventorySelection, collectPlaywrightInventorySelection } from './test-inventory.mjs';
 import { UNIT_SCRIPT_TESTS, collectUnitTestFiles } from './unit-test-selection.mjs';
-import { EXPLICIT_NPM_SUITES, GUARD_SELF_TEST_SUITES } from './explicit-npm-test-selection.mjs';
+import { EXPLICIT_NPM_SUITES, GUARD_SELF_TEST_SUITES, collectSyntheticPluginSelections } from './explicit-npm-test-selection.mjs';
 import { collectPlaywrightTestFiles, playwrightTestSelection } from './playwright-test-selection.mjs';
 import { collectHeadlessPortableTests } from './run-headless-portable-tests.mjs';
 
@@ -122,6 +122,20 @@ function fixture(t, withDebt = false) {
   entries.push({ path: 'e2e/a.spec.ts', selection: { state: 'mapped', suiteIds: ['npm:test:e2e'] } });
   pkg.scripts['test:e2e'] = 'playwright test --workers=1';
   workflows['.github/workflows/e2e.yml'].jobs.e2e.steps.push({ run: 'npm run test:e2e' });
+  const plugin = 'plugins/mediflow-synthetic';
+  for (const [file, script] of [[`${plugin}/test/plugin.test.mjs`, 'test'], [`${plugin}/scripts/browser-smoke.mjs`, 'test:browser']]) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    fs.writeFileSync(path.join(root, file), 'import assert from "node:assert/strict"; throw new Error("Plugin must not execute");');
+    entries.push({ path: file, selection: { state: 'mapped', suiteIds: [`npm:synthetic-plugin:${script}`] } });
+  }
+  fs.writeFileSync(path.join(root, plugin, 'package.json'), JSON.stringify({ scripts: {
+    test: 'node --test test/*.test.mjs', 'test:browser': 'node scripts/browser-smoke.mjs',
+  } }));
+  const pluginWorkflow = '.github/workflows/synthetic-plugin.yml';
+  const pluginPaths = [`${plugin}/**`, 'packages/mcp/src/contracts.ts', pluginWorkflow];
+  workflows[pluginWorkflow] = { on: { pull_request: { paths: pluginPaths }, push: { branches: ['main'], paths: pluginPaths } },
+    jobs: { 'synthetic-plugin': { defaults: { run: { 'working-directory': plugin } },
+      steps: [{ run: 'npm test' }, { run: 'npm run test:browser' }] } } };
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg));
   for (const [file, workflow] of Object.entries(workflows)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
@@ -507,4 +521,72 @@ test('real CLI verifies support linkage and rejects removed imports and renamed 
   assert.equal(renamed.status, 1);
   assert.match(renamed.stderr, /STALE_ENTRY: lib\/helper.mjs/);
   assert.match(renamed.stderr, /UNREGISTERED_CANDIDATE: lib\/renamed-helper.mjs/);
+});
+
+
+test('synthetic plugin binds its real package scripts, five files and path-conditional workflow', () => {
+  const selected = collectSyntheticPluginSelections(fileURLToPath(new URL('..', import.meta.url)));
+  assert.deepEqual(selected['npm:synthetic-plugin:test'].files, [
+    'plugins/mediflow-synthetic/test/codex-agent-contract.test.mjs',
+    'plugins/mediflow-synthetic/test/package.test.mjs',
+    'plugins/mediflow-synthetic/test/protocol.test.mjs',
+    'plugins/mediflow-synthetic/test/review.test.mjs',
+  ]);
+  assert.deepEqual(selected['npm:synthetic-plugin:test:browser'].files, ['plugins/mediflow-synthetic/scripts/browser-smoke.mjs']);
+  for (const value of Object.values(selected)) {
+    assert.deepEqual(value.errors, []);
+    assert.equal(value.conditional, true);
+    assert.equal(value.binding.workingDirectory, 'plugins/mediflow-synthetic');
+    assert.deepEqual(value.binding.triggers.push.branches, ['main']);
+    assert.deepEqual(value.binding.triggers.pull_request.paths, value.binding.triggers.push.paths);
+  }
+});
+
+test('plugin literal glob stays nonrecursive, excludes hidden files and fails missing or empty groups', t => {
+  const root = fixture(t);
+  const group = path.join(root, 'plugins/mediflow-synthetic/test');
+  fs.mkdirSync(path.join(group, 'nested'));
+  fs.writeFileSync(path.join(group, '.hidden.test.mjs'), 'throw 1;');
+  fs.writeFileSync(path.join(group, 'nested/child.test.mjs'), 'throw 1;');
+  assert.deepEqual(collectSyntheticPluginSelections(root)['npm:synthetic-plugin:test'].files, ['plugins/mediflow-synthetic/test/plugin.test.mjs']);
+  fs.unlinkSync(path.join(group, 'plugin.test.mjs'));
+  assert.match(collectSyntheticPluginSelections(root)['npm:synthetic-plugin:test'].errors.join(), /empty/);
+  fs.rmSync(group, { recursive: true });
+  assert.match(collectSyntheticPluginSelections(root)['npm:synthetic-plugin:test'].errors.join(), /ENOENT/);
+});
+
+test('plugin command, working directory, CI call and trigger drift fail without promoting files', t => {
+  const workflowFile = '.github/workflows/synthetic-plugin.yml';
+  const edit = (root, file, change) => {
+    const target = path.join(root, file), value = JSON.parse(fs.readFileSync(target)); change(value); fs.writeFileSync(target, JSON.stringify(value));
+  };
+  for (const mutate of [
+    root => edit(root, 'plugins/mediflow-synthetic/package.json', pkg => { pkg.scripts.test = 'node --test test/one.test.mjs'; }),
+    root => edit(root, workflowFile, w => { w.jobs['synthetic-plugin'].defaults.run['working-directory'] = '.'; }),
+    root => edit(root, workflowFile, w => { w.jobs['synthetic-plugin'].steps[0].run = 'npm test || true'; }),
+    root => edit(root, workflowFile, w => { w.jobs['synthetic-plugin'].steps.push({ run: 'npm test' }); }),
+    root => edit(root, workflowFile, w => { w.on.pull_request.paths = ['other/**']; }),
+    root => edit(root, workflowFile, w => { w.on.push.branches = ['other']; }),
+  ]) {
+    const root = fixture(t); mutate(root);
+    const selected = collectSyntheticPluginSelections(root)['npm:synthetic-plugin:test'];
+    assert.deepEqual(selected.files, []); assert.equal(selected.binding, null); assert.equal(selected.errors.length, 1);
+    assert.match(run(root).stderr, /INCOMPLETE_SELECTION: npm:synthetic-plugin:test/);
+  }
+  const root = fixture(t);
+  fs.unlinkSync(path.join(root, 'plugins/mediflow-synthetic/scripts/browser-smoke.mjs'));
+  assert.deepEqual(collectSyntheticPluginSelections(root)['npm:synthetic-plugin:test:browser'].files, []);
+  assert.match(run(root).stderr, /INCOMPLETE_SELECTION: npm:synthetic-plugin:test:browser/);
+});
+
+test('plugin test rename cannot silently change the manifest and reports conditional selection separately', t => {
+  const root = fixture(t);
+  const good = run(root, 'complete');
+  assert.equal(good.status, 0, good.stderr);
+  assert.match(good.stdout, /Conditional suites \(workflow paths\): npm:synthetic-plugin:test/);
+  fs.renameSync(path.join(root, 'plugins/mediflow-synthetic/test/plugin.test.mjs'), path.join(root, 'plugins/mediflow-synthetic/test/renamed.test.mjs'));
+  const result = run(root);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /STALE_ENTRY: plugins\/mediflow-synthetic\/test\/plugin.test.mjs/);
+  assert.match(result.stderr, /SELECTED_WITHOUT_ENTRY: npm:synthetic-plugin:test: plugins\/mediflow-synthetic\/test\/renamed.test.mjs/);
 });
