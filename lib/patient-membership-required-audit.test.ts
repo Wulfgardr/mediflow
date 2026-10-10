@@ -175,18 +175,20 @@ for (const repair of ['fix-orphans', 'migrate-m2m'] as const) {
         const body = JSON.stringify(payload('unassign', { ambulatoryId: 'primary' }));
         assert.equal((await request('unassign', body)).status, 200);
         const before = snapshot();
-        const route: { POST: (request: Request) => Promise<Response> } = repair === 'fix-orphans'
+        const route: { GET: () => Promise<Response>; POST: (request: Request) => Promise<Response> } = repair === 'fix-orphans'
             ? load('../app/api/system/fix-orphans/route.ts')
             : load('../app/api/system/migrate-m2m/route.ts');
         assert.equal((await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST',
-            ...(repair === 'migrate-m2m' ? { body: JSON.stringify(await migrationSnapshot()) } : {}) }))).status, 200);
+            body: JSON.stringify(repair === 'migrate-m2m' ? await migrationSnapshot()
+                : { expectedSnapshot: (await (await route.GET()).json()).expectedSnapshot }) }))).status, 200);
         const repaired = snapshot();
         assert.deepEqual(repaired.patients.map(p => p.version), [2, 2]);
         const events = repaired.events.slice(before.events.length);
         assert.equal(events.length, 2);
         assert.ok(events.every(e => JSON.parse(String(e.redacted_metadata)).resourceVersion === 2));
         const repeated = await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST',
-            ...(repair === 'migrate-m2m' ? { body: JSON.stringify(await migrationSnapshot()) } : {}) }));
+            body: JSON.stringify(repair === 'migrate-m2m' ? await migrationSnapshot()
+                : { expectedSnapshot: (await (await route.GET()).json()).expectedSnapshot }) }));
         assert.equal(repeated.status, 200);
         if (repair === 'migrate-m2m') assert.deepEqual(await repeated.json(), { success: true, migrated: 0, total: 2 });
         assert.deepEqual(snapshot(), repaired, 'empty repair has no effects');
