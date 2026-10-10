@@ -44,13 +44,17 @@ function applyBaseMigrations(dbPath: string): void {
     }
 }
 
-function runBootstrapWorker(dataDir: string): Promise<{ code: number | null; output: string }> {
+function runBootstrapWorker(dataDir: string, importOnly = false): Promise<{ code: number | null; output: string }> {
     return new Promise((resolve, reject) => {
         const child = spawn(
             process.execPath,
             [
                 path.join(ROOT_DIR, 'scripts/run-strip-types.mjs'),
-                path.join(ROOT_DIR, 'scripts/db-server-bootstrap-worker.mjs'),
+                ...(importOnly ? ['--input-type=module', '--eval', `
+                    await import('@/lib/db-server');
+                    await import('@/lib/security/headless-soap-active-role-attestation-store');
+                    await import('@/lib/security/headless-soap-entry-commit-owner');
+                `] : [path.join(ROOT_DIR, 'scripts/db-server-bootstrap-worker.mjs')]),
             ],
             {
                 cwd: ROOT_DIR,
@@ -93,6 +97,18 @@ test('new-database bootstrap preserves application tables with a sqlite-like pre
         );
     } finally {
         db.close();
+    }
+});
+
+test('module imports do not create or bootstrap a clinical archive', { timeout: 30_000 }, async () => {
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-db-import-only-'));
+    const dataDir = path.join(workspace, 'unopened-archive');
+    try {
+        const result = await runBootstrapWorker(dataDir, true);
+        assert.equal(result.code, 0, result.output);
+        assert.equal(fs.existsSync(dataDir), false, 'import created the clinical data directory');
+    } finally {
+        fs.rmSync(workspace, { recursive: true, force: true });
     }
 });
 

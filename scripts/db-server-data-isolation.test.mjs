@@ -25,10 +25,22 @@ const worker = `
     return exists(value);
   };
   syncBuiltinESMExports();
-  await import('@/lib/db-server');
+  const { openDbServer, dbServer } = await import('@/lib/db-server');
+  if (rejectLegacyProbe === 'sticky-copy-failure') {
+    const { default: assert } = await import('node:assert/strict');
+    const { resolveDataPath } = await import('@/lib/data-dir');
+    let failure;
+    try { openDbServer(); } catch (error) { failure = error; }
+    assert.ok(failure, 'corrupt legacy copy must deny opening');
+    assert.equal(fs.existsSync(resolveDataPath('medical.db')), false, 'failed copy created an empty clinical database');
+    fs.renameSync(path.join(process.cwd(), 'medical.db'), path.join(process.cwd(), 'preserved-corrupt-original'));
+    assert.throws(() => openDbServer(), error => error === failure);
+    assert.throws(() => dbServer.$client.open, error => error === failure);
+    assert.equal(fs.existsSync(resolveDataPath('medical.db')), false, 'retry silently created a new clinical database');
+  } else openDbServer();
 `;
 
-function bootstrap(sandbox, { directory, disableLegacy = false, rejectLegacyProbe = false } = {}) {
+function bootstrap(sandbox, { directory, disableLegacy = false, rejectLegacyProbe = false, stickyCopyFailure = false } = {}) {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith('NODE_TEST')) delete env[key];
   delete env.MEDIFLOW_DATA_DIR;
@@ -38,7 +50,7 @@ function bootstrap(sandbox, { directory, disableLegacy = false, rejectLegacyProb
   if (disableLegacy) env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1';
   return spawnSync(process.execPath, [
     '--experimental-strip-types', '--import', loader, '--input-type=module', '-e', worker,
-    path.join(sandbox, 'synthetic-home'), rejectLegacyProbe ? 'yes' : 'no',
+    path.join(sandbox, 'synthetic-home'), stickyCopyFailure ? 'sticky-copy-failure' : rejectLegacyProbe ? 'yes' : 'no',
   ], { cwd: sandbox, env, encoding: 'utf8', timeout: 30_000 });
 }
 
@@ -147,5 +159,16 @@ test('startup stops when the append-only audit schema cannot be established', ()
     assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.match(result.stderr, /views may not be indexed/);
     assert.deepEqual(auditObjects(dbPath), ['view:audit_events']);
+  } finally { fs.rmSync(sandbox, { recursive: true, force: true }); }
+});
+
+
+test('failed legacy copy cannot create an empty archive and failed opening remains sticky', () => {
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-legacy-copy-failure-'));
+  const corrupt = 'SYNTHETIC-CORRUPT-NOT-A-DATABASE';
+  try {
+    fs.writeFileSync(path.join(sandbox, 'medical.db'), corrupt);
+    expectReady(bootstrap(sandbox, { stickyCopyFailure: true }));
+    assert.equal(fs.readFileSync(path.join(sandbox, 'preserved-corrupt-original'), 'utf8'), corrupt);
   } finally { fs.rmSync(sandbox, { recursive: true, force: true }); }
 });

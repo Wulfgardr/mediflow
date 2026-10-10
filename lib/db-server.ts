@@ -14,43 +14,11 @@ import { ensureExemptionImportSchema } from '@/lib/exemption-catalog-schema';
 /* @Codex */
 import { ensureProstheticsCatalogSchema } from '@/lib/reference-data/prosthetics-catalog-schema';
 
-// Ensure the data directory exists in production or use project root for dev
-/* @Codex */
-const isNextProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
-/* @Codex */
-const dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');
-const legacyDbPath = path.join(process.cwd(), 'medical.db');
-
-// Recovery decides before legacy adoption, SQLite open or schema bootstrap.
-// Build-time imports have no authority even to inspect persistent artifacts.
-const swapRecovery = isNextProductionBuild ? { status: 'CLEAN' as const } : recoverSqliteSwapArtifacts(dbPath);
-if (swapRecovery.status === 'HOLD') throw new SqliteSwapRecoveryRequiredError();
-
-// An explicitly selected archive must not adopt an unrelated database from cwd.
-// Keep the historical default-root migration, with the same opt-out as E2E setup.
-const allowLegacyBootstrapCopy = !process.env.MEDIFLOW_DATA_DIR
-    && process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1';
-if (!isNextProductionBuild && allowLegacyBootstrapCopy
-    && !fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
-    // Copy through SQLite (recovers pages still in the legacy -wal sidecar)
-    // and stage + rename so a failed copy never leaves a torn medical.db:
-    // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).
-    const bootStagingPath = `${dbPath}.repair-tmp-boot-${process.pid}`;
-    try {
-        fs.rmSync(bootStagingPath, { force: true });
-        copySqliteDatabaseSync(legacyDbPath, bootStagingPath);
-        fs.renameSync(bootStagingPath, dbPath);
-        console.log(`[MediFlow] Copied legacy DB to ${dbPath}`);
-    } catch (error) {
-        console.error('[MediFlow] Failed to copy legacy DB:', error);
-        fs.rmSync(bootStagingPath, { force: true });
-    }
-}
-
-// WUL-268 (STREAM A): apply durable pragmas (WAL, busy_timeout, synchronous,
-// foreign_keys) right after every open (boot + swap). See lib/sqlite-pragmas.ts.
-let sqlite = new Database(dbPath);
-initSqlitePragmas(sqlite);
+// Import is inert; only an explicit open or use of the lazy client acquires SQLite.
+let sqlite: Database.Database;
+let dbPath: string;
+let openState: 'unopened' | 'opening' | 'opened' | 'failed' = 'unopened';
+let openFailure: unknown;
 /* @Codex */
 const PHYSICIAN_REVIEW_ATTESTATIONS_DDL = `
     CREATE TABLE physician_review_attestations (
@@ -204,7 +172,7 @@ function physicianReviewAttestationSchemaEquals(expected: string): boolean {
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
 }
 /* @Codex */
-export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
+function checkHasCanonicalPhysicianReviewAttestationSchema(): boolean {
     return physicianReviewAttestationSchemaEquals(PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
 }
 /* @Codex */
@@ -230,12 +198,12 @@ function hasNoHeadlessSoapActiveRoleAttestationOrphans(): boolean {
     }
 }
 /* @Codex */
-export function hasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
+function checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
     return headlessSoapActiveRoleAttestationSchemaEquals(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA)
         && hasNoHeadlessSoapActiveRoleAttestationOrphans();
 }
 /* @Codex */
-export function hasCanonicalHeadlessCheckupActiveRoleAttestationSchema(): boolean {
+function checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema(): boolean {
     try {
         const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
             .get('headless_checkup_active_role_attestations') as { sql?: unknown } | undefined;
@@ -253,7 +221,7 @@ function ensureHeadlessCheckupActiveRoleAttestationSchema(): void {
         if (!exists) sqlite.prepare(HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL
             .replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
     } catch { throw new Error('Headless checkup active-role attestation schema is unavailable.'); }
-    if (!hasCanonicalHeadlessCheckupActiveRoleAttestationSchema()) {
+    if (!checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema()) {
         throw new Error('Headless checkup active-role attestation schema is incompatible.');
     }
 }
@@ -266,12 +234,12 @@ function ensureHeadlessSoapActiveRoleAttestationSchema(): void {
     } catch {
         throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_unavailable');
     }
-    if (!hasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
+    if (!checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema()) {
         throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_incompatible');
     }
 }
 /* @Codex */
-export function hasCanonicalHeadlessSoapEntryCommitSchema(): boolean {
+function checkHasCanonicalHeadlessSoapEntryCommitSchema(): boolean {
     try {
         const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
             .get('headless_soap_entry_commits') as { sql?: unknown } | undefined;
@@ -308,10 +276,10 @@ function ensureHeadlessSoapEntryCommitSchema(): void {
         if (error instanceof HeadlessSoapEntryCommitSchemaError) throw error;
         throw new HeadlessSoapEntryCommitSchemaError('schema_unavailable');
     }
-    if (!hasCanonicalHeadlessSoapEntryCommitSchema()) throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
+    if (!checkHasCanonicalHeadlessSoapEntryCommitSchema()) throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
 }
 /* @Codex */
-export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
+function checkHasCanonicalDurableReviewPatientLinkSchema(): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'durable_review_patient_links'").get() as { sql?: unknown } | undefined;
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === DURABLE_REVIEW_PATIENT_LINKS_SCHEMA;
 }
@@ -1077,19 +1045,62 @@ function validateRecoveryAuditSchema(): void {
     } finally { canonical.close(); }
 }
 
-// Next evaluates route modules while collecting build metadata. That phase has
-// no runtime authority and must never open, copy, inspect, or migrate the
-// persistent clinical database. The in-memory handle above keeps imports
-// structurally valid; real bootstrap remains unchanged for dev/server phases.
-if (!isNextProductionBuild) {
+/** Opens once synchronously. A failed open or subsequently closed handle never silently reopens. */
+export function openDbServer(): Database.Database {
+    if (openState === 'failed') throw openFailure;
+    if (openState === 'opened') return sqlite;
+    if (openState === 'opening') throw new Error('Database initialization is already in progress.');
+    openState = 'opening';
     try {
-        applySchemaGuardsSerially();
-        if (swapRecovery.status === 'RECOVERED') {
-            validateRecoveryAuditSchema();
-            swapRecovery.complete();
+        const isNextProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
+        /* @Codex */
+        dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');
+        const legacyDbPath = path.join(process.cwd(), 'medical.db');
+
+        // Recovery decides before legacy adoption, SQLite open or schema bootstrap.
+        // Build-time imports have no authority even to inspect persistent artifacts.
+        const swapRecovery = isNextProductionBuild ? { status: 'CLEAN' as const } : recoverSqliteSwapArtifacts(dbPath);
+        if (swapRecovery.status === 'HOLD') throw new SqliteSwapRecoveryRequiredError();
+
+        // An explicitly selected archive must not adopt an unrelated database from cwd.
+        // Keep the historical default-root migration, with the same opt-out as E2E setup.
+        const allowLegacyBootstrapCopy = !process.env.MEDIFLOW_DATA_DIR
+            && process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1';
+        if (!isNextProductionBuild && allowLegacyBootstrapCopy
+            && !fs.existsSync(dbPath) && fs.existsSync(legacyDbPath)) {
+            // Copy through SQLite (recovers pages still in the legacy -wal sidecar)
+            // and stage + rename so a failed copy never leaves a torn medical.db:
+            // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).
+            const bootStagingPath = `${dbPath}.repair-tmp-boot-${process.pid}`;
+            try {
+                fs.rmSync(bootStagingPath, { force: true });
+                copySqliteDatabaseSync(legacyDbPath, bootStagingPath);
+                fs.renameSync(bootStagingPath, dbPath);
+                console.log(`[MediFlow] Copied legacy DB to ${dbPath}`);
+            } catch (error) {
+                console.error('[MediFlow] Failed to copy legacy DB:', error);
+                fs.rmSync(bootStagingPath, { force: true });
+                throw error;
+            }
         }
+
+        // WUL-268 (STREAM A): apply durable pragmas (WAL, busy_timeout, synchronous,
+        // foreign_keys) right after every open (boot + swap). See lib/sqlite-pragmas.ts.
+        sqlite = new Database(dbPath);
+        initSqlitePragmas(sqlite);
+        if (!isNextProductionBuild) {
+            applySchemaGuardsSerially();
+            if (swapRecovery.status === 'RECOVERED') {
+                validateRecoveryAuditSchema();
+                swapRecovery.complete();
+            }
+        }
+        openState = 'opened';
+        return sqlite;
     } catch (error) {
-        sqlite.close();
+        openFailure = error;
+        openState = 'failed';
+        if (sqlite?.open) sqlite.close();
         throw error;
     }
 }
@@ -1106,6 +1117,7 @@ if (!isNextProductionBuild) {
  * touching the shared connection (the route maps it to HTTP 409).
  */
 export async function swapDatabaseFromFile(sourcePath: string, backupPath: string | null): Promise<void> {
+    openDbServer();
     await replaceSqliteDatabase({
         sourcePath,
         destPath: dbPath,
@@ -1130,6 +1142,7 @@ export async function swapDatabaseFromFile(sourcePath: string, backupPath: strin
 // close/reopen performed by swapDatabaseFromFile.
 const sqliteHandle = new Proxy({} as Database.Database, {
     get(_target, prop) {
+        openDbServer();
         const value = Reflect.get(sqlite, prop) as unknown;
         return typeof value === 'function'
             ? (value as (...args: unknown[]) => unknown).bind(sqlite)
@@ -1138,13 +1151,40 @@ const sqliteHandle = new Proxy({} as Database.Database, {
     // drizzle 0.45.2 never assigns onto the connection, but forward writes to
     // the live connection anyway so they can never land on the dummy target.
     set(_target, prop, value) {
+        openDbServer();
         return Reflect.set(sqlite, prop, value);
     },
 });
-export const dbServer = drizzle(sqliteHandle);
+// Explicit config avoids Drizzle inspecting proxy.constructor during import.
+export const dbServer = drizzle({ client: sqliteHandle });
 
 /* @Codex */
 /** Runs a bounded DB mutation under SQLite's writer lock so stale readers cannot race a CAS decision. */
 export function runDbServerImmediateTransaction<T>(operation: () => T): T {
-    return sqlite.transaction(operation).immediate();
+    return openDbServer().transaction(operation).immediate();
+}
+
+export function hasCanonicalPhysicianReviewAttestationSchema(): boolean {
+    openDbServer();
+    return checkHasCanonicalPhysicianReviewAttestationSchema();
+}
+
+export function hasCanonicalHeadlessSoapActiveRoleAttestationSchema(): boolean {
+    openDbServer();
+    return checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema();
+}
+
+export function hasCanonicalHeadlessCheckupActiveRoleAttestationSchema(): boolean {
+    openDbServer();
+    return checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema();
+}
+
+export function hasCanonicalHeadlessSoapEntryCommitSchema(): boolean {
+    openDbServer();
+    return checkHasCanonicalHeadlessSoapEntryCommitSchema();
+}
+
+export function hasCanonicalDurableReviewPatientLinkSchema(): boolean {
+    openDbServer();
+    return checkHasCanonicalDurableReviewPatientLinkSchema();
 }

@@ -27,7 +27,7 @@ function contents(dir: string): Record<string, string> {
 
 function boot(dir: string, extraEnv: Record<string, string> = {}) {
     return spawnSync(process.execPath, ['scripts/run-strip-types.mjs', '--input-type=module', '-e',
-        "await import('./lib/db-server.ts'); console.log('SYNTHETIC_BOOT_OK');"], {
+        "(await import('./lib/db-server.ts')).openDbServer(); console.log('SYNTHETIC_BOOT_OK');"], {
         cwd: root, encoding: 'utf8', timeout: 30_000,
         env: { ...process.env, MEDIFLOW_DATA_DIR: dir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', ...extraEnv },
     });
@@ -313,7 +313,8 @@ test('production schema validation closes the failed candidate; restart retains 
             import Database from 'better-sqlite3';
             import path from 'node:path';
             import { sql } from 'drizzle-orm';
-            import { dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+            import { dbServer, swapDatabaseFromFile, openDbServer } from './lib/db-server.ts';
+            openDbServer();
             dbServer.run(sql.raw("INSERT INTO audit_events VALUES ('synthetic-swap-audit',1,'patient.updated',1700000000,'success','user','synthetic-operator','patient','synthetic-patient','web','synthetic-request','{}',1700000001)"));
             let rejected = false, closed = false;
             try { await swapDatabaseFromFile(path.join(process.env.MEDIFLOW_DATA_DIR,'replacement.db'), null); } catch { rejected = true; }
@@ -355,7 +356,7 @@ for (const mode of ['staging-only', 'corrupt-live', 'unreadable-directory']) {
                     if (String(file) === fs.realpathSync(process.env.MEDIFLOW_DATA_DIR)) throw Object.assign(new Error('SYNTHETIC_PERMISSION_DENIED'), {code:'EACCES'});
                     return read.call(this, file, ...args);
                 };
-                await import('./lib/db-server.ts');
+                (await import('./lib/db-server.ts')).openDbServer();
             `) : boot(dir);
             assert.notEqual(result.status, 0);
             assert.match(result.stderr, /SQLITE_SWAP_RECOVERY_REQUIRED/);
@@ -411,7 +412,8 @@ for (const fault of ['weakened-trigger', 'audit-index-failure', 'quoted-type', '
                 import fs from 'node:fs';
                 import path from 'node:path';
                 import { sql } from 'drizzle-orm';
-                import { dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+                import { dbServer, swapDatabaseFromFile, openDbServer } from './lib/db-server.ts';
+            openDbServer();
                 const dir = process.env.MEDIFLOW_DATA_DIR, sourcePath = path.join(dir,'replacement.db');
                 const live = new Database(path.join(dir,'medical.db'));
                 await live.backup(sourcePath); live.close();
@@ -452,7 +454,8 @@ test('production swap accepts the supported tracked migration baseline without w
         const result = worker(dir, `
             import path from 'node:path';
             import { sql } from 'drizzle-orm';
-            import { dbServer, swapDatabaseFromFile } from './lib/db-server.ts';
+            import { dbServer, swapDatabaseFromFile, openDbServer } from './lib/db-server.ts';
+            openDbServer();
             await swapDatabaseFromFile(path.join(process.env.MEDIFLOW_DATA_DIR,'replacement.db'), null);
             const audit = dbServer.all(sql.raw('SELECT * FROM audit_events'));
             console.log('RESULT:' + JSON.stringify(audit));
