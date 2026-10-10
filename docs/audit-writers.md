@@ -240,8 +240,8 @@ attesa e risponde `409`: il request ID è correlazione, non una chiave generale
 di idempotenza. È una prova di arresto del processo, non di perdita di alimentazione.
 
 La suite è selezionata dal runner unit mediante discovery `lib/**/*.test.ts`
-in [unit-test-selection.mjs](../scripts/unit-test-selection.mjs) ed è registrata
-nell'[inventario](../test-inventory.v1.json). Gli esiti del candidato sono nella
+in [unit-test-selection.mjs](../scripts/unit-test-selection.mjs), sotto il
+[controllo di selezione](./test-selection.md). Gli esiti del candidato sono nella
 PR e nella CI collegata, senza duplicare i log in questo elenco.
 
 Quando cambia un writer, aggiornare la sua riga insieme all'implementazione.

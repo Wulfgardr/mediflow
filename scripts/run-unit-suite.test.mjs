@@ -102,7 +102,7 @@ for (const testFile of [
   'check-never-regress-ocr-retirement.test.mjs',
   'check-never-regress-tinetti-provenance.test.mjs',
   'unit-test-selection.test.mjs',
-  'test-inventory.test.mjs',
+  'check-test-selection.test.mjs',
   'explicit-npm-test-selection.test.mjs',
   'generate-runtime-payload-ledger.test.mjs',
   'chatgpt-account/account-service.test.ts',
