@@ -182,6 +182,19 @@ import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'unexpecte
   });
 }
 
+test('a test run never copies the checkout database unless the caller opts in', (t) => {
+  const directory = fixture(t);
+  const target = path.join(directory, 'legacy-copy.test.ts');
+  fs.writeFileSync(target, `import test from 'node:test'; import assert from 'node:assert/strict';
+test('veto', () => assert.equal(process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY, process.env.EXPECTED_LEGACY_COPY_VETO));`);
+  const dataDir = path.join(directory, 'data');
+  const inherited = run(directory, ['--test', target], { MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: undefined, EXPECTED_LEGACY_COPY_VETO: '1' });
+  assert.equal(inherited.status, 0, inherited.stderr + inherited.stdout);
+  // A test of the legacy copy itself can still ask for it.
+  const optedIn = run(directory, ['--test', target], { MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '0', EXPECTED_LEGACY_COPY_VETO: '0' });
+  assert.equal(optedIn.status, 0, optedIn.stderr + optedIn.stdout);
+});
+
 test('explicit synthetic directory receives requested DB initialization; default stays absent', (t) => {
   const directory = fixture(t);
   const dataDir = path.join(directory, 'explicit data');
