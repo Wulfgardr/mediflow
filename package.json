@@ -6,6 +6,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "test:clinical-http": "node scripts/run-clinical-http-suite.mjs",
     "preinstall": "node scripts/node-runtime-contract.mjs verify-node",
     "postinstall": "node scripts/node-runtime-contract.mjs verify",
     "predev": "node scripts/node-runtime-contract.mjs verify",
