@@ -968,7 +968,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                     ? sourceRows.map((row) => ({ ...row, status: 'inactive', issuer_ref: null, expires_at: null, activated_at: null }))
                     : sourceRows;
                 assert.equal(targetRows.length, sourceRows.length, `${table} count must survive restore`);
-                assert.deepEqual(targetRows, expectedRows, `${table} rows must survive restore byte-for-byte`);
+                assert.deepEqual(targetRows, expectedRows, `${table} rows must reach the target as the restore contract declares`);
 
                 for (let rowIndex = 0; rowIndex < sourceRows.length; rowIndex += 1) {
                     for (const [column, value] of Object.entries(sourceRows[rowIndex])) {
