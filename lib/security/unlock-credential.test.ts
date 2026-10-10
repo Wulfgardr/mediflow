@@ -159,13 +159,17 @@ test('a recovery key is 160 random bits in eight readable groups', async () => {
 
 test('the recovery wrapping opens with the recovery key as a person types it back, and with nothing else', async () => {
     const masterKey = await generateMasterKey();
-    const { recoveryKey, wrappedMasterKey, salt } = await createRecoveryWrapping(masterKey);
+    const { recoveryKey, wrappedMasterKey, salt, verifier } = await createRecoveryWrapping(masterKey);
     assert.match(wrappedMasterKey, /^r1:/u);
     assert.equal(bytes(salt).length, 16);
 
-    assert.equal(await rawKey(await openRecoveryWrapping(wrappedMasterKey, salt, recoveryKey)), await rawKey(masterKey));
+    const opened = await openRecoveryWrapping(wrappedMasterKey, salt, recoveryKey);
+    assert.equal(await rawKey(opened.masterKey), await rawKey(masterKey));
+    assert.equal(opened.verifier, verifier, 'recovery yields the verifier made with the kit');
     const typed = `  ${recoveryKey.toLowerCase().replaceAll('-', ' ').replaceAll('0', 'o').replaceAll('1', 'l')} `;
-    assert.equal(await rawKey(await openRecoveryWrapping(wrappedMasterKey, salt, typed)), await rawKey(masterKey));
+    const reopened = await openRecoveryWrapping(wrappedMasterKey, salt, typed);
+    assert.equal(await rawKey(reopened.masterKey), await rawKey(masterKey));
+    assert.equal(reopened.verifier, verifier);
 
     const other = await createRecoveryWrapping(masterKey);
     await assert.rejects(() => openRecoveryWrapping(wrappedMasterKey, salt, other.recoveryKey));
@@ -179,8 +183,13 @@ test('the recovery wrapping opens with the recovery key as a person types it bac
     const bits = [...recoveryKey.replaceAll('-', '')].map((character) => alphabet.indexOf(character).toString(2).padStart(5, '0')).join('');
     const secret = Buffer.from(bits.match(/.{8}/gu)!.map((chunk) => Number.parseInt(chunk, 2)));
     assert.equal(secret.length, 20);
-    const kek = Buffer.from(hkdfSync('sha256', secret, bytes(salt), 'mediflow.recovery.kek.v1', 32));
-    assert.equal(openWithNode(wrappedMasterKey, kek), await rawKey(masterKey));
+    const derive = (info: string) => Buffer.from(hkdfSync('sha256', secret, bytes(salt), info, 32));
+    assert.equal(openWithNode(wrappedMasterKey, derive('mediflow.recovery.kek.v1')), await rawKey(masterKey));
+    assert.equal(derive('mediflow.recovery.verifier.v1').toString('base64'), verifier);
+    // What the server stores for recovery opens nothing.
+    for (const candidate of [Buffer.from(verifier, 'base64'), Buffer.from(await hashAccessVerifier(verifier), 'hex')]) {
+        assert.throws(() => openWithNode(wrappedMasterKey, candidate));
+    }
 });
 
 test('the two wrappings of one master key are independent', async () => {
