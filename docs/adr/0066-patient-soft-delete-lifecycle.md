@@ -122,3 +122,41 @@ Motivazioni sintetiche:
 **Slice 3 (WUL-322):** clear per membership + esclusione live + soft-delete con `deletionReason='test-container-clear'` + audit per paziente. Dipende solo dalla Slice 1.
 
 **Fuori da queste slice:** WUL-300 (issue separata, sbloccata e de-rischiata dalla Slice 3); flip `PRAGMA foreign_keys=ON` + guardie 404 sui POST figli (hardening futuro, ora reso possibile); audit dentro la transazione (follow-up pre-esistente).
+
+
+### WUL-720 — autorità osservata della bonifica orfani (2026-10-10)
+
+GET e POST Web admin di `fix-orphans` condividono un'unica funzione di ispezione:
+GET la esegue in una transazione di lettura coerente, POST nella transazione
+`IMMEDIATE`. Il preview aggiunge `expectedSnapshot`, SHA-256 del piano canonico:
+ID/versione dei pazienti senza membership (incluse tombstone), ID/versione e
+stato default del target selezionato con la precedenza esistente, oppure assenza
+del target, e identità delle righe figlie orfane (tabella, chiave, patientId).
+Le identità sono ordinate; nessun contenuto clinico entra nel digest o nel preview.
+La chiave delle membership è patientId/ambulatoryId; quella dei durable review
+link è reviewId. Le altre tabelle usano id.
+
+Il caller deve rileggere GET e inviare `{ expectedSnapshot,
+purgeOrphanedClinicalRows: false }` (oppure `true` per richiedere il purge).
+Il flag resta opzionale e, se presente, deve essere booleano. Il corpo assente
+non è più ammesso: snapshot assente o non esadecimale minuscolo di 64 caratteri
+restituisce 400, piano cambiato 409 con invito a ispezionare nuovamente.
+L'autenticazione precede ancora la validazione. Non è modificato il contratto
+native `/api/v1`.
+
+Il confronto include conservativamente i figli anche senza purge. Avviene prima
+di default, relink, purge, revoca locator e audit. Prima degli effetti, ogni
+versione da incrementare deve essere intera sicura, positiva e minore di
+`MAX_SAFE_INTEGER`; altrimenti 409 per l'intero batch. Bump e audit richiesti
+restano nella stessa transazione. Un piano vuoto riletto può essere ripetuto
+senza effetti; replay di un piano superato, anche dopo relink/unlink che aumenta
+la versione, è 409. Il digest è una precondizione, non una ricevuta consumabile:
+non introduce registro token né garantisce contro ABA con ricreazione delle
+stesse identità/versioni. Purge-patient e snapshot dei suoi figli, altri writer,
+restore C15 e garanzie globali restano fuori da questo intervento.
+
+Prove: `lib/orphan-repair-required-audit.test.ts` conserva successo composto e
+rollback audit/purge, aggiungendo autorità obbligatoria, replay immediato e
+interposto, cambio identità a conteggio invariato, versione target, nuovo orfano,
+esaurimento versione e no-op riletto. Il caller della prova membership ottiene
+il digest da GET. Non risulta un caller UI di questa route nel perimetro esaminato.
