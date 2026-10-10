@@ -1,6 +1,7 @@
 // WUL-306 (ADR 0066): patient soft-delete lifecycle helpers.
 import { isNull } from 'drizzle-orm';
 import { patients } from './schema';
+import { canIncrementVersion, VersionExhaustedError } from './version-concurrency';
 
 // Shared read predicate: every UI/API patient read path must exclude tombstoned rows.
 // backup-restore, fix-orphans, migrate and purge-patient deliberately do NOT filter.
@@ -20,6 +21,7 @@ export function buildPatientTombstoneValues(
     deletionReason: string,
     now: Date = new Date()
 ): PatientTombstoneValues {
+    if (!canIncrementVersion(expectedVersion)) throw new VersionExhaustedError();
     return {
         deletedAt: now,
         deletionReason,
@@ -33,6 +35,7 @@ export function buildPatientRestoreValues(
     currentVersion: number,
     now: Date = new Date()
 ): PatientTombstoneValues {
+    if (!canIncrementVersion(currentVersion)) throw new VersionExhaustedError();
     return {
         deletedAt: null,
         deletionReason: null,

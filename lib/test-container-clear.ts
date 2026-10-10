@@ -1,3 +1,4 @@
+import { canIncrementVersion, VersionExhaustedError } from './version-concurrency';
 // WUL-322 (ADR 0066, Slice 3): membership-based clear of a test container.
 // Selection goes through patientsToAmbulatories ONLY: the stale legacy
 // ambulatory column on patients must never pick deletion sets (WUL-300).
@@ -74,6 +75,19 @@ export function clearTestContainerByMembership(
             .where(and(inArray(patients.id, testOnlyIds), activePatients()))
             .all();
 
+    // Patients not tombstoned by this clear still lose membership authority.
+    // Preserve their lifecycle fields, including an existing tombstone.
+    const tombstonedIds = new Set(activeTestOnly.map(patient => patient.id));
+    const remainingIds = memberIds.filter(id => !tombstonedIds.has(id));
+    const remainingPatients = remainingIds.length === 0 ? [] : runner
+        .select({ id: patients.id, version: patients.version }).from(patients)
+        .where(inArray(patients.id, remainingIds)).all();
+    // Preflight all patients before the helper's first write. The caller may already
+    // have guarded the container: throw to roll that write back as well.
+    if ([...activeTestOnly, ...remainingPatients].some(patient => !canIncrementVersion(patient.version))) {
+        throw new VersionExhaustedError();
+    }
+
     const clearedPatients: ClearedTestPatient[] = [];
     for (const patient of activeTestOnly) {
         const tombstone = runner
@@ -86,13 +100,6 @@ export function clearTestContainerByMembership(
         clearedPatients.push({ id: patient.id, version: patient.version });
     }
 
-    // Patients not tombstoned by this clear still lose membership authority.
-    // Preserve their lifecycle fields, including an existing tombstone.
-    const tombstonedIds = new Set(clearedPatients.map(patient => patient.id));
-    const remainingIds = memberIds.filter(id => !tombstonedIds.has(id));
-    const remainingPatients = remainingIds.length === 0 ? [] : runner
-        .select({ id: patients.id, version: patients.version }).from(patients)
-        .where(inArray(patients.id, remainingIds)).all();
     const unlinkedPatients: ClearedTestPatient[] = [];
     for (const patient of remainingPatients) {
         const nextVersion = patient.version + 1;

@@ -371,3 +371,31 @@ test('two SQLite processes serialize one default promotion', async () => {
     const audit = snapshot().audit as Array<Record<string, unknown>>;
     assert.equal(audit.filter(event => event.subject_ref === x.target || event.subject_ref === x.fallback).length, 2);
 });
+
+
+test('clear version exhaustion rolls back container, every patient and membership before audit', async () => {
+    for (const kind of ['container', 'test-only', 'already-deleted', 'shared-live', 'invalid-database'] as const) {
+        resetSyntheticDomain();
+        const x = prepare('host-clear');
+        if (kind === 'container') sql.prepare('UPDATE ambulatories SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER, x.target);
+        else sql.prepare('UPDATE patients SET version=? WHERE id=?').run(kind === 'invalid-database' ? 0 : Number.MAX_SAFE_INTEGER,
+            kind === 'already-deleted' ? x.alreadyDeleted : kind === 'shared-live' ? x.sharedLive : x.testOnlyB);
+        const before = snapshot();
+        const response = await invoke(kind === 'already-deleted' ? 'paired-clear' : 'host-clear', x,
+            kind === 'container' ? Number.MAX_SAFE_INTEGER : 3);
+        assert.equal(response.status, 409, kind);
+        assert.deepEqual(snapshot(), before, kind);
+    }
+    resetSyntheticDomain();
+    const x = prepare('host-clear');
+    sql.prepare('UPDATE ambulatories SET version=? WHERE id=?').run(Number.MAX_SAFE_INTEGER - 1, x.target);
+    sql.prepare('UPDATE patients SET version=?').run(Number.MAX_SAFE_INTEGER - 1);
+    assert.equal((await invoke('host-clear', x, Number.MAX_SAFE_INTEGER - 1)).status, 200);
+    assert.equal((sql.prepare('SELECT version FROM ambulatories WHERE id=?').get(x.target) as {version:number}).version, Number.MAX_SAFE_INTEGER);
+    for (const id of [x.testOnlyA, x.sharedLive, x.alreadyDeleted]) {
+        assert.equal((sql.prepare('SELECT version FROM patients WHERE id=?').get(id) as {version:number}).version, Number.MAX_SAFE_INTEGER);
+    }
+    const after = snapshot();
+    assert.equal((await invoke('host-clear', x, Number.MAX_SAFE_INTEGER - 1)).status, 409);
+    assert.deepEqual(snapshot(), after);
+});
