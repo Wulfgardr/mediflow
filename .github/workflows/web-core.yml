@@ -38,6 +38,9 @@ jobs:
             printf 'MEDIFLOW_WEB_CORE_DATA_DIR=%s\n' "${DATA_DIR}"
           } >> "${GITHUB_ENV}"
       - run: npm run test:unit
+      - name: Clinical HTTP synthetic harnesses
+        timeout-minutes: 20
+        run: npm run test:clinical-http
       - name: Cleanup synthetic test data directory
         if: always()
         run: |
