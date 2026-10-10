@@ -2276,6 +2276,15 @@
       }
     },
     {
+      "path": "lib/backup-restore-key-check.test.ts",
+      "selection": {
+        "state": "mapped",
+        "suiteIds": [
+          "unit"
+        ]
+      }
+    },
+    {
       "path": "lib/backup-restore-preflight.test.ts",
       "selection": {
         "state": "mapped",
