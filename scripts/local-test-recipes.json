@@ -425,6 +425,330 @@
         "scripts/mobile-home-base-interop-xctestrun-test.py"
       ],
       "prerequisites": "Python 3 unittest entrypoint; preserve macOS/Xcode fixture requirements and skips."
+    },
+    {
+      "id": "scripts/api-v1-put-negative-routes.test.mjs",
+      "mode": "local",
+      "kind": "wrapped-node",
+      "files": [
+        "scripts/api-v1-put-negative-routes.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/legacy-clinical-writes.test.mjs",
+      "mode": "local",
+      "kind": "wrapped-node",
+      "files": [
+        "scripts/legacy-clinical-writes.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-account-pin.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-account-pin.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-aggregate-read.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-aggregate-read.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-ambulatory-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-ambulatory-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-catalog-read.test.mjs",
+      "mode": "local",
+      "kind": "network-fixed",
+      "files": [
+        "scripts/network-home-base-catalog-read.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-checkup-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-checkup-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-diary-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-diary-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-discovery-read.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-discovery-read.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-documents-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-documents-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-observation-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-observation-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-patient-lifecycle-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-patient-lifecycle-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-prescriptions-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-prescriptions-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-readonly.test.mjs",
+      "mode": "local",
+      "kind": "network-fixed",
+      "files": [
+        "scripts/network-home-base-readonly.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-therapy-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-therapy-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/network-home-base-write.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-write.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
+      "id": "scripts/anydoc-desktop-ocr-real.test.ts",
+      "mode": "local",
+      "kind": "strip-serial",
+      "files": [
+        "scripts/anydoc-desktop-ocr-real.test.ts"
+      ],
+      "prerequisites": "Real desktop OCR assets/OS required; preserves test concurrency=1 and all opt-ins. No OCR qualification claimed."
+    },
+    {
+      "id": "scripts/benchmark-document-router.ts",
+      "mode": "local",
+      "kind": "strip-self",
+      "files": [
+        "scripts/benchmark-document-router.ts"
+      ],
+      "prerequisites": "Synthetic router self-check mode; not a benchmark performance or live routing qualification."
+    },
+    {
+      "id": "scripts/chatgpt-account/account-ui-browser.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/chatgpt-account/account-ui-browser.mjs"
+      ],
+      "prerequisites": "Requires explicit temporary MEDIFLOW_DATA_DIR, esbuild and local browser; synthetic component fixture writes output artifacts. Browser remains unexecuted."
+    },
+    {
+      "id": "scripts/check-macos-web-runtime-native-payload.sh",
+      "mode": "local",
+      "kind": "bash-self",
+      "files": [
+        "scripts/check-macos-web-runtime-native-payload.sh"
+      ],
+      "prerequisites": "Existing synthetic native payload self-check; host tools must be present, not a shipped binary qualification."
+    },
+    {
+      "id": "scripts/check-standalone-runtime-bundle.mjs",
+      "mode": "local",
+      "kind": "node-self",
+      "files": [
+        "scripts/check-standalone-runtime-bundle.mjs"
+      ],
+      "prerequisites": "Existing synthetic standalone manifest self-check mode; product bundle qualification remains separate."
+    },
+    {
+      "id": "scripts/function-models/ui-browser.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/function-models/ui-browser.mjs"
+      ],
+      "prerequisites": "Requires explicit temporary MEDIFLOW_DATA_DIR, esbuild and local browser; synthetic component fixture writes output artifacts. Browser remains unexecuted."
+    },
+    {
+      "id": "scripts/generate-clinical-rich-text-fixtures.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/generate-clinical-rich-text-fixtures.mjs"
+      ],
+      "prerequisites": "Assertive fixture generator; rewrites the synthetic native contract fixtures. Not excluded as a non-test."
+    },
+    {
+      "id": "scripts/generate-fhir-golden-worker.ts",
+      "mode": "local",
+      "kind": "strip-script",
+      "files": [
+        "scripts/generate-fhir-golden-worker.ts"
+      ],
+      "prerequisites": "Assertive synthetic FHIR golden generator; rewrites fixtures and verifies round trips. Not excluded as a non-test."
+    },
+    {
+      "id": "scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/mediflow-headless-supervisor-standalone-smoke.mjs"
+      ],
+      "prerequisites": "Requires a built standalone runtime and synthetic smoke environment; no runtime/build qualification claimed."
+    },
+    {
+      "id": "scripts/mlx-chat-batch-runner-test.sh",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/mlx-chat-batch-runner-test.sh"
+      ],
+      "prerequisites": "Existing synthetic MLX shell harness; preserve its tool and platform prerequisites."
+    },
+    {
+      "id": "scripts/patient-concurrency.test.mjs",
+      "mode": "local",
+      "kind": "wrapped-node",
+      "files": [
+        "scripts/patient-concurrency.test.mjs"
+      ],
+      "prerequisites": "Existing patient-concurrency-smoke wrapper owns the synthetic server/bootstrap."
+    },
+    {
+      "id": "scripts/run-visit-recording-synthetic-benchmark.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/run-visit-recording-synthetic-benchmark.mjs"
+      ],
+      "prerequisites": "macOS synthetic voices, local transcription assets and runtime required; no microphone/real patient data, not a CI qualification."
+    },
+    {
+      "id": "app/api/ai/local-provider/onboarding/route.test.ts",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": [
+        "app/api/ai/local-provider/onboarding/route.test.ts"
+      ],
+      "prerequisites": "Requires MEDIFLOW_DATA_DIR in a fresh local-onboarding temporary directory, prebootstrapped with node scripts/prepare-e2e-db.mjs under that same variable. Real DB imports happen at module load; no fixture preparation or execution is attested by selection."
+    },
+    {
+      "id": "scripts/native-test.sh",
+      "mode": "local",
+      "kind": "bash",
+      "files": [
+        "scripts/native-test.sh"
+      ],
+      "prerequisites": "Existing native orchestrator; Darwin/SwiftPM/Xcode tools and mode-specific fixtures required. Local wrapper selection is not qualification of all branches or extra Swift test cases."
+    },
+    {
+      "id": "experiments/rust-boundary/compare.mjs",
+      "mode": "local",
+      "kind": "rust-compare",
+      "files": [
+        "experiments/rust-boundary/compare.mjs"
+      ],
+      "prerequisites": "Synthetic research codec comparator. Supply the built Rust binary and output JSON path; requires local cargo build --release --manifest-path experiments/rust-boundary/Cargo.toml first. No product/CI/performance qualification.",
+      "parameters": [
+        "rust-binary",
+        "output"
+      ]
+    },
+    {
+      "id": "plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs",
+      "mode": "local",
+      "kind": "node-parameters",
+      "files": [
+        "plugins/mediflow-synthetic/scripts/codex-agent-smoke.mjs"
+      ],
+      "prerequisites": "Explicit opt-in real Codex smoke; supply absolute marketplace JSON path, installed enabled synthetic plugin and authenticated Codex CLI. No persistent configuration changes or CI claim.",
+      "parameters": [
+        "--marketplace"
+      ]
+    },
+    {
+      "id": "scripts/mobile-home-base-interop-cas-relay.mjs",
+      "mode": "local",
+      "kind": "node-parameters",
+      "files": [
+        "scripts/mobile-home-base-interop-cas-relay.mjs"
+      ],
+      "prerequisites": "Assertive live synthetic mobile CAS scenario. Supply case JSON and two private mode-0700 participant directories backed by running synthetic contenders. Hardware/simulator and coordinated client events required; no execution claim.",
+      "parameters": [
+        "--case",
+        "--contender-directory",
+        "--peer-directory"
+      ]
+    },
+    {
+      "id": "scripts/mobile-home-base-interop-module-verifier.mjs",
+      "mode": "local",
+      "kind": "node-parameters",
+      "files": [
+        "scripts/mobile-home-base-interop-module-verifier.mjs"
+      ],
+      "prerequisites": "Assertive synthetic mobile module scenario. Supply descriptor, ios/ipados client, private mode-0700 exchange directory and run ID; running synthetic client/server producers required. No execution or hardware qualification.",
+      "parameters": [
+        "--descriptor",
+        "--client",
+        "--directory",
+        "--run-id"
+      ]
     }
   ]
 }
