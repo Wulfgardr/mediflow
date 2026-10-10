@@ -88,11 +88,14 @@ function referenceClause(tokens: string[]): unknown | null {
 }
 function checkIdentifiers(tokens: string[], columns: Column[]): string[] {
   const names = new Set(columns.map(column => column.name));
+  const checkedNames = new Set(['actor_ref', 'attestation_ref', 'attestation_version', 'operation_id',
+    'policy_version', 'revocation_generation', 'schema_version', 'status', 'role', 'capability',
+    'issuer_ref', 'expires_at', 'activated_at', 'revoked_at', 'created_at', 'updated_at']);
   // Only observed, unambiguous bare column spellings are admitted. Other quoted
   // identifiers, functions, CAST types and collations remain conservative.
   return tokens.map((token, i) => {
     const name = identifier(token);
-    if (name === null || !names.has(name) || !/^(?:[a-z][a-z0-9]*_[a-z0-9_]+|status|role|capability)$/.test(name)
+    if (name === null || !names.has(name) || !checkedNames.has(name)
         || tokens[i + 1] === '(' || ['AS', 'COLLATE'].includes(tokens[i - 1]?.toUpperCase())) return token;
     return name;
   });

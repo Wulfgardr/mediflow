@@ -92,3 +92,19 @@ test('bounded full-schema spellings preserve CHECK, trigger body, key direction 
     quoted.replace('ABORT', 'FAIL'), quoted.replace("'append-only'", "'append only'"), quoted.replace('BEFORE UPDATE','BEFORE DELETE'),
     quoted.replace('DEFAULT 1 NOT NULL', 'DEFAULT 1 NOT NULL ON CONFLICT IGNORE')]) assert.equal(differs(plain, changed), true);
 });
+
+test('quoted current_date column is not the CURRENT_DATE special expression', () => {
+  const column = 'CREATE TABLE t("current_date" TEXT CHECK("current_date" <> \'blocked\'))';
+  const expression = 'CREATE TABLE t("current_date" TEXT CHECK(current_date <> \'blocked\'))';
+  assert.equal(differs(column, expression), true);
+  const dbs = [new Database(':memory:'), new Database(':memory:')];
+  try {
+    dbs[0].exec(column); dbs[1].exec(expression);
+    assert.throws(() => dbs[0].prepare('INSERT INTO t VALUES (?)').run('blocked'), /CHECK constraint failed/);
+    assert.equal(dbs[1].prepare('INSERT INTO t VALUES (?)').run('blocked').changes, 1);
+  } finally { dbs.forEach(db => db.close()); }
+  for (const name of ['current_time', 'current_timestamp']) {
+    assert.equal(differs(`CREATE TABLE t("${name}" TEXT CHECK("${name}" <> 'blocked'))`,
+      `CREATE TABLE t("${name}" TEXT CHECK(${name} <> 'blocked'))`), true);
+  }
+});
