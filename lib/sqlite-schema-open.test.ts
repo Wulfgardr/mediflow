@@ -34,7 +34,7 @@ test('fresh and reserved archives consume admission atomically; repeated open do
                 const db = new Database(w.file);
                 db.pragma(`application_id = ${reservation.applicationId}`);
                 db.close();
-            }
+            } else fs.writeFileSync(path.join(w.directory, '.DS_Store'), 'unrelated');
             let db = openVersionedSqliteDatabase(w.file);
             assert.equal(db.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             assert.equal(db.pragma('application_id', { simple: true }), 0);
@@ -75,7 +75,7 @@ test('future versions, corrupt and unreserved empty files are preserved and refu
             if (scenario === 'corrupt') fs.writeFileSync(w.file, 'synthetic non SQLite bytes');
             if (scenario === 'zero') fs.writeFileSync(w.file, '');
             if (scenario === 'empty') { const db = new Database(w.file); db.pragma('user_version = 0'); db.close(); }
-            if (scenario === 'missing-existing') fs.writeFileSync(path.join(w.directory, 'archive-metadata'), 'synthetic');
+            if (scenario === 'missing-existing') fs.writeFileSync(`${w.file}-wal`, 'synthetic');
             const before = fs.existsSync(w.file) ? fs.readFileSync(w.file) : null;
             assert.throws(() => openVersionedSqliteDatabase(w.file), scenario);
             assert.deepEqual(fs.existsSync(w.file) ? fs.readFileSync(w.file) : null, before, scenario);
@@ -105,6 +105,7 @@ test('failed snapshot publication and unsupported schema roll back without claim
             if (scenario === 'schema') assert.ok(after.prepare("SELECT name FROM sqlite_schema WHERE name='unsupported_schema'").get());
             if (scenario === 'view') assert.ok(after.prepare("SELECT name FROM sqlite_schema WHERE name='unsupported_view'").get());
             after.close();
+            assert.deepEqual(originals(w.directory), [], scenario);
         } finally { fs.linkSync = link; w.cleanup(); }
     }
 });

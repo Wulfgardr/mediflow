@@ -41,7 +41,10 @@ export function openVersionedSqliteDatabase(databasePath: string): Database.Data
     try { before = fs.lstatSync(databasePath); }
     catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-        if (fs.readdirSync(path.dirname(databasePath)).length !== 0 && !fs.existsSync(databasePath)) deny('missing database in an existing archive');
+        // Sidecars, preserved originals or swap artifacts mean a database lived
+        // here; unrelated files (tokens, logs, .DS_Store) do not.
+        const leftovers = fs.readdirSync(path.dirname(databasePath)).filter(name => name.startsWith(path.basename(databasePath)));
+        if (leftovers.length !== 0 && !fs.existsSync(databasePath)) deny('missing database in an existing archive');
         // Another first-start worker may have won after lstat. It must finish
         // its own admission; this process never promotes its empty file.
         try {
@@ -69,6 +72,7 @@ export function openVersionedSqliteDatabase(databasePath: string): Database.Data
     }
 
     const connection = new Database(databasePath, { fileMustExist: true });
+    let snapshot: string | undefined;
     try {
         // Connection-only settings precede admission. WAL changes the database
         // header and therefore follows the verified original and schema commit.
@@ -98,7 +102,7 @@ export function openVersionedSqliteDatabase(databasePath: string): Database.Data
                     return;
                 }
                 if (!fresh) {
-                    const snapshot = `${databasePath}.schema-original-v${version}-${randomUUID()}.db`;
+                    snapshot = `${databasePath}.schema-original-v${version}-${randomUUID()}.db`;
                     createVerifiedSqliteSnapshotSync(databasePath, snapshot);
                     const afterCopy = fs.lstatSync(databasePath);
                     if (afterCopy.dev !== before.dev || afterCopy.ino !== before.ino) deny('database identity changed during snapshot');
@@ -115,7 +119,11 @@ export function openVersionedSqliteDatabase(databasePath: string): Database.Data
         initSqlitePragmas(connection);
         return connection;
     } catch (error) {
+        // After a rollback the archive is still the original: keeping one more
+        // full copy per failed start would only fill the disk.
+        const rolledBack = !connection.inTransaction;
         connection.close();
+        if (snapshot && rolledBack) fs.rmSync(snapshot, { force: true });
         throw error;
     }
 }

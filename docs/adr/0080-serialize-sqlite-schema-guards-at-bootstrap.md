@@ -97,8 +97,9 @@ l'import e dell'ammissione di qualsiasi database vuoto.
 | Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
 
 La versione SQLite corrente è `user_version=1`. La prima installazione ammette
-un file creato esclusivamente dal processo in una directory vuota, oppure la
-prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
+un file creato esclusivamente dal processo in una directory senza residui di
+un database precedente (sidecar, originali conservati, artefatti di swap),
+oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
 SQLite vuoto senza prenotazione non diventa un archivio nuovo. Un processo
 concorrente attende il primo writer entro il limite esistente di cinque secondi.
 
@@ -116,7 +117,8 @@ Per un'origine ammessa l'originale `medical.db.schema-original-v0-<uuid>.db`
 confermano insieme. Al riavvio, la versione 1 viene validata senza DDL,
 backfill o nuove copie; un suo drift non viene riparato automaticamente.
 Interruzione prima del commit conserva lo schema precedente tramite rollback;
-un originale già pubblicato resta disponibile. Versione futura, corruzione,
+un originale già pubblicato resta disponibile. Dopo un rifiuto con rollback
+l'archivio è invariato e la copia di quel tentativo viene rimossa. Versione futura, corruzione,
 lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 
 ### Percorso per archivi non ammessi
