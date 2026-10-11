@@ -132,7 +132,11 @@ export function LockScreen() {
                             ref={pinInputRef}
                             type="password"
                             value={pin}
-                            onChange={(e) => setPin(e.target.value)}
+                            onChange={(e) => {
+                                // Any edit ends the confirmation, also one that is typed back before a submit.
+                                setHeldText(null);
+                                setPin(e.target.value);
+                            }}
                             className={styles.pinInput}
                             inputMode="text"
                             autoComplete="off"

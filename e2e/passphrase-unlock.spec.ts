@@ -215,6 +215,16 @@ test('a PIN as long as a passphrase still opens its archive, on a second gesture
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(logins).toEqual([]);
 
+    // An edit ends the confirmation even when the text is typed back before any submit: the
+    // notice does not return by itself and the next submit is a first gesture again.
+    await input.fill(`${LONG_PIN}!`);
+    await expect(notice).toHaveCount(0);
+    await input.fill(LONG_PIN);
+    await expect(notice).toHaveCount(0);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins).toEqual([]);
+
     // A changed text is another text: it is held in its turn.
     await input.fill(`${LONG_PIN}!`);
     await expect(notice).toHaveCount(0);
