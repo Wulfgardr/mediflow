@@ -355,7 +355,7 @@ test('main checks the real direct and transactional writer contracts and rejects
         assert.equal(cleanResult.status, 0);
         assert.equal(cleanReport.findings.length, 0);
         assert.equal(cleanReport.findings.filter((finding) => finding.code === 'AUDIT_CONTROL_FLOW').length, 0); assert.equal(cleanReport.findings.some((finding) => 'writerContracts' in finding), false);
-        assert.deepEqual([cleanReport.checked.auditControlFlowTargets, cleanReport.checked.auditControlFlowFiles], [1, 1]);
+        assert.deepEqual([cleanReport.checked.auditControlFlowTargets, cleanReport.checked.auditControlFlowFiles], [2, 1]);
 
         const pinService = path.join(fixtureRoot, 'lib/security/pin-change-service.ts');
         const original = fs.readFileSync(pinService, 'utf8');
@@ -376,7 +376,7 @@ test('main checks the real direct and transactional writer contracts and rejects
         });
         assert.equal(result.status, 1);
         const report = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'tmp/g3a-wiring-test.json'), 'utf8'));
-        assert.equal(report.checked.auditControlFlowTargets, 1);
+        assert.equal(report.checked.auditControlFlowTargets, 2);
         assert.equal(report.checked.auditControlFlowFiles, 1);
         assert.deepEqual(
             report.findings.filter((finding) => finding.code === 'AUDIT_CONTROL_FLOW'),
