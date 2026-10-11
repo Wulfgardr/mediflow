@@ -82,7 +82,8 @@ interface SecurityContextType {
     unlockCredential: UnlockParameters['credential'];
     /**
      * `shown` is what the field said while the person typed. 'confirm' means nothing was sent:
-     * the text is long enough to be a passphrase and must be submitted again, unchanged.
+     * the text is long enough to be a passphrase and must be confirmed, unchanged, on the control
+     * the lock screen shows with its notice. Only that control passes `longPinConfirmed`.
      */
     login: (
         secret: string,
