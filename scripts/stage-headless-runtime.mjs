@@ -107,7 +107,7 @@ export async function stageHeadlessRuntime(app) {
         ? traceSourceText(ts, file, bytes, ROOT) : bytes;
     },
   });
-  const files = new Set([...sourceFiles, '.nvmrc', 'package.json']);
+  const files = new Set([...sourceFiles, '.nvmrc', 'package.json', 'LICENSE', 'CREDITS.md']);
   // The existing DB bootstrap reads the migration journal and SQL by filename.
   const drizzle = physicalPath(path.join(ROOT, 'drizzle'), true);
   for (const name of fs.readdirSync(drizzle).filter(name => /^\d[^/]*\.sql$/u.test(name)).sort()) files.add(`drizzle/${name}`);
