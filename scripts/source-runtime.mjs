@@ -5,15 +5,16 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory, verifyNativeBinding } from './node-runtime-contract.mjs';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
+import { physicalFiles, physicalRecord } from './launch-bundled-headless-supervisor.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ledgerPath = web => path.join(path.dirname(web), 'runtime-payload-ledger.json');
 const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const distDirectory = web => readJson(path.join(web, 'mediflow-runtime-contract.json')).distDir ?? '.next';
 
-// Next can point package aliases at the source install on Windows. Outside
-// this build, only a complete installed local package with pinned provenance
-// may supply bytes. Aliases are never admitted at startup.
+// Registry aliases reuse only the physical traced subset already in this build;
+// an external local package additionally requires its complete pinned provenance.
+// Neither kind of alias is admitted at startup.
 export function materializeSourceRuntime(web, sourceRoot = ROOT, directory = web, active = new Set()) {
   const real = fs.realpathSync(directory);
   if (active.has(real) || (real !== web && !real.startsWith(web + path.sep))) throw new Error('Source runtime alias escapes or cycles');
@@ -21,8 +22,7 @@ export function materializeSourceRuntime(web, sourceRoot = ROOT, directory = web
   for (const name of fs.readdirSync(directory)) {
     const file = path.join(directory, name), stat = fs.lstatSync(file);
     if (stat.isSymbolicLink()) {
-      const target = fs.realpathSync(file);
-      let installed;
+      let target = fs.realpathSync(file), installed, traced;
       if (!target.startsWith(web + path.sep)) {
         for (const input of [sourceRoot, path.join(sourceRoot, 'node_modules')]) {
           const physical = path.resolve(input), inputStat = fs.lstatSync(physical);
@@ -34,7 +34,27 @@ export function materializeSourceRuntime(web, sourceRoot = ROOT, directory = web
         if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u.test(packageName)) {
           throw new Error('Source runtime alias escapes build or installed package root');
         }
-        installed = generatePayloadLedger({ sourceRoot, payloadRoot: target, profile: 'local-package', packageName });
+        const reference = readJson(path.join(sourceRoot, 'package.json')).dependencies?.[packageName];
+        if (reference?.startsWith('file:')) {
+          installed = generatePayloadLedger({ sourceRoot, payloadRoot: target, profile: 'local-package', packageName });
+        } else {
+          const lock = readJson(path.join(sourceRoot, 'package-lock.json'));
+          const locked = lock.packages?.[`node_modules/${packageName}`];
+          const canonical = path.join(web, 'node_modules', packageName);
+          traced = physicalFiles(canonical).map(name => [name, physicalRecord(path.join(canonical, name))]);
+          const metadata = readJson(path.join(canonical, 'package.json'));
+          if (!reference || lock.lockfileVersion !== 3 || locked?.dev === true
+            || !locked?.resolved?.startsWith('https://') || !/^sha512-[A-Za-z0-9+/]+={0,2}$/u.test(locked?.integrity ?? '')
+            || metadata.name !== packageName || metadata.version !== locked?.version) {
+            throw new Error('Source runtime alias lacks a matching locked runtime package');
+          }
+          for (const [name, record] of traced) {
+            if (JSON.stringify(physicalRecord(path.join(target, name))) !== JSON.stringify(record)) {
+              throw new Error('Source runtime traced package differs from installed member');
+            }
+          }
+          target = canonical;
+        }
       } else if (fs.statSync(target).isDirectory()) materializeSourceRuntime(web, sourceRoot, target, ancestors);
       const temporary = `${file}.${process.pid}.tmp`;
       fs.mkdirSync(temporary); // Claim an absent, owned container before copying.
@@ -42,6 +62,9 @@ export function materializeSourceRuntime(web, sourceRoot = ROOT, directory = web
         const copy = path.join(temporary, 'payload');
         fs.cpSync(target, copy, { recursive: true, errorOnExist: true, force: false });
         if (installed) verifyPayloadLedger({ payloadRoot: copy, ledger: installed });
+        if (traced && JSON.stringify(physicalFiles(copy).map(name => [name, physicalRecord(path.join(copy, name))])) !== JSON.stringify(traced)) {
+          throw new Error('Source runtime traced package changed while copying');
+        }
         fs.unlinkSync(file); fs.renameSync(copy, file);
       } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
     } else if (stat.isDirectory()) materializeSourceRuntime(web, sourceRoot, file, ancestors);
