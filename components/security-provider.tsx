@@ -17,6 +17,7 @@ import {
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
+import { encryptRecoveryBackup, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup';
 import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
 import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
 import { LockScreen } from '@/components/lock-screen';
@@ -93,6 +94,7 @@ interface SecurityContextType {
         secret: string,
         options?: { shown?: UnlockParameters['credential']; longPinConfirmed?: boolean },
     ) => Promise<boolean | 'confirm'>;
+    recoveryBackup: (artifact?: Uint8Array) => Promise<Uint8Array | void>;
     preparePassphraseChange: (secret: string, passphrase: string) => Promise<AccessResult>;
     preparePassphraseRecovery: (secret: string, passphrase: string, kit?: RecoveryKit) => Promise<AccessResult>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -732,6 +734,33 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
     };
 
+    const recoveryBackup = async (artifact?: Uint8Array): Promise<Uint8Array | void> => {
+        const key = masterKeyRef.current;
+        const generation = authorityAttemptGenerationRef.current;
+        if (!key || !isAuthenticated || isLocked || unlockCredential !== 'passphrase' || user?.role !== 'admin') {
+            throw new Error('Sblocca con la passphrase dell’amministratore prima di continuare.');
+        }
+        const current = () => generation === authorityAttemptGenerationRef.current && masterKeyRef.current === key;
+        let bytes: Uint8Array | undefined;
+        try {
+            if (artifact) {
+                bytes = await decryptRecoveryBackup(artifact, key);
+                if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+                return;
+            }
+            const response = await fetch('/api/system/recovery-backup', { method: 'POST', cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (!response.ok || Number(response.headers.get('Content-Length')) > MAX_RECOVERY_DATABASE_BYTES || !current()) {
+                throw new Error('Backup completo non disponibile. Rinnova l’accesso e verifica l’archivio.');
+            }
+            bytes = new Uint8Array(await response.arrayBuffer());
+            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+            const encrypted = await encryptRecoveryBackup(bytes, key);
+            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+            return encrypted;
+        } finally { bytes?.fill(0); }
+    };
+
     const preparePassphraseChange = async (secret: string, passphrase: string): Promise<AccessResult> => {
         const snapshot = wrappingRef.current;
         if (!isAuthenticated || isLocked || !user || !snapshot || preparedAccessRef.current || accessPreparePending.current) return { ok: false, message: 'Rinnova l’accesso prima di cambiare la credenziale.' };
@@ -856,6 +885,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 authRecoveryState,
                 unlockCredential,
                 login,
+                recoveryBackup,
                 preparePassphraseChange,
                 preparePassphraseRecovery,
                 changePin,
@@ -881,6 +911,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             authRecoveryState,
             unlockCredential,
             login,
+            recoveryBackup,
             preparePassphraseChange,
             preparePassphraseRecovery,
             changePin,

@@ -5,7 +5,7 @@ read_when:
   - "Changing the backup format, the scheduled runner or the restore executor."
 ---
 
-# Prova di ripristino
+# Prova di ripristino dell’esportazione portabile
 
 Un backup serve se si riesce a ripristinarlo. Questa prova lo verifica su
 archivi sintetici creati apposta: non legge, non copia e non modifica i dati
@@ -81,3 +81,44 @@ npm run test:backup-restore:drill -- --keep-work-dir
 
 Restano in `tmp-backup-restore-drill/`; si possono cancellare a mano. Un
 fallimento va segnalato con il rapporto allegato: non contiene dati reali.
+
+
+## Backup completo dopo la perdita del computer
+
+Questo percorso è distinto dalla prova portabile sopra. In Impostazioni →
+Backup, «Crea backup completo cifrato» salva `.mediflow-recovery` con l’intero
+SQLite, account e chiavi protette compresi. Conserva il kit corrispondente a
+quella copia; una rotazione successiva delle credenziali produce un altro kit.
+La chiave su carta resta separata. «Verifica il file cifrato» controlla
+l’autenticità con la chiave sbloccata, **non** dimostra un ripristino.
+
+Per recuperare su un computer nuovo:
+
+1. Installa le dipendenze del sorgente con Node 24, ma non completare il primo
+   avvio. Prepara una cartella locale vuota su volume cifrato, fuori da servizi
+   di sincronizzazione. Chiudi tutti i processi MediFlow. Non copiare token
+   locali o configurazioni di accesso dalla sorgente; lascia disattivato
+   `MEDIFLOW_LOCAL_API_TOKEN` anche al primo avvio dopo il recupero.
+2. Ritira la vecchia installazione: non usare contemporaneamente i due archivi.
+   Il protocollo locale non può osservare una copia su un altro computer.
+3. Dalla cartella del programma esegui, sostituendo i tre percorsi:
+
+   ```bash
+   npm run recovery:restore -- --backup /percorso/backup.mediflow-recovery --kit /percorso/kit.json --data-dir /percorso/archivio-vuoto --source-retired
+   ```
+
+4. Inserisci la chiave cartacea al prompt: non compare sul terminale e non va
+   messa nella riga di comando. In caso di errore non eliminare lo stato di
+   manutenzione o le copie del protocollo per forzare un secondo tentativo.
+5. Avvia MediFlow con `MEDIFLOW_DATA_DIR` impostata alla stessa cartella.
+   Scegli «Recupera con kit e chiave», imposta una nuova passphrase, salva il
+   nuovo kit e rinnova l’accesso. Riabbina i dispositivi.
+6. Nella prova sintetica controlla una nota cifrata, lo storico e una ricevuta
+   già applicata; la ricevuta non deve produrre una seconda scrittura.
+
+Il backup è limitato a 256 MiB e allo schema corrente. File incompleto, alterato,
+chiave o kit errati, schema incompatibile e destinazione non vuota vengono
+rifiutati prima dello swap. La prova automatica del confine SQLite è
+`lib/recovery-backup.test.ts`: usa solo archivi sintetici e verifica anche che
+un processo locale ancora ammesso impedisca la sostituzione. Non costituisce
+la prova operativa di un secondo operatore né certifica un backup dello studio.
