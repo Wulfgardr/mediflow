@@ -97,7 +97,7 @@ const fixture = code => ({ url: 'data:text/javascript,' + encodeURIComponent(cod
 const unavailable = 'export const createHostProviderLifecycleService = () => ({ service: { read: () => ({ status: "denied", reason: "unavailable" }) } });';
 const forbid = name => 'export const ' + name + ' = () => { throw new Error("UNEXPECTED_OTHER_LANE_ACQUISITION"); };';
 const leaves = new Map([
-    ['lib/db-server.ts', 'const chain = { from: () => chain, where: () => chain, all: () => { globalThis.__trComposition.observed.databaseReads++; return []; } }; export const dbServer = { select: () => chain, insert: () => { throw new Error("DB_WRITE_FORBIDDEN"); } }; export const runDbServerImmediateTransaction = () => { throw new Error("TRANSACTION_FORBIDDEN"); };'],
+    ['lib/db-server.ts', 'const chain = { from: () => chain, where: () => chain, all: () => { globalThis.__trComposition.observed.databaseReads++; return []; } }; export const dbServer = { select: () => chain, insert: () => { throw new Error("DB_WRITE_FORBIDDEN"); } }; export const openDbServer = () => { throw new Error("DATABASE_OPEN_FORBIDDEN"); }; export const runDbServerImmediateTransaction = () => { throw new Error("TRANSACTION_FORBIDDEN"); };'],
     ['lib/schema.ts', 'export const ambulatories = { id: "id", type: "type" }; export const settings = { key: "key", value: "value" }; export const patients = { id: "id", version: "version" }; export const patientsToAmbulatories = { patientId: "patientId", ambulatoryId: "ambulatoryId" };'],
     ['lib/security/server-auth.ts', 'export const requireSession = async () => null; export const requireSessionOrLocalToken = async () => globalThis.__trComposition.allowStatus ? { id: "synthetic-status-reader" } : null; export const unauthorizedResponse = () => Response.json({ error: "unauthorized" }, { status: 401 }); export const acquireAuthenticatedWebSessionProjectionOwnerContext = async () => { throw new Error("CLINICAL_CONTEXT_FORBIDDEN"); };'],
     ['lib/security/server-session.ts', forbid('registerServerSessionResource') + forbid('getSession') + forbid('peekSession')],
@@ -120,7 +120,7 @@ registerHooks({
     resolve(specifier, context, next) {
         if (specifier === 'server-only') return fixture('export {};');
         if (specifier === 'next/server') return fixture('export const NextResponse = Response; export const NextRequest = Request;');
-        if (specifier === 'drizzle-orm') return fixture('export const inArray = () => null; export const eq = () => null; export const and = () => null;');
+        if (specifier === 'drizzle-orm') return fixture('export const sql = () => { throw new Error("DATABASE_READ_FORBIDDEN"); }; export const inArray = () => null; export const eq = () => null; export const and = () => null;');
         if (specifier === '@mediflow/web-auth-lifecycle-owner') return { url: pathToFileURL(path.join(source, 'packages/web-auth-lifecycle-owner/index.js')).href, shortCircuit: true };
         let base;
         if (specifier.startsWith('@/')) base = path.join(source, specifier.slice(2));
