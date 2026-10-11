@@ -29,7 +29,8 @@ export async function POST(request: Request) {
         if (result.kind === 'unauthorized') return unauthorizedResponse();
         if (result.kind === 'failure') return failureResponse(result.status, result.code, result.message);
 
-        const response = NextResponse.json({ success: true });
+        // False when a copy made before the passphrase, or the log of the archive, could not be cleared: the person must be told.
+        const response = NextResponse.json({ success: true, earlierCopiesCleared: result.earlierCopiesCleared === true });
         response.headers.set('Cache-Control', 'no-store');
         return response;
     } catch (error) {

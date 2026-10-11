@@ -5,7 +5,10 @@
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
+import Database from 'better-sqlite3';
 import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3400';
@@ -24,6 +27,18 @@ test('an account moves from its PIN to a passphrase and the PIN stops opening it
     const pinLogin = await login({ password: PIN });
     assert.equal(pinLogin.response.status, 200);
     const masterKey = openPinWrapping(pinLogin.json.encryptedMasterKey, pinLogin.json.salt);
+
+    // A full copy of the archive, named and sealed the way a repair leaves it, taken while the PIN wraps the key.
+    assert.ok(process.env.MEDIFLOW_DATA_DIR, 'MEDIFLOW_DATA_DIR is required to look at the files of the archive');
+    const archive = path.join(process.env.MEDIFLOW_DATA_DIR, 'medical.db');
+    const pinEraCopy = `${archive}.bak-20261011-101500123`;
+    const source = new Database(archive, { readonly: true });
+    try { source.prepare('VACUUM INTO ?').run(pinEraCopy); } finally { source.close(); }
+    const sealed = new Database(pinEraCopy);
+    try { sealed.pragma('journal_mode = DELETE'); } finally { sealed.close(); }
+    const filesHolding = (text) => [archive, `${archive}-wal`, pinEraCopy]
+        .filter((file) => fs.existsSync(file) && fs.readFileSync(file).includes(Buffer.from(text))).map((file) => path.basename(file));
+    assert.ok(filesHolding(pinLogin.json.encryptedMasterKey).includes(path.basename(pinEraCopy)));
 
     const unlock = passphraseWrapping(masterKey, PASSPHRASE);
     const recovery = recoveryWrapping(masterKey);
@@ -52,9 +67,14 @@ test('an account moves from its PIN to a passphrase and the PIN stops opening it
     const unchanged = await login({ password: PIN });
     assert.equal(unchanged.response.status, 200);
     assert.equal(unchanged.json.encryptedMasterKey, pinLogin.json.encryptedMasterKey);
+    assert.ok(fs.existsSync(pinEraCopy), 'refused requests and PIN logins leave the copy where it is');
 
     const adopted = await adoption(unchanged.cookieHeader);
-    assert.deepEqual([adopted.response.status, adopted.json], [200, { success: true }]);
+    assert.deepEqual([adopted.response.status, adopted.json], [200, { success: true, earlierCopiesCleared: true }]);
+    // Nothing the product keeps beside the archive holds the PIN wrapping or its salt any more:
+    // not the copy, not the archive, not its write-ahead log.
+    assert.equal(fs.existsSync(pinEraCopy), false);
+    assert.deepEqual([...filesHolding(pinLogin.json.encryptedMasterKey), ...filesHolding(pinLogin.json.salt)], []);
 
     // Every session of the account is retired, including the one that asked.
     for (const cookieHeader of [pinLogin.cookieHeader, unchanged.cookieHeader]) {

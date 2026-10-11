@@ -16,6 +16,7 @@ const { POST: login } = await import('../../app/api/auth/login/route.ts');
 const { GET: check } = await import('../../app/api/auth/check/route.ts');
 const { dbServer } = await import('../db-server.ts');
 const { users } = await import('../schema.ts');
+const { createVerifiedSqliteSnapshotSync } = await import('../sqlite-repair.ts');
 const { clearAllSessions } = await import('./server-session.ts');
 const { persistKdfRewrap } = await import('./kdf-rewrap-service.ts');
 const { createNativeLoginHttpHandler } = await import('./native-login-http.ts');
@@ -27,6 +28,10 @@ const USERNAME = 'synthetic-admin';
 const PIN = '2468';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
 const account = () => dbServer.select().from(users).where(eq(users.username, USERNAME)).get()!;
+const archive = path.join(dataDir, 'medical.db');
+/** Which files of the archive hold `text` in their raw bytes. */
+const filesHolding = (text: string) => [archive, `${archive}-wal`]
+    .filter((file) => fs.existsSync(file) && fs.readFileSync(file).includes(Buffer.from(text))).map((file) => path.basename(file));
 const rawKey = async (key: CryptoKey) => Buffer.from(await globalThis.crypto.subtle.exportKey('raw', key)).toString('hex');
 
 async function readCheck() {
@@ -71,20 +76,27 @@ test('an account moves from its PIN to a passphrase: check, login and re-wrap fo
     });
     assert.equal(created.status, 200);
 
+    // A repair made while the account is on its PIN leaves a full copy beside the archive.
+    const pinEraCopy = `${archive}.bak-20261011-101500123`;
+    createVerifiedSqliteSnapshotSync(archive, pinEraCopy);
+
     // On its PIN: nothing new is disclosed before authentication, and the PIN opens a session.
     assert.deepEqual((await readCheck()).body.unlock, { credential: 'pin' });
     assert.equal((await post(login, '/api/auth/login', { username: USERNAME, password: PIN })).status, 200);
+    assert.ok(fs.existsSync(pinEraCopy), 'the copies of an account on its PIN are its safety net: a login leaves them');
     assert.deepEqual(await nativeLogin(PIN), { status: 200, sessions: 1 });
     const stronger = validateKdfRewrapPayload({ encryptedMasterKey: pinWrapping, salt: Buffer.from(pinSalt).toString('base64') });
     assert.ok(stronger);
     assert.equal(persistKdfRewrap(dbServer, account().id, stronger), true);
 
-    // What the migration of step 3 will write in one transaction.
+    // What the move writes in one transaction. Written here alone, it also stands for a move
+    // interrupted before it could remove what still holds the PIN wrapping beside the archive.
     const wrapping = await createUnlockWrapping(masterKey, PASSPHRASE);
     dbServer.update(users).set({
         encryptedMasterKey: wrapping.encryptedMasterKey, salt: wrapping.salt,
         unlockVerifierHash: await hashAccessVerifier(wrapping.verifier),
     }).where(eq(users.username, USERNAME)).run();
+    assert.notDeepEqual(filesHolding(pinWrapping), [], 'the write alone leaves the PIN wrapping in the files of the archive');
 
     // Before authentication the browser learns the salt, and only the salt.
     const { unlock } = (await readCheck()).body;
@@ -95,6 +107,10 @@ test('an account moves from its PIN to a passphrase: check, login and re-wrap fo
     const opened = await post(login, '/api/auth/login', { username: USERNAME, verifier: material.verifier });
     assert.equal(opened.status, 200);
     assert.equal(await rawKey(await openUnlockWrapping(String(opened.body.encryptedMasterKey), material.kek)), await rawKey(masterKey));
+    // The first unlock with the passphrase makes up for the interruption: the copy is gone, and
+    // neither the archive nor its log holds the PIN wrapping or its salt any more.
+    assert.equal(fs.existsSync(pinEraCopy), false);
+    assert.deepEqual([...filesHolding(pinWrapping), ...filesHolding(Buffer.from(pinSalt).toString('base64'))], []);
 
     // The PIN no longer opens a session, alone or beside a verifier, and is not counted as an attempt.
     const withPin = await post(login, '/api/auth/login', { username: USERNAME, password: PIN });
