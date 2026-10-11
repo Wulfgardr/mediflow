@@ -71,13 +71,19 @@ async function buildSourceRuntime(root = ROOT, args = []) {
   if (git(['status', '--porcelain', '--untracked-files=normal'])) throw new Error('Commit source changes before a production build');
   const revision = git(['rev-parse', 'HEAD']);
   const branch = git(['branch', '--show-current']) || 'detached';
-  execFileSync(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'build', ...args], { cwd: root, stdio: 'inherit' });
+  const sourceFingerprint = `${branch}@${revision.slice(0, 12)}:clean`;
+  execFileSync(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'build', ...args], {
+    cwd: root, stdio: 'inherit', env: { ...process.env,
+      MEDIFLOW_APP_REVISION: revision.slice(0, 12), MEDIFLOW_APP_BRANCH: branch,
+      MEDIFLOW_APP_WORKTREE_HASH: 'clean', MEDIFLOW_APP_SOURCE_FINGERPRINT: sourceFingerprint,
+      MEDIFLOW_APP_FINGERPRINT: sourceFingerprint },
+  });
   if (git(['rev-parse', 'HEAD']) !== revision || git(['status', '--porcelain', '--untracked-files=normal'])) {
     throw new Error('Source changed during build');
   }
   const web = standaloneDirectory(root);
   fs.writeFileSync(path.join(web, 'mediflow-build-identity.json'), JSON.stringify({
-    schemaVersion: 1, revision, branch, worktreeHash: 'clean', sourceFingerprint: `${branch}@${revision}:clean`,
+    schemaVersion: 1, revision, branch, worktreeHash: 'clean', sourceFingerprint,
     buildId: fs.readFileSync(path.join(web, path.basename(path.dirname(web)), 'BUILD_ID'), 'utf8').trim(),
   }) + '\n');
 }
@@ -111,7 +117,7 @@ export async function startSourceRuntime(mode, root = ROOT) {
   if (!['web', 'headless'].includes(mode)) throw new Error('Expected web or headless');
   const { web, identity } = verifySourceRuntime(root);
   Object.assign(process.env, { NODE_ENV: 'production', HOSTNAME: '127.0.0.1',
-    MEDIFLOW_APP_REVISION: identity.revision, MEDIFLOW_APP_BRANCH: identity.branch,
+    MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12), MEDIFLOW_APP_BRANCH: identity.branch,
     MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
     MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint,
     MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint });

@@ -157,6 +157,15 @@ incluse. Il standalone aggiunge copie integrali dei testi ufficiali GNU
 Queste copie colmano il buco dei testi LGPL/GPL nel payload; non qualificano
 la conformità globale, i diritti di tutte le dipendenze o gli altri profili.
 
+### Canvas PDF
+
+Il runtime usa `@napi-rs/canvas` 0.1.100 e il backend della piattaforma,
+ottenuti dal registro npm secondo il lockfile. Entrambi dichiarano MIT e il
+repository [Brooooooklyn/canvas](https://github.com/Brooooooklyn/canvas);
+il payload conserva LICENSE del pacchetto principale e README del backend.
+La dichiarazione del pacchetto non è una revisione dei diritti di tutte le
+librerie incorporate nel binario Skia: tale revisione resta non nota.
+
 ### Font Lume
 
 **Inter Variable** dà forma alla Voce di Lume. Il file locale
