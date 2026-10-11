@@ -105,10 +105,9 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   expect(setupCheck.status()).toBe(200);
   await expect(setupCheck.json()).resolves.toMatchObject({ isSetup: false, hasSession: false });
 
-  // Re-onboard with a new PIN and ordinary key generation, never a fake crypto blob.
-  const setupResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/setup');
+  // Re-provision the compatibility PIN through the real API fixture, which checks
+  // the setup response itself and generates a real wrapped master key.
   await bootstrapUnlockedSession(page, '5678');
-  expect((await setupResponse).status()).toBe(200);
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
 
   const afterSetup = await request.get('/api/patients');
