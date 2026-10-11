@@ -43,7 +43,7 @@ export const FABRIC_VENUE_COPY: Readonly<Record<FabricVenue, FabricVenueCopy>> =
     }),
     home_base: Object.freeze({
         title: 'Postazione principale',
-        description: 'Il nodo host esegue il calcolo per un client accoppiato.',
+        description: 'La postazione principale esegue il calcolo per un dispositivo abbinato.',
     }),
     on_device: Object.freeze({
         title: 'Sul dispositivo',
@@ -105,10 +105,10 @@ export function describeProviderDisclosure(
 ): ProviderDisclosurePresentation {
     return Object.freeze({
         declaredLifecycle: provider.declared.lifecycle === 'host_managed'
-            ? 'Gestito dall’host'
+            ? 'Gestito dalla postazione'
             : 'Solo informativo',
         declaredRuntimeObservation: provider.declared.runtimeObservation === 'operation_receipt_required'
-            ? 'Richiede la receipt dell’operazione corrente'
+            ? 'Richiede la prova dell’operazione corrente'
             : 'Disabilitata',
         declaredVenue: FABRIC_VENUE_COPY[provider.declared.venue].title,
         declaredEgress: provider.declared.egress === 'none' ? 'Nessuna' : 'Disabilitata',
@@ -119,7 +119,7 @@ export function describeProviderDisclosure(
             ? 'Candidato locale, massimo solo proposta'
             : 'Esecuzione disabilitata',
         lifecycle: PROVIDER_DISCLOSURE_LIFECYCLE_LABELS[provider.effective.lifecycle],
-        runtimeObservation: 'Non osservata: serve una receipt dell’operazione corrente.',
+        runtimeObservation: 'Non osservata: serve una prova dell’operazione corrente.',
         effectiveVenue: 'Non osservata',
         effectiveEgress: 'Non osservato',
         effectiveCredentialClass: provider.effective.credentialClass === 'local_model'

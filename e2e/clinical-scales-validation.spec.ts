@@ -27,7 +27,9 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     expect(writes).toBe(0);
     // @Codex: button cancellation must preserve a partial draft until the explicit leave decision.
     const firstAnswer = form.getByRole('radio', { name: /^0\./ });
-    await firstAnswer.click();
+    await firstAnswer.focus();
+    await page.keyboard.press('Space');
+    await expect(firstAnswer).toBeFocused();
     await form.getByLabel('Contesto').selectOption('home');
     await form.getByRole('button', { name: 'Annulla', exact: true }).click();
     const leaveDialog = page.getByRole('dialog', { name: 'Lasciare la compilazione?', exact: true });
