@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { parseRecoveryKit, type RecoveryKit } from '@/lib/recovery-backup';
+export type { RecoveryKit } from '@/lib/recovery-backup';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
 import { SETTINGS_CARD_CLASS, SETTINGS_INPUT_CLASS, SETTINGS_LABEL_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings/settings-ui';
 
-export type RecoveryKit = { schemaVersion: 'mediflow.recovery-kit.v1'; username: string; wrappedMasterKey: string; salt: string };
 export type PreparedRecoveryKit = { kit: RecoveryKit; recoveryKey: string };
 export type AccessResult = { ok: true } | { ok: false; message: string };
 
@@ -64,11 +65,7 @@ export function PassphraseAccessForm({ mode, onPrepare }: {
                 setKit(undefined); setError(''); const input = e.currentTarget; const file = input.files?.[0]; if (!file) return;
                 try {
                     if (file.size > 4096) throw new Error();
-                    const value = JSON.parse(await file.text());
-                    if (!value || Object.keys(value).sort().join('|') !== 'salt|schemaVersion|username|wrappedMasterKey'
-                        || value.schemaVersion !== 'mediflow.recovery-kit.v1' || typeof value.username !== 'string' || value.username.length > 128
-                        || typeof value.wrappedMasterKey !== 'string' || !value.wrappedMasterKey.startsWith('r1:') || value.wrappedMasterKey.length > 128
-                        || typeof value.salt !== 'string' || value.salt.length > 64) throw new Error();
+                    const value = parseRecoveryKit(await file.text());
                     if (input.files?.[0] === file) setKit(value);
                 } catch { if (input.files?.[0] === file) setError('Kit di recupero non valido.'); }
             }} /></div>}
