@@ -74,15 +74,15 @@ test('a version 1 archive gains the unlock credential columns once and keeps its
         const v1 = seed(w.file);
         for (const column of added) v1.exec(`ALTER TABLE users DROP COLUMN ${column}`);
         v1.prepare(`INSERT INTO users (id, username, password_hash, encrypted_master_key, salt)
-            VALUES ('synthetic-user', 'synthetic', 'synthetic-hash', 'v2:synthetic-wrapping', 'synthetic-salt')`).run();
+            VALUES ('synthetic-user', 'synthetic-account', 'synthetic-hash', 'v2:synthetic-wrapping', 'synthetic-salt')`).run();
         v1.pragma('user_version = 1');
         v1.close();
 
         let db = openVersionedSqliteDatabase(w.file);
         assert.equal(db.pragma('user_version', { simple: true }), 2);
         assert.deepEqual(userColumns(db).slice(-added.length), added);
-        assert.deepEqual(db.prepare(`SELECT username, encrypted_master_key, ${added.join(', ')} FROM users`).all(), [{
-            username: 'synthetic', encrypted_master_key: 'v2:synthetic-wrapping',
+        assert.deepEqual(db.prepare(`SELECT id, encrypted_master_key, ${added.join(', ')} FROM users`).all(), [{
+            id: 'synthetic-user', encrypted_master_key: 'v2:synthetic-wrapping',
             unlock_verifier_hash: null, recovery_wrapped_master_key: null, recovery_salt: null, recovery_verifier_hash: null,
         }]);
         db.close();
@@ -93,7 +93,7 @@ test('a version 1 archive gains the unlock credential columns once and keeps its
         const original = new Database(path.join(w.directory, names[0]), { readonly: true });
         assert.equal(original.pragma('user_version', { simple: true }), 1);
         assert.equal(userColumns(original).some(column => added.includes(column)), false);
-        assert.equal(original.prepare('SELECT username FROM users').pluck().get(), 'synthetic');
+        assert.equal(original.prepare('SELECT id FROM users').pluck().get(), 'synthetic-user');
         original.close();
 
         db = openVersionedSqliteDatabase(w.file); db.close();
