@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
@@ -17,6 +19,8 @@ export async function GET(request: Request) {
         const patientId = new URL(request.url).searchParams.get('patientId');
         return NextResponse.json(await listProstheticPrescriptions(patientId));
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /prosthetic-prescriptions error:', error);
         return NextResponse.json({ error: 'Failed to fetch prosthetic prescriptions' }, { status: 500 });
     }
@@ -25,6 +29,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsedBody = await readPrescriptionJsonObject(request);
@@ -33,6 +39,8 @@ export async function POST(request: Request) {
         const result = await createHostProstheticPrescription({ request, session }, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /prosthetic-prescriptions error:', error);
         return NextResponse.json({ error: 'Failed to create prosthetic prescription' }, { status: 500 });
     }

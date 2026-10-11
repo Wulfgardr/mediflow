@@ -91,7 +91,7 @@ test('descrive provider dichiarati ed effettivi senza trasformare lifecycle o re
     const [ollama, athena, openai] = snapshot.providerDisclosure.providers.map(describeProviderDisclosure);
 
     assert.equal(ollama.lifecycle, PROVIDER_DISCLOSURE_LIFECYCLE_LABELS.available_unqualified);
-    assert.equal(ollama.runtimeObservation, 'Non osservata: serve una receipt dell’operazione corrente.');
+    assert.equal(ollama.runtimeObservation, 'Non osservata: serve una prova dell’operazione corrente.');
     assert.equal(ollama.executionDisposition, 'Nessuna esecuzione corrente osservata');
     assert.equal(ollama.effectiveVenue, 'Non osservata');
     assert.equal(ollama.effectiveEgress, 'Non osservato');

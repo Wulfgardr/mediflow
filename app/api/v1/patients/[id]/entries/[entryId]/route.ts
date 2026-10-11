@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -54,6 +55,8 @@ export async function GET(
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/entries/[entryId] error:', error);
         return NextResponse.json({ error: 'Failed to fetch entry' }, { status: 500 });
     }
@@ -68,8 +71,8 @@ export async function PUT(
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
+        /* @Codex */
         const { id, entryId } = await params;
         const parsed = await readEntryJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
@@ -78,11 +81,13 @@ export async function PUT(
         const context = auditContextFromSession(auditSession);
         const result = updateEntryOperation({ patientId: id, entryId, expectedVersion: prepared.expectedVersion,
             values: prepared.values, changedFields: prepared.changedFields, mode: 'v1', audit: {
-                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
             } });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /api/v1/patients/[id]/entries/[entryId] error:', error);
         return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 });
     }
@@ -97,8 +102,8 @@ export async function DELETE(
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
+        /* @Codex */
         const { id, entryId } = await params;
         // WUL-308: DELETE keeps the soft-delete tombstone and gains the version guard.
         const parsedBody = await parseEntryDeleteInput(request, 'api-v1-delete');
@@ -110,11 +115,13 @@ export async function DELETE(
         const context = auditContextFromSession(auditSession);
         const result = updateEntryOperation({ patientId: id, entryId, expectedVersion: prepared.expectedVersion,
             values: prepared.values, changedFields: prepared.changedFields, mode: 'v1', audit: {
-                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
             } });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /api/v1/patients/[id]/entries/[entryId] error:', error);
         return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 });
     }

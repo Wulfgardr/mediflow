@@ -28,15 +28,15 @@ after(() => {
 test('legacy entries and checkups use version guards and soft-delete tombstones', async () => {
     await assertServerReady();
 
-    const cookieHeader = await login();
+    const sessionHeaders = await login();
     const patientId = await createSeedPatient();
 
-    await exerciseLegacyEntryContract(cookieHeader, patientId);
-    await exerciseLegacyCheckupContract(cookieHeader, patientId);
+    await exerciseLegacyEntryContract(sessionHeaders, patientId);
+    await exerciseLegacyCheckupContract(sessionHeaders, patientId);
 });
 
-async function exerciseLegacyEntryContract(cookieHeader, patientId) {
-    const create = await webRequest(cookieHeader, 'POST', '/api/entries', {
+async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
+    const create = await webRequest(sessionHeaders, 'POST', '/api/entries', {
         id: crypto.randomUUID(),
         patientId,
         type: 'note',
@@ -49,35 +49,35 @@ async function exerciseLegacyEntryContract(cookieHeader, patientId) {
     assert.ok(typeof entryId === 'string' && entryId.length > 0);
     assert.equal(create.json?.version, 1);
 
-    const listed = await webRequest(cookieHeader, 'GET', `/api/entries?patientId=${patientId}`);
+    const listed = await webRequest(sessionHeaders, 'GET', `/api/entries?patientId=${patientId}`);
     assert.equal(listed.status, 200);
     const listedEntry = listed.json.find((item) => item.id === entryId);
     assert.equal(listedEntry?.version, 1);
     assert.equal(listedEntry?.deletedAt, null);
 
-    const missingPut = await webRequest(cookieHeader, 'PUT', `/api/entries/${crypto.randomUUID()}`, {
+    const missingPut = await webRequest(sessionHeaders, 'PUT', `/api/entries/${crypto.randomUUID()}`, {
         version: 1,
         content: 'missing record',
     });
     assert.equal(missingPut.status, 404);
     assert.deepEqual(missingPut.json, { error: 'Not found' });
 
-    const missingDelete = await webRequest(cookieHeader, 'DELETE', `/api/entries/${crypto.randomUUID()}`, {
+    const missingDelete = await webRequest(sessionHeaders, 'DELETE', `/api/entries/${crypto.randomUUID()}`, {
         version: 1,
         deletionReason: 'missing record',
     });
     assert.equal(missingDelete.status, 404);
     assert.deepEqual(missingDelete.json, { error: 'Not found' });
 
-    await expectWebError(cookieHeader, 'PUT', `/api/entries/${entryId}`, { content: 'senza versione' }, 400, 'Version is required');
+    await expectWebError(sessionHeaders, 'PUT', `/api/entries/${entryId}`, { content: 'senza versione' }, 400, 'Version is required');
 
-    const fresh = await webRequest(cookieHeader, 'PUT', `/api/entries/${entryId}`, {
+    const fresh = await webRequest(sessionHeaders, 'PUT', `/api/entries/${entryId}`, {
         version: 1,
         content: 'Voce legacy aggiornata',
     });
     assert.equal(fresh.status, 200);
 
-    const stale = await webRequest(cookieHeader, 'PUT', `/api/entries/${entryId}`, {
+    const stale = await webRequest(sessionHeaders, 'PUT', `/api/entries/${entryId}`, {
         version: 1,
         content: 'stale write',
     });
@@ -87,9 +87,9 @@ async function exerciseLegacyEntryContract(cookieHeader, patientId) {
     assert.equal(stale.json?.recordId, entryId);
     assert.equal(stale.json?.currentVersion, 2);
 
-    await expectWebError(cookieHeader, 'DELETE', `/api/entries/${entryId}`, { deletionReason: 'missing version' }, 400, 'Version is required');
+    await expectWebError(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, { deletionReason: 'missing version' }, 400, 'Version is required');
 
-    const staleDelete = await webRequest(cookieHeader, 'DELETE', `/api/entries/${entryId}`, {
+    const staleDelete = await webRequest(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, {
         version: 1,
         deletionReason: 'stale delete',
     });
@@ -97,17 +97,17 @@ async function exerciseLegacyEntryContract(cookieHeader, patientId) {
     assert.equal(staleDelete.json?.code, 'VERSION_CONFLICT');
     assert.equal(staleDelete.json?.currentVersion, 2);
 
-    const deletion = await webRequest(cookieHeader, 'DELETE', `/api/entries/${entryId}`, {
+    const deletion = await webRequest(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, {
         version: 2,
         deletionReason: 'legacy-entry-delete-smoke',
     });
     assert.equal(deletion.status, 200);
 
-    const hiddenList = await webRequest(cookieHeader, 'GET', `/api/entries?patientId=${patientId}`);
+    const hiddenList = await webRequest(sessionHeaders, 'GET', `/api/entries?patientId=${patientId}`);
     assert.equal(hiddenList.status, 200);
     assert.ok(!hiddenList.json.some((item) => item.id === entryId), 'legacy entry list should hide tombstones');
 
-    const includedList = await webRequest(cookieHeader, 'GET', `/api/entries?patientId=${patientId}&includeDeleted=true`);
+    const includedList = await webRequest(sessionHeaders, 'GET', `/api/entries?patientId=${patientId}&includeDeleted=true`);
     assert.equal(includedList.status, 200);
     assert.ok(includedList.json.some((item) => item.id === entryId), 'legacy entry includeDeleted should expose tombstones');
 
@@ -117,14 +117,14 @@ async function exerciseLegacyEntryContract(cookieHeader, patientId) {
     assert.equal(tombstone.json?.deletionReason, 'legacy-entry-delete-smoke');
     assert.equal(tombstone.json?.version, 3);
 
-    const restore = await webRequest(cookieHeader, 'PUT', `/api/entries/${entryId}`, {
+    const restore = await webRequest(sessionHeaders, 'PUT', `/api/entries/${entryId}`, {
         version: tombstone.json.version,
         deletedAt: null,
         deletionReason: null,
     });
     assert.equal(restore.status, 200);
 
-    const restoredList = await webRequest(cookieHeader, 'GET', `/api/entries?patientId=${patientId}`);
+    const restoredList = await webRequest(sessionHeaders, 'GET', `/api/entries?patientId=${patientId}`);
     assert.equal(restoredList.status, 200);
     assert.ok(restoredList.json.some((item) => item.id === entryId), 'legacy entry list should show restored records');
 
@@ -137,8 +137,8 @@ async function exerciseLegacyEntryContract(cookieHeader, patientId) {
     scenarioResults.push({ resource: 'entry', entryId, staleStatus: stale.status, deleteStatus: deletion.status, restoreStatus: restore.status });
 }
 
-async function exerciseLegacyCheckupContract(cookieHeader, patientId) {
-    const create = await webRequest(cookieHeader, 'POST', '/api/checkups', {
+async function exerciseLegacyCheckupContract(sessionHeaders, patientId) {
+    const create = await webRequest(sessionHeaders, 'POST', '/api/checkups', {
         id: crypto.randomUUID(),
         patientId,
         date: '2026-05-04T09:00:00.000Z',
@@ -151,35 +151,35 @@ async function exerciseLegacyCheckupContract(cookieHeader, patientId) {
     const checkupId = create.json?.id;
     assert.ok(typeof checkupId === 'string' && checkupId.length > 0);
 
-    const listed = await webRequest(cookieHeader, 'GET', `/api/checkups?patientId=${patientId}`);
+    const listed = await webRequest(sessionHeaders, 'GET', `/api/checkups?patientId=${patientId}`);
     assert.equal(listed.status, 200);
     const listedCheckup = listed.json.find((item) => item.id === checkupId);
     assert.equal(listedCheckup?.version, 1);
     assert.equal(listedCheckup?.deletedAt, null);
 
-    const missingPut = await webRequest(cookieHeader, 'PUT', `/api/checkups/${crypto.randomUUID()}`, {
+    const missingPut = await webRequest(sessionHeaders, 'PUT', `/api/checkups/${crypto.randomUUID()}`, {
         version: 1,
         title: 'missing record',
     });
     assert.equal(missingPut.status, 404);
     assert.deepEqual(missingPut.json, { error: 'Not found' });
 
-    const missingDelete = await webRequest(cookieHeader, 'DELETE', `/api/checkups/${crypto.randomUUID()}`, {
+    const missingDelete = await webRequest(sessionHeaders, 'DELETE', `/api/checkups/${crypto.randomUUID()}`, {
         version: 1,
         deletionReason: 'missing record',
     });
     assert.equal(missingDelete.status, 404);
     assert.deepEqual(missingDelete.json, { error: 'Not found' });
 
-    await expectWebError(cookieHeader, 'PUT', `/api/checkups/${checkupId}`, { title: 'senza versione' }, 400, 'Version is required');
+    await expectWebError(sessionHeaders, 'PUT', `/api/checkups/${checkupId}`, { title: 'senza versione' }, 400, 'Version is required');
 
-    const fresh = await webRequest(cookieHeader, 'PUT', `/api/checkups/${checkupId}`, {
+    const fresh = await webRequest(sessionHeaders, 'PUT', `/api/checkups/${checkupId}`, {
         version: 1,
         title: 'Legacy checkup aggiornato',
     });
     assert.equal(fresh.status, 200);
 
-    const stale = await webRequest(cookieHeader, 'PUT', `/api/checkups/${checkupId}`, {
+    const stale = await webRequest(sessionHeaders, 'PUT', `/api/checkups/${checkupId}`, {
         version: 1,
         title: 'stale write',
     });
@@ -189,9 +189,9 @@ async function exerciseLegacyCheckupContract(cookieHeader, patientId) {
     assert.equal(stale.json?.recordId, checkupId);
     assert.equal(stale.json?.currentVersion, 2);
 
-    await expectWebError(cookieHeader, 'DELETE', `/api/checkups/${checkupId}`, { deletionReason: 'missing version' }, 400, 'Version is required');
+    await expectWebError(sessionHeaders, 'DELETE', `/api/checkups/${checkupId}`, { deletionReason: 'missing version' }, 400, 'Version is required');
 
-    const staleDelete = await webRequest(cookieHeader, 'DELETE', `/api/checkups/${checkupId}`, {
+    const staleDelete = await webRequest(sessionHeaders, 'DELETE', `/api/checkups/${checkupId}`, {
         version: 1,
         deletionReason: 'stale delete',
     });
@@ -199,17 +199,17 @@ async function exerciseLegacyCheckupContract(cookieHeader, patientId) {
     assert.equal(staleDelete.json?.code, 'VERSION_CONFLICT');
     assert.equal(staleDelete.json?.currentVersion, 2);
 
-    const deletion = await webRequest(cookieHeader, 'DELETE', `/api/checkups/${checkupId}`, {
+    const deletion = await webRequest(sessionHeaders, 'DELETE', `/api/checkups/${checkupId}`, {
         version: 2,
         deletionReason: 'legacy-checkup-delete-smoke',
     });
     assert.equal(deletion.status, 200);
 
-    const hiddenList = await webRequest(cookieHeader, 'GET', `/api/checkups?patientId=${patientId}`);
+    const hiddenList = await webRequest(sessionHeaders, 'GET', `/api/checkups?patientId=${patientId}`);
     assert.equal(hiddenList.status, 200);
     assert.ok(!hiddenList.json.some((item) => item.id === checkupId), 'legacy checkup list should hide tombstones');
 
-    const includedList = await webRequest(cookieHeader, 'GET', `/api/checkups?patientId=${patientId}&includeDeleted=true`);
+    const includedList = await webRequest(sessionHeaders, 'GET', `/api/checkups?patientId=${patientId}&includeDeleted=true`);
     assert.equal(includedList.status, 200);
     assert.ok(includedList.json.some((item) => item.id === checkupId), 'legacy checkup includeDeleted should expose tombstones');
 
@@ -219,14 +219,14 @@ async function exerciseLegacyCheckupContract(cookieHeader, patientId) {
     assert.equal(tombstone.json?.deletionReason, 'legacy-checkup-delete-smoke');
     assert.equal(tombstone.json?.version, 3);
 
-    const restore = await webRequest(cookieHeader, 'PUT', `/api/checkups/${checkupId}`, {
+    const restore = await webRequest(sessionHeaders, 'PUT', `/api/checkups/${checkupId}`, {
         version: tombstone.json.version,
         deletedAt: null,
         deletionReason: null,
     });
     assert.equal(restore.status, 200);
 
-    const restoredList = await webRequest(cookieHeader, 'GET', `/api/checkups?patientId=${patientId}`);
+    const restoredList = await webRequest(sessionHeaders, 'GET', `/api/checkups?patientId=${patientId}`);
     assert.equal(restoredList.status, 200);
     assert.ok(restoredList.json.some((item) => item.id === checkupId), 'legacy checkup list should show restored records');
 
@@ -247,8 +247,8 @@ async function assertServerReady() {
 async function login() {
     const loginResponse = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(loginResponse.response.status, 200);
-    assert.ok(loginResponse.cookieHeader);
-    return loginResponse.cookieHeader;
+    assert.ok(loginResponse.webHeaders);
+    return loginResponse.webHeaders;
 }
 
 async function createSeedPatient() {
@@ -269,16 +269,16 @@ async function createSeedPatient() {
     return id;
 }
 
-async function expectWebError(cookieHeader, method, pathname, body, status, error) {
-    const result = await webRequest(cookieHeader, method, pathname, body);
+async function expectWebError(sessionHeaders, method, pathname, body, status, error) {
+    const result = await webRequest(sessionHeaders, method, pathname, body);
     assert.equal(result.status, status);
     assert.deepEqual(result.json, { error });
 }
 
-async function webRequest(cookieHeader, method, pathname, body) {
+async function webRequest(sessionHeaders, method, pathname, body) {
     return await request(method, pathname, {
         headers: {
-            Cookie: cookieHeader,
+            ...sessionHeaders,
             Origin: BASE_URL,
             'Sec-Fetch-Site': 'same-origin',
             'Cache-Control': 'no-store',

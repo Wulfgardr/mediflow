@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 /* @Codex */
 import {
     requestIdFromRequest,
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
         // ADR 0143: nothing beside the archive of a passphrase account may still hold its PIN
         // wrapping. The move removes it; this repeats what an interruption or a busy reader left.
         const earlierCopiesCleared = verifier ? retirePendingPinEraResidues(user.id, dbServer) : undefined;
+        const issuedArchiveGeneration = archiveGenerationForSession({ id: session.sessionId, expiresAt: 0 });
         try {
             await writeAuditEvent({
                 eventType: 'auth.login.succeeded',
@@ -104,6 +106,7 @@ export async function POST(request: Request) {
         }
         const response = NextResponse.json({
             success: true,
+            archiveGeneration: issuedArchiveGeneration,
             id: user.id,
             username: user.username,
             displayName: user.displayName,

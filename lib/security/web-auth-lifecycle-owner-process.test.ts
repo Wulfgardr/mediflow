@@ -2,16 +2,19 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const OWNER = path.join(ROOT, 'packages/web-auth-lifecycle-owner/internal/owner.cjs');
-const ENTRY = path.join(ROOT, 'packages/web-auth-lifecycle-owner/index.js');
-const ACTIVATION = path.join(ROOT, 'packages/web-auth-lifecycle-owner/internal/session-activation.cjs');
-const RETIREMENT = path.join(ROOT, 'packages/web-auth-lifecycle-owner/internal/session-retirement.cjs');
-const CELLS = path.join(ROOT, 'packages/web-auth-lifecycle-owner/internal/session-cell.cjs');
+const nodeRequire = createRequire(import.meta.url);
+const ENTRY = nodeRequire.resolve('@mediflow/web-auth-lifecycle-owner');
+const PACKAGE = path.dirname(ENTRY);
+const OWNER = path.join(PACKAGE, 'internal/owner.cjs');
+const ACTIVATION = path.join(PACKAGE, 'internal/session-activation.cjs');
+const RETIREMENT = path.join(PACKAGE, 'internal/session-retirement.cjs');
+const CELLS = path.join(PACKAGE, 'internal/session-cell.cjs');
 
 const CHILD = String.raw`
 const assert = require('node:assert/strict');
@@ -336,7 +339,7 @@ function runScenario(
     assert.equal(result.stdout, 'pass');
 }
 
-test('activates the final frozen root and binds lifecycle authority to control plus bearer', () => {
+test('activates the installed final frozen root and binds lifecycle authority to control plus bearer', () => {
     runScenario('lifecycle');
 });
 

@@ -79,7 +79,7 @@ test('a version 1 archive gains the unlock credential columns once and keeps its
         v1.close();
 
         let db = openVersionedSqliteDatabase(w.file);
-        assert.equal(db.pragma('user_version', { simple: true }), 2);
+        assert.equal(db.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
         assert.deepEqual(userColumns(db).slice(-added.length), added);
         assert.deepEqual(db.prepare(`SELECT id, encrypted_master_key, ${added.join(', ')} FROM users`).all(), [{
             id: 'synthetic-user', encrypted_master_key: 'v2:synthetic-wrapping',

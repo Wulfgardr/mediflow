@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -70,6 +72,8 @@ export async function GET(request: Request) {
         }));
         return NextResponse.json(normalizedData);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed to fetch checkups" }, { status: 500 });
     }
 }
@@ -78,6 +82,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const envelope = await readCheckupJsonObject(request);
@@ -130,12 +136,14 @@ export async function POST(request: Request) {
         const result = createCheckupOperation({
             patientId: body.patientId, checkupId: String(newId), values: checkupValues, mode: 'web',
             changedFields: listChangedFields(auditBody, ['id']),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Checkup create error", error);
         return NextResponse.json({ error: "Create Failed" }, { status: 500 });
     }

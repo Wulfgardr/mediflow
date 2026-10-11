@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: synthetic real-SQLite candidate oracle for eight ordinary observation mutations. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -45,6 +46,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, observations, servicePrescriptions, servicePrescriptionItems } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/observations/route.ts') as typeof import('../app/api/observations/route.ts');
@@ -102,7 +104,7 @@ type Surface = 'web' | 'v1' | 'network';
 type Operation = 'POST' | 'PUT' | 'DELETE';
 function request(method: Operation, body: unknown, surface: Surface, raw?: string, headers: Record<string,string> = {}) {
     return new Request('http://127.0.0.1/api/observations', { method,
-        headers: { 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-observation-synthetic-token' }), ...headers },
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-observation-synthetic-token' }), ...headers },
         body: raw ?? JSON.stringify(body),
     });
 }

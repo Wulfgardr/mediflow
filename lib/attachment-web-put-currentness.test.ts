@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -19,6 +20,7 @@ for (const name of fs.readdirSync(path.join(root, 'drizzle')).filter((file) => f
 migrationDb.close();
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 (await import('./db-server.ts')).openDbServer();
+bindSyntheticArchiveSessions('session.synthetic');
 const requireCurrent = createRequire(import.meta.url);
 const adapter = requireCurrent('./attachment-content-cas-route') as typeof import('./attachment-content-cas-route');
 const attachmentSchemas = requireCurrent('./api-schemas/attachments') as typeof import('./api-schemas/attachments');

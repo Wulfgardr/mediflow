@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { physicalRecord, physicalFiles, sha256 } from './launch-bundled-headless-supervisor.mjs';
-import { appLayout, checkHeadlessRuntime, traceSourceText } from './stage-headless-runtime.mjs';
+import { appLayout, checkHeadlessRuntime, sharedRuntimeDependency, traceSourceText } from './stage-headless-runtime.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const template = fs.readFileSync(new URL('./launch-bundled-headless-supervisor.mjs', import.meta.url), 'utf8');
@@ -154,6 +154,25 @@ test('actual incompatible Node is rejected', t => {
   if (!otherNode) { t.skip('Set MEDIFLOW_HEADLESS_TEST_OTHER_NODE to an actual non-24 Node for this negative test.'); return; }
   const f = fixture(t);
   denied(spawnSync(otherNode, [f.launcher], { encoding: 'utf8', env: {}, timeout: 10_000 }));
+});
+test('trace keeps shared delivery lanes separate on both path styles, without hiding missing source edges', async t => {
+  const { nodeFileTrace } = createRequire(path.join(ROOT, 'package.json'))('next/dist/compiled/@vercel/nft');
+  const root = path.join(fixture(t).directory, 'trace');
+  const lanes = ['.next/server.js', 'packages/mini/index.js', 'node_modules/better-sqlite3/index.js'];
+  const entry = write(path.join(root, 'entry.cjs'), [...lanes, 'lib/required.js'].map(name => `require('./${name}');`).join('\n'));
+  for (const name of lanes) write(path.join(root, name), "require('unavailable-in-this-delivery-lane');");
+  write(path.join(root, 'lib/required.js'), 'module.exports = {};');
+  for (const separator of ['/', '\\']) {
+    const trace = () => nodeFileTrace([entry], { base: root, processCwd: root,
+      ignore: file => sharedRuntimeDependency(file.split(path.sep).join(separator)) });
+    const closed = await trace();
+    assert.equal(closed.warnings.size, 0);
+    assert.ok([...closed.fileList].some(name => name.split(path.sep).join('/') === 'lib/required.js'));
+    assert.ok([...closed.fileList].every(name => !sharedRuntimeDependency(name)));
+    fs.unlinkSync(path.join(root, 'lib/required.js'));
+    assert.ok([...(await trace()).warnings].some(warning => warning.message.includes('required')));
+    write(path.join(root, 'lib/required.js'), 'module.exports = {};');
+  }
 });
 test('trace removes type-only edges and resolves only exact local files', t => {
   let ts;

@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ const authFile = join(dataDir, 'auth.cjs');
 const admission = { role: 'admin' as string | null };
 const stateKey = Symbol.for(dataDir);
 (globalThis as unknown as Record<symbol, typeof admission>)[stateKey] = admission;
-writeFileSync(authFile, `exports.requireSession=async()=>{const role=globalThis[Symbol.for(${JSON.stringify(dataDir)})].role;return role?{id:'synthetic-session',userId:'synthetic-user',role}:null;};
+writeFileSync(authFile, `exports.requireSession=async()=>{const role=globalThis[Symbol.for(${JSON.stringify(dataDir)})].role;return role?{id:'synthetic-session',userId:'synthetic-user',role,authChannel:'web'}:null;};
 exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});`);
 const { registerHooks } = load('node:module') as {
@@ -27,6 +28,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const create = load('../app/api/ambulatories/route.ts') as typeof import('../app/api/ambulatories/route.ts');
@@ -38,7 +40,7 @@ type Operation = 'create' | 'update' | 'delete' | 'clear';
 function call(operation: Operation, body?: string, id = 'synthetic-amb', headers: Record<string, string> = {}) {
     const request = new Request('http://127.0.0.1/api/ambulatories', {
         method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
-        headers: { 'content-type': 'application/json', ...headers }, ...(body === undefined ? {} : { body }),
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...headers }, ...(body === undefined ? {} : { body }),
     });
     const context = { params: Promise.resolve({ id }) };
     return operation === 'create' ? create.POST(request) : operation === 'clear' ? clear.POST(request)

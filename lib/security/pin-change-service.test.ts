@@ -45,6 +45,7 @@ import type {
 
 type TestDatabase = NonNullable<PinChangeServiceDependencies['db']>;
 type AuditInput = Parameters<NonNullable<PinChangeServiceDependencies['writeAuditEvent']>>[0];
+const TEST_GENERATION = 'c15c15c1-1111-4111-8111-111111111111';
 const TEST_USERNAME = ['test', 'user'].join('-');
 const OTHER_USERNAME = ['synthetic', 'other'].join('-');
 
@@ -69,6 +70,8 @@ test.afterEach(() => clearAllSessions());
 function makeDatabase() {
     const sqlite = new Database(':memory:');
     sqlite.exec(`
+        CREATE TABLE archive_generation (id INTEGER PRIMARY KEY, generation TEXT NOT NULL);
+        INSERT INTO archive_generation VALUES (1, '${TEST_GENERATION}');
         CREATE TABLE users (
             id TEXT PRIMARY KEY NOT NULL,
             username TEXT NOT NULL UNIQUE,
@@ -232,7 +235,7 @@ test('native PIN rotation retires both real channel owners and preserves another
     try {
         await seedUser(db);
         const native = nativePinSession(); const sibling = nativePinSession();
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:native-rewrap', salt: 'native-salt',
         }, { db, readPairedNativeSession: async () => native, writeAuditEvent: testAuditWriter(db) });
@@ -255,7 +258,7 @@ test('a native request becoming stale during hashing aborts both preparations be
     const web = issueSourceWebSession(physicalWebOwner, 'native-pin-stale', 'user-1');
     try {
         await seedUser(db); const native = nativePinSession(); let reads = 0;
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:must-not-save', salt: 'must-not-save',
         }, { db, readPairedNativeSession: async () => ++reads === 1 ? native : null });
@@ -272,7 +275,7 @@ test('native PIN CAS conflict preserves the winning credential and existing chan
     const web = issueSourceWebSession(physicalWebOwner, 'native-pin-conflict', 'user-1');
     try {
         await seedUser(db); const native = nativePinSession(); let reads = 0;
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: native, request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234', newPin: '5678', encryptedMasterKey: 'v2:loser', salt: 'loser',
         }, { db, readPairedNativeSession: async () => {
@@ -299,7 +302,7 @@ test('changePin persists the client re-wrap, resets lockout, and writes a redact
             ...webRetirement('completed', projection),
         };
 
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: projection,
             request: new Request('http://127.0.0.1/api/auth/change-pin', { headers: { 'x-request-id': 'pin-test' } }),
             currentPin: '1234',
@@ -355,7 +358,7 @@ test('changePin removes all old sessions and session-scoped resources only after
         registerServerSessionResource(sibling.id, (reason) => { disposals.push(`sibling:${reason}`); });
         registerServerSessionResource(otherUser.id, (reason) => { disposals.push(`other:${reason}`); });
 
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: session('user-1'),
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
@@ -389,7 +392,7 @@ test('changePin preserves sessions when the credential rotation is rejected', as
         const disposals: string[] = [];
         registerServerSessionResource(active.id, (reason) => { disposals.push(reason); });
 
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: session('user-1'),
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '0000',
@@ -418,7 +421,7 @@ test('changePin never replaces the wrapping of an account that unlocks with a pa
         const before = db.select().from(users).get();
         let retirements = 0;
         // The current PIN is the right one: it is the authority of the PIN over the wrapping that is gone.
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: session('user-1'),
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
@@ -455,7 +458,7 @@ test('changePin compare-and-swap allows exactly one concurrent rotation', async 
             { newPin: '9012', encryptedMasterKey: 'v2:blob-b', salt: 'salt-b' },
         ];
 
-        const results = await Promise.all(rotations.map((rotation) => changePin({
+        const results = await Promise.all(rotations.map((rotation) => changePin({ archiveGeneration: TEST_GENERATION,
             session: session('user-1'),
             request,
             currentPin: '1234',
@@ -487,7 +490,7 @@ test('changePin does not mutate credentials when native retirement cannot be pre
     const { sqlite, db } = makeDatabase();
     try {
         await seedUser(db);
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: session('user-1'),
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
@@ -524,7 +527,7 @@ test('changePin denies confirmation after CAS when Web retirement is not termina
             { id: 'user-1', username: TEST_USERNAME, role: 'admin' },
             { clientId: 'synthetic-active', clientPlatform: 'macos' },
         );
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: session('user-1'),
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
@@ -572,7 +575,7 @@ test('changePin keeps every same-user Web sibling terminal when lock wins after 
         });
         const persistAudit = testAuditWriter(db);
 
-        const result = await changePin({
+        const result = await changePin({ archiveGeneration: TEST_GENERATION,
             session: initiator.projection,
             request: new Request('http://127.0.0.1/api/auth/change-pin'),
             currentPin: '1234',
@@ -674,7 +677,7 @@ test('adoptPassphrase moves the account to the passphrase in one write and keeps
             db, writeAuditEvent: testAuditWriter(db), ...webRetirement('completed', projection), retirePinEraResidues: residues.retirePinEraResidues,
         };
 
-        assert.deepEqual(await adoptPassphrase({ session: projection, request: adoptionRequest(), payload }, dependencies), { kind: 'success', earlierCopiesCleared: true });
+        assert.deepEqual(await adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: projection, request: adoptionRequest(), payload }, dependencies), { kind: 'success', earlierCopiesCleared: true });
         assert.deepEqual(residues.runs, ['user-1'], 'what still held the PIN wrapping beside the archive is removed for this account');
 
         assert.deepEqual(storedUser(db), {
@@ -718,7 +721,7 @@ test('adoptPassphrase needs the current PIN and happens once: the PIN cannot rep
             prepareWebSessionsForUserRetirement: (projection) => { prepared += 1; return retirement.prepareWebSessionsForUserRetirement!(projection); },
         };
         const adopt = (payload: Awaited<ReturnType<typeof adoptionPayload>>['payload']) =>
-            adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, dependencies);
+            adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload }, dependencies);
 
         const wrongPin = await adopt((await adoptionPayload('0000')).payload);
         assert.deepEqual(wrongPin.kind === 'failure' && [wrongPin.status, wrongPin.code], [401, 'PASSPHRASE_ADOPTION_INVALID_PIN']);
@@ -749,7 +752,7 @@ test('two adoptions at once leave one whole set of credentials, never a mix', as
         const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement(), retirePinEraResidues: residues.retirePinEraResidues };
         const candidates = await Promise.all([adoptionPayload(), adoptionPayload()]);
         const results = await Promise.all(candidates.map(({ payload }) =>
-            adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, dependencies)));
+            adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload }, dependencies)));
 
         assert.equal(results.filter((result) => result.kind === 'success').length, 1);
         assert.deepEqual(results.find((result) => result.kind === 'success'), { kind: 'success', earlierCopiesCleared: false },
@@ -785,7 +788,7 @@ test('an interruption inside the write leaves the PIN account as it was, with it
         const residues = residueRemoval();
         const { payload } = await adoptionPayload();
 
-        await assert.rejects(() => adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, {
+        await assert.rejects(() => adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload }, {
             db: interrupted, writeAuditEvent: testAuditWriter(db), ...retirement, retirePinEraResidues: residues.retirePinEraResidues,
             commitWebSessionsForUserRetirement: (capability) => { outcomes.push('committed'); return retirement.commitWebSessionsForUserRetirement!(capability); },
             abortWebSessionsForUserRetirement: (capability) => { outcomes.push('aborted'); return retirement.abortWebSessionsForUserRetirement!(capability); },
@@ -807,7 +810,7 @@ test('when the retirement of the sessions cannot be confirmed the passphrase is 
         await seedUser(db);
         const { payload, unlock } = await adoptionPayload();
         const residues = residueRemoval();
-        const result = await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, {
+        const result = await adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload }, {
             db, writeAuditEvent: testAuditWriter(db), ...webRetirement('failed'), retirePinEraResidues: residues.retirePinEraResidues,
         });
         assert.deepEqual(result.kind === 'failure' && [result.status, result.code], [409, PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE]);
@@ -844,7 +847,7 @@ test('a session cannot guess the PIN through the adoption: wrong PINs lock the a
         const before = credentialColumns(db);
         const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement() };
         const adopt = async (pin: string) =>
-            adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: (await adoptionPayload(pin)).payload }, dependencies);
+            adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload: (await adoptionPayload(pin)).payload }, dependencies);
 
         for (let attempt = 1; attempt <= 4; attempt += 1) {
             const wrong = await adopt('0000');
@@ -867,7 +870,7 @@ test('a lock established after the PIN was verified is not cleared by the adopti
         await seedUser(db);
         const before = credentialColumns(db);
         const lockedUntil = new Date(Date.now() + 10 * 60 * 1000);
-        const result = await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: (await adoptionPayload()).payload }, {
+        const result = await adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload: (await adoptionPayload()).payload }, {
             db, writeAuditEvent: testAuditWriter(db), ...webRetirement(),
             // The PIN is verified, then five wrong attempts elsewhere lock the account before the write.
             verifyPin: async (input, verifierDependencies) => {
@@ -920,7 +923,7 @@ async function recover(db: TestDatabase, recoveryVerifier: string, options: {
 } = {}) {
     const own = options.own ?? recoverySession();
     const candidate = await recoveryPayload(recoveryVerifier);
-    const result = await recoverPassphrase({ request: recoveryRequest(), payload: candidate.payload, openSession: own.openSession }, {
+    const result = await recoverPassphrase({ archiveGeneration: TEST_GENERATION, request: recoveryRequest(), payload: candidate.payload, openSession: own.openSession }, {
         db, writeAuditEvent: testAuditWriter(db), ...webRetirement(options.outcome ?? 'completed'), retireWebSession: own.retireWebSession,
         ...options.dependencies,
     });
@@ -929,7 +932,7 @@ async function recover(db: TestDatabase, recoveryVerifier: string, options: {
 async function adoptedAccount(db: TestDatabase) {
     await seedUser(db);
     const adoption = await adoptionPayload();
-    assert.equal((await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: adoption.payload }, {
+    assert.equal((await adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload: adoption.payload }, {
         db, writeAuditEvent: testAuditWriter(db), ...webRetirement(), retirePinEraResidues: residueRemoval().retirePinEraResidues,
     })).kind, 'success');
     return adoption;
@@ -955,14 +958,14 @@ test('changing a passphrase preserves encrypted history, retires sessions and re
                 retired = value; return retirement.prepareWebSessionsForUserRetirement!(value);
             },
         };
-        const result = await changePassphrase({ session: projection, request: adoptionRequest(), payload }, dependencies);
+        const result = await changePassphrase({ archiveGeneration: TEST_GENERATION, session: projection, request: adoptionRequest(), payload }, dependencies);
         assert.equal(result.kind, 'success');
         assert.equal(retired, projection);
         const material = await deriveUnlockMaterial('una passphrase del tutto nuova', Buffer.from(unlock.salt, 'base64'));
         const reopened = await openUnlockWrapping(storedUser(db).encryptedMasterKey, material.kek);
         assert.deepEqual(new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, reopened, ciphertext)), text);
         const before = credentialColumns(db);
-        const denied = await changePassphrase({ session: projection, request: adoptionRequest(), payload }, dependencies);
+        const denied = await changePassphrase({ archiveGeneration: TEST_GENERATION, session: projection, request: adoptionRequest(), payload }, dependencies);
         assert.equal(denied.kind === 'denied' && denied.status, 401);
         assert.deepEqual(credentialColumns(db), before);
         assert.equal(storedUser(db).failedLoginAttempts, 1);
@@ -981,7 +984,7 @@ test('a concurrent credential change or an unavailable retirement leaves the pro
         const candidate = await recoveryPayload(adopted.recovery.verifier);
         const payload = validatePassphraseChangePayload({ ...candidate.payload, currentVerifier: adopted.unlock.verifier });
         assert.ok(payload);
-        const input = { session: session('user-1'), request: adoptionRequest(), payload };
+        const input = { archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload };
         const before = credentialColumns(db);
         const refused = await changePassphrase(input, {
             db, ...webRetirement(), prepareWebSessionsForUserRetirement: () => null,
@@ -1071,7 +1074,7 @@ test('a wrong recovery key changes nothing, opens no session and is counted unti
         assert.deepEqual(noRecovery.own.opened, []);
 
         const adoption = await adoptionPayload();
-        assert.equal((await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: adoption.payload }, {
+        assert.equal((await adoptPassphrase({ archiveGeneration: TEST_GENERATION, session: session('user-1'), request: adoptionRequest(), payload: adoption.payload }, {
             db, writeAuditEvent: testAuditWriter(db), ...webRetirement(), retirePinEraResidues: residueRemoval().retirePinEraResidues,
         })).kind, 'success');
         const adopted = credentialColumns(db);
@@ -1193,4 +1196,44 @@ test('the recovery request must carry a new recovery key and nothing that stands
     for (const [name, candidate] of rejected) assert.equal(validatePassphraseRecoveryPayload(candidate), null, name);
     const { username: _omitted, ...withoutUsername } = payload;
     assert.deepEqual(validatePassphraseRecoveryPayload(withoutUsername), { ...payload, username: '' });
+});
+
+
+test('credential CAS rejects archive B with the same account and credentials after verification on A', async () => {
+    for (const mode of ['adopt', 'change', 'recover'] as const) {
+        const { sqlite, db } = makeDatabase();
+        try {
+            const adopted = mode === 'adopt' ? null : await adoptedAccount(db);
+            if (!adopted) await seedUser(db);
+            const candidate = adopted ? await recoveryPayload(adopted.recovery.verifier) : await adoptionPayload();
+            const before = credentialColumns(db);
+            const auditsBefore = db.select().from(auditEvents).all();
+            let commits = 0;
+            const owner = webRetirement();
+            const dependencies: PinChangeServiceDependencies = {
+                db, ...owner, writeAuditEvent: testAuditWriter(db),
+                retirePinEraResidues: residueRemoval().retirePinEraResidues,
+                prepareNativeSessionsForUserRetirement: (userId) => {
+                    sqlite.prepare('UPDATE archive_generation SET generation = ? WHERE id = 1')
+                        .run('c15c15c1-2222-4222-8222-222222222222');
+                    return prepareNativeLegacyUserRetirement(userId);
+                },
+                commitWebSessionsForUserRetirement: (capability) => { commits += 1; return owner.commitWebSessionsForUserRetirement!(capability); },
+            };
+            const common = { archiveGeneration: TEST_GENERATION, request: adoptionRequest() };
+            await assert.rejects(async () => {
+                if (mode === 'adopt') return adoptPassphrase({ ...common, session: session('user-1'),
+                    payload: (candidate as Awaited<ReturnType<typeof adoptionPayload>>).payload }, dependencies);
+                const recovery = candidate as Awaited<ReturnType<typeof recoveryPayload>>;
+                if (mode === 'recover') return recoverPassphrase({ ...common, payload: recovery.payload,
+                    openSession: recoverySession().openSession }, dependencies);
+                const { username: _username, recoveryVerifier: _previous, ...credentials } = recovery.payload;
+                return changePassphrase({ ...common, session: session('user-1'),
+                    payload: { ...credentials, currentVerifier: adopted!.unlock.verifier } }, dependencies);
+            }, { code: 'ARCHIVE_REPLACED' }, mode);
+            assert.deepEqual(credentialColumns(db), before, mode);
+            assert.deepEqual(db.select().from(auditEvents).all(), auditsBefore, mode);
+            assert.equal(commits, 0, mode);
+        } finally { sqlite.close(); }
+    }
 });

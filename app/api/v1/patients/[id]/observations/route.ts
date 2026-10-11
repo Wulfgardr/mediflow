@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
@@ -88,6 +89,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/observations error:', error);
         return NextResponse.json({ error: 'Failed to fetch observations' }, { status: 500 });
     }
@@ -110,12 +113,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const result = createObservationOperation({
             patientId: id, observationId, values: normalized.values, mode: 'v1',
             changedFields: observationChangedFields(normalized.values, parsed.body),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /api/v1/patients/[id]/observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });
     }

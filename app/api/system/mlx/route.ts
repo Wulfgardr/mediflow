@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { PM2Manager } from '@/lib/pm2-manager';
 /* @Codex */
@@ -39,13 +40,15 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
     /* @Codex */
     if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         await PM2Manager.withConnection(() => PM2Manager.start());
@@ -55,13 +58,15 @@ export async function POST() {
     }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
     /* @Codex */
     if (!MLX_SUPPORTED) return mlxUnsupportedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         await PM2Manager.withConnection(() => PM2Manager.stop());

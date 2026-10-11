@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('ambulatory clear rolls back audit failure, preserves live patients and reloads the accepted version', async ({ page, baseURL }, testInfo) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
@@ -15,11 +16,12 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
     const originalList = await page.request.get('/api/ambulatories');
     expect(originalList.status()).toBe(200);
     const originalRoster = (await originalList.json() as Array<{ id: string }>).map(item => item.id).sort();
     const name = `Ambulatorio di prova ${Date.now()}`;
-    const created = await page.request.post('/api/ambulatories', { data: { name, type: 'test' } });
+    const created = await page.request.post('/api/ambulatories', { headers: archiveHeaders, data: { name, type: 'test' } });
     expect(created.status()).toBe(201);
     const { id } = await created.json() as { id: string };
     type OriginalPatientDestination = {
@@ -42,7 +44,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             patientIds.push(patientId);
             // @Codex: create through the authenticated Web route; its destination is
             // the active/default ambulatory, then scope these synthetic IDs below.
-            const response = await page.request.post('/api/patients', { data: {
+            const response = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
                 id: patientId, firstName: 'Sintetico', lastName,
                 taxCode: `AMB${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
                 isAdi: false,
@@ -173,7 +175,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             expect(currentList.status()).toBe(200);
             const currentAmbulatory = (await currentList.json() as Array<{ id: string; version: number }>).find(item => item.id === id);
             expect(currentAmbulatory).toBeTruthy();
-            const deleted = await page.request.delete(`/api/ambulatories/${id}`, { data: { version: currentAmbulatory!.version } });
+            const deleted = await page.request.delete(`/api/ambulatories/${id}`, { headers: archiveHeaders, data: { version: currentAmbulatory!.version } });
             expect(deleted.status()).toBe(200);
             const finalList = await page.request.get('/api/ambulatories');
             expect(finalList.status()).toBe(200);

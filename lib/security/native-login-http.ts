@@ -14,6 +14,8 @@ import {
     SESSION_COOKIE_NAME,
 } from '@/lib/security/server-session';
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
+import { bindSessionToArchive, currentArchiveGeneration } from './archive-session-generation';
+import { retireServerSessionForLogout } from './server-session';
 
 type Credentials = Readonly<{ username: string; password: string }>;
 type Verification = Awaited<ReturnType<typeof verifyUnlockCredentials>>;
@@ -80,6 +82,7 @@ export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDepend
             const parsed = credentials(input);
             if (!parsed) return nativeLoginDeniedResponse();
             const loginFence = captureNativeLoginSessionFence();
+            const generation = currentArchiveGeneration();
             const verification = await verify({ username: parsed.username, pin: parsed.password });
             if (verification.kind === 'denied') return authFailure(verification.body, verification.status);
             const paired = await consume(admission); consumed = true;
@@ -89,6 +92,8 @@ export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDepend
                 paired,
                 loginFence,
             );
+            try { bindSessionToArchive(session, generation); }
+            catch { retireServerSessionForLogout(session.id); return nativeLoginDeniedResponse(); }
             const response = NextResponse.json({ success: true, id: verification.account.id, username: verification.account.username, displayName: verification.account.displayName, ambulatoryName: verification.account.ambulatoryName, role: verification.account.role, encryptedMasterKey: verification.account.encryptedMasterKey, salt: verification.account.salt });
             response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
             response.headers.set('Cache-Control', 'no-store');

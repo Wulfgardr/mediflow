@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 /* @Codex: paired observation boundary delegates ordinary writes to the single required-audit operation. */
 import { v4 as uuidv4 } from 'uuid';
 import { requestIdFromRequest } from './security/audit';
@@ -32,7 +33,7 @@ function boundaryError(body: Record<string, unknown>, forbidden: Set<string>): M
 }
 
 function auditFor(context: MutationContext) {
-    return { actorType: 'user' as const, actorRef: context.session.userId,
+    return { archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user' as const, actorRef: context.session.userId,
         sourceSurface: 'native' as const, requestId: requestIdFromRequest(context.request),
         flags: ['auth:paired-client', `paired-client:${context.pairedClient.clientId}`, 'scope:ambulatory'] };
 }

@@ -1,5 +1,21 @@
-import { sqliteTable, text, integer, primaryKey, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+
+// Local authority, deliberately excluded from portable backup collections.
+export const archiveGeneration = sqliteTable('archive_generation', {
+    id: integer('id').primaryKey().notNull(),
+    generation: text('generation').notNull(),
+}, table => [
+    check('archive_generation_singleton', sql`${table.id} = 1`),
+    check('archive_generation_value', sql`length(${table.generation}) = 36`),
+]);
+
+// Hashes are locators only: the packed owner still decides whether a session is authentic.
+export const archiveSessionGenerations = sqliteTable('archive_session_generations', {
+    sessionRef: text('session_ref').primaryKey().notNull(),
+    generation: text('generation').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+});
 
 // --- Users (Auth) ---
 export const users = sqliteTable('users', {

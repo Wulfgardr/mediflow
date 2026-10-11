@@ -1,4 +1,5 @@
 'use client';
+import { ARCHIVE_REPLACED_EVENT, installArchiveGenerationTransport } from '@/lib/security/client-auth-api';
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -16,6 +17,7 @@ import {
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
+import { encryptRecoveryBackup, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup';
 import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
 import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
 import { LockScreen } from '@/components/lock-screen';
@@ -92,6 +94,7 @@ interface SecurityContextType {
         secret: string,
         options?: { shown?: UnlockParameters['credential']; longPinConfirmed?: boolean },
     ) => Promise<boolean | 'confirm'>;
+    recoveryBackup: (artifact?: Uint8Array) => Promise<Uint8Array | void>;
     preparePassphraseChange: (secret: string, passphrase: string) => Promise<AccessResult>;
     preparePassphraseRecovery: (secret: string, passphrase: string, kit?: RecoveryKit) => Promise<AccessResult>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -235,6 +238,16 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(false);
         setIsLocked(true);
     };
+
+    useEffect(() => {
+        const uninstall = installArchiveGenerationTransport();
+        const replaced = () => {
+            ++authorityAttemptGenerationRef.current;
+            clearClientAuthority();
+        };
+        window.addEventListener(ARCHIVE_REPLACED_EVENT, replaced);
+        return () => { window.removeEventListener(ARCHIVE_REPLACED_EVENT, replaced); uninstall(); };
+    }, []);
 
     /* @Codex */
     const runAuthorityNetworkRequest = <T,>(request: () => Promise<T>): Promise<T> => {
@@ -386,7 +399,26 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (!res.ok) {
                 throw new Error(payload?.error || 'Ripristino fallito');
             }
-            await checkAuthStatus();
+            if (res.status !== 202 || payload?.status !== 'accepted' || !payload.requestId) {
+                throw new Error('Risposta di manutenzione non valida.');
+            }
+            clearClientAuthority();
+            setFlowError('Riparazione avviata. Attendi il riavvio e la conferma dell’archivio.');
+            const deadline = Date.now() + 20000;
+            while (Date.now() < deadline) {
+                await new Promise(resolve => window.setTimeout(resolve, 1000));
+                try {
+                    const status = await fetch('/api/auth/check', { cache: 'no-store' }).then(response => response.json());
+                    if (status.archiveMaintenance?.requestId === payload.requestId) {
+                        if (status.archiveMaintenance.status === 'committed') { window.location.reload(); return; }
+                        if (status.archiveMaintenance.status === 'rejected') {
+                            setFlowError('Archivio precedente non compatibile. I dati attuali sono invariati: accedi di nuovo per continuare.');
+                            return;
+                        }
+                    }
+                } catch { /* The owned Web process is expected to be unavailable during replacement. */ }
+            }
+            setFlowError('Riparazione non ancora confermata. Conserva l’archivio e verifica lo stato del supervisore.');
         } catch (e) {
             console.error('Repair failed', e);
             setFlowError('Ripristino fallito. Verifica i dettagli in console.');
@@ -414,6 +446,19 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return false;
         }
     };
+
+    // Reconcile another tab's completed replacement before its displayed records can be reused.
+    useEffect(() => {
+        const reconcile = () => { if (document.visibilityState === 'visible') void checkAuthStatus(); };
+        window.addEventListener('focus', reconcile);
+        document.addEventListener('visibilitychange', reconcile);
+        const timer = window.setInterval(reconcile, 15000);
+        return () => {
+            window.removeEventListener('focus', reconcile);
+            document.removeEventListener('visibilitychange', reconcile);
+            window.clearInterval(timer);
+        };
+    }, []);
 
     // Initial check
     useEffect(() => {
@@ -689,6 +734,33 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
     };
 
+    const recoveryBackup = async (artifact?: Uint8Array): Promise<Uint8Array | void> => {
+        const key = masterKeyRef.current;
+        const generation = authorityAttemptGenerationRef.current;
+        if (!key || !isAuthenticated || isLocked || unlockCredential !== 'passphrase' || user?.role !== 'admin') {
+            throw new Error('Sblocca con la passphrase dell’amministratore prima di continuare.');
+        }
+        const current = () => generation === authorityAttemptGenerationRef.current && masterKeyRef.current === key;
+        let bytes: Uint8Array | undefined;
+        try {
+            if (artifact) {
+                bytes = await decryptRecoveryBackup(artifact, key);
+                if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+                return;
+            }
+            const response = await fetch('/api/system/recovery-backup', { method: 'POST', cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            if (!response.ok || Number(response.headers.get('Content-Length')) > MAX_RECOVERY_DATABASE_BYTES || !current()) {
+                throw new Error('Backup completo non disponibile. Rinnova l’accesso e verifica l’archivio.');
+            }
+            bytes = new Uint8Array(await response.arrayBuffer());
+            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+            const encrypted = await encryptRecoveryBackup(bytes, key);
+            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+            return encrypted;
+        } finally { bytes?.fill(0); }
+    };
+
     const preparePassphraseChange = async (secret: string, passphrase: string): Promise<AccessResult> => {
         const snapshot = wrappingRef.current;
         if (!isAuthenticated || isLocked || !user || !snapshot || preparedAccessRef.current || accessPreparePending.current) return { ok: false, message: 'Rinnova l’accesso prima di cambiare la credenziale.' };
@@ -813,6 +885,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 authRecoveryState,
                 unlockCredential,
                 login,
+                recoveryBackup,
                 preparePassphraseChange,
                 preparePassphraseRecovery,
                 changePin,
@@ -838,6 +911,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             authRecoveryState,
             unlockCredential,
             login,
+            recoveryBackup,
             preparePassphraseChange,
             preparePassphraseRecovery,
             changePin,

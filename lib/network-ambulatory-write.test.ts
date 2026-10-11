@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -19,6 +20,7 @@ type LoadedModules = {
     createNetworkAmbulatory: typeof import('./network-ambulatory-write.ts').createNetworkAmbulatory;
 };
 
+let archiveBound = false;
 let modulesPromise: Promise<LoadedModules> | null = null;
 
 function bootstrapDatabaseFile(dataDir: string): void {
@@ -44,6 +46,7 @@ async function loadModules(): Promise<LoadedModules> {
             dbServer: dbServerModule.dbServer, schema, ...ambulatoryWrite, ...networkWrite,
         }));
     }
+    if (!archiveBound) { await modulesPromise; bindSyntheticArchiveSessions('ambulatory-test-session'); archiveBound = true; }
     return modulesPromise;
 }
 

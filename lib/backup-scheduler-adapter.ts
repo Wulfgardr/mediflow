@@ -3,7 +3,7 @@
 // (scripts/run-scheduled-backup.mjs) is already OS-agnostic; this module
 // abstracts ONLY the OS-specific registration of a recurring job behind a
 // single SchedulerAdapter interface:
-//   - macOS:   launchd LaunchAgent (delegates to backup-scheduler.ts, unchanged)
+//   - macOS:   launchd LaunchAgent (delegates to backup-scheduler.ts)
 //   - Windows: Task Scheduler via schtasks.exe + a small .cmd wrapper for env vars
 //   - Linux:   systemd user timer (default), with a crontab fallback
 // On a host where none is available (headless/sandbox) isSupported() is false and
@@ -15,10 +15,13 @@ import { spawnSync } from 'child_process';
 
 import {
     BACKUP_SCHEDULER_LABEL,
+    BACKUP_SCHEDULER_COMMAND_OPTIONS,
+    BackupSchedulerOutcomeUnknownError,
+    assertBackupSchedulerCommand,
+    readBackupLaunchAgentInstalled,
     type BackupScheduleKind,
     type BackupSchedulerState,
     type BackupSchedulerStatus,
-    buildBackupLaunchAgentPlist,
     getBackupLaunchAgentPath,
     getDefaultDataDir,
     installBackupLaunchAgent,
@@ -54,13 +57,6 @@ function pad2(value: number): string {
 
 function runnerPathFor(projectRoot: string): string {
     return path.join(projectRoot, 'scripts', 'run-scheduled-backup.mjs');
-}
-
-function backupEnv(state: BackupSchedulerState, dataDir: string): Record<string, string> {
-    return {
-        MEDIFLOW_DATA_DIR: dataDir,
-        MEDIFLOW_BACKUP_DEST_DIR: state.config.destinationDir,
-    };
 }
 
 function assertNoControlChars(value: string, label: string): void {
@@ -212,7 +208,7 @@ class MacOSScheduler implements SchedulerAdapter {
     }
     getStatus(): SchedulerStatus {
         const schedulePath = getBackupLaunchAgentPath();
-        return { installed: fs.existsSync(schedulePath), schedulePath };
+        return { installed: readBackupLaunchAgentInstalled(), schedulePath };
     }
 }
 
@@ -225,11 +221,14 @@ class WindowsScheduler implements SchedulerAdapter {
 
     isSupported(): boolean {
         if (process.platform !== 'win32') return false;
-        const probe = spawnSync('schtasks', ['/Query', '/?'], { stdio: 'ignore' });
-        return !probe.error;
+        const probe = spawnSync('schtasks', ['/Query', '/?'], BACKUP_SCHEDULER_COMMAND_OPTIONS);
+        if ((probe.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return false;
+        assertBackupSchedulerCommand(probe);
+        return true;
     }
 
     install(state: BackupSchedulerState): SchedulerInstallResult {
+        this.getStatus(); // A failed read cannot authorize replacement of the wrapper.
         const dataDir = getDefaultDataDir();
         const wrapperPath = this.wrapperPath();
         const wrapper = buildWindowsWrapperCmd({
@@ -247,22 +246,25 @@ class WindowsScheduler implements SchedulerAdapter {
             hour: state.config.hour,
             minute: state.config.minute,
         });
-        const result = spawnSync('schtasks', args, { encoding: 'utf8' });
-        if (result.status !== 0) {
-            throw new Error((result.stderr || result.stdout || 'schtasks /Create failed').trim());
-        }
+        const result = spawnSync('schtasks', args, BACKUP_SCHEDULER_COMMAND_OPTIONS);
+        assertBackupSchedulerCommand(result);
+        if (!this.getStatus().installed) throw new BackupSchedulerOutcomeUnknownError();
         return { schedulePath: wrapperPath, kind: this.kind };
     }
 
     uninstall(): void {
-        spawnSync('schtasks', ['/Delete', '/F', '/TN', WINDOWS_TASK_NAME], { stdio: 'ignore' });
+        if (this.getStatus().installed) assertBackupSchedulerCommand(spawnSync('schtasks', ['/Delete', '/F', '/TN', WINDOWS_TASK_NAME], BACKUP_SCHEDULER_COMMAND_OPTIONS));
+        if (this.getStatus().installed) throw new BackupSchedulerOutcomeUnknownError();
         const wrapperPath = this.wrapperPath();
         if (fs.existsSync(wrapperPath)) fs.unlinkSync(wrapperPath);
     }
 
     getStatus(): SchedulerStatus {
-        const query = spawnSync('schtasks', ['/Query', '/TN', WINDOWS_TASK_NAME], { stdio: 'ignore' });
-        return { installed: query.status === 0, schedulePath: this.wrapperPath() };
+        const query = spawnSync('schtasks', ['/Query', '/FO', 'CSV', '/NH'], BACKUP_SCHEDULER_COMMAND_OPTIONS);
+        assertBackupSchedulerCommand(query);
+        const rows = query.stdout.trim() ? query.stdout.trim().split(/\r?\n/) : [];
+        if (query.stderr.trim() || rows.some(row => !/^"(?:[^"]|"")*","(?:[^"]|"")*","(?:[^"]|"")*"$/u.test(row))) throw new BackupSchedulerOutcomeUnknownError();
+        return { installed: rows.some(row => row.startsWith(`"\\${WINDOWS_TASK_NAME}",`)), schedulePath: this.wrapperPath() };
     }
 }
 
@@ -279,13 +281,16 @@ class LinuxScheduler implements SchedulerAdapter {
         return path.join(this.systemdDir(), `${SYSTEMD_UNIT_NAME}.timer`);
     }
     private hasSystemd(): boolean {
-        const probe = spawnSync('systemctl', ['--user', 'show-environment'], { stdio: 'ignore' });
-        return !probe.error && probe.status === 0;
+        const probe = spawnSync('systemctl', ['--user', 'show-environment'], BACKUP_SCHEDULER_COMMAND_OPTIONS);
+        if ((probe.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return false;
+        assertBackupSchedulerCommand(probe);
+        return true;
     }
     private hasCron(): boolean {
-        const probe = spawnSync('crontab', ['-l'], { stdio: 'ignore' });
-        // exit 0 (has crontab) or 1 (no crontab yet) both mean crontab is usable; ENOENT means missing.
-        return !probe.error;
+        const probe = spawnSync('crontab', ['-l'], { ...BACKUP_SCHEDULER_COMMAND_OPTIONS, env: { ...process.env, LC_ALL: 'C' } });
+        if ((probe.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return false;
+        if (probe.error || probe.signal || (probe.status !== 0 && !(probe.status === 1 && /^no crontab for /u.test(probe.stderr.trim()) && !probe.stdout.trim()))) throw new BackupSchedulerOutcomeUnknownError();
+        return true;
     }
 
     isSupported(): boolean {
@@ -299,6 +304,7 @@ class LinuxScheduler implements SchedulerAdapter {
         const runnerPath = runnerPathFor(projectRoot);
 
         if (this.hasSystemd()) {
+            this.readSystemdInstalled();
             const service = buildSystemdServiceUnit({
                 nodePath: process.execPath,
                 runnerPath,
@@ -312,11 +318,10 @@ class LinuxScheduler implements SchedulerAdapter {
                 hour: state.config.hour,
                 minute: state.config.minute,
             }), 'utf8');
-            spawnSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'ignore' });
-            const result = spawnSync('systemctl', ['--user', 'enable', '--now', `${SYSTEMD_UNIT_NAME}.timer`], { encoding: 'utf8' });
-            if (result.status !== 0) {
-                throw new Error((result.stderr || result.stdout || 'systemctl --user enable failed').trim());
-            }
+            assertBackupSchedulerCommand(spawnSync('systemctl', ['--user', 'daemon-reload'], BACKUP_SCHEDULER_COMMAND_OPTIONS));
+            const result = spawnSync('systemctl', ['--user', 'enable', '--now', `${SYSTEMD_UNIT_NAME}.timer`], BACKUP_SCHEDULER_COMMAND_OPTIONS);
+            assertBackupSchedulerCommand(result);
+            if (!this.readSystemdInstalled()) throw new BackupSchedulerOutcomeUnknownError();
             return { schedulePath: this.timerPath(), kind: 'systemd-timer' };
         }
 
@@ -330,45 +335,61 @@ class LinuxScheduler implements SchedulerAdapter {
             hour: state.config.hour,
             minute: state.config.minute,
         });
-        this.writeCron([...this.readCronWithoutMarker(), line]);
+        const existing = this.readCronWithoutMarker();
+        this.writeCron([...existing, line]);
+        if (!this.getStatus().installed) throw new BackupSchedulerOutcomeUnknownError();
         return { schedulePath: 'crontab', kind: 'cron' };
     }
 
     uninstall(): void {
-        if (this.hasSystemd() && fs.existsSync(this.timerPath())) {
-            spawnSync('systemctl', ['--user', 'disable', '--now', `${SYSTEMD_UNIT_NAME}.timer`], { stdio: 'ignore' });
+        const systemd = this.hasSystemd();
+        if (!systemd && fs.existsSync(this.timerPath())) throw new BackupSchedulerOutcomeUnknownError();
+        if (systemd && (this.readSystemdInstalled() || fs.existsSync(this.timerPath()))) {
+            assertBackupSchedulerCommand(spawnSync('systemctl', ['--user', 'disable', '--now', `${SYSTEMD_UNIT_NAME}.timer`], BACKUP_SCHEDULER_COMMAND_OPTIONS));
+            if (this.readSystemdInstalled()) throw new BackupSchedulerOutcomeUnknownError();
             if (fs.existsSync(this.timerPath())) fs.unlinkSync(this.timerPath());
             if (fs.existsSync(this.servicePath())) fs.unlinkSync(this.servicePath());
-            spawnSync('systemctl', ['--user', 'daemon-reload'], { stdio: 'ignore' });
-            return;
+            assertBackupSchedulerCommand(spawnSync('systemctl', ['--user', 'daemon-reload'], BACKUP_SCHEDULER_COMMAND_OPTIONS));
         }
         if (this.hasCron()) {
             this.writeCron(this.readCronWithoutMarker());
         }
+        if (this.getStatus().installed) throw new BackupSchedulerOutcomeUnknownError();
+    }
+
+    private readSystemdInstalled(): boolean {
+        const query = spawnSync('systemctl', ['--user', 'show', `${SYSTEMD_UNIT_NAME}.timer`, '--property=LoadState,UnitFileState,ActiveState'], BACKUP_SCHEDULER_COMMAND_OPTIONS);
+        assertBackupSchedulerCommand(query);
+        const values = Object.fromEntries(query.stdout.trim().split(/\r?\n/).map(line => line.split('=')));
+        if (query.stderr.trim() || !['loaded', 'not-found'].includes(values.LoadState)
+            || typeof values.UnitFileState !== 'string' || typeof values.ActiveState !== 'string') throw new BackupSchedulerOutcomeUnknownError();
+        if (values.LoadState === 'loaded' && (['enabled', 'enabled-runtime'].includes(values.UnitFileState) || values.ActiveState === 'active')) return true;
+        if (values.ActiveState === 'inactive' && ['', 'disabled', 'static', 'masked'].includes(values.UnitFileState)) return false;
+        throw new BackupSchedulerOutcomeUnknownError();
     }
 
     getStatus(): SchedulerStatus {
-        if (fs.existsSync(this.timerPath())) {
-            return { installed: true, schedulePath: this.timerPath() };
-        }
-        if (this.hasCron()) {
-            const existing = spawnSync('crontab', ['-l'], { encoding: 'utf8' });
-            if ((existing.stdout || '').includes(CRON_MARKER)) {
-                return { installed: true, schedulePath: 'crontab' };
-            }
-        }
+        const systemd = this.hasSystemd();
+        if (!systemd && fs.existsSync(this.timerPath())) throw new BackupSchedulerOutcomeUnknownError();
+        if (systemd && this.readSystemdInstalled()) return { installed: true, schedulePath: this.timerPath() };
+        if (this.hasCron() && this.readCron().some(line => line.trimEnd().endsWith(CRON_MARKER))) return { installed: true, schedulePath: 'crontab' };
         return { installed: false, schedulePath: null };
     }
 
+    private readCron(): string[] {
+        const existing = spawnSync('crontab', ['-l'], { ...BACKUP_SCHEDULER_COMMAND_OPTIONS, env: { ...process.env, LC_ALL: 'C' } });
+        if (!existing.error && !existing.signal && existing.status === 1 && /^no crontab for /u.test(existing.stderr.trim()) && !existing.stdout.trim()) return [];
+        assertBackupSchedulerCommand(existing);
+        if (existing.stderr.trim()) throw new BackupSchedulerOutcomeUnknownError();
+        return existing.stdout.split(/\r?\n/);
+    }
     private readCronWithoutMarker(): string[] {
-        const existing = spawnSync('crontab', ['-l'], { encoding: 'utf8' });
-        const lines = existing.status === 0 ? (existing.stdout || '').split(/\r?\n/) : [];
-        return lines.filter((l) => l.trim() && !l.includes(CRON_MARKER));
+        return this.readCron().filter(line => line.trim() && !line.trimEnd().endsWith(CRON_MARKER));
     }
 
     private writeCron(lines: string[]): void {
         const content = lines.join('\n') + (lines.length ? '\n' : '');
-        spawnSync('crontab', ['-'], { input: content, encoding: 'utf8' });
+        assertBackupSchedulerCommand(spawnSync('crontab', ['-'], { ...BACKUP_SCHEDULER_COMMAND_OPTIONS, input: content }));
     }
 }
 
@@ -405,11 +426,19 @@ export function getSchedulerAdapter(): SchedulerAdapter {
 export function buildBackupSchedulerStatus(value: string | null | undefined): BackupSchedulerStatus {
     const state = readBackupSchedulerStateFromValue(value);
     const adapter = getSchedulerAdapter();
-    const supported = adapter.isSupported();
-    const status = supported ? adapter.getStatus() : { installed: false, schedulePath: null };
+    let supported = true;
+    let status: { installed: boolean | null; schedulePath: string | null; observationMessage?: string };
+    try {
+        supported = adapter.isSupported();
+        status = supported ? adapter.getStatus() : { installed: false, schedulePath: null };
+    } catch (error) {
+        if (!(error instanceof BackupSchedulerOutcomeUnknownError)) throw error;
+        status = { installed: null, schedulePath: null, observationMessage: error.message };
+    }
     return {
         supported,
         installed: status.installed,
+        ...(status.observationMessage ? { observationMessage: status.observationMessage } : {}),
         plistPath: process.platform === 'darwin' ? status.schedulePath : null,
         schedulePath: status.schedulePath,
         scheduleKind: supported ? adapter.kind : null,

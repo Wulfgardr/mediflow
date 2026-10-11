@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 /* @Codex */
 import { NextResponse } from 'next/server';
@@ -16,6 +18,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function PUT(request: Request, context: RouteContext) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await context.params;
@@ -25,6 +29,8 @@ export async function PUT(request: Request, context: RouteContext) {
         const result = await updateHostServicePrescription({ request, session, id }, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /service-prescriptions/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update service prescription' }, { status: 500 });
     }
@@ -33,6 +39,8 @@ export async function PUT(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await context.params;
@@ -46,6 +54,8 @@ export async function DELETE(request: Request, context: RouteContext) {
         const result = await deleteHostServicePrescription({ request, session, id }, versionResult.expectedVersion);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /service-prescriptions/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete service prescription' }, { status: 500 });
     }

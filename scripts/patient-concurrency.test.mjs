@@ -319,7 +319,7 @@ async function createAuthContext() {
     const nativeAuthHeaders = {
         Authorization: `Bearer ${LOCAL_API_TOKEN}`
     };
-    const cookieHeader = await login();
+    const auth = await login();
 
     const nativeLane = new LaneClient('native-v1', '/api/v1/patients', {
         ...nativeAuthHeaders
@@ -327,7 +327,8 @@ async function createAuthContext() {
 
     return {
         web: new LaneClient('web', '/api/patients', {
-            Cookie: cookieHeader,
+            Cookie: auth.cookieHeader,
+            'x-mediflow-archive-generation': auth.json.archiveGeneration,
             Origin: new URL(BASE_URL).origin,
             'Sec-Fetch-Site': 'same-origin',
         }),
@@ -340,7 +341,8 @@ async function login() {
     const result = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(result.response.status, 200, 'web concurrency lane should authenticate');
     assert.ok(result.cookieHeader, 'login should return the mediflow_session cookie');
-    return result.cookieHeader;
+    assert.equal(typeof result.json?.archiveGeneration, 'string');
+    return result;
 }
 
 async function cleanupPatient(nativeLane, patientId) {

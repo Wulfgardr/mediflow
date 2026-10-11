@@ -14,9 +14,11 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
-import { copySqliteDatabaseSync, recoverSqliteSwapArtifacts, replaceSqliteDatabase, SqliteSwapRecoveryRequiredError } from '@/lib/sqlite-repair';
+import { copySqliteDatabaseSync, hasSqliteSwapArtifacts, recoverSqliteSwapArtifacts, SqliteSwapRecoveryRequiredError } from '@/lib/sqlite-repair';
 import { initSqlitePragmas } from '@/lib/sqlite-pragmas';
 import { openVersionedSqliteDatabase } from '@/lib/sqlite-schema-open';
+import { openAdmittedSqlite, runWithSqliteMaintenanceSync } from './sqlite-maintenance-admission.mjs';
+import { readSqliteArchiveGeneration, rotateSqliteArchiveGeneration } from './archive-generation';
 
 // Import is inert; only an explicit open or use of the lazy client acquires SQLite.
 let sqlite: Database.Database;
@@ -25,6 +27,7 @@ let initialSqlite: Database.Database;
 let dbPath: string;
 let openState: 'unopened' | 'opening' | 'opened' | 'failed' = 'unopened';
 let openFailure: unknown;
+let admission: ReturnType<typeof openAdmittedSqlite> | undefined;
 /** Opens once synchronously. A failed open or subsequently closed handle never silently reopens. */
 export function openDbServer(): Database.Database {
     if (openState === 'failed') throw openFailure;
@@ -39,8 +42,16 @@ export function openDbServer(): Database.Database {
 
         // Recovery decides before legacy adoption, SQLite open or schema bootstrap.
         // Build-time imports have no authority even to inspect persistent artifacts.
-        const swapRecovery = isNextProductionBuild ? { status: 'CLEAN' as const } : recoverSqliteSwapArtifacts(dbPath);
-        if (swapRecovery.status === 'HOLD') throw new SqliteSwapRecoveryRequiredError();
+        if (!isNextProductionBuild && hasSqliteSwapArtifacts(dbPath)) {
+            runWithSqliteMaintenanceSync(dbPath, () => {
+                const recovery = recoverSqliteSwapArtifacts(dbPath);
+                if (recovery.status === 'HOLD') throw new SqliteSwapRecoveryRequiredError();
+                const checked = openVersionedSqliteDatabase(dbPath);
+                try { validateRecoveryAuditSchema(checked); }
+                finally { checked.close(); }
+                if (recovery.status === 'RECOVERED') recovery.complete();
+            });
+        }
 
         // An explicitly selected archive must not adopt an unrelated database from cwd.
         // Keep the historical default-root migration, with the same opt-out as E2E setup.
@@ -52,9 +63,13 @@ export function openDbServer(): Database.Database {
             // and stage + rename so a failed copy never leaves a torn medical.db:
             // a plain fs.copyFileSync here was the same bug WUL-321 fixes (boot path).
             const bootStagingPath = `${dbPath}.repair-tmp-boot-${process.pid}`;
+            runWithSqliteMaintenanceSync(dbPath, () => {
             try {
                 fs.rmSync(bootStagingPath, { force: true });
                 copySqliteDatabaseSync(legacyDbPath, bootStagingPath);
+                const adopted = openVersionedSqliteDatabase(bootStagingPath);
+                try { adopted.transaction(() => rotateSqliteArchiveGeneration(adopted)).immediate(); }
+                finally { adopted.close(); }
                 fs.renameSync(bootStagingPath, dbPath);
                 console.log(`[MediFlow] Copied legacy DB to ${dbPath}`);
             } catch (error) {
@@ -62,18 +77,26 @@ export function openDbServer(): Database.Database {
                 fs.rmSync(bootStagingPath, { force: true });
                 throw error;
             }
+            });
         }
 
         // WUL-268 (STREAM A): apply durable pragmas (WAL, busy_timeout, synchronous,
         // foreign_keys) right after every open (boot + swap). See lib/sqlite-pragmas.ts.
-        sqlite = isNextProductionBuild ? new Database(':memory:') : openVersionedSqliteDatabase(dbPath);
-        if (isNextProductionBuild) initSqlitePragmas(sqlite);
-        if (!isNextProductionBuild) {
-            if (swapRecovery.status === 'RECOVERED') {
-                validateRecoveryAuditSchema(sqlite);
-                swapRecovery.complete();
-            }
+        const managed = process.env.MEDIFLOW_ARCHIVE_MANAGED_WEB === '1'
+            && typeof process.send === 'function' && process.connected;
+        sqlite = isNextProductionBuild ? new Database(':memory:') : openVersionedSqliteDatabase(dbPath, file => {
+            if (managed) return new Database(file, { fileMustExist: true });
+            admission = openAdmittedSqlite(file, { role: 'web', sqliteOptions: { fileMustExist: true } });
+            return admission.database;
+        });
+        if (managed && readSqliteArchiveGeneration(sqlite) !== process.env.MEDIFLOW_ARCHIVE_OWNER_GENERATION) {
+            throw new Error('Managed Web archive generation mismatch.');
         }
+        if (admission) process.once('exit', () => {
+            try { admission?.closeSync(); }
+            catch { console.error('[MediFlow] SQLite lease release unverified; preserve the archive maintenance state.'); }
+        });
+        if (isNextProductionBuild) initSqlitePragmas(sqlite);
         initialSqlite = sqlite;
         openState = 'opened';
         return sqlite;
@@ -91,42 +114,12 @@ export function getInitialDbServerHandle(): Database.Database {
     return initialSqlite;
 }
 
-/**
- * Replaces the SQLite file from sourcePath without writing under the open
- * shared connection: close, stage independent SQLite snapshots, journal the
- * replacement, reopen and re-apply schema guards, then persist the swap commit.
- * Queries during asynchronous staging encounter the closed shared handle.
- * Reopening, validation and the durable commit run without an event-loop yield.
- *
- * Swaps are serialized per destination inside replaceSqliteDatabase: a second
- * call while one is running rejects with SqliteSwapInProgressError before
- * touching the shared connection (the route maps it to HTTP 409).
- */
-export async function swapDatabaseFromFile(sourcePath: string, backupPath: string | null): Promise<void> {
-    openDbServer();
-    await replaceSqliteDatabase({
-        sourcePath,
-        destPath: dbPath,
-        backupPath,
-        connection: sqlite,
-        reopenConnection: () => {
-            sqlite = openVersionedSqliteDatabase(dbPath);
-            try {
-                validateRecoveryAuditSchema(sqlite);
-                return sqlite;
-            } catch (error) {
-                sqlite.close();
-                throw error;
-            }
-        },
-    });
-}
-
 // Stable handle so the shared drizzle instance keeps working across the
 // close/reopen performed by swapDatabaseFromFile.
 const sqliteHandle = new Proxy({} as Database.Database, {
     get(_target, prop) {
         openDbServer();
+        if (prop === 'close' && admission) return () => admission!.closeSync();
         const value = Reflect.get(sqlite, prop) as unknown;
         return typeof value === 'function'
             ? (value as (...args: unknown[]) => unknown).bind(sqlite)

@@ -16,75 +16,38 @@ read_when:
 > repository è definita da [CONTRIBUTING.md](../CONTRIBUTING.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
-Ultimo aggiornamento del raccordo di consegna: 2026-09-26. Le prove della release
-del 20 settembre e delle candidature precedenti conservano data e revisione.
+## Supporto, capacità e protezione correnti
 
-<!-- reconciliation-20260912 -->
-**La `0.8.6` è stata pubblicata come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
-il 20 settembre 2026 alle 19:19:26 UTC**, non come draft o prerelease. Comprende
-il runtime locale sul Mac, con interfaccia browser su localhost e accesso
-senza interfaccia grafica per client e agenti autorizzati. Gli archivi disponibili
-sono ZIP e TAR.GZ: non sono installer nativi firmati o notarizzati e non
-attestano app complete Windows, Linux, iOS o iPadOS. Il client nativo segue un
-percorso separato e non è un requisito di consegna della 0.8.6.
+Matrice generale aggiornata l'11 ottobre 2026; le fonti collegate mantengono i contratti del proprio confine.
 
-La release corrisponde al commit `46296266c0a8ff4d4ab19216af7e761cddec7d78`,
-tree `76ecc6b32a44d852e6ca7aeeba03b449f6c3c5bb`.
-La [CI sul commit pubblicato](https://github.com/Wulfgardr/mediflow/actions/runs/35530827079)
-ha completato, come la PR353, sei workflow e sette controlli richiesti, senza
-bypass né riesecuzione dei workflow. Su main, Playwright conta 159 test
-passati e 51 skip previsti, senza flaky, fallimenti o retry; l’harness ChatGPT
-conta 26 test passati, inclusi 10 casi di conformance, senza skip, fallimenti
-o cancellazioni. Nella PR353, invece, 157 test Playwright erano passati subito
-e due al retry automatico già previsto, con 51 skip. I due casi riguardavano
-l’avviso di modello AI in hold e l’estrazione OCR di un’immagine: il risultato
-successivo non dimostra che la causa dell’intermittenza sia stata risolta.
+La release pubblicata resta [v0.8.6, sorgente Mac/localhost](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6).
+La **0.9.0 è una candidatura in consolidamento**, non ancora una release né
+un'installazione clinica ammessa. Stato e criteri finiti sono nel
+[programma Linear](https://linear.app/wulfgardr/issue/WUL-717); commit, review e
+controlli restano nelle PR e nella CI.
 
-Il confronto degli archivi scaricati mediante API GitHub con il tree ha dato
-corrispondenza per 2844/2844 blob Git in ciascuno. Lo ZIP misura 18.335.516 byte,
-SHA256 `a2867cef3c2044e6e65aafe3230105b3c098f64ad3b6d00fd4a8faf273663fd2`;
-il TAR.GZ misura 16.418.260 byte,
-SHA256 `3934c67fe2c95c5c62a479342c7c55da0d1304dfe747ed018ec320edb932edc7`.
-Questi dati identificano gli archivi della release, non una futura revisione
-editoriale. Lo storico delle versioni resta nel [CHANGELOG](../CHANGELOG.md).
+| Ambito | Contenuto e confine dei sorgenti correnti | Stato di consegna e fonte |
+| --- | --- | --- |
+| Profili 0.9.0 | Sorgente, browser localhost e headless con Node 24: macOS, Windows 11 ARM con Node x64 emulato, Omarchy/Arch ARM su Parallels. | Profili scelti, qualifica finale aperta in [C20](https://linear.app/wulfgardr/issue/WUL-735). I runner CI non sostituiscono le macchine dichiarate. |
+| App e installer nativi | Percorso separato; un archivio ZIP/TAR.GZ non è un installer firmato. | Previsti nella 0.9.6; gli account v3 non sono ammessi nei client nativi non qualificati. |
+| Cartella ordinaria | Ricerca, revisione e scritture nominate, con conflitti, validazione e audit. AI facoltativa, provider esterni spenti per impostazione predefinita. | [Roster clinico](./clinical-write-roster.md); flussi integrati e usabilità finale in C20, non dedotti dalla compilazione. |
+| Protezione locale | Cifratura applicativa dei soli campi dichiarati; passphrase v3 e kit separato. Identificativi, metadati e alcune copie restano in chiaro. | [Matrice dati a riposo](./data-at-rest-matrix.md) e [policy](../SECURITY.md#chiavi-passphrase-e-recupero); volume cifrato e recupero completo restano verifiche distinte. |
+| Backup | Export portabile clinico e recupero completo non sono sinonimi. I formati che non rappresentano lo storico durevole restano bloccati. | [Drill](./backup-restore-drill.md) e [C15](https://linear.app/wulfgardr/issue/WUL-730); la creazione del file non dimostra il recupero. |
+| Documenti e scale | Estrazione locale nei formati ammessi; testo e punteggi richiedono revisione. Errori e contenuti illeggibili non diventano risultati clinici. | Versioni locali esplicite; stato dei diritti e approvazione delle formulazioni in [C08](https://linear.app/wulfgardr/issue/WUL-723), revisione del corpus sintetico in [C11](https://linear.app/wulfgardr/issue/WUL-726). Gli accordi privati non sono pubblicati né esaminati qui. Le prove di sviluppo non attestano efficacia clinica. |
+| Artefatti di runtime | La build da checkout Git pulito prepara un payload fisico comune a Web e Headless. I due avvii verificano membri, byte, identità e Node/ABI/piattaforma prima dell'app; cache Next su disco disabilitata. | [C18](https://linear.app/wulfgardr/issue/WUL-733) conserva qualifica, provenienza e notices. Il registro esterno non è una firma contro la sostituzione degli input fidati, né un controllo continuo durante l'esecuzione. Il launcher nativo resta distinto. |
+| Client e agenti | Operazioni nominate, selezione e permessi; niente SQL generico, percorsi del database o conferme umane delegate all'agente. | [C16](https://linear.app/wulfgardr/issue/WUL-731) distingue trasporto locale, client provato e host/modello esterno non osservato. Non è una promessa che i dati consegnati all'host restino locali. |
 
-Pubblicare i sorgenti e superare prove sintetiche non equivale ad ammettere
-un deployment clinico. Tale valutazione resta aperta in WUL-688 e spetta al
-referente competente. Il coordinamento della consegna sorgente e del passaggio
-alla 0.9.0 [WUL-669](https://linear.app/wulfgardr/issue/WUL-669) è invece
-concluso dal 23 settembre. Non viene dichiarata una nuova prova live di account o
-provider consumer sul candidato finale. Integrazione ChatGPT, login,
-configurazione, prova sintetica ed esecuzione reale rimangono fatti distinti.
+**Uso clinico quotidiano: non valutato per la candidata 0.9.0.** Leonardo e il
+referente competente decidono l'ammissione dell'installazione e dei flussi
+concreti; una consegna sorgente o una prova sintetica non prende tale decisione.
+La [guida alle responsabilità](./privacy-and-ai-governance.md) prepara funzioni,
+scopi d'uso e ruoli; non attribuisce una classe regolatoria o una certificazione.
 
-### Seguito della consegna — 23 settembre, riletto il 26 settembre 2026
+## Prove storiche
 
-Le [correzioni funzionali PR 358](https://github.com/Wulfgardr/mediflow/pull/358)
-e il [dossier PR 359](https://github.com/Wulfgardr/mediflow/pull/359) sono
-integrati in `main`, riletto a `6c212221a98f9b8e45cc1d243226d0adb41770bd`.
-Comprendono il ritorno alla lista dopo il primo paziente, la conservazione
-della preferenza del modello con funzione spenta e il messaggio della sintesi
-disattivata. Non modificano retroattivamente il tag o gli archivi `v0.8.6`.
-
-Il progetto 0.8.6 conta 21 issue concluse, quattro in revisione e due tracker
-superati: WUL-683/684 trasferiscono requisiti a WUL-705/728/732, senza
-dichiarare eseguito tutto il censimento o la semplificazione. WUL-685–688
-conservano applicabilità, ruoli, adozione delle procedure e decisione sul
-deployment concreto. Il loro stato non è un difetto software da chiudere
-automaticamente.
-
-WUL-729 conserva separatamente il timeout intermittente del selettore nativo
-AnyDoc osservato nella CI della PR 358: il tentativo successivo superato non
-ne dimostra la causa o la risoluzione. Il primo lavoro 0.9.0 parte dal
-censimento WUL-705 e dalle verifiche richieste, secondo la
-[roadmap](./ROADMAP.md#roadmap-vigente--21-settembre-2026), senza riaprire le
-accettazioni 0.8.6 già documentate né qualificare piattaforme differite.
-
-MediFlow si può usare senza AI. Le funzioni intelligenti sono facoltative e
-producono proposte da rivedere; i fornitori esterni sono spenti per
-impostazione predefinita. Gli agenti accedono ai comandi MediFlow, non al
-database: autenticazione, permessi, verifica della validità del contesto,
-conferma pertinente alle scritture cliniche, audit e ricevute restano necessari.
-Né una preferenza di modello né una ricevuta possono sostituire tali requisiti.
+La 0.8.6 è stata pubblicata il 20 settembre 2026. Le sue prove e i limiti sono
+nella [verifica datata](./analysis/2026-09-07-086-release-verification.md), gli
+archivi e il commit nel tag, le versioni nel [CHANGELOG](../CHANGELOG.md).
 
 **Come leggere la ricostruzione seguente.** I due aggiornamenti datati
 ricostruiscono le candidature precedenti: verbi, limiti e risultati valgono per

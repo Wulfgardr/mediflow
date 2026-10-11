@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 import { canIncrementVersion } from './version-concurrency';
 /* @Codex */
 import { randomUUID } from 'node:crypto';
@@ -56,7 +57,7 @@ function writeNetworkLifecycleAudit(
     writeAuditEventInTransaction(tx, {
         eventType,
         outcome: 'success',
-        actorType: 'user',
+        archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user',
         actorRef: context.session.userId,
         subjectType: 'patient',
         subjectRef: patientId,

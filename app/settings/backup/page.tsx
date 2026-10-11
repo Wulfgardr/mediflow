@@ -12,7 +12,7 @@ export default function SettingsBackupPage() {
             <SettingsSectionIntro
                 kicker="Dati e sicurezza"
                 title="Backup e ripristino"
-                description="Schedulazione e restore degli archivi cifrati locali."
+                description="Backup completo cifrato, esportazioni portabili e pianificazione locale."
             />
             <div className="space-y-6">
                 <BackupSchedulerUI />

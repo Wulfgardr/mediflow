@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
@@ -9,6 +11,7 @@ import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
+    BackupSchedulerOutcomeUnknownError,
     applyBackupRetention,
     applyRetentionResultToState,
     mergeBackupSchedulerConfig,
@@ -43,6 +46,8 @@ export async function GET() {
         const value = await loadSchedulerSettingValue();
         return NextResponse.json(buildBackupSchedulerStatus(value));
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('GET backup scheduler status failed:', error);
         return NextResponse.json({ error: 'Failed to load backup scheduler status.' }, { status: 500 });
     }
@@ -52,6 +57,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await request.json();
@@ -121,6 +128,7 @@ export async function POST(request: Request) {
             adapter.uninstall();
         }
 
+        if (adapter.getStatus().installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
         await saveSchedulerSettingValue(JSON.stringify(nextState));
 
         try {
@@ -143,8 +151,16 @@ export async function POST(request: Request) {
             console.error('Audit backup scheduler write failed:', error);
         }
 
-        return NextResponse.json(buildBackupSchedulerStatus(JSON.stringify(nextState)));
+        const observed = buildBackupSchedulerStatus(JSON.stringify(nextState));
+        if (observed.installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
+        return NextResponse.json(observed);
     } catch (error) {
+        if (error instanceof BackupSchedulerOutcomeUnknownError) {
+            return NextResponse.json({
+                error: 'Esito del backup automatico non confermato. Rileggi lo stato prima di ripetere l’operazione.', code: 'backup_scheduler_outcome_unconfirmed',
+                status: buildBackupSchedulerStatus(await loadSchedulerSettingValue()),
+            }, { status: 503 });
+        }
         /* Il messaggio grezzo qui contiene la destinazione del backup. */
         return apiInternalError('POST backup scheduler', error, {
             code: 'backup_scheduler_save_failed',

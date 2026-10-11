@@ -59,6 +59,7 @@ export function writeStandaloneManifest(root = defaultRoot) {
     const output = path.join(standaloneDirectory(root), 'mediflow-runtime-contract.json');
     fs.writeFileSync(output, `${JSON.stringify({
         schemaVersion: 1,
+        distDir: path.basename(path.dirname(standaloneDirectory(root))),
         node: { major: contract.major, version: runtime.version, moduleVersion: runtime.moduleVersion },
         platform: process.platform,
         arch: process.arch,

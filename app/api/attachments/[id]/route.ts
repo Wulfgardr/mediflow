@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { writeAttachmentWebAudit } from '@/lib/attachment-web-audit';
 import { NextResponse } from 'next/server';
@@ -59,6 +61,8 @@ export async function GET(
             path: buildAttachmentPath(row.path, row.name, row.id),
         });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: 'Failed to fetch attachment' }, { status: 500 });
     }
 }
@@ -69,6 +73,8 @@ export async function PUT(
 ) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -133,6 +139,8 @@ export async function PUT(
         }, { behavior: 'immediate' });
         return NextResponse.json({ success: true, currentness: updated });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         if (error instanceof AttachmentPreconditionError) return error.response();
         if (isAttachmentMetadataCurrentnessHostError(error)) {
             if (error.code === 'ocr_queue_unavailable') return NextResponse.json({ error: 'Attachment is not in the OCR queue' }, { status: 409 });
@@ -155,6 +163,8 @@ export async function DELETE(
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -174,6 +184,8 @@ export async function DELETE(
         }, { behavior: 'immediate' });
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         if (error instanceof AttachmentPreconditionError) return error.response();
         return NextResponse.json({ error: "Delete Failed" }, { status: 500 });
     }

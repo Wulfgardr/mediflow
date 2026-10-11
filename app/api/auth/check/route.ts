@@ -5,6 +5,7 @@ import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
 import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
 import { parseWrappedMasterKey } from '@/lib/security/security';
+import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
 /* @Codex */
 import {
     bootstrapWebAuthControl,
@@ -65,8 +66,16 @@ function finalizeControlResponse(
     presentedControlId: string | null,
     control: WebAuthControlBootstrap,
 ) {
+    // Resolving an archive-A session can retire it and advance its control fence.
+    // Return the post-resolution fence, not the one observed before retirement.
+    const currentControl = bootstrapWebAuthControl(control.controlId);
+    if (!currentControl || currentControl.controlId !== control.controlId) {
+        return NextResponse.json({ status: 'error', isSetup: false, hasSession: false,
+            error: { code: 'AUTH_CONTROL_UNAVAILABLE', message: 'Authentication control unavailable.' } },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    }
     response.headers.set('Cache-Control', 'no-store');
-    setWebAuthControlEtag(response, control.etag);
+    setWebAuthControlEtag(response, currentControl.etag);
     if (presentedControlId !== control.controlId) setWebAuthControlCookie(response, request, control.controlId);
     return response;
 }
@@ -157,6 +166,9 @@ export async function GET(request: Request) {
         const response = NextResponse.json({
             /* @Codex */
             status: 'ok',
+            archiveGeneration: currentArchiveGeneration(),
+            archiveMaintenance: process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT
+                ? JSON.parse(process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT) : undefined,
             isSetup: accounts.length > 0,
             hasSession,
             ...(accounts.length > 0 ? { unlock: unlockParameters(accounts) } : {}),

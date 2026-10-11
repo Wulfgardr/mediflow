@@ -83,7 +83,7 @@ test('real Web legacy, fixed-preview, and v1 create have one host-attributed eve
     assert.ok(user);
     const target = writer.prepare('SELECT id FROM ambulatories WHERE is_default=1 LIMIT 1').get();
     assert.ok(target);
-    const webHeaders = { Cookie: login.cookieHeader, 'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed-actor' };
+    const webHeaders = { Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration, 'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed-actor' };
     const v1Headers = { authorization: `Bearer ${token}`, 'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed-actor' };
 
     const deniedWebId = randomUUID();

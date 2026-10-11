@@ -20,7 +20,7 @@ const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
 // @Codex ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
 // Aliases and owner delivery stay guarded independently of standalone tracing additions.
-const NEXT_RESOLVER_AST_SHA256 = '27b380dfb9ba4df2fd4686bfa6b49ae26a198be51fc2391226a43dfe90a98776';
+const NEXT_RESOLVER_AST_SHA256 = '36032142572744684b21f214ae31e14eb6e08c066749856f1a843e44ff3e04a3';
 const REVIEWED_TRACE_FILES = {
     'scripts/anydoc-desktop-renderer-trace.mjs': '786ff72eaa6d8e35cf108e58fd23a675cba4e40b28dd5d2343ab831a41782723',
     'scripts/anydoc-pdf-renderer-profiles.json': 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf',
@@ -36,10 +36,10 @@ const EXPECTED_SCRIPTS = {
     [`post${GUARD_SCRIPT}`]: null,
     predev: 'node scripts/node-runtime-contract.mjs verify',
     dev: 'next dev --turbopack --hostname 127.0.0.1 --port 3000', postdev: null,
-    prebuild: 'node scripts/node-runtime-contract.mjs verify', build: 'next build',
-    postbuild: 'node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs',
-    prestart: 'node scripts/node-runtime-contract.mjs verify',
-    start: 'next start --hostname 127.0.0.1 --port 3000',
+    prebuild: 'node scripts/node-runtime-contract.mjs verify', build: 'node scripts/source-runtime.mjs build',
+    postbuild: 'node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs && node scripts/source-runtime.mjs prepare',
+    prestart: 'node scripts/node-runtime-contract.mjs verify-node',
+    start: 'node scripts/source-runtime.mjs web',
     poststart: null,
 };
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };

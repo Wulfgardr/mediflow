@@ -5,6 +5,7 @@ import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw, ShieldCheck } 
 import { BackupRestoreBlockedError, BackupRestorePreflightError, exportRawDatabase, importRawDatabase, verifyRawDatabase } from '@/lib/db';
 import { BackupRestoreKeyError } from '@/lib/backup-restore-key-check';
 import { useSecurity } from './security-provider';
+import { RecoveryBackupUI } from './recovery-backup-ui';
 
 // WUL-297: parola chiave richiesta per confermare il restore.
 const RESTORE_CONFIRM_KEYWORD = 'RIPRISTINA';
@@ -158,14 +159,15 @@ export default function BackupRestoreUI() {
 
     return (
         <div className="grid gap-6 xl:grid-cols-2">
+            <div className="xl:col-span-2"><RecoveryBackupUI /></div>
             <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Export locale</p>
                 <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
                     <Download className="w-5 h-5 text-blue-500" />
-                    Backup
+                    Esportazione portabile
                 </h3>
                 <p className="mb-4 mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
-                    Scarica un artifact <code>.mediflow</code> v1 con manifest e checksum. Il ripristino valida formato, versione e integrità prima di sovrascrivere i dati.
+                    Scarica un file <code>.mediflow</code> con le collezioni esportabili. Non è il backup completo di recupero: non contiene gli account e gli involucri delle chiavi. Il ripristino valida formato, versione e integrità prima di sovrascrivere i dati.
                     <br />
                     <span className="font-bold text-amber-600 dark:text-amber-500">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
                 </p>
@@ -232,7 +234,8 @@ export default function BackupRestoreUI() {
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
                                 ATTENZIONE: <strong>TUTTI i dati attuali verranno cancellati</strong> e sostituiti con
-                                quelli del backup. L&apos;operazione non è reversibile.
+                                quelli del backup. L&apos;operazione non è reversibile. Le altre schede verranno ricaricate;
+                                i dispositivi abbinati dovranno essere abbinati e sincronizzati di nuovo.
                             </p>
                         </div>
                         <p className="text-xs text-red-800/80 dark:text-red-200/80">

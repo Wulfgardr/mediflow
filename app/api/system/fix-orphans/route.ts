@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -72,6 +74,8 @@ export async function GET() {
             willCreateDefaultAmbulatory: !targetAmb
         });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Fix Orphan Dry-Run Error:", error);
         /* @Codex */
         return NextResponse.json({ error: 'Failed to inspect orphan patients' }, { status: 500 });
@@ -84,6 +88,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsed = await readBoundedJsonBody(request, REPAIR_JSON_MAX_BYTES, 'request-json',
@@ -103,7 +109,7 @@ export async function POST(request: Request) {
         const purgeRequested = body.purgeOrphanedClinicalRows === true;
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
-        const actor = { actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+        const actor = { archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
             sourceSurface: auditContext.sourceSurface, requestId };
 
         const result = dbServer.transaction((tx) => {
@@ -182,6 +188,8 @@ export async function POST(request: Request) {
         return NextResponse.json(result, { status: 'error' in result ? 409 : 200 });
 
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Fix Orphan Error:", error);
         /* @Codex */
         return NextResponse.json({ error: 'Failed to fix orphan patients' }, { status: 500 });

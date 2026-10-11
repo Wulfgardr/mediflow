@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: WUL-718 synthetic SQLite and real patient PUT routes; auth seams only. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -23,9 +24,9 @@ const { registerHooks } = load('node:module') as {
 };
 const authPath = join(dataDir, 'auth-seam.cjs');
 writeFileSync(authPath, `const state=globalThis[Symbol.for(${JSON.stringify(`mediflow-c03-auth-${dataDir}`)})];
-exports.requireSession=async()=>state.webAllowed?({userId:'synthetic-user',role:'admin'}):null;
+exports.requireSession=async()=>state.webAllowed?({id:'synthetic-web',userId:'synthetic-user',role:'admin',authChannel:'web'}):null;
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
-exports.requireLocalApiActorSession=async()=>({userId:'synthetic-user',role:'admin'});`, { mode: 0o600 });
+exports.requireLocalApiActorSession=async()=>({id:'synthetic-local',userId:'synthetic-user',role:'admin',authChannel:'system'});`, { mode: 0o600 });
 const tokenPath = join(dataDir, 'token-seam.cjs');
 writeFileSync(tokenPath, `const state=globalThis[Symbol.for(${JSON.stringify(`mediflow-c03-auth-${dataDir}`)})];
 exports.requireLocalApiToken=()=>state.v1Allowed?null:Response.json({error:'Unauthorized'},{status:401});
@@ -37,6 +38,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 openDbServer();
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local');
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, { cookies: new Map([['ambulatory_id', 'c03-a']]) });
@@ -71,8 +73,8 @@ function reset() {
 }
 
 async function put(route: typeof web | typeof v1, body: Record<string, unknown>) {
-    return route.PUT(new Request('http://127.0.0.1/api/patients/c03-patient', {
-        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    return route.PUT(syntheticArchiveRequest(archiveGeneration, 'http://127.0.0.1/api/patients/c03-patient', {
+        method: 'PUT', headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json' }, body: JSON.stringify(body),
     }), { params: Promise.resolve({ id: 'c03-patient' }) });
 }
 
@@ -138,7 +140,7 @@ for (const [name, route] of [['web', web], ['v1', v1]] as const) {
         authState[name === 'web' ? 'webAllowed' : 'v1Allowed'] = false;
         assert.equal((await put(route, { version: 3, firstName: 'Denied' })).status, 401);
         authState.webAllowed = true; authState.v1Allowed = true;
-        const missing = await route.PUT(new Request('http://127.0.0.1/missing', {
+        const missing = await route.PUT(syntheticArchiveRequest(archiveGeneration, 'http://127.0.0.1/missing', {
             method: 'PUT', body: JSON.stringify({ version: 3, firstName: 'Missing' }),
         }), { params: Promise.resolve({ id: 'missing' }) });
         assert.equal(missing.status, 404);

@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: WUL-720 synthetic SQLite and real patient PUT route envelope regression. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -17,7 +18,7 @@ process.env.MEDIFLOW_DATA_DIR = dataDir;
 const oldToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-synthetic-token';
 type SyntheticAuthority = ReturnType<typeof syntheticNetworkPatientAuthority>;
-const state = { web: true, v1: true, network: true, authority: null as SyntheticAuthority | null };
+const state = { web: true, v1: true, network: true, generation: '', authority: null as SyntheticAuthority | null };
 const stateKey = Symbol.for(`c05-auth-${dataDir}`);
 (globalThis as unknown as Record<symbol, typeof state>)[stateKey] = state;
 
@@ -27,8 +28,8 @@ function shim(name: string, source: string) {
     return pathToFileURL(path).href;
 }
 const auth = shim('auth.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-auth-${dataDir}`)})];
-exports.requireSession=async()=>s.web?({userId:'c05-user',role:'admin'}):null;
-exports.requireLocalApiActorSession=async()=>({id:'local-api',userId:'local-api',role:'admin'});
+exports.requireSession=async()=>s.web?({id:'synthetic-web',userId:'c05-user',role:'admin',authChannel:'web'}):null;
+exports.requireLocalApiActorSession=async()=>({id:'local-api',userId:'local-api',role:'admin',archiveGeneration:s.generation});
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
 exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`);
 const token = shim('token.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-auth-${dataDir}`)})];
@@ -62,6 +63,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 openDbServer();
+const archiveGeneration = state.generation = bindSyntheticArchiveSessions('synthetic-web');
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
 const native = load('../app/api/v1/network/patients/[id]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/route.ts');
@@ -103,10 +105,10 @@ type Route = typeof web | typeof v1 | typeof native;
 function requestFor(route: Route, body: string) {
     const networkHeaders = route === native && state.authority
         ? Object.fromEntries(state.authority.request.headers.entries()) : {};
-    return new Request('http://127.0.0.1/api/patients/c05-patient', {
+    return syntheticArchiveRequest(archiveGeneration, 'http://127.0.0.1/api/patients/c05-patient', {
         method: 'PUT', headers: {
             ...networkHeaders,
-            'content-type': 'application/json',
+            'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json',
             'authorization': route === v1 ? 'Bearer c05-synthetic-token' : '',
             'x-request-id': 'c05-synthetic-request',
         }, body,
@@ -196,7 +198,7 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
         if (method === 'POST') test(`${name} create identity adapter preserves opaque IDs and generates only for omission`, async () => {
             reset();
             const body = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SYNTH-IDENTITY' };
-            const invokeBody = (value: Record<string, unknown>) => invoke(new Request('http://localhost/api/patients', { method, body: JSON.stringify(value) }));
+            const invokeBody = (value: Record<string, unknown>) => invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body: JSON.stringify(value) }));
             const before = fullSnapshot();
             assert.equal((await invokeBody({ ...body, id: 42 })).status, 400);
             assert.deepEqual(fullSnapshot(), before);
@@ -212,30 +214,30 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
         });
         test(`${name} ${method} admission precedes poisoned body access`, async () => {
             reset(); const before = fullSnapshot(); state[name === 'network' ? 'network' : name] = false;
-            const request = new Request('http://localhost/api/patients', { method, body:'{}' });
+            const request = syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body:'{}' });
             Object.defineProperty(request, 'body', { get() { throw new Error('poison-stream-read'); } });
             assert.equal((await invoke(request)).status, 401); assert.deepEqual(fullSnapshot(), before);
         });
         test(`${name} ${method} failed stream is bounded 400 with zero effects`, async () => {
             reset(); const before = fullSnapshot();
             const body = new ReadableStream<Uint8Array>({ start(c) { c.error(new TypeError('synthetic-stream-failure')); } });
-            const response = await invoke(new Request('http://localhost/api/patients', { method, body, duplex:'half' } as RequestInit));
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body, duplex:'half' } as RequestInit));
             assert.equal(response.status, 400); assert.deepEqual(fullSnapshot(), before);
         });
         test(`${name} ${method} pre-aborted body has zero effects`, async () => {
             reset(); const before = fullSnapshot(); const controller = new AbortController(); controller.abort();
-            const response = await invoke(new Request('http://localhost/api/patients', { method, body:'{}', signal:controller.signal }));
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body:'{}', signal:controller.signal }));
             assert.equal(response.status, 400); assert.deepEqual(fullSnapshot(), before);
         });
         for (const raw of ['null', '[]', '{', '"scalar"', '']) test(`${name} ${method} malformed denied without effects: ${raw}`, async () => {
             reset(); const before = fullSnapshot();
-            const response = await invoke(new Request('http://localhost/api/patients', { method, body: raw }));
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body: raw }));
             assert.equal(response.status, 400); assert.deepEqual(fullSnapshot(), before);
         });
         for (const declared of [undefined, '1', 'nonsense', String(cap+1)]) test(`${name} ${method} chunked oversize (${declared}) has zero effects`, async () => {
             reset(); const before = fullSnapshot(); let cancelled = false;
             const body = new ReadableStream<Uint8Array>({ start(c) { c.enqueue(new TextEncoder().encode(' '.repeat(cap))); c.enqueue(new Uint8Array([32])); }, cancel() { cancelled = true; } });
-            const response = await invoke(new Request('http://localhost/api/patients', { method, body,
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body,
                 headers: declared === undefined ? {} : { 'content-length': declared }, duplex: 'half' } as RequestInit));
             assert.equal(response.status, 413); assert.equal(cancelled, true);
             assert.deepEqual(await response.json(), { error: 'JSON payload too large', code: 'JSON_BODY_TOO_LARGE' });
@@ -244,7 +246,7 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
         test(`${name} ${method} abort cancels pending read without effects`, async () => {
             reset(); const before = fullSnapshot(); const controller = new AbortController(); let cancelled = false;
             const body = new ReadableStream<Uint8Array>({ cancel() { cancelled = true; } });
-            const request = new Request('http://localhost/api/patients', { method, body, signal: controller.signal, duplex: 'half' } as RequestInit);
+            const request = syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body, signal: controller.signal, duplex: 'half' } as RequestInit);
             const signal = request.signal;
             const pending = invoke(request);
             setTimeout(() => { controller.abort(); assert.equal(signal.aborted, true); }, 10);
@@ -255,7 +257,7 @@ for (const [name, item, collection] of [['web', web, webCreate], ['v1', v1, v1Cr
             const value = method === 'POST' ? { id:'c05-created', firstName:'Ada', lastName:'Sintetica', taxCode:'SYNTHETIC-CREATE', notes:'ENC:iv:ciphertext' }
                 : method === 'PUT' ? { version:3, notes:'ENC:iv:ciphertext' } : {version:3, deletionReason:'ENC:iv:reason'};
             const json = JSON.stringify(value); const raw = json + ' '.repeat(size - new TextEncoder().encode(json).byteLength);
-            const response = await invoke(new Request('http://localhost/api/patients', { method, body:raw }));
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/patients', { method, body:raw }));
             assert.equal(response.status, method === 'POST' ? 201 : 200);
             const row = sql.prepare('SELECT * FROM patients WHERE id=?').get(method === 'POST' ? 'c05-created' : 'c05-patient') as Record<string,unknown>;
             assert.equal(row[method === 'DELETE' ? 'deletion_reason' : 'notes'], method === 'DELETE' ? 'ENC:iv:reason' : 'ENC:iv:ciphertext');

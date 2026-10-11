@@ -2,6 +2,7 @@
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
+import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { createHash } from 'node:crypto';
 import { and, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 
@@ -78,6 +79,7 @@ export type PinChangeServiceDependencies = {
 export type PinChangeServiceInput = {
     session: WebSessionProjection | PairedNativeSession;
     request: Request;
+    archiveGeneration: string | undefined;
     currentPin: string;
     newPin: string;
     encryptedMasterKey: string;
@@ -207,8 +209,9 @@ export async function changePin(
             abortPreparedRetirements();
             return { kind: 'unauthorized' };
         }
-        updateResult = db.transaction((tx) => tx
-            .update(users)
+        updateResult = db.transaction((tx) => {
+            assertArchiveGeneration(tx, input.archiveGeneration);
+            return tx.update(users)
             .set({
                 passwordHash: nextPasswordHash,
                 encryptedMasterKey: input.encryptedMasterKey,
@@ -218,7 +221,8 @@ export async function changePin(
                 lockedUntil: null,
             })
             .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash), isNull(users.unlockVerifierHash)))
-            .run());
+            .run();
+        });
     } catch (error) {
         abortPreparedRetirements();
         throw error;
@@ -284,6 +288,7 @@ export async function changePin(
 export type PassphraseAdoptionInput = {
     session: WebSessionProjection;
     request: Request;
+    archiveGeneration: string | undefined;
     payload: PassphraseAdoptionPayload;
 };
 
@@ -345,8 +350,9 @@ export async function adoptPassphrase(
 
     let changes: number;
     try {
-        changes = db.transaction((tx) => tx
-            .update(users)
+        changes = db.transaction((tx) => {
+            assertArchiveGeneration(tx, input.archiveGeneration);
+            return tx.update(users)
             .set({
                 encryptedMasterKey: payload.encryptedMasterKey,
                 salt: payload.salt,
@@ -365,7 +371,8 @@ export async function adoptPassphrase(
                 // A lock established after the PIN was verified stands: this write does not clear it.
                 or(isNull(users.lockedUntil), lte(users.lockedUntil, new Date())),
             ))
-            .run()).changes;
+            .run();
+        }).changes;
     } catch (error) {
         abortPrepared();
         throw error;
@@ -428,6 +435,7 @@ type RecoveredAccount = Extract<HostCredentialVerification, { kind: 'verified' }
 
 export type PassphraseRecoveryInput = {
     request: Request;
+    archiveGeneration: string | undefined;
     payload: PassphraseRecoveryPayload;
     /**
      * Recovery arrives without a session, and the Web session owner retires the sessions of an
@@ -460,7 +468,7 @@ export async function recoverPassphrase(
 
 /** The authenticated account changes its own passphrase; its PIN cannot authorize this. */
 export async function changePassphrase(
-    input: { session: WebSessionProjection; request: Request; payload: PassphraseChangePayload },
+    input: { session: WebSessionProjection; request: Request; archiveGeneration: string | undefined; payload: PassphraseChangePayload },
     dependencies: PinChangeServiceDependencies = {},
 ): Promise<PassphraseRecoveryResult | { kind: 'unauthorized' }> {
     const db = await resolveDatabase(dependencies);
@@ -472,6 +480,7 @@ export async function changePassphrase(
     };
     return rotatePassphrase({
         request: input.request,
+        archiveGeneration: input.archiveGeneration,
         payload: { ...input.payload, username: user.username },
         previousVerifier: input.payload.currentVerifier,
         openSession: (account) => account.id === input.session.userId ? input.session : null,
@@ -482,6 +491,7 @@ export async function changePassphrase(
 async function rotatePassphrase(
     input: {
         request: Request;
+        archiveGeneration: string | undefined;
         payload: PassphraseCredentials & { username: string }; previousVerifier: string;
         openSession: (account: RecoveredAccount) => WebSessionProjection | null;
     },
@@ -533,8 +543,9 @@ async function rotatePassphrase(
 
     let changes: number;
     try {
-        changes = db.transaction((tx) => tx
-            .update(users)
+        changes = db.transaction((tx) => {
+            assertArchiveGeneration(tx, input.archiveGeneration);
+            return tx.update(users)
             .set({
                 encryptedMasterKey: payload.encryptedMasterKey,
                 salt: payload.salt,
@@ -555,7 +566,8 @@ async function rotatePassphrase(
                 // A lock established after the recovery key was verified stands: this write does not clear it.
                 or(isNull(users.lockedUntil), lte(users.lockedUntil, new Date())),
             ))
-            .run()).changes;
+            .run();
+        }).changes;
     } catch (error) {
         abortPrepared();
         throw error;

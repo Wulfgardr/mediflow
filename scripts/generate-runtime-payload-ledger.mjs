@@ -181,7 +181,9 @@ function runtimeIdentity(sourceRoot, payloadRoot, files, expected) {
     || Number(runtime.node?.version?.split('.')[0]) !== contract.major
     || runtime.node.version !== expected.nodeVersion || runtime.node.moduleVersion !== expected.nodeAbi
     || runtime.platform !== expected.platform || runtime.arch !== expected.arch) fail('runtime target identity mismatch');
-  for (const name of ['server.js', 'package.json', '.next/BUILD_ID']) {
+  const distDir = runtime.distDir ?? '.next';
+  if (!/^\.next(?:-[a-zA-Z0-9_-]+)?$/u.test(distDir)) fail('unsupported standalone dist directory');
+  for (const name of ['server.js', 'package.json', `${distDir}/BUILD_ID`]) {
     if (!files.some(file => file.path === name)) fail(`missing standalone identity member ${name}`);
   }
   const build = files.find(file => file.path === 'mediflow-build-identity.json');
@@ -189,7 +191,7 @@ function runtimeIdentity(sourceRoot, payloadRoot, files, expected) {
     const identity = json(path.join(payloadRoot, build.path));
     const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRoot, encoding: 'utf8' }).trim();
     if (identity.schemaVersion !== 1 || identity.revision !== revision
-      || identity.buildId !== fs.readFileSync(path.join(payloadRoot, '.next/BUILD_ID'), 'utf8').trim()) fail('source/build identity mismatch');
+      || identity.buildId !== fs.readFileSync(path.join(payloadRoot, distDir, 'BUILD_ID'), 'utf8').trim()) fail('source/build identity mismatch');
   }
   return { status: 'DECLARED_TARGET_MATCH', declared: runtime,
     buildIdentity: build ? 'REVISION_AND_BUILD_ID_MATCH' : 'NOT_PRESENT',

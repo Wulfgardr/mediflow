@@ -6,6 +6,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
+import { encryptData, generateMasterKey } from './security/security';
+import { prepareFhirBundleFromRecords } from './fhir/export-precheck';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOADER = pathToFileURL(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')).href;
@@ -74,5 +76,83 @@ test('the at-rest matrix lists as encrypted exactly the columns of the client co
         // A contract field with no column is declared in the matrix prose, not as a column.
         const expected = (contract[table] ?? []).map(snakeCase).filter((column) => columns.includes(column));
         assert.deepEqual([...matrix.get(table)!.encrypted].sort(), expected.sort(), `${table}: encrypted columns follow ENCRYPTED_FIELDS`);
+    }
+});
+
+test('sentinels follow real SQLite, scheduled backup and FHIR artifacts after success, failure and cancellation', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-at-rest-sentinel-'));
+    const dataDir = path.join(directory, 'data'), temporary = path.join(directory, 'tmp');
+    fs.mkdirSync(dataDir, { mode: 0o700 }); fs.mkdirSync(temporary, { mode: 0o700 });
+    const clear = 'SYNTHETIC_C06_IDENTIFIER', sealed = 'SYNTHETIC_C06_ADDRESS';
+    const { iv, data } = await encryptData(sealed, await generateMasterKey());
+    const env = { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DATA_DIR: dataDir,
+        MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: '', TMPDIR: temporary };
+    let db: Database.Database | undefined;
+    try {
+        execFileSync(process.execPath, ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval',
+            `(await import(${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib/db-server.ts')).href)})).openDbServer();`],
+        { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+        db = new Database(path.join(dataDir, 'medical.db'));
+        db.pragma('journal_mode = WAL');
+        db.prepare('INSERT INTO patients(id,first_name,last_name,tax_code,address) VALUES (?,?,?,?,?)')
+            .run('c06-synthetic-patient', clear, 'Synthetic', clear, `ENC:${iv}:${data}`);
+        const output = path.join(directory, 'backups');
+        const configure = (destinationDir: string) => {
+            env.MEDIFLOW_BACKUP_DEST_DIR = destinationDir;
+            db!.prepare('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value')
+                .run('backupScheduler', JSON.stringify({ version: 1, config: { enabled: true, destinationDir } }));
+        };
+        const backup = () => {
+            const result = execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'],
+                { cwd: ROOT, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+            fs.appendFileSync(path.join(directory, 'operations.log'), result, { mode: 0o600 });
+            return JSON.parse(result) as { ok: boolean; artifactPath?: string };
+        };
+        const files = (root: string): string[] => fs.readdirSync(root, { withFileTypes: true }).flatMap(entry => {
+            const child = path.join(root, entry.name);
+            return entry.isDirectory() ? files(child) : entry.isFile() ? [child] : [];
+        });
+        const inspected = new Set<string>();
+        const inspect = (exported = false) => {
+            const observed = files(directory);
+            for (const file of observed) {
+                const bytes = fs.readFileSync(file);
+                const relative = path.relative(directory, file);
+                inspected.add(relative);
+                assert.equal(bytes.includes(Buffer.from(sealed)), exported && relative === 'export.json', relative);
+                if (relative === 'operations.log' || relative.startsWith(`tmp${path.sep}`)) assert.equal(bytes.includes(Buffer.from(clear)), false, relative);
+            }
+            assert.ok(observed.some(file => fs.readFileSync(file).includes(Buffer.from(clear))), 'the declared clear identifier remains observable');
+        };
+        configure(output);
+        inspect();
+        assert.ok(inspected.has(path.join('data', 'medical.db-wal')), 'the live WAL is actually inspected before its possible retirement');
+        const created = backup();
+        assert.equal(created.ok, true); assert.ok(created.artifactPath);
+        assert.ok(fs.readFileSync(created.artifactPath).includes(Buffer.from(clear)));
+        inspect();
+
+        // A real destination error must not print or persist the record contents.
+        const blocked = path.join(directory, 'not-a-directory'); fs.writeFileSync(blocked, 'synthetic'); configure(blocked);
+        assert.throws(backup, error => {
+            const failure = error as Error & { stdout: string; stderr: string; status: number };
+            assert.equal(failure.status, 1);
+            assert.match(JSON.parse(failure.stdout).message, /EEXIST|ENOTDIR/u);
+            fs.appendFileSync(path.join(directory, 'operations.log'), `${failure.stdout || ''}${failure.stderr || ''}`);
+            return true;
+        });
+        inspect();
+
+        const input = { patient: { id: 'c06-synthetic-patient', firstName: clear, lastName: 'Synthetic', taxCode: clear, address: sealed,
+            diagnoses: [{ id: 'c06-diagnosis', code: 'synthetic', description: 'Synthetic', system: 'UNKNOWN', date: '2026-10-11' }] },
+        entries: [], therapies: [], checkups: [], observations: [], generatedAt: '2026-10-11T00:00:00Z' };
+        assert.equal(await prepareFhirBundleFromRecords(input, () => false), null);
+        assert.equal(fs.existsSync(path.join(directory, 'export.json')), false);
+        inspect();
+        const exported = await prepareFhirBundleFromRecords(input, () => true);
+        fs.writeFileSync(path.join(directory, 'export.json'), JSON.stringify(exported), { mode: 0o600 });
+        inspect(true); // The explicitly requested FHIR export is clear, unlike the stored address.
+    } finally {
+        db?.close(); fs.rmSync(directory, { recursive: true, force: true });
     }
 });

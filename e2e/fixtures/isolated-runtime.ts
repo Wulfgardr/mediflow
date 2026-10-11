@@ -22,6 +22,17 @@ async function availableLoopbackPort(): Promise<number> {
   return address.port;
 }
 
+// Source payloads must use their admitted launcher; CI's traced standalone copy
+// has no source ledger and retains its existing build-time environment contract.
+export function isolatedRuntimeArguments(bundle: string): string[] {
+  if (!existsSync(path.join(path.dirname(bundle), 'runtime-payload-ledger.json'))) {
+    return [path.join(bundle, 'server.js')];
+  }
+  const launcher = path.resolve(bundle, '../..', 'scripts/source-runtime.mjs');
+  if (!existsSync(launcher)) throw new Error('Source payload requires its verified source runtime launcher.');
+  return [launcher, 'web'];
+}
+
 type IsolatedRuntime = Readonly<{ url: string }>;
 
 export const test = base.extend<{ isolatedRuntime: IsolatedRuntime }>({
@@ -53,12 +64,13 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime }>({
     const log = openSync(path.join(directory, 'server.log'), 'wx', 0o600);
     const environment: NodeJS.ProcessEnv = { ...process.env,
       NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: String(port),
+      MEDIFLOW_NEXT_DIST_DIR: contract.distDir,
       MEDIFLOW_DATA_DIR: dataDirectory, MEDIFLOW_E2E_DATA_DIR: dataDirectory,
       MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', E2E_DISABLE_LEGACY_COPY: '1',
     };
     delete environment.MEDIFLOW_RUNTIME_TWIN;
     delete environment.NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN;
-    const child = spawn(process.execPath, [serverPath], {
+    const child = spawn(process.execPath, isolatedRuntimeArguments(bundle), {
       cwd: bundle, env: environment, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
     });
     const closed = new Promise<void>(resolve => child.once('close', () => resolve()));

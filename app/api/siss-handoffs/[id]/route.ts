@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
@@ -33,6 +35,8 @@ function optionalText(value: unknown): string | null | undefined {
 export async function PUT(request: Request, context: RouteContext) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await context.params;
@@ -100,7 +104,7 @@ export async function PUT(request: Request, context: RouteContext) {
             writeAuditEventInTransaction(tx, {
                 eventType: 'siss.handoff.updated',
                 outcome: 'success',
-                actorType: auditContext.actorType,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType,
                 actorRef: auditContext.actorRef,
                 subjectType: 'siss_handoff',
                 subjectRef: id,
@@ -114,6 +118,8 @@ export async function PUT(request: Request, context: RouteContext) {
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /siss-handoffs/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update SISS handoff' }, { status: 500 });
     }
@@ -122,6 +128,8 @@ export async function PUT(request: Request, context: RouteContext) {
 export async function DELETE(request: Request, context: RouteContext) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await context.params;
@@ -151,7 +159,7 @@ export async function DELETE(request: Request, context: RouteContext) {
             writeAuditEventInTransaction(tx, {
                 eventType: 'siss.handoff.deleted',
                 outcome: 'success',
-                actorType: auditContext.actorType,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType,
                 actorRef: auditContext.actorRef,
                 subjectType: 'siss_handoff',
                 subjectRef: id,
@@ -163,6 +171,8 @@ export async function DELETE(request: Request, context: RouteContext) {
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /siss-handoffs/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete SISS handoff' }, { status: 500 });
     }

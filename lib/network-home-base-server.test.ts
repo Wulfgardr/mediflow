@@ -36,6 +36,7 @@ function bootstrapDatabase(): void {
 
 bootstrapDatabase();
 
+const { currentArchiveGeneration } = await import('./security/archive-session-generation');
 const { dbServer } = await import('./db-server.ts');
 const {
     confirmNetworkPairingIntent,
@@ -67,7 +68,7 @@ function syntheticClient(clientId: string, token: string) {
 }
 
 function writeStateDirectly(state: NetworkPairingState): void {
-    const serialized = serializeNetworkPairingState(state);
+    const serialized = JSON.stringify({ ...JSON.parse(serializeNetworkPairingState(state)), archiveGeneration: currentArchiveGeneration() });
     dbServer
         .insert(settings)
         .values({ key: NETWORK_PAIRING_STATE_KEY, value: serialized })
@@ -174,4 +175,18 @@ test('intent e conferma reali passano dalla primitiva e restano funzionanti', as
     assert.equal(finalState.clients.length, 1);
 
     await dbServer.delete(settings).where(eq(settings.key, NETWORK_MODE_KEY));
+});
+
+
+test('archive replacement revokes persisted pairing grants without rewriting or promoting them', async () => {
+    const { rotateSqliteArchiveGeneration } = await import('./archive-generation');
+    const token = 'synthetic-prior-archive-token';
+    writeStateDirectly({ intents: [], clients: [syntheticClient('prior-archive-client', token)] });
+    const request = pairedRequest('prior-archive-client', token);
+    assert.ok(authenticatePairedClientRequest(request, (await loadNetworkPairingState()).clients));
+    const original = dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!.value;
+    dbServer.$client.transaction(() => rotateSqliteArchiveGeneration(dbServer.$client)).immediate();
+    assert.equal(authenticatePairedClientRequest(request, (await loadNetworkPairingState()).clients), null);
+    assert.deepEqual((await loadNetworkPairingState()).clients, []);
+    assert.equal(dbServer.select().from(settings).where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).get()!.value, original);
 });

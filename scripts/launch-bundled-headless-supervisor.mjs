@@ -24,7 +24,7 @@ export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex'
 // Do not canonicalize an alias into an accepted input; inspect every ancestor.
 export function physicalPath(value, directory = false) {
   if (typeof value !== 'string' || !path.isAbsolute(value) || path.normalize(value) !== value
-    || /[\x00-\x1f\x7f\\]/u.test(value)) fail();
+    || /[\x00-\x1f\x7f]/u.test(value) || (path.sep !== '\\' && value.includes('\\'))) fail();
   let current = path.parse(value).root;
   const parts = value.slice(current.length).split(path.sep);
   for (let index = 0; index < parts.length; index += 1) {

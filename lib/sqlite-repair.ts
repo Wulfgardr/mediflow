@@ -98,6 +98,9 @@ function assertIntegrity(file: string): void {
 }
 
 function sealSnapshot(file: string, foreignKeys: 'clean' | 'as-found' = 'clean'): void {
+    // A snapshot is a full copy of the archive and SQLite created it with the
+    // umask default: owner-only before it is sealed, copied or renamed into place.
+    fs.chmodSync(file, 0o600);
     const snapshot = new Database(file, { fileMustExist: true });
     try {
         snapshot.pragma('journal_mode = DELETE');
@@ -109,6 +112,11 @@ function sealSnapshot(file: string, foreignKeys: 'clean' | 'as-found' = 'clean')
         if (regularFile(file + suffix)) throw new SqliteSwapRecoveryRequiredError();
     }
     syncFile(file);
+}
+
+export function hasSqliteSwapArtifacts(file: string): boolean {
+    try { return artifactNames(canonicalTarget(file)).length !== 0; }
+    catch { throw new SqliteSwapRecoveryRequiredError(); }
 }
 
 function artifactNames(target: string): string[] {
@@ -198,6 +206,9 @@ function restoreOriginal(context: SwapContext): void {
     for (const suffix of SIDECAR_SUFFIXES) regularFile(context.target + suffix);
     const restore = path.join(context.dir, 'restore.db');
     fs.copyFileSync(original, restore, fs.constants.COPYFILE_EXCL);
+    // restore.db becomes the live database: owner-only even when the snapshot
+    // was prepared by a version that left it with the umask default.
+    fs.chmodSync(restore, 0o600);
     syncFile(restore);
     syncDirectory(context.dir);
     // Keep the failed candidate and its WAL for inspection. The independent
@@ -284,7 +295,6 @@ export function createVerifiedSqliteSnapshotSync(sourcePath: string, destination
     const temporary = path.join(temporaryDirectory, 'original.db');
     try {
         copySqliteDatabaseSync(source, temporary);
-        fs.chmodSync(temporary, 0o600);
         sealSnapshot(temporary, 'as-found');
         syncDirectory(temporaryDirectory);
         if (SIDECAR_SUFFIXES.some(suffix => regularFile(destination + suffix))) {
@@ -321,6 +331,8 @@ export interface ReplaceSqliteDatabaseOptions {
     backupPath?: string | null;
     /** Shared connection on destPath; closed before asynchronous staging. External writers must be stopped. */
     connection: Database.Database;
+    /** Mutate only the independent replacement before its durable digest is sealed. */
+    prepareReplacement?: (stagingPath: string) => void;
     /** Synchronous validation; close on throw, return the candidate handle so commit failure can close it. */
     reopenConnection: () => Database.Database | void;
     /**
@@ -377,13 +389,17 @@ export async function replaceSqliteDatabase(options: ReplaceSqliteDatabaseOption
             for (const file of [target, sourcePath]) for (const suffix of SIDECAR_SUFFIXES) regularFile(file + suffix);
             await backupSqliteDatabase(target, original);
             await backupSqliteDatabase(sourcePath, staging);
+            options.prepareReplacement?.(staging);
             sealSnapshot(original);
             sealSnapshot(staging);
             if (backupPath) {
                 const backup = path.resolve(backupPath);
                 if (backup === target || backup === path.resolve(sourcePath) || backup.startsWith(dir + path.sep)) throw new SqliteSwapRecoveryRequiredError();
                 regularFile(backup);
+                // The copy is created with the mode of its source; the chmod does
+                // not leave a full copy of the archive to depend on that.
                 fs.copyFileSync(original, backup, fs.constants.COPYFILE_EXCL);
+                fs.chmodSync(backup, 0o600);
                 syncFile(backup);
                 syncDirectory(path.dirname(backup));
             }

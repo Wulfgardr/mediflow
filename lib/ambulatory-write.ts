@@ -41,6 +41,7 @@ function ambulatoryAuditInput(
         : metadata?.flags;
     return {
         eventType, outcome: 'success' as const,
+        archiveGeneration: actor.archiveGeneration,
         actorType: surface === 'network' ? 'user' as const : actor.actorType,
         actorRef: surface === 'network' ? context.session.userId : actor.actorRef,
         subjectType, subjectRef,

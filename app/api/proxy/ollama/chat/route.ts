@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -17,6 +19,8 @@ export async function POST(req: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(req, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await req.json();
@@ -42,6 +46,8 @@ export async function POST(req: Request) {
         return NextResponse.json(data);
 
     } catch (e: unknown) {
+        const replacement = archiveReplacementResponse(e);
+        if (replacement) return replacement;
         const localityResponse = ollamaLocalityErrorResponse(e);
         if (localityResponse) return localityResponse;
         console.error("[Proxy] Chat Failed:", e);

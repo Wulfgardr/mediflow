@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { archiveGenerationForSession, currentArchiveGeneration, sessionMatchesArchive } from './archive-session-generation';
 import type { ServerSessionProjectionOwner } from '@/lib/security/server-session-projection-owner';
 import { serverSessionProjectionOwnerRegistry } from '@/lib/security/server-session-projection-owner-production';
 import {
@@ -59,6 +60,7 @@ export type ServerSession = Readonly<{
     authChannel: 'web' | 'native' | 'system';
     createdAt: number;
     expiresAt: number;
+    archiveGeneration?: string;
 }>;
 
 function ambientThenSafe(): boolean {
@@ -171,7 +173,9 @@ function activeWebProjection(sessionId: unknown, controlId: unknown): WebSession
         || typeof projection.createdAt !== 'number' || !NumberIsSafeInteger(projection.createdAt)
         || typeof projection.expiresAt !== 'number' || !NumberIsSafeInteger(projection.expiresAt)
         || projection.expiresAt <= DateNow()) return null;
-    return resolved.projection as WebSessionProjection;
+    const session = resolved.projection as WebSessionProjection;
+    if (!sessionMatchesArchive(session)) return null;
+    return session;
 }
 
 function validatedUserAgreesWithActiveWebSession(user: unknown, session: WebSessionProjection): boolean {
@@ -196,7 +200,7 @@ async function validateProjectionAgainstDatabase(projection: WebSessionProjectio
         .from(users)
         .where(eq(users.id, projection.userId))
         .get();
-    if (validatedUserAgreesWithActiveWebSession(user, projection)) return projection;
+    if (validatedUserAgreesWithActiveWebSession(user, projection) && sessionMatchesArchive(projection)) return projection;
     retireActiveWebSessionsForProjectionUser(projection);
     return null;
 }
@@ -286,11 +290,12 @@ export async function acquireAuthenticatedWebSessionProjectionOwner() {
     return (await acquireAuthenticatedWebSessionProjectionOwnerContext())?.owner ?? null;
 }
 
-function buildLocalApiSystemSession(): ServerSession {
+function buildLocalApiSystemSession(generation = currentArchiveGeneration()): ServerSession {
     const now = Date.now();
     return {
         id: 'local-api', userId: 'local-api', username: 'local-api', role: 'admin', authChannel: 'system',
         createdAt: now, expiresAt: now + 1000 * 60 * 60,
+        archiveGeneration: generation,
     };
 }
 
@@ -303,9 +308,11 @@ export async function requireSessionOrLocalToken(request: Request): Promise<Serv
 
 export async function requireLocalApiActorSession(request: Request): Promise<ServerSession | null> {
     if (requireLocalApiToken(request)) return null;
+    const generation = currentArchiveGeneration();
     const session = await requireSession();
-    if (session) return { ...session, id: `native:${session.userId}`, authChannel: 'native' };
-    return buildLocalApiSystemSession();
+    if (session) return { ...session, id: `native:${session.userId}`, authChannel: 'native',
+        archiveGeneration: archiveGenerationForSession(session) };
+    return buildLocalApiSystemSession(generation);
 }
 
 export function unauthorizedResponse() {

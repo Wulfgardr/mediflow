@@ -1,3 +1,6 @@
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 
 /* @Codex */
@@ -17,6 +20,10 @@ export async function POST(request: Request) {
     const session = await requireAccountSession(request);
     if (!session) return unauthorizedResponse();
 
+    const archiveGeneration = archiveGenerationForSession(session);
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
+
     try {
         const body = await request.json();
         const currentPin = typeof body?.currentPin === 'string' ? body.currentPin : '';
@@ -27,6 +34,7 @@ export async function POST(request: Request) {
         const result = await changePin({
             session,
             request,
+            archiveGeneration,
             currentPin,
             newPin,
             encryptedMasterKey,
@@ -42,6 +50,8 @@ export async function POST(request: Request) {
         response.headers.set('Cache-Control', 'no-store');
         return response;
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('Change PIN error:', error);
         return failureResponse(500, 'PIN_CHANGE_FAILED', 'Errore durante il cambio PIN.');
     }
