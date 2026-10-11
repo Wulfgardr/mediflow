@@ -29,7 +29,7 @@ function assertStartupPreserved(dir: string, before: Record<string, string>) {
     const after = contents(dir);
     for (const [file, bytes] of Object.entries(before)) assert.equal(after[file], bytes, file);
     for (const file of Object.keys(after).filter(file => !(file in before)))
-        assert.match(file, /^medical\.db\.maintenance-admission\/(protocol|intent)\.json$/u);
+        assert.match(file.split(path.sep).join('/'), /^medical\.db\.maintenance-admission\/(protocol|intent)\.json$/u);
 }
 
 function boot(dir: string, extraEnv: Record<string, string> = {}) {
