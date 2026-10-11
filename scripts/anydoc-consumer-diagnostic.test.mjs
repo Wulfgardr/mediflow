@@ -6,10 +6,10 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 import ts from 'typescript';
 
-// Evaluate only the test helper in a separate realm; no application/DB imports.
+// Evaluate the helper and optional real browser transport in an isolated realm; no DB imports.
 const source = fs.readFileSync(new URL('../e2e/anydoc-consumer-diagnostic.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, target: ts.ScriptTarget.ES2022 } }).outputText;
-function fixture({ correlated = false } = {}) {
+function fixture({ correlated = false, archiveTransport = false } = {}) {
   const chunk = { done: false, value: new Uint8Array([83, 69, 67, 82, 69, 84]) };
   const readPromise = Promise.resolve(chunk);
   const cancelPromise = Promise.resolve();
@@ -26,10 +26,18 @@ function fixture({ correlated = false } = {}) {
   const nativeFetch = function(...args) { called = { receiver: this, args }; return fetchPromise; };
   const listeners = new Map();
   const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
-    location: { href: 'http://127.0.0.1:3000/synthetic' }, fetch: nativeFetch,
+    location: { href: 'http://127.0.0.1:3000/synthetic', origin: 'http://127.0.0.1:3000' }, fetch: nativeFetch,
     addEventListener(name, fn) { listeners.set(name, fn); },
     removeEventListener(name) { listeners.delete(name); },
   });
+  if (archiveTransport) {
+    const transport = fs.readFileSync(new URL('../lib/security/client-auth-api.ts', import.meta.url), 'utf8');
+    vm.runInContext('window = globalThis', context);
+    vm.runInContext(ts.transpileModule(transport, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context);
+    context.exports.observeArchiveGeneration('11111111-1111-4111-8111-111111111111');
+    context.exports.installArchiveGenerationTransport();
+    context.exports = {};
+  }
   vm.runInContext(compiled, context);
   context.exports.installAnyDocConsumerDiagnostic(correlated
     ? { pathname: '/api/attachments/SYN/local-extraction', scope: '1234567890abcdef1234567890abcdef' }
@@ -40,6 +48,25 @@ function fixture({ correlated = false } = {}) {
     counts: () => ({ reads, cancels, releases }), called: () => called };
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
+
+test('correlation composes with the real archive transport without changing project or release requests', async () => {
+  const f = fixture({ correlated: true, archiveTransport: true });
+  for (const method of ['POST', 'DELETE']) {
+    const signal = new AbortController().signal;
+    const init = { method, signal, cache: 'no-store', credentials: 'same-origin', keepalive: true,
+      headers: { 'x-mediflow-extraction-action': 'project' }, ...(method === 'POST' ? { body: new Uint8Array([1, 2, 3]) } : {}) };
+    assert.strictEqual(await f.context.fetch('/api/attachments/SYN/local-extraction', init), f.response);
+    const forwarded = f.called().args[1];
+    for (const key of ['method', 'body', 'signal', 'cache', 'credentials', 'keepalive']) assert.strictEqual(forwarded[key], init[key], key);
+    const request = new Request(new URL(f.called().args[0], f.context.location.href), forwarded);
+    assert.equal(request.method, method);
+    assert.deepEqual(new Uint8Array(await request.arrayBuffer()), init.body ?? new Uint8Array());
+    assert.equal(request.headers.get('x-mediflow-archive-generation'), '11111111-1111-4111-8111-111111111111');
+    assert.match(request.headers.get('x-mediflow-anydoc-diagnostic'), /^ad1-[a-f0-9]{32}-1-[12]$/u);
+    assert.equal(Object.hasOwn(init.headers, 'x-mediflow-anydoc-diagnostic'), false);
+  }
+  f.api.dispose();
+});
 
 for (const shape of ['inherited', 'nonenumerable', 'accessors']) {
   test(`correlation preserves ${shape} RequestInit options and original getter receivers`, async () => {
