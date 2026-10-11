@@ -166,8 +166,17 @@ for (const mutation of ['malformed', 'target-traversal', 'original-digest', 'rep
                 fs.writeFileSync(journalPath, JSON.stringify(journal));
             }
             if (mutation === 'symlink') {
-                fs.renameSync(path.join(journalDir, 'original.db'), path.join(dir, 'preserved-original.db'));
-                fs.symlinkSync(path.join(dir, 'preserved-original.db'), path.join(journalDir, 'original.db'));
+                if (process.platform === 'win32') {
+                    // Junctions exercise the nonphysical recovery-directory guard;
+                    // POSIX keeps the distinct linked-original-file guard below.
+                    const preserved = path.join(dir, 'preserved-recovery');
+                    fs.renameSync(journalDir, preserved);
+                    fs.symlinkSync(preserved, journalDir, 'junction');
+                    assert.equal(fs.lstatSync(journalDir).isSymbolicLink(), true);
+                } else {
+                    fs.renameSync(path.join(journalDir, 'original.db'), path.join(dir, 'preserved-original.db'));
+                    fs.symlinkSync(path.join(dir, 'preserved-original.db'), path.join(journalDir, 'original.db'));
+                }
             }
             if (mutation === 'collision') fs.writeFileSync(path.join(journalDir, 'restore.db'), 'synthetic-collision');
             if (mutation === 'partial-commit') fs.writeFileSync(path.join(journalDir, 'committed.json'), '{');

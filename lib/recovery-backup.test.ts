@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { openVersionedSqliteDatabase, CURRENT_SQLITE_SCHEMA_VERSION } from './sqlite-schema-open';
 import { readSqliteArchiveGeneration } from './archive-generation';
@@ -99,7 +100,7 @@ test('complete encrypted snapshot recovers keys, all tables and replay history i
             assert.throws(() => restored.prepare('DELETE FROM audit_events').run(), /append-only/u);
         } finally { restored.close(); }
         // Real post-restart command service: replay returns its receipt without consuming a gesture or emitting audit.
-        const output = execFileSync(process.execPath, ['--import', path.resolve('scripts/register-strip-types-loader.mjs'), '--input-type=module', '--eval', `
+        const output = execFileSync(process.execPath, ['--import', pathToFileURL(path.resolve('scripts/register-strip-types-loader.mjs')).href, '--input-type=module', '--eval', `
             import { createPhysicianReviewCommandService } from './lib/ai-providers/fabric/physician-review-command.ts';
             import { sessionMatchesArchive } from './lib/security/archive-session-generation.ts';
             import { loadNetworkPairingState } from './lib/network-home-base-server.ts';
