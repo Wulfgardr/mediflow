@@ -35,8 +35,14 @@ function snapshotApp() {
   walk(APP); return records;
 }
 function rememberDescendants(pid) {
-  const result = spawnSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', env: {}, timeout: 5_000 });
+  const windows = process.platform === 'win32';
+  const result = windows
+    ? spawnSync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
+      "$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_Process | ForEach-Object { '{0} {1}' -f $_.ProcessId, $_.ParentProcessId }"],
+    { encoding: 'utf8', env: process.env, timeout: 5_000, maxBuffer: 1024 * 1024 })
+    : spawnSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', env: {}, timeout: 5_000 });
   assert.equal(result.status, 0, 'Cannot observe child cleanup');
+  if (windows) assert.match(result.stdout.trim(), /^\d+ \d+(?:\r?\n\d+ \d+)*$/u, 'Invalid process observation');
   const rows = result.stdout.trim().split('\n').map(line => line.trim().split(/\s+/u).map(Number));
   const found = new Set([pid]);
   for (;;) {
