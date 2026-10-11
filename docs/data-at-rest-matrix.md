@@ -7,9 +7,9 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 6.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 7.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Aggiornata l’11 ottobre 2026 per credenziali v3 e generazione
-dell’archivio; la prima classificazione era su `main` `bcb7af46a`.
+dell’archivio e recupero cifrato completo; la prima classificazione era su `main` `bcb7af46a`.
 
 MediFlow cifra alcuni campi, non il database. Questa matrice dice, per ogni
 colonna e per ogni file che il prodotto scrive, che cosa si legge senza la
@@ -276,14 +276,16 @@ locali salvano ciò che ricevono.
 | Copia di riparazione `medical.db.bak-<data>-<ora>` | Directory dati. | Copia integrale del database com'era prima della riparazione, compresi `users` e l'involucro della chiave. | Campi cifrati. Il file nasce con i permessi predefiniti del sistema (misurato `0644` con umask `022`), non `0600`: verso gli altri account lo protegge solo la directory dati. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `app/api/system/repair-db/route.ts`, `lib/sqlite-repair.ts`, `lib/security/pin-era-residues.ts` |
 | Copie di manutenzione `medical.db.old-*`, `.repair-tmp*` | Directory dati. | Copie integrali del database. | Come il database; restano finché non vengono rimosse. | `lib/sqlite-repair.ts` |
 | Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file `0600`, compresi quelli lasciati da versioni precedenti; una destinazione nuova nasce `0700`, una già esistente resta com'è. | `scripts/run-scheduled-backup.mjs` |
-| Backup scaricato dall'interfaccia | Dove lo salva il browser. | Come il backup pianificato. | Campi cifrati. | `app/api/system/backup-restore/route.ts` |
+| Export portabile scaricato dall'interfaccia | Dove lo salva il browser. | Come il backup pianificato. | Campi cifrati. | `app/api/system/backup-restore/route.ts` |
+| Recupero completo `.mediflow-recovery` | Dove lo salva il browser. | Snapshot coerente di tutto SQLite, inclusi account, impostazioni e storico durevole. | Intero payload AES-256-GCM, chiave casuale per backup avvolta con la master key; kit corrispondente e chiave di recupero separati. | `lib/recovery-backup.ts`, `lib/recovery-backup-server.ts` |
+| Snapshot del recupero | `.recovery-backup-*` e `.recovery-restore-*` nella radice dati. | Stessa protezione per campo dell’archivio; metadati e identificativi in chiaro. | File `0600`, radice posseduta rimossa a fine operazione; un arresto improvviso può lasciare residui sul volume cifrato. | `lib/recovery-backup-server.ts`, `scripts/restore-recovery-backup.ts` |
 | Export FHIR del paziente | Dove lo salva il browser. | La scheda decifrata; il nome del file contiene cognome e nome. | Nessuna. | `app/patients/[id]/edit/page.tsx` |
 | Moduli scaricati o condivisi | Dove li salva il browser. | Il modulo compilato, in chiaro. | Nessuna. | `app/patients/[id]/modules/page.tsx` |
-| `localStorage` del browser | Profilo del browser. | Salt, involucro della master key, preferenze dell'interfaccia. | L'involucro vale quanto il PIN. | `lib/security/security.ts` |
+| `localStorage` del browser | Profilo del browser. | Salt, involucro della master key, preferenze dell'interfaccia. | V3: involucro derivato dalla passphrase; profilo transitorio: protezione del PIN. Non contiene la master key v3 in chiaro. | `lib/security/security.ts` |
 | `sessionStorage` del browser | Profilo del browser, per scheda. | Solo nel profilo PIN transitorio: master key in chiaro e dati dell'utente. Gli account v3 non li persistono e cancellano la precedente sessione. | Il profilo PIN non protegge questa copia; v3 conserva una chiave non estraibile solo in memoria e richiede sblocco dopo reload. | `lib/security/client-security-session.ts`, `components/security-provider.tsx` |
 | Token dell'API locale | `local-api-token` nella directory dati. | Il segreto dei client locali. | File `0600`. | `lib/security/local-api-token.ts` |
 | Testo estratto dai documenti | Memoria dei processi di estrazione. | I byte del documento arrivano ai processi figli sullo standard input; il risultato torna al browser, che lo cifra nelle colonne degli allegati. | Nessun file previsto. | `lib/domain/documents/anydoc-local-extraction-runner.ts`, `anydoc-pdf-child-process-owner.ts` |
-| Radice temporanea dell'OCR | `mediflow-vision-ocr-*` nella directory temporanea del sistema. | Area di lavoro del riconoscimento Apple Vision; rimossa a fine corsa. | Contenuto non ancora provato da un test. | `lib/domain/documents/anydoc-apple-vision-ocr.ts` |
+| Radice temporanea dell'OCR | `mediflow-vision-ocr-*` nella directory temporanea del sistema. | Area di lavoro del riconoscimento Apple Vision; rimossa a fine corsa. | Sentinella non rilevata durante l’esecuzione reale Apple Vision, prima della pulizia, dopo successo ed errore; non è prova di cancellazione sicura. | `lib/domain/documents/anydoc-apple-vision-ocr.ts` |
 | Copia della cronologia del browser | `mediflow-siss-atlas-history-*` nella directory temporanea del sistema. | Copia del file `History` usata per osservare la sessione SISS. | Nessuna. | `lib/siss-session-observer.ts` |
 | Home dell'account ChatGPT | `mediflow-chatgpt-account-*` nella directory temporanea del sistema. | Configurazione isolata dell'integrazione facoltativa. | Directory `0700`, file `0600`. | `lib/chatgpt-account/account-host.ts` |
 | Log | Output del processo; `<directory dati>/logs` per il backup pianificato su macOS; `.pm2/logs` per il runner MLX. | Ciò che il codice scrive, entro le regole di SECURITY.md. | Nessuna prova automatica che non contengano dati clinici. | `lib/backup-scheduler.ts`, `ecosystem.config.js`, [SECURITY.md](../SECURITY.md) |
@@ -294,17 +296,22 @@ locali salvano ciò che ricevono.
 
 | Minaccia | Campi cifrati | Tutto il resto |
 | --- | --- | --- |
-| T1, T2 | Nel profilo PIN transitorio sono protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Gli account v3 usano la passphrase dell'ADR 0143. Il backup non contiene hash né involucro. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
+| T1, T2 | Nel profilo PIN transitorio sono protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Gli account v3 usano la passphrase dell'ADR 0143. L’export portabile non contiene account o involucro; il backup completo cifra l’intero snapshot. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
 | T3 | Il database è `0600`. | Directory dati predefinita `0700` e backup pianificati `0600` su macOS e Linux. Restano come le ha impostate l'operatore una directory dati o una destinazione dei backup scelte da lui e già esistenti. |
-| T4 | Nessuna | Non provato: manca il test con la sentinella del criterio 3. |
+| T4 | Dipende dall’artefatto | Sentinelle provate sui confini reali SQLite/WAL, backup pianificato, export FHIR e temporanei Vision. Nessuna garanzia globale su log o residui di arresti improvvisi. |
 
-## Esposizioni da decidere
+## Esposizioni e disposizioni
 
-Sono l'ingresso del criterio 2: ciascuna deve arrivare a un rimedio, a un
-prerequisito di installazione verificabile o a una sospensione decisa da
-Leonardo.
+Le disposizioni del criterio 2 sono rimedi del prodotto e prerequisiti
+dell’installazione. Il volume cifrato non è cifratura applicativa: va verificato
+sulla radice dati e sulle destinazioni di export/backup portabile. Su macOS
+si controlla con `fdesetup status`; su Windows con `manage-bde -status` da
+terminale amministrativo; su Linux con la catena `findmnt`/`lsblk` fino al
+volume cifrato. La qualifica sintetica delle VM non ammette dati clinici su
+un volume ospite non verificato. La chiave di ripristino del volume va
+conservata separatamente secondo il sistema operativo.
 
-1. **Identificativi e terapia in chiaro** nel database e in ogni backup.
+1. **Identificativi e terapia in chiaro** nel database e negli export/backup portabili. Il recupero completo cifra invece tutto il payload.
    La decisione del 9 ottobre indica il volume cifrato verificato come
    prerequisito.
 2. **PIN corto**: hash e involucro si attaccano fuori dal computer, e i limiti
@@ -315,10 +322,9 @@ Leonardo.
 4. **Il server riceve il PIN** negli accessi del profilo transitorio. Per v3
    riceve solo il verificatore; il PIN separato rimane nelle conferme.
 5. **Permessi** dei backup pianificati e della directory dati: chiusi dalla
-   versione 2 di questa matrice. Resta da decidere se verificare, e come
-   segnalare, una directory scelta dall'operatore e leggibile da altri account.
+   versione 2 di questa matrice. Una destinazione scelta dall’operatore richiede permessi limitati al suo account; su Windows si verificano le ACL, non si deducono dai bit POSIX.
 6. **Export FHIR e moduli** in chiaro, con il nome del paziente nel nome del
-   file.
+   file. Destinazione controllata dall’operatore, volume cifrato e condivisione deliberata: nessuna cifratura dell’export è dichiarata.
 7. **Le rotte Web locali non controllano l'involucro**: un client che invia
    un campo del contratto in chiaro lo vede salvato così.
 8. **Contratto e schema non coincidono**:
@@ -335,7 +341,7 @@ Leonardo.
    manuale: non si dichiara che siano prive di residui. Restano fuori dalla
    pulizia Time Machine, copie a mano e il vecchio `medical.db` nella
    cartella dell’applicazione.
-10. **File temporanei e log** non sono coperti da una prova.
+10. **File temporanei e log**: le sentinelle reali coprono i confini nominati sopra. Copie SISS, log e residui di crash richiedono volume cifrato e accesso limitato; non si dichiara assenza generale di dati sensibili né cancellazione sicura.
 
 ## Come si aggiorna
 
@@ -351,3 +357,4 @@ cambia una classificazione.
 | 4 | Quattro colonne nuove in `users` per l'ADR 0143, ancora vuote. |
 | 5 | Aggiunti gli originali dell'aggiornamento dello schema e le copie di riparazione, che mancavano. Il passaggio alla passphrase elimina quelle con l'involucro del PIN e svuota il WAL. |
 | 6 | Generazione e legame sessioni; chiave v3 solo in memoria; limiti espliciti della pulizia dei residui. |
+| 7 | Recupero completo cifrato distinto dall’export portabile, snapshot temporanei e disposizioni verificabili delle esposizioni. |
