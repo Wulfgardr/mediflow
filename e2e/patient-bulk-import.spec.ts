@@ -6,6 +6,7 @@ import type { Page, Request } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 
 const PIN = 'bulk086086';
+const PASSPHRASE = 'Archivio CSV soltanto sintetico 086086';
 const header = 'nome;cognome;codice_fiscale;data_nascita;indirizzo;telefono';
 const existingCode = 'SYNTHETIC0000009';
 const firstCode = 'SYNTHETIC0000001';
@@ -41,25 +42,48 @@ async function setup(page: Page): Promise<void> {
     await page.getByLabel('Nome Ambulatorio', { exact: true }).fill('Ambulatorio CSV Sintetico');
     await page.getByRole('button', { name: 'Avanti', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
+    await page.getByLabel('Passphrase di accesso', { exact: true }).fill(PASSPHRASE);
+    await page.getByLabel('Conferma passphrase', { exact: true }).fill(PASSPHRASE);
     await page.locator('#setup-pin').fill(PIN);
     await page.locator('#setup-confirm-pin').fill(PIN);
-    const response = page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/api/auth/setup');
     await page.getByRole('button', { name: 'Concludi Setup', exact: true }).click();
-    expect((await response).status()).toBe(200);
+    const kit = page.getByTestId('recovery-kit');
+    const activate = kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true });
+    await expect(activate).toBeDisabled();
+    const download = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click();
+    await download;
+    await kit.getByRole('checkbox').check();
+    const response = page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/api/auth/setup');
+    await activate.click();
+    const setupResponse = await response;
+    expect(setupResponse.status()).toBe(200);
+    expect(setupResponse.request().postDataJSON().encryptedMasterKey).toMatch(/^v3:/u);
+    expect(setupResponse.request().postData()).not.toContain(PASSPHRASE);
+    await unlockPassphrase(page);
     await unlocked(page);
     expect(await list(page)).toEqual([]);
 }
+async function unlockPassphrase(page: Page): Promise<void> {
+    const input = page.getByLabel('Passphrase', { exact: true });
+    await expect(input).toBeVisible();
+    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+    if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
+    await expect(input).toBeEnabled();
+    await input.fill(PASSPHRASE);
+    const response = page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/api/auth/login');
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    const login = await response;
+    expect(login.status()).toBe(200);
+    expect(Object.keys(login.request().postDataJSON())).toEqual(['verifier']);
+    expect(login.request().postData()).not.toContain(PASSPHRASE);
+}
 async function unlockAfterReload(page: Page): Promise<void> {
-    // A full reload may lose the in-memory key. Use the real existing form, never inject a key.
-    const input = page.getByLabel('PIN operatore', { exact: true });
+    // v3 deliberately keeps no key in sessionStorage: reload uses the real passphrase form.
+    const input = page.getByLabel('Passphrase', { exact: true });
     const panel = page.getByTestId('patient-bulk-import');
     await expect(panel.or(input).first()).toBeVisible();
-    if (await input.isVisible()) {
-        await input.fill(PIN);
-        const response = page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === '/api/auth/login');
-        await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
-        expect((await response).status()).toBe(200);
-    }
+    if (await input.isVisible()) await unlockPassphrase(page);
     await expect(panel).toBeVisible();
 }
 // @Codex: first access can open Agenda; use the visible patient-area navigation.
