@@ -66,12 +66,47 @@ test('upgrade preserves a verified original before DDL and does not repeat on re
     } finally { w.cleanup(); }
 });
 
+test('a version 1 archive gains the unlock credential columns once and keeps its account', () => {
+    const added = ['unlock_verifier_hash', 'recovery_wrapped_master_key', 'recovery_salt', 'recovery_verifier_hash'];
+    const userColumns = (db: Database.Database) => (db.pragma('table_info(users)') as { name: string }[]).map(row => row.name);
+    const w = workspace();
+    try {
+        const v1 = seed(w.file);
+        for (const column of added) v1.exec(`ALTER TABLE users DROP COLUMN ${column}`);
+        v1.prepare(`INSERT INTO users (id, username, password_hash, encrypted_master_key, salt)
+            VALUES ('synthetic-user', 'synthetic', 'synthetic-hash', 'v2:synthetic-wrapping', 'synthetic-salt')`).run();
+        v1.pragma('user_version = 1');
+        v1.close();
+
+        let db = openVersionedSqliteDatabase(w.file);
+        assert.equal(db.pragma('user_version', { simple: true }), 2);
+        assert.deepEqual(userColumns(db).slice(-added.length), added);
+        assert.deepEqual(db.prepare(`SELECT username, encrypted_master_key, ${added.join(', ')} FROM users`).all(), [{
+            username: 'synthetic', encrypted_master_key: 'v2:synthetic-wrapping',
+            unlock_verifier_hash: null, recovery_wrapped_master_key: null, recovery_salt: null, recovery_verifier_hash: null,
+        }]);
+        db.close();
+
+        const names = originals(w.directory);
+        assert.equal(names.length, 1);
+        assert.match(names[0], /\.schema-original-v1-/u);
+        const original = new Database(path.join(w.directory, names[0]), { readonly: true });
+        assert.equal(original.pragma('user_version', { simple: true }), 1);
+        assert.equal(userColumns(original).some(column => added.includes(column)), false);
+        assert.equal(original.prepare('SELECT username FROM users').pluck().get(), 'synthetic');
+        original.close();
+
+        db = openVersionedSqliteDatabase(w.file); db.close();
+        assert.deepEqual(originals(w.directory), names, 'the second start neither migrates nor copies again');
+    } finally { w.cleanup(); }
+});
+
 test('future versions, corrupt and unreserved empty files are preserved and refused', () => {
     for (const scenario of ['future', 'corrupt', 'zero', 'empty', 'missing-existing', 'current-drift']) {
         const w = workspace();
         try {
-            if (scenario === 'future') { const db = seed(w.file); db.pragma('user_version = 2'); db.close(); }
-            if (scenario === 'current-drift') { const db = seed(w.file, true); db.pragma('user_version = 1'); db.close(); }
+            if (scenario === 'future') { const db = seed(w.file); db.pragma(`user_version = ${CURRENT_SQLITE_SCHEMA_VERSION + 1}`); db.close(); }
+            if (scenario === 'current-drift') { const db = seed(w.file, true); db.pragma(`user_version = ${CURRENT_SQLITE_SCHEMA_VERSION}`); db.close(); }
             if (scenario === 'corrupt') fs.writeFileSync(w.file, 'synthetic non SQLite bytes');
             if (scenario === 'zero') fs.writeFileSync(w.file, '');
             if (scenario === 'empty') { const db = new Database(w.file); db.pragma('user_version = 0'); db.close(); }
@@ -153,7 +188,7 @@ test('process interruption before schema stamp rolls back and the next start saf
             import Database from 'better-sqlite3';
             const original = Database.prototype.pragma;
             Database.prototype.pragma = function(sql, ...args) {
-                if (sql === 'user_version = 1') {
+                if (sql === 'user_version = ${CURRENT_SQLITE_SCHEMA_VERSION}') {
                     process.send({ phase: 'schema-ready-before-stamp' });
                     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
                 }

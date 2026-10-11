@@ -96,7 +96,7 @@ l'import e dell'ammissione di qualsiasi database vuoto.
 | Storia e dichiarazioni ORM | `drizzle/*.sql` resta immutato e non viene replayato dal runtime; `lib/schema.ts` descrive l'ORM e viene confrontato con il bootstrap reale. |
 | Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
 
-La versione SQLite corrente è `user_version=1`. La prima installazione ammette
+La versione SQLite corrente è `user_version=2` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
 un file creato esclusivamente dal processo in una directory senza residui di
 un database precedente (sidecar, originali conservati, artefatti di swap),
 oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
@@ -116,14 +116,30 @@ l'apertura: l'archivio era utilizzabile prima e resta tale. La migrazione non
 può aggiungere violazioni di chiave esterna, e l'originale conservato le
 mantiene come le ha trovate. La corruzione (`integrity_check`) resta bloccante.
 
-Per un'origine ammessa l'originale `medical.db.schema-original-v0-<uuid>.db`
-è verificato e pubblicato prima della prima modifica. Schema e versione si
-confermano insieme. Al riavvio, la versione 1 viene validata senza DDL,
+Per un'origine ammessa l'originale `medical.db.schema-original-v<N>-<uuid>.db`,
+dove `<N>` è la versione di partenza, è verificato e pubblicato prima della
+prima modifica. Schema e versione si
+confermano insieme. Al riavvio, la versione corrente viene validata senza DDL,
 backfill o nuove copie; un suo drift non viene riparato automaticamente.
 Interruzione prima del commit conserva lo schema precedente tramite rollback;
 un originale già pubblicato resta disponibile. Dopo un rifiuto con rollback
 l'archivio è invariato e la copia di quel tentativo viene rimossa. Versione futura, corruzione,
 lock persistente o schema non riconosciuto impediscono l'apertura operativa.
+
+### Versioni dello schema
+
+| Versione | Dal | Che cosa cambia |
+| --- | --- | --- |
+| 1 | 10 ottobre 2026 | Primo schema versionato. |
+| 2 | 11 ottobre 2026 | `users` riceve le quattro colonne dell'[ADR 0143](0143-strong-unlock-credential.md), vuote finché l'account sblocca con il PIN. |
+
+Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema
+canonico richiede un numero nuovo**: altrimenti gli archivi già marcati con il
+numero vecchio verrebbero rifiutati all'avvio come schema non riconosciuto. Un
+archivio alla versione 1 viene portato alla 2 con lo stesso percorso delle
+origini non versionate: originale verificato, DDL, convalida e marca nella
+stessa transazione. La versione 1 è esistita soltanto su `main`, mai in una
+release.
 
 ### Percorso per archivi non ammessi
 

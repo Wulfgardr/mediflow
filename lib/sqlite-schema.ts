@@ -457,6 +457,11 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'users', 'failed_login_attempts', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
         ensureColumn(sqlite, 'users', 'first_failed_login_at', 'first_failed_login_at INTEGER');
         ensureColumn(sqlite, 'users', 'locked_until', 'locked_until INTEGER');
+        // ADR 0143: null while the account still unlocks with a PIN.
+        ensureColumn(sqlite, 'users', 'unlock_verifier_hash', 'unlock_verifier_hash TEXT');
+        ensureColumn(sqlite, 'users', 'recovery_wrapped_master_key', 'recovery_wrapped_master_key TEXT');
+        ensureColumn(sqlite, 'users', 'recovery_salt', 'recovery_salt TEXT');
+        ensureColumn(sqlite, 'users', 'recovery_verifier_hash', 'recovery_verifier_hash TEXT');
     } catch (error) {
         console.warn('[MediFlow] Users schema check failed:', error);
         throw error;

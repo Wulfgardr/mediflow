@@ -8,7 +8,10 @@ import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
 import { initSqlitePragmas } from './sqlite-pragmas';
 import { upgradeObservationTimestampDefault } from './sqlite-observation-schema-upgrade';
 
-export const CURRENT_SQLITE_SCHEMA_VERSION = 1;
+// 1: the first versioned schema (C09). 2: users gains the four columns of ADR 0143.
+// A version is validated without DDL at every start: any change to the canonical
+// schema needs a new number, or the archives already stamped are refused.
+export const CURRENT_SQLITE_SCHEMA_VERSION = 2;
 // Same values as scripts/native-first-install-contract.json, which the native
 // helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
 const reservation = { applicationId: 1296451154, userVersion: 0 };
