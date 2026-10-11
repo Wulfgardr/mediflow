@@ -94,7 +94,7 @@ test('real cookie Web-admin restore ignores bearer spoof, serializes contention,
     const login = await loginWithWebAuthControl(baseUrl, { username, password: pin });
     assert.equal(login.response.status, 200);
     assert.ok(login.cookieHeader);
-    const webHeaders = { Cookie: login.cookieHeader, authorization: `Bearer ${token}`,
+    const webHeaders = { Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration, authorization: `Bearer ${token}`,
         'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed-actor' };
     const firstId = randomUUID();
     seedPatient(firstId, ambulatory.id);

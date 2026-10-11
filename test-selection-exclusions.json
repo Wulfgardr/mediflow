@@ -35,6 +35,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/trusted-web-request.ts",
+    "reason": "WUL-729: Shared request headers and session assertions consumed by selected Playwright specs; no standalone test registration.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/ordinary-chatgpt-ui-fixture.ts",
     "reason": "WUL-729: Synthetic transport and UI helper imported by the four-functions spec.",
     "owner": "@Wulfgardr"

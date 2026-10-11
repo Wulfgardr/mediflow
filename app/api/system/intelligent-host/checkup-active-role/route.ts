@@ -1,3 +1,4 @@
+import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
 /* @Codex */
 import { createHeadlessCheckupActiveRoleHttpHandlersV1 } from '@/lib/security/headless-checkup-active-role-http';
 import { enrollHeadlessCheckupActiveRoleAttestation,
@@ -15,5 +16,5 @@ const handlers = createHeadlessCheckupActiveRoleHttpHandlersV1({
   revoke: revokeHeadlessCheckupActiveRoleAttestation,
   retireOperation: disposeCheckupStatusTransitionForHostV1,
 });
-export const POST = handlers.POST;
-export const DELETE = handlers.DELETE;
+export const POST = withArchiveRequestContext(handlers.POST);
+export const DELETE = withArchiveRequestContext(handlers.DELETE);

@@ -77,12 +77,17 @@ jobs:
           mkdir -p "${E2E_AUTH_RUNTIME}/public" "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static"
           cp -R public/. "${E2E_AUTH_RUNTIME}/public/"
           cp -R "${MEDIFLOW_NEXT_DIST_DIR}/static/." "${E2E_AUTH_RUNTIME}/${MEDIFLOW_NEXT_DIST_DIR}/static/"
-          {
-            printf 'E2E_ISOLATED_STANDALONE_DIR=%s\n' "${E2E_AUTH_RUNTIME}"
-            printf 'MEDIFLOW_APP_REVISION=%s\n' "${MEDIFLOW_APP_REVISION}"
-            printf 'MEDIFLOW_APP_BRANCH=%s\n' "${MEDIFLOW_APP_BRANCH}"
-            printf 'MEDIFLOW_APP_WORKTREE_HASH=%s\n' "${MEDIFLOW_APP_WORKTREE_HASH}"
-          } >> "$GITHUB_ENV"
+          printf 'E2E_ISOLATED_STANDALONE_DIR=%s\n' "${E2E_AUTH_RUNTIME}" >> "$GITHUB_ENV"
+          node --input-type=module - "${E2E_AUTH_RUNTIME}/mediflow-build-identity.json" >> "$GITHUB_ENV" <<'NODE'
+          import fs from 'node:fs';
+          const identity = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          for (const [key, value] of Object.entries({
+            MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12),
+            MEDIFLOW_APP_BRANCH: identity.branch, MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
+            MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint,
+            MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
+          })) console.log(`${key}=${value}`);
+          NODE
 
       - name: Seed ephemeral e2e database
         run: |

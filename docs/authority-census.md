@@ -74,6 +74,37 @@ e script di fixture sono classificati qui sotto, non eliminati dall'analisi.
 | Audit e sink tecnici | [security audit](../lib/security/audit.ts), [egress audit](../lib/ai-egress-audit.ts) | [audit-writers](./audit-writers.md) distingue clinical commit, storico, sicurezza e telemetria. |
 | Scritture sintetiche e migrazioni storiche | [seed baseline](../scripts/seed-performance-baseline.mjs), [restore drill](../scripts/backup-restore-drill.mjs), `scripts/fixtures/`, `scripts/test-support/`, `drizzle/` | Fixture e prove non sono ingressi operativi di cartella; presenza del codice non autorizza esecuzione su dati reali. |
 
+## Processi, lavori e temporanei del runtime locale
+
+Questa è la mappa C12 ([WUL-727](https://linear.app/wulfgardr/issue/WUL-727)),
+non un elenco di prove superate. Limiti e segnali restano definiti negli owner
+collegati; aggiungere un processo richiede aggiornare il suo owner, non un registro
+parallelo di numeri. Build, installazione dei modelli e fixture non sono lavori
+clinici. Un adapter opzionale presente nel sorgente non è un runtime qualificato.
+
+| Processo / lavoro / risorsa | Owner e limite da consultare | Scadenza, terminazione e residui |
+| --- | --- | --- |
+| Web e MCP/Mini avviati dal Supervisor | [child processes](../lib/security/portable-supervisor-child-processes.ts), [launcher](../scripts/mediflow-headless-supervisor.mjs); argv e ambiente costruiti dall'owner | Revoca prima dello stop; SIGTERM, escalation sul figlio preciso e attesa di `close`. EOF e segnali del parent chiudono i figli posseduti, non processi cercati per nome. |
+| Sessione, code e preview headless | [Supervisor](../lib/security/portable-supervisor-production.ts), [preview job control](../lib/security/in-process-preview-job-control.ts) | Binding, lease e deadline governano ammissione e uso. Revoca/annullamento non cambiano provider né ripartono; una risposta tardiva non riabilita la proiezione. |
+| Web durante manutenzione dell'archivio | [maintenance owner](../lib/security/archive-maintenance-owner.ts), [admission](../lib/sqlite-maintenance-admission.mjs) | Solo il child creato dall'owner può essere drenato. Candidato validato prima dello stop; attesa reale, lease esclusiva, swap e riavvio. Intento e copia recuperabile restano su esito ambiguo; non sono temporanei da pulire alla cieca. |
+| Conversione documentale locale | [extraction runner](../lib/domain/documents/anydoc-local-extraction-runner.ts); deadline, cap output e diagnostica nel modulo | Input su stdin, worker regolare con digest verificato e cwd fisica propria. Timeout/cap terminano il child; il risultato si pubblica dopo `close`, senza stderr o copie dei byte persistenti. |
+| PDF materializzato / rasterizzato | [PDF child owner](../lib/domain/documents/anydoc-pdf-child-process-owner.ts); single flight, memoria, pagine e cap dei frame | Deadline condivisa, permessi Node ristretti e SIGKILL sul child posseduto; header e PNG validati prima di pubblicare. Slot occupato finché la terminazione non è osservata. |
+| OCR Apple Vision e directory temporanea | [Vision owner](../lib/domain/documents/anydoc-apple-vision-ocr.ts); cap input/output, una deadline per documento | Input su stdin, nessun file immagine creato dall'owner; TMPDIR privato. Abort/limite termina il gruppo creato dall'owner e attende `close`, poi rimuove la radice. Errore di creazione/pulizia ha uno stato esplicito. Solo macOS. |
+| Ragionamento terapeutico portabile | [portable runtime](../lib/ai-providers/fabric/treatment-reasoning-portable-runtime.ts); one-shot, single flight, cap e deadline inclusa acquisizione | Ambiente offline allowlisted, stdin e frame bounded. Revoca/abort fermano il lavoro e il gruppo posseduto; mancata prova di uscita mantiene lo slot indisponibile. Nessun download in inferenza o fallback implicito. |
+| Redazione neurale locale | [GLiNER runner](../lib/gliner-redaction-runner.ts), [preparazione ordinaria](../lib/chatgpt-execution/ordinary-preparation.ts) | Worker Python isolato su Mac, frame bounded, stderr scartato; abort e chiusura attendono l'uscita dopo TERM/KILL. Modello e disponibilità sono preflight separati, non una promessa sugli altri profili. |
+| Login account esterno e home effimera | [account host](../lib/chatgpt-account/account-host.ts), [account transport](../lib/chatgpt-account/account-transport.ts) | Binario assoluto esplicito, argv fissi e home privata. Timeout/protocollo/uscita chiudono il trasporto; cleanup solo dopo uscita confermata. Parent morto termina i suoi figli ma non dichiara eliminata la home rimasta, mai riusata. Non è il trasporto MCP clinico. |
+| Custode nativo dell'esecuzione Mac | [native execution](../lib/chatgpt-execution/execution-mac-native.ts), [qualification](../lib/chatgpt-execution/execution-mac-qualification.ts) | Probe bounded e heartbeat; workspace privato e diagnostica non conservata. Le condizioni native restano nel contratto dell'adapter: i profili sorgente 0.9.0 non qualificano una distribuzione `.app`. |
+| Scheduler OS e backup avviato manualmente | [scheduler e limiti dei comandi](../lib/backup-scheduler.ts), [OS adapter](../lib/backup-scheduler-adapter.ts), [runner](../scripts/run-scheduled-backup.mjs) | Job OS nominato e configurato esplicitamente; comandi con deadline e output limitato. Una lettura fallita lascia lo stato incerto: nessun fallback o riscrittura dei job. I file del job si rimuovono solo dopo la revoca confermata. Il runner possiede snapshot e `.mediflow.tmp`; gli originali recuperabili non sono residui eliminabili. |
+| Probe NTFS dello swap | [durability](../lib/sqlite-durability.mjs) | PowerShell senza shell, timeout e output limitati; qualunque errore o risultato diverso dal filesystem richiesto nega il commit. Nessun contenuto clinico negli argomenti. |
+| Copia temporanea dello storico SISS | [session observer](../lib/siss-session-observer.ts) | Il fallimento della copia iniziale e il cleanup dopo lettura rimuovono la sola radice posseduta; sorgente e file estranei sono conservati. Distinta dal monitor di rete e dalle sessioni browser dell'utente, che non vengono terminate. |
+
+La [matrice dati a riposo](./data-at-rest-matrix.md) resta la fonte per contenuti,
+chiavi, log, export e residui; questa mappa non promette cancellazione sicura del
+supporto. [data-dir](../lib/data-dir.ts) e l'admissione possiedono la radice dati:
+cwd del caller, alias di macOS e path degli allegati sono confini diversi.
+I generatori legacy ATHENA importati dai soli smoke non ereditano le garanzie del
+runtime portabile; discovery o presenza di un export non ne fanno ingressi operativi.
+
 ## Disposizione dei candidati già individuati
 
 Fonte dei candidati: [rapporto WUL-683](./analysis/2026-09-06-086-code-inventory.md#prioritized-findings).

@@ -89,7 +89,7 @@ test('setup emits a web session despite forged native, paired, token, and cookie
     }, control));
     assert.equal(response.status, 200);
     const body = await response.json() as Record<string, unknown>;
-    assert.deepEqual(Object.keys(body).sort(), ['id', 'success']);
+    assert.deepEqual(Object.keys(body).sort(), ['archiveGeneration', 'id', 'success']);
     assert.equal(body.success, true);
     assert.match(String(body.id), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu);
     assert.deepEqual(await dbServer.select({ id: users.id }).from(users).limit(1), [{ id: body.id }]);
@@ -109,7 +109,7 @@ test('login delegates credentials, preserves its Web contract, and records Web a
     assert.equal(response.headers.get('cache-control'), 'no-store');
     const body = await response.json() as Record<string, unknown>;
     assert.deepEqual(Object.keys(body).sort(), [
-        'ambulatoryName', 'displayName', 'encryptedMasterKey', 'id', 'role', 'salt', 'success', 'username',
+        'ambulatoryName', 'archiveGeneration', 'displayName', 'encryptedMasterKey', 'id', 'role', 'salt', 'success', 'username',
     ]);
     assert.equal(body.success, true);
     assert.equal(body.username, USERNAME);

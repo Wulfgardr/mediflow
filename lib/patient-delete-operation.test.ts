@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: WUL-720 real synthetic SQLite and real Web/API-v1 DELETE route checks. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -15,7 +16,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-delete-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-delete-synthetic-token';
-const state = { web: true, v1: true, actorSession: false };
+const state = { web: true, v1: true, actorSession: false, generation: '' };
 const stateKey = Symbol.for(`c05-delete-auth-${dataDir}`);
 (globalThis as unknown as Record<symbol, typeof state>)[stateKey] = state;
 function seam(name: string, source: string) {
@@ -24,8 +25,8 @@ function seam(name: string, source: string) {
     return pathToFileURL(file).href;
 }
 const auth = seam('auth.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-delete-auth-${dataDir}`)})];
-exports.requireSession=async()=>s.web?({id:'web-session',userId:'c05-web-user',role:'admin'}):null;
-exports.requireLocalApiActorSession=async()=>s.actorSession?({id:'native-session',userId:'c05-native-user',role:'admin'}):({id:'local-api',userId:'local-api',role:'admin'});
+exports.requireSession=async()=>s.web?({id:'web-session',authChannel:'web',userId:'c05-web-user',role:'admin'}):null;
+exports.requireLocalApiActorSession=async()=>s.actorSession?({id:'native-session',userId:'c05-native-user',role:'admin'}):({id:'local-api',archiveGeneration:s.generation,userId:'local-api',role:'admin'});
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});`);
 const token = seam('token.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-delete-auth-${dataDir}`)})];
 exports.requireLocalApiToken=()=>s.v1?null:Response.json({error:'Unauthorized'},{status:401});
@@ -41,6 +42,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 openDbServer();
+state.generation = bindSyntheticArchiveSessions('web-session', 'native-session');
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
@@ -81,7 +83,7 @@ function snapshot() {
 
 type Route = typeof web | typeof v1;
 function requestFor(route: Route, body: string) {
-    return new Request(`http://127.0.0.1/api/patients/${id}`, { method: 'DELETE', body,
+    return syntheticArchiveRequest(state.generation, `http://127.0.0.1/api/patients/${id}`, { method: 'DELETE', body,
         headers: { 'content-type': 'application/json',
             authorization: route === v1 ? 'Bearer c05-delete-synthetic-token' : '',
             'x-request-id': 'c05-delete-request', 'x-mediflow-source-surface': 'job',
@@ -227,10 +229,11 @@ test('two SQLite writer processes with the same version produce one tombstone an
 import { existsSync, writeFileSync } from 'node:fs';
 const load = createRequire(import.meta.url);
 const { deletePatientOperation } = load(${JSON.stringify(join(repo, 'lib/patient-delete-operation.ts'))});
+const { dbServer } = load(${JSON.stringify(join(repo, 'lib/db-server.ts'))});
 writeFileSync(process.argv[2], 'ready');
 while (!existsSync(process.argv[3])) await new Promise(resolve => setTimeout(resolve, 10));
 const result = deletePatientOperation({patientId:'c05-delete-patient',expectedVersion:3,
-  deletionReason:'synthetic-concurrent', audit:{actorType:'user',actorRef:'c05-child',
+  deletionReason:'synthetic-concurrent', audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation,actorType:'user',actorRef:'c05-child',
     sourceSurface:'web',requestId:'c05-concurrent',flags:['auth:session']}});
 console.log(JSON.stringify({status:result.status}));
 `, { mode: 0o600 });

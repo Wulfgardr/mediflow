@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
@@ -56,6 +57,8 @@ export async function PUT(
         if (!decision.allowed) {
             return NextResponse.json({ error: decision.reason }, { status: decision.status });
         }
+        const archiveDenial = archiveWriteRequestDenial(request, session);
+        if (archiveDenial) return archiveDenial;
         if (decision.unregistered) {
             console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/security/settings-write-policy.ts`);
         }

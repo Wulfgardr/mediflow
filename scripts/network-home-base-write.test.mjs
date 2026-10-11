@@ -54,12 +54,12 @@ test('paired patient profile write requires write capability, session, scope, an
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const cookieHeader = login.cookieHeader;
+        const sessionHeaders = login.webHeaders;
 
         const readOnlyWrite = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -80,7 +80,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const update = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -94,7 +94,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const detail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -105,7 +105,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -119,7 +119,7 @@ test('paired patient profile write requires write capability, session, scope, an
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 2,
@@ -131,7 +131,7 @@ test('paired patient profile write requires write capability, session, scope, an
 
         const audit = await request('GET', `/api/system/audit?eventType=patient.updated&subjectType=patient&limit=20`, {
             headers: {
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(audit.response.status, 200);
@@ -172,14 +172,14 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const cookieHeader = login.cookieHeader;
+        const sessionHeaders = login.webHeaders;
 
         await setNetworkMode('local-only');
 
         const gatedWrite = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -192,7 +192,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
         const gatedRead = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(gatedRead.response.status, 403);
@@ -203,7 +203,7 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
         const update = await request('PUT', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(writeClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,

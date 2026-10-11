@@ -57,7 +57,7 @@ test('six local checkup POST/PUT/DELETE paths enforce their object/byte contract
         const patient = await send('POST', '/api/v1/patients', localHeaders, JSON.stringify({ id: patientId,
             firstName: 'Synthetic', lastName: 'Envelope', taxCode: `SYN${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`, ambulatoryId }));
         assert.equal(patient.response.status, 201);
-        const headers = surface === 'web' ? { 'Content-Type': 'application/json', Cookie: login.cookieHeader } : localHeaders;
+        const headers = surface === 'web' ? { 'Content-Type': 'application/json', Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration } : localHeaders;
         const checkupId = crypto.randomUUID();
         const createBody = { id: checkupId, ...(surface === 'web' ? { patientId } : {}), date: '2026-05-02T09:00:00.000Z',
             title: 'Synthetic checkup', notes: 'ENC:synthetic:notes', status: 'pending', source: 'manual' };

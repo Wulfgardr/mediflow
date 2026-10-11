@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories, patientDuplicateIntents } from '@/lib/schema';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -21,6 +23,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await readBoundedJsonBody(request, DUPLICATE_JSON_MAX_BYTES, 'request-json',
@@ -96,7 +100,7 @@ export async function POST(request: Request) {
                 if (linked.changes !== 1) throw new Error('Clone membership did not insert exactly one row');
                 writeAuditEventInTransaction(tx, {
                     eventType: 'patient.created', outcome: 'success',
-                    actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                    archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                     subjectType: 'patient', subjectRef: newId,
                     sourceSurface: auditContext.sourceSurface, requestId,
                     redactedMetadata: withAuditContextMetadata(auditContext, {
@@ -110,6 +114,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Duplicate patients error:", error);
         return NextResponse.json({ error: "Failed to duplicate patients" }, { status: 500 });
     }

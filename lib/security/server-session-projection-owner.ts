@@ -1,5 +1,6 @@
 /* @Codex */
 import 'server-only';
+import { ArchiveReplacedError } from '../archive-generation';
 
 import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
@@ -766,7 +767,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             const resolveClinicalContext = (pair: CanonicalPair): CanonicalClinicalContext => {
                 let candidate: unknown;
                 try { candidate = sources.resolve(session, ObjectFreeze({ patientId: pair.patientId, ambulatoryId: pair.ambulatoryId })); }
-                catch { return fail('selection_unavailable'); }
+                catch (error) { if (error instanceof ArchiveReplacedError) throw error; return fail('selection_unavailable'); }
                 return canonicalClinicalContext(candidate, pair) ?? fail('selection_unavailable');
             };
             const requireCurrentSession = (presented: ServerSession) => {
@@ -793,7 +794,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 if (terminal || selection !== expected || epoch !== expected.selectionEpoch) return false;
                 let observed: CanonicalClinicalContext;
                 try { observed = resolveClinicalContext(expected); }
-                catch { invalidateSelection(); return false; }
+                catch (error) { if (error instanceof ArchiveReplacedError) throw error; invalidateSelection(); return false; }
                 if (observed.patientId !== expected.patientId || observed.ambulatoryId !== expected.ambulatoryId
                     || observed.patientVersion !== expected.patientVersion) {
                     invalidateSelection(); return false;

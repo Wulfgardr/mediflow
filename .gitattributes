@@ -17,3 +17,13 @@ lib/exemption-import-receipt.ts text eol=lf
 lib/exemption-import-contract.ts text eol=lf
 lib/reference-data/prosthetics-catalog-backup.ts text eol=lf
 lib/reference-data/prosthetics-catalog-contract.ts text eol=lf
+
+# Source runtime ledger anchors compare these exact tracked bytes on every OS.
+.nvmrc text eol=lf
+package.json text eol=lf
+package-lock.json text eol=lf
+LICENSE text eol=lf
+packages/web-auth-lifecycle-owner/package.json text eol=lf
+packages/web-auth-lifecycle-owner/index.* text eol=lf
+packages/web-auth-lifecycle-owner/internal/** text eol=lf
+packages/web-auth-lifecycle-owner/artifacts/*.provenance.json text eol=lf

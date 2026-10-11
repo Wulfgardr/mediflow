@@ -1,126 +1,166 @@
-# ADR 0144: generazione dell'archivio, per non scrivere nel database B ciò che è stato letto dal database A
+# ADR 0144: generazione dell’archivio e sostituzione Web gestita
 
 Date: 2026-10-11
 
-Status: Accepted, 11 ottobre 2026, con le opzioni raccomandate. Nessun codice cambia con questo documento.
+Status: Accepted — implementazione Web 0.9.0; qualifica delle altre piattaforme separata
 
-## Problema e contesto
+## Problema
 
-C15 / [WUL-730](https://linear.app/wulfgardr/issue/WUL-730), criteri 4 e 5.
-L'[ADR 0142](0142-sqlite-maintenance-admission.md) ha lasciato in HOLD
-l'integrazione del lifecycle Web con una frase che resta il requisito:
-"un'operazione che ha letto il database A non deve riprendere e scrivere nel
-database B". Questo documento propone come soddisfarla.
+C15 / [WUL-730](https://linear.app/wulfgardr/issue/WUL-730), criteri 4 e 5:
+un’operazione che ha letto l’archivio A non deve scrivere nell’archivio B,
+anche quando identificativi e versioni delle righe coincidono. Ritirare solo
+le sessioni non basta: una scheda vecchia può ereditare il cookie nuovo da
+un’altra scheda, e una richiesta può aver già superato l’autenticazione.
+Il repair fisico deve inoltre impedire che un processo conservi handle o
+continuazioni asincrone sul file sostituito.
 
-Letto sul codice di `main` `1eb1f468d`:
+## Decisione
 
-- il ripristino da backup è una sola transazione IMMEDIATE; prima della prima
-  scrittura distruttiva esegue una chiusura sincrona
-  (`runMutationFence` in `lib/backup-restore-executor.ts`), che oggi ritira
-  soltanto l'operazione di transizione dei checkup;
-- le sessioni Web vivono in memoria; lo stato degli abbinamenti sta in
-  `settings` (`NETWORK_PAIRING_STATE_KEY` in `lib/network-home-base-server.ts`),
-  che il backup non contiene: un ripristino non lo tocca;
-- il browser che ripristina ricarica la pagina
-  (`components/backup-restore-ui.tsx`); le altre schede e gli altri client no;
-- 24 moduli di produzione scrivono dati clinici passando da
-  `writeAuditEventInTransaction` (`lib/security/audit.ts`), dentro la propria
-  transazione: è l'unico punto che tutte le scritture cliniche con audit
-  obbligatorio hanno in comune.
+### Generazione e autorità
 
-Dopo un ripristino restano quindi quattro strade aperte:
+`archive_generation` contiene una sola UUID casuale. Non è un dato clinico,
+non contiene credenziali e non è esportata nel backup. Lo schema passa alla
+versione 3. Il ripristino logico la ruota nella stessa transazione IMMEDIATE
+delle scritture distruttive; il repair e l’adozione legacy la ruotano nella
+copia preparata, prima del seal del journal. La sorgente resta intatta.
 
-| | Che cosa succede | Perché ritirare le sessioni non basta |
-| --- | --- | --- |
-| a | Un'altra sessione resta valida sui dati sostituiti. | Basterebbe, ma oggi non avviene. |
-| b | Una scheda rimasta aperta conserva righe lette dal database A, con ID e versione. Dopo un nuovo accesso le invia al database B. | Un backup dello stesso archivio ha gli stessi ID: se anche la versione coincide, la scrittura è accettata. |
-| c | Un'operazione già autenticata, in attesa del lock, scrive dopo il commit del ripristino. | La sessione era valida quando la richiesta è entrata. |
-| d | Un client abbinato conserva il suo grant e la sua cache. | Il grant sta in `settings`, fuori dal backup. |
+Le sessioni Web conservano il legame durevole in `archive_session_generations`
+(hash dell’identificativo, generazione e scadenza), senza cambiare la forma
+dell’owner di autenticazione. Le sessioni native catturano la generazione
+nell’adattatore host; i grant di pairing la conservano nel loro stato.
+L’autenticazione rifiuta un legame diverso dall’archivio corrente. Il restore
+ritira anche le sessioni native in memoria. Un client abbinato deve ripetere
+abbinamento e sincronizzazione; l’interfaccia lo dichiara prima del restore.
 
-Lo stesso vale per lo scambio di file del repair, che sostituisce l'intero
-archivio.
+La generazione della sessione si cattura **prima** degli await della richiesta.
+Il writer audit obbligatorio la verifica dentro la stessa transazione della
+modifica clinica: una divergenza causa rollback e `409 ARCHIVE_REPLACED`.
+Non si sostituisce mai una generazione vecchia con quella appena riletta.
 
-## Decisione proposta
+Anche setup, adozione, cambio e recupero delle credenziali catturano la
+generazione prima delle attese e la confrontano nella transazione CAS. Un
+utente con lo stesso ID e le stesse credenziali nell’archivio B non eredita
+l’operazione iniziata su A.
 
-### 1. Ogni archivio ha una generazione
+### Schede Web e richieste già avviate
 
-Un identificatore casuale, conservato nell'archivio in una tabella di una sola
-riga che il backup non esporta. Cambia nella stessa transazione, o nello stesso
-journal, di ogni operazione che sostituisce in blocco il contenuto clinico:
-ripristino da backup, scambio di file del repair, adozione di un archivio
-precedente. Non cambia per le scritture ordinarie.
+Check, login e setup espongono la generazione. Il documento Web la fissa alla
+prima osservazione e non la aggiorna in place: un cambiamento scarta lo stato
+e forza il reload. Anche le richieste Web mutanti dichiarano
+`x-mediflow-archive-generation`, stampata dal trasporto comune con il valore
+fissato dal documento. Dopo autenticazione e scope, il server confronta
+intestazione, legame della sessione e archivio. Così una scheda A con il nuovo
+cookie B riceve 409, anche prima che il polling osservi il cambiamento.
 
-### 2. Una sessione vale per una generazione
+Le factory opache mantengono autenticazione e autorità canoniche: un contesto
+asincrono trasporta soltanto la generazione della richiesta; l’ammissione
+esistente verifica il legame prima di pubblicare capability o inviare dati.
+Il controllo viene ripetuto nella transazione clinica. Non è introdotto un
+secondo resolver di identità e non cambia il contratto wire dei client nativi.
 
-Sessioni Web, sessioni native e grant dei client abbinati registrano la
-generazione con cui sono stati emessi. L'autenticazione rifiuta quelli di
-un'altra generazione. La chiusura sincrona del ripristino continua a ritirare
-ciò che vive in memoria; la generazione rende il ritiro durevole e raggiunge ciò
-che la chiusura non vede: un altro processo, un grant in `settings`.
+### Proprietario del processo Web per il repair fisico
 
-Chiude le strade a e d. Un client abbinato deve abbinarsi di nuovo, e un nuovo
-abbinamento comporta una nuova sincronizzazione.
+Il supervisor esistente espone `--maintenance-web` (`npm run maintenance:web`)
+per il runtime standalone di produzione. Non cambia `npm run dev` né i
+launcher di sviluppo. Il proprietario mantiene il lease SQLite del figlio;
+il figlio Node 24 non ha il permesso di creare subprocessi. In questa modalità
+i helper che richiedono processi figli non sono disponibili. Non esiste un
+listener di comandi: il canale IPC privato ammette solo il repair legacy con
+UUID della richiesta e generazione attesa, senza percorsi o comandi arbitrari.
 
-### 3. La scrittura confronta la generazione dentro la propria transazione
+Il proprietario copia e valida la sorgente fissa `medical.db` in una directory
+isolata mentre A continua a funzionare. Una sorgente assente o non valida è
+rifiutata senza arrestare A. Per una copia valida: pubblica l’intent, ferma il
+figlio posseduto, attende il suo evento terminale `close`, chiude handle e lease,
+attende gli altri partecipanti e solo allora esegue lo swap con il journal
+esistente. Riavvia il figlio dopo il commit, verificabile da `auth/check`.
+Una richiesta accettata (202) non è un repair riuscito: l’interfaccia distingue
+esito committed, rejected e risultato ancora non confermato tramite request ID.
 
-`writeAuditEventInTransaction` riceve la generazione della sessione che ha
-autenticato la richiesta e la confronta con quella dell'archivio, letta nella
-stessa transazione. Se differiscono, la transazione fallisce e la rotta
-risponde `409 ARCHIVE_REPLACED`. La regola viaggia così sulla garanzia che
-esiste già: nessuna scrittura clinica senza la sua riga di audit.
+Un errore dopo l’arresto conserva intent e copie e richiede recupero esplicito;
+non riavvia automaticamente A o B e non elimina record in base a PID o età.
+Le regole di ammissione e recovery restano quelle dell’[ADR 0142](0142-sqlite-maintenance-admission.md).
 
-Chiude la strada c: l'operazione in attesa porta la generazione vecchia.
+### Writer che non usano l’audit clinico comune
 
-### 4. Il browser ricarica quando la generazione cambia
+| Percorso | Confine per il cambio archivio |
+| --- | --- |
+| `system/migrate` | Generazione catturata prima della decifratura asincrona e verificata nella transazione di aggiornamento. Il contratto audit preesistente non viene ampliato qui. |
+| `physician-review-command` | Confronto esplicito nella transazione IMMEDIATE che scrive stato, audit e replay. |
+| SOAP headless e transizioni checkup | Rivalidazione dell’owner di sessione/selezione dentro il commit; la sessione è vincolata alla generazione. |
+| Backfill documentale CLI | Dry-run con lease read-only; apply esclusivo offline sotto intent per l’intero backup, letture asincrone e scritture. Un lease attivo impedisce anche il backup. |
+| Store envelope/replay di review e link paziente | Primitive sincrone senza composizione Web esposta; non costituiscono un’API autonoma. |
+| Bootstrap, reset, cataloghi e impostazioni | Confini operativi, non riprese cliniche da uno snapshot paziente; bootstrap ammesso, richieste Web protette dal documento corrente. |
 
-`GET /api/auth/check` e la risposta di login includono la generazione. Il
-client Web ricorda quella con cui ha caricato i dati; se ne osserva una
-diversa scarta lo stato e ricarica la pagina prima di accettare altro input.
+## Alternative scartate e limiti
 
-Chiude la strada b per il client Web, che è l'unico del profilo 0.9.0.
+Solo logout non chiude richieste in attesa né schede con cookie condiviso.
+Una chiave in `settings` sarebbe scrivibile dall’API generica. Un lock soltanto
+nel route non chiude handle e continuazioni del processo. Perciò il repair
+senza proprietario gestito rimane indisponibile, non viene degradato a uno swap
+online. La qualifica dei client nativi e dei filesystem Windows/Linux resta
+separata; questi controlli non dichiarano parità, resistenza a power loss o
+recupero completo delle chiavi.
 
-## Alternative considerate
+## Verifica
 
-- **Solo ritirare le sessioni.** Chiude a, non b né c.
-- **Ogni richiesta di scrittura dichiara la generazione da cui ha letto**, in
-  un'intestazione che il server confronta. È la chiusura completa di b anche
-  per i client che non controlliamo, ma cambia il contratto di tutte le API di
-  scrittura e dei client nativi, che si qualificano nella 0.9.6. Proposta per
-  quella release, sopra la stessa generazione.
-- **Tenere la generazione in `settings`.** Evita una tabella nuova, ma
-  `settings` si scrive dalla rotta generica delle impostazioni: servirebbe una
-  chiave riservata e una guardia in più.
+Fixture sintetiche con SQLite reale provano A→B a identico ID/versione durante
+l’attesa del body, rollback senza dati o audit, scheda A con cookie B rifiutata,
+nuova sessione/documento B ammessi, revoca pairing e latch Web che non promuove
+la vecchia scheda. Il supervisor viene provato con figlio reale: ingresso
+concorrente, rifiuto della sorgente prima dello stop, stop terminale prima dello
+swap e errore post-stop senza riavvio automatico. Il percorso operativo passa
+anche da Next standalone, setup, repair accettato, riavvio e nuovo archivio.
 
-## Conseguenze
 
-- Una tabella nuova: lo schema passa alla versione successiva, secondo la
-  regola dell'[ADR 0080](0080-serialize-sqlite-schema-guards-at-bootstrap.md#versioni-dello-schema).
-- Un codice di errore nuovo, `ARCHIVE_REPLACED`, che l'interfaccia deve
-  spiegare: "i dati sono stati ripristinati da un backup; ricarico la pagina".
-- Dopo un ripristino i client abbinati vanno abbinati di nuovo. Va detto al
-  medico nella pagina di ripristino, prima della conferma.
-- Una lettura in più, di una riga, in ogni transazione di scrittura clinica.
-- Le scritture che non passano da `writeAuditEventInTransaction` non sono
-  coperte dal punto 3: vanno elencate e decise una per una.
+## Backup completo cifrato e recupero offline
 
-## Decisioni
+L’esportazione portabile `.mediflow` resta distinta: non esporta account e
+involucri delle chiavi e mantiene il blocco sui comandi durevoli. Il backup
+completo `.mediflow-recovery` conserva invece **tutte le tabelle SQLite**, senza
+un registro di collezioni: account, involucri, impostazioni, ledger e audit
+originale compresi. Non copia token locali, configurazioni o file esterni a
+SQLite. La directory di lavoro e quella di recupero devono stare su un volume
+cifrato; l’artefatto scaricato è cifrato separatamente.
 
-L'11 ottobre 2026 Leonardo ha lasciato a chi esegue la scelta della pratica
-migliore sulle tre questioni aperte. Sono adottate le opzioni raccomandate;
-cambiarne una riapre il punto corrispondente.
+Un amministratore Web sbloccato con passphrase richiede una copia consistente
+con `VACUUM INTO`, sotto l’ammissione del processo esistente. La copia isolata
+è verificata e restituita solo al browser same-origin autenticato, con
+`no-store`; non viene offerta come download in chiaro. La directory temporanea
+sta accanto all’archivio ed è rimossa prima della risposta. Il browser genera una
+chiave AES-256 casuale per il backup, cifra la copia e avvolge quella chiave
+con la master key residente **senza esportarla**. La chiave clinica non arriva
+al server Web. Un cambio di autorità durante gli await annulla il download.
 
-| Decisione | Scelta | Perché |
-| --- | --- | --- |
-| Client abbinati dopo un ripristino | Il grant decade e il client si abbina di nuovo. | Soddisfa il criterio 5 senza cambiare le API dei client. La dichiarazione della generazione a ogni scrittura resta proposta per i client della 0.9.6. |
-| Dove sta la generazione | Tabella dedicata, di una sola riga, fuori dal backup. | `settings` si scrive dalla rotta generica delle impostazioni: una chiave riservata chiederebbe una guardia in più. |
-| Repair con scambio di file | Riceve la generazione insieme al ripristino. | È lo stesso confine, e lasciarlo fuori terrebbe aperto il criterio 4. |
+Il formato v1 è binario e limitato a 256 MiB di SQLite. Il prefisso `MDFREC01`
+(8 byte) è seguito da nonce casuale di wrapping (12), chiave avvolta con tag
+(48), nonce casuale del contenuto (12) e contenuto cifrato con tag (almeno 116).
+Entrambi usano AES-256-GCM con tag da 128 bit. Il wrapping usa l’AAD
+`mediflow.recovery-backup.key.v1`; il contenuto autentica tutti gli 80 byte
+dell’intestazione. Non ci sono nome utente, kit o metadati clinici in chiaro.
+Il kit resta un file separato; la chiave cartacea non viene salvata nel backup.
 
-## Come si prova
+Il recupero canonico è una CLI **offline**, non un endpoint anonimo: legge la
+chiave da terminale senza eco, mai da argomenti, variabili d’ambiente o log.
+Solo quel processo dedicato recupera temporaneamente la master key in memoria.
+Autenticità, limite, integrità SQLite, schema corrente completo, relazioni e
+corrispondenza del kit all’account amministratore nello snapshot sono verificati
+prima dell’apertura mutante della destinazione. Un kit di un’altra rotazione
+è rifiutato: va conservato il kit corrispondente a ciascun backup.
 
-Su SQLite reale, con dati sintetici: una sessione emessa prima del ripristino
-non autentica dopo; una scrittura fermata sul lock durante il ripristino
-fallisce con `ARCHIVE_REPLACED` e non lascia righe, e senza il confronto del
-punto 3 lo stesso test la vede riuscire; un grant abbinato emesso prima non
-vale dopo. Nel browser: due schede, ripristino dalla prima, la seconda
-ricarica prima di poter salvare. Per il repair: lo stesso dopo lo scambio di
-file.
+La destinazione deve essere assente oppure un archivio inizializzato senza
+alcuna riga, eccetto la generazione. Un `local-api-token` già presente o un
+override `MEDIFLOW_LOCAL_API_TOKEN` fanno rifiutare il recupero: non devono
+ereditare autorità sui dati ripristinati. Non vanno ricopiati o riutilizzati
+all’avvio successivo. Dopo la nuova verifica sotto ammissione
+esclusiva, il recupero riusa lo swap con journal: nessun secondo owner o motore
+di ripristino. La copia preparata ruota la generazione e elimina i legami delle
+sessioni; i processi devono essere chiusi e i dispositivi riabbinati. Ledger e
+audit restano byte per byte nei loro valori; i comandi non vengono rieseguiti.
+Il recupero della passphrase successivo usa il percorso dell’ADR 0143.
+
+Il lease impedisce la doppia autorità **locale sullo stesso archivio**, non la
+riaccensione di una copia su un altro computer. L’operatore deve ritirare
+l’installazione sorgente prima di lavorare su quella recuperata; la CLI richiede
+questa conferma. Non è una prevenzione tecnica dei cloni remoti. La UI distingue
+backup creato, autenticità della cifratura verificata e ripristino provato.

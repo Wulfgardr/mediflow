@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
@@ -58,6 +59,8 @@ export async function GET(
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/checkups/[checkupId] error:', error);
         return NextResponse.json({ error: 'Failed to fetch checkup' }, { status: 500 });
     }
@@ -72,8 +75,8 @@ export async function PUT(
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
+        /* @Codex */
         const { id, checkupId } = await params;
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
@@ -101,12 +104,14 @@ export async function PUT(
         const result = updateCheckupOperation({
             patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',
             changedFields: listChangedFields(body, ['version']),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /api/v1/patients/[id]/checkups/[checkupId] error:', error);
         return NextResponse.json({ error: 'Failed to update checkup' }, { status: 500 });
     }
@@ -121,8 +126,8 @@ export async function DELETE(
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
+        /* @Codex */
         const { id, checkupId } = await params;
         // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
         const parsedBody = await parseClinicalDeleteBody(request);
@@ -153,12 +158,14 @@ export async function DELETE(
         const result = updateCheckupOperation({
             patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',
             changedFields: ['deletedAt', 'deletionReason'],
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /api/v1/patients/[id]/checkups/[checkupId] error:', error);
         return NextResponse.json({ error: 'Failed to delete checkup' }, { status: 500 });
     }

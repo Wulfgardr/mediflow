@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,6 +37,7 @@ function bootstrapDatabase(): void {
 bootstrapDatabase();
 
 const { dbServer } = await import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-network-attachment');
 const { createNetworkScopedAttachment } = await import('./network-attachment-write.ts');
 
 const SCOPE_AMBULATORY = 'amb-attachment-write-scope';
@@ -68,7 +70,7 @@ function makeContext() {
         patientId: PATIENT_ID,
         scopeAmbulatoryId: SCOPE_AMBULATORY,
         pairedClient: { clientId: 'client-attachment-write-test' } as never,
-        session: { userId: 'user-attachment-write-test' } as never,
+        session: { id: 'synthetic-network-attachment', authChannel: 'native', archiveGeneration, userId: 'user-attachment-write-test' } as never,
     };
 }
 

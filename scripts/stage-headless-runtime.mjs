@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { physicalPath, physicalFiles, physicalRecord, sha256 } from './launch-bundled-headless-supervisor.mjs';
 import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/u, '');
+const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SEEDS = ['scripts/mediflow-headless-supervisor.mjs', 'scripts/intelligent-host-mcp-stdio.mjs',
   'scripts/node-runtime-contract.mjs', 'scripts/register-strip-types-loader.mjs', 'scripts/run-strip-types.mjs'];
 const TOKEN = '__MEDIFLOW_HEADLESS_ROSTER_SHA256__';
@@ -79,18 +79,12 @@ async function trace(nodeFileTrace, seeds, root, options = {}) {
     physicalPath(file); return relative.split(path.sep).join('/');
   });
 }
-export async function stageHeadlessRuntime(app) {
-  const layout = appLayout(app, true);
-  assertNodeRuntime(readNodeContract(ROOT));
-  physicalPath(process.execPath); physicalPath(path.join(ROOT, 'node_modules'), true);
-  for (const file of SEEDS) physicalPath(path.join(ROOT, file));
-  for (const name of [layout.runtime, layout.launcher]) {
-    try {
-      fs.lstatSync(name);
-      if (name === layout.runtime) deny('Headless destination must be absent; use a fresh WebRuntime.');
-      physicalPath(name);
-    } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  }
+// NFT supplies native relative paths, including backslashes on Windows.
+export function sharedRuntimeDependency(file) {
+  return /(?:^|\/)(?:\.next|packages\/mini|node_modules\/better-sqlite3)(?:\/|$)/u.test(file.replaceAll('\\', '/'));
+}
+// The source profile uses the same traced closure without an app envelope.
+async function sourceClosure() {
   const require = createRequire(path.join(ROOT, 'package.json'));
   const { nodeFileTrace } = require('next/dist/compiled/@vercel/nft');
   const ts = require('typescript');
@@ -98,7 +92,7 @@ export async function stageHeadlessRuntime(app) {
     // Share the already-normalized SQLite loader/native target, never a second Mach-O.
     // Web standalone is shared separately. Mini is a different delivery lane,
     // and SQLite uses the normalized/signed copy already inside the app.
-    ignore: file => /(?:^|\/)(?:\.next|packages\/mini|node_modules\/better-sqlite3)(?:\/|$)/u.test(file),
+    ignore: sharedRuntimeDependency,
     readFile: async file => {
       let bytes;
       try { bytes = await fs.promises.readFile(file, 'utf8'); }
@@ -121,6 +115,31 @@ export async function stageHeadlessRuntime(app) {
     if ([0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe, 0xcafebabe, 0xbebafeca, 0xcafebabf, 0xbfbafeca, 0x7f454c46]
       .includes(magic.readUInt32BE(0)) || magic.subarray(0, 2).toString() === 'MZ') deny('Unexpected native Headless payload.');
   }
+  return files;
+}
+export async function stageSourceHeadlessRuntime(web) {
+  physicalPath(web, true);
+  const files = await sourceClosure();
+  for (const name of [...files].sort()) {
+    const source = path.join(ROOT, name), target = path.join(web, name);
+    if (fs.existsSync(target)) {
+      if (physicalRecord(source).sha256 !== physicalRecord(target).sha256) deny(`Source/Web overlap differs: ${name}`);
+    } else copyFile(source, target);
+  }
+}
+export async function stageHeadlessRuntime(app) {
+  const layout = appLayout(app, true);
+  assertNodeRuntime(readNodeContract(ROOT));
+  physicalPath(process.execPath); physicalPath(path.join(ROOT, 'node_modules'), true);
+  for (const file of SEEDS) physicalPath(path.join(ROOT, file));
+  for (const name of [layout.runtime, layout.launcher]) {
+    try {
+      fs.lstatSync(name);
+      if (name === layout.runtime) deny('Headless destination must be absent; use a fresh WebRuntime.');
+      physicalPath(name);
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  const files = await sourceClosure();
   // Next already produced and the builder already validated the standalone Web
   // closure. Retain only the exact Web entry/identity plus the shared SQLite
   // package used by the source Supervisor; retracing server.js sweeps optional

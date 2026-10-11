@@ -22,7 +22,7 @@ test('actual route + guide: abort preserves the catalog, explicit retry succeeds
     const catalog = await import('./aifa-catalog-server.ts');
     const auth = requireCurrent('./security/server-auth.ts') as typeof import('./security/server-auth');
     const owner = requireCurrent('./security/web-auth-lifecycle-owner-adapter.ts') as typeof import('./security/web-auth-lifecycle-owner-adapter');
-    const { syntheticExemptionSession } = await import('../scripts/fixtures/exemption-import-session.ts');
+    const { syntheticExemptionSession, syntheticExemptionRequest } = await import('../scripts/fixtures/exemption-import-session.ts');
     const { POST } = requireCurrent('../app/api/drugs/update/route.ts') as typeof import('../app/api/drugs/update/route');
     const session = syntheticExemptionSession();
     let current: Awaited<ReturnType<typeof auth.requireSession>> = session;
@@ -65,7 +65,7 @@ test('actual route + guide: abort preserves the catalog, explicit retry succeeds
             read: async () => { if (readFailure) throw new Error('synthetic readback failure'); return catalog.getAifaCatalogStatus(); },
             update: async signal => {
                 posts++;
-                const response = await POST(new Request('http://localhost/api/drugs/update', { method: 'POST', signal }));
+                const response = await POST(syntheticExemptionRequest('http://localhost/api/drugs/update', { method: 'POST', signal }));
                 const body = await response.json();
                 if (!response.ok) throw new Error(body.error);
                 return body as AifaImportClientResult;

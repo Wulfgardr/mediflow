@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { PatientCreateConflictError, PatientCreateDestinationNotFoundError } from '@/lib/patient-create-service';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 // Codex: created 2026-02-01
@@ -64,6 +65,8 @@ export async function GET(request: Request) {
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients error:', error);
         return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 });
     }
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
     if (authError) return authError;
 
     try {
+        const actorSession = await requireLocalApiActorSession(request);
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
@@ -92,7 +96,6 @@ export async function POST(request: Request) {
         }
 
         /* @Codex: resolve the host actor before entering the synchronous transaction. */
-        const actorSession = await requireLocalApiActorSession(request);
         const auditContext = auditContextFromRequest(request, actorSession);
         const requestId = requestIdFromRequest(request);
 
@@ -113,7 +116,7 @@ export async function POST(request: Request) {
             }
             writeAuditEventInTransaction(tx, {
                 eventType: 'patient.created', outcome: 'success',
-                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 subjectType: 'patient', subjectRef: normalized.values.id,
                 sourceSurface: auditContext.sourceSurface, requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
@@ -126,6 +129,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         if (error instanceof PatientCreateDestinationNotFoundError) return NextResponse.json({ error: 'Ambulatory not found' }, { status: 404 });
         if (error instanceof PatientCreateConflictError) return NextResponse.json({ error: 'Patient create conflict' }, { status: 409 });
         console.error('API POST /api/v1/patients error:', error);

@@ -233,6 +233,7 @@ il documento o la prova nominati, non l’intero prodotto.
 - Adapter ICD-11 verso sidecar WHO locale opt-in: [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md)
 - Configurazione ICD-11 WHO e readiness governata: [setup WHO](./icd-who-setup.md)
 - Transizione agentica governata dello stato checkup: [ADR 0116](./adr/0116-agentic-checkup-status-transition.md)
+- Headless locale: [capacità, client provato e confine dei dati](./headless-local-client.md).
 - Headless portabile agent-first e Fabric capability-first: [ADR 0117](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md)
 - Contratto Intelligence Fabric e headless 0.8.5, con quattro smart path generativi e capability Fabric `ocr=unavailable` distinta dal fallback AnyDoc: [ADR 0094](./adr/0094-intelligence-fabric-headless-contract-085.md)
 - Crosswalk runtime Fabric del candidato 0.8.5: [docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json](./capability-mapping/fabric-generative-runtime-crosswalk.v1.json)

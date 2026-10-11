@@ -137,6 +137,22 @@ test('deadline refuses maintenance before callback and leaves native database un
     } finally { if (participant.database.open) participant.database.close(); f.cleanup(); }
 });
 
+test('a drain that closes its participant then fails preserves intent before the operation starts', async () => {
+    const f = fixture();
+    const participant = openAdmittedSqlite(f.target);
+    try {
+        let reached = false;
+        await assert.rejects(runWithSqliteMaintenance(f.target, { drain: async () => {
+            await participant.close();
+            throw new Error('synthetic failure after Web closed');
+        } }, () => { reached = true; }), SqliteMaintenanceHoldError);
+        assert.equal(participant.database.open, false);
+        assert.equal(reached, false);
+        assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), true);
+        assert.throws(() => openAdmittedSqlite(f.target), /maintenance_pending/);
+    } finally { if (participant.database.open) participant.database.close(); f.cleanup(); }
+});
+
 test('failed native close retains the lease and blocks maintenance', async () => {
     const f = fixture();
     const participant = openAdmittedSqlite(f.target);
@@ -209,7 +225,8 @@ test('linked target or admission root is rejected without opening the target', a
     const f = fixture();
     try {
         const outside = path.join(f.dir, 'outside'); fs.mkdirSync(outside);
-        fs.symlinkSync(outside, store(f.target), 'dir');
+        fs.symlinkSync(outside, store(f.target), process.platform === 'win32' ? 'junction' : 'dir');
+        assert.equal(fs.lstatSync(store(f.target)).isSymbolicLink(), true);
         assert.throws(() => openAdmittedSqlite(f.target), SqliteMaintenanceHoldError);
         assert.deepEqual(fs.readdirSync(outside), []);
         fs.unlinkSync(store(f.target));

@@ -1,3 +1,4 @@
+import { assertArchiveRequestInTransaction } from './archive-request-context';
 import crypto from 'crypto';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -5,6 +6,8 @@ import { hasValidLocalApiToken } from './local-api-auth';
 import { auditEvents } from '../schema';
 import type { dbServer } from '../db-server';
 import type { ServerSession } from './server-session';
+import { archiveGenerationForSession } from './archive-session-generation';
+import { assertArchiveGeneration } from '../archive-generation';
 
 /* @Codex */
 export const AUDIT_SCHEMA_VERSION = 1 as const;
@@ -83,6 +86,7 @@ export type AuditContext = {
     actorRef: string;
     sourceSurface: AuditSourceSurface;
     authContext: AuditAuthContext;
+    archiveGeneration?: string;
 };
 
 /* @Codex */
@@ -97,6 +101,7 @@ export type AuditRedactedMetadata = {
 };
 
 type AuditWriteInput = {
+    archiveGeneration?: string;
     eventType: AuditEventType;
     outcome: AuditOutcome;
     actorType: AuditActorType;
@@ -112,6 +117,7 @@ type AuditWriteInput = {
 /* @Codex: host-derived identity/correlation only; the patient core owns event and subject. */
 export type RequiredAuditContext = Pick<AuditWriteInput, 'actorType' | 'actorRef' | 'sourceSurface' | 'requestId'> & {
     flags: string[];
+    archiveGeneration: string | undefined;
 };
 
 /* @Codex */
@@ -183,6 +189,7 @@ export function auditContextFromSession(session: ServerSession | null | undefine
             actorRef: session.userId,
             sourceSurface: 'native',
             authContext: 'local-token',
+            archiveGeneration: archiveGenerationForSession(session),
         };
     }
 
@@ -192,6 +199,7 @@ export function auditContextFromSession(session: ServerSession | null | undefine
             actorRef: 'local-api',
             sourceSurface: 'api',
             authContext: 'local-token',
+            archiveGeneration: archiveGenerationForSession(session),
         };
     }
 
@@ -200,6 +208,7 @@ export function auditContextFromSession(session: ServerSession | null | undefine
         actorRef: session?.userId || 'anonymous',
         sourceSurface: 'web',
         authContext: session?.userId ? 'session' : 'anonymous',
+        archiveGeneration: archiveGenerationForSession(session),
     };
 }
 
@@ -215,6 +224,7 @@ export function auditContextFromRequest(
                 actorRef: session.userId,
                 sourceSurface: 'native',
                 authContext: 'local-token',
+                archiveGeneration: archiveGenerationForSession(session),
             };
         }
 
@@ -223,6 +233,7 @@ export function auditContextFromRequest(
             actorRef: 'local-api',
             sourceSurface: 'api',
             authContext: 'local-token',
+            archiveGeneration: archiveGenerationForSession(session),
         };
     }
 
@@ -263,7 +274,7 @@ export function buildAuditWriteInputFromRequest(
     return {
         eventType: input.eventType,
         outcome: input.outcome ?? 'success',
-        actorType: context.actorType,
+        archiveGeneration: context.archiveGeneration, actorType: context.actorType,
         actorRef: context.actorRef,
         subjectType: input.subjectType,
         subjectRef: input.subjectRef ?? null,
@@ -352,6 +363,8 @@ export function writeAuditEventInTransaction(
     tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
     input: AuditWriteInput,
 ): string {
+    assertArchiveGeneration(tx, input.archiveGeneration);
+    assertArchiveRequestInTransaction(tx);
     const row = buildAuditEventRow(input);
     const result = tx.insert(auditEvents).values(row).run();
     if (result.changes !== 1) {

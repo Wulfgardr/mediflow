@@ -1,3 +1,4 @@
+import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
 /* @Codex */
 import { acquireDocumentSynthesisProductionOperation } from '@/lib/ai-providers/fabric/document-synthesis-production-operation';
 import { createDocumentSynthesisCaptureHttpHandler } from '@/lib/ai-providers/fabric/document-synthesis-production-http';
@@ -5,4 +6,4 @@ import { createDocumentSynthesisCaptureHttpHandler } from '@/lib/ai-providers/fa
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export const POST = createDocumentSynthesisCaptureHttpHandler({ acquireOperation: acquireDocumentSynthesisProductionOperation });
+export const POST = withArchiveRequestContext(createDocumentSynthesisCaptureHttpHandler({ acquireOperation: acquireDocumentSynthesisProductionOperation }));

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
 import { prepareScaleSubmission } from './scale-submission';
+import { SCALES } from './scale-definitions';
 
 test('actual Patient Insight builder carries a bounded stored version without rewriting legacy', async () => {
     const submission = prepareScaleSubmission('gds', {
@@ -33,8 +34,18 @@ test('actual Patient Insight builder carries a bounded stored version without re
         const before = JSON.stringify(entry);
         const current = await buildPatientInsightContext('synthetic-patient');
         const line = current.sourceRefs.find(ref => ref.evidenceSourceId === 'diary:synthetic-scale')!.promptLine;
-        assert.match(line, /Versione interpretazione: mediflow\.gds15\.screening-limits\.v1/);
+        assert.match(line, /Versione interpretazione: mediflow\.gds15\.screening-limits\.v2/);
         assert.equal(JSON.stringify(entry), before);
+
+        for (const id of ['adl', 'iadl', 'tinetti-poma28-v1']) {
+            const local = prepareScaleSubmission(id, Object.fromEntries(SCALES[id].questions.map(q => [q.id, 0])));
+            storedEntry = { ...entry, ...local };
+            const bytes = JSON.stringify(storedEntry);
+            const context = await buildPatientInsightContext('synthetic-patient');
+            assert.ok(context.sourceRefs.find(ref => ref.evidenceSourceId === 'diary:synthetic-scale')!.promptLine
+                .includes(`Versione interpretazione: ${local.metadata.interpretationVersion}`));
+            assert.equal(JSON.stringify(storedEntry), bytes);
+        }
 
         const originalContent = 'Valutazione GDS. Punteggio: 6. Interpretazione: Depressione Lieve (6-10).';
         storedEntry = { ...entry, content: originalContent,

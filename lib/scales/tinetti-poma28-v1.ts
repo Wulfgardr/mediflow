@@ -17,7 +17,7 @@ export const TINETTI_NONCLASSIFICATION = "Punteggio POMA-28: interpretazione cli
 export const TINETTI_POMA28 = withValidatedScoring({
     id: TINETTI_POMA28_ID,
     title: 'Tinetti POMA-28 (v1)',
-    description: "POMA-28 v1: equilibrio 16 + andatura 12, in 20 componenti di punteggio. Iniziare da seduti su sedia rigida senza braccioli; in piedi con il terapista, camminare al passo abituale e tornare a passo rapido ma sicuro, con l’ausilio abituale. Resa italiana locale non validata. Fonte: NHS FPS 006 V1 (luglio 2012).",
+    description: "POMA-28 v1: equilibrio 16 + andatura 12, in 20 componenti di punteggio. Iniziare da seduti su sedia rigida senza braccioli; in piedi con il terapista, camminare al passo abituale e tornare a passo rapido ma sicuro, con l’ausilio abituale. Richiede osservazione clinica; nessuna categoria automatica universale del rischio. Resa italiana locale non validata. Fonte: NHS FPS 006 V1 (luglio 2012).",
     instrument: TINETTI_POMA28_INSTRUMENT,
     questions: [
         {"id": "poma28v1.balance.sitting", "text": "Equilibrio da seduto", "type": "choice", "options": [{"label": "0. Si inclina o scivola", "value": 0}, {"label": "1. Fermo e sicuro", "value": 1}]},

@@ -50,11 +50,11 @@ for (const file of [paths.nodePath, paths.webTargetPath]) {
 }
 after(() => { fs.rmSync(fixtureRoot, { recursive: true, force: true }); });
 
-function setup() {
+function setup(webBuildIdentity?: { revision: string; branch: string; worktreeHash: string; sourceFingerprint: string }) {
   const calls: Array<{ command: string; args: readonly string[]; options: SpawnOptions }> = [];
   const children = [new SyntheticChild(), new SyntheticChild()];
   const processes = createPortableSupervisorProductionChildProcessesV1({
-    dataDir, ...paths,
+    dataDir, ...paths, webBuildIdentity,
     spawnChild: (command, args, options) => {
       calls.push({ command, args, options });
       return children[calls.length - 1] as unknown as ChildProcess;
@@ -64,7 +64,9 @@ function setup() {
 }
 
 test('spawns one marker-only MCP child with a file URL loader and one direct loopback Web child', () => {
-  const current = setup();
+  const identity = { revision: 'a'.repeat(40), branch: 'synthetic', worktreeHash: 'clean',
+    sourceFingerprint: `synthetic@${'a'.repeat(12)}:clean` };
+  const current = setup(identity);
   assert.equal(current.calls.length, 2);
   const [mcp, web] = current.calls;
   assert.equal(mcp?.command, paths.nodePath);
@@ -83,6 +85,9 @@ test('spawns one marker-only MCP child with a file URL loader and one direct loo
   assert.deepEqual(web?.options.stdio, ['ignore', 2, 2, 'ipc']);
   assert.deepEqual(web?.options.env, {
     NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir,
+    MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12), MEDIFLOW_APP_BRANCH: identity.branch,
+    MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
+    MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint, MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
   });
   current.processes.terminateAll();
 });

@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -32,6 +33,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return replacements[specifier] ? { url: replacements[specifier], shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, prostheticPrescriptions } = load('./schema.ts') as typeof import('./schema.ts');
 const web = load('../app/api/prosthetic-prescriptions/[id]/route.ts') as typeof import('../app/api/prosthetic-prescriptions/[id]/route.ts');
@@ -44,7 +46,7 @@ dbServer.insert(prostheticPrescriptions).values({ id: 'synthetic-prosthetic', pa
 const context = { params: Promise.resolve({ id: 'synthetic-prosthetic' }) };
 const cap = 4 * 1024 * 1024;
 function request(body?: string | ReadableStream<Uint8Array>, method = 'POST', headers: Record<string, string> = {}) {
-    return new Request('http://localhost/api/prescriptions', { method, body, headers,
+    return syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/prescriptions', { method, body, headers,
         ...(body instanceof ReadableStream ? { duplex: 'half' } : {}) } as RequestInit);
 }
 function snapshot() {

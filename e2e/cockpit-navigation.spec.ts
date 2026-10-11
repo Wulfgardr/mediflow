@@ -1,6 +1,7 @@
 /* @Codex: delay real successful reads; no replacement patient or route payload. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 function barrier() {
   let release = () => {};
@@ -133,13 +134,14 @@ test('deferred row focus yields to a newer focus outside the list', async ({ pag
    render its child. Both the summary intent and the return destination matter. */
 test('Apri quadro has one destination while folder navigation is pending', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = await createPatients(page, 1);
   const response = await page.request.get('/api/patients');
   expect(response.status()).toBe(200);
   const patients = await response.json() as Array<{ id: string; lastName: string }>;
   const patient = patients.find(value => value.lastName.includes(marker));
   expect(patient).toBeTruthy();
-  const entryResponse = await page.request.post('/api/entries', { data: {
+  const entryResponse = await page.request.post('/api/entries', { headers: archiveHeaders, data: {
     patientId: patient!.id, type: 'note', title: `Navigazione ${marker}`,
     content: 'Verifica sintetica del ritorno al diario.', date: new Date().toISOString(), setting: 'ambulatory',
   } });
@@ -174,11 +176,11 @@ test('Apri quadro has one destination while folder navigation is pending', async
   } finally {
     released.release();
     await page.unrouteAll({ behavior: 'wait' });
-    const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { data: { version: entry.version } });
+    const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { headers: archiveHeaders, data: { version: entry.version } });
     expect(removedEntry.status()).toBe(200);
     const current = await page.request.get(`/api/patients/${patient!.id}`);
     expect(current.status()).toBe(200);
     const { version } = await current.json() as { version: number };
-    expect((await page.request.delete(`/api/patients/${patient!.id}`, { data: { version } })).status()).toBe(200);
+    expect((await page.request.delete(`/api/patients/${patient!.id}`, { headers: archiveHeaders, data: { version } })).status()).toBe(200);
   }
 });

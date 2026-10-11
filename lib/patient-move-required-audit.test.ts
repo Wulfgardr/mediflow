@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -23,6 +24,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const { POST } = load('../app/api/patients/move/route.ts') as typeof import('../app/api/patients/move/route.ts');
@@ -59,7 +61,7 @@ function payload(values: Record<string, unknown> = {}) {
         targetAmbulatoryId: 'target', sourceAmbulatoryId: 'source', ...values };
 }
 function request(body = JSON.stringify(payload())) {
-    return POST(new Request('http://127.0.0.1/api/patients/move', {
+    return POST(syntheticArchiveRequest(archiveGeneration, 'http://127.0.0.1/api/patients/move', {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-request-id': requestId,
             'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed' }, body,
     }));

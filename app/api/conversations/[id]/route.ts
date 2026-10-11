@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -13,6 +15,8 @@ export async function PUT(
 ) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -34,6 +38,8 @@ export async function PUT(
         await dbServer.update(conversations).set(updateData).where(eq(conversations.id, id));
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /conversations/[id] error:', error);
         return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
     }
@@ -45,6 +51,8 @@ export async function DELETE(
 ) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -55,6 +63,8 @@ export async function DELETE(
         });
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /conversations/[id] error:', error);
         return NextResponse.json({ error: 'Delete Failed' }, { status: 500 });
     }

@@ -57,9 +57,17 @@ export function installAnyDocConsumerDiagnostic(config: string | { pathname: str
         // Fetch reads dictionary properties, including inherited/non-enumerable
         // values. Preserve their receiver; an empty target also avoids proxy
         // invariants for non-configurable properties on the original init.
-        diagnosticInit = new Proxy({}, { get(_target, key) {
-          return key === 'headers' ? headers : init == null ? undefined : Reflect.get(init, key, init);
-        } });
+        diagnosticInit = new Proxy({}, {
+          get(_target, key) {
+            return key === 'headers' ? headers : init == null ? undefined : Reflect.get(init, key, init);
+          },
+          // Existing fetch wrappers may spread init before calling native fetch.
+          ownKeys: () => Reflect.ownKeys(init ?? {}),
+          getOwnPropertyDescriptor(_target, key) {
+            const descriptor = Reflect.getOwnPropertyDescriptor(init ?? {}, key);
+            return descriptor && { ...descriptor, configurable: true };
+          },
+        });
       } else emit('correlation_probe_error', owner);
     }
     const report = (event: string, value?: number) => emit(event, owner, value, id);

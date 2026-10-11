@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -53,6 +55,8 @@ export async function GET(request: Request) {
         const data = await query;
         return NextResponse.json(data);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /observations error:', error);
         return NextResponse.json({ error: 'Failed to fetch observations' }, { status: 500 });
     }
@@ -61,6 +65,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsed = await readObservationJsonObject(request);
@@ -79,12 +85,14 @@ export async function POST(request: Request) {
         const result = createObservationOperation({
             patientId, observationId, values: normalized.values, mode: 'web',
             changedFields: observationChangedFields(normalized.values, body),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /observations error:', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });
     }

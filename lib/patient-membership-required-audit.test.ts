@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,6 +29,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const routes = {
@@ -72,7 +74,7 @@ function payload(operation: Operation, values: Record<string, unknown> = {}) {
 }
 function request(operation: Operation, body = JSON.stringify(payload(operation))) {
     return routes[operation].POST(new Request(`http://127.0.0.1/api/patients/${operation}`, {
-        method: 'POST', headers: { 'content-type': 'application/json', 'x-request-id': requestId,
+        method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', 'x-request-id': requestId,
             'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed' }, body,
     }));
 }
@@ -83,7 +85,7 @@ async function migrationSnapshot() {
     return (await response.json()).snapshot as { candidates: Array<{ patientId: string; patientVersion: number; primaryAmbulatoryId: string; ambulatoryVersion: number }> };
 }
 function migrate(body: unknown) {
-    return migration.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body: JSON.stringify(body) }));
+    return migration.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration }, body: JSON.stringify(body) }));
 }
 test.after(() => {
     sql.close(); dbServer.$client.close(); hooks.deregister();
@@ -179,7 +181,7 @@ for (const repair of ['fix-orphans', 'migrate-m2m'] as const) {
         const route: { GET: () => Promise<Response>; POST: (request: Request) => Promise<Response> } = repair === 'fix-orphans'
             ? load('../app/api/system/fix-orphans/route.ts')
             : load('../app/api/system/migrate-m2m/route.ts');
-        assert.equal((await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST',
+        assert.equal((await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration },
             body: JSON.stringify(repair === 'migrate-m2m' ? await migrationSnapshot()
                 : { expectedSnapshot: (await (await route.GET()).json()).expectedSnapshot }) }))).status, 200);
         const repaired = snapshot();
@@ -187,7 +189,7 @@ for (const repair of ['fix-orphans', 'migrate-m2m'] as const) {
         const events = repaired.events.slice(before.events.length);
         assert.equal(events.length, 2);
         assert.ok(events.every(e => JSON.parse(String(e.redacted_metadata)).resourceVersion === 2));
-        const repeated = await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST',
+        const repeated = await route.POST(new Request(`http://127.0.0.1/api/system/${repair}`, { method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration },
             body: JSON.stringify(repair === 'migrate-m2m' ? await migrationSnapshot()
                 : { expectedSnapshot: (await (await route.GET()).json()).expectedSnapshot }) }));
         assert.equal(repeated.status, 200);
@@ -221,7 +223,7 @@ test('migration: second required audit failure rolls back links, versions and ev
     sql.exec(`CREATE TRIGGER membership_audit_fault BEFORE INSERT ON audit_events
         WHEN NEW.subject_ref = '${ids[1]}' BEGIN SELECT RAISE(IGNORE); END`);
     const { POST } = load('../app/api/system/migrate-m2m/route.ts') as typeof import('../app/api/system/migrate-m2m/route.ts');
-    assert.equal((await POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body: JSON.stringify(await migrationSnapshot()) }))).status, 500);
+    assert.equal((await POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration }, body: JSON.stringify(await migrationSnapshot()) }))).status, 500);
     assert.deepEqual(snapshot(), before);
 });
 
@@ -258,7 +260,7 @@ test('migration snapshot rejects replay after interposed membership removal', as
     const body = JSON.stringify({ candidates: ids.map(patientId => ({ patientId, patientVersion: 1,
         primaryAmbulatoryId: 'primary', ambulatoryVersion: 1 })) });
     const route = load('../app/api/system/migrate-m2m/route.ts') as typeof import('../app/api/system/migrate-m2m/route.ts');
-    const execute = () => route.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body }));
+    const execute = () => route.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration }, body }));
     assert.equal((await execute()).status, 200);
     sql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=?').run(ids[0]);
     const before = snapshot();
@@ -303,7 +305,7 @@ test('migration rejects malformed snapshots and requires identical Web admin adm
         assert.deepEqual(snapshot(), before);
     }
     for (const raw of ['', '{', ' '.repeat(65537)]) {
-        const result = await migration.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', body: raw }));
+        const result = await migration.POST(new Request('http://127.0.0.1/api/system/migrate-m2m', { method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration }, body: raw }));
         assert.equal(result.status, raw.length > 65536 ? 413 : 400);
         assert.deepEqual(snapshot(), before);
     }

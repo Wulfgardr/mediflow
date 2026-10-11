@@ -32,6 +32,7 @@ export function readUnlockParameters(value: unknown): UnlockParameters | null {
 
 /* @Codex */
 export type AuthHealthPayload = {
+    archiveGeneration?: string;
     status: 'ok' | 'error';
     isSetup?: boolean;
     hasSession?: boolean;
@@ -59,6 +60,7 @@ export type LoginFailurePayload = {
 };
 
 type LoginSuccessPayload = {
+    archiveGeneration: string;
     id: string;
     username: string;
     displayName?: string;
@@ -86,6 +88,8 @@ type SetupResponsePayload = {
 };
 
 type RepairDbPayload = {
+    status?: 'accepted';
+    requestId?: string;
     success?: boolean;
     error?: string;
     backupCreated?: boolean;
@@ -332,6 +336,7 @@ export async function checkAuthHealthRequest(options: { fresh?: boolean } = {}) 
             cache: 'no-store',
             credentials: 'same-origin',
         });
+        if (result.response.ok && result.payload?.status === 'ok') observeArchiveGeneration(result.payload.archiveGeneration);
         const observation = retainAuthControlEtag(result.response, expectedEtag);
         return { ...result, controlState: observation.state };
     })();
@@ -362,6 +367,9 @@ async function requestAuthMutationJson<T>(
     const controlState = response.ok && observation.state === 'accepted' && observation.etag === etag
         ? 'invalid'
         : observation.state;
+    if (response.ok && typeof payload === 'object' && payload !== null && 'archiveGeneration' in payload) {
+        observeArchiveGeneration((payload as { archiveGeneration: unknown }).archiveGeneration);
+    }
     return { response, payload, controlState };
 }
 
@@ -431,4 +439,48 @@ export function rewrapMasterKeyRequest(payload: { encryptedMasterKey: string; sa
 /* @Codex */
 export function repairLegacyDbRequest() {
     return requestJson<RepairDbPayload>('/api/system/repair-db', { method: 'POST' });
+}
+
+const GENERATION = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+export const ARCHIVE_REPLACED_EVENT = 'mediflow:archive-replaced';
+let documentGeneration: string | null = null;
+
+/** Never relatch a document that still contains records from the preceding archive. */
+export function rejectReplacedArchive(): never {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(ARCHIVE_REPLACED_EVENT));
+        window.location.reload();
+    }
+    throw new Error('ARCHIVE_REPLACED');
+}
+
+export function observeArchiveGeneration(value: unknown): void {
+    if (typeof value !== 'string' || !GENERATION.test(value)) throw new Error('Archive generation unavailable.');
+    if (documentGeneration === null) { documentGeneration = value; return; }
+    if (documentGeneration === value) return;
+    rejectReplacedArchive();
+}
+
+/** One document-wide transport fence also reaches controllers that use plain fetch. */
+export function installArchiveGenerationTransport(): () => void {
+    const original = window.fetch;
+    const guarded: typeof fetch = (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
+        const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+        if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')
+            || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return original(input, init);
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        // A caller cannot silently change which archive this document has displayed.
+        if (documentGeneration) headers.set('x-mediflow-archive-generation', documentGeneration);
+        else headers.delete('x-mediflow-archive-generation');
+        return original(input, { ...init, headers }).then(async response => {
+            if (response.status === 409) {
+                const payload = await response.clone().json().catch(() => null);
+                if (payload?.code === 'ARCHIVE_REPLACED') rejectReplacedArchive();
+            }
+            return response;
+        });
+    };
+    window.fetch = guarded;
+    return () => { if (window.fetch === guarded) window.fetch = original; };
 }

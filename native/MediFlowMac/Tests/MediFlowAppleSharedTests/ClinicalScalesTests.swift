@@ -11,27 +11,27 @@ final class ClinicalScalesTests: XCTestCase {
         XCTAssertEqual(adl.maxScore, 6)
     }
 
-    func testAdlScoringAndInterpretationThresholds() throws {
-        func score(_ on: Set<String>) throws -> ClinicalScaleResult {
-            try adl.result(from: Dictionary(uniqueKeysWithValues: adl.questions.map { ($0.id, on.contains($0.id) ? 1 : 0) }))
+    func testAdlTotalsDoNotAssignUnverifiedSeverityClasses() throws {
+        for total in [0, 1, 2, 3, 4, 5, 6] {
+            let on = Set(adl.questions.prefix(total).map(\.id))
+            let result = try adl.result(from: Dictionary(uniqueKeysWithValues:
+                adl.questions.map { ($0.id, on.contains($0.id) ? 1 : 0) }))
+            XCTAssertEqual(result.score, total)
+            XCTAssertTrue(result.interpretation.hasPrefix("Punteggio ADL locale: \(total)/6."))
+            XCTAssertFalse(result.interpretation.contains("Compromissione"))
+            XCTAssertFalse(result.interpretation.contains("Autonomia Conservata"))
         }
-        XCTAssertEqual(try score([]).score, 0)
-        XCTAssertEqual(try score([]).interpretation, "Compromissione Grave (0-1/6)")
-        XCTAssertEqual(try score(["bath", "dress"]).interpretation, "Compromissione Moderata (2-3/6)")
-        XCTAssertEqual(try score(["bath", "dress", "toilet", "transfer"]).interpretation, "Compromissione Lieve (4-5/6)")
-        let full = try score(["bath", "dress", "toilet", "transfer", "cont", "feed"])
-        XCTAssertEqual(full.score, 6)
-        XCTAssertEqual(full.interpretation, "Autonomia Conservata (6/6)")
     }
 
     func testMetadataJsonMatchesWebShape() throws {
         let result = try adl.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])
         let json = try ClinicalScales.metadataJSON(definition: adl, result: result)
-        // The web persists { title, scaleId, score, interpretation, answers }.
+        // The web persists the same clinical metadata and interpretation version.
         XCTAssertTrue(json.contains("\"scaleId\":\"adl\""))
         XCTAssertTrue(json.contains("\"score\":2"))
         XCTAssertTrue(json.contains("\"title\":\"ADL (Indice di Katz)\""))
-        XCTAssertTrue(json.contains("\"interpretation\":\"Compromissione Moderata (2-3/6)\""))
+        XCTAssertTrue(json.contains("Punteggio ADL locale: 2/6."))
+        XCTAssertTrue(json.contains("mediflow.adl.local-interpretation.v2"))
         XCTAssertTrue(json.contains("\"answers\""))
         // It must be valid JSON that re-parses.
         XCTAssertNoThrow(try JSONSerialization.jsonObject(with: Data(json.utf8)))
@@ -41,7 +41,7 @@ final class ClinicalScalesTests: XCTestCase {
         let result = try adl.result(from: Dictionary(uniqueKeysWithValues: adl.questions.map { ($0.id, 1) }))
         let summary = ClinicalScales.contentSummary(definition: adl, result: result)
         XCTAssertTrue(summary.contains("Punteggio: 6"))
-        XCTAssertTrue(summary.contains("Autonomia Conservata"))
+        XCTAssertTrue(summary.contains("Punteggio ADL locale: 6/6."))
     }
 
     // --- Scale library (G1 parity: Tinetti/IADL/MMSE/GDS added) ---
@@ -109,7 +109,7 @@ final class ClinicalScalesTests: XCTestCase {
     func testIadlInterpretationInterpolatesScore() throws {
         XCTAssertEqual(
             try interpretation(ClinicalScales.iadl, at: 8),
-            "Punteggio totale: 8/8. (Minore è il punteggio, maggiore è la dipendenza strumentale)."
+            "Punteggio IADL locale: 8/8. Otto domini per ogni persona, indipendentemente dal sesso. Definizione locale con ancoraggi semplificati; equivalenza a una versione validata non verificata. Attività mai svolte e contesto istituzionale limitano l’interpretazione; nessuna imputazione o riduzione automatica del denominatore."
         )
     }
 

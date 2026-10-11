@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from '../../lib/security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: child-process SQLite fixture; synthetic test data only. */
 import { dbServer } from '../../lib/db-server.ts';
 import { patients } from '../../lib/schema.ts';
@@ -5,6 +6,8 @@ import { eq } from 'drizzle-orm';
 import { updateHostProstheticPrescription } from '../../lib/prosthetic-prescription-write.ts';
 import type { ServerSession } from '../../lib/security/server-session';
 
+const sessionId = `synthetic-child-${process.pid}`;
+bindSyntheticArchiveSessions(sessionId);
 const [mode, patientId, id] = process.argv.slice(2);
 /* @Codex: both processes must finish startup before the parent releases either writer. */
 if (mode === 'update') {
@@ -18,7 +21,7 @@ if (mode === 'tombstone') {
     dbServer.update(patients).set({ deletedAt: new Date('2026-05-02') }).where(eq(patients.id, patientId)).run();
     process.stdout.write(JSON.stringify({ status: 'tombstoned' }));
 } else if (mode === 'update') {
-    const session: ServerSession = { id: 'synthetic-process-session', userId: 'synthetic-process-user', username: patientId, role: 'admin', authChannel: 'web', createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
+    const session: ServerSession = { id: sessionId, userId: 'synthetic-process-user', username: patientId, role: 'admin', authChannel: 'web', createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
     try {
         const result = await updateHostProstheticPrescription({ request: new Request('http://localhost/test'), session, id }, { version: 3, description: 'ENC:synthetic:process' });
         process.stdout.write(JSON.stringify(result));

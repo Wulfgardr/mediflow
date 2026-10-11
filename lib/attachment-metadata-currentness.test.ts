@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -23,6 +24,7 @@ const authorityModule = await import('./domain/documents/attachment-extraction-s
 const webFixtureModule = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
+const archiveGeneration = bindSyntheticArchiveSessions('session.synthetic');
 const { issueSyntheticWebSession, retireSyntheticWebSession } = webFixtureModule;
 const REF = 'b'.repeat(64); const PATIENT = 'patient.synthetic.w0b'; const OTHER = 'patient.synthetic.other';
 const ATTACHMENT = 'attachment.synthetic.w0b'; const AMBULATORY = 'ambulatory.synthetic.w0b';
@@ -53,8 +55,8 @@ function reset(values: { revision?: number; epoch?: number } = {}) {
 }
 function snapshot() { const db = new Database(dbPath); try { return db.prepare(`SELECT patient_id, summary_snapshot, parse_evidence_artifact_snapshot,
     ocr_queue_state, document_source_ref, document_revision, document_freshness_epoch FROM attachments WHERE id = ?`).get(ATTACHMENT); } finally { db.close(); } }
-function request(method: 'PUT' | 'DELETE', body?: unknown) { return new Request(`http://localhost/api/attachments/${ATTACHMENT}`, {
-    method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
+function request(method: 'PUT' | 'DELETE', body?: unknown) { return syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments/${ATTACHMENT}`, {
+    method, headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
 }); }
 function observed() {
     const row = snapshot() as Record<string, unknown> | undefined;
@@ -170,7 +172,7 @@ test('metadata JSON is bounded at 4 MiB and rejects malformed or invalid shapes 
     reset();
     const original = serverAuth.requireSession;
     serverAuth.requireSession = async () => auth;
-    const send = (body: string, headers: HeadersInit = {}) => route.PUT(new Request(`http://localhost/api/attachments/${ATTACHMENT}`, {
+    const send = (body: string, headers: HeadersInit = {}) => route.PUT(syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments/${ATTACHMENT}`, {
         method: 'PUT', body, headers,
     }), { params: Promise.resolve({ id: ATTACHMENT }) });
     try {
@@ -248,7 +250,7 @@ test('matching client snapshot preserves tombstoned-parent admission and OCR tra
 test('content replacement invalidates earlier metadata and delete snapshots', async () => {
     reset(); const earlier = observed();
     const { putAttachmentContent } = await import('./attachment-content-cas-route.ts');
-    const replaced = await putAttachmentContent(new Request(`http://localhost/api/attachments/${ATTACHMENT}/content`, {
+    const replaced = await putAttachmentContent(syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments/${ATTACHMENT}/content`, {
         method: 'PUT', body: JSON.stringify({ expected: earlier.expected, replacement: 'ENC:c3ludGhldGlj:cmVwbGFjZW1lbnQ=' }),
     }), ATTACHMENT, auth as ServerSession);
     assert.equal(replaced.status, 200);

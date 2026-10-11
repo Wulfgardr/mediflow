@@ -179,10 +179,10 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         let model = await makeModel(source: source)
         await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
 
-        // @Codex WUL-723: a new result persists the neutral wording and its version.
+        // A new result persists the neutral wording and its version.
         let answers = Dictionary(uniqueKeysWithValues: ClinicalScales.mmse.questions.map { ($0.id, 0) })
-        let interpretation = "Punteggio grezzo MMSE: 0/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Interpretazione clinica richiesta; nessuna correzione per età, scolarità o lingua applicata."
-        let version = "mediflow.mmse.screening-limits.v1"
+        let interpretation = "Punteggio grezzo MMSE: 0/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Definizione locale: edizione e variante italiana non identificate. Interpretazione clinica richiesta; nessuna correzione normativa applicata."
+        let version = "mediflow.mmse.screening-limits.v2"
         await model.submitScale(ClinicalScales.mmse, answers: answers)
 
         let createCount = await source.createEntryCalls

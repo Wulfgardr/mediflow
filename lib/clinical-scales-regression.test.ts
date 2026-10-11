@@ -50,14 +50,14 @@ test('new interpretation versions persist separately from instruments at every f
                 'reg1', 'reg2', 'reg3', 'att1', 'att2', 'att3', 'att4', 'att5', 'rec1', 'rec2', 'rec3',
                 'lang1', 'lang2', 'lang3', 'lang4', 'lang5', 'lang6', 'lang7'],
             totals: [0, 9, 10, 17, 18, 23, 24, 30],
-            version: 'mediflow.mmse.screening-limits.v1',
-            text: (total: number) => `Punteggio grezzo MMSE: ${total}/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Interpretazione clinica richiesta; nessuna correzione per età, scolarità o lingua applicata.`,
+            version: 'mediflow.mmse.screening-limits.v2',
+            text: (total: number) => `Punteggio grezzo MMSE: ${total}/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Definizione locale: edizione e variante italiana non identificate. Interpretazione clinica richiesta; nessuna correzione normativa applicata.`,
         },
         gds: {
             keys: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8', 'g9', 'g10', 'g11', 'g12', 'g13', 'g14', 'g15'],
             totals: [0, 5, 6, 10, 11, 15],
-            version: 'mediflow.gds15.screening-limits.v1',
-            text: (total: number) => `Punteggio grezzo GDS-15: ${total}/15. Screening dei sintomi depressivi: il punteggio non formula una diagnosi né stabilisce la gravità. Valutazione clinica richiesta; versione italiana e periodo di riferimento da verificare.`,
+            version: 'mediflow.gds15.screening-limits.v2',
+            text: (total: number) => `Punteggio grezzo GDS-15: ${total}/15. Screening dei sintomi depressivi: il punteggio non formula una diagnosi né stabilisce la gravità. Definizione locale: fonte della traduzione italiana e periodo di riferimento non identificati. Valutare comprensione e attendibilità delle risposte, con particolare cautela nella compromissione cognitiva grave. Valutazione clinica richiesta.`,
         },
     };
     for (const [id, golden] of Object.entries(domains)) {
@@ -81,19 +81,51 @@ test('new interpretation versions persist separately from instruments at every f
             assert.ok(stored.content.endsWith(`Versione interpretazione: ${golden.version}`));
         }
     }
-    assert.equal(prepareScaleSubmission(poma.id, zero).metadata.interpretationVersion, undefined);
+
 });
 
-test('historical MMSE/GDS records and absent or unknown version metadata are not reinterpreted', () => {
+test('new local functional policies persist totals and limits while POMA wording stays unchanged', async () => {
+    for (const [id, version, texts] of [
+        ['adl', 'mediflow.adl.local-interpretation.v2', [0, 6].map(score => `Punteggio ADL locale: ${score}/6. Risposte ai sei domini di autonomia, senza attribuzione di una classe di gravità. Fonte della versione locale e adattamento italiano da verificare. Interpretare considerando osservazione clinica, contesto e informazioni della persona o dell’informante.`)],
+        ['iadl', 'mediflow.iadl.local-interpretation.v2', [0, 8].map(score =>
+            `Punteggio IADL locale: ${score}/8. Otto domini per ogni persona, indipendentemente dal sesso. Definizione locale con ancoraggi semplificati; equivalenza a una versione validata non verificata. Attività mai svolte e contesto istituzionale limitano l’interpretazione; nessuna imputazione o riduzione automatica del denominatore.`)],
+        [poma.id, 'mediflow.poma28.nonclassification.v1', [vectors.nonclassification, vectors.nonclassification]],
+    ] as const) {
+        const definition = SCALES[id];
+        for (const maximum of [false, true]) {
+            const answers = Object.fromEntries(definition.questions.map(q =>
+                [q.id, maximum ? Math.max(...q.options!.map(o => o.value as number)) : 0]));
+            const stored = await submitScale(id, answers, submission => JSON.parse(JSON.stringify(submission)));
+            assert.equal(stored.metadata.score, Object.values(answers).reduce((sum, value) => sum + value, 0));
+            assert.equal(stored.metadata.interpretation, texts[maximum ? 1 : 0]);
+            assert.equal(stored.metadata.interpretationVersion, version);
+            assert.deepEqual(stored.metadata.instrument, definition.instrument);
+            assert.ok(stored.content.endsWith(`Versione interpretazione: ${version}`));
+            assert.ok(scaleHistoryNotice(stored.metadata)!.includes(`Versione interpretazione: ${version}`));
+            const { interpretationVersion: omitted, ...historical } = stored.metadata;
+            assert.equal(omitted, version);
+            const bytes = JSON.stringify(historical);
+            assert.equal(scaleHistoryNotice(historical), id === poma.id ? SOURCE_BOUND_TINETTI_NOTICE : null);
+            assert.equal(JSON.stringify(historical), bytes);
+        }
+    }
+});
+
+test('historical local-scale records and absent or unknown version metadata are not reinterpreted', () => {
     for (const [id, score, text] of [
         ['mmse', 24, 'Assenza di decadimento cognitivo (24-30)'],
         ['gds', 6, 'Depressione Lieve (6-10)'],
+        ['adl', 4, 'Compromissione Lieve (4-5/6)'],
+        ['iadl', 8, 'Punteggio totale: 8/8. (Minore è il punteggio, maggiore è la dipendenza strumentale).'],
     ] as const) {
         const stored = { scaleId: id, score, interpretation: text, answers: { legacyPartial: 1 } };
         const bytes = JSON.stringify(stored);
         assert.equal(scaleHistoryNotice(stored), null);
         assert.equal(JSON.stringify(stored), bytes);
         assert.equal(stored.interpretation, text);
+        const previous = { ...stored, interpretationVersion: 'recorded.policy.v1' };
+        assert.equal(scaleHistoryNotice(previous), 'Versione interpretazione: recorded.policy.v1');
+        assert.equal(previous.interpretation, text);
         const future = { ...stored, interpretationVersion: 'future.policy.v9' };
         assert.equal(scaleHistoryNotice(future), 'Versione interpretazione: future.policy.v9');
         assert.equal(future.interpretation, text);
@@ -110,11 +142,12 @@ test('catalog review register covers all instruments without inventing permissio
         assert.equal(contract.clinicalReviewer, null);
         assert.equal(contract.rightsReviewer, null);
         assert.equal(contract.permissionReference, null);
+        assert.equal(contract.permissionAttestation, 'project-owner-attested-2026-10-11');
         assert.equal(contract.newUseDecision, 'hold-proposed-not-enforced');
         assert.equal(contract.missingAnswers, 'reject-incomplete-no-imputation');
         assert.ok(contract.sourceId && contract.population && contract.scoring && contract.reviewGap);
     }
-    assert.equal(SCALE_USE_CONTRACTS.gds.rights, 'original-public-domain; local-translation-unverified');
+    assert.equal(SCALE_USE_CONTRACTS.gds.rights, 'original-public-domain; local-permission-owner-attested-not-inspected');
     assert.match(SCALES.iadl.description, /tutte le 8 risposte per ogni persona/);
 });
 
@@ -210,7 +243,7 @@ test('Retired/unknown IDs are never active aliases and historic answer semantics
 
 test('Source-bound display requires every known provenance field; no historical recalculation', () => {
     const metadata = prepareScaleSubmission(poma.id, zero).metadata;
-    assert.equal(scaleHistoryNotice(metadata), SOURCE_BOUND_TINETTI_NOTICE);
+    assert.equal(scaleHistoryNotice(metadata), `${SOURCE_BOUND_TINETTI_NOTICE} · Versione interpretazione: mediflow.poma28.nonclassification.v1`);
     for (const key of Object.keys(vectors.instrument)) {
         const incomplete = { ...vectors.instrument } as Record<string, unknown>;
         delete incomplete[key];
@@ -276,6 +309,6 @@ test('POMA provenance stays metadata through submission and history without fetc
     assert.equal(writes, 1, 'only the explicit synthetic writer is called');
     assert.deepEqual(metadata.instrument, vectors.instrument);
     assert.equal(isSourceBoundTinetti(metadata), true);
-    assert.equal(scaleHistoryNotice(metadata), SOURCE_BOUND_TINETTI_NOTICE);
+    assert.equal(scaleHistoryNotice(metadata), `${SOURCE_BOUND_TINETTI_NOTICE} · Versione interpretazione: mediflow.poma28.nonclassification.v1`);
     assert.equal(fetches, 0, 'no source URL retrieval, including a swallowed fetch failure');
 });

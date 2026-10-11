@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -25,10 +26,13 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-    if (!await requireSession()) return unauthorizedResponse();
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
     let input: unknown;
     try { input = await request.json(); }
     catch { return failure(new WorkProfileError('input_invalid')); }
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     try {
         return NextResponse.json(updateWorkProfile(input), { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) { return failure(error); }

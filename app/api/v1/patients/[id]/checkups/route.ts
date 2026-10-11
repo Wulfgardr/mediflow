@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { checkupCreateIdSchema } from '@/lib/api-schemas/clinical-writes';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
 // Codex: created 2026-02-01
@@ -89,6 +90,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/checkups error:', error);
         return NextResponse.json({ error: 'Failed to fetch checkups' }, { status: 500 });
     }
@@ -99,8 +102,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
+        /* @Codex */
         const { id } = await params;
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
@@ -123,12 +126,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const result = createCheckupOperation({
             patientId: id, checkupId: normalized.values.id, values: normalized.values, mode: 'v1',
             changedFields: listChangedFields(auditBody, ['id']),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /api/v1/patients/[id]/checkups error:', error);
         return NextResponse.json({ error: 'Failed to create checkup' }, { status: 500 });
     }

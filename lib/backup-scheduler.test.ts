@@ -4,11 +4,14 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { spawnSync } from 'node:child_process';
+import childProcess, { spawnSync } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import {
     applyBackupRetention,
+    BackupSchedulerOutcomeUnknownError,
+    runBackupSchedulerScript,
     applyRetentionResultToState,
     buildBackupLaunchAgentPlist,
     DEFAULT_BACKUP_RETENTION_KEEP_ARTIFACTS,
@@ -19,6 +22,8 @@ import {
 } from './backup-scheduler.ts';
 import {
     buildCronLine,
+    getSchedulerAdapter,
+    buildBackupSchedulerStatus,
     buildSchtasksCreateArgs,
     buildSystemdServiceUnit,
     buildSystemdTimerUnit,
@@ -422,4 +427,88 @@ test('rejects unsafe scheduler command values before writing OS job files', () =
         () => buildCronLine({ nodePath: '/usr/bin/node', runnerPath: '/app/runner.mjs', projectRoot: '/app', dataDir: '/d', destinationDir: '/b\n* * * * * bad', hour: 2, minute: 0 }),
         /destinationDir/,
     );
+});
+
+
+// The scheduler boundary is replaced; no command reaches a real OS scheduler.
+function syntheticScheduler(t: test.TestContext, platform: string, command: typeof spawnSync) {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-scheduler-boundary-')));
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    const dataDir = process.env.MEDIFLOW_DATA_DIR;
+    Object.defineProperty(process, 'platform', { value: platform });
+    process.env.MEDIFLOW_DATA_DIR = root;
+    t.mock.method(os, 'homedir', () => root);
+    t.mock.method(childProcess, 'spawnSync', command);
+    syncBuiltinESMExports();
+    t.after(() => {
+        t.mock.restoreAll(); syncBuiltinESMExports();
+        Object.defineProperty(process, 'platform', originalPlatform);
+        if (dataDir === undefined) delete process.env.MEDIFLOW_DATA_DIR; else process.env.MEDIFLOW_DATA_DIR = dataDir;
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+    return root;
+}
+const schedulerResult = (stdout = '', status: number | null = 0, error?: Error) => ({ pid: 1, output: [], stdout, stderr: '', signal: null, status, ...(error ? { error } : {}) });
+
+test('failed or truncated cron read preserves foreign jobs without issuing a write', (t) => {
+    let cron = '5 * * * * foreign-job # dev.wulfgardr.mediflow.backup-other\n';
+    let writes = 0;
+    syntheticScheduler(t, 'linux', ((file: string, args: string[], options: { input?: string }) => {
+        if (file === 'systemctl') return schedulerResult('', null, Object.assign(new Error('synthetic missing systemd'), { code: 'ENOENT' }));
+        if (args[0] === '-') { writes += 1; cron = options.input ?? ''; return schedulerResult(); }
+        return schedulerResult('5 * * * * partial-output', null, Object.assign(new Error('synthetic output limit'), { code: 'ENOBUFS' }));
+    }) as unknown as typeof spawnSync);
+    assert.throws(() => getSchedulerAdapter().install(getDefaultBackupSchedulerState()), BackupSchedulerOutcomeUnknownError);
+    assert.equal(writes, 0);
+    assert.equal(cron, '5 * * * * foreign-job # dev.wulfgardr.mediflow.backup-other\n');
+    assert.equal(buildBackupSchedulerStatus(null).installed, null);
+});
+
+test('cron changes retain foreign marker prefixes and require readback of the exact owned line', (t) => {
+    const foreign = '5 * * * * foreign-job # dev.wulfgardr.mediflow.backup-other';
+    let cron = foreign + '\n';
+    syntheticScheduler(t, 'linux', ((file: string, args: string[], options: { input?: string }) => {
+        if (file === 'systemctl') return schedulerResult('', null, Object.assign(new Error('synthetic missing systemd'), { code: 'ENOENT' }));
+        if (args[0] === '-') { cron = options.input ?? ''; return schedulerResult(); }
+        return schedulerResult(cron);
+    }) as unknown as typeof spawnSync);
+    getSchedulerAdapter().install(getDefaultBackupSchedulerState());
+    assert.equal(cron.split('\n')[0], foreign);
+    assert.equal(getSchedulerAdapter().getStatus().installed, true);
+    getSchedulerAdapter().uninstall();
+    assert.equal(cron, foreign + '\n');
+    assert.equal(getSchedulerAdapter().getStatus().installed, false);
+});
+
+test('uncertain task deletion stops before wrapper cleanup or another command', (t) => {
+    const calls: string[] = [];
+    let deletionAccepted = false;
+    const root = syntheticScheduler(t, 'win32', ((_file: string, args: string[]) => {
+        calls.push(args[0]);
+        if (deletionAccepted && args[0] === '/Delete') return schedulerResult();
+        if (args[0] === '/Query' && (!deletionAccepted || calls.length === 1)) return schedulerResult('"\\MediFlow Backup","later","Ready"');
+        return schedulerResult('', null, Object.assign(new Error('synthetic timeout'), { code: 'ETIMEDOUT' }));
+    }) as unknown as typeof spawnSync);
+    const wrapper = path.join(root, 'mediflow-scheduled-backup.cmd');
+    fs.writeFileSync(wrapper, 'synthetic wrapper');
+    assert.throws(() => getSchedulerAdapter().uninstall(), BackupSchedulerOutcomeUnknownError);
+    assert.equal(fs.readFileSync(wrapper, 'utf8'), 'synthetic wrapper');
+    assert.deepEqual(calls, ['/Query', '/Delete']);
+    deletionAccepted = true; calls.length = 0;
+    assert.throws(() => getSchedulerAdapter().uninstall(), BackupSchedulerOutcomeUnknownError);
+    assert.equal(fs.readFileSync(wrapper, 'utf8'), 'synthetic wrapper');
+    assert.deepEqual(calls, ['/Query', '/Delete', '/Query']);
+});
+
+test('launchd state comes from the OS response, not the presence of a plist', (t) => {
+    const root = syntheticScheduler(t, 'darwin', (() => schedulerResult('PID\tStatus\tLabel\n')) as unknown as typeof spawnSync);
+    const plist = path.join(root, 'Library', 'LaunchAgents', 'dev.wulfgardr.mediflow.backup.plist');
+    fs.mkdirSync(path.dirname(plist), { recursive: true }); fs.writeFileSync(plist, 'synthetic stale plist');
+    assert.equal(getSchedulerAdapter().getStatus().installed, false);
+});
+
+test('manual runner cannot publish reassuring JSON when its process failed', (t) => {
+    syntheticScheduler(t, process.platform, (() => schedulerResult('{"ok":true,"message":"synthetic success"}', 1)) as unknown as typeof spawnSync);
+    assert.deepEqual(runBackupSchedulerScript(), { ok: false, uncertain: true,
+        message: 'Esito del backup non confermato. Rileggi l’ultimo backup prima di ripetere l’operazione.' });
 });

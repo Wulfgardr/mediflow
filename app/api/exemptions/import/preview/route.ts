@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { dbServer } from '@/lib/db-server';
@@ -9,6 +10,8 @@ export const runtime = 'nodejs';
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     let authority: ReturnType<typeof acquireExemptionImportAuthority> | undefined;
     try {
         authority = acquireExemptionImportAuthority(session);

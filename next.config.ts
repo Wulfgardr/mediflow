@@ -64,6 +64,9 @@ const nextConfig: NextConfig = {
   /* @Codex */
   distDir,
   output: "standalone",
+  // The admitted source payload stays immutable across requests and restarts.
+  // Next retains its in-memory cache and immutable build seeds; no disk ISR/image cache.
+  experimental: { isrFlushToDisk: false },
   /* @Codex */
   outputFileTracingIncludes: {
     "/*": [

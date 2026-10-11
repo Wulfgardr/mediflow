@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
+import { materializeSourceRuntime } from './source-runtime.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const owner = '@mediflow/web-auth-lifecycle-owner';
@@ -87,6 +88,90 @@ test('inventory distinguishes packed closure, locked inputs, missing notices and
   assert.deepEqual(generatePayloadLedger(input), ledger);
   assert.equal(verifyPayloadLedger({ payloadRoot: input.payloadRoot, ledger }).status, 'TRUSTED_ROSTER_BYTES_MATCH');
 });
+
+function sourceAliasFixture(t, registry = false) {
+  const f = fixture(t), packageName = registry ? 'synthetic-runtime' : owner;
+  const installed = path.join(f.sourceRoot, 'node_modules', packageName);
+  if (registry) {
+    f.put(f.payloadRoot, 'package.json', { name: packageName, version: '1.0.0' });
+    f.put(f.sourceRoot, 'package.json', { dependencies: { [packageName]: '^1.0.0' } });
+    f.put(f.sourceRoot, 'package-lock.json', { lockfileVersion: 3, packages: {
+      '': {}, [`node_modules/${packageName}`]: { version: '1.0.0',
+        resolved: `https://registry.npmjs.org/${packageName}/-/${packageName}-1.0.0.tgz`, integrity: 'sha512-c3ludGhldGlj' },
+    } });
+  }
+  fs.mkdirSync(path.dirname(installed), { recursive: true });
+  fs.renameSync(f.payloadRoot, installed);
+  const web = path.join(f.directory, 'standalone');
+  const alias = path.join(web, '.next/node_modules', `${packageName}-synthetic`);
+  fs.mkdirSync(path.dirname(alias), { recursive: true });
+  fs.symlinkSync(installed, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const canonical = path.join(web, 'node_modules', packageName);
+  if (registry) {
+    fs.cpSync(installed, canonical, { recursive: true });
+    f.put(installed, 'untraced.js', '// must never be copied into the payload\n');
+  }
+  return { ...f, installed, web, alias, canonical };
+}
+
+test('source preparation materializes only the proven installed local package, without changing its source', t => {
+  const f = sourceAliasFixture(t);
+  const ledger = generatePayloadLedger({ ...f, payloadRoot: f.installed });
+  assert.throws(() => verifyPayloadLedger({ payloadRoot: f.alias, ledger }), /nonphysical/u);
+  materializeSourceRuntime(f.web, f.sourceRoot);
+  assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), false);
+  assert.equal(verifyPayloadLedger({ payloadRoot: f.alias, ledger }).files, 2);
+  assert.equal(verifyPayloadLedger({ payloadRoot: f.installed, ledger }).files, 2);
+});
+
+test('source registry alias reuses only its matching physical traced subset', t => {
+  const f = sourceAliasFixture(t, true);
+  materializeSourceRuntime(f.web, f.sourceRoot);
+  assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), false);
+  assert.deepEqual(fs.readdirSync(f.alias), ['index.js', 'package.json']);
+  assert.deepEqual(fs.readFileSync(path.join(f.alias, 'index.js')), fs.readFileSync(path.join(f.installed, 'index.js')));
+  assert.equal(fs.existsSync(path.join(f.installed, 'untraced.js')), true);
+});
+
+for (const mutation of ['different traced bytes', 'missing canonical', 'aliased canonical', 'wrong lock version']) {
+  test(`source registry alias rejects ${mutation} without replacing the alias`, t => {
+    const f = sourceAliasFixture(t, true);
+    if (mutation === 'different traced bytes') fs.appendFileSync(path.join(f.canonical, 'index.js'), 'changed');
+    if (mutation === 'missing canonical' || mutation === 'aliased canonical') fs.rmSync(f.canonical, { recursive: true });
+    if (mutation === 'aliased canonical') fs.symlinkSync(f.installed, f.canonical, process.platform === 'win32' ? 'junction' : 'dir');
+    if (mutation === 'wrong lock version') {
+      const lock = JSON.parse(fs.readFileSync(path.join(f.sourceRoot, 'package-lock.json')));
+      lock.packages['node_modules/synthetic-runtime'].version = '2.0.0';
+      f.put(f.sourceRoot, 'package-lock.json', lock);
+    }
+    assert.throws(() => materializeSourceRuntime(f.web, f.sourceRoot));
+    assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), true);
+    assert.deepEqual(fs.readdirSync(path.dirname(f.alias)), [path.basename(f.alias)]);
+  });
+}
+
+for (const mutation of ['tampered installed bytes', 'aliased node_modules', 'aliased source root']) {
+  test(`source preparation rejects ${mutation} before replacing the build alias`, t => {
+    const f = sourceAliasFixture(t);
+    let sourceRoot = f.sourceRoot;
+    if (mutation === 'tampered installed bytes') {
+      fs.cpSync(f.installed, f.canonical, { recursive: true });
+      fs.appendFileSync(path.join(f.installed, 'index.js'), 'changed');
+    }
+    if (mutation === 'aliased node_modules') {
+      const modules = path.join(sourceRoot, 'node_modules'), outside = path.join(f.directory, 'foreign-install');
+      fs.renameSync(modules, outside);
+      fs.symlinkSync(outside, modules, process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    if (mutation === 'aliased source root') {
+      sourceRoot = path.join(f.directory, 'source-alias');
+      fs.symlinkSync(f.sourceRoot, sourceRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    assert.throws(() => materializeSourceRuntime(f.web, sourceRoot));
+    assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), true);
+    assert.deepEqual(fs.readdirSync(path.dirname(f.alias)), [path.basename(f.alias)]);
+  });
+}
 
 for (const mutation of ['tampered', 'missing', 'extra', 'wrong-package', 'symlink']) {
   test(`local closure rejects ${mutation} installed members without execution`, t => {
@@ -192,5 +277,73 @@ for (const mode of [0o755, 0o4644]) {
       return;
     }
     assert.throws(() => generatePayloadLedger(input), /installed member mode mismatch/u);
+  });
+}
+
+// Same external ledger and startup path used by npm start and source Headless.
+function sourceStartFixture(t) {
+  const f = fixture(t, 'standalone');
+  const web = path.join(f.sourceRoot, '.next', 'standalone');
+  fs.mkdirSync(path.dirname(web)); fs.renameSync(f.payloadRoot, web); f.payloadRoot = web;
+  f.expectedRuntime = { nodeVersion: process.versions.node, nodeAbi: process.versions.modules,
+    platform: process.platform, arch: process.arch };
+  const marker = path.join(f.directory, 'application-executed');
+  f.put(web, 'mediflow-runtime-contract.json', { schemaVersion: 1,
+    node: { major: 24, version: process.versions.node, moduleVersion: process.versions.modules },
+    platform: process.platform, arch: process.arch });
+  f.put(web, 'server.js', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'web');
+    console.log(process.env.MEDIFLOW_APP_REVISION, process.env.MEDIFLOW_APP_FINGERPRINT);`);
+  f.put(web, 'scripts/register-strip-types-loader.mjs', '// inert synthetic loader');
+  f.put(web, 'scripts/mediflow-headless-supervisor.mjs', `import fs from 'node:fs';
+    export function runHeadlessSupervisorV1() { fs.writeFileSync(${JSON.stringify(marker)}, 'headless');
+      console.log(process.env.MEDIFLOW_APP_REVISION, process.env.MEDIFLOW_APP_FINGERPRINT); }`);
+  f.put(web, 'node_modules/better-sqlite3/package.json', { name: 'better-sqlite3', version: 'synthetic', main: 'index.js' });
+  f.put(web, 'node_modules/better-sqlite3/index.js', `module.exports = class {
+    constructor(name) { if (name !== ':memory:') throw new Error('Non-synthetic database'); }
+    prepare() { return { get: () => ({ value: 1 }) }; } close() {} };`);
+  // The synthetic dependency belongs to the synthetic lock, not the host install.
+  const lock = JSON.parse(fs.readFileSync(path.join(f.sourceRoot, 'package-lock.json')));
+  lock.packages['node_modules/better-sqlite3'] = { version: 'synthetic' };
+  f.put(f.sourceRoot, 'package-lock.json', lock);
+  f.put(f.sourceRoot, '.gitignore', '.next/\n'); f.commit();
+  const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.sourceRoot, encoding: 'utf8' }).trim();
+  const sourceFingerprint = `synthetic@${revision.slice(0, 12)}:clean`;
+  f.put(web, 'mediflow-build-identity.json', { schemaVersion: 1,
+    revision, branch: 'synthetic', worktreeHash: 'clean', sourceFingerprint, buildId: 'synthetic-build' });
+  const seal = () => f.put(path.dirname(web), 'runtime-payload-ledger.json', generatePayloadLedger(f));
+  seal();
+  const run = mode => spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import { startSourceRuntime } from ${JSON.stringify(new URL('./source-runtime.mjs', import.meta.url).href)};
+    await startSourceRuntime(${JSON.stringify(mode)}, ${JSON.stringify(f.sourceRoot)});`],
+  { env: { MEDIFLOW_DATA_DIR: f.directory }, encoding: 'utf8', timeout: 15000 });
+  return { ...f, marker, seal, run, revision, sourceFingerprint };
+}
+
+test('source Web and Headless launch the admitted payload, independently of cwd', t => {
+  const f = sourceStartFixture(t);
+  for (const mode of ['web', 'headless']) {
+    const result = f.run(mode); assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), `${f.revision.slice(0, 12)} ${f.sourceFingerprint}`);
+    assert.equal(fs.readFileSync(f.marker, 'utf8'), mode); fs.unlinkSync(f.marker);
+  }
+});
+
+for (const mutation of ['missing', 'altered', 'extra', 'node', 'abi', 'arch']) {
+  test(`source startup denies ${mutation} before Web or Headless application execution`, t => {
+    const f = sourceStartFixture(t);
+    if (mutation === 'missing') fs.unlinkSync(path.join(f.payloadRoot, 'scripts/register-strip-types-loader.mjs'));
+    if (mutation === 'altered') fs.appendFileSync(path.join(f.payloadRoot, 'server.js'), '// changed');
+    if (mutation === 'extra') f.put(f.payloadRoot, '.next/server/route-cache/APP_PAGE/extra', 'not admitted');
+    if (mutation === 'node') f.put(f.sourceRoot, '.nvmrc', '26\n');
+    if (mutation === 'abi' || mutation === 'arch') {
+      const contract = JSON.parse(fs.readFileSync(path.join(f.payloadRoot, 'mediflow-runtime-contract.json')));
+      if (mutation === 'abi') { contract.node.moduleVersion = '999'; f.expectedRuntime.nodeAbi = '999'; }
+      else { contract.arch = process.arch === 'x64' ? 'arm64' : 'x64'; f.expectedRuntime.arch = contract.arch; }
+      f.put(f.payloadRoot, 'mediflow-runtime-contract.json', contract); f.seal();
+    }
+    for (const mode of ['web', 'headless']) {
+      assert.notEqual(f.run(mode).status, 0, mutation);
+      assert.equal(fs.existsSync(f.marker), false, `${mode} must not execute before admission`);
+    }
   });
 }

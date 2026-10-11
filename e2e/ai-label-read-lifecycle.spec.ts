@@ -2,12 +2,14 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('locking retires the pending model footer read before its response or fallback', async ({ page }) => {
     const pin = process.env.E2E_PIN || '1234';
     await bootstrapUnlockedSession(page, pin);
+    const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
     const marker = randomUUID();
-    const created = await page.request.post('/api/patients', { data: {
+    const created = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
         firstName: 'Lettura footer', lastName: `Sintetico ${marker.slice(0, 8)}`,
         taxCode: `LBL${marker.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
     } });
@@ -18,7 +20,7 @@ test('locking retires the pending model footer read before its response or fallb
     const { version } = await baseline.json() as { version: number };
     // @Codex: persisted insights belong to the versioned update contract;
     // patient creation intentionally does not accept this field.
-    const updated = await page.request.put(`/api/patients/${patient.id}`, { data: {
+    const updated = await page.request.put(`/api/patients/${patient.id}`, { headers: archiveHeaders, data: {
         version, documentInsights: JSON.stringify([{
             id: marker, date: new Date().toISOString(), fileName: 'Evidenza sintetica',
             rawMarkdown: 'Test di cancellazione.', summary: 'Nessun dato reale.', extractedData: {},
@@ -92,7 +94,7 @@ test('locking retires the pending model footer read before its response or fallb
             const current = await page.request.get(`/api/patients/${patient.id}`);
             expect(current.status()).toBe(200);
             const { version } = await current.json() as { version: number };
-            expect((await page.request.delete(`/api/patients/${patient.id}`, { data: { version } })).status()).toBe(200);
+            expect((await page.request.delete(`/api/patients/${patient.id}`, { headers: archiveHeaders, data: { version } })).status()).toBe(200);
         }
     }
 });

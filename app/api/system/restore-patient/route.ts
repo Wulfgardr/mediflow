@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { canIncrementVersion } from '@/lib/version-concurrency';
 // WUL-306 (ADR 0066): explicit admin restore of a soft-deleted patient.
 import { NextResponse } from 'next/server';
@@ -40,6 +42,8 @@ export async function GET() {
 
         return NextResponse.json({ success: true, softDeleted });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] Restore patient list failed:', error);
         return NextResponse.json({ error: 'Failed to list soft-deleted patients' }, { status: 500 });
     }
@@ -49,6 +53,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsed = await readBoundedJsonBody(request, RESTORE_PATIENT_JSON_MAX_BYTES, 'request-json');
@@ -92,7 +98,7 @@ export async function POST(request: Request) {
             writeAuditEventInTransaction(tx, {
                 eventType: 'patient.restored',
                 outcome: 'success',
-                actorType: auditContext.actorType,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType,
                 actorRef: auditContext.actorRef,
                 subjectType: 'patient',
                 subjectRef: patientId,
@@ -108,6 +114,8 @@ export async function POST(request: Request) {
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] Restore patient failed:', error);
         return NextResponse.json({ error: 'Restore failed' }, { status: 500 });
     }
