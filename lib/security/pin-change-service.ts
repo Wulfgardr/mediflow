@@ -2,7 +2,7 @@
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 
 /* @Codex */
 import {
@@ -16,6 +16,7 @@ import {
     PIN_CHANGE_CONFLICT_CODE,
     PIN_CHANGE_INVALID_CURRENT_PIN_CODE,
     PIN_CHANGE_INVALID_NEW_PIN_CODE,
+    PIN_CHANGE_PASSPHRASE_ACCOUNT_CODE,
     PIN_CHANGE_REUSE_NOT_ALLOWED_CODE,
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
@@ -112,6 +113,15 @@ export async function changePin(
     const db = await resolveDatabase(dependencies);
     const user = await db.select().from(users).where(eq(users.id, input.session.userId)).get();
     if (!user) return { kind: 'unauthorized' };
+    // This rotation replaces the wrapping of the master key: the PIN no longer has that authority here.
+    if (user.unlockVerifierHash) {
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PIN_CHANGE_PASSPHRASE_ACCOUNT_CODE,
+            message: 'Questo account si sblocca con una passphrase: il PIN non può sostituire la protezione della chiave.',
+        };
+    }
 
     const isCurrentPinValid = await bcrypt.compare(input.currentPin, user.passwordHash);
     if (!isCurrentPinValid) {
@@ -191,7 +201,7 @@ export async function changePin(
                 firstFailedLoginAt: null,
                 lockedUntil: null,
             })
-            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash)))
+            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash), isNull(users.unlockVerifierHash)))
             .run());
     } catch (error) {
         abortPreparedRetirements();

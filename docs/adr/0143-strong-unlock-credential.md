@@ -2,7 +2,7 @@
 
 Date: 2026-10-10
 
-Status: Accepted — 10 ottobre 2026, con le opzioni raccomandate; nessun codice cambia con questo documento
+Status: Accepted — 10 ottobre 2026, con le opzioni raccomandate; emendato l'11 ottobre 2026 ([Emendamento del passo 2](#emendamento-del-passo-2-11-ottobre-2026))
 
 ## Problema e contesto
 
@@ -177,6 +177,43 @@ Ogni passo è una PR a sé, provata prima di collegare il successivo.
    l'adattamento della navigazione e della suite E2E.
 6. **Recupero.** Ripristino su un computer nuovo con backup, kit e chiave di
    recupero: chiude il criterio 1 di WUL-730.
+
+## Emendamento del passo 2 (11 ottobre 2026)
+
+Scrivendo il lato server sono emerse cinque cose che il testo sopra non
+fissava, o fissava in modo incompatibile con la scelta del PIN di conferma.
+Dove questo emendamento e il testo sopra divergono, vale l'emendamento.
+
+1. **Il PIN che il medico ha già diventa il PIN di conferma.** La migrazione
+   toglie l'involucro del PIN, non il suo hash bcrypt: il punto 6 diceva di
+   togliere entrambi, ma le conferme di revisione e di ruolo verificano proprio
+   quell'hash, e tra la migrazione e il passo 4 non avrebbero avuto nulla da
+   verificare. Tenerlo non espone di più: dopo la migrazione il PIN non avvolge
+   alcuna chiave, e chi possiede una copia del database precedente alla
+   migrazione può già provare il PIN contro l'involucro che quella copia
+   contiene.
+2. **Su un account con passphrase il PIN non apre una sessione e non tocca
+   l'involucro.** L'accesso, dal browser e dal canale nativo, accetta solo il
+   verificatore; il cambio PIN e il re-wrap, che sostituiscono l'involucro, sono
+   rifiutati. Un PIN presentato all'accesso è negato senza essere confrontato e
+   senza contare come tentativo: un client rimasto alla versione precedente che
+   riprova il PIN non deve poter bloccare l'account.
+3. **Prima di autenticarsi il browser riceve il salt.** `GET /api/auth/check`
+   restituisce, per un account con passphrase, il salt e la versione della
+   derivazione: senza non potrebbe derivare il verificatore. Il salt non è un
+   segreto; per un account ancora sul PIN la risposta non rivela nulla di nuovo.
+4. **I client nativi restano fuori dagli account migrati** finché non inviano
+   il verificatore: non entrano con il PIN. È una conseguenza da dichiarare al
+   medico prima che la migrazione del passo 3 lo raggiunga.
+5. **Recupero sullo stesso computer.** Anche la chiave di recupero produce un
+   verificatore, di cui il server conserva l'hash: chi la possiede può far
+   accettare una nuova passphrase senza sessione. Le colonne sono quindi
+   quattro, non due, e portano lo schema alla versione 2
+   ([ADR 0080](0080-serialize-sqlite-schema-guards-at-bootstrap.md#versioni-dello-schema)).
+
+Il passo 4 dell'ordine di consegna si riduce di conseguenza: dare al PIN di
+conferma un cambio proprio, che aggiorna solo l'hash, e chiamarlo con il suo
+nome nell'interfaccia.
 
 ## Come si prova
 

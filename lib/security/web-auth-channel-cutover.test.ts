@@ -132,7 +132,8 @@ test('routes make Web authority literal, do not read source-surface, and retain 
     const loginSource = fs.readFileSync(path.join(root, 'app/api/auth/login/route.ts'), 'utf8');
     const setupSource = fs.readFileSync(path.join(root, 'app/api/auth/setup/route.ts'), 'utf8');
     assert.match(loginSource, /from '@\/lib\/security\/host-credential-verification'/u);
-    assert.match(loginSource, /verifyHostCredentials\(\{ username: requestedUsername, pin: password \}\)/u);
+    assert.match(loginSource, /verifyUnlockCredentials\(\s*verifier \? \{ username: requestedUsername, verifier \} : \{ username: requestedUsername, pin: password \},\s*\)/u);
+    assert.doesNotMatch(loginSource, /verifyHostCredentials/u);
     assert.match(loginSource, /authFailureResponse\(verification\.body, verification\.status, mutation\.ifMatch\)/u);
     assert.match(loginSource, /beginWebAuthControl\('login', mutation\)/u);
     assert.match(loginSource, /issueWebAuthControl\(attempt,\s*\{[\s\S]*?id:\s*user\.id[\s\S]*?\}\);/u);

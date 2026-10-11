@@ -9,6 +9,8 @@ export const PIN_CHANGE_INVALID_NEW_PIN_CODE = 'PIN_CHANGE_INVALID_NEW_PIN';
 export const PIN_CHANGE_REUSE_NOT_ALLOWED_CODE = 'PIN_CHANGE_REUSE_NOT_ALLOWED';
 /* @Codex */
 export const PIN_CHANGE_CONFLICT_CODE = 'PIN_CHANGE_CONFLICT';
+/** ADR 0143: on an account with a passphrase the PIN wraps nothing, so it cannot replace the wrapping. */
+export const PIN_CHANGE_PASSPHRASE_ACCOUNT_CODE = 'PIN_CHANGE_PASSPHRASE_ACCOUNT';
 
 /* @Codex */
 export type PinChangeFailurePayload = {
