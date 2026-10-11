@@ -387,7 +387,7 @@ test('security provider clears stale persisted authority and fences stale auth p
     assert.ok(lockStart >= 0 && source.indexOf('clearClientAuthority();', lockStart) < requestStart);
     for (const pattern of [
         /authorityAttemptGenerationRef\.current === attemptGeneration/,
-        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return verifier \? loginWithVerifierRequest\(verifier\) : loginWithPinRequest\(pin\);/,
+        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;[\s\S]{0,160}?return material \? loginWithVerifierRequest\(material\.verifier\) : loginWithPinRequest\(pin\);/,
         /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return setupSecurityRequest\(/,
         /await persistSecuritySession\(masterKey, userData\);[\s\S]*?clearClientAuthority\(\);/,
         /setupSecurityRequest[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?SETUP_ALREADY_COMPLETED/,
