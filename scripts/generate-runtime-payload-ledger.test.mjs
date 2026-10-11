@@ -206,10 +206,12 @@ function sourceStartFixture(t) {
   f.put(web, 'mediflow-runtime-contract.json', { schemaVersion: 1,
     node: { major: 24, version: process.versions.node, moduleVersion: process.versions.modules },
     platform: process.platform, arch: process.arch });
-  f.put(web, 'server.js', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'web');`);
+  f.put(web, 'server.js', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'web');
+    console.log(process.env.MEDIFLOW_APP_REVISION, process.env.MEDIFLOW_APP_FINGERPRINT);`);
   f.put(web, 'scripts/register-strip-types-loader.mjs', '// inert synthetic loader');
   f.put(web, 'scripts/mediflow-headless-supervisor.mjs', `import fs from 'node:fs';
-    export function runHeadlessSupervisorV1() { fs.writeFileSync(${JSON.stringify(marker)}, 'headless'); }`);
+    export function runHeadlessSupervisorV1() { fs.writeFileSync(${JSON.stringify(marker)}, 'headless');
+      console.log(process.env.MEDIFLOW_APP_REVISION, process.env.MEDIFLOW_APP_FINGERPRINT); }`);
   f.put(web, 'node_modules/better-sqlite3/package.json', { name: 'better-sqlite3', version: 'synthetic', main: 'index.js' });
   f.put(web, 'node_modules/better-sqlite3/index.js', `module.exports = class {
     constructor(name) { if (name !== ':memory:') throw new Error('Non-synthetic database'); }
@@ -219,21 +221,24 @@ function sourceStartFixture(t) {
   lock.packages['node_modules/better-sqlite3'] = { version: 'synthetic' };
   f.put(f.sourceRoot, 'package-lock.json', lock);
   f.put(f.sourceRoot, '.gitignore', '.next/\n'); f.commit();
+  const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.sourceRoot, encoding: 'utf8' }).trim();
+  const sourceFingerprint = `synthetic@${revision.slice(0, 12)}:clean`;
   f.put(web, 'mediflow-build-identity.json', { schemaVersion: 1,
-    revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.sourceRoot, encoding: 'utf8' }).trim(), buildId: 'synthetic-build' });
+    revision, branch: 'synthetic', worktreeHash: 'clean', sourceFingerprint, buildId: 'synthetic-build' });
   const seal = () => f.put(path.dirname(web), 'runtime-payload-ledger.json', generatePayloadLedger(f));
   seal();
   const run = mode => spawnSync(process.execPath, ['--input-type=module', '-e', `
     import { startSourceRuntime } from ${JSON.stringify(new URL('./source-runtime.mjs', import.meta.url).href)};
     await startSourceRuntime(${JSON.stringify(mode)}, ${JSON.stringify(f.sourceRoot)});`],
   { env: { MEDIFLOW_DATA_DIR: f.directory }, encoding: 'utf8', timeout: 15000 });
-  return { ...f, marker, seal, run };
+  return { ...f, marker, seal, run, revision, sourceFingerprint };
 }
 
 test('source Web and Headless launch the admitted payload, independently of cwd', t => {
   const f = sourceStartFixture(t);
   for (const mode of ['web', 'headless']) {
     const result = f.run(mode); assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), `${f.revision.slice(0, 12)} ${f.sourceFingerprint}`);
     assert.equal(fs.readFileSync(f.marker, 'utf8'), mode); fs.unlinkSync(f.marker);
   }
 });

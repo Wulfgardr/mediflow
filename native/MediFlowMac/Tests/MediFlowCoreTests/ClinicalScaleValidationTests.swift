@@ -174,7 +174,9 @@ final class ClinicalScaleValidationTests: XCTestCase {
         let corrected = try ClinicalScales.prepareSubmission(definition: definition, answers: vector.answers)
         let bound = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry(corrected.metadataJSON)))
         XCTAssertEqual(bound.scoreLabel, "28/28")
-        XCTAssertEqual(bound.provenanceLabel, ClinicalScales.sourceBoundTinettiNotice)
+        XCTAssertEqual(bound.interpretationVersion, "mediflow.poma28.nonclassification.v1")
+        XCTAssertEqual(bound.provenanceLabel, ClinicalScales.sourceBoundTinettiNotice
+            + " · Versione interpretazione: mediflow.poma28.nonclassification.v1")
         let missing = "{\"scaleId\":\"tinetti-poma28-v1\",\"score\":24,\"interpretation\":\"Originale\",\"instrument\":\"unbound\"}"
         let unbound = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry(missing)))
         XCTAssertEqual(unbound.scoreLabel, "24")
