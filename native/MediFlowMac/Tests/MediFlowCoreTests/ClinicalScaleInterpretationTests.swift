@@ -11,16 +11,39 @@ final class ClinicalScaleInterpretationTests: XCTestCase {
         }
     }
 
+    func testNewLocalPoliciesPreserveTotalsAndKeepPomaWording() throws {
+        for (definition, version, texts) in [
+            (ClinicalScales.adl, "mediflow.adl.local-interpretation.v2", [0, 6].map { "Punteggio ADL locale: \($0)/6. Risposte ai sei domini di autonomia, senza attribuzione di una classe di gravità. Fonte della versione locale e adattamento italiano da verificare. Interpretare considerando osservazione clinica, contesto e informazioni della persona o dell’informante." }),
+            (ClinicalScales.iadl, "mediflow.iadl.local-interpretation.v2", [0, 8].map { "Punteggio IADL locale: \($0)/8. Otto domini per ogni persona, indipendentemente dal sesso. Definizione locale con ancoraggi semplificati; equivalenza a una versione validata non verificata. Attività mai svolte e contesto istituzionale limitano l’interpretazione; nessuna imputazione o riduzione automatica del denominatore." }),
+            (ClinicalScales.tinettiPOMA28V1, "mediflow.poma28.nonclassification.v1", Array(repeating: "Punteggio POMA-28: interpretazione clinica richiesta; nessuna classificazione automatica del rischio.", count: 2))
+        ] {
+            for maximum in [false, true] {
+                let answers = Dictionary(uniqueKeysWithValues: definition.questions.map {
+                    ($0.id, maximum ? $0.options.map(\.value).max()! : 0)
+                })
+                let submission = try ClinicalScales.prepareSubmission(definition: definition, answers: answers)
+                XCTAssertEqual(submission.result.score, answers.values.reduce(0, +))
+                XCTAssertEqual(submission.result.interpretation, texts[maximum ? 1 : 0])
+                XCTAssertEqual(submission.result.interpretationVersion, version)
+                let metadata = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(submission.metadataJSON.utf8)) as? [String: Any])
+                XCTAssertEqual(metadata["interpretationVersion"] as? String, version)
+                XCTAssertEqual(metadata["instrument"] == nil, definition.instrument == nil)
+                XCTAssertTrue(ClinicalScales.contentSummary(definition: definition, result: submission.result)
+                    .hasSuffix("Versione interpretazione: \(version)"))
+            }
+        }
+    }
+
     func testNewVersionsCrossFormerBoundariesWithoutDiagnosticLabels() throws {
         let cases: [(ClinicalScaleDefinition, [String], [Int], String)] = [
             (ClinicalScales.mmse,
              ["ot1", "ot2", "ot3", "ot4", "ot5", "os1", "os2", "os3", "os4", "os5",
               "reg1", "reg2", "reg3", "att1", "att2", "att3", "att4", "att5", "rec1", "rec2", "rec3",
               "lang1", "lang2", "lang3", "lang4", "lang5", "lang6", "lang7"],
-             [0, 9, 10, 17, 18, 23, 24, 30], "mediflow.mmse.screening-limits.v1"),
+             [0, 9, 10, 17, 18, 23, 24, 30], "mediflow.mmse.screening-limits.v2"),
             (ClinicalScales.gds,
              ["g1", "g2", "g3", "g4", "g5", "g6", "g7", "g8", "g9", "g10", "g11", "g12", "g13", "g14", "g15"],
-             [0, 5, 6, 10, 11, 15], "mediflow.gds15.screening-limits.v1")
+             [0, 5, 6, 10, 11, 15], "mediflow.gds15.screening-limits.v2")
         ]
         for (definition, keys, totals, version) in cases {
             XCTAssertEqual(definition.questions.map(\.id), keys)

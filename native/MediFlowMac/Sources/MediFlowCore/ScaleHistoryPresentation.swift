@@ -48,6 +48,10 @@ public enum ScaleHistoryPresentation {
         let scoreLabel = scoreLabel(metadata: metadata) ?? fallbackLineValue(prefix: "Punteggio:", in: entry.content)
         let interpretation = metadata?.interpretation?.trimmedOrNil
             ?? fallbackLineValue(prefix: "Interpretazione:", in: entry.content)
+        let provenance = ClinicalScales.tinettiHistoryNotice(
+            scaleId: metadata?.scaleId, title: title, instrument: metadata?.instrument
+        )
+        let versionLabel = metadata?.interpretationVersion.map { "Versione interpretazione: \($0)" }
 
         return ScaleHistoryItem(
             id: entry.id,
@@ -56,9 +60,9 @@ public enum ScaleHistoryPresentation {
             scoreLabel: scoreLabel,
             interpretation: interpretation,
             content: entry.content,
-            provenanceLabel: ClinicalScales.tinettiHistoryNotice(
-                scaleId: metadata?.scaleId, title: title, instrument: metadata?.instrument
-            ) ?? metadata?.interpretationVersion.map { "Versione interpretazione: \($0)" },
+            provenanceLabel: provenance == ClinicalScales.sourceBoundTinettiNotice
+                ? [provenance, versionLabel].compactMap { $0 }.joined(separator: " · ")
+                : provenance ?? versionLabel,
             interpretationVersion: metadata?.interpretationVersion
         )
     }

@@ -103,7 +103,7 @@ public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
             guard !addition.overflow else { throw ClinicalScaleValidationError.invalidDefinition }
             score = addition.partialValue
         }
-        let current = ClinicalScaleInterpretation.current(scaleId: id, score: score)
+        let current = ClinicalScaleInterpretation.current(scaleId: id, score: score) { interpret(score) }
         return ClinicalScaleResult(score: score, interpretation: current?.text ?? interpret(score), answers: answers,
                                    interpretationVersion: current?.version)
     }
@@ -114,7 +114,7 @@ public enum ClinicalScales {
     public static let adl = ClinicalScaleDefinition(
         id: "adl",
         title: "ADL (Indice di Katz)",
-        scaleDescription: "Autonomia nelle attivita della vita quotidiana (1 = Autonomo, 0 = Dipendente).",
+        scaleDescription: "Definizione locale dei sei domini ADL di Katz; adattamento italiano non identificato. Autonomia nelle attività della vita quotidiana (1 = Autonomo, 0 = Dipendente).",
         questions: [
             choice("bath", "Fare il bagno"),
             choice("dress", "Vestirsi"),
@@ -169,7 +169,7 @@ public enum ClinicalScales {
     public static let iadl = ClinicalScaleDefinition(
         id: "iadl",
         title: "IADL (Indice di Lawton)",
-        scaleDescription: "Attività strumentali della vita quotidiana: questa versione richiede tutte le 8 risposte per ogni persona, con punteggio totale da 0 a 8.",
+        scaleDescription: "Definizione locale degli otto domini IADL di Lawton, con ancoraggi semplificati: richiede tutte le 8 risposte per ogni persona, con punteggio totale da 0 a 8. Equivalenza a una traduzione italiana validata non verificata.",
         questions: [
             q("q1", "1. Capace di usare il telefono", [("0. No (non usa/non risponde)", 0), ("1. Si (chiama/risponde autonomamente)", 1)]),
             q("q2", "2. Fare acquisti", [("0. No (incapace/accompagnato)", 0), ("1. Si (provvede autonomamente)", 1)]),
@@ -189,7 +189,7 @@ public enum ClinicalScales {
     public static let mmse = ClinicalScaleDefinition(
         id: "mmse",
         title: "MMSE (Folstein)",
-        scaleDescription: "Mini-Mental State Examination. Somministrazione standardizzata.",
+        scaleDescription: "MMSE: definizione locale per screening cognitivo. Edizione e variante italiana non identificate; equivalenza a una versione standardizzata non verificata.",
         questions: [
             q("ot1", "In che anno siamo?", [("Erra", 0), ("Corretto", 1)]),
             q("ot2", "In che stagione?", [("Erra", 0), ("Corretto", 1)]),
@@ -234,7 +234,7 @@ public enum ClinicalScales {
     public static let gds = ClinicalScaleDefinition(
         id: "gds",
         title: "GDS (Geriatric Depression Scale 15)",
-        scaleDescription: "Scala depressione. Risposte in grassetto = Depressive (+1).",
+        scaleDescription: "GDS-15: definizione locale per screening dei sintomi depressivi. Fonte della traduzione italiana e periodo di riferimento non identificati; punteggio secondo le risposte agli item.",
         questions: [
             q("g1", "1. È soddisfatto della sua vita?", [("Sì", 0), ("No (+1)", 1)]),
             q("g2", "2. Ha rinunciato a molte attività?", [("No", 0), ("Sì (+1)", 1)]),

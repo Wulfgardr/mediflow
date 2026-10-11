@@ -43,7 +43,7 @@ const definitions: Record<string, ScaleDefinition> = {
     'adl': {
         id: 'adl',
         title: 'ADL (Indice di Katz)',
-        description: 'Autonomia nelle attività della vita quotidiana (1 = Autonomo, 0 = Dipendente).',
+        description: 'Definizione locale dei sei domini ADL di Katz; adattamento italiano non identificato. Autonomia nelle attività della vita quotidiana (1 = Autonomo, 0 = Dipendente).',
         questions: [
             { id: 'bath', text: 'Fare il bagno', type: 'choice', options: [{ label: '0. Dipendente', value: 0 }, { label: '1. Autonomo (senza supervisione)', value: 1 }] },
             { id: 'dress', text: 'Vestirsi', type: 'choice', options: [{ label: '0. Dipendente', value: 0 }, { label: '1. Autonomo (anche allacciare scarpe)', value: 1 }] },
@@ -64,7 +64,7 @@ const definitions: Record<string, ScaleDefinition> = {
     'iadl': {
         id: 'iadl',
         title: 'IADL (Indice di Lawton)',
-        description: 'Attività strumentali della vita quotidiana: questa versione richiede tutte le 8 risposte per ogni persona, con punteggio totale da 0 a 8.',
+        description: 'Definizione locale degli otto domini IADL di Lawton, con ancoraggi semplificati: richiede tutte le 8 risposte per ogni persona, con punteggio totale da 0 a 8. Equivalenza a una traduzione italiana validata non verificata.',
         questions: [
             { id: 'q1', text: '1. Capace di usare il telefono', type: 'choice', options: [{ label: '0. No (non usa/non risponde)', value: 0 }, { label: '1. Si (chiama/risponde autonomamente)', value: 1 }] },
             { id: 'q2', text: '2. Fare acquisti', type: 'choice', options: [{ label: '0. No (incapace/accompagnato)', value: 0 }, { label: '1. Si (provvede autonomamente)', value: 1 }] },
@@ -82,7 +82,7 @@ const definitions: Record<string, ScaleDefinition> = {
     'mmse': {
         id: 'mmse',
         title: 'MMSE (Folstein)',
-        description: 'Mini-Mental State Examination. Somministrazione standardizzata.',
+        description: 'MMSE: definizione locale per screening cognitivo. Edizione e variante italiana non identificate; equivalenza a una versione standardizzata non verificata.',
         questions: [
             // ORIENTAMENTO TEMPORALE (5)
             { id: 'ot1', text: 'In che anno siamo?', type: 'choice', options: [{ label: 'Erra', value: 0 }, { label: 'Corretto', value: 1 }] },
@@ -132,7 +132,7 @@ const definitions: Record<string, ScaleDefinition> = {
     'gds': {
         id: 'gds',
         title: 'GDS (Geriatric Depression Scale 15)',
-        description: 'Scala depressione. Risposte in grassetto = Depressive (+1).',
+        description: 'GDS-15: definizione locale per screening dei sintomi depressivi. Fonte della traduzione italiana e periodo di riferimento non identificati; punteggio secondo le risposte agli item.',
         questions: [
             { id: 'g1', text: '1. È soddisfatto della sua vita?', type: 'choice', options: [{ label: 'Sì', value: 0 }, { label: 'No (+1)', value: 1 }] },
             { id: 'g2', text: '2. Ha rinunciato a molte attività?', type: 'choice', options: [{ label: 'No', value: 0 }, { label: 'Sì (+1)', value: 1 }] },

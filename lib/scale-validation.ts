@@ -112,6 +112,6 @@ export function calculateScaleResult(definition: ScaleDefinition, input: unknown
     const score = definition.scoringLogic(answers);
     if (!Number.isFinite(score)) throw new ScaleValidationError(['invalid-total']);
     // Only newly calculated results use this policy. History reads persisted text.
-    const interpretation = currentScaleInterpretation(definition.id, score);
+    const interpretation = currentScaleInterpretation(definition.id, score, () => definition.interpretation(score));
     return { score, answers, ...(interpretation ?? { interpretation: definition.interpretation(score) }) };
 }
