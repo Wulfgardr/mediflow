@@ -89,15 +89,29 @@ test('inventory distinguishes packed closure, locked inputs, missing notices and
   assert.equal(verifyPayloadLedger({ payloadRoot: input.payloadRoot, ledger }).status, 'TRUSTED_ROSTER_BYTES_MATCH');
 });
 
-function sourceAliasFixture(t) {
-  const f = fixture(t), installed = path.join(f.sourceRoot, 'node_modules', owner);
+function sourceAliasFixture(t, registry = false) {
+  const f = fixture(t), packageName = registry ? 'synthetic-runtime' : owner;
+  const installed = path.join(f.sourceRoot, 'node_modules', packageName);
+  if (registry) {
+    f.put(f.payloadRoot, 'package.json', { name: packageName, version: '1.0.0' });
+    f.put(f.sourceRoot, 'package.json', { dependencies: { [packageName]: '^1.0.0' } });
+    f.put(f.sourceRoot, 'package-lock.json', { lockfileVersion: 3, packages: {
+      '': {}, [`node_modules/${packageName}`]: { version: '1.0.0',
+        resolved: `https://registry.npmjs.org/${packageName}/-/${packageName}-1.0.0.tgz`, integrity: 'sha512-c3ludGhldGlj' },
+    } });
+  }
   fs.mkdirSync(path.dirname(installed), { recursive: true });
   fs.renameSync(f.payloadRoot, installed);
   const web = path.join(f.directory, 'standalone');
-  const alias = path.join(web, '.next/node_modules', `${owner}-synthetic`);
+  const alias = path.join(web, '.next/node_modules', `${packageName}-synthetic`);
   fs.mkdirSync(path.dirname(alias), { recursive: true });
   fs.symlinkSync(installed, alias, process.platform === 'win32' ? 'junction' : 'dir');
-  return { ...f, installed, web, alias };
+  const canonical = path.join(web, 'node_modules', packageName);
+  if (registry) {
+    fs.cpSync(installed, canonical, { recursive: true });
+    f.put(installed, 'untraced.js', '// must never be copied into the payload\n');
+  }
+  return { ...f, installed, web, alias, canonical };
 }
 
 test('source preparation materializes only the proven installed local package, without changing its source', t => {
@@ -110,11 +124,40 @@ test('source preparation materializes only the proven installed local package, w
   assert.equal(verifyPayloadLedger({ payloadRoot: f.installed, ledger }).files, 2);
 });
 
+test('source registry alias reuses only its matching physical traced subset', t => {
+  const f = sourceAliasFixture(t, true);
+  materializeSourceRuntime(f.web, f.sourceRoot);
+  assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), false);
+  assert.deepEqual(fs.readdirSync(f.alias), ['index.js', 'package.json']);
+  assert.deepEqual(fs.readFileSync(path.join(f.alias, 'index.js')), fs.readFileSync(path.join(f.installed, 'index.js')));
+  assert.equal(fs.existsSync(path.join(f.installed, 'untraced.js')), true);
+});
+
+for (const mutation of ['different traced bytes', 'missing canonical', 'aliased canonical', 'wrong lock version']) {
+  test(`source registry alias rejects ${mutation} without replacing the alias`, t => {
+    const f = sourceAliasFixture(t, true);
+    if (mutation === 'different traced bytes') fs.appendFileSync(path.join(f.canonical, 'index.js'), 'changed');
+    if (mutation === 'missing canonical' || mutation === 'aliased canonical') fs.rmSync(f.canonical, { recursive: true });
+    if (mutation === 'aliased canonical') fs.symlinkSync(f.installed, f.canonical, process.platform === 'win32' ? 'junction' : 'dir');
+    if (mutation === 'wrong lock version') {
+      const lock = JSON.parse(fs.readFileSync(path.join(f.sourceRoot, 'package-lock.json')));
+      lock.packages['node_modules/synthetic-runtime'].version = '2.0.0';
+      f.put(f.sourceRoot, 'package-lock.json', lock);
+    }
+    assert.throws(() => materializeSourceRuntime(f.web, f.sourceRoot));
+    assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), true);
+    assert.deepEqual(fs.readdirSync(path.dirname(f.alias)), [path.basename(f.alias)]);
+  });
+}
+
 for (const mutation of ['tampered installed bytes', 'aliased node_modules', 'aliased source root']) {
   test(`source preparation rejects ${mutation} before replacing the build alias`, t => {
     const f = sourceAliasFixture(t);
     let sourceRoot = f.sourceRoot;
-    if (mutation === 'tampered installed bytes') fs.appendFileSync(path.join(f.installed, 'index.js'), 'changed');
+    if (mutation === 'tampered installed bytes') {
+      fs.cpSync(f.installed, f.canonical, { recursive: true });
+      fs.appendFileSync(path.join(f.installed, 'index.js'), 'changed');
+    }
     if (mutation === 'aliased node_modules') {
       const modules = path.join(sourceRoot, 'node_modules'), outside = path.join(f.directory, 'foreign-install');
       fs.renameSync(modules, outside);
