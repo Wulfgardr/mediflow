@@ -157,7 +157,7 @@ export async function POST(request: Request) {
     } catch (error) {
         if (error instanceof BackupSchedulerOutcomeUnknownError) {
             return NextResponse.json({
-                error: error.message, code: 'backup_scheduler_outcome_unconfirmed',
+                error: 'Esito del backup automatico non confermato. Rileggi lo stato prima di ripetere l’operazione.', code: 'backup_scheduler_outcome_unconfirmed',
                 status: buildBackupSchedulerStatus(await loadSchedulerSettingValue()),
             }, { status: 503 });
         }
