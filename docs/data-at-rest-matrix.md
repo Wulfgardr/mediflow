@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 3** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 4** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
 ottobre 2026.
 
@@ -250,9 +250,10 @@ locali salvano ciò che ricevono.
 
 ### `users` — account locale e involucro della chiave
 
-- Altra protezione: `password_hash`, `encrypted_master_key`
-- In chiaro: `id`, `username`, `display_name`, `ambulatory_name`, `role`, `salt`, `created_at`, `failed_login_attempts`, `first_failed_login_at`, `locked_until`
+- Altra protezione: `password_hash`, `encrypted_master_key`, `unlock_verifier_hash`, `recovery_wrapped_master_key`, `recovery_verifier_hash`
+- In chiaro: `id`, `username`, `display_name`, `ambulatory_name`, `role`, `salt`, `created_at`, `failed_login_attempts`, `first_failed_login_at`, `locked_until`, `recovery_salt`
 - Leggibile senza chiave: nome utente, nome visualizzato, studio, salt e contatori di blocco. `password_hash` è l'hash bcrypt del PIN; `encrypted_master_key` è la master key avvolta con la chiave derivata dal PIN.
+- Le quattro colonne dell'[ADR 0143](adr/0143-strong-unlock-credential.md) esistono ma restano vuote: nessun codice le scrive finché la migrazione dai PIN non è consegnata. Conterranno gli hash SHA-256 dei due verificatori (`unlock_verifier_hash`, `recovery_verifier_hash`), la master key avvolta con la chiave di recupero (`recovery_wrapped_master_key`) e il salt di quell'involucro (`recovery_salt`).
 
 ## File e altri artefatti
 
@@ -326,3 +327,4 @@ cambia una classificazione.
 | 1 | Prima stesura sul codice di `main` `bcb7af46a`. |
 | 2 | Backup pianificati `0600` e directory dati predefinita `0700`. |
 | 3 | Tolto dal contratto `messages.reasoning`, che non era una colonna. |
+| 4 | Quattro colonne nuove in `users` per l'ADR 0143, ancora vuote. |
