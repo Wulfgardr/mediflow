@@ -217,3 +217,50 @@ o release readiness.**
 Fermare la promozione se una prova mostra authority dopo denial, una sessione
 P3 non terminale dopo successo PIN, cookie mutation nel logout, fallback
 legacy/native/system, retry automatico setup o un claim oltre questo limite.
+
+
+## Mappa prima/dopo della semplificazione 0.9.0
+
+Per [WUL-725](https://linear.app/wulfgardr/issue/WUL-725), questa mappa raccorda
+il lifecycle precedente con gli owner correnti. I link al codice seguono la
+revisione del documento; i confronti storici sono nelle PR indicate. Non crea
+un secondo catalogo di capacità o di dati a riposo.
+
+| Oggetto o controllo | Prima | Owner attuale e momento del controllo |
+| --- | --- | --- |
+| Tentativi e stato di blocco delle credenziali | Confronto e aggiornamento SQLite separati; race nei contatori e nel reset dello stato. | [Verificatore host](../../lib/security/host-credential-verification.ts): transizione atomica dopo il confronto, senza cancellare un blocco concorrente; [PR389](https://github.com/Wulfgardr/mediflow/pull/389). |
+| Ammissione delle mutazioni con cookie Web | Il singolo ingresso doveva richiedere l'origine fidata. | [Proxy](../../proxy.ts) prima del body di ogni mutazione API con entrambi i cookie Web, usando [request-transport](../../lib/security/request-transport.ts); [PR392](https://github.com/Wulfgardr/mediflow/pull/392). Bootstrap, native e metodi sicuri restano distinti. |
+| Control, attempt, ticket, cella e projection Web | Cluster storico `web-auth-control-owner`, `web-auth-control-record`, `web-auth-session-issuer`. | Un [package fisico](../../packages/web-auth-lifecycle-owner/index.js), consumato dal solo [adapter](../../lib/security/web-auth-lifecycle-owner-adapter.ts). `begin`, `issue`, resolver e retirement controllano identità esatta, fence, TTL e terminalità; il [guard](../../lib/security/web-auth-lifecycle-owner-boundary.test.ts) esclude consumer prodotto del cluster storico e deep import. |
+| Sessione native, pairing e trasporto | Il cambio dei campi di authority poteva lasciare attiva la sessione operatore. | Owner native nello stesso package, esposto da `serverSessions`, più [workspace Apple](../../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift): endpoint, pin TLS e pairing cambiati ritirano prima degli osservatori; [PR394](https://github.com/Wulfgardr/mediflow/pull/394). Non emettono projection Web. |
+| Port, use e risorsa privata Web/native | Lifecycle separati per canale, con il rischio di replicare la sequenza di uso nei consumer. | [Ordinary session authority](../../lib/security/ordinary-session-authority.ts) condivide soltanto la meccanica; i due issuer conservano brand e registri separati. Verifica a mint, begin, binding, commit e disposal; cleanup dopo ritiro terminale. |
+| Selezione paziente/sede, lease, epoch e porte di commit delle quattro funzioni documentali | Factory e facade non bastavano a provare un unico owner di processo. | [Singleton production](../../lib/security/server-session-projection-owner-production-internal.ts), pubblicato dalla [facade](../../lib/security/server-session-projection-owner-production.ts). [Owner](../../lib/security/server-session-projection-owner.ts) ricontrolla sessione, paziente, versione, scope e lease prima e dopo il punto d'uso; ogni porta mantiene la propria semantica, non un commit generico. |
+| Projection clinica e handle monouso | Broker tipizzato autonomo: la validità del contenuto non prova il lifecycle della sessione. | [Broker](../../lib/typed-projection-broker.ts) controlla target, capability, freschezza e consumo; [binding](../../lib/security/server-session-projection-broker.ts) lo revoca con la risorsa autentica. Le proiezioni per capability restano quelle dell'[ADR0095](./0095-broker-projection-e-servizi-host-per-capability.md), non dati arbitrari. |
+| Grant di ruolo, child session, proposal e prova umana headless | Autorità già separate, non controlli equivalenti da fondere. | [ADR0097](./0097-active-role-session-and-step-up-authorization.md) e [ADR0103](./0103-headless-clinician-authorized-soap-entry-write.md) possiedono la mappa dei grant e i controlli a emissione, uso e conferma. Dipendono dalla sessione/selection autentica; nessuna conferma passa al client o al modello. |
+| Passphrase, PIN di conferma, chiave clinica e recupero | Sblocco Web tramite PIN e involucro storico. | [ADR0143](./0143-strong-unlock-credential.md) possiede custodia e formato correnti C07: wrapping nel browser, chiave residente non estraibile, rinnovo esplicito dopo reload. Il cambio prepara il ritiro prima del CAS; non cambia l'owner packed. |
+| Segreti provider, file e risorse di processo | Autorità differenti dalla sessione, non trasferibili al broker. | [Census](../authority-census.md#altre-autorità-owner-e-fonte-da-consultare) rimanda ai rispettivi owner; [matrice a riposo](../data-at-rest-matrix.md) possiede i residui. C15 lega le sessioni anche alla [generazione dell'archivio](../../lib/security/archive-session-generation.ts): non si riusa autorità dopo una sostituzione. |
+
+### Consolidamento e controlli che restano
+
+Il consolidamento elimina consumer del vecchio owner, centralizza l'ammissione
+cookie e condivide il lifecycle delle risorse senza unire i canali. Non elimina
+le verifiche successive: origine non prova la sessione; sessione non prova la
+selezione; selezione non prova versione e lease al commit. Il confronto delle
+credenziali e il CAS finale proteggono momenti diversi. I confini in-process
+restano quelli dell'[ADR0105](./0105-web-auth-process-integrity-assumption.md).
+
+Le prove riusate sono [process lifecycle](../../lib/security/web-auth-lifecycle-owner-process.test.ts)
+(eseguito sull'installato), [adapter](../../lib/security/web-auth-lifecycle-owner-adapter.test.ts),
+[projection owner](../../lib/security/server-session-projection-owner.test.ts),
+[commit binding](../../lib/security/server-session-projection-owner-commit-binding.test.ts)
+e [broker binding](../../lib/security/server-session-projection-broker.test.ts):
+negano cloni, target/capability differenti, scadenza, riuso, reentry e uso dopo
+ritiro; mantengono distinti abort e commit del retirement. Clock e membership
+sintetici non sono provider o autorizzazione clinica.
+
+La corrispondenza sorgente/archivio/installato e il rifiuto di membri alterati
+usano il [guard packed esistente](../../lib/security/web-auth-lifecycle-owner-boundary.test.ts)
+e il profilo `local-package` del [ledger runtime](../runtime-payload-ledger.md#local-packed-owner-package),
+non una nuova lista. La sessione senza AI è provata dai percorsi produzione
+[Web ordinario](../../e2e/web-smoke.spec.ts) e [logout ostile/valido](../../e2e/web-cookie-mutation-admission.spec.ts);
+non dipende da eseguire un provider. Gli esiti appartengono alla PR e alla CI,
+non a questa mappa.
