@@ -55,7 +55,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                         <button
                             type="button"
                             onClick={() => remove(index)}
-                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity mf-btn-secondary p-2 z-10"
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity mf-btn-secondary p-2 z-10"
                             aria-label="Rimuovi diagnosi"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -63,7 +63,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-[7rem_9rem_minmax(0,1fr)] md:items-start">
                             <div className="w-full min-w-0">
-                                <label className="mf-field-label">Sistema</label>
+                                <p className="mf-field-label">Sistema</p>
                                 {(() => {
                                     const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
                                     const isV11 = sys === 'ICD-11';
@@ -77,8 +77,9 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             </div>
 
                             <div className="w-full min-w-0">
-                                <label className="mf-field-label">Codice</label>
+                                <label className="mf-field-label" htmlFor={`diagnosis-${field.id}-code`}>Codice</label>
                                 <input
+                                    id={`diagnosis-${field.id}-code`}
                                     {...register(`diagnoses.${index}.code`)}
                                     readOnly={!!watch(`diagnoses.${index}.canonicalUri`)}
                                     placeholder="Es. 8A80.0"
@@ -88,9 +89,10 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             </div>
 
                             <div className="flex-1 w-full min-w-0">
-                                <label className="mf-field-label">Diagnosi o ricerca clinica</label>
+                                <label className="mf-field-label" htmlFor={`diagnosis-${field.id}-search`}>Diagnosi o ricerca clinica</label>
                                 <div className="relative">
                                     <ICDAutocomplete
+                                        inputId={`diagnosis-${field.id}-search`}
                                         value={{
                                             code: watch(`diagnoses.${index}.code`) || "",
                                             description: watch(`diagnoses.${index}.description`) || "",
@@ -173,7 +175,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                         <button
                             type="button"
                             onClick={() => removeField(index)}
-                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 transition-opacity mf-btn-secondary p-2 z-10"
+                            className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity mf-btn-secondary p-2 z-10"
                             aria-label="Rimuovi pianificazione"
                         >
                             <Trash2 className="w-4 h-4" />
@@ -181,9 +183,10 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
 
                         <div className="flex flex-col md:flex-row gap-5 items-end">
                             <div className="w-full md:w-40 shrink-0">
-                                <label className="mf-field-label">Data prevista</label>
+                                <label className="mf-field-label" htmlFor={`checkup-${field.id}-date`}>Data prevista</label>
                                 <input
                                     type="date"
+                                    id={`checkup-${field.id}-date`}
                                     {...register(`checkups.${index}.date`)}
                                     className="mf-input mf-input-sm dark:[color-scheme:dark]"
                                     aria-invalid={!!errors.checkups?.[index]?.date}
@@ -191,8 +194,9 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                             </div>
 
                             <div className="flex-1 w-full">
-                                <label className="mf-field-label">Prossimo passaggio</label>
+                                <label className="mf-field-label" htmlFor={`checkup-${field.id}-title`}>Prossimo passaggio</label>
                                 <input
+                                    id={`checkup-${field.id}-title`}
                                     {...register(`checkups.${index}.title`)}
                                     placeholder="Es. PRIAMO, valutazione ADL, visita programmata, ECG..."
                                     className="mf-input mf-input-sm"
@@ -201,8 +205,9 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
                             </div>
                         </div>
                         <div className="mt-4">
-                            <label className="mf-field-label">Note operative</label>
+                            <label className="mf-field-label" htmlFor={`checkup-${field.id}-notes`}>Note operative</label>
                             <textarea
+                                id={`checkup-${field.id}-notes`}
                                 {...register(`checkups.${index}.notes`)}
                                 placeholder="Materiali, scale da somministrare, contesto utile per il prossimo passaggio..."
                                 rows={2}
@@ -278,49 +283,61 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Nome <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-firstName">Nome <span className="text-red-500">*</span></label>
                         <input
+                            id="patient-firstName"
+                            aria-invalid={!!errors.firstName}
+                            aria-describedby={errors.firstName ? "patient-firstName-error" : undefined}
                             {...register('firstName')}
                             className={FORM_INPUT_CLASS}
                             placeholder="Es. Mario"
                         />
-                        {errors.firstName && <p className="mf-field-error">{errors.firstName.message}</p>}
+                        {errors.firstName && <p id="patient-firstName-error" className="mf-field-error" role="alert">{errors.firstName.message}</p>}
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Cognome <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-lastName">Cognome <span className="text-red-500">*</span></label>
                         <input
+                            id="patient-lastName"
+                            aria-invalid={!!errors.lastName}
+                            aria-describedby={errors.lastName ? "patient-lastName-error" : undefined}
                             {...register('lastName')}
                             className={FORM_INPUT_CLASS}
                             placeholder="Es. Rossi"
                         />
-                        {errors.lastName && <p className="mf-field-error">{errors.lastName.message}</p>}
+                        {errors.lastName && <p id="patient-lastName-error" className="mf-field-error" role="alert">{errors.lastName.message}</p>}
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Codice fiscale <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-taxCode">Codice fiscale <span className="text-red-500">*</span></label>
                         <input
+                            id="patient-taxCode"
+                            aria-invalid={!!errors.taxCode}
+                            aria-describedby={errors.taxCode ? "patient-taxCode-error" : undefined}
                             {...register('taxCode')}
                             className={`${FORM_INPUT_CLASS} uppercase font-mono font-bold tracking-wider`}
                             placeholder="RSSMRA80A01H501U"
                             maxLength={16}
                         />
-                        {errors.taxCode && <p className="mf-field-error">{errors.taxCode.message}</p>}
+                        {errors.taxCode && <p id="patient-taxCode-error" className="mf-field-error" role="alert">{errors.taxCode.message}</p>}
                     </div>
 
                     <div className="space-y-1">
                         <div className="flex justify-between items-center mb-1.5">
-                            <label className="mf-field-label mb-0">Data di nascita</label>
+                            <label className="mf-field-label mb-0" htmlFor="patient-birthDate">Data di nascita</label>
                             {estimatedAge !== null && (
                                 <span className="apple-chip">Stima età ~{estimatedAge} anni ({estimatedYear})</span>
                             )}
                         </div>
                         <input
                             type="date"
+                            id="patient-birthDate"
+                            aria-invalid={!!errors.birthDate}
+                            aria-describedby={errors.birthDate ? "patient-birthDate-error" : undefined}
                             {...register('birthDate')}
                             className={`${FORM_INPUT_CLASS} dark:[color-scheme:dark]`}
                         />
-                        {errors.birthDate && <p className="mf-field-error">{errors.birthDate.message}</p>}
+                        {errors.birthDate && <p id="patient-birthDate-error" className="mf-field-error" role="alert">{errors.birthDate.message}</p>}
                     </div>
                 </div>
             </div>
@@ -339,8 +356,9 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Indirizzo di residenza</label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-address">Indirizzo di residenza</label>
                         <input
+                            id="patient-address"
                             {...register('address')}
                             className={FORM_INPUT_CLASS}
                             placeholder="Es. Via Roma 1, Milano"
@@ -348,10 +366,11 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Cellulare / Telefono</label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-phone">Cellulare / Telefono</label>
                         <div className="relative">
                             <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
                             <input
+                                id="patient-phone"
                                 {...register('phone')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
                                 placeholder="Es. +39 333 1234567"
@@ -360,10 +379,11 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="col-span-full space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Caregiver o riferimento</label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-caregiver">Caregiver o riferimento</label>
                         <div className="relative">
                             <HeartHandshake className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-accent)' }} />
                             <input
+                                id="patient-caregiver"
                                 {...register('caregiver')}
                                 className={`${FORM_INPUT_CLASS} pl-11`}
                                 placeholder="Es. Maria Rossi, figlia, +39..."
@@ -465,9 +485,10 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                         </div>
 
                         <div className="flex-1 space-y-2">
-                            <label className={FORM_LABEL_CLASS}>Tipo di presa in carico</label>
+                            <label className={FORM_LABEL_CLASS} htmlFor="patient-monitoringProfile">Tipo di presa in carico</label>
                             <div className="relative">
                                 <select
+                                    id="patient-monitoringProfile"
                                     {...register('monitoringProfile')}
                                     className={`mf-input appearance-none cursor-pointer pr-10 font-semibold ${currentStatus === 'taken_in_charge' ? 'graphite-chip-tone-success' : 'graphite-chip-tone-warning'}`}
                                 >
@@ -481,11 +502,12 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
                             {hasStatusChanged && isEditMode && (
                                 <div className="animate-in fade-in slide-in-from-top-2 pt-2">
-                                    <label className="mf-field-label flex items-center gap-1.5">
+                                    <label htmlFor="patient-statusReason" className="mf-field-label flex items-center gap-1.5">
                                         <AlertTriangle className="w-3.5 h-3.5" style={{ color: 'var(--lume-signal-warning)' }} />
                                         Motivo cambio stato (obbligatorio)
                                     </label>
                                     <textarea
+                                        id="patient-statusReason"
                                         {...register('statusReason')}
                                         required
                                         className="mf-input resize-y leading-relaxed"
@@ -498,8 +520,9 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS}>Note cliniche e contesto</label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-notes">Note cliniche e contesto</label>
                         <textarea
+                            id="patient-notes"
                             {...register('notes')}
                             className={`${FORM_INPUT_CLASS} min-h-[140px] leading-relaxed`}
                             placeholder="Informazioni utili, contesto familiare, accessi, preferenze del paziente..."

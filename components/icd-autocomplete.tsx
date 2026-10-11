@@ -12,6 +12,7 @@ type ICDSelection = { code: string; description: string; system: string;
     canonicalUri?: string; reference?: ICDSearchResult['reference'] };
 
 interface ICDAutocompleteProps {
+    inputId?: string;
     value?: ICDSelection;
     onChange?: (value: ICDSelection) => void;
     // Alternative simple mode
@@ -19,7 +20,7 @@ interface ICDAutocompleteProps {
     onSelect?: (code: string, title: string, provenance?: ICDSelection) => void;
 }
 
-export default function ICDAutocomplete({ value, onChange, initialValue, onSelect }: ICDAutocompleteProps) {
+export default function ICDAutocomplete({ value, onChange, initialValue, onSelect, inputId }: ICDAutocompleteProps) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<ICDSearchResult[]>([]);
     const [isOpen, setIsOpen] = useState(false);
@@ -179,6 +180,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} aria-hidden="true" />
                 <input
                     type="text"
+                    id={inputId}
                     role="combobox"
                     value={query}
                     onChange={handleSearch}

@@ -15,12 +15,16 @@ test.describe.configure({ retries: 0 });
 async function fixture(page: Page, bytes = RTF, extension = 'rtf') {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const marker = randomUUID();
-  const patient = await page.request.post('/api/patients', { data: {
-    firstName: 'Synthetic', lastName: 'OCR Recovery', birthDate: '1975-01-01T00:00:00.000Z',
-    taxCode: `REC${marker.replaceAll('-', '').slice(0, 13)}`, diagnoses: [],
-  } });
-  expect(patient.ok()).toBe(true);
-  const patientId = (await patient.json()).id as string;
+  // Browser fetch carries the current archive fence; APIRequestContext does not.
+  const patientId = await page.evaluate(async marker => {
+    const response = await fetch('/api/patients', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        firstName: 'Synthetic', lastName: 'OCR Recovery', birthDate: '1975-01-01T00:00:00.000Z',
+        taxCode: `REC${marker.replaceAll('-', '').slice(0, 13)}`, diagnoses: [],
+      }) });
+    if (!response.ok) throw new Error(`Synthetic patient: HTTP ${response.status}`);
+    return (await response.json()).id as string;
+  }, marker);
   const name = `synthetic-recovery.${extension}`;
   const type = extension === 'pdf' ? 'application/pdf' : 'application/rtf';
   const url = `/patients/${patientId}/modules`;
