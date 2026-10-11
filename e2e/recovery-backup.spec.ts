@@ -1,0 +1,65 @@
+import fs from 'node:fs';
+import { test, expect } from './fixtures/isolated-runtime';
+
+test.describe.configure({ retries: 0 });
+const phrase = 'Passphrase recupero soltanto sintetica';
+
+test('complete backup is encrypted in the browser and verification never claims a proven restore', async ({ page }, testInfo) => {
+    const pageErrors: string[] = []; const sent: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('request', request => { if (request.method() === 'POST') sent.push(request.postData() ?? ''); });
+    expect((await page.request.post('/api/system/recovery-backup', { data: {} })).status()).toBe(401);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.getByLabel('Nome e Cognome', { exact: true }).fill('Medico Sintetico Recupero');
+    await page.getByLabel('Nome Ambulatorio', { exact: true }).fill('Studio Sintetico Recupero');
+    await page.getByRole('button', { name: 'Avanti', exact: true }).click();
+    await page.getByLabel('Passphrase di accesso', { exact: true }).fill(phrase);
+    await page.getByLabel('Conferma passphrase', { exact: true }).fill(phrase);
+    await page.locator('#setup-pin').fill('recov1234');
+    await page.locator('#setup-confirm-pin').fill('recov1234');
+    await page.getByRole('button', { name: 'Concludi Setup', exact: true }).click();
+    const kit = page.getByTestId('recovery-kit');
+    const recoveryKey = await kit.getByLabel('Chiave di recupero').textContent();
+    const kitDownload = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click(); await kitDownload;
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true }).click();
+    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+    await expect(renew).toBeEnabled(); await renew.click();
+    await page.getByLabel('Passphrase', { exact: true }).fill(phrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
+    const manual = page.getByRole('link', { name: 'Apri la cartella manualmente', exact: true });
+    await expect(navigation.or(manual).first()).toBeVisible();
+    if (await manual.isVisible()) await manual.click();
+    await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.getByRole('link', { name: 'Backup', exact: true }).click();
+    const panel = page.getByRole('region', { name: 'Backup completo di recupero', exact: true });
+    await expect(panel).toBeVisible();
+    const denied = await page.request.post('/api/system/recovery-backup', { data: {}, headers: {
+        Origin: 'https://untrusted.invalid', 'Sec-Fetch-Site': 'cross-site',
+    } });
+    expect(denied.status()).toBe(403);
+    const downloadEvent = page.waitForEvent('download');
+    await panel.getByRole('button', { name: 'Crea backup completo cifrato', exact: true }).click();
+    const download = await downloadEvent;
+    const artifactPath = testInfo.outputPath('synthetic.mediflow-recovery'); await download.saveAs(artifactPath);
+    const bytes = fs.readFileSync(artifactPath);
+    expect(bytes.subarray(0, 8).toString()).toBe('MDFREC01');
+    expect(bytes.includes(Buffer.from('SQLite format 3'))).toBe(false);
+    expect(bytes.includes(Buffer.from('Medico Sintetico Recupero'))).toBe(false);
+    await expect(panel.getByRole('status')).toContainText('Non è ancora stato provato un ripristino.');
+    await panel.getByTestId('recovery-backup-verify').setInputFiles(artifactPath);
+    await expect(panel.getByRole('status')).toContainText('Cifratura e integrità del file verificate');
+    await expect(panel.getByRole('status')).toContainText('Il ripristino non è ancora provato');
+    bytes[bytes.length - 1] ^= 1;
+    await panel.getByTestId('recovery-backup-verify').setInputFiles({ name: 'altered.mediflow-recovery', mimeType: 'application/octet-stream', buffer: bytes });
+    await expect(panel.getByRole('status')).toContainText('File non verificato');
+    await panel.getByText('Recupero su un computer nuovo', { exact: true }).click();
+    await expect(panel).toContainText('il programma non può impedire l’uso di una copia su un altro computer');
+    await panel.screenshot({ path: testInfo.outputPath('recovery-backup-mobile.png') });
+    expect(sent.join('\n')).not.toContain(phrase);
+    expect(recoveryKey).toBeTruthy(); expect(sent.join('\n')).not.toContain(recoveryKey!);
+    expect(pageErrors).toEqual([]);
+});
