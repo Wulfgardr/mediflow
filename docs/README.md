@@ -48,7 +48,9 @@ distingue inventario, correzioni pazienti, audit pilota e prove dal rilascio.
 
 L’[elenco dei writer audit](./audit-writers.md) classifica obblighi, stato corrente
 e residui clinici consegnati da C04 a C05. Il [roster delle scritture cliniche](./clinical-write-roster.md)
-collega ciascun ingresso a validazione, transazione, audit, prove e lavori C05.
+collega ciascun ingresso a validazione, transazione, audit e prove C05. Il
+[CSV canonico](./clinical-write-surfaces.csv) tiene mutazioni e caller; la
+[mappa autorità C01](./authority-census.md) tiene owner, differenze e disposizioni.
 La [matrice dei dati a riposo](./data-at-rest-matrix.md) dice colonna per colonna e
 file per file che cosa si legge senza la chiave, e quali esposizioni restano da decidere in C06.
 
