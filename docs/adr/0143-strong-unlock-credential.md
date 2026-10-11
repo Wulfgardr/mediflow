@@ -239,7 +239,8 @@ chiesto di chiudere anche la finestra descritta nella seconda riga e ha
 aggiunto l'ultima. Una terza ha chiesto che la conferma del testo trattenuto
 non possa sopravvivere al proprio avviso. Una quarta ha giudicato le
 correzioni pronte e ha chiesto che ogni modifica del testo faccia
-ricominciare, anche quando viene annullata prima dell'invio.
+ricominciare, anche quando viene annullata prima dell'invio o lascia lo
+stesso testo, come un incolla sopra la selezione.
 
 | Difetto | Esito |
 | --- | --- |

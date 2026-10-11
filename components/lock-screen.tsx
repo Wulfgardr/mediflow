@@ -14,6 +14,7 @@ export function LockScreen() {
     const [pin, setPin] = useState('');
     // The exact text the provider held back because the policy would accept it as a passphrase.
     const [heldText, setHeldText] = useState<string | null>(null);
+    const endConfirmation = () => setHeldText(null);
     // Counted as the primitives count it, after normalization: what they accept can be submitted.
     const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
     const [confirmPin, setConfirmPin] = useState('');
@@ -132,11 +133,14 @@ export function LockScreen() {
                             ref={pinInputRef}
                             type="password"
                             value={pin}
-                            onChange={(e) => {
-                                // Any edit ends the confirmation, also one that is typed back before a submit.
-                                setHeldText(null);
-                                setPin(e.target.value);
-                            }}
+                            onChange={(e) => setPin(e.target.value)}
+                            // Any editing gesture ends the confirmation, also one that leaves the same
+                            // text: React reports a change only when the value differs.
+                            onInput={endConfirmation}
+                            onPaste={endConfirmation}
+                            onCut={endConfirmation}
+                            onDrop={endConfirmation}
+                            onCompositionStart={endConfirmation}
                             className={styles.pinInput}
                             inputMode="text"
                             autoComplete="off"

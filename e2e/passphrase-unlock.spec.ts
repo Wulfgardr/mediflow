@@ -225,6 +225,16 @@ test('a PIN as long as a passphrase still opens its archive, on a second gesture
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(logins).toEqual([]);
 
+    // So does an editing gesture that leaves the same text, like pasting it over itself: the
+    // value does not change, the confirmation still ends.
+    await input.selectText();
+    await lockPage.keyboard.insertText(LONG_PIN);
+    await expect(input).toHaveValue(LONG_PIN);
+    await expect(notice).toHaveCount(0);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins).toEqual([]);
+
     // A changed text is another text: it is held in its turn.
     await input.fill(`${LONG_PIN}!`);
     await expect(notice).toHaveCount(0);
