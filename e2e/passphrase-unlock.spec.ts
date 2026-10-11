@@ -170,6 +170,10 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(page.locator('#mediflow-lock-error')).toHaveText('Passphrase non valida. Tentativi rimasti: 4.');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
 
+  await page.route('**/api/auth/login', async route => {
+    const result = await route.fetch();
+    await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
+  });
   await field.fill(PASSPHRASE);
   const accepted = page.waitForResponse(response => isPost(response.request(), '/api/auth/login'));
   await submit.click();
@@ -178,7 +182,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   expect(await response.json()).toMatchObject({ success: true, encryptedMasterKey: credential.encryptedMasterKey, salt: credential.salt });
   // The shell is rendered only after the provider has opened the returned wrapping with the key it derived.
   await expectUnlocked(page);
-  await expect(page.getByTestId('pin-residue-notice')).toHaveCount(0); // The real login confirms cleanup.
+  await expect(page.getByTestId('pin-residue-notice')).toBeVisible(); // Pending remains visible in the unlocked shell.
 
   // The access settings describe the account as it is now, and no longer offer the PIN rotation the server refuses.
   await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
@@ -194,6 +198,14 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
     expect(body).not.toContain(PASSPHRASE);
   }
   expect(JSON.parse(logins[1])).toEqual({ verifier: credential.verifier });
+  await expect(page.getByTestId('pin-residue-notice')).toBeVisible();
+  await page.unroute('**/api/auth/login');
+  await page.getByRole('button', { name: 'Blocca sessione adesso', exact: true }).click();
+  await expect(field).toBeEnabled();
+  await field.fill(PASSPHRASE);
+  await field.press('Enter');
+  await expectUnlocked(page);
+  await expect(page.getByTestId('pin-residue-notice')).toHaveCount(0); // Only canonical true clears the warning.
 
   // A browser with no cookie, storage or key of the first one unlocks the same way.
   const reopened = await browser.newContext({ baseURL });

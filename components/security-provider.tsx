@@ -751,7 +751,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }} /></div>
     </div>;
 
-    const pinResidueNotice = pinResiduesPending && <p role="alert" className="relative z-[110] bg-[var(--lume-surface-canvas)] p-4" data-testid="pin-residue-notice">
+    const pinResidueNotice = pinResiduesPending && <p role="alert" className="pointer-events-none relative z-[110] bg-[var(--lume-surface-canvas)] p-4" data-testid="pin-residue-notice">
         La passphrase è attiva, ma la rimozione delle vecchie copie del prodotto o del registro temporaneo non è confermata: possono ancora contenere l’involucro protetto dal PIN. Il prossimo sblocco ritenta la bonifica dell’archivio; le copie già migrate richiedono verifica e non vengono eliminate. Conserva backup e kit; se l’avviso resta, chiedi assistenza.
     </p>;
 

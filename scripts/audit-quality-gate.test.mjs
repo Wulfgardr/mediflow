@@ -355,7 +355,7 @@ test('main checks the real direct and transactional writer contracts and rejects
         assert.equal(cleanResult.status, 0);
         assert.equal(cleanReport.findings.length, 0);
         assert.equal(cleanReport.findings.filter((finding) => finding.code === 'AUDIT_CONTROL_FLOW').length, 0); assert.equal(cleanReport.findings.some((finding) => 'writerContracts' in finding), false);
-        assert.deepEqual([cleanReport.checked.auditControlFlowTargets, cleanReport.checked.auditControlFlowFiles], [3, 1]);
+        assert.deepEqual([cleanReport.checked.auditControlFlowTargets, cleanReport.checked.auditControlFlowFiles], [4, 1]);
 
         const pinService = path.join(fixtureRoot, 'lib/security/pin-change-service.ts');
         const original = fs.readFileSync(pinService, 'utf8');
