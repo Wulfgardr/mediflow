@@ -1,0 +1,34 @@
+import { NextResponse } from 'next/server';
+
+import { validatePassphraseAdoptionPayload } from '@/lib/security/passphrase-adoption-validation';
+import { PASSPHRASE_ADOPTION_INVALID_CODE } from '@/lib/security/pin-change';
+import { adoptPassphrase } from '@/lib/security/pin-change-service';
+import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
+
+function failureResponse(status: number, code: string, message: string) {
+    const response = NextResponse.json({ error: message, code, message }, { status });
+    response.headers.set('Cache-Control', 'no-store');
+    return response;
+}
+
+/** ADR 0143: the account moves from its PIN to a passphrase. A Web session only: native clients do not derive it yet. */
+export async function POST(request: Request) {
+    const session = await requireSession();
+    if (!session) return unauthorizedResponse();
+
+    try {
+        const payload = validatePassphraseAdoptionPayload(await request.json().catch(() => null));
+        if (!payload) return failureResponse(400, PASSPHRASE_ADOPTION_INVALID_CODE, 'Richiesta di passaggio alla passphrase non valida.');
+
+        const result = await adoptPassphrase({ session, request, payload });
+        if (result.kind === 'unauthorized') return unauthorizedResponse();
+        if (result.kind === 'failure') return failureResponse(result.status, result.code, result.message);
+
+        const response = NextResponse.json({ success: true });
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+    } catch (error) {
+        console.error('Passphrase adoption error:', error);
+        return failureResponse(500, 'PASSPHRASE_ADOPTION_FAILED', 'Errore durante il passaggio alla passphrase.');
+    }
+}

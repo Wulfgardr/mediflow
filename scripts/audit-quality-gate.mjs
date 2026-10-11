@@ -39,6 +39,15 @@ const REQUIRED_ROUTE_AUDIT = [
             requirePinRetirementOrder: true,
         }],
     },
+    {
+        route: 'app/api/auth/passphrase/route.ts', events: ['settings.updated'], reason: 'the move from the PIN to a passphrase replaces the wrapping of the master key',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'adoptPassphrase',
+            target: 'passphrase-adoption', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'adoptPassphrase',
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
     { route: 'app/api/settings/[key]/route.ts', events: ['settings.updated'], reason: 'single-key settings mutations must stay auditable' },
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },

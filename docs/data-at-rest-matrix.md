@@ -253,7 +253,7 @@ locali salvano ciò che ricevono.
 - Altra protezione: `password_hash`, `encrypted_master_key`, `unlock_verifier_hash`, `recovery_wrapped_master_key`, `recovery_verifier_hash`
 - In chiaro: `id`, `username`, `display_name`, `ambulatory_name`, `role`, `salt`, `created_at`, `failed_login_attempts`, `first_failed_login_at`, `locked_until`, `recovery_salt`
 - Leggibile senza chiave: nome utente, nome visualizzato, studio, salt e contatori di blocco. `password_hash` è l'hash bcrypt del PIN; `encrypted_master_key` è la master key avvolta con la chiave derivata dal PIN.
-- Le quattro colonne dell'[ADR 0143](adr/0143-strong-unlock-credential.md) esistono ma restano vuote: nessun codice le scrive finché la migrazione dai PIN non è consegnata. Conterranno gli hash SHA-256 dei due verificatori (`unlock_verifier_hash`, `recovery_verifier_hash`), la master key avvolta con la chiave di recupero (`recovery_wrapped_master_key`) e il salt di quell'involucro (`recovery_salt`).
+- Le quattro colonne dell'[ADR 0143](adr/0143-strong-unlock-credential.md) restano vuote finché l'account sblocca con il PIN. Le scrive, insieme al nuovo involucro, il passaggio alla passphrase (`POST /api/auth/passphrase`), che l'interfaccia non offre ancora: gli hash SHA-256 dei due verificatori (`unlock_verifier_hash`, `recovery_verifier_hash`), la master key avvolta con la chiave di recupero (`recovery_wrapped_master_key`) e il salt di quell'involucro (`recovery_salt`). Da quel momento `encrypted_master_key` è avvolta con la chiave derivata dalla passphrase e `password_hash` resta come PIN di conferma.
 
 ## File e altri artefatti
 

@@ -10,10 +10,15 @@ import { eq } from 'drizzle-orm';
 
 import { auditEvents, users } from '@/lib/schema';
 import {
+    adoptPassphrase,
     changePin,
     PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE,
     type PinChangeServiceDependencies,
 } from './pin-change-service';
+import { verifyHostCredentials, verifyUnlockCredentials } from './host-credential-verification';
+import { validatePassphraseAdoptionPayload } from './passphrase-adoption-validation';
+import { generateMasterKey } from './security';
+import { createRecoveryWrapping, createUnlockWrapping, hashAccessVerifier } from './unlock-credential';
 import {
     abortNativeLegacyUserRetirement,
     captureNativeLoginSessionFence,
@@ -623,4 +628,178 @@ test('changePin keeps every same-user Web sibling terminal when lock wins after 
     } finally {
         sqlite.close();
     }
+});
+
+/** What the browser sends, made with the browser primitives at their production cost (ADR 0143). */
+async function adoptionPayload(currentPin = '1234') {
+    const masterKey = await generateMasterKey();
+    const unlock = await createUnlockWrapping(masterKey, 'cavallo batteria graffetta corretta');
+    const recovery = await createRecoveryWrapping(masterKey);
+    const payload = validatePassphraseAdoptionPayload({
+        currentPin, encryptedMasterKey: unlock.encryptedMasterKey, salt: unlock.salt, verifier: unlock.verifier,
+        recovery: { wrappedMasterKey: recovery.wrappedMasterKey, salt: recovery.salt, verifier: recovery.verifier },
+    });
+    assert.ok(payload, 'the server accepts what the browser primitives produce');
+    return { payload, unlock, recovery };
+}
+const SEEDED_PIN = '1234'; // the PIN seedUser gives the account
+const adoptionRequest = () => new Request('http://127.0.0.1/api/auth/passphrase', { headers: { 'x-request-id': 'adoption-test' } });
+const storedUser = (db: TestDatabase) => db.select().from(users).where(eq(users.id, 'user-1')).get()!;
+
+test('adoptPassphrase moves the account to the passphrase in one write and keeps the PIN for confirmations', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const before = storedUser(db);
+        const projection = session('user-1');
+        const { payload, unlock, recovery } = await adoptionPayload();
+        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement('completed', projection) };
+
+        assert.deepEqual(await adoptPassphrase({ session: projection, request: adoptionRequest(), payload }, dependencies), { kind: 'success' });
+
+        assert.deepEqual(storedUser(db), {
+            ...before,
+            encryptedMasterKey: unlock.encryptedMasterKey,
+            salt: unlock.salt,
+            unlockVerifierHash: await hashAccessVerifier(unlock.verifier),
+            recoveryWrappedMasterKey: recovery.wrappedMasterKey,
+            recoverySalt: recovery.salt,
+            recoveryVerifierHash: await hashAccessVerifier(recovery.verifier),
+            failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null,
+        }, 'the PIN hash is the only credential column left as it was');
+
+        const quiet = { db, writeAuditEvent: async () => 'audit' };
+        assert.equal((await verifyUnlockCredentials({ username: TEST_USERNAME, verifier: unlock.verifier }, quiet)).kind, 'verified');
+        assert.equal((await verifyUnlockCredentials({ username: TEST_USERNAME, pin: SEEDED_PIN }, quiet)).kind, 'denied');
+        assert.equal((await verifyHostCredentials({ username: TEST_USERNAME, pin: SEEDED_PIN }, quiet)).kind, 'verified');
+
+        const audit = db.select().from(auditEvents).get();
+        assert.equal(audit?.subjectRef, 'security.unlock-credential');
+        const metadata = JSON.parse(audit?.redactedMetadata ?? '{}') as Record<string, unknown>;
+        assert.equal(metadata.reasonCode, 'passphrase_adopted');
+        for (const secret of ['1234', unlock.verifier, recovery.verifier, recovery.recoveryKey]) {
+            assert.equal(JSON.stringify(audit).includes(secret), false, 'no secret reaches the audit record');
+        }
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('adoptPassphrase needs the current PIN and happens once: the PIN cannot replace a passphrase', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const before = storedUser(db);
+        let prepared = 0;
+        const retirement = webRetirement();
+        const dependencies: PinChangeServiceDependencies = {
+            db, writeAuditEvent: testAuditWriter(db), ...retirement,
+            prepareWebSessionsForUserRetirement: (projection) => { prepared += 1; return retirement.prepareWebSessionsForUserRetirement!(projection); },
+        };
+        const adopt = (payload: Awaited<ReturnType<typeof adoptionPayload>>['payload']) =>
+            adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, dependencies);
+
+        const wrongPin = await adopt((await adoptionPayload('0000')).payload);
+        assert.deepEqual(wrongPin.kind === 'failure' && [wrongPin.status, wrongPin.code], [401, 'PASSPHRASE_ADOPTION_INVALID_PIN']);
+        assert.deepEqual(storedUser(db), before);
+        assert.equal(prepared, 0, 'no session is prepared for retirement before the PIN is verified');
+
+        assert.deepEqual(await adopt((await adoptionPayload()).payload), { kind: 'success' });
+        const adopted = storedUser(db);
+
+        // The right PIN and a well-formed request, again: this is how a PIN would take the archive back.
+        const again = await adopt((await adoptionPayload()).payload);
+        assert.deepEqual(again.kind === 'failure' && [again.status, again.code], [409, 'PASSPHRASE_ALREADY_ADOPTED']);
+        assert.deepEqual(storedUser(db), adopted);
+        assert.equal(prepared, 1);
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('two adoptions at once leave one whole set of credentials, never a mix', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement() };
+        const candidates = await Promise.all([adoptionPayload(), adoptionPayload()]);
+        const results = await Promise.all(candidates.map(({ payload }) =>
+            adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, dependencies)));
+
+        assert.equal(results.filter((result) => result.kind === 'success').length, 1);
+        const winner = candidates[results.findIndex((result) => result.kind === 'success')];
+        const stored = storedUser(db);
+        assert.deepEqual(
+            [stored.encryptedMasterKey, stored.salt, stored.unlockVerifierHash, stored.recoveryWrappedMasterKey, stored.recoverySalt, stored.recoveryVerifierHash],
+            [winner.unlock.encryptedMasterKey, winner.unlock.salt, await hashAccessVerifier(winner.unlock.verifier),
+                winner.recovery.wrappedMasterKey, winner.recovery.salt, await hashAccessVerifier(winner.recovery.verifier)],
+        );
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('an interruption inside the write leaves the PIN account as it was, with its sessions', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        db.update(users).set({ failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null }).run();
+        const before = storedUser(db);
+        const interrupted = new Proxy(db, {
+            get(target, property, receiver) {
+                if (property === 'transaction') return () => { throw new Error('synthetic interruption'); };
+                const value = Reflect.get(target, property, receiver);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
+        }) as TestDatabase;
+        const outcomes: string[] = [];
+        const retirement = webRetirement();
+        const { payload } = await adoptionPayload();
+
+        await assert.rejects(() => adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, {
+            db: interrupted, writeAuditEvent: testAuditWriter(db), ...retirement,
+            commitWebSessionsForUserRetirement: (capability) => { outcomes.push('committed'); return retirement.commitWebSessionsForUserRetirement!(capability); },
+            abortWebSessionsForUserRetirement: (capability) => { outcomes.push('aborted'); return retirement.abortWebSessionsForUserRetirement!(capability); },
+        }), /synthetic interruption/u);
+
+        assert.deepEqual(storedUser(db), before);
+        assert.deepEqual(outcomes, ['aborted'], 'the sessions prepared for retirement are released, not retired');
+        const quiet = { db, writeAuditEvent: async () => 'audit' };
+        assert.equal((await verifyUnlockCredentials({ username: TEST_USERNAME, pin: SEEDED_PIN }, quiet)).kind, 'verified');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('when the retirement of the sessions cannot be confirmed the passphrase is already the credential', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const { payload, unlock } = await adoptionPayload();
+        const result = await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, {
+            db, writeAuditEvent: testAuditWriter(db), ...webRetirement('failed'),
+        });
+        assert.deepEqual(result.kind === 'failure' && [result.status, result.code], [409, PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE]);
+        assert.match(result.kind === 'failure' ? result.message : '', /passphrase è attiva/u);
+        assert.equal(storedUser(db).unlockVerifierHash, await hashAccessVerifier(unlock.verifier));
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('the adoption request is accepted only in the shapes the browser primitives produce', async () => {
+    const { payload } = await adoptionPayload();
+    const rejected: Array<[string, unknown]> = [
+        ['a PIN wrapping in place of the passphrase one', { ...payload, encryptedMasterKey: `v2:${payload.encryptedMasterKey.slice(3)}` }],
+        ['a truncated wrapping', { ...payload, encryptedMasterKey: payload.encryptedMasterKey.slice(0, -4) }],
+        ['a recovery wrapping labelled as a passphrase one', { ...payload, recovery: { ...payload.recovery, wrappedMasterKey: payload.encryptedMasterKey } }],
+        ['a short verifier', { ...payload, verifier: Buffer.alloc(16, 1).toString('base64') }],
+        ['one verifier for both secrets', { ...payload, recovery: { ...payload.recovery, verifier: payload.verifier } }],
+        ['one salt for both wrappings', { ...payload, recovery: { ...payload.recovery, salt: payload.salt } }],
+        ['no recovery wrapping', { ...payload, recovery: undefined }],
+        ['no current PIN', { ...payload, currentPin: '' }],
+        ['not an object', 'v3:'],
+    ];
+    for (const [name, candidate] of rejected) assert.equal(validatePassphraseAdoptionPayload(candidate), null, name);
+    assert.deepEqual(validatePassphraseAdoptionPayload({ ...payload, unexpected: 'ignored' }), payload);
 });
