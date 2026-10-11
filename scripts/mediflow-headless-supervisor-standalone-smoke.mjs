@@ -314,13 +314,12 @@ async function main() {
   const foreignCwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-extracted-cwd-')));
   const marker = path.join(foreignCwd, 'substitution-was-executed');
   fs.writeFileSync(path.join(foreignCwd, 'node'), `#!/bin/sh\n: > '${marker}'\nexit 99\n`, { mode: 0o755 });
-  const ordinaryDataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-c16-ordinary-')));
   let child = null, ordinary = null, stderr = '', before = null; try {
     if (APP) { await checkHeadlessRuntime(APP); before = snapshotApp(); }
-    prepareSyntheticDatabase(ordinaryDataDir);
+    prepareSyntheticDatabase(dataDir);
     ordinary = spawn(process.execPath, [path.join(layout?.web ?? path.join(ROOT, '.next/standalone'), 'server.js')], {
       cwd: ROOT, env: { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3001',
-        MEDIFLOW_DATA_DIR: ordinaryDataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
+        MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
         MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -332,7 +331,6 @@ async function main() {
     const ordinaryLogin = await loginWithWebAuthControl(ORDINARY_URL, { username: USERNAME, password: '1234' });
     assert.equal(ordinaryLogin.response.status, 200);
     assert.ok(ordinaryLogin.cookieHeader);
-    prepareSyntheticDatabase(dataDir);
     child = launch(dataDir, foreignCwd);
     const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
     child.stderr.setEncoding('utf8');
@@ -510,7 +508,6 @@ async function main() {
     if (APP && child && !hasExited(child)) rememberDescendants(child.pid);
     await terminateChild(child);
     await terminateChild(ordinary);
-    fs.rmSync(ordinaryDataDir, { recursive: true, force: true });
     // Recovery does not turn a failed cleanup assertion into a PASS.
     for (const pid of ownedPids) if (alive(pid)) process.kill(pid, 'SIGKILL');
     fs.rmSync(dataDir, { recursive: true, force: true });
