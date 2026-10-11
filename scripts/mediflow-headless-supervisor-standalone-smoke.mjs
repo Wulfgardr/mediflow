@@ -10,7 +10,9 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 import { appLayout, checkHeadlessRuntime } from './stage-headless-runtime.mjs';
+import { OPERATION_DESCRIPTORS, publicCatalog } from '../packages/mcp/src/contracts.ts';
 const ROOT = fileURLToPath(new URL('..', import.meta.url)), BASE_URL = 'http://127.0.0.1:3000';
+const ORDINARY_URL = 'http://127.0.0.1:3001';
 // @Codex: the same real authenticated smoke, now against an extracted app.
 const args = process.argv.slice(2);
 assert.ok(args.length === 0 || (args.length === 2 && args[0] === '--app'),
@@ -84,6 +86,7 @@ async function prebindShutdown(dataDir, foreignCwd, kind) {
   } finally { await terminateChild(child); }
 }
 const USERNAME = 'synthetic-supervisor-smoke', PATIENT_ID = 'patient.synthetic.supervisor-smoke';
+const DISCLOSURE_SENTINEL = 'SYNTHETIC_C16_PRIVATE_SERVICE_NOT_FOR_AGENT';
 const CHECKUP_ID = 'checkup.synthetic.supervisor-smoke', CHECKUP_TITLE = 'Synthetic bounded checkup';
 const META = Object.freeze({
   'io.modelcontextprotocol/protocolVersion': '2026-07-28',
@@ -221,6 +224,24 @@ async function activateSyntheticSelection() {
   });
   assert.equal(checkupResponse.status, 201);
   assert.deepEqual(await checkupResponse.json(), { id: CHECKUP_ID, version: 1 });
+  const prescriptionResponse = await fetch(new URL('/api/service-prescriptions', BASE_URL), {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ id: 'prescription.synthetic.c16', patientId: PATIENT_ID,
+      prescribedAt: '2020-01-01T00:00:00.000Z', category: 'lab', status: 'prescribed',
+      serviceName: DISCLOSURE_SENTINEL }),
+  });
+  assert.equal(prescriptionResponse.status, 201);
+  const itemResponse = await fetch(new URL('/api/service-prescription-items', BASE_URL), {
+    method: 'POST', headers: jsonHeaders,
+    body: JSON.stringify({ id: 'item.synthetic.c16', prescriptionId: 'prescription.synthetic.c16',
+      serviceName: DISCLOSURE_SENTINEL, status: 'prescribed', category: 'lab',
+      scheduledAt: '2020-01-01T00:00:00.000Z' }),
+  });
+  assert.equal(itemResponse.status, 201);
+  const sourceResponse = await fetch(new URL(`/api/service-prescriptions?patientId=${PATIENT_ID}`, BASE_URL),
+    { headers: { Cookie: login.cookieHeader } });
+  assert.equal(sourceResponse.status, 200);
+  assert.ok(JSON.stringify(await sourceResponse.json()).includes(DISCLOSURE_SENTINEL));
   const epochResponse = await fetch(new URL('/api/ai/smart-import/selection', BASE_URL),
     { headers: { Cookie: login.cookieHeader } });
   assert.equal(epochResponse.status, 200);
@@ -274,14 +295,43 @@ function verifyCommittedTransition(dataDir, receipt) {
     assert.deepEqual(audit.receipt, receipt);
   } finally { database.close(); }
 }
+async function verifyOrdinaryWeb(child, cookieHeader) {
+  assert.equal(child.exitCode, null, 'Agent teardown interrupted independent Web');
+  const headers = { ...webMutationHeaders(cookieHeader), Origin: ORDINARY_URL };
+  const response = await fetch(new URL('/api/patients', ORDINARY_URL), {
+    method: 'POST', headers,
+    body: JSON.stringify({ id: 'patient.synthetic.independent-web', firstName: 'Synthetic',
+      lastName: 'Independent', taxCode: 'SYNTHETIC-C16-INDEPENDENT', birthDate: '1970-01-01' }),
+  });
+  assert.equal(response.status, 201);
+  const read = await fetch(new URL('/api/patients', ORDINARY_URL), { headers });
+  assert.equal(read.status, 200);
+  assert.ok((await read.json()).some(item => item.id === 'patient.synthetic.independent-web'));
+}
 function tool(name, argumentsValue = {}) { return { name, arguments: argumentsValue }; }
 async function main() {
   const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-production-smoke-')));
   const foreignCwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-extracted-cwd-')));
   const marker = path.join(foreignCwd, 'substitution-was-executed');
   fs.writeFileSync(path.join(foreignCwd, 'node'), `#!/bin/sh\n: > '${marker}'\nexit 99\n`, { mode: 0o755 });
-  let child = null, stderr = '', before = null; try {
+  const ordinaryDataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-c16-ordinary-')));
+  let child = null, ordinary = null, stderr = '', before = null; try {
     if (APP) { await checkHeadlessRuntime(APP); before = snapshotApp(); }
+    prepareSyntheticDatabase(ordinaryDataDir);
+    ordinary = spawn(process.execPath, [path.join(layout?.web ?? path.join(ROOT, '.next/standalone'), 'server.js')], {
+      cwd: ROOT, env: { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3001',
+        MEDIFLOW_DATA_DIR: ordinaryDataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
+        MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let ordinaryOutput = '';
+    for (const stream of [ordinary.stdout, ordinary.stderr]) {
+      stream.setEncoding('utf8'); stream.on('data', chunk => { ordinaryOutput += chunk; });
+    }
+    await waitForReady(() => ordinaryOutput, ordinary);
+    const ordinaryLogin = await loginWithWebAuthControl(ORDINARY_URL, { username: USERNAME, password: '1234' });
+    assert.equal(ordinaryLogin.response.status, 200);
+    assert.ok(ordinaryLogin.cookieHeader);
     prepareSyntheticDatabase(dataDir);
     child = launch(dataDir, foreignCwd);
     const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
@@ -305,16 +355,39 @@ async function main() {
     assert.equal(cloudProbe.status, 409);
     assert.equal((await cloudProbe.json()).code, 'provider_probe_disabled');
     const capabilities = await rpc.send('tools/call', tool('mediflow.system.capabilities.v1'));
-    assert.equal(capabilities.result.structuredContent.operations.length, 5);
+    assert.deepEqual(capabilities.result.structuredContent, publicCatalog(OPERATION_DESCRIPTORS));
+    const listed = await rpc.send('tools/list');
+    assert.deepEqual(new Set(listed.result.tools.map(item => item.name)), new Set([
+      'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
+      ...OPERATION_DESCRIPTORS.map(item => item.operationId),
+    ]));
+    for (const descriptor of OPERATION_DESCRIPTORS) {
+      assert.equal(listed.result.tools.find(item => item.name === descriptor.operationId)
+        ._meta['mediflow/maximumStage'], descriptor.maximumStage);
+    }
     const terminology = await rpc.send('tools/call', tool('mediflow.terminology.search.v1', {
       system: 'LOINC', query: 'glucose', limit: 1,
     }));
     assert.equal(terminology.result.structuredContent.items.length, 1);
     assert.equal(terminology.result.structuredContent.receipt.egress, 'none');
     const loops = await rpc.send('tools/call', tool('mediflow.patient.open_loops.read.v1'));
-    assert.deepEqual(loops.result.structuredContent.items, []);
+    assert.equal(loops.result.structuredContent.items.length, 1);
+    assert.equal(loops.result.structuredContent.items[0].kind, 'results_pending');
+    assert.match(loops.result.structuredContent.items[0].loopRef, /^aipl_[0-9a-f]{64}$/u);
+    const repeatedRead = await rpc.send('tools/call', tool('mediflow.patient.open_loops.read.v1'));
+    assert.deepEqual(repeatedRead.result.structuredContent.items, loops.result.structuredContent.items);
+    for (const argumentsValue of [{ patientId: 'patient.synthetic.wrong' }, { confirmation: true }]) {
+      const denied = await rpc.send('tools/call', tool('mediflow.patient.open_loops.read.v1', argumentsValue));
+      assert.equal(denied.result.isError, true);
+    }
+    const oversized = await rpc.send('tools/call', tool('mediflow.terminology.search.v1', {
+      system: 'LOINC', query: 'x'.repeat(513), limit: 1,
+    }));
+    assert.equal(oversized.result.isError, true);
     const proposal = await rpc.send('tools/call', tool('mediflow.patient.open_loops.follow_up.propose.v1'));
     assert.equal(proposal.result.structuredContent.apply, 'none');
+    assert.equal(proposal.result.structuredContent.items.length, 1);
+    assert.equal(proposal.result.structuredContent.items[0].loopRef, loops.result.structuredContent.items[0].loopRef);
     const semantic = await rpc.send('tools/call', tool('mediflow.semantic_query_plan.execute.v1', {
       budget: { maxSteps: 2, maxDurationMs: 250, maxOutputBytes: 32_768 },
       explanation: 'Synthetic bounded local read',
@@ -326,6 +399,10 @@ async function main() {
     }));
     assert.equal(semantic.result.structuredContent.receipt.writesPerformed, 0);
     assert.equal(semantic.result.structuredContent.steps.length, 2);
+    const stalePreview = await rpc.send('tools/call', tool('mediflow.patient.checkup.status.transition.v1', {
+      checkupRef, targetStatus: 'completed', expectedRevision: 2,
+    }));
+    assert.equal(stalePreview.result.structuredContent.outcome, 'denied');
     const checkupPreview = await rpc.send('tools/call',
       tool('mediflow.patient.checkup.status.transition.v1', {
         checkupRef, targetStatus: 'completed', expectedRevision: 1,
@@ -405,6 +482,8 @@ async function main() {
     assert.equal(logout.status, 204);
     assert.equal(await withTimeout(exit, 'Supervisor terminal exit'), 0);
     verifyCommittedTransition(dataDir, receipt);
+    await prebindShutdown(dataDir, foreignCwd, 'EOF');
+    await verifyOrdinaryWeb(ordinary, ordinaryLogin.cookieHeader);
     if (APP) await assertReaped();
     rpc.assertHealthy();
     assert.equal(rpc.pending.size, 0);
@@ -414,9 +493,10 @@ async function main() {
     const forbidden = /patient\.synthetic|checkup\.synthetic|synthetic-supervisor|synthetic bounded checkup|synthetic supervisor smoke|synthetic ambulatory smoke|synthetic supervisor/iu;
     assert.doesNotMatch(rpc.lines.join('\n'), forbidden);
     assert.doesNotMatch(stderr, forbidden);
+    assert.equal(rpc.lines.join('\n').includes(DISCLOSURE_SENTINEL), false);
+    assert.equal(stderr.includes(DISCLOSURE_SENTINEL), false);
     assert.doesNotMatch(JSON.stringify(receipt), forbidden);
     if (APP) {
-      await prebindShutdown(dataDir, foreignCwd, 'EOF');
       await prebindShutdown(dataDir, foreignCwd, 'SIGTERM');
       assert.equal(fs.existsSync(marker), false, 'cwd/PATH substitution executed');
       await checkHeadlessRuntime(APP);
@@ -429,6 +509,8 @@ async function main() {
   } finally {
     if (APP && child && !hasExited(child)) rememberDescendants(child.pid);
     await terminateChild(child);
+    await terminateChild(ordinary);
+    fs.rmSync(ordinaryDataDir, { recursive: true, force: true });
     // Recovery does not turn a failed cleanup assertion into a PASS.
     for (const pid of ownedPids) if (alive(pid)) process.kill(pid, 'SIGKILL');
     fs.rmSync(dataDir, { recursive: true, force: true });
