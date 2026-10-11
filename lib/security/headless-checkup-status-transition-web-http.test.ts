@@ -163,7 +163,7 @@ test('routes remain thin dynamic Node adapters with preview absent from HTTP', (
     assert.match(source, /readAuthenticatedWebSession/u);
     assert.doesNotMatch(source, /\bdb\b|database|candidatePin\s*=|handlePreview|process\.send|console\./iu);
   }
-  assert.match(base, /export const POST = handlers\.select/u); assert.match(base, /export const DELETE = handlers\.revoke/u);
+  assert.match(base, /export const POST = withArchiveRequestContext\(handlers\.select\)/u); assert.match(base, /export const DELETE = withArchiveRequestContext\(handlers\.revoke\)/u);
   assert.match(proposalRoute, /export const GET = handlers\.read/u);
-  assert.match(proposalRoute, /export const POST = handlers\.confirm/u);
+  assert.match(proposalRoute, /export const POST = withArchiveRequestContext\(handlers\.confirm\)/u);
 });

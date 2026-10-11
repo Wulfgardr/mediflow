@@ -2,7 +2,7 @@
 
 Date: 2026-10-08
 
-Status: Proposed — tranche admission/scheduler; integrazione del lifecycle Web ancora HOLD
+Status: Accepted — admission/scheduler; lifecycle Web gestito nell’ADR 0144
 
 ## Problema e confine
 
@@ -15,10 +15,9 @@ Un lock sulla directory dei backup e un guard in memoria dello swap non
 coordinano queste connessioni.
 
 Questa tranche fornisce il protocollo di ammissione condiviso e collega lo
-scheduler. Non collega automaticamente il repair Web al nuovo protocollo:
+scheduler. Il collegamento Web è definito nell’[ADR 0144](0144-archive-generation.md):
 assenza di connessioni registrate non prova assenza di operazioni Web asincrone
-né di processi che non partecipano al protocollo. Il repair online resta HOLD
-fino all'integrazione e alla verifica del lifecycle proprietario.
+né di processi che non partecipano al protocollo. Il repair senza lifecycle proprietario resta indisponibile.
 
 ## Decisione
 
@@ -75,7 +74,7 @@ record prima di qualsiasi riconciliazione. Un segnale inviato, IPC disconnesso,
 Un'installazione aggiornata deve prima fermare i vecchi processi non partecipanti:
 assenza di lease non dimostra che un vecchio runner non stia operando.
 
-## Integrazione operativa ancora necessaria
+## Integrazione operativa Web
 
 Il lifecycle Web deve impedire nuovo lavoro, attendere le operazioni già
 avviate, chiudere gli handle e fornire una ricevuta terminale del processo
@@ -83,8 +82,8 @@ posseduto prima dello snapshot. Un'operazione che ha letto il database A non
 deve riprendere e scrivere nel database B. Il solo proxy di SQLite o una flag
 nel route non garantisce questo confine.
 
-Il collegamento di `db-server`, recovery all'avvio, owner del processo Web e
-route repair richiede una tranche coordinata distinta. Anche gli altri tool
+Il collegamento di `db-server`, recovery all’avvio, owner del processo Web e
+route repair è implementato nell’[ADR 0144](0144-archive-generation.md). Anche gli altri tool
 diretti che possono operare sul target gestito devono partecipare o avere un
 confine offline/sintetico verificato. Il modulo non autorizza uno swap sulla
 base di un censimento incompleto. Non si presume approvata una nuova API,

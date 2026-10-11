@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { desc, eq } from 'drizzle-orm';
@@ -50,6 +52,8 @@ export async function GET(request: Request) {
         const data = await query.orderBy(desc(sissHandoffEvents.startedAt));
         return NextResponse.json(data);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /siss-handoffs error:', error);
         return NextResponse.json({ error: 'Failed to fetch SISS handoffs' }, { status: 500 });
     }
@@ -58,6 +62,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsed = await readBoundedJsonBody(request, SISS_HANDOFF_JSON_MAX_BYTES, 'request-json');
@@ -117,7 +123,7 @@ export async function POST(request: Request) {
             writeAuditEventInTransaction(tx, {
                 eventType: 'siss.handoff.created',
                 outcome: 'success',
-                actorType: auditContext.actorType,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType,
                 actorRef: auditContext.actorRef,
                 subjectType: 'siss_handoff',
                 subjectRef: id,
@@ -132,6 +138,8 @@ export async function POST(request: Request) {
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /siss-handoffs error:', error);
         return NextResponse.json({ error: 'Failed to create SISS handoff' }, { status: 500 });
     }

@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import {
     clearAifaCatalog,
@@ -67,6 +69,8 @@ export async function GET(request: Request) {
             headers: { [CATALOG_STATUS_HEADER]: status.state },
         });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] AIFA catalog read failed:', error);
         return NextResponse.json({ error: 'Failed to read drug catalog' }, { status: 500 });
     }
@@ -75,6 +79,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const form = await request.formData();
@@ -93,14 +99,18 @@ export async function POST(request: Request) {
     }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         clearAifaCatalog();
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] AIFA catalog clear failed:', error);
         return NextResponse.json({ error: 'Failed to clear drug catalog' }, { status: 500 });
     }

@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm';
+import { bindSessionToArchive } from './security/archive-session-generation';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -41,15 +43,17 @@ export function syntheticNetworkPatientAuthority(db: typeof dbServer, scopeAmbul
     };
     db.insert(users).values({ ...user, passwordHash: 'synthetic-unusable', encryptedMasterKey: 'synthetic-unusable', salt: 'synthetic-unusable' })
         .onConflictDoNothing().run();
+    const archiveGeneration = (db.get(sql`SELECT generation FROM archive_generation WHERE id = 1`) as { generation: string }).generation;
     for (const [key, value] of [[NETWORK_MODE_KEY, 'network-home-base'], [NETWORK_PAIRING_STATE_KEY,
-        serializeNetworkPairingState({ clients: [pairedClient], intents: [] })]]) {
+        JSON.stringify({ ...JSON.parse(serializeNetworkPairingState({ clients: [pairedClient], intents: [] })), archiveGeneration })]]) {
         db.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
     }
     const { clientId, clientPlatform, tokenHash } = pairedClient;
     const session = createNativeServerSession(user, { clientId, clientPlatform, tokenHash }, captureNativeLoginSessionFence());
+    if (session) bindSessionToArchive(session, archiveGeneration);
     const request = new Request('http://127.0.0.1/api/v1/network/patients/synthetic-patient', { headers: {
         'x-mediflow-paired-client-id': pairedClient.clientId, 'x-mediflow-paired-client-token': token,
-        'x-request-id': options.requestId ?? 'synthetic-patient-request',
+        'x-mediflow-archive-generation': archiveGeneration, 'x-request-id': options.requestId ?? 'synthetic-patient-request',
     } });
     return { request, scopeAmbulatoryId, pairedClient, session };
 }

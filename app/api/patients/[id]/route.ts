@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
@@ -36,7 +38,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const patient = await dbServer.select().from(patients).where(and(eq(patients.id, id), activePatients())).get();
         if (!patient) return NextResponse.json({ error: "Not found" }, { status: 404 });
         return NextResponse.json(patient);
-    } catch {
+    } catch (archiveError) {
+        const replacement = archiveReplacementResponse(archiveError);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed to fetch patient" }, { status: 500 });
     }
 }
@@ -45,6 +49,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -76,7 +82,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             patientId: id, expectedVersion, values: normalized.values,
             setPrimaryAmbulatory: Object.prototype.hasOwnProperty.call(body, 'ambulatoryId'),
             audit: {
-                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${auditContext.authContext}`],
             },
@@ -84,7 +90,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         if (commit.status !== 200) return NextResponse.json(commit.value, { status: commit.status });
 
         return NextResponse.json({ success: true });
-    } catch {
+    } catch (archiveError) {
+        const replacement = archiveReplacementResponse(archiveError);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Update failed" }, { status: 500 });
     }
 }
@@ -93,6 +101,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -113,14 +123,16 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const auditContext = auditContextFromSession(session);
         const result = deletePatientOperation({
             patientId: id, expectedVersion, deletionReason,
-            audit: { actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+            audit: { archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${auditContext.authContext}`] },
         });
         if (result.status !== 200) return NextResponse.json(result.value, { status: result.status });
 
         return NextResponse.json({ success: true });
-    } catch {
+    } catch (archiveError) {
+        const replacement = archiveReplacementResponse(archiveError);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Delete failed" }, { status: 500 });
     }
 }

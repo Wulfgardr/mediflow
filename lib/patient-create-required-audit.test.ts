@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: C05 real patient POST handlers on synthetic SQLite; auth/cookie seams only. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -14,7 +15,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-c05-create-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const previousToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c05-create-synthetic-token';
-const state: { session: PhysicalOwner.WebSessionProjection | null; selected: string } = { session: null, selected: 'c05-create-a' };
+const state: { session: PhysicalOwner.WebSessionProjection | null; selected: string; generation: string } = { session: null, generation: '', selected: 'c05-create-a' };
 const stateKey = Symbol.for(`c05-create-seam-${dataDir}`);
 (globalThis as unknown as Record<symbol, typeof state>)[stateKey] = state;
 function seam(name: string, source: string) {
@@ -24,7 +25,7 @@ function seam(name: string, source: string) {
 }
 const auth = seam('auth.cjs', `const s=globalThis[Symbol.for(${JSON.stringify(`c05-create-seam-${dataDir}`)})];
 exports.requireSession=async()=>s.session;
-exports.requireLocalApiActorSession=async()=>({id:'local-api',userId:'local-api',role:'admin'});
+exports.requireLocalApiActorSession=async()=>({id:'local-api',userId:'local-api',role:'admin',archiveGeneration:s.generation});
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
 exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`);
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-create-synthetic-token'
@@ -48,6 +49,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 openDbServer();
+const archiveGeneration = state.generation = bindSyntheticArchiveSessions();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const web = load('../app/api/patients/route.ts') as typeof import('../app/api/patients/route.ts');
 const v1 = load('../app/api/v1/patients/route.ts') as typeof import('../app/api/v1/patients/route.ts');
@@ -78,6 +80,7 @@ function issueSession(suffix: string) {
     const resolved = physicalOwner.resolve(issued.sessionId, control.controlId);
     assert.equal(resolved.status, 'active');
     if (resolved.status !== 'active') throw new Error('Synthetic physical owner session unavailable');
+    bindSyntheticArchiveSessions(resolved.projection.id);
     return resolved.projection;
 }
 
@@ -119,7 +122,7 @@ async function create(surface: Surface, id: string, options: {
     body?: Record<string, unknown>;
     headers?: Record<string, string>;
 } = {}) {
-    const requestHeaders = new Headers({ 'content-type': 'application/json',
+    const requestHeaders = new Headers({ 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json',
         'x-request-id': `synthetic-${id}`, ...options.headers });
     if (surface === 'v1') requestHeaders.set('authorization', 'Bearer c05-create-synthetic-token');
     if (surface === 'web-fixed-preview-v1') {
@@ -333,7 +336,7 @@ test('purged patient identity cannot be recreated by Web or v1 and old PUT remai
     const id = 'c05-retired-identity';
     const params = { params: Promise.resolve({ id }) };
     const request = (method: string, body: Record<string, unknown>) => new Request(`http://127.0.0.1/api/patients/${id}`, {
-        method, headers: { 'content-type': 'application/json', 'x-request-id': 'synthetic-aba' }, body: JSON.stringify(body),
+        method, headers: { 'content-type': 'application/json', 'x-request-id': 'synthetic-aba', 'x-mediflow-archive-generation': state.generation }, body: JSON.stringify(body),
     });
     assert.equal((await create('web-legacy', id)).status, 201);
     const observed = await detail.GET(new Request(`http://127.0.0.1/api/patients/${id}`), params);

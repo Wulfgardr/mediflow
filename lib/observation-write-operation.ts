@@ -58,7 +58,7 @@ export function createObservationOperation(input: CreateInput): Result {
         if (inserted.changes !== 1) throw new Error('Observation create did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: 'observation.created', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'observation', subjectRef: input.observationId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
@@ -93,7 +93,7 @@ export function updateObservationOperation(input: UpdateInput): Result {
         if (changed.changes !== 1) throw new Error('Observation update did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: input.values.deletedAt ? 'observation.deleted' : 'observation.updated', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'observation', subjectRef: input.observationId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields,

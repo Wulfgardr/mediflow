@@ -111,6 +111,11 @@ function sealSnapshot(file: string, foreignKeys: 'clean' | 'as-found' = 'clean')
     syncFile(file);
 }
 
+export function hasSqliteSwapArtifacts(file: string): boolean {
+    try { return artifactNames(canonicalTarget(file)).length !== 0; }
+    catch { throw new SqliteSwapRecoveryRequiredError(); }
+}
+
 function artifactNames(target: string): string[] {
     const base = path.basename(target);
     return fs.readdirSync(path.dirname(target)).filter(name => name === base + RECOVERY_SUFFIX
@@ -321,6 +326,8 @@ export interface ReplaceSqliteDatabaseOptions {
     backupPath?: string | null;
     /** Shared connection on destPath; closed before asynchronous staging. External writers must be stopped. */
     connection: Database.Database;
+    /** Mutate only the independent replacement before its durable digest is sealed. */
+    prepareReplacement?: (stagingPath: string) => void;
     /** Synchronous validation; close on throw, return the candidate handle so commit failure can close it. */
     reopenConnection: () => Database.Database | void;
     /**
@@ -377,6 +384,7 @@ export async function replaceSqliteDatabase(options: ReplaceSqliteDatabaseOption
             for (const file of [target, sourcePath]) for (const suffix of SIDECAR_SUFFIXES) regularFile(file + suffix);
             await backupSqliteDatabase(target, original);
             await backupSqliteDatabase(sourcePath, staging);
+            options.prepareReplacement?.(staging);
             sealSnapshot(original);
             sealSnapshot(staging);
             if (backupPath) {

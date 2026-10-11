@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { inArray } from 'drizzle-orm';
@@ -99,6 +100,8 @@ export async function POST(request: Request) {
         );
     }
 
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     const upstream = buildOpenMedUpstreamCall(parsed.value, config);
 
     try {

@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: real SQLite candidate oracle for the eight ordinary diary mutations. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -44,6 +45,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/entries/route.ts') as typeof import('../app/api/entries/route.ts');
@@ -94,7 +96,7 @@ function readBack(patientId: string, entryId: string) {
 
 function request(method: string, body: unknown, surface: string, raw?: string, extraHeaders: Record<string, string> = {}) {
     return new Request('http://127.0.0.1/api/entries', { method,
-        headers: { 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-diary-synthetic-token' }),
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-diary-synthetic-token' }),
             ...extraHeaders },
         body: raw ?? JSON.stringify(body),
     });
@@ -368,7 +370,7 @@ function streamedRequest(surface: Surface, operation: Operation, chunks: Uint8Ar
         cancel() { cancels += 1; },
     }, { highWaterMark: 0 });
     const req = new Request('http://127.0.0.1/api/entries', { method: operation, body: stream,
-        headers: { 'content-type': 'application/json',
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json',
             ...(surface === 'v1' ? { authorization: 'Bearer c05-diary-synthetic-token' } : {}),
             ...headers }, duplex: 'half' } as RequestInit);
     return { req, counts: () => ({ pulls, cancels }) };

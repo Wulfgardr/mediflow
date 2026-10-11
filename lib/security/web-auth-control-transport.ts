@@ -6,6 +6,7 @@ import type { NextResponse } from 'next/server';
 
 import { sessionCookieOptionsForRequest } from './request-transport';
 import * as lifecycleOwner from './web-auth-lifecycle-owner-adapter';
+import { bindSessionToArchive, currentArchiveGeneration, sessionMatchesArchive } from './archive-session-generation';
 
 export const WEB_AUTH_CONTROL_COOKIE_NAME = 'mediflow_auth_control';
 
@@ -62,6 +63,7 @@ type LifecycleOwnerTransportPort = Readonly<{
 type ExactRecord = Readonly<Record<string, unknown>>;
 
 const owner = lifecycleOwner as unknown as Partial<LifecycleOwnerTransportPort>;
+const archiveAttempts = new WeakMap<object, { generation: string; controlId: string }>();
 
 function frozenRecord<Value extends object>(value: Value): Readonly<Value> {
     return ObjectFreeze(value) as Readonly<Value>;
@@ -150,20 +152,37 @@ export function bootstrapWebAuthControl(controlId: string | null): WebAuthContro
 
 export function beginWebAuthControl(kind: 'login' | 'setup', mutation: WebAuthControlMutation): unknown | null {
     if (!isWebAuthControlMutation(mutation) || typeof owner.begin !== 'function') return null;
-    try { return owner.begin(kind, mutation) ?? null; } catch { return null; }
+    try {
+        const generation = currentArchiveGeneration();
+        const attempt = owner.begin(kind, mutation);
+        if (!attempt || typeof attempt !== 'object') return null;
+        archiveAttempts.set(attempt, { generation, controlId: mutation.controlId });
+        return attempt;
+    } catch { return null; }
 }
 
 export function issueWebAuthControl(attempt: unknown, user: unknown): WebAuthControlIssue | null {
     if (typeof owner.issue !== 'function') return null;
+    const archive = typeof attempt === 'object' && attempt !== null ? archiveAttempts.get(attempt) : undefined;
+    if (!archive || archive.generation !== currentArchiveGeneration()) return null;
+    archiveAttempts.delete(attempt as object);
     let value: unknown;
     try { value = owner.issue(attempt, user); } catch { return null; }
     const record = exactFrozenRecord(value, ['ok', 'sessionId', 'etag']);
     if (!record || record.ok !== true || typeof record.sessionId !== 'string' || !SESSION_ID.test(record.sessionId)
         || typeof record.etag !== 'string' || !CONTROL_TOKEN.test(record.etag)) return null;
+    const resolved = lifecycleOwner.resolve(record.sessionId, archive.controlId);
+    if (resolved.status !== 'active') return null;
+    try { bindSessionToArchive(resolved.projection, archive.generation); }
+    catch {
+        lifecycleOwner.retire(resolved.projection, 'dispose');
+        return null;
+    }
     return value as WebAuthControlIssue;
 }
 
 export function abortWebAuthControl(attempt: unknown): boolean {
+    if (typeof attempt === 'object' && attempt !== null) archiveAttempts.delete(attempt);
     if (typeof owner.abort !== 'function') return false;
     try { return owner.abort(attempt) === true; } catch { return false; }
 }
@@ -177,6 +196,15 @@ export function resolveWebAuthControlSession(sessionId: unknown, controlId: unkn
         return value as WebAuthControlResolution;
     }
     const active = exactFrozenRecord(value, ['status', 'projection']);
+    if (active?.status === 'active') {
+        try {
+            const projection = active.projection as lifecycleOwner.WebSessionProjection;
+            if (!sessionMatchesArchive(projection)) {
+                lifecycleOwner.retire(projection, 'dispose');
+                return frozenRecord({ status: 'owned_denied' });
+            }
+        } catch { return null; }
+    }
     return active?.status === 'active' ? value as WebAuthControlResolution : null;
 }
 

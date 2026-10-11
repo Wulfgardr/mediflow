@@ -4,7 +4,9 @@ import { eq } from 'drizzle-orm';
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 /* @Codex */
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
-import { dbServer, runDbServerImmediateTransaction } from './db-server';
+import { dbServer, openDbServer, runDbServerImmediateTransaction } from './db-server';
+import { ArchiveReplacedError, rotateSqliteArchiveGeneration } from './archive-generation';
+import { clearAllSessions } from './security/server-session';
 import {
     ambulatories,
     auditEvents,
@@ -273,7 +275,8 @@ function runMutationFence(fence: BackupRestoreMutationFence): void {
         if (typeof fence() !== 'boolean') {
             throw new Error('invalid fence result');
         }
-    } catch {
+    } catch (error) {
+        if (error instanceof ArchiveReplacedError) throw error;
         throw new BackupRestoreBlockedError('runtime_fence', 'runtime mutation fence unavailable.');
     }
 }
@@ -373,6 +376,8 @@ export function restoreBackupArtifact(
         const plan = planBackupAuditRestore(rows);
         const soapAttestations = soapAttestationsWithoutRestoredAuthority(artifact.payload.headlessSoapActiveRoleAttestations ?? []);
         runMutationFence(beforeMutation);
+        rotateSqliteArchiveGeneration(openDbServer());
+        clearAllSessions();
         for (const collection of CLEAR_ORDER) {
             dbServer.delete(TABLE_LOOKUP[collection]).run();
         }

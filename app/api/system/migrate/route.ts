@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients } from '@/lib/schema';
 import { isNull } from 'drizzle-orm';
@@ -6,16 +7,21 @@ import { v4 as uuidv4 } from 'uuid';
 /* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 import { apiInternalError } from '@/lib/api-error-response';
+import { assertArchiveGeneration } from '@/lib/archive-generation';
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST() {
+export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
+        const generation = archiveGenerationForSession(session);
         // 1. Check if default ambulatory exists
         const existingAmbulatories = await dbServer.select().from(ambulatories).limit(1);
 
@@ -31,6 +37,7 @@ export async function POST() {
         // patients to it must be atomic, otherwise a crash could relink patients to
         // an ambulatory that was never committed. Transaction is synchronous (no awaits).
         dbServer.transaction((tx) => {
+            assertArchiveGeneration(tx, generation);
             if (mustCreateDefault) {
                 console.log("No ambulatories found. Creating default...");
                 tx.insert(ambulatories).values({

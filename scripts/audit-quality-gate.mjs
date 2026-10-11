@@ -48,6 +48,26 @@ const REQUIRED_ROUTE_AUDIT = [
             dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
         }],
     },
+    {
+        route: 'app/api/auth/passphrase/recover/route.ts', events: ['settings.updated'], reason: 'recovery replaces the passphrase and the recovery key of an account',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'recoverPassphrase',
+            target: 'passphrase-recovery', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'rotatePassphrase',
+            hop: { target: 'rotatePassphrase', argumentIndex: 2, literal: 'recovery' },
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
+    {
+        route: 'app/api/auth/passphrase/change/route.ts', events: ['settings.updated'], reason: 'authenticated passphrase change shares the atomic rotation owner',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'changePassphrase',
+            target: 'passphrase-change', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'rotatePassphrase',
+            hop: { target: 'rotatePassphrase', argumentIndex: 2, literal: 'change' },
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
     { route: 'app/api/settings/[key]/route.ts', events: ['settings.updated'], reason: 'single-key settings mutations must stay auditable' },
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },
@@ -1213,7 +1233,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
-        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'actorType', 'actorRef',
+        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
             'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
     const literal = (name, value) => {
         const node = props?.get(name)?.initializer;
@@ -1310,7 +1330,7 @@ export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSour
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
-        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'actorType', 'actorRef',
+        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
             'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
     const event = props?.get('eventType')?.initializer;
     const subject = props?.get('subjectType')?.initializer;
@@ -1532,7 +1552,7 @@ export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSour
     }
     const auditInput = unwrap(audit.arguments[1]);
     const props = ts.isObjectLiteralExpression(auditInput)
-        ? exactPropertyAssignments(auditInput, ['eventType', 'outcome', 'actorType', 'actorRef',
+        ? exactPropertyAssignments(auditInput, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
             'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
     const event = props?.get('eventType')?.initializer;
     const outcome = props?.get('outcome')?.initializer;

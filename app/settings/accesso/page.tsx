@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { KeyRound, Lock, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSecurity } from '@/components/security-provider';
+import { PassphraseAccessForm } from '@/components/recovery-kit';
 import {
     SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
@@ -16,7 +17,7 @@ import {
 } from '@/components/settings/settings-ui';
 
 export default function SettingsAccessPage() {
-    const { user, changePin, lock, unlockCredential } = useSecurity();
+    const { user, changePin, lock, unlockCredential, preparePassphraseChange } = useSecurity();
     // ADR 0143: on an account that unlocks with a passphrase the PIN no longer rotates the key wrapping.
     const passphrase = unlockCredential === 'passphrase';
     /* @Codex */
@@ -57,9 +58,14 @@ export default function SettingsAccessPage() {
                 title="Accesso"
                 description={passphrase
                     ? 'Sblocco con passphrase, PIN di conferma e controllo della sessione.'
-                    : 'Rotazione del PIN di sblocco e controllo della sessione.'}
+                    : 'Accesso PIN transitorio: adotta una passphrase per proteggere l’archivio.'}
             />
 
+            {!passphrase && <div className={`${SETTINGS_CARD_CLASS} space-y-4`}>
+                <h2 className="font-semibold">Passa dal PIN alla passphrase</h2>
+                <p>Il PIN attuale è una protezione transitoria. La passphrase aprirà l’archivio; il PIN resterà solo per le conferme. I backup e le copie Time Machine precedenti non vengono ripuliti. Dopo un ricaricamento, usa Rinnova accesso e inserisci di nuovo il PIN prima di preparare il kit.</p>
+                <PassphraseAccessForm mode="adopt" onPrepare={preparePassphraseChange} />
+            </div>}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {passphrase ? (
                 <div className={SETTINGS_CARD_CLASS} data-testid="settings-access-passphrase">
@@ -77,8 +83,9 @@ export default function SettingsAccessPage() {
                     </div>
                     <div className="mf-section">
                         <p className="text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
-                            In questa versione la passphrase e il PIN di conferma non si possono ancora cambiare da qui.
+                            Il cambio aggiorna passphrase e kit di recupero. Il PIN di conferma rimane separato e invariato.
                         </p>
+                        <PassphraseAccessForm mode="change" onPrepare={preparePassphraseChange} />
                     </div>
                 </div>
                 ) : (
@@ -199,7 +206,7 @@ export default function SettingsAccessPage() {
                             className={SETTINGS_SECONDARY_BUTTON_CLASS}
                         >
                             <Lock className="h-4 w-4" />
-                            Blocca sessione adesso
+                            {passphrase ? 'Blocca sessione adesso' : 'Rinnova accesso'}
                         </button>
                     </div>
                 </div>

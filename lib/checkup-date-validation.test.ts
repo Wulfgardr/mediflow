@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: ordinary route handlers with synthetic admission seams and real SQLite readback. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -42,6 +43,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
 const { ambulatories, patients, patientsToAmbulatories, checkups } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/checkups/route.ts') as typeof import('../app/api/checkups/route.ts');
 const webItem = load('../app/api/checkups/[id]/route.ts') as typeof import('../app/api/checkups/[id]/route.ts');
@@ -87,7 +89,7 @@ async function invoke(surface: Surface, operation: Operation, ids: ReturnType<ty
             title: 'Synthetic', date: nextDate, notes: 'ENC:synthetic:notes', ...changes }
         : { version: 3, ...changes };
     const request = new Request('http://127.0.0.1/api/checkups', { method: operation,
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
     if (surface === 'web') return operation === 'POST' ? webCreate.POST(request)
         : webItem.PUT(request, { params: Promise.resolve({ id: ids.checkupId }) });
     if (surface === 'v1') return operation === 'POST' ? v1Create.POST(request, { params: Promise.resolve({ id: ids.patientId }) })

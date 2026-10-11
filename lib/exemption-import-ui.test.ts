@@ -8,7 +8,7 @@ import test, { after } from 'node:test';
 import { chromium, expect } from '@playwright/test';
 import { build } from 'esbuild';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
-import { syntheticExemptionSession } from '../scripts/fixtures/exemption-import-session';
+import { syntheticExemptionSession, syntheticExemptionRequest } from '../scripts/fixtures/exemption-import-session';
 import { retireForUser } from './security/web-auth-lifecycle-owner-adapter';
 
 // Component + actual route/writer integration without a listener or user server.
@@ -49,7 +49,7 @@ test('UI selects, previews without writing, confirms, rereads, reports invalid r
             if (url.pathname === '/bundle.js') {
                 await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].text }); return;
             }
-            const request = new Request(req.url(), { method: req.method(), headers: req.headers(), body: req.method() === 'POST' ? req.postData() : undefined });
+            const request = syntheticExemptionRequest(req.url(), { method: req.method(), headers: req.headers(), body: req.method() === 'POST' ? req.postData() : undefined });
             let response: Response;
             if (url.pathname === '/api/exemptions/import/status') response = await statusRoute.GET();
             else if (url.pathname === '/api/exemptions/import/preview') response = await previewRoute.POST(request);

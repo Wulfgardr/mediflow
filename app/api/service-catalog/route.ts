@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
@@ -85,6 +86,8 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
+        const archiveDenial = archiveWriteRequestDenial(request, session);
+        if (archiveDenial) return archiveDenial;
         const items = Array.isArray(body) ? body : [body];
 
         let imported = 0;

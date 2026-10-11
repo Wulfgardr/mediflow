@@ -85,7 +85,7 @@ export function parseTables(source) {
 
 export function writesTable(source, symbol, table = '') {
   return new RegExp(`\\.(?:insert|update|delete)\\(\\s*${symbol}\\b`).test(source)
-    || (table !== '' && new RegExp(`\\bINSERT\\s+INTO\\s+${table}\\b`, 'i').test(source));
+    || (table !== '' && new RegExp(`\\b(?:INSERT\\s+INTO|UPDATE)\\s+${table}\\b`, 'i').test(source));
 }
 
 function isTestFile(file) {
@@ -172,6 +172,7 @@ function selfTest() {
     'await tx.update( alpha ).set(row);',
     'await db.delete(alpha).where(eq(alpha.id, id));',
     'const result = run("INSERT INTO alpha (id) VALUES (?)");',
+    'const result = run("UPDATE alpha SET value = ? WHERE id = ?");',
   ];
   for (const sample of positives) {
     if (!writesTable(sample, 'alpha', 'alpha')) failures.push(`writesTable: missed a write in ${JSON.stringify(sample)}`);
@@ -182,6 +183,7 @@ function selfTest() {
     'await db.insert(alphaBeta).values(row);',
     'const alpha = 1;',
     'const query = "INSERT INTO alphabet (id) VALUES (?)";',
+    'const query = "UPDATE alphabet SET value = ?";',
   ];
   for (const sample of negatives) {
     if (writesTable(sample, 'alpha', 'alpha')) failures.push(`writesTable: false positive on ${JSON.stringify(sample)}`);

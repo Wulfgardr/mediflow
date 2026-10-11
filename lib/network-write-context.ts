@@ -24,6 +24,7 @@ import { resolveNetworkDiscoveryAuth } from './network-discovery-auth';
 /* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from './security/server-auth';
 import { requirePairedNativeSession } from './security/paired-native-session';
+import { archiveWriteRequestDenial } from './security/archive-write-request';
 /* @Codex */
 import type { ServerSession } from './security/server-session';
 
@@ -69,6 +70,8 @@ export async function requireNetworkCapabilityContext(
 
     const session = await requireSession() ?? await requirePairedNativeSession(request);
     if (!session) return { ok: false, response: unauthorizedResponse() };
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return { ok: false, response: archiveDenial };
 
     const scopeAmbulatoryId = await resolveNetworkScope(session);
     if (!scopeAmbulatoryId) {

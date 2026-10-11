@@ -192,7 +192,8 @@ test('constructed signed zero is rejected before mutation while zero seconds sup
         const repeated = restore(dir, artifactPath, 'zero-repeat');
         assert.equal(repeated.error, null);
         assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 1 });
-        assert.deepEqual(repeated.after, repeated.before);
+        assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
+        assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
         assert.equal((repeated.after.audit_events as { occurred_at: number; created_at: number | null }[])
             .filter(row => row.occurred_at === 0 && row.created_at === 0).length, 1);
     } finally { fs.rmSync(work, { recursive: true, force: true }); }
@@ -225,7 +226,8 @@ for (const coverage of ['omitted', 'included'] as const) {
             const repeated = restore(dir, artifactPath, mode + '-repeat');
             assert.equal(repeated.error, null);
             assert.deepEqual(repeated.result?.audit, { coverage, inserted: 0, reused: 0 });
-            assert.deepEqual(repeated.after, repeated.before);
+            assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
+        assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
             const evidence = process.env.MEDIFLOW_AUDIT_EVIDENCE_DIR;
             if (evidence) fs.copyFileSync(artifactPath, path.join(evidence, mode + '.mediflow'));
         } finally { fs.rmSync(work, { recursive: true, force: true }); }
@@ -261,7 +263,7 @@ test('scheduled snapshot restores original audits, preserves target history and 
             "dbServer.insert(ambulatories).values({id:'audit-amb',name:'Synthetic audit',type:'synthetic',createdAt:new Date(1783000000000)}).run();",
             "dbServer.insert(patients).values({id:'audit-patient',firstName:'Synthetic',lastName:'Before',taxCode:'SYNTHETIC-AUDIT',ambulatoryId:'audit-amb',version:1,createdAt:new Date(1783000000000)}).run();",
             "dbServer.insert(patientsToAmbulatories).values({patientId:'audit-patient',ambulatoryId:'audit-amb',assignedAt:new Date(1783000000000)}).run();",
-            "const result = updatePatientOperation({patientId:'audit-patient',expectedVersion:1,values:{lastName:'After',updatedAt:new Date(1783000001000)},setPrimaryAmbulatory:false,audit:{actorType:'user',actorRef:'synthetic-operator',sourceSurface:'web',requestId:'synthetic-required-update'}});",
+            "const result = updatePatientOperation({patientId:'audit-patient',expectedVersion:1,values:{lastName:'After',updatedAt:new Date(1783000001000)},setPrimaryAmbulatory:false,audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation,actorType:'user',actorRef:'synthetic-operator',sourceSurface:'web',requestId:'synthetic-required-update'}});",
             "if (result.status !== 200) throw new Error('Synthetic patient update failed');",
         ].join('\n'));
         const source = new Database(path.join(sourceDir, 'medical.db'));
@@ -295,7 +297,8 @@ test('scheduled snapshot restores original audits, preserves target history and 
             assert.equal((target.prepare("SELECT COUNT(*) AS n FROM audit_events WHERE event_id = 'synthetic-target-only'").get() as { n: number }).n, 1);
             const repeated = restore(targetDir, exported.artifactPath, 'repeat');
             assert.deepEqual(repeated.result?.audit, { coverage: 'included', inserted: 0, reused: 4 });
-            assert.deepEqual(repeated.after, repeated.before);
+            assert.notDeepEqual(repeated.after.archive_generation, repeated.before.archive_generation);
+        assert.deepEqual({ ...repeated.after, archive_generation: undefined }, { ...repeated.before, archive_generation: undefined });
 
             const reexport = JSON.parse(runNode(targetDir, ['scripts/run-scheduled-backup.mjs'], {
                 MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(work, 'union'),

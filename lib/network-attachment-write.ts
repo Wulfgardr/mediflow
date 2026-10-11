@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 /* @Codex */
 import { randomUUID } from 'node:crypto';
 /* @Codex */
@@ -128,7 +129,7 @@ function writeNetworkAttachmentAuditEvent(
     writeAuditEventInTransaction(tx, {
         eventType: 'attachment.created',
         outcome: 'success',
-        actorType: 'user',
+        archiveGeneration: archiveGenerationForSession(input.context.session), actorType: 'user',
         actorRef: input.context.session.userId,
         subjectType: 'attachment',
         subjectRef: input.subjectRef,

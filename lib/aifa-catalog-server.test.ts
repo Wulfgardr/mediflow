@@ -1,3 +1,5 @@
+import { syntheticExemptionRequest } from '../scripts/fixtures/exemption-import-session';
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -214,7 +216,7 @@ test('update route guards streamed bodies and cancels on actual session retireme
     t.mock.method(auth, 'requireSession', async () => current);
     let calls = 0;
     t.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('unexpected network'); });
-    const request = () => new Request('http://localhost/api/drugs/update', { method: 'POST' });
+    const request = () => syntheticExemptionRequest('http://localhost/api/drugs/update', { method: 'POST' });
     assert.equal((await POST(request())).status, 401);
     assert.equal(calls, 0);
     const control = owner.bootstrapControl()!;
@@ -225,12 +227,13 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal(resolved.status, 'active');
     if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
     current = resolved.projection;
-    assert.equal((await POST(new Request('http://localhost/api/drugs/update?url=https://invalid.example', { method: 'POST' }))).status, 400);
-    assert.equal((await POST(new Request('http://localhost/api/drugs/update', { method: 'POST', body: '{}' }))).status, 400);
+    bindSyntheticArchiveSessions(current.id);
+    assert.equal((await POST(syntheticExemptionRequest('http://localhost/api/drugs/update?url=https://invalid.example', { method: 'POST' }))).status, 400);
+    assert.equal((await POST(syntheticExemptionRequest('http://localhost/api/drugs/update', { method: 'POST', body: '{}' }))).status, 400);
     assert.equal(calls, 0);
     /* @Codex Body guards run before transport and leave the catalog intact. */
     const bodySnapshot = getAifaCatalogSnapshot();
-    const streamed = (body: ReadableStream<Uint8Array>, signal?: AbortSignal) => new Request('http://localhost/api/drugs/update', {
+    const streamed = (body: ReadableStream<Uint8Array>, signal?: AbortSignal) => syntheticExemptionRequest('http://localhost/api/drugs/update', {
         method: 'POST', body, signal, duplex: 'half',
     } as RequestInit);
     for (const bytes of [new Uint8Array([0]), new TextEncoder().encode(' '), new TextEncoder().encode('{}')]) {
@@ -345,6 +348,7 @@ test('update route guards streamed bodies and cancels on actual session retireme
     const nextResolved = owner.resolve(nextIssued.sessionId, nextControl.controlId);
     if (nextResolved.status !== 'active') throw new Error('synthetic session setup failed');
     current = nextResolved.projection;
+    bindSyntheticArchiveSessions(current.id);
     let bodyStarted!: () => void;
     const bodyReading = new Promise<void>((resolve) => { bodyStarted = resolve; });
     let bodyCancelled = false;

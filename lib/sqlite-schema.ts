@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { ensureAuditSqliteSchema } from '@/lib/security/audit-db';
 import { bootstrapEmptySqliteDatabase } from '@/lib/sqlite-new-database-bootstrap';
@@ -1010,6 +1011,16 @@ export function initializeSqliteSchema(sqlite: Database.Database): void {
         bootstrapEmptySqliteDatabase(sqlite);
         applySchemaGuards(sqlite);
         upgradeLegacyAttachmentCurrentness(sqlite);
+        sqlite.exec(`CREATE TABLE IF NOT EXISTS archive_generation (
+            id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+            generation TEXT NOT NULL CHECK (length(generation) = 36)
+        )`);
+        sqlite.prepare('INSERT OR IGNORE INTO archive_generation (id, generation) VALUES (1, ?)').run(randomUUID());
+        sqlite.exec(`CREATE TABLE IF NOT EXISTS archive_session_generations (
+            session_ref TEXT PRIMARY KEY NOT NULL,
+            generation TEXT NOT NULL,
+            expires_at INTEGER NOT NULL
+        )`);
     }).immediate();
 }
 

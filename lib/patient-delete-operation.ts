@@ -44,7 +44,7 @@ export function deletePatientOperation(input: PatientDeleteOperationInput): Pati
 
         writeAuditEventInTransaction(tx, {
             eventType: 'patient.deleted', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'patient', subjectRef: input.patientId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },

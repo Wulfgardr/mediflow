@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
@@ -43,6 +45,8 @@ export async function GET() {
         const value = await loadSchedulerSettingValue();
         return NextResponse.json(buildBackupSchedulerStatus(value));
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('GET backup scheduler status failed:', error);
         return NextResponse.json({ error: 'Failed to load backup scheduler status.' }, { status: 500 });
     }
@@ -52,6 +56,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await request.json();

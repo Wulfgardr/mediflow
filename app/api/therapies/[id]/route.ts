@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -25,6 +27,8 @@ export async function PUT(
 ) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -133,12 +137,14 @@ export async function PUT(
         const result = updateTherapyOperation({
             therapyId: id, expectedVersion, values: { ...updateData, updatedAt: new Date() },
             changedFields: therapyChangedFields(updateData, rawBody), mode: 'web',
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /therapies/[id] error:', error);
         return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
     }
@@ -150,6 +156,8 @@ export async function DELETE(
 ) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const { id } = await params;
@@ -169,12 +177,14 @@ export async function DELETE(
         const result = updateTherapyOperation({
             therapyId: id, expectedVersion, values: normalized.values,
             changedFields: ['deletedAt', 'deletionReason'], mode: 'web',
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /therapies/[id] error:', error);
         return NextResponse.json({ error: 'Delete Failed' }, { status: 500 });
     }

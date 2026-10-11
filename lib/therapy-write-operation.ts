@@ -45,7 +45,7 @@ export function createTherapyOperation(input: CreateInput): Result {
         if (inserted.changes !== 1) throw new Error('Therapy create did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: 'therapy.created', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'therapy', subjectRef: input.therapyId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
@@ -76,7 +76,7 @@ export function updateTherapyOperation(input: UpdateInput): Result {
         if (changed.changes !== 1) throw new Error('Therapy update did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: input.values.deletedAt ? 'therapy.deleted' : 'therapy.updated', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'therapy', subjectRef: input.therapyId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields,

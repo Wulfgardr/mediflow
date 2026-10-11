@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -87,6 +88,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to fetch patient' }, { status: 500 });
     }
@@ -98,6 +101,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (authError) return authError;
 
     try {
+        const archiveActorSession = await requireLocalApiActorSession(request);
         const { id } = await params;
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
@@ -121,13 +125,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        /* @Codex: resolve the API actor before the required synchronous commit. */
-        const auditContext = auditContextFromRequest(request, await requireLocalApiActorSession(request));
+        /* @Codex: the actor was admitted before awaiting request input. */
+        const auditContext = auditContextFromRequest(request, archiveActorSession);
         const commit = updatePatientOperation({
             patientId: id, expectedVersion, values: normalized.values,
             setPrimaryAmbulatory: Object.prototype.hasOwnProperty.call(body, 'ambulatoryId'),
             audit: {
-                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${auditContext.authContext}`],
             },
@@ -136,6 +140,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /api/v1/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update patient' }, { status: 500 });
     }
@@ -147,6 +153,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (authError) return authError;
 
     try {
+        const archiveActorSession = await requireLocalApiActorSession(request);
         const { id } = await params;
         /* @Codex */
         const parsed = await readPatientJsonObject(request);
@@ -162,10 +169,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         }
 
         /* @Codex: resolve the API actor before the synchronous tombstone/audit commit. */
-        const auditContext = auditContextFromRequest(request, await requireLocalApiActorSession(request));
+        const auditContext = auditContextFromRequest(request, archiveActorSession);
         const result = deletePatientOperation({
             patientId: id, expectedVersion, deletionReason,
-            audit: { actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+            audit: { archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${auditContext.authContext}`] },
         });
@@ -173,6 +180,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /api/v1/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete patient' }, { status: 500 });
     }

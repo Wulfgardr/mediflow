@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readAmbulatoryJsonObject } from '@/lib/ambulatory-json-body';
 import { NextResponse } from 'next/server';
 import { clearAmbulatory } from '@/lib/ambulatory-write';
@@ -7,6 +9,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     try {
         const parsed = await readAmbulatoryJsonObject(request);
         if (!parsed.ok) return parsed.response;
@@ -16,6 +20,8 @@ export async function POST(request: Request) {
         const result = await clearAmbulatory({ request, session }, ambulatoryId, body.version);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('Clear ambulatory error:', error);
         return NextResponse.json({ error: 'Failed to clear ambulatory' }, { status: 500 });
     }

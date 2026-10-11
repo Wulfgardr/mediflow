@@ -79,7 +79,7 @@ export function updatePatientOperation(input: PatientUpdateOperationInput): Pati
         writeAuditEventInTransaction(tx, {
             eventType: classifyPatientMutationEvent(existing.isArchived ?? null, input.values.isArchived as boolean | undefined),
             outcome: 'success',
-            actorType: input.audit.actorType,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType,
             actorRef: input.audit.actorRef,
             subjectType: 'patient',
             subjectRef: input.patientId,

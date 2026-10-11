@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,6 +32,7 @@ const detailRoute = await import('../app/api/attachments/[id]/route.ts');
 const { dbServer } = await import('./db-server.ts');
 const requireCurrent = createRequire(import.meta.url);
 const serverAuth = requireCurrent('./security/server-auth') as { requireSession: () => Promise<unknown> };
+const archiveGeneration = bindSyntheticArchiveSessions('session.synthetic');
 
 const patientId = 'patient.synthetic.currentness';
 const sessionUsername = ['synthetic', 'web'].join('.');
@@ -60,8 +62,8 @@ function rows(): Array<Record<string, unknown>> {
 }
 
 function request(payload: Record<string, unknown>): Request {
-    return new Request('http://localhost/api/attachments', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload),
+    return syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/attachments', {
+        method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json' }, body: JSON.stringify(payload),
     });
 }
 
@@ -194,7 +196,7 @@ test('web list and metadata reads expose nested currentness with the observed re
     try {
         serverAuth.requireSession = async () => session;
         for (const suffix of ['', '?metadata=true']) {
-            const response = await route.GET(new Request(`http://localhost/api/attachments${suffix}`));
+            const response = await route.GET(syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments${suffix}`));
             assert.equal(response.status, 200);
             const [attachment] = await response.json() as Array<Record<string, unknown>>;
             const row = rows()[0]!;
@@ -230,7 +232,7 @@ test('web detail exposes nested currentness alongside the payload', async () => 
     const originalRequireSession = serverAuth.requireSession;
     try {
         serverAuth.requireSession = async () => session;
-        const response = await detailRoute.GET(new Request(`http://localhost/api/attachments/${attachmentId}`), {
+        const response = await detailRoute.GET(syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments/${attachmentId}`), {
             params: Promise.resolve({ id: attachmentId }),
         });
         assert.equal(response.status, 200);
@@ -284,7 +286,7 @@ async function remove(id: string, admitted: unknown = session): Promise<Response
     try {
         serverAuth.requireSession = async () => admitted;
         const row = rows().find(row => row.id === id);
-        return await detailRoute.DELETE(new Request(`http://localhost/api/attachments/${id}`, {
+        return await detailRoute.DELETE(syntheticArchiveRequest(archiveGeneration, `http://localhost/api/attachments/${id}`, {
             method: 'DELETE', headers: { 'x-mediflow-source-surface': 'job' },
             body: JSON.stringify({ patientId, expected: { sourceRef: row?.document_source_ref ?? 'a'.repeat(64),
                 revision: row?.document_revision ?? 1, freshnessEpoch: row?.document_freshness_epoch ?? 1 } }),
@@ -296,7 +298,7 @@ test('create and delete commit exactly one session-derived event without clinica
     reset();
     const before = snapshot();
     const id = 'attachment.synthetic.audit';
-    const response = await invoke(new Request('http://localhost/api/attachments', {
+    const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/attachments', {
         method: 'POST', headers: { 'x-mediflow-source-surface': 'job' },
         body: JSON.stringify(payload({ id, data: 'ENC:c3ludGhldGlj:YmxvYg==' })),
     }));
@@ -353,16 +355,16 @@ test('create rejects malformed, non-object, wrong-type and oversized JSON before
             JSON.stringify(payload({ patientId: 17 })), JSON.stringify(payload({ name: ' ' })),
             JSON.stringify(payload({ ocrQueueState: 'unknown' })), JSON.stringify(payload({ actorRef: 'injected' }))]) {
             const before = snapshot();
-            const response = await invoke(new Request('http://localhost/api/attachments', { method: 'POST', body }));
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/attachments', { method: 'POST', body }));
             assert.equal(response.status, 400, body);
             assert.deepEqual(snapshot(), before);
         }
         const valid = JSON.stringify(payload({ id: 'attachment.synthetic.bound' }));
         const atLimit = valid + ' '.repeat(1024 - Buffer.byteLength(valid));
-        assert.equal((await invoke(new Request('http://localhost/api/attachments', { method: 'POST', body: atLimit }))).status, 201);
+        assert.equal((await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/attachments', { method: 'POST', body: atLimit }))).status, 201);
         for (const headers of [{}, { 'content-length': '1' }, { 'content-length': '1025' }] as HeadersInit[]) {
             const before = snapshot();
-            const response = await invoke(new Request('http://localhost/api/attachments', {
+            const response = await invoke(syntheticArchiveRequest(archiveGeneration, 'http://localhost/api/attachments', {
                 method: 'POST', headers, body: atLimit + ' ',
             }));
             assert.equal(response.status, 413);
