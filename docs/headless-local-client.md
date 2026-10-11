@@ -38,8 +38,13 @@ Da checkout con Node previsto dal contratto e dipendenze fisiche:
 
 ```sh
 npm run build
+node --input-type=module -e "import { cpSync } from 'node:fs'; cpSync('public', '.next/standalone/public', { recursive: true }); cpSync('.next/static', '.next/standalone/.next/static', { recursive: true });"
 npm run mcp:intelligent-host:production
 ```
+
+La copia fisica degli asset serve anche allo smoke: la build standalone da sola
+non include `public` e `.next/static`. Il comando Node vale sui tre profili e non
+usa hard link o dipendenze condivise.
 
 Il Supervisor possiede Web standalone e MCP come figli separati, con IPC
 ereditato. Aprire il Web locale, autenticarsi e selezionare un paziente prima
