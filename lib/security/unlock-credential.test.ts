@@ -50,6 +50,8 @@ test('the passphrase policy is one length rule, counted in characters after NFKC
     // Eight characters outside the basic plane are sixteen UTF-16 units, and still eight characters.
     assert.deepEqual(checkPassphrase('🩺'.repeat(8)), { ok: false, reason: 'too_short' });
     assert.equal(checkPassphrase('🩺'.repeat(15)).ok, true);
+    // One ligature is three characters once normalized: five of them are a passphrase of fifteen.
+    assert.deepEqual(checkPassphrase('ﬃ'.repeat(5)), { ok: true, passphrase: 'ffi'.repeat(5) });
     // No composition rule, and nothing is trimmed away.
     assert.deepEqual(checkPassphrase(` ${'1'.repeat(15)} `), { ok: true, passphrase: ` ${'1'.repeat(15)} ` });
     assert.deepEqual(checkPassphrase(`perchè ${'a'.repeat(10)}`), { ok: true, passphrase: `perchè ${'a'.repeat(10)}` });

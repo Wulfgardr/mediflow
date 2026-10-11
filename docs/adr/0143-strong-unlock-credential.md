@@ -2,7 +2,7 @@
 
 Date: 2026-10-10
 
-Status: Accepted — 10 ottobre 2026, con le opzioni raccomandate; emendato l'11 ottobre 2026 ([Emendamento del passo 2](#emendamento-del-passo-2-11-ottobre-2026))
+Status: Accepted, 10 ottobre 2026, con le opzioni raccomandate. Emendato l'11 ottobre 2026: [passo 2](#emendamento-del-passo-2-11-ottobre-2026), [decisioni e review indipendente](#decisioni-e-review-indipendente-11-ottobre-2026).
 
 ## Problema e contesto
 
@@ -158,8 +158,9 @@ adotta le opzioni raccomandate; cambiarne una riapre il punto corrispondente.
 | Lunghezza minima | 15 caratteri. | È il minimo che regge il confronto della tabella sopra senza regole di composizione. |
 | Formato del kit | File dedicato, distinto dal backup. | Chi copia un backup non deve trovare accanto il modo di aprirlo. |
 
-Resta da misurare il costo di derivazione sui profili Windows e Omarchy prima
-di fissare le iterazioni della versione 3.
+Le [misure sui tre profili](https://github.com/Wulfgardr/mediflow/pull/492#issuecomment-6109090403)
+confermano 2.000.000 di iterazioni: il tentativo più lento resta sotto un secondo.
+Sono misure della primitiva, non qualificazione dell'intera applicazione.
 
 ## Ordine di consegna
 
@@ -214,6 +215,62 @@ Dove questo emendamento e il testo sopra divergono, vale l'emendamento.
 Il passo 4 dell'ordine di consegna si riduce di conseguenza: dare al PIN di
 conferma un cambio proprio, che aggiorna solo l'hash, e chiamarlo con il suo
 nome nell'interfaccia.
+
+## Decisioni e review indipendente (11 ottobre 2026)
+
+### Decisioni di Leonardo
+
+- **Recupero con la chiave di recupero.** Passa dal controllo di accesso Web
+  come un login ritirato nella stessa richiesta. Il recupero non ha una
+  sessione, e il proprietario delle sessioni Web ritira le sessioni di un
+  account solo a partire da una sessione autentica di quell'account, mai da un
+  identificativo utente: così la regola resta intatta e il pacchetto
+  `web-auth-lifecycle-owner` non cambia. La sessione aperta per il recupero non
+  viene mai consegnata al browser.
+- **App native.** Restano fuori dagli account passati alla passphrase finché
+  non adottano la versione 3. È accettato: oggi nessuno le usa.
+
+### Review indipendente del codice integrato
+
+Una review in sola lettura, eseguita da un secondo strumento sul diff
+`41b0ce6b7..41d601004`, non ha trovato errori nella costruzione crittografica
+e ha trovato quattro difetti. Tre sono corretti; il primo va chiuso prima che
+l'interfaccia offra il passaggio. Una seconda review, sulle correzioni, ha
+chiesto di chiudere anche la finestra descritta nella seconda riga e ha
+aggiunto l'ultima. Le successive hanno mostrato che un secondo invio dello
+stesso modulo non si lascia distinguere in modo affidabile dal primo: un testo
+modificato e riscritto, un incolla che lo lascia uguale, un tasto tenuto
+premuto, un doppio clic. Per questo la conferma non è più un secondo invio:
+è un comando a sé, mostrato con l'avviso.
+
+| Difetto | Esito |
+| --- | --- |
+| La copia `medical.db.schema-original-v<N>-<uuid>.db` creata dall'aggiornamento dello schema conserva l'involucro del PIN della stessa master key: dopo il passaggio alla passphrase resta una via d'attacco offline. | Corretto. Il passaggio elimina le copie del prodotto in cui l'account ha ancora l'involucro del PIN: l'originale dell'aggiornamento dello schema e la copia di riparazione `medical.db.bak-*`. Una prova su archivio sintetico ha mostrato che l'involucro resta anche nel registro WAL dell'archivio aperto: il passaggio lo svuota, senza attendere un lettore. Ciò che un'interruzione o un lettore lasciano indietro viene ripreso al primo sblocco con la passphrase. Le copie fatte dopo il passaggio restano: contengono solo l'involucro della passphrase. La risposta del passaggio dice se qualcosa non è stato tolto. Restano fuori le copie che il prodotto non possiede: Time Machine, copie a mano, il vecchio `medical.db` nella cartella dell'applicazione. La procedura guidata deve dirlo. |
+| Una scheda ferma sulla schermata di blocco da prima del passaggio inviava la passphrase al server come se fosse un PIN. | Corretto. A ogni sblocco il browser chiede, dopo il gesto, che cosa sblocca l'account; se la risposta non lo dice, o differisce da ciò che il campo mostrava mentre si scriveva, non invia nulla. Quella risposta può però essere già vecchia quando la richiesta parte, perché il passaggio può avvenire nel mezzo: per questo un testo che la policy accetterebbe come passphrase (da 15 a 128 caratteri dopo la normalizzazione) non parte mai come PIN quando si invia il modulo, in qualunque modo lo si invii e quante volte. Resta nel campo sotto un avviso, e con l'avviso compare un comando a sé, "È il mio PIN": parte solo se la persona attiva quel comando, per quel testo immutato, mentre l'avviso è a schermo; prima il browser chiede di nuovo. Le ripetizioni di un tasto tenuto premuto non attivano nulla, il secondo clic di un doppio clic non conferma, e un tentativo già in corso ne esclude un altro. Se un altro messaggio prende il posto dell'avviso, o il testo cambia, anche per essere riscritto uguale, il comando scompare e si ricomincia. Un PIN così esiste solo se è stato scelto al primo avvio. La decisione sta in una funzione sola, `planUnlock`. Limite accettato: chi scrive la futura passphrase nel campo del PIN di un account ancora sul PIN, e la conferma, la invia; nulla può sapere che è una futura passphrase. |
+| Il passaggio verificava il PIN senza contare i tentativi: chi aveva una sessione poteva indovinarlo. | Corretto: usa la verifica condivisa, con contatori e blocco; un blocco nato dopo la verifica ferma la scrittura. Il cambio PIN ha lo stesso limite da prima e resta da allineare. |
+| La schermata di blocco contava la lunghezza prima della normalizzazione, e rifiutava passphrase che le primitive accettano. | Corretto: usa lo stesso controllo delle primitive. |
+| Un PIN sbagliato presentato al passaggio viene registrato come accesso fallito anonimo, senza la sessione che lo ha chiesto. | Noto, non corretto: è ciò che la verifica condivisa registra anche per le conferme di ruolo. Va corretto per tutte insieme, dando alla verifica il contesto di chi la chiama. |
+
+## Percorso applicativo
+
+Il primo avvio crea un account v3. Adozione dal PIN, cambio e recupero
+riutilizzano un kit preparato: il medico lo salva e conserva la chiave prima
+della scrittura. Il PIN di conferma resta separato e invariato. Dopo il commit
+serve uno sblocco esplicito; la chiave residente v3 non è estraibile né persistita.
+Un reload richiede nuovamente lo sblocco; la navigazione interna usa il routing client.
+Il recupero sullo stesso archivio conserva la storia cifrata. Il drill su un
+archivio vuoto dopo la perdita del computer resta il criterio 1 di WUL-730:
+la prova cambio/recupero non lo sostituisce.
+
+La bonifica usa `VACUUM` sulla connessione ammessa e poi un checkpoint `TRUNCATE`:
+il solo checkpoint non elimina le celle obsolete. Non è uno swap esterno;
+[SQLite mantiene rollback e lock](https://www.sqlite.org/lang_vacuum.html).
+Può richiedere spazio fino a due volte il database e lavoro sincrono: un errore
+lascia l’accesso v3 attivo, ma la bonifica non confermata e un avviso persistente.
+Le copie di riparazione con riga già v3 sono conservate e restano da verificare:
+il vecchio producer `backup()` può aver copiato celle obsolete. Non vengono
+certificate dal solo SELECT né eliminate come copie di recupero. Nessuna promessa
+di cancellazione fisica sul disco; copie manuali e Time Machine restano fuori.
 
 ## Come si prova
 

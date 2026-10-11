@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { checkPassphrase } from '@/lib/security/unlock-credential';
 import styles from './onboarding-experience.module.css';
 
-/* @Codex: setup identity and PIN only; work tailoring follows authenticated setup. */
+export type SecuritySetup = { displayName: string; ambulatoryName: string; pin: string; passphrase: string };
 interface OnboardingWizardProps {
-    onComplete: (data: { displayName: string; ambulatoryName: string; pin: string }) => Promise<void>;
+    onComplete: (data: SecuritySetup) => Promise<void>;
 }
 
 export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
@@ -22,25 +23,28 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         displayName: '',
         ambulatoryName: '',
         pin: '',
-        confirmPin: ''
+        confirmPin: '',
+        passphrase: '',
+        confirmPassphrase: ''
     });
 
     // Step 1: Profile
     const canAdvanceProfile = formData.displayName.length > 2 && formData.ambulatoryName.length > 2;
 
-    // @Codex: the existing owner uses the PIN for access and key wrapping.
-    // Step 2: PIN
-    const canSubmit = formData.pin.length >= 4 && formData.pin === formData.confirmPin;
+    const canSubmit = checkPassphrase(formData.passphrase).ok
+        && formData.passphrase.normalize('NFKC') === formData.confirmPassphrase.normalize('NFKC')
+        && formData.pin.length >= 4 && formData.pin.length <= 64 && formData.pin === formData.confirmPin;
 
     const handleSubmit = async () => {
+        if (!canSubmit || isSubmitting) return;
         setIsSubmitting(true);
         setSubmitError(null);
         try {
-            // @Codex: preserve the existing setup owner; collect only fields it consumes.
             await onComplete({
                 displayName: formData.displayName,
                 ambulatoryName: formData.ambulatoryName,
-                pin: formData.pin
+                pin: formData.pin,
+                passphrase: formData.passphrase
             });
         } catch (e) {
             console.error(e);
@@ -104,11 +108,21 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div className={styles.stack}>
                     <header className={styles.heading}>
                         <h2>Sicurezza</h2>
-                        <p id="setup-pin-help">Il PIN protegge l’accesso locale e la chiave dei campi clinici cifrati. Usa almeno 4 caratteri e conservalo.</p>
+                        <p id="setup-pin-help">La passphrase apre l’archivio: usa da 15 a 128 caratteri. Il PIN separato, da 4 a 64 caratteri, serve solo per le conferme di revisione e di ruolo.</p>
                     </header>
                     <div className={styles.fields}>
                         <div className={styles.field}>
-                            <label htmlFor="setup-pin">PIN di accesso e cifratura</label>
+                            <label htmlFor="setup-passphrase">Passphrase di accesso</label>
+                            <input id="setup-passphrase" type="password" inputMode="text" autoComplete="new-password" spellCheck={false} className={styles.input}
+                                value={formData.passphrase} onChange={e => setFormData({ ...formData, passphrase: e.target.value })} aria-describedby="setup-pin-help" />
+                        </div>
+                        <div className={styles.field}>
+                            <label htmlFor="setup-confirm-passphrase">Conferma passphrase</label>
+                            <input id="setup-confirm-passphrase" type="password" inputMode="text" autoComplete="new-password" spellCheck={false} className={styles.input}
+                                value={formData.confirmPassphrase} onChange={e => setFormData({ ...formData, confirmPassphrase: e.target.value })} />
+                        </div>
+                        <div className={styles.field}>
+                            <label htmlFor="setup-pin">PIN di conferma</label>
                             <input
                                 type="password"
                                 inputMode="text"
