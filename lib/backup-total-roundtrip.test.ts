@@ -27,7 +27,7 @@ const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 // Their historical audit backfill does not qualify export/restore continuity (C15).
 const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents', 'patient_retired_ids']);
 /* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
-const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations']);
+const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations']);
 /* @Codex Command replay remains empty until append-only audit restore has a separate contract. */
 const AUDIT_DEPENDENT_EMPTY_TABLES = new Set(['durable_review_command_operations', 'durable_review_command_states']);
 const BACKUP_TABLES = {
@@ -681,7 +681,7 @@ test('retires a pending Checkup proposal before a same-ID/version restore ABA sw
         } finally { restored.close(); }
 
         const routeSource = fs.readFileSync(path.join(ROOT, 'app/api/system/backup-restore/route.ts'), 'utf8');
-        assert.match(routeSource, /restoreBackupArtifact\(artifact,\s*disposeCheckupStatusTransitionForHostV1\)/u);
+        assert.match(routeSource, /restoreBackupArtifact\(artifact,\s*\(\) => \{\s*assertArchiveGeneration\(dbServer, archiveGeneration\);\s*return disposeCheckupStatusTransitionForHostV1\(\);/u);
     } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
 });
 

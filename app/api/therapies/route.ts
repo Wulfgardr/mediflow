@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
@@ -62,6 +64,8 @@ export async function GET(request: Request) {
         }));
         return NextResponse.json(normalizedData);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed" }, { status: 500 });
     }
 }
@@ -69,6 +73,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsed = await readTherapyJsonObject(request, 'web', 'create');
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
         const result = createTherapyOperation({
             patientId: body.patientId, therapyId: newId, values: therapyValues,
             changedFields: therapyChangedFields(therapyValues, parsed.body), mode: 'web',
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });

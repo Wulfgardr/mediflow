@@ -11,7 +11,7 @@ import type { KdfRewrapPayload } from '@/lib/security/kdf-rewrap-validation';
  * when the account unlocks with a passphrase (ADR 0143): a session must not be able to put a
  * PIN wrapping back in place of the passphrase one.
  */
-export function persistKdfRewrap(db: typeof dbServerType, userId: string, payload: KdfRewrapPayload): boolean {
+export function persistKdfRewrap(db: Pick<typeof dbServerType, 'update'>, userId: string, payload: KdfRewrapPayload): boolean {
     return db.update(users)
         .set({ encryptedMasterKey: payload.encryptedMasterKey, salt: payload.salt })
         .where(and(eq(users.id, userId), isNull(users.unlockVerifierHash)))

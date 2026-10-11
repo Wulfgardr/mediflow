@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: C05 real admin restore handler and synthetic SQLite with auth seam. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -31,6 +32,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web-session');
 openDbServer();
 const { ambulatories, entries, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const route = load('../app/api/system/restore-patient/route.ts') as typeof import('../app/api/system/restore-patient/route.ts');
@@ -84,7 +86,7 @@ function readBack(id: string) {
 
 function post(rawBody: string, extraHeaders: Record<string, string> = {}) {
     return route.POST(new Request('http://127.0.0.1/api/system/restore-patient', {
-        method: 'POST', headers: { 'content-type': 'application/json', 'x-request-id': 'synthetic-admin-restore',
+        method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', 'x-request-id': 'synthetic-admin-restore',
             ...extraHeaders }, body: rawBody,
     }));
 }
@@ -102,7 +104,7 @@ function streamedPost(chunks: Uint8Array[], extraHeaders: Record<string, string>
     }, { highWaterMark: 0 });
     const request = new Request('http://127.0.0.1/api/system/restore-patient', {
         method: 'POST', body: stream,
-        headers: { 'content-type': 'application/json', ...extraHeaders }, duplex: 'half',
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...extraHeaders }, duplex: 'half',
     } as RequestInit);
     return { request, counts: () => ({ pulls, cancels }) };
 }

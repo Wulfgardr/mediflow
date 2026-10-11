@@ -7,9 +7,9 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 5.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
-ottobre 2026.
+**Versione 6.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Aggiornata l’11 ottobre 2026 per credenziali v3 e generazione
+dell’archivio; la prima classificazione era su `main` `bcb7af46a`.
 
 MediFlow cifra alcuni campi, non il database. Questa matrice dice, per ogni
 colonna e per ogni file che il prodotto scrive, che cosa si legge senza la
@@ -26,22 +26,23 @@ il file; dove una proprietà non è ancora provata da un test, è scritto.
 
 - **Master key.** AES-256-GCM, generata nel browser. Cifra ogni valore
   `ENC:<iv>:<cifrato>`.
-- **Involucro.** La master key è avvolta con una chiave derivata dal PIN
-  (PBKDF2-SHA256, 600.000 iterazioni per gli involucri nuovi, 100.000 per
-  quelli della prima versione) e salvata in `users.encrypted_master_key`, con
-  una copia nel `localStorage` del browser (`lib/security/security.ts`).
-- **PIN.** Almeno quattro caratteri allo sblocco (`components/lock-screen.tsx`);
-  le conferme di ruolo ne accettano al massimo otto
-  (`lib/security/headless-soap-active-role-enrollment.ts`). A ogni accesso il
-  browser lo invia al server locale, che ne conserva l'hash bcrypt in
-  `users.password_hash` (`lib/security/client-auth-api.ts`,
-  `app/api/auth/setup/route.ts`).
-- **Chiave sbloccata.** Finché l'applicazione è sbloccata, la master key sta
-  nel `sessionStorage` del browser in formato JWK, in chiaro
-  (`lib/security/client-security-session.ts`).
+- **Involucro v3.** La passphrase (15–128 caratteri) deriva il materiale con
+  PBKDF2-SHA256, 2.000.000 iterazioni; HKDF separa chiave di avvolgimento e
+  verificatore di accesso. Il server conserva l’involucro e il salt in `users`,
+  ma riceve soltanto il verificatore, non la passphrase. Il kit di recupero
+  usa una chiave casuale separata (`lib/security/unlock-credential.ts`).
+- **PIN transitorio.** Gli archivi non ancora migrati conservano l’avvolgimento
+  PIN v1/v2 (100.000/600.000 iterazioni) e inviano il PIN al server locale.
+  Il PIN separato rimane per le conferme dopo il passaggio a v3; non può più
+  sbloccare né sostituire la protezione della master key.
+- **Chiave sbloccata.** Per v3 è non estraibile e vive solo in memoria: il
+  reload richiede un nuovo sblocco. Solo il profilo PIN transitorio conserva
+  la chiave in chiaro nel `sessionStorage` come JWK
+  (`components/security-provider.tsx`, `lib/security/client-security-session.ts`).
 
-Il server non decifra i campi clinici. Il confine è una disciplina del codice:
-il server riceve il PIN e possiede involucro e salt.
+Il server non decifra i campi clinici. Per v3 il verificatore di accesso non
+permette di derivare la chiave di avvolgimento; nel profilo PIN transitorio il
+server riceve invece il PIN e possiede involucro e salt.
 
 ## Minacce considerate
 
@@ -69,6 +70,16 @@ locali salvano ciò che ricevono.
 
 - In chiaro: `id`, `name`, `address`, `parent_id`, `type`, `description`, `is_default`, `created_at`, `version`
 - Leggibile senza chiave: nome e indirizzo delle sedi.
+
+### `archive_generation` — identità della versione dell'archivio
+
+- In chiaro: `id`, `generation`
+- Leggibile senza chiave: identificatore casuale, senza contenuto clinico; non è una credenziale.
+
+### `archive_session_generations` — legame fra sessione e archivio
+
+- In chiaro: `session_ref`, `generation`, `expires_at`
+- Leggibile senza chiave: hash SHA-256 dell'identificatore casuale di sessione, generazione e scadenza. Non contiene cookie né chiavi e non autentica una sessione.
 
 ### `attachments`: documenti allegati e loro estratti
 
@@ -318,9 +329,12 @@ Leonardo.
 9. **Copie del database e residui** (`.old-*`, originali dell'aggiornamento,
    copie di riparazione, WAL, pagine libere) conservano valori precedenti. Per
    l'involucro del PIN di un account passato alla passphrase, le copie del
-   prodotto e il WAL sono chiusi dalla versione 5; restano le copie fuori
-   dalla directory dati (Time Machine, copie a mano, il vecchio `medical.db`
-   nella cartella dell'applicazione).
+   prodotto vengono rimosse quando identificabili. L’archivio attivo è
+   compattato e il WAL svuotato soltanto quando la pulizia è completa. Le
+   `.bak` già v3 restano conservate e segnalate come pendenti per controllo
+   manuale: non si dichiara che siano prive di residui. Restano fuori dalla
+   pulizia Time Machine, copie a mano e il vecchio `medical.db` nella
+   cartella dell’applicazione.
 10. **File temporanei e log** non sono coperti da una prova.
 
 ## Come si aggiorna
@@ -336,3 +350,4 @@ cambia una classificazione.
 | 3 | Tolto dal contratto `messages.reasoning`, che non era una colonna. |
 | 4 | Quattro colonne nuove in `users` per l'ADR 0143, ancora vuote. |
 | 5 | Aggiunti gli originali dell'aggiornamento dello schema e le copie di riparazione, che mancavano. Il passaggio alla passphrase elimina quelle con l'involucro del PIN e svuota il WAL. |
+| 6 | Generazione e legame sessioni; chiave v3 solo in memoria; limiti espliciti della pulizia dei residui. |

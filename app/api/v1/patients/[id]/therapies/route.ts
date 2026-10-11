@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -95,6 +96,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/therapies error:', error);
         return NextResponse.json({ error: 'Failed to fetch therapies' }, { status: 500 });
     }
@@ -118,12 +121,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const result = createTherapyOperation({
             patientId: id, therapyId: newId, values: normalized.values,
             changedFields: therapyChangedFields(normalized.values, parsed.body), mode: 'v1',
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /api/v1/patients/[id]/therapies error:', error);
         return NextResponse.json({ error: 'Failed to create therapy' }, { status: 500 });
     }

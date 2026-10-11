@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 /* @Codex: paired therapy boundary remains specific to this capability and routes. */
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeTherapyCreateInput, normalizeTherapyUpdateInput } from './api-v1-clinical-write-normalization';
@@ -72,7 +73,7 @@ function validateNetworkTherapyMutationBoundary(
 
 function networkAuditContext(context: NetworkTherapyMutationContext) {
     return {
-        actorType: 'user' as const, actorRef: context.session.userId,
+        archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user' as const, actorRef: context.session.userId,
         sourceSurface: 'native' as const, requestId: requestIdFromRequest(context.request),
         flags: ['auth:paired-client', `paired-client:${context.pairedClient.clientId}`, 'scope:ambulatory'],
     };

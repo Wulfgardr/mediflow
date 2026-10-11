@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, eq, isNotNull } from 'drizzle-orm';
@@ -61,6 +63,8 @@ export async function GET() {
         if (!preview.ok) return NextResponse.json(preview.value, { status: preview.status });
         return NextResponse.json({ success: true, dryRun: true, snapshot: preview.snapshot, total: preview.total });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('Migration preview failed:', error);
         return NextResponse.json({ error: 'Migration preview failed' }, { status: 500 });
     }
@@ -71,6 +75,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await readBoundedJsonBody(request, MIGRATION_JSON_MAX_BYTES, 'request-json',
@@ -99,7 +105,7 @@ export async function POST(request: Request) {
                 if (updated.changes !== 1) throw new Error('Migration patient version did not update exactly one row');
                 writeAuditEventInTransaction(tx, {
                     eventType: 'patient.updated', outcome: 'success',
-                    actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                    archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                     subjectType: 'patient', subjectRef: patient.patientId,
                     sourceSurface: auditContext.sourceSurface, requestId,
                     redactedMetadata: withAuditContextMetadata(auditContext, {
@@ -113,6 +119,8 @@ export async function POST(request: Request) {
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.ok ? 200 : result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Migration fatal error:", error);
         return NextResponse.json({ error: "Migration failed" }, { status: 500 });
     }

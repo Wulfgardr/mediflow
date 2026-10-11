@@ -232,7 +232,8 @@ export default function BackupRestoreUI() {
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
                                 ATTENZIONE: <strong>TUTTI i dati attuali verranno cancellati</strong> e sostituiti con
-                                quelli del backup. L&apos;operazione non è reversibile.
+                                quelli del backup. L&apos;operazione non è reversibile. Le altre schede verranno ricaricate;
+                                i dispositivi abbinati dovranno essere abbinati e sincronizzati di nuovo.
                             </p>
                         </div>
                         <p className="text-xs text-red-800/80 dark:text-red-200/80">

@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { mintResourcePort, releaseResourcePort, registerPrivateResource, unregisterPrivateResource,
@@ -45,6 +46,8 @@ export async function POST(request: Request) {
     if (new URL(request.url).search) {
         return Response.json({ error: 'La richiesta AIFA non accetta parametri o contenuti' }, { status: 400 });
     }
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     const port = mintResourcePort(session);
     if (!port) return unauthorizedResponse();
     const controller = new AbortController();

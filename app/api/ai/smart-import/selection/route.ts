@@ -1,3 +1,4 @@
+import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
 /* @Codex */
 import { acquireAuthenticatedWebSessionSelection } from '@/lib/security/server-session-authenticated-selection-production';
 import { readAuthenticatedWebSessionSelectionEpoch } from '@/lib/security/server-session-authenticated-selection-epoch-production';
@@ -11,12 +12,12 @@ const selectCurrent = createSmartImportSelectionHttpHandler({
     acquireSelection: acquireAuthenticatedWebSessionSelection,
 });
 
-export function POST(request: Request) {
+export const POST = withArchiveRequestContext((request: Request) => {
     return completePortableSupervisorWebLifecycleMutationV1(
         selectCurrent(request),
         'reselection',
     );
-}
+});
 
 export const GET = createSmartImportSelectionEpochHttpHandler({
     readEpoch: readAuthenticatedWebSessionSelectionEpoch,

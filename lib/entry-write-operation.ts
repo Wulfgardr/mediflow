@@ -72,7 +72,7 @@ export function createEntryOperation(input: CreateInput): Result {
         if (inserted.changes !== 1) throw new Error('Entry create did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: 'entry.created', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'entry', subjectRef: input.id,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
@@ -106,7 +106,7 @@ export function updateEntryOperation(input: UpdateInput): Result {
         if (changed.changes !== 1) throw new Error('Entry update did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: input.values.deletedAt ? 'entry.deleted' : 'entry.updated', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'entry', subjectRef: input.entryId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields,

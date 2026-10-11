@@ -1,3 +1,4 @@
+import { bindSessionToArchive, currentArchiveGeneration } from './security/archive-session-generation';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -43,6 +44,7 @@ function fixture(operation: Operation, channel: 'native' | 'web' = 'native') {
         const resolved = owner.resolve(issued.sessionId, control.controlId); assert.equal(resolved.status, 'active');
         if (resolved.status !== 'active') throw new Error('synthetic Web session missing');
         session = resolved.projection;
+        bindSessionToArchive(session, currentArchiveGeneration());
         cookieState.cookies.set('mediflow_auth_control', control.controlId);
     }
     cookieState.cookies.set('mediflow_session', session.id);
@@ -63,7 +65,8 @@ function fixture(operation: Operation, channel: 'native' | 'web' = 'native') {
 function clinicalSnapshot() {
     return ['patients', 'patients_to_ambulatories', 'audit_events'].map(table => dbServer.$client.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
 }
-function setSetting(key: string, value: string) { dbServer.update(settings).set({ value }).where(eq(settings.key, key)).run(); }
+function setSetting(key: string, value: string) {
+    if (key === NETWORK_PAIRING_STATE_KEY) value = JSON.stringify({ ...JSON.parse(value), archiveGeneration: currentArchiveGeneration() }); dbServer.update(settings).set({ value }).where(eq(settings.key, key)).run(); }
 function revoke(kind: string, context: ReturnType<typeof fixture>['context']) {
     if (kind === 'pairing') setSetting(NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState({ intents: [], clients: [] }));
     if (kind === 'mode') setSetting(NETWORK_MODE_KEY, 'local-only');

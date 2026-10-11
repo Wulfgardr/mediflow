@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: real SQLite regression oracle for the five ordinary prosthetic writes. */
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -13,6 +14,7 @@ const dir = mkdtempSync(join(root, 'prosthetic-atomic-'));
 process.env.MEDIFLOW_DATA_DIR = dir;
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer();
+bindSyntheticArchiveSessions('synthetic-session', 'synthetic-native', 'synthetic-local-api');
 const { patients, ambulatories, patientsToAmbulatories, prostheticPrescriptions } = await import('./schema.ts');
 const writer = await import('./prosthetic-prescription-write.ts');
 const sql = new Database(join(dir, 'medical.db'));
@@ -177,7 +179,8 @@ test('two SQLite processes contend for one version; a later process sees tombsto
 test('host system session retains its audit actor classification', async () => {
     if (baseline) return;
     const ids = seed();
-    const systemSession: ServerSession = { ...session, id: 'local-api', authChannel: 'system' };
+    const systemSession = { ...session, id: 'local-api', authChannel: 'system' as const,
+        archiveGeneration: (sql.prepare('SELECT generation FROM archive_generation WHERE id=1').get() as { generation: string }).generation };
     const result = await writer.createHostProstheticPrescription({ request, session: systemSession },
         { id: ids.id, patientId: ids.patientId, prescribedAt: '2026-05-01', description: 'ENC:synthetic:system' });
     assert.equal(result.status, 201);

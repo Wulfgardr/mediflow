@@ -15,6 +15,13 @@
    non fuga. Per loro esiste apiFailure(), che pretende un codice esplicito. */
 
 import { NextResponse } from 'next/server';
+import { ArchiveReplacedError } from './archive-generation';
+
+export function archiveReplacementResponse(error: unknown): NextResponse | null {
+    return error instanceof ArchiveReplacedError
+        ? apiFailure('ARCHIVE_REPLACED', 'I dati sono stati ripristinati. Ricarica la pagina prima di continuare.', 409)
+        : null;
+}
 
 export type ApiErrorBody = {
     error: string;
@@ -36,6 +43,8 @@ export function apiInternalError(
     error: unknown,
     options: { status?: number; code?: string; message?: string; extra?: CampiExtra } = {},
 ): NextResponse {
+    const replacement = archiveReplacementResponse(error);
+    if (replacement) return replacement;
     console.error(`[MediFlow] ${scope}:`, error);
     const body: ApiErrorBody & CampiExtra = {
         ...(options.extra ?? {}),

@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 import { checkupCreateIdSchema } from './api-schemas/clinical-writes';
 /* @Codex: paired checkup boundary preserves current capability, normalization and ENC semantics. */
 import { v4 as uuidv4 } from 'uuid';
@@ -73,7 +74,7 @@ function validateNetworkCheckupMutationBoundary(
 
 function requiredAuditContext(context: NetworkCheckupMutationContext) {
     return {
-        actorType: 'user' as const,
+        archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user' as const,
         actorRef: context.session.userId,
         sourceSurface: 'native' as const,
         requestId: requestIdFromRequest(context.request),

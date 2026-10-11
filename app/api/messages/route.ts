@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { messages } from '@/lib/schema';
@@ -44,6 +46,8 @@ export async function GET(request: Request) {
         const data = await query;
         return NextResponse.json(data);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 });
     }
 }
@@ -52,6 +56,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await request.json();
@@ -71,6 +77,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: newId }, { status: 201 });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Create Failed" }, { status: 500 });
     }
 }

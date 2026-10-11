@@ -1,4 +1,5 @@
 'use client';
+import { ARCHIVE_REPLACED_EVENT, installArchiveGenerationTransport } from '@/lib/security/client-auth-api';
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -236,6 +237,16 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(true);
     };
 
+    useEffect(() => {
+        const uninstall = installArchiveGenerationTransport();
+        const replaced = () => {
+            ++authorityAttemptGenerationRef.current;
+            clearClientAuthority();
+        };
+        window.addEventListener(ARCHIVE_REPLACED_EVENT, replaced);
+        return () => { window.removeEventListener(ARCHIVE_REPLACED_EVENT, replaced); uninstall(); };
+    }, []);
+
     /* @Codex */
     const runAuthorityNetworkRequest = <T,>(request: () => Promise<T>): Promise<T> => {
         const barrier = authorityNetworkBarrierRef.current;
@@ -386,7 +397,26 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (!res.ok) {
                 throw new Error(payload?.error || 'Ripristino fallito');
             }
-            await checkAuthStatus();
+            if (res.status !== 202 || payload?.status !== 'accepted' || !payload.requestId) {
+                throw new Error('Risposta di manutenzione non valida.');
+            }
+            clearClientAuthority();
+            setFlowError('Riparazione avviata. Attendi il riavvio e la conferma dell’archivio.');
+            const deadline = Date.now() + 20000;
+            while (Date.now() < deadline) {
+                await new Promise(resolve => window.setTimeout(resolve, 1000));
+                try {
+                    const status = await fetch('/api/auth/check', { cache: 'no-store' }).then(response => response.json());
+                    if (status.archiveMaintenance?.requestId === payload.requestId) {
+                        if (status.archiveMaintenance.status === 'committed') { window.location.reload(); return; }
+                        if (status.archiveMaintenance.status === 'rejected') {
+                            setFlowError('Archivio precedente non compatibile. I dati attuali sono invariati: accedi di nuovo per continuare.');
+                            return;
+                        }
+                    }
+                } catch { /* The owned Web process is expected to be unavailable during replacement. */ }
+            }
+            setFlowError('Riparazione non ancora confermata. Conserva l’archivio e verifica lo stato del supervisore.');
         } catch (e) {
             console.error('Repair failed', e);
             setFlowError('Ripristino fallito. Verifica i dettagli in console.');
@@ -414,6 +444,19 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return false;
         }
     };
+
+    // Reconcile another tab's completed replacement before its displayed records can be reused.
+    useEffect(() => {
+        const reconcile = () => { if (document.visibilityState === 'visible') void checkAuthStatus(); };
+        window.addEventListener('focus', reconcile);
+        document.addEventListener('visibilitychange', reconcile);
+        const timer = window.setInterval(reconcile, 15000);
+        return () => {
+            window.removeEventListener('focus', reconcile);
+            document.removeEventListener('visibilitychange', reconcile);
+            window.clearInterval(timer);
+        };
+    }, []);
 
     // Initial check
     useEffect(() => {

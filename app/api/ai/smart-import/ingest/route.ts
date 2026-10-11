@@ -1,3 +1,4 @@
+import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
 /* @Codex */
 import { acquireAuthenticatedSmartImportAttachmentIngest } from '@/lib/security/server-session-authenticated-smart-import-attachment-ingest-production';
 import { createSmartImportIngestHttpHandler } from '@/lib/security/server-session-smart-import-ingest-http';
@@ -5,4 +6,4 @@ import { createSmartImportIngestHttpHandler } from '@/lib/security/server-sessio
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export const POST = createSmartImportIngestHttpHandler({ acquireIngest: acquireAuthenticatedSmartImportAttachmentIngest });
+export const POST = withArchiveRequestContext(createSmartImportIngestHttpHandler({ acquireIngest: acquireAuthenticatedSmartImportAttachmentIngest }));

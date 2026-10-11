@@ -6,6 +6,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "maintenance:web": "node --experimental-strip-types --import ./scripts/register-strip-types-loader.mjs scripts/mediflow-headless-supervisor.mjs --maintenance-web",
     "test:clinical-http": "node scripts/run-clinical-http-suite.mjs",
     "preinstall": "node scripts/node-runtime-contract.mjs verify-node",
     "postinstall": "node scripts/node-runtime-contract.mjs verify",

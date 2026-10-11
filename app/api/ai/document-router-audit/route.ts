@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 
@@ -18,6 +20,8 @@ const MODES: ReadonlySet<string> = new Set(['shadow']);
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await request.json() as Record<string, unknown>;
@@ -37,7 +41,9 @@ export async function POST(request: Request) {
             mode: body.mode as DocumentRouterControlFlowMode,
         });
         return NextResponse.json({ success: true });
-    } catch {
+    } catch (archiveError) {
+        const replacement = archiveReplacementResponse(archiveError);
+        if (replacement) return replacement;
         return NextResponse.json({ error: 'Impossibile registrare l\'audit del router documentale' }, { status: 500 });
     }
 }

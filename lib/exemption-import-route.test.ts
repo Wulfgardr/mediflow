@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test, { after } from 'node:test';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
-import { syntheticExemptionSession } from '../scripts/fixtures/exemption-import-session';
+import { syntheticExemptionSession, syntheticExemptionRequest } from '../scripts/fixtures/exemption-import-session';
 import { retireForUser } from './security/web-auth-lifecycle-owner-adapter';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-exemptions-route-synthetic-'));
@@ -26,7 +26,7 @@ const originalNative = nativeAuth.requireLocalApiToken;
 const session = syntheticExemptionSession();
 const bytes = Buffer.from([EXEMPTION_COLUMNS.join('|'), ['ZZ_ROUTE', 'Categoria inventata route', '\\N', '20240101', '\\N', 'S', 'N', '\\N'].join('|')].join('\r\n') + '\r\n');
 const body = { sourceName: 'inventato-route.txt', base64: bytes.toString('base64') };
-const request = (value: unknown) => new Request('http://localhost/api/exemptions/import/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
+const request = (value: unknown) => syntheticExemptionRequest('http://localhost/api/exemptions/import/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
 const db = dbServer.$client;
 after(() => {
     retireForUser(session);

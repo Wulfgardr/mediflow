@@ -210,7 +210,7 @@ function auditRows(): string[] {
 /** Host-only test inspection. The Mini child still receives only the late-bound IPC marker. */
 function dataSnapshot() {
   const tables = dbServer.$client.prepare(`SELECT name FROM sqlite_master
-    WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name <> 'audit_events' ORDER BY name`).all() as
+    WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name NOT IN ('audit_events', 'archive_session_generations') ORDER BY name`).all() as
     Array<{ name: string }>;
   return tables.map(({ name }) => {
     const identifier = '"' + name.replaceAll('"', '""') + '"';
