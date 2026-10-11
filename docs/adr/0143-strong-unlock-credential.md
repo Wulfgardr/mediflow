@@ -262,6 +262,16 @@ Il recupero sullo stesso archivio conserva la storia cifrata. Il drill su un
 archivio vuoto dopo la perdita del computer resta il criterio 1 di WUL-730:
 la prova cambio/recupero non lo sostituisce.
 
+La bonifica usa `VACUUM` sulla connessione ammessa e poi un checkpoint `TRUNCATE`:
+il solo checkpoint non elimina le celle obsolete. Non è uno swap esterno;
+[SQLite mantiene rollback e lock](https://www.sqlite.org/lang_vacuum.html).
+Può richiedere spazio fino a due volte il database e lavoro sincrono: un errore
+lascia l’accesso v3 attivo, ma la bonifica non confermata e un avviso persistente.
+Le copie di riparazione con riga già v3 sono conservate e restano da verificare:
+il vecchio producer `backup()` può aver copiato celle obsolete. Non vengono
+certificate dal solo SELECT né eliminate come copie di recupero. Nessuna promessa
+di cancellazione fisica sul disco; copie manuali e Time Machine restano fuori.
+
 ## Come si prova
 
 Sblocco, cambio, recupero e riavvio su dati sintetici; migrazione interrotta a

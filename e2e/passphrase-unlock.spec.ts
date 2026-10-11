@@ -105,10 +105,16 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   const download = page.waitForEvent('download');
   await kitPanel.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
   await kitPanel.getByRole('checkbox').check();
+  // The server can commit credentials while cleanup remains pending; the UI must keep that distinction.
+  await page.route('**/api/auth/passphrase', async route => {
+    const result = await route.fetch();
+    await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
+  });
   const adoption = page.waitForResponse(response => isPost(response.request(), '/api/auth/passphrase'));
   await kitPanel.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
   const adopted = await adoption;
   expect(adopted.status()).toBe(200);
+  await expect(page.getByTestId('pin-residue-notice')).toContainText('rimozione');
   const payload = adopted.request().postDataJSON();
   expect(payload.currentPin).toBe(PIN); expect(JSON.stringify(payload)).not.toContain(PASSPHRASE);
   credential = payload;
@@ -172,6 +178,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   expect(await response.json()).toMatchObject({ success: true, encryptedMasterKey: credential.encryptedMasterKey, salt: credential.salt });
   // The shell is rendered only after the provider has opened the returned wrapping with the key it derived.
   await expectUnlocked(page);
+  await expect(page.getByTestId('pin-residue-notice')).toHaveCount(0); // The real login confirms cleanup.
 
   // The access settings describe the account as it is now, and no longer offer the PIN rotation the server refuses.
   await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();

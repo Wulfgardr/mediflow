@@ -162,6 +162,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [isLocked, setIsLocked] = useState(true);
     const [user, setUser] = useState<User | null>(null);
     const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
+    const [pinResiduesPending, setPinResiduesPending] = useState(false);
     /* @Codex */
     const [authRecoveryState, setAuthRecoveryState] = useState<AuthRecoveryState>('ready');
     const authRecoveryStateRef = useRef<AuthRecoveryState>('ready');
@@ -505,6 +506,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 displayName?: string;
                 ambulatoryName?: string;
                 role: string;
+                earlierCopiesCleared?: boolean;
             } | null;
             /* @Codex */
             if (!data
@@ -557,6 +559,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             setIsAuthenticated(true);
             setIsLocked(false);
             setAuthErrorMessage(null);
+            if (material && typeof data.earlierCopiesCleared === 'boolean') setPinResiduesPending(!data.earlierCopiesCleared);
 
             // Persist session
             try {
@@ -672,9 +675,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
     };
 
-    const finishAccessMutation = async (generation: number, result: { response: Response; payload: { success?: boolean; error?: string; message?: string } | null }): Promise<AccessResult> => {
+    const finishAccessMutation = async (generation: number, result: { response: Response; payload: { success?: boolean; error?: string; message?: string; earlierCopiesCleared?: boolean } | null }): Promise<AccessResult> => {
         if (generation !== authorityAttemptGenerationRef.current) return { ok: false, message: 'Operazione scaduta. Rinnova l’accesso.' };
         if (!result.response.ok || result.payload?.success !== true) return { ok: false, message: result.payload?.message || result.payload?.error || 'Aggiornamento non confermato. Riprova.' };
+        if (typeof result.payload.earlierCopiesCleared === 'boolean') setPinResiduesPending(!result.payload.earlierCopiesCleared);
         ++authorityAttemptGenerationRef.current;
         clearClientAuthority();
         setRequiresSetup(false);
@@ -747,6 +751,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }} /></div>
     </div>;
 
+    const pinResidueNotice = pinResiduesPending && <p role="alert" className="relative z-[110] bg-[var(--lume-surface-canvas)] p-4" data-testid="pin-residue-notice">
+        La passphrase è attiva, ma la rimozione delle vecchie copie del prodotto o del registro temporaneo non è confermata: possono ancora contenere l’involucro protetto dal PIN. Il prossimo sblocco ritenta la bonifica dell’archivio; le copie già migrate richiedono verifica e non vengono eliminate. Conserva backup e kit; se l’avviso resta, chiedi assistenza.
+    </p>;
+
     /* @Codex */
     if (authHealth?.status === 'error') {
         return (
@@ -813,6 +821,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 lock,
                 updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
             }}>
+                {pinResidueNotice}
                 <LockScreen />
             </SecurityContext.Provider>
         );
@@ -838,6 +847,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             updateUser: (data) => setUser(prev => prev ? { ...prev, ...data } : null)
         }}>
             <div className="relative min-h-screen">
+                {pinResidueNotice}
                 {children}
             </div>
         </SecurityContext.Provider>
