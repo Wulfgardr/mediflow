@@ -20,7 +20,7 @@ const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
 // @Codex ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
 // Aliases and owner delivery stay guarded independently of standalone tracing additions.
-const NEXT_RESOLVER_AST_SHA256 = '6f82f937e84472448200761daf22e3629b9d4683f2fd9161c5bf30979160cf70';
+const NEXT_RESOLVER_AST_SHA256 = '27b380dfb9ba4df2fd4686bfa6b49ae26a198be51fc2391226a43dfe90a98776';
 const REVIEWED_TRACE_FILES = {
     'scripts/anydoc-desktop-renderer-trace.mjs': '786ff72eaa6d8e35cf108e58fd23a675cba4e40b28dd5d2343ab831a41782723',
     'scripts/anydoc-pdf-renderer-profiles.json': 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf',
