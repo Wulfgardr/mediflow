@@ -1,29 +1,12 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { advanceOnboarding, startOnboarding } from '../../ai-providers/fabric/onboarding.ts';
-import { admitProvider, transitionProviderLifecycle } from '../../ai-providers/fabric/provider-lifecycle.ts';
+import { transitionProviderLifecycle } from '../../ai-providers/fabric/provider-lifecycle.ts';
 import {
+    createPatientSmartImportCandidateHostSnapshot,
     executePatientSmartImportFabricPreview,
     PatientSmartImportFabricDeniedError,
-    type PatientSmartImportFabricHostSnapshot,
 } from './patient-smart-import-fabric.ts';
-
-function enabledLocal() {
-    return ['configure', 'credential_declared', 'attest_local', 'enable'].reduce(
-        (state, type) => advanceOnboarding(state, { type } as Parameters<typeof advanceOnboarding>[1]),
-        startOnboarding('ollama', 'local_model'),
-    );
-}
-
-function hostSnapshot(): PatientSmartImportFabricHostSnapshot {
-    const onboarding = enabledLocal();
-    return {
-        capabilityAvailable: true,
-        onboarding,
-        lifecycle: admitProvider(onboarding),
-    };
-}
 
 const modelInfo = Object.freeze({
     provider: 'ollama' as const,
@@ -47,7 +30,7 @@ const health = Object.freeze({ status: 'ok', models: Object.freeze(['synthetic-m
 test('Smart Import resolves its named Fabric capability before one provider preview', async () => {
     let invocations = 0;
     const result = await executePatientSmartImportFabricPreview(
-        { modelInfo, health, host: hostSnapshot() },
+        { modelInfo, health, host: createPatientSmartImportCandidateHostSnapshot() },
         async () => {
             invocations += 1;
             return 'synthetic-provider-output';
@@ -63,7 +46,7 @@ test('Smart Import resolves its named Fabric capability before one provider prev
 });
 
 test('Smart Import denials never invoke the provider or return a reusable receipt', async () => {
-    const available = hostSnapshot();
+    const available = createPatientSmartImportCandidateHostSnapshot();
     const cases = [
         { host: { ...available, capabilityAvailable: false }, health },
         { host: available, health: { status: 'error', models: [] } },
@@ -101,7 +84,7 @@ test('Smart Import denies when health omits the selected receipt model', async (
     await assert.rejects(executePatientSmartImportFabricPreview({
         modelInfo,
         health: { status: 'ok', models: ['different-model'] },
-        host: hostSnapshot(),
+        host: createPatientSmartImportCandidateHostSnapshot(),
     }, async () => { invocations += 1; return 'must-not-run'; }),
     (error) => error instanceof PatientSmartImportFabricDeniedError && error.denial.receipt === null);
     assert.equal(invocations, 0);
