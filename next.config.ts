@@ -68,6 +68,10 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./package.json",
+      "./LICENSE",
+      "./CREDITS.md",
+      "./app/fonts/*-OFL.txt",
+      "./licenses/sharp-libvips/*.txt",
       // Raw scheduler closure; checked against the canonical runtime roster in tests.
       "./scripts/run-scheduled-backup.mjs",
       "./scripts/scheduled-backup-date-fields.mjs",
@@ -128,6 +132,13 @@ const nextConfig: NextConfig = {
   },
   /* @Codex */
   outputFileTracingExcludes: {
+    "**": [
+      // Keep source tests and historical evidence, not their copies in the Web runtime.
+      "./{app,components,hooks,lib,packages,scripts}/**/*.test.*",
+      "./{test,tests,screenshots}/**/*",
+      // Next matches common excludes by substring: e2e/** also removes .next-e2e server chunks.
+      "./e2e/**/*.ts", "./e2e/fixtures/**/*", "./e2e/quarantine.json",
+    ],
     "/*": [
       // @Codex: Treatment runtime/model data are external, explicitly provisioned objects.
       "./**/treatment-reasoning-portable/**",
