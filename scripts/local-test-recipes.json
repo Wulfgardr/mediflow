@@ -445,6 +445,15 @@
       "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
     },
     {
+      "id": "scripts/network-home-base-account-passphrase.test.mjs",
+      "mode": "local",
+      "kind": "network-write",
+      "files": [
+        "scripts/network-home-base-account-passphrase.test.mjs"
+      ],
+      "prerequisites": "Existing synthetic HTTP wrapper owns temporary Next workspace/server; installed build/runtime and loopback required. No CI or execution claim."
+    },
+    {
       "id": "scripts/network-home-base-account-pin.test.mjs",
       "mode": "local",
       "kind": "network-write",
