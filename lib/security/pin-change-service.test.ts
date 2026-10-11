@@ -403,6 +403,36 @@ test('changePin preserves sessions when the credential rotation is rejected', as
     }
 });
 
+test('changePin never replaces the wrapping of an account that unlocks with a passphrase', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        db.update(users).set({ unlockVerifierHash: 'a'.repeat(64), encryptedMasterKey: 'v3:passphrase-wrapping' }).run();
+        const before = db.select().from(users).get();
+        let retirements = 0;
+        // The current PIN is the right one: it is the authority of the PIN over the wrapping that is gone.
+        const result = await changePin({
+            session: session('user-1'),
+            request: new Request('http://127.0.0.1/api/auth/change-pin'),
+            currentPin: '1234',
+            newPin: '5678',
+            encryptedMasterKey: 'v2:pin-wrapping',
+            salt: 'pin-salt',
+        }, {
+            db,
+            writeAuditEvent: testAuditWriter(db),
+            ...webRetirement(),
+            prepareWebSessionsForUserRetirement: () => { retirements += 1; return null; },
+        });
+
+        assert.deepEqual(result.kind === 'failure' && [result.status, result.code], [409, 'PIN_CHANGE_PASSPHRASE_ACCOUNT']);
+        assert.deepEqual(db.select().from(users).get(), before);
+        assert.equal(retirements, 0, 'no session is retired for a rotation that cannot happen');
+    } finally {
+        sqlite.close();
+    }
+});
+
 test('changePin compare-and-swap allows exactly one concurrent rotation', async () => {
     const { sqlite, db } = makeDatabase();
     try {

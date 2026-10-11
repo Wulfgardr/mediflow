@@ -6,7 +6,7 @@ import { types } from 'node:util';
 
 import { createInvalidCredentialsPayload } from '@/lib/security/auth-lockout';
 import { requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
-import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
+import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
 import type { NativeBootstrapRouteBinding } from '@/lib/security/native-bootstrap-admission';
 import {
     captureNativeLoginSessionFence,
@@ -16,7 +16,7 @@ import {
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
 type Credentials = Readonly<{ username: string; password: string }>;
-type Verification = Awaited<ReturnType<typeof verifyHostCredentials>>;
+type Verification = Awaited<ReturnType<typeof verifyUnlockCredentials>>;
 type Account = Extract<Verification, { kind: 'verified' }>['account'];
 type Consume = (value: unknown) => Promise<NativeBootstrapRouteBinding | null>;
 
@@ -68,7 +68,8 @@ async function auditSuccess(request: Request, user: Account, session: ReturnType
 /** The sole native login seam: admission is burned on every path and only rechecked after PIN verification. */
 /* @Codex */
 export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDependencies = {}) {
-    const verify = dependencies.verify ?? verifyHostCredentials;
+    // An account with a passphrase refuses the PIN here until the native clients send the verifier (ADR 0143).
+    const verify = dependencies.verify ?? verifyUnlockCredentials;
     const consume = dependencies.consume ?? consumeNativeAdmission;
     const createNativeSession = dependencies.createNativeSession ?? createNativeServerSession;
     const audit = dependencies.audit ?? auditSuccess;
