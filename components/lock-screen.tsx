@@ -76,18 +76,24 @@ export function LockScreen() {
         void attempt(false);
     };
 
-    // The confirmation is a gesture of its own, on the control shown with the notice. The second
-    // click of a double click belongs to the gesture that came before it, wherever that began.
+    // The confirmation is a gesture of its own, on the control shown with the notice, and answers
+    // three gestures only. A click of the pointer that is not the second of a double click, wherever
+    // that began. An activation that comes with neither pointer nor key, as assistive technology makes.
     const confirmHeldText = (e: React.MouseEvent) => {
         if (longPinNotice && e.detail <= 1) void attempt(true);
     };
+    // And Enter or Space going down on it, not repeating. What a browser does by itself with those
+    // keys on a button is cancelled, press and release alike: it depends on what the button
+    // remembers of earlier presses, and a key held down elsewhere could end as an activation here.
+    const confirmByKey = (e: React.KeyboardEvent) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        if (e.type === 'keydown' && !e.repeat && longPinNotice) void attempt(true);
+    };
 
-    // A key held down is one gesture. Its repetitions activate nothing: Enter on any control of
-    // the form, Space on its buttons, where a repetition would arm the click that the key makes
-    // when it comes up. A key therefore activates only the control on which it went down.
+    // A key held down is one gesture: the repetitions of Enter submit nothing.
     const cancelRepeats = (e: React.KeyboardEvent) => {
-        if (!e.repeat) return;
-        if (e.key === 'Enter' || (e.key === ' ' && e.target instanceof HTMLButtonElement)) e.preventDefault();
+        if (e.repeat && e.key === 'Enter') e.preventDefault();
     };
 
     const handleSetup = async (e: React.FormEvent) => {
@@ -204,7 +210,7 @@ export function LockScreen() {
                             <div className="text-center text-sm">
                                 <button type="button" id="mediflow-lock-confirm-pin" disabled={credentialsDisabled}
                                     className="min-h-11 px-4 py-2 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
-                                    onClick={confirmHeldText}>
+                                    onKeyDown={confirmByKey} onKeyUp={confirmByKey} onClick={confirmHeldText}>
                                     {LONG_PIN_CONFIRM_LABEL}
                                 </button>
                             </div>
