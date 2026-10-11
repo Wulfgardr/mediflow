@@ -560,7 +560,89 @@
         "reviewerId": null,
         "reviewedAt": null
       }
+    },
+    {
+      "id": "Q13",
+      "patientRef": "synthetic-A",
+      "classes": [
+        "date-ambiguity",
+        "temporality",
+        "uncertainty"
+      ],
+      "pages": [
+        {
+          "number": 1,
+          "subjectRef": "synthetic-A",
+          "text": "Controllo annotato il 03/04/26; il formato della data non è specificato."
+        }
+      ],
+      "proposedFacts": [
+        {
+          "id": "Q13-F1",
+          "subjectRef": "synthetic-A",
+          "statement": "La data 03/04/26 è ambigua: non attribuire al controllo una data normalizzata senza conferma.",
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "Controllo annotato il 03/04/26; il formato della data non è specificato.",
+              "start": 0,
+              "end": 72
+            }
+          ]
+        }
+      ],
+      "forbiddenStatements": [
+        "Il controllo è avvenuto il 3 aprile 2026",
+        "Il controllo è avvenuto il 4 marzo 2026"
+      ],
+      "caseVersion": 1,
+      "review": {
+        "status": "pending",
+        "reviewerId": null,
+        "reviewedAt": null
+      }
+    },
+    {
+      "id": "Q14",
+      "patientRef": "synthetic-A",
+      "classes": [
+        "illegible",
+        "missing"
+      ],
+      "pages": [
+        {
+          "number": 1,
+          "subjectRef": "synthetic-A",
+          "text": "Scansione sintetica: [testo illeggibile; diagnosi, farmaco e dose non decifrabili]."
+        }
+      ],
+      "proposedFacts": [
+        {
+          "id": "Q14-F1",
+          "subjectRef": "synthetic-A",
+          "statement": "Il testo del documento è illeggibile; diagnosi, farmaco e dose non sono ricavabili e richiedono revisione manuale.",
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "Scansione sintetica: [testo illeggibile; diagnosi, farmaco e dose non decifrabili].",
+              "start": 0,
+              "end": 83
+            }
+          ]
+        }
+      ],
+      "forbiddenStatements": [
+        "Il paziente non ha diagnosi",
+        "Nessuna terapia in corso",
+        "Farmaco e dose ricostruiti dal testo illeggibile"
+      ],
+      "caseVersion": 1,
+      "review": {
+        "status": "pending",
+        "reviewerId": null,
+        "reviewedAt": null
+      }
     }
   ],
-  "corpusVersion": "1.0.0-development"
+  "corpusVersion": "1.1.0-development"
 }
