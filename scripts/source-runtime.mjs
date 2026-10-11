@@ -55,7 +55,7 @@ export async function prepareSourceRuntime(root = ROOT) {
   for (const [source, destination] of [
     [path.join(root, 'public'), path.join(web, 'public')],
     [path.join(path.dirname(web), 'static'), path.join(web, distDir, 'static')],
-  ]) fs.cpSync(source, destination, { recursive: true, errorOnExist: true, force: false });
+  ]) fs.cpSync(source, destination, { recursive: true });
   const ledger = generatePayloadLedger({ sourceRoot: root, payloadRoot: web, profile: 'standalone',
     expectedRuntime: { nodeVersion: process.versions.node, nodeAbi: process.versions.modules,
       platform: process.platform, arch: process.arch } });
@@ -66,12 +66,12 @@ export async function prepareSourceRuntime(root = ROOT) {
 
 // Keep build identity at the build boundary, never stamp an old standalone
 // with the commit of a later preparation. Source production uses committed code.
-async function buildSourceRuntime(root = ROOT) {
+async function buildSourceRuntime(root = ROOT, args = []) {
   const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   if (git(['status', '--porcelain', '--untracked-files=normal'])) throw new Error('Commit source changes before a production build');
   const revision = git(['rev-parse', 'HEAD']);
   const branch = git(['branch', '--show-current']) || 'detached';
-  execFileSync(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'build'], { cwd: root, stdio: 'inherit' });
+  execFileSync(process.execPath, [path.join(root, 'node_modules/next/dist/bin/next'), 'build', ...args], { cwd: root, stdio: 'inherit' });
   if (git(['rev-parse', 'HEAD']) !== revision || git(['status', '--porcelain', '--untracked-files=normal'])) {
     throw new Error('Source changed during build');
   }
@@ -125,10 +125,12 @@ export async function startSourceRuntime(mode, root = ROOT) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.argv.length !== 3 || process.execArgv.length
-      || ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES']
-        .some(key => process.env[key] !== undefined)) throw new Error('Source runtime invocation invalid');
-    if (process.argv[2] === 'build') await buildSourceRuntime();
+    const command = process.argv[2];
+    if (command !== 'build' && process.argv.length !== 3) throw new Error('Source runtime arguments invalid');
+    if (['web', 'headless'].includes(command) && (process.execArgv.length
+      || ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']
+        .some(key => process.env[key] !== undefined))) throw new Error('Source runtime invocation invalid');
+    if (command === 'build') await buildSourceRuntime(ROOT, process.argv.slice(3));
     else if (process.argv[2] === 'prepare') await prepareSourceRuntime();
     else await startSourceRuntime(process.argv[2]);
   } catch (error) {
