@@ -79,6 +79,10 @@ async function trace(nodeFileTrace, seeds, root, options = {}) {
     physicalPath(file); return relative.split(path.sep).join('/');
   });
 }
+// NFT supplies native relative paths, including backslashes on Windows.
+export function sharedRuntimeDependency(file) {
+  return /(?:^|\/)(?:\.next|packages\/mini|node_modules\/better-sqlite3)(?:\/|$)/u.test(file.replaceAll('\\', '/'));
+}
 // The source profile uses the same traced closure without an app envelope.
 async function sourceClosure() {
   const require = createRequire(path.join(ROOT, 'package.json'));
@@ -88,7 +92,7 @@ async function sourceClosure() {
     // Share the already-normalized SQLite loader/native target, never a second Mach-O.
     // Web standalone is shared separately. Mini is a different delivery lane,
     // and SQLite uses the normalized/signed copy already inside the app.
-    ignore: file => /(?:^|\/)(?:\.next|packages\/mini|node_modules\/better-sqlite3)(?:\/|$)/u.test(file),
+    ignore: sharedRuntimeDependency,
     readFile: async file => {
       let bytes;
       try { bytes = await fs.promises.readFile(file, 'utf8'); }
