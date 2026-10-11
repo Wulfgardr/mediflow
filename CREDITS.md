@@ -130,6 +130,33 @@ benchmark e non è stato promosso a runtime.
 
 ## Runtime e librerie locali
 
+### Codice originale e notices distribuiti
+
+Il codice originale di Ordito & Concilio, incluso il modulo locale
+`@mediflow/web-auth-lifecycle-owner`, è coperto dalla [licenza MIT](./LICENSE)
+del progetto. I builder canonici includono `LICENSE` e questa pagina nel
+runtime standalone e nel runtime Headless; non modificano l’archivio o la
+provenienza del modulo locale. La MIT non estende diritti sui materiali di terzi.
+
+### Sharp e libvips
+
+Il runtime macOS arm64 include `@img/sharp-libvips-darwin-arm64` 1.3.4,
+con libvips 8.18.7 e le dipendenze elencate nel suo `versions.json`.
+Il pacchetto dichiara `LGPL-3.0-or-later`; i
+[notices upstream della stessa versione](https://github.com/lovell/sharp-libvips/blob/v1.3.4/THIRD-PARTY-NOTICES.md)
+spiegano l’uso della LGPL v3 tramite la clausola “any later version” della LGPL
+v2 o v2.1. La [fonte libvips 8.18.7](https://github.com/libvips/libvips/tree/v8.18.7)
+e il [builder upstream 1.3.4](https://github.com/lovell/sharp-libvips/tree/v1.3.4)
+restano distinti dal codice originale MediFlow.
+
+Il README distribuito nel pacchetto conserva i notices upstream delle librerie
+incluse. Il standalone aggiunge copie integrali dei testi ufficiali GNU
+[LGPL v3](https://www.gnu.org/licenses/lgpl-3.0.html) e
+[GPL v3](https://www.gnu.org/licenses/gpl-3.0.html), in
+`licenses/sharp-libvips/`: la LGPL v3 incorpora i termini della GPL v3.
+Queste copie colmano il buco dei testi LGPL/GPL nel payload; non qualificano
+la conformità globale, i diritti di tutte le dipendenze o gli altri profili.
+
 ### Font Lume
 
 **Inter Variable** dà forma alla Voce di Lume. Il file locale
