@@ -5,7 +5,7 @@ import {
     type CandidateRoutingDecision,
 } from '../../ai-providers/fabric/candidate-router';
 import type { FabricProvenanceRecord } from '../../ai-providers/fabric/contract';
-import { advanceOnboarding, startOnboarding, type ProviderOnboardingState } from '../../ai-providers/fabric/onboarding';
+import { enabledLocalOnboarding, type ProviderOnboardingState } from '../../ai-providers/fabric/onboarding';
 import { admitProvider, type ProviderLifecycleState } from '../../ai-providers/fabric/provider-lifecycle';
 import type { ProviderSelectionReceipt } from '../../ai-providers/registry';
 import { observeVenue } from '../../ai-providers/fabric/routing-observability';
@@ -31,10 +31,7 @@ export class PatientSmartImportFabricDeniedError extends Error {
 }
 
 export function createPatientSmartImportCandidateHostSnapshot(): PatientSmartImportFabricHostSnapshot {
-    const onboarding = ['configure', 'credential_declared', 'attest_local', 'enable'].reduce(
-        (state, type) => advanceOnboarding(state, { type } as Parameters<typeof advanceOnboarding>[1]),
-        startOnboarding('ollama', 'local_model'),
-    );
+    const onboarding = enabledLocalOnboarding();
     return Object.freeze({
         capabilityAvailable: true,
         onboarding,
