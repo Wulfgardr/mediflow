@@ -24,8 +24,8 @@ import {
     PIN_CHANGE_REUSE_NOT_ALLOWED_CODE,
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
-import type { PassphraseAdoptionPayload, PassphraseRecoveryPayload } from '@/lib/security/passphrase-adoption-validation';
-import { verifyHostCredentials, verifyRecoveryCredentials, type HostCredentialVerification } from '@/lib/security/host-credential-verification';
+import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseCredentials, PassphraseRecoveryPayload } from '@/lib/security/passphrase-adoption-validation';
+import { verifyHostCredentials, verifyRecoveryCredentials, verifyUnlockCredentials, type HostCredentialVerification } from '@/lib/security/host-credential-verification';
 import { retirePinEraResidues, type PinEraResidues } from '@/lib/security/pin-era-residues';
 /* @Codex */
 import { users } from '@/lib/schema';
@@ -67,6 +67,7 @@ export type PinChangeServiceDependencies = {
     readPairedNativeSession?: typeof requirePairedNativeSession;
     verifyPin?: typeof verifyHostCredentials;
     verifyRecovery?: typeof verifyRecoveryCredentials;
+    verifyUnlock?: typeof verifyUnlockCredentials;
     /** Closes the one session a recovery opened for itself, when the recovery then changes nothing. */
     retireWebSession?: (session: WebSessionProjection, reason: 'delete') => unknown;
     /** Removes what the product keeps beside the archive that still holds the PIN wrapping. */
@@ -452,10 +453,49 @@ export async function recoverPassphrase(
     input: PassphraseRecoveryInput,
     dependencies: PinChangeServiceDependencies = {},
 ): Promise<PassphraseRecoveryResult> {
+    return rotatePassphrase({
+        ...input, mode: 'recovery', previousVerifier: input.payload.recoveryVerifier,
+    }, dependencies);
+}
+
+/** The authenticated account changes its own passphrase; its PIN cannot authorize this. */
+export async function changePassphrase(
+    input: { session: WebSessionProjection; request: Request; payload: PassphraseChangePayload },
+    dependencies: PinChangeServiceDependencies = {},
+): Promise<PassphraseRecoveryResult | { kind: 'unauthorized' }> {
+    const db = await resolveDatabase(dependencies);
+    const user = db.select().from(users).where(eq(users.id, input.session.userId)).get();
+    if (!user) return { kind: 'unauthorized' };
+    if (!user.unlockVerifierHash) return {
+        kind: 'failure', status: 409, code: 'PASSPHRASE_ACCOUNT_REQUIRED',
+        message: 'Questo account usa ancora il PIN. Passa prima alla passphrase.',
+    };
+    return rotatePassphrase({
+        mode: 'change', request: input.request,
+        payload: { ...input.payload, username: user.username },
+        previousVerifier: input.payload.currentVerifier,
+        openSession: (account) => account.id === input.session.userId ? input.session : null,
+    }, { ...dependencies, db });
+}
+
+/** Shared atomic replacement and terminal session retirement for change and recovery. */
+async function rotatePassphrase(
+    input: {
+        mode: 'change' | 'recovery'; request: Request;
+        payload: PassphraseCredentials & { username: string }; previousVerifier: string;
+        openSession: (account: RecoveredAccount) => WebSessionProjection | null;
+    },
+    dependencies: PinChangeServiceDependencies,
+): Promise<PassphraseRecoveryResult> {
     const { payload } = input;
     const db = await resolveDatabase(dependencies);
-    const verification = await (dependencies.verifyRecovery ?? verifyRecoveryCredentials)(
-        { username: payload.username, recoveryVerifier: payload.recoveryVerifier },
+    const verify = input.mode === 'recovery'
+        ? dependencies.verifyRecovery ?? verifyRecoveryCredentials
+        : dependencies.verifyUnlock ?? verifyUnlockCredentials;
+    const verification = await verify(
+        input.mode === 'recovery'
+            ? { username: payload.username, recoveryVerifier: input.previousVerifier }
+            : { username: payload.username, verifier: input.previousVerifier },
         { db, ...(dependencies.writeAuditEvent ? { writeAuditEvent: dependencies.writeAuditEvent } : {}) },
     );
     if (verification.kind === 'denied') return { kind: 'denied', status: verification.status, body: verification.body };
@@ -467,6 +507,7 @@ export async function recoverPassphrase(
     const session = input.openSession(account);
     if (!session) return unconfirmed('Il recupero non può essere confermato. Riprova tra poco.');
     const closeSession = (): void => {
+        if (input.mode !== 'recovery') return;
         try { (dependencies.retireWebSession ?? retire)(session, 'delete'); } catch { /* it was never handed out */ }
     };
     const nativeRetirement = (dependencies.prepareNativeSessionsForUserRetirement ?? prepareNativeLegacyUserRetirement)(account.id);
@@ -506,7 +547,9 @@ export async function recoverPassphrase(
             })
             .where(and(
                 eq(users.id, account.id),
-                eq(users.recoveryVerifierHash, verifierHash(payload.recoveryVerifier)),
+                input.mode === 'recovery'
+                    ? eq(users.recoveryVerifierHash, verifierHash(input.previousVerifier))
+                    : eq(users.unlockVerifierHash, verifierHash(input.previousVerifier)),
                 isNotNull(users.unlockVerifierHash),
                 // A lock established after the recovery key was verified stands: this write does not clear it.
                 or(isNull(users.lockedUntil), lte(users.lockedUntil, new Date())),
@@ -544,7 +587,9 @@ export async function recoverPassphrase(
     }
 
     try {
-        // Nobody holds a session here: the actor is the account whose recovery key was presented.
+        const context = input.mode === 'recovery'
+            ? { actorType: 'user' as const, actorRef: account.id, sourceSurface: 'web' as const, authContext: 'anonymous' as const }
+            : auditContextFromSession(session);
         await (dependencies.writeAuditEvent ?? writeAuditEvent)({
             eventType: 'settings.updated',
             outcome: 'success',
@@ -552,12 +597,12 @@ export async function recoverPassphrase(
             actorRef: account.id,
             subjectType: 'settings',
             subjectRef: 'security.unlock-credential',
-            sourceSurface: 'web',
+            sourceSurface: context.sourceSurface,
             requestId: requestIdFromRequest(input.request),
-            redactedMetadata: withAuditContextMetadata({ actorType: 'user', actorRef: account.id, sourceSurface: 'web', authContext: 'anonymous' }, {
+            redactedMetadata: withAuditContextMetadata(context, {
                 changedFields: ['encryptedMasterKey', 'salt', 'unlockVerifierHash', 'recoveryWrappedMasterKey', 'recoverySalt', 'recoveryVerifierHash'],
-                flags: ['credential-rotation', 'recovery-key'],
-                reasonCode: 'passphrase_recovered',
+                flags: input.mode === 'recovery' ? ['credential-rotation', 'recovery-key'] : ['credential-rotation'],
+                reasonCode: input.mode === 'recovery' ? 'passphrase_recovered' : 'passphrase_changed',
             }),
         });
     } catch (error) {

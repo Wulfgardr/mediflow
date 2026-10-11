@@ -252,8 +252,8 @@ locali salvano ciò che ricevono.
 
 - Altra protezione: `password_hash`, `encrypted_master_key`, `unlock_verifier_hash`, `recovery_wrapped_master_key`, `recovery_verifier_hash`
 - In chiaro: `id`, `username`, `display_name`, `ambulatory_name`, `role`, `salt`, `created_at`, `failed_login_attempts`, `first_failed_login_at`, `locked_until`, `recovery_salt`
-- Leggibile senza chiave: nome utente, nome visualizzato, studio, salt e contatori di blocco. `password_hash` è l'hash bcrypt del PIN; `encrypted_master_key` è la master key avvolta con la chiave derivata dal PIN.
-- Le quattro colonne dell'[ADR 0143](adr/0143-strong-unlock-credential.md) restano vuote finché l'account sblocca con il PIN. Le scrive, insieme al nuovo involucro, il passaggio alla passphrase (`POST /api/auth/passphrase`), che l'interfaccia non offre ancora: gli hash SHA-256 dei due verificatori (`unlock_verifier_hash`, `recovery_verifier_hash`), la master key avvolta con la chiave di recupero (`recovery_wrapped_master_key`) e il salt di quell'involucro (`recovery_salt`). Da quel momento `encrypted_master_key` è avvolta con la chiave derivata dalla passphrase e `password_hash` resta come PIN di conferma.
+- Leggibile senza chiave: nome utente, nome visualizzato, studio, salt e contatori di blocco. `password_hash` è l'hash bcrypt del PIN di conferma; `encrypted_master_key` è la master key avvolta con la chiave derivata dalla passphrase negli account v3, dal PIN nel profilo transitorio.
+- Le quattro colonne dell'[ADR 0143](adr/0143-strong-unlock-credential.md) restano vuote finché l'account sblocca con il PIN. Le scrivono, insieme al nuovo involucro, il primo avvio v3 e il passaggio alla passphrase (`POST /api/auth/passphrase`), offerti dall'interfaccia: gli hash SHA-256 dei due verificatori (`unlock_verifier_hash`, `recovery_verifier_hash`), la master key avvolta con la chiave di recupero (`recovery_wrapped_master_key`) e il salt di quell'involucro (`recovery_salt`). Da quel momento `encrypted_master_key` è avvolta con la chiave derivata dalla passphrase e `password_hash` resta come PIN di conferma.
 
 ## File e altri artefatti
 
@@ -269,7 +269,7 @@ locali salvano ciò che ricevono.
 | Export FHIR del paziente | Dove lo salva il browser. | La scheda decifrata; il nome del file contiene cognome e nome. | Nessuna. | `app/patients/[id]/edit/page.tsx` |
 | Moduli scaricati o condivisi | Dove li salva il browser. | Il modulo compilato, in chiaro. | Nessuna. | `app/patients/[id]/modules/page.tsx` |
 | `localStorage` del browser | Profilo del browser. | Salt, involucro della master key, preferenze dell'interfaccia. | L'involucro vale quanto il PIN. | `lib/security/security.ts` |
-| `sessionStorage` del browser | Profilo del browser, per scheda. | Master key in chiaro e dati dell'utente, finché l'applicazione è sbloccata. | Nessuna. Il browser può scriverlo su disco per ripristinare la sessione. | `lib/security/client-security-session.ts` |
+| `sessionStorage` del browser | Profilo del browser, per scheda. | Solo nel profilo PIN transitorio: master key in chiaro e dati dell'utente. Gli account v3 non li persistono e cancellano la precedente sessione. | Il profilo PIN non protegge questa copia; v3 conserva una chiave non estraibile solo in memoria e richiede sblocco dopo reload. | `lib/security/client-security-session.ts`, `components/security-provider.tsx` |
 | Token dell'API locale | `local-api-token` nella directory dati. | Il segreto dei client locali. | File `0600`. | `lib/security/local-api-token.ts` |
 | Testo estratto dai documenti | Memoria dei processi di estrazione. | I byte del documento arrivano ai processi figli sullo standard input; il risultato torna al browser, che lo cifra nelle colonne degli allegati. | Nessun file previsto. | `lib/domain/documents/anydoc-local-extraction-runner.ts`, `anydoc-pdf-child-process-owner.ts` |
 | Radice temporanea dell'OCR | `mediflow-vision-ocr-*` nella directory temporanea del sistema. | Area di lavoro del riconoscimento Apple Vision; rimossa a fine corsa. | Contenuto non ancora provato da un test. | `lib/domain/documents/anydoc-apple-vision-ocr.ts` |
@@ -283,7 +283,7 @@ locali salvano ciò che ricevono.
 
 | Minaccia | Campi cifrati | Tutto il resto |
 | --- | --- | --- |
-| T1, T2 | Protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Il backup non contiene hash né involucro. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
+| T1, T2 | Nel profilo PIN transitorio sono protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Gli account v3 usano la passphrase dell'ADR 0143. Il backup non contiene hash né involucro. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
 | T3 | Il database è `0600`. | Directory dati predefinita `0700` e backup pianificati `0600` su macOS e Linux. Restano come le ha impostate l'operatore una directory dati o una destinazione dei backup scelte da lui e già esistenti. |
 | T4 | Nessuna | Non provato: manca il test con la sentinella del criterio 3. |
 
@@ -299,9 +299,10 @@ Leonardo.
 2. **PIN corto**: hash e involucro si attaccano fuori dal computer, e i limiti
    di lunghezza non coincidono fra sblocco e conferme di ruolo. È
    [WUL-722](https://linear.app/wulfgardr/issue/WUL-722).
-3. **Master key nel `sessionStorage`**: la decisione del 9 ottobre la vuole
-   solo in memoria.
-4. **Il server riceve il PIN** a ogni accesso.
+3. **Master key nel `sessionStorage`**: tolta per gli account v3; resta nel
+   profilo PIN transitorio, dichiarato nell'interfaccia.
+4. **Il server riceve il PIN** negli accessi del profilo transitorio. Per v3
+   riceve solo il verificatore; il PIN separato rimane nelle conferme.
 5. **Permessi** dei backup pianificati e della directory dati: chiusi dalla
    versione 2 di questa matrice. Resta da decidere se verificare, e come
    segnalare, una directory scelta dall'operatore e leggibile da altri account.

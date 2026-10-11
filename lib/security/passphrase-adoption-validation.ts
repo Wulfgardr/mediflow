@@ -23,7 +23,7 @@ function wrapping(value: unknown, prefix: string): value is string {
 const bytes = (value: unknown, length: number): value is string =>
     typeof value === 'string' && value.length <= 64 && hasCanonicalBase64ByteLength(value, length);
 
-type PassphraseCredentials = Omit<PassphraseAdoptionPayload, 'currentPin'>;
+export type PassphraseCredentials = Omit<PassphraseAdoptionPayload, 'currentPin'>;
 
 /** Shape only: the server cannot open either wrapping, and must not be able to. */
 function readPassphraseCredentials(body: Record<string, unknown>): PassphraseCredentials | null {
@@ -62,4 +62,19 @@ export function validatePassphraseRecoveryPayload(value: unknown): PassphraseRec
     // The recovery key has been typed into a browser: it is replaced, never kept.
     if (!credentials || credentials.recovery.verifier === body.recoveryVerifier || credentials.verifier === body.recoveryVerifier) return null;
     return { username: username.trim(), recoveryVerifier: body.recoveryVerifier, ...credentials };
+}
+
+export function validatePassphraseSetupCredentials(value: unknown): PassphraseCredentials | null {
+    return value && typeof value === 'object' ? readPassphraseCredentials(value as Record<string, unknown>) : null;
+}
+
+export type PassphraseChangePayload = PassphraseCredentials & { currentVerifier: string };
+
+export function validatePassphraseChangePayload(value: unknown): PassphraseChangePayload | null {
+    if (!value || typeof value !== 'object') return null;
+    const body = value as Record<string, unknown>;
+    const credentials = readPassphraseCredentials(body);
+    if (!credentials || !bytes(body.currentVerifier, VERIFIER_BYTES)
+        || credentials.verifier === body.currentVerifier || credentials.recovery.verifier === body.currentVerifier) return null;
+    return { currentVerifier: body.currentVerifier, ...credentials };
 }

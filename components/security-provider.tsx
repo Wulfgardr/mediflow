@@ -16,7 +16,8 @@ import {
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
-import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
+import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
 import { LockScreen } from '@/components/lock-screen';
 /* @Codex */
 import { AuthHealthScreen } from '@/components/auth-health-screen';
@@ -42,11 +43,14 @@ import {
     rewrapMasterKeyRequest,
     requestApplicationLockConfirmation,
     setupSecurityRequest,
+    adoptPassphraseRequest,
+    changePassphraseRequest,
+    recoverPassphraseRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
     type UnlockParameters,
 } from '@/lib/security/client-auth-api';
-import { deriveUnlockMaterial, openUnlockWrapping } from '@/lib/security/unlock-credential';
+import { createUnlockWrapping, createRecoveryWrapping, openRecoveryWrapping, deriveUnlockMaterial, openUnlockWrapping } from '@/lib/security/unlock-credential';
 import { planUnlock } from '@/lib/security/unlock-plan';
 /* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
@@ -88,7 +92,8 @@ interface SecurityContextType {
         secret: string,
         options?: { shown?: UnlockParameters['credential']; longPinConfirmed?: boolean },
     ) => Promise<boolean | 'confirm'>;
-    setupPin: (pin: string) => Promise<void>;
+    preparePassphraseChange: (secret: string, passphrase: string) => Promise<AccessResult>;
+    preparePassphraseRecovery: (secret: string, passphrase: string, kit?: RecoveryKit) => Promise<AccessResult>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
     sealClinicianSoapEntry: (fieldSet: ClinicianSoapEntryFieldSetV1) => Promise<ClinicianSoapEntrySealResult>;
     reopenClinicianSoapEntry: (
@@ -176,6 +181,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
     /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
+    const wrappingRef = useRef<{ encryptedMasterKey: string; salt: string } | null>(null);
+    const preparedAccessRef = useRef<{ generation: number; commit: () => Promise<AccessResult> } | null>(null);
+    const [preparedKit, setPreparedKit] = useState<PreparedRecoveryKit | null>(null);
+    const accessCommitPending = useRef(false);
+    const accessPreparePending = useRef(false);
     /* @Codex */
     const authorityAttemptGenerationRef = useRef(0);
     /* @Codex */
@@ -216,6 +226,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     /* @Codex */
     const clearClientAuthority = () => {
         clearSecuritySession();
+        wrappingRef.current = null;
+        preparedAccessRef.current = null;
+        setPreparedKit(null);
         setActiveMasterKey(null);
         setUser(null);
         setIsAuthenticated(false);
@@ -384,6 +397,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const restoreSession = async (): Promise<boolean> => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         try {
+            const parameters = await askUnlockParameters();
+            if (parameters?.credential !== 'pin') { clearSecuritySession(); return false; }
             const session = await restoreSecuritySession<User>();
             if (!session) return false;
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
@@ -535,7 +550,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             /* @Codex */
             unacceptedServerAuthority = false;
 
-            setActiveMasterKey(masterKey);
+            wrappingRef.current = { encryptedMasterKey, salt: btoa(String.fromCharCode(...saltBytes)) };
+            setActiveMasterKey(material ? await residentKey(masterKey) : masterKey);
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) { clearClientAuthority(); return false; }
             setUser(userData);
             setIsAuthenticated(true);
             setIsLocked(false);
@@ -543,7 +560,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             // Persist session
             try {
-                await persistSecuritySession(masterKey, userData);
+                if (!material) await persistSecuritySession(masterKey, userData);
+                else clearSecuritySession();
             } catch (e) {
                 console.error("Failed to save session", e);
             }
@@ -628,91 +646,106 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Legacy setupPin (for context interface compatibility)
-    const setupPin = async (pin: string): Promise<void> => {
-        await handleWizardComplete({ displayName: 'Admin', ambulatoryName: 'Studio', pin });
+    // The resident v3 key is never exported. Only a freshly opened wrapping is transiently exportable.
+    const residentKey = async (transient: CryptoKey): Promise<CryptoKey> => {
+        const bytes = new Uint8Array(await crypto.subtle.exportKey('raw', transient));
+        try { return await crypto.subtle.importKey('raw', bytes, 'AES-GCM', false, ['encrypt', 'decrypt']); }
+        finally { bytes.fill(0); }
     };
 
-    // New handler for Onboarding Wizard
-    const handleWizardComplete = async (data: { displayName: string; ambulatoryName: string; pin: string }) => {
-        const attemptGeneration = ++authorityAttemptGenerationRef.current;
-        const { displayName, ambulatoryName, pin } = data;
-        setFlowError(null);
+    const runPreparedAccessRequest = <T,>(generation: number, request: () => Promise<T>) =>
+        runAuthorityNetworkRequest(async () => {
+            if (generation !== authorityAttemptGenerationRef.current) throw new Error('Access operation expired.');
+            return request();
+        });
 
+    const prepareAccess = async (key: CryptoKey, passphrase: string, username: string,
+        request: (credentials: Awaited<ReturnType<typeof createUnlockWrapping>> & {
+            recovery: { wrappedMasterKey: string; salt: string; verifier: string };
+        }) => Promise<AccessResult>, generation: number): Promise<AccessResult> => {
+        const unlock = await createUnlockWrapping(key, passphrase);
+        const { recoveryKey, ...recovery } = await createRecoveryWrapping(key);
+        if (generation !== authorityAttemptGenerationRef.current) return { ok: false, message: 'Accesso cambiato. Rinnova l’accesso e riprova.' };
+        preparedAccessRef.current = { generation, commit: () => request({ ...unlock, recovery }) };
+        setPreparedKit({ recoveryKey, kit: { schemaVersion: 'mediflow.recovery-kit.v1', username,
+            wrappedMasterKey: recovery.wrappedMasterKey, salt: recovery.salt } });
+        return { ok: true };
+    };
+
+    const finishAccessMutation = async (generation: number, result: { response: Response; payload: { success?: boolean; error?: string; message?: string } | null }): Promise<AccessResult> => {
+        if (generation !== authorityAttemptGenerationRef.current) return { ok: false, message: 'Operazione scaduta. Rinnova l’accesso.' };
+        if (!result.response.ok || result.payload?.success !== true) return { ok: false, message: result.payload?.message || result.payload?.error || 'Aggiornamento non confermato. Riprova.' };
+        ++authorityAttemptGenerationRef.current;
+        clearClientAuthority();
+        setRequiresSetup(false);
+        setUnlockCredential('passphrase');
+        shownCredentialRef.current = 'passphrase';
+        setAuthErrorMessage('Passphrase aggiornata. Rinnova l’accesso e sblocca con la nuova passphrase.');
+        updateAuthRecoveryState('required');
+        return { ok: true };
+    };
+
+    const preparePassphraseChange = async (secret: string, passphrase: string): Promise<AccessResult> => {
+        const snapshot = wrappingRef.current;
+        if (!isAuthenticated || isLocked || !user || !snapshot || preparedAccessRef.current || accessPreparePending.current) return { ok: false, message: 'Rinnova l’accesso prima di cambiare la credenziale.' };
+        const generation = authorityAttemptGenerationRef.current;
+        accessPreparePending.current = true;
         try {
-            // Generate crypto. New setups wrap at the current KDF version (v2, 600k).
-            const salt = window.crypto.getRandomValues(new Uint8Array(16));
-            const masterKey = await generateMasterKey();
-            const encryptedMasterKey = await wrapMasterKeyVersioned(masterKey, pin, salt);
-            const saltB64 = btoa(String.fromCharCode(...salt));
-            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
-
-            // Send to Server
-            const result = await runAuthorityNetworkRequest(async () => {
-                if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
-                return setupSecurityRequest({
-                    username: 'admin',
-                    password: pin,
-                    encryptedMasterKey,
-                    salt: saltB64,
-                    displayName,
-                    ambulatoryName
-                });
-            });
-            if (!result) return;
-            const { response: res, payload, controlState } = result;
-            if (authorityAttemptGenerationRef.current !== attemptGeneration) return;
-
-            /* @Codex */
-            if (res.ok && controlState !== 'accepted') {
-                lock();
-                setFlowError('Risposta di configurazione non verificabile. Sessione bloccata.');
-                return;
-            }
-
-            /* @Codex */
-            if (!res.ok) {
-                if (res.status === 409 && payload?.code === 'SETUP_ALREADY_COMPLETED') {
-                    clearClientAuthority();
-                    setRequiresSetup(false);
-                    // Il recupero richiede un nuovo gesto esplicito sulla LockScreen.
-                    setAuthErrorMessage("Accesso già configurato. Accedi con il PIN.");
-                    return;
-                }
-
-                throw new Error(payload?.error || "Setup failed server-side");
-            }
-
-            /* @Codex */
-            if (payload?.success !== true) {
-                lock();
-                setFlowError('Risposta di configurazione non valida. Sessione bloccata.');
-                return;
-            }
-
-            // Set Active
-            setActiveMasterKey(masterKey);
-            setRequiresSetup(false);
-            setIsAuthenticated(true);
-            setIsLocked(false);
-
-            // Persist
-            const userData: User = { id: 'admin', username: 'admin', role: 'admin', displayName, ambulatoryName };
-            setUser(userData);
-            try {
-                await persistSecuritySession(masterKey, userData);
-            } catch (sessionError) {
-                console.error("Failed to save session", sessionError);
-            }
-            if (authorityAttemptGenerationRef.current !== attemptGeneration) {
-                clearClientAuthority();
-            }
-        } catch (e) {
-            console.error("Setup failed", e);
-            const detail = e instanceof Error ? e.message : String(e);
-            setFlowError("Errore configurazione: " + detail);
-        }
+            const salt = Uint8Array.from(atob(snapshot.salt), character => character.charCodeAt(0));
+            const material = unlockCredential === 'passphrase' ? await deriveUnlockMaterial(secret, salt) : null;
+            const key = material ? await openUnlockWrapping(snapshot.encryptedMasterKey, material.kek)
+                : await unwrapMasterKeyVersioned(snapshot.encryptedMasterKey, secret, salt);
+            return await prepareAccess(key, passphrase, user.username, async credentials =>
+                finishAccessMutation(generation, await runPreparedAccessRequest(generation, () => material
+                    ? changePassphraseRequest({ currentVerifier: material.verifier, ...credentials })
+                    : adoptPassphraseRequest({ currentPin: secret, ...credentials }))), generation);
+        } catch { return { ok: false, message: 'Credenziale attuale non valida o nuova passphrase fuori dai limiti.' }; }
+        finally { accessPreparePending.current = false; }
     };
+
+    const preparePassphraseRecovery = async (secret: string, passphrase: string, kit?: RecoveryKit): Promise<AccessResult> => {
+        if (!kit || authRecoveryStateRef.current !== 'ready' || preparedAccessRef.current || accessPreparePending.current) return { ok: false, message: 'Rinnova l’accesso e seleziona il kit prima di recuperare.' };
+        const generation = authorityAttemptGenerationRef.current;
+        accessPreparePending.current = true;
+        try {
+            const recovered = await openRecoveryWrapping(kit.wrappedMasterKey, kit.salt, secret);
+            return await prepareAccess(recovered.masterKey, passphrase, kit.username, async credentials => {
+                const result = await runPreparedAccessRequest(generation, () => recoverPassphraseRequest({ username: kit.username, recoveryVerifier: recovered.verifier, ...credentials }));
+                if (result.response.ok && result.controlState !== 'accepted') { lock(); return { ok: false, message: 'Risposta di recupero non verificabile. Rinnova l’accesso.' }; }
+                return finishAccessMutation(generation, result);
+            }, generation);
+        } catch { return { ok: false, message: 'Kit o chiave non validi, oppure nuova passphrase fuori dai limiti.' }; }
+        finally { accessPreparePending.current = false; }
+    };
+
+    const handleWizardComplete = async ({ displayName, ambulatoryName, pin, passphrase }: SecuritySetup) => {
+        const generation = ++authorityAttemptGenerationRef.current;
+        const key = await generateMasterKey();
+        const result = await prepareAccess(key, passphrase, 'admin', async credentials => {
+            const result = await runPreparedAccessRequest(generation, () => setupSecurityRequest({ username: 'admin', password: pin, displayName, ambulatoryName, ...credentials }));
+            if (result.response.status === 409 && result.payload?.code === 'SETUP_ALREADY_COMPLETED') {
+                ++authorityAttemptGenerationRef.current; clearClientAuthority(); setRequiresSetup(false);
+                updateAuthRecoveryState('required');
+                return { ok: false, message: 'Configurazione già completata. Rinnova l’accesso.' };
+            }
+            if (result.response.ok && result.controlState !== 'accepted') { lock(); return { ok: false, message: 'Risposta di configurazione non verificabile. Rinnova l’accesso.' }; }
+            return finishAccessMutation(generation, result);
+        }, generation);
+        if (!result.ok) throw new Error(result.message);
+    };
+
+    if (preparedKit) return <div className="fixed inset-0 z-[110] overflow-y-auto bg-[var(--lume-surface-canvas)] p-4 text-[var(--lume-ink)]">
+        <div className="mx-auto max-w-2xl"><RecoveryKitPanel key={preparedKit.kit.wrappedMasterKey} prepared={preparedKit} onCancel={() => {
+            preparedAccessRef.current = null; setPreparedKit(null);
+        }} onCommit={async () => {
+            const prepared = preparedAccessRef.current;
+            if (!prepared || accessCommitPending.current || prepared.generation !== authorityAttemptGenerationRef.current) return { ok: false, message: 'Operazione scaduta. Rinnova l’accesso.' };
+            accessCommitPending.current = true;
+            try { return await prepared.commit(); }
+            catch { lock(); return { ok: false, message: 'Esito non confermato. Rinnova l’accesso prima di riprovare.' }; }
+            finally { accessCommitPending.current = false; }
+        }} /></div>
+    </div>;
 
     /* @Codex */
     if (authHealth?.status === 'error') {
@@ -772,7 +805,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 authRecoveryState,
                 unlockCredential,
                 login,
-                setupPin,
+                preparePassphraseChange,
+                preparePassphraseRecovery,
                 changePin,
                 sealClinicianSoapEntry,
                 reopenClinicianSoapEntry,
@@ -795,7 +829,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             authRecoveryState,
             unlockCredential,
             login,
-            setupPin,
+            preparePassphraseChange,
+            preparePassphraseRecovery,
             changePin,
             sealClinicianSoapEntry,
             reopenClinicianSoapEntry,

@@ -158,8 +158,9 @@ adotta le opzioni raccomandate; cambiarne una riapre il punto corrispondente.
 | Lunghezza minima | 15 caratteri. | È il minimo che regge il confronto della tabella sopra senza regole di composizione. |
 | Formato del kit | File dedicato, distinto dal backup. | Chi copia un backup non deve trovare accanto il modo di aprirlo. |
 
-Resta da misurare il costo di derivazione sui profili Windows e Omarchy prima
-di fissare le iterazioni della versione 3.
+Le [misure sui tre profili](https://github.com/Wulfgardr/mediflow/pull/492#issuecomment-6109090403)
+confermano 2.000.000 di iterazioni: il tentativo più lento resta sotto un secondo.
+Sono misure della primitiva, non qualificazione dell'intera applicazione.
 
 ## Ordine di consegna
 
@@ -249,6 +250,17 @@ premuto, un doppio clic. Per questo la conferma non è più un secondo invio:
 | Il passaggio verificava il PIN senza contare i tentativi: chi aveva una sessione poteva indovinarlo. | Corretto: usa la verifica condivisa, con contatori e blocco; un blocco nato dopo la verifica ferma la scrittura. Il cambio PIN ha lo stesso limite da prima e resta da allineare. |
 | La schermata di blocco contava la lunghezza prima della normalizzazione, e rifiutava passphrase che le primitive accettano. | Corretto: usa lo stesso controllo delle primitive. |
 | Un PIN sbagliato presentato al passaggio viene registrato come accesso fallito anonimo, senza la sessione che lo ha chiesto. | Noto, non corretto: è ciò che la verifica condivisa registra anche per le conferme di ruolo. Va corretto per tutte insieme, dando alla verifica il contesto di chi la chiama. |
+
+## Percorso applicativo
+
+Il primo avvio crea un account v3. Adozione dal PIN, cambio e recupero
+riutilizzano un kit preparato: il medico lo salva e conserva la chiave prima
+della scrittura. Il PIN di conferma resta separato e invariato. Dopo il commit
+serve uno sblocco esplicito; la chiave residente v3 non è estraibile né persistita.
+Un reload richiede nuovamente lo sblocco; la navigazione interna usa il routing client.
+Il recupero sullo stesso archivio conserva la storia cifrata. Il drill su un
+archivio vuoto dopo la perdita del computer resta il criterio 1 di WUL-730:
+la prova cambio/recupero non lo sostituisce.
 
 ## Come si prova
 

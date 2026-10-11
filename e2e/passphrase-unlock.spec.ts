@@ -1,10 +1,9 @@
 /* ADR 0143: real UI on an isolated server. An account moved to a passphrase is unlocked by it in
-   the browser, and what the person types never reaches the network. The move itself is asked
-   through the route, as the page will ask it once the guided procedure exists. */
+   the browser, and what the person types never reaches the network. The account is provisioned
+   as an explicitly legacy PIN fixture; adoption uses the real access settings. */
 import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2Sync, randomBytes } from 'node:crypto';
 import type { Page, Request } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
-import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 import { bootstrapUnlockedSession } from './utils';
 
 const PIN = 'demo086086';
@@ -61,11 +60,11 @@ async function expectUnlocked(page: Page): Promise<void> {
 
 test('an account moved to a passphrase is unlocked by it, and the passphrase never reaches the network', async ({ page, browser, baseURL, browserName }) => {
   expect(browserName, 'The held answer needs Chromium: it must not be skipped silently').toBe('chromium');
-  // Ordinary onboarding with a PIN: the provider generates and wraps the real master key.
-  const setup = page.waitForRequest(request => isPost(request, '/api/auth/setup'));
+  // Compatibility setup uses the real legacy API; the browser opens it through ordinary PIN login.
+  const login = page.waitForResponse(response => isPost(response.request(), '/api/auth/login'));
   await bootstrapUnlockedSession(page, PIN);
-  const pinWrapping = (await setup).postDataJSON() as { encryptedMasterKey: string; salt: string };
-  const credential = passphraseCredential(openPinWrapping(pinWrapping.encryptedMasterKey, pinWrapping.salt));
+  const pinWrapping = await (await login).json() as { encryptedMasterKey: string; salt: string };
+  let credential = passphraseCredential(openPinWrapping(pinWrapping.encryptedMasterKey, pinWrapping.salt));
 
   // Asked by another site with this browser's cookie, the move is refused.
   const foreign = await page.request.post('/api/auth/passphrase', {
@@ -95,10 +94,26 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await staleInput.press('Enter');
   await expect.poll(() => heldCheck, 'the real answer of the server must reach the gate').toBeTruthy();
 
-  const adopted = await page.request.post('/api/auth/passphrase', {
-    headers: trustedWebRequestHeaders(baseURL), data: { currentPin: PIN, ...credential },
-  });
+  await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await page.getByRole('link', { name: 'Accesso', exact: true }).click();
+  await page.getByLabel('PIN attuale', { exact: true }).first().fill(PIN);
+  await page.getByLabel('Nuova passphrase', { exact: true }).fill(PASSPHRASE);
+  await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(PASSPHRASE);
+  await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+  const kitPanel = page.getByTestId('recovery-kit');
+  await expect(kitPanel.getByRole('button', { name: 'Attiva la nuova passphrase' })).toBeDisabled();
+  const download = page.waitForEvent('download');
+  await kitPanel.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
+  await kitPanel.getByRole('checkbox').check();
+  const adoption = page.waitForResponse(response => isPost(response.request(), '/api/auth/passphrase'));
+  await kitPanel.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
+  const adopted = await adoption;
   expect(adopted.status()).toBe(200);
+  const payload = adopted.request().postDataJSON();
+  expect(payload.currentPin).toBe(PIN); expect(JSON.stringify(payload)).not.toContain(PASSPHRASE);
+  credential = payload;
+  const root = pbkdf2Sync(Buffer.from(PASSPHRASE.normalize('NFKC'), 'utf8'), Buffer.from(credential.salt, 'base64'), 2_000_000, 32, 'sha256');
+  expect(credential.verifier).toBe(Buffer.from(hkdfSync('sha256', root, Buffer.alloc(0), 'mediflow.unlock.verifier.v3', 32)).toString('base64'));
   // The move retires the session of the page that asked.
   expect((await page.request.get('/api/patients')).status()).toBe(401);
 
@@ -159,7 +174,8 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expectUnlocked(page);
 
   // The access settings describe the account as it is now, and no longer offer the PIN rotation the server refuses.
-  await page.goto('/settings/accesso');
+  await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await page.getByRole('link', { name: 'Accesso', exact: true }).click();
   await expect(page.getByTestId('settings-access-passphrase')).toContainText('Questo archivio si sblocca con la passphrase.');
   await expect(page.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);
   await expect(page.getByText('Il blocco richiede la passphrase al prossimo accesso.')).toBeVisible();
