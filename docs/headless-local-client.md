@@ -55,8 +55,8 @@ lettura ripetuta, revoca e chiusura. I negativi condivisi di cancellazione,
 frame malformati e budget vivono anche in `test:mcp:intelligent-host` e
 `test:headless-portable`: non sono prove di un modello remoto.
 
-Una sessione Web ordinaria indipendente continua lettura e scrittura sintetica
-dopo la chiusura della coppia agentica. Il Web privato del Supervisor termina
+Una sessione Web ordinaria indipendente, sullo stesso archivio sintetico,
+continua lettura e scrittura dopo la chiusura della coppia agentica. Il Web privato del Supervisor termina
 insieme al suo agente: non è la sessione ordinaria. I provider sono spenti e
 la prova esistente ne verifica il rifiuto della sonda cloud.
 
