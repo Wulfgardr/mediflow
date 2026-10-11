@@ -52,7 +52,18 @@ const REQUIRED_ROUTE_AUDIT = [
         route: 'app/api/auth/passphrase/recover/route.ts', events: ['settings.updated'], reason: 'recovery replaces the passphrase and the recovery key of an account',
         writerContracts: [{
             handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'recoverPassphrase',
-            target: 'passphrase-recovery', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'recoverPassphrase',
+            target: 'passphrase-recovery', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'rotatePassphrase',
+            hop: { target: 'rotatePassphrase', argumentIndex: 2, literal: 'recovery' },
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
+    {
+        route: 'app/api/auth/passphrase/change/route.ts', events: ['settings.updated'], reason: 'authenticated passphrase change shares the atomic rotation owner',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'changePassphrase',
+            target: 'passphrase-change', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'rotatePassphrase',
+            hop: { target: 'rotatePassphrase', argumentIndex: 2, literal: 'change' },
             writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
             dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
         }],

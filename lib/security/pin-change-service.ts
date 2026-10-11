@@ -454,8 +454,8 @@ export async function recoverPassphrase(
     dependencies: PinChangeServiceDependencies = {},
 ): Promise<PassphraseRecoveryResult> {
     return rotatePassphrase({
-        ...input, mode: 'recovery', previousVerifier: input.payload.recoveryVerifier,
-    }, dependencies);
+        ...input, previousVerifier: input.payload.recoveryVerifier,
+    }, dependencies, 'recovery');
 }
 
 /** The authenticated account changes its own passphrase; its PIN cannot authorize this. */
@@ -471,29 +471,30 @@ export async function changePassphrase(
         message: 'Questo account usa ancora il PIN. Passa prima alla passphrase.',
     };
     return rotatePassphrase({
-        mode: 'change', request: input.request,
+        request: input.request,
         payload: { ...input.payload, username: user.username },
         previousVerifier: input.payload.currentVerifier,
         openSession: (account) => account.id === input.session.userId ? input.session : null,
-    }, { ...dependencies, db });
+    }, { ...dependencies, db }, 'change');
 }
 
 /** Shared atomic replacement and terminal session retirement for change and recovery. */
 async function rotatePassphrase(
     input: {
-        mode: 'change' | 'recovery'; request: Request;
+        request: Request;
         payload: PassphraseCredentials & { username: string }; previousVerifier: string;
         openSession: (account: RecoveredAccount) => WebSessionProjection | null;
     },
     dependencies: PinChangeServiceDependencies,
+    mode: 'change' | 'recovery',
 ): Promise<PassphraseRecoveryResult> {
     const { payload } = input;
     const db = await resolveDatabase(dependencies);
-    const verify = input.mode === 'recovery'
+    const verify = mode === 'recovery'
         ? dependencies.verifyRecovery ?? verifyRecoveryCredentials
         : dependencies.verifyUnlock ?? verifyUnlockCredentials;
     const verification = await verify(
-        input.mode === 'recovery'
+        mode === 'recovery'
             ? { username: payload.username, recoveryVerifier: input.previousVerifier }
             : { username: payload.username, verifier: input.previousVerifier },
         { db, ...(dependencies.writeAuditEvent ? { writeAuditEvent: dependencies.writeAuditEvent } : {}) },
@@ -507,7 +508,7 @@ async function rotatePassphrase(
     const session = input.openSession(account);
     if (!session) return unconfirmed('Il recupero non può essere confermato. Riprova tra poco.');
     const closeSession = (): void => {
-        if (input.mode !== 'recovery') return;
+        if (mode !== 'recovery') return;
         try { (dependencies.retireWebSession ?? retire)(session, 'delete'); } catch { /* it was never handed out */ }
     };
     const nativeRetirement = (dependencies.prepareNativeSessionsForUserRetirement ?? prepareNativeLegacyUserRetirement)(account.id);
@@ -547,7 +548,7 @@ async function rotatePassphrase(
             })
             .where(and(
                 eq(users.id, account.id),
-                input.mode === 'recovery'
+                mode === 'recovery'
                     ? eq(users.recoveryVerifierHash, verifierHash(input.previousVerifier))
                     : eq(users.unlockVerifierHash, verifierHash(input.previousVerifier)),
                 isNotNull(users.unlockVerifierHash),
@@ -587,7 +588,7 @@ async function rotatePassphrase(
     }
 
     try {
-        const context = input.mode === 'recovery'
+        const context = mode === 'recovery'
             ? { actorType: 'user' as const, actorRef: account.id, sourceSurface: 'web' as const, authContext: 'anonymous' as const }
             : auditContextFromSession(session);
         await (dependencies.writeAuditEvent ?? writeAuditEvent)({
@@ -601,8 +602,8 @@ async function rotatePassphrase(
             requestId: requestIdFromRequest(input.request),
             redactedMetadata: withAuditContextMetadata(context, {
                 changedFields: ['encryptedMasterKey', 'salt', 'unlockVerifierHash', 'recoveryWrappedMasterKey', 'recoverySalt', 'recoveryVerifierHash'],
-                flags: input.mode === 'recovery' ? ['credential-rotation', 'recovery-key'] : ['credential-rotation'],
-                reasonCode: input.mode === 'recovery' ? 'passphrase_recovered' : 'passphrase_changed',
+                flags: mode === 'recovery' ? ['credential-rotation', 'recovery-key'] : ['credential-rotation'],
+                reasonCode: mode === 'recovery' ? 'passphrase_recovered' : 'passphrase_changed',
             }),
         });
     } catch (error) {
