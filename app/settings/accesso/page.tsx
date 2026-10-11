@@ -16,7 +16,9 @@ import {
 } from '@/components/settings/settings-ui';
 
 export default function SettingsAccessPage() {
-    const { user, changePin, lock } = useSecurity();
+    const { user, changePin, lock, unlockCredential } = useSecurity();
+    // ADR 0143: on an account that unlocks with a passphrase the PIN no longer rotates the key wrapping.
+    const passphrase = unlockCredential === 'passphrase';
     /* @Codex */
     const [pinForm, setPinForm] = useState({ currentPin: '', newPin: '', confirmPin: '' });
     /* @Codex */
@@ -53,10 +55,33 @@ export default function SettingsAccessPage() {
             <SettingsSectionIntro
                 kicker="Dati e sicurezza"
                 title="Accesso"
-                description="Rotazione del PIN di sblocco e controllo della sessione."
+                description={passphrase
+                    ? 'Sblocco con passphrase, PIN di conferma e controllo della sessione.'
+                    : 'Rotazione del PIN di sblocco e controllo della sessione.'}
             />
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {passphrase ? (
+                <div className={SETTINGS_CARD_CLASS} data-testid="settings-access-passphrase">
+                    <div className="mb-5 flex items-start gap-3">
+                        <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
+                            <KeyRound className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="section-kicker">Sicurezza</p>
+                            <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Sblocco con passphrase</h2>
+                            <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
+                                Questo archivio si sblocca con la passphrase. Il PIN resta per le conferme di revisione e di ruolo: non apre l’archivio.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mf-section">
+                        <p className="text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                            In questa versione la passphrase e il PIN di conferma non si possono ancora cambiare da qui.
+                        </p>
+                    </div>
+                </div>
+                ) : (
                 <div className={SETTINGS_CARD_CLASS}>
                     {/* @Codex WUL-229: security card icon switches to MediFlow warning tone */}
                     <div className="mb-5 flex items-start gap-3">
@@ -144,6 +169,7 @@ export default function SettingsAccessPage() {
                         </div>
                     </div>
                 </div>
+                )}
 
                 {/* WUL-297: sessione locale corrente, con blocco immediato. */}
                 <div className={SETTINGS_CARD_CLASS}>
@@ -155,7 +181,7 @@ export default function SettingsAccessPage() {
                             <p className="section-kicker">Sessione</p>
                             <h2 className="mt-1 text-base font-semibold" style={{ color: 'var(--lume-ink)' }}>Sessione corrente</h2>
                             <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Una sola sessione attiva su questa postazione. Il blocco richiede il PIN al prossimo accesso.
+                                Una sola sessione attiva su questa postazione. Il blocco richiede {passphrase ? 'la passphrase' : 'il PIN'} al prossimo accesso.
                             </p>
                         </div>
                     </div>

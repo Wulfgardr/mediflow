@@ -14,6 +14,7 @@ export const OWNED_HTTP_FILES = Object.freeze([
     "scripts/legacy-clinical-writes-test.sh",
     "scripts/legacy-clinical-writes.test.mjs",
     "scripts/mediflow-headless-supervisor-standalone-smoke.mjs",
+    "scripts/network-home-base-account-passphrase.test.mjs",
     "scripts/network-home-base-account-pin.test.mjs",
     "scripts/network-home-base-aggregate-read.test.mjs",
     "scripts/network-home-base-ambulatory-write.test.mjs",

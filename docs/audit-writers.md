@@ -166,7 +166,8 @@ C04 classifica questi punti; non dichiara risolta la loro migrazione.
 | [settings/route.ts:49](../app/api/settings/route.ts#L49) | POST impostazioni: upsert persistente prima dell'audit, catch separato. | C05 per effetti persistenti; C06/C10 per impostazioni di sicurezza. |
 | [settings/[key]/route.ts:73](../app/api/settings/[key]/route.ts#L73) | PUT impostazione: stesso confine upsert/audit separato. | C05, con il contratto della specifica impostazione. |
 | [profile-update-service.ts:80](../lib/security/profile-update-service.ts#L80) | Profilo utente e discovery identity: transazione precedente all'audit; non è il profilo paziente. | C10. |
-| [pin-change-service.ts:236](../lib/security/pin-change-service.ts#L236) | CAS credenziale e ritiro autorità Web/native precedono audit; errore assorbito. | C07/C10, preservando il ritiro dell'autorità. |
+| [pin-change-service.ts:251](../lib/security/pin-change-service.ts#L251) | CAS credenziale e ritiro autorità Web/native precedono audit; errore assorbito. | C07/C10, preservando il ritiro dell'autorità. |
+| [pin-change-service.ts:382](../lib/security/pin-change-service.ts#L382) | Passaggio dal PIN alla passphrase ([ADR 0143](./adr/0143-strong-unlock-credential.md)): CAS credenziale e ritiro autorità Web/native precedono audit; errore assorbito. | C07. |
 | [rewrap-master-key/route.ts:64](../app/api/auth/rewrap-master-key/route.ts#L64) | Cambia wrapping/salt prima dell'audit; catch separato. | C06/C07. |
 | [auth/login/route.ts:77](../app/api/auth/login/route.ts#L77) | Login Web: audit dopo emissione dell'autorità, con catch. | C10, protocollo di autenticazione. |
 | [native-login-http.ts:61](../lib/security/native-login-http.ts#L61) | Login nativo: wrapper chiamato a :94 dopo creazione autorità; fallback esplicito. | C10. |

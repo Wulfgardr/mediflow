@@ -2,6 +2,7 @@
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
+import { createHash } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 
 /* @Codex */
@@ -13,6 +14,9 @@ import {
 } from '@/lib/security/audit';
 /* @Codex */
 import {
+    PASSPHRASE_ADOPTION_CONFLICT_CODE,
+    PASSPHRASE_ADOPTION_INVALID_PIN_CODE,
+    PASSPHRASE_ALREADY_ADOPTED_CODE,
     PIN_CHANGE_CONFLICT_CODE,
     PIN_CHANGE_INVALID_CURRENT_PIN_CODE,
     PIN_CHANGE_INVALID_NEW_PIN_CODE,
@@ -20,6 +24,7 @@ import {
     PIN_CHANGE_REUSE_NOT_ALLOWED_CODE,
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
+import type { PassphraseAdoptionPayload } from '@/lib/security/passphrase-adoption-validation';
 /* @Codex */
 import { users } from '@/lib/schema';
 /* @Codex */
@@ -260,6 +265,137 @@ export async function changePin(
         });
     } catch (error) {
         console.error('Audit pin change write failed:', error);
+    }
+
+    return { kind: 'success' };
+}
+
+export type PassphraseAdoptionInput = {
+    session: WebSessionProjection;
+    request: Request;
+    payload: PassphraseAdoptionPayload;
+};
+
+/** What the server keeps of a verifier: the browser computes the same value with hashAccessVerifier. */
+const verifierHash = (verifier: string) => createHash('sha256').update(Buffer.from(verifier, 'base64')).digest('hex');
+
+/**
+ * ADR 0143: moves an account from its PIN to a passphrase, once. One UPDATE writes the passphrase
+ * wrapping, its verifier and the recovery wrapping, or nothing: an interruption leaves either the
+ * PIN or the passphrase with its recovery kit, never a new secret over an unreadable archive.
+ * The PIN authorizes the move and stays as the confirmation PIN; it can never repeat the move,
+ * so it cannot replace a passphrase. Every session of the account is retired, as for a PIN change.
+ */
+export async function adoptPassphrase(
+    input: PassphraseAdoptionInput,
+    dependencies: PinChangeServiceDependencies = {},
+): Promise<PinChangeServiceResult> {
+    const { payload } = input;
+    const db = await resolveDatabase(dependencies);
+    const user = await db.select().from(users).where(eq(users.id, input.session.userId)).get();
+    if (!user) return { kind: 'unauthorized' };
+    if (user.unlockVerifierHash) {
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PASSPHRASE_ALREADY_ADOPTED_CODE,
+            message: 'Questo account si sblocca già con una passphrase.',
+        };
+    }
+    if (!await bcrypt.compare(payload.currentPin, user.passwordHash)) {
+        return {
+            kind: 'failure',
+            status: 401,
+            code: PASSPHRASE_ADOPTION_INVALID_PIN_CODE,
+            message: 'Il PIN attuale non è corretto.',
+        };
+    }
+
+    const unconfirmed = (message: string): PinChangeServiceResult => ({
+        kind: 'failure', status: 409, code: PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE, message,
+    });
+    const nativeRetirement = (dependencies.prepareNativeSessionsForUserRetirement ?? prepareNativeLegacyUserRetirement)(user.id);
+    if (!nativeRetirement) return unconfirmed('Il passaggio alla passphrase non può essere confermato. Riprova dopo un nuovo accesso.');
+    const abortNative = (): void => {
+        try { (dependencies.abortNativeSessionsForUserRetirement ?? abortNativeLegacyUserRetirement)(nativeRetirement); } catch { /* nothing was written */ }
+    };
+    const webRetirement = (dependencies.prepareWebSessionsForUserRetirement ?? prepareUserRetirement)(input.session);
+    if (!webRetirement) {
+        abortNative();
+        return unconfirmed('Il passaggio alla passphrase non può essere confermato. Riprova dopo un nuovo accesso.');
+    }
+    const abortPrepared = (): void => {
+        try { (dependencies.abortWebSessionsForUserRetirement ?? abortUserRetirement)(webRetirement); } catch { /* nothing was written */ }
+        abortNative();
+    };
+
+    let changes: number;
+    try {
+        changes = db.transaction((tx) => tx
+            .update(users)
+            .set({
+                encryptedMasterKey: payload.encryptedMasterKey,
+                salt: payload.salt,
+                unlockVerifierHash: verifierHash(payload.verifier),
+                recoveryWrappedMasterKey: payload.recovery.wrappedMasterKey,
+                recoverySalt: payload.recovery.salt,
+                recoveryVerifierHash: verifierHash(payload.recovery.verifier),
+                failedLoginAttempts: 0,
+                firstFailedLoginAt: null,
+                lockedUntil: null,
+            })
+            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash), isNull(users.unlockVerifierHash)))
+            .run()).changes;
+    } catch (error) {
+        abortPrepared();
+        throw error;
+    }
+    if (changes !== 1) {
+        abortPrepared();
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PASSPHRASE_ADOPTION_CONFLICT_CODE,
+            message: 'Le credenziali sono state modificate da un’altra sessione. Accedi di nuovo e riprova.',
+        };
+    }
+
+    // The passphrase is now the credential: a retirement that fails keeps its fence and is never aborted.
+    let webOutcome: 'completed' | 'failed' | 'denied' = 'failed';
+    try {
+        webOutcome = (dependencies.commitWebSessionsForUserRetirement ?? commitUserRetirement)(webRetirement).outcome;
+    } catch {
+        webOutcome = 'failed';
+    }
+    let nativeOutcome: 'completed' | 'failed' | 'denied' = 'failed';
+    try {
+        nativeOutcome = (dependencies.commitNativeSessionsForUserRetirement ?? commitNativeLegacyUserRetirement)(nativeRetirement).outcome;
+    } catch {
+        nativeOutcome = 'failed';
+    }
+    if (webOutcome !== 'completed' || nativeOutcome !== 'completed') {
+        return unconfirmed('La passphrase è attiva, ma il ritiro delle sessioni non è confermato. Accedi di nuovo con la passphrase.');
+    }
+
+    try {
+        const context = auditContextFromSession(input.session);
+        await (dependencies.writeAuditEvent ?? writeAuditEvent)({
+            eventType: 'settings.updated',
+            outcome: 'success',
+            actorType: context.actorType,
+            actorRef: context.actorRef,
+            subjectType: 'settings',
+            subjectRef: 'security.unlock-credential',
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(input.request),
+            redactedMetadata: withAuditContextMetadata(context, {
+                changedFields: ['encryptedMasterKey', 'salt', 'unlockVerifierHash', 'recoveryWrappedMasterKey', 'recoverySalt', 'recoveryVerifierHash'],
+                flags: ['credential-rotation'],
+                reasonCode: 'passphrase_adopted',
+            }),
+        });
+    } catch (error) {
+        console.error('Audit passphrase adoption write failed:', error);
     }
 
     return { kind: 'success' };

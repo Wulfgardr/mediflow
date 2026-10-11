@@ -36,13 +36,17 @@ import {
     changePinRequest,
     createClientAuthorityNetworkBarrier,
     loginWithPinRequest,
+    loginWithVerifierRequest,
+    readUnlockParameters,
     repairLegacyDbRequest,
     rewrapMasterKeyRequest,
     requestApplicationLockConfirmation,
     setupSecurityRequest,
     type AuthHealthPayload,
     type LoginFailurePayload,
+    type UnlockParameters,
 } from '@/lib/security/client-auth-api';
+import { deriveUnlockMaterial, openUnlockWrapping, UNLOCK_KDF_VERSION } from '@/lib/security/unlock-credential';
 /* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
 /* @Codex */
@@ -73,6 +77,8 @@ interface SecurityContextType {
     user: User | null;
     authErrorMessage: string | null;
     authRecoveryState: AuthRecoveryState;
+    /** ADR 0143: what the lock screen asks for. The server decides; the browser learns it from the auth check. */
+    unlockCredential: UnlockParameters['credential'];
     login: (pin: string) => Promise<boolean>;
     setupPin: (pin: string) => Promise<void>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -97,9 +103,15 @@ function formatLockedUntil(lockedUntil?: string) {
 }
 
 /* @Codex */
-function formatLoginFailure(payload: LoginFailurePayload | null, status: number) {
+function formatLoginFailure(payload: LoginFailurePayload | null, status: number, credential: UnlockParameters['credential'] = 'pin') {
     if (payload?.code === 'AUTH_LOCKED') {
         return payload.message || formatLockedUntil(payload.lockedUntil);
+    }
+    // The server words every denial for a PIN; an account with a passphrase is told what it actually typed.
+    if (credential === 'passphrase' && status === 401) {
+        return typeof payload?.remainingAttempts === 'number' && payload.remainingAttempts > 0
+            ? `Passphrase non valida. Tentativi rimasti: ${payload.remainingAttempts}.`
+            : 'Passphrase non valida.';
     }
     if (payload?.code === 'INVALID_CREDENTIALS' || payload?.code === 'AUTH_INVALID_CREDENTIALS') {
         if (payload.message) return payload.message;
@@ -144,6 +156,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const updateAuthRecoveryState = (state: AuthRecoveryState) => {
         authRecoveryStateRef.current = state;
         setAuthRecoveryState(state);
+    };
+    const [unlockCredential, setUnlockCredential] = useState<UnlockParameters['credential']>('pin');
+    const unlockParametersRef = useRef<UnlockParameters>({ credential: 'pin' });
+    const applyUnlockParameters = (value: unknown) => {
+        const unlock = readUnlockParameters(value);
+        unlockParametersRef.current = unlock;
+        setUnlockCredential(unlock.credential);
     };
     /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
@@ -300,6 +319,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
             /* @Codex */
             setAuthHealth(null);
+            applyUnlockParameters(data.unlock);
 
             // If setup is missing on server, force setup flow regardless of session
             if (!data.isSetup) {
@@ -378,17 +398,42 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         void init();
     }, []);
 
+    /** Asks the server again what unlocks the account, without touching session or lock state. */
+    const refreshUnlockParameters = async () => {
+        try {
+            const { response, payload, controlState } = await checkAuthHealthRequest();
+            if (response.ok && payload?.status === 'ok' && controlState !== 'stale' && controlState !== 'invalid') {
+                applyUnlockParameters(payload.unlock);
+            }
+        } catch {
+            // The next attempt asks again.
+        }
+    };
+
     const login = async (pin: string): Promise<boolean> => {
         /* @Codex: also guard direct/queued callers, before capturing the PIN request fence. */
         if (authRecoveryStateRef.current !== 'ready') return false;
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         /* @Codex */
         let unacceptedServerAuthority = false;
+        const unlock = unlockParametersRef.current;
         try {
             setAuthErrorMessage(null);
+            // ADR 0143: the passphrase never leaves this function. It becomes the key that opens the
+            // wrapping, which stays here, and the verifier, which is all the server receives.
+            let material: Awaited<ReturnType<typeof deriveUnlockMaterial>> | null = null;
+            if (unlock.credential === 'passphrase') {
+                if (unlock.kdfVersion !== UNLOCK_KDF_VERSION) {
+                    setAuthErrorMessage('Questa versione di MediFlow non sa aprire l’archivio. Aggiorna MediFlow e riprova.');
+                    return false;
+                }
+                material = await deriveUnlockMaterial(pin, Uint8Array.from(atob(unlock.salt), (character) => character.charCodeAt(0)));
+                if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
+            }
             const result = await runAuthorityNetworkRequest(async () => {
                 if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
-                return loginWithPinRequest(pin);
+                // Decided by the account, never by what the derivation returned: a passphrase is not sent as a PIN.
+                return material ? loginWithVerifierRequest(material.verifier) : loginWithPinRequest(pin);
             });
             if (!result) return false;
             const { response: res, payload, controlState } = result;
@@ -403,8 +448,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             if (!res.ok) {
                 if (authorityAttemptGenerationRef.current === attemptGeneration) {
-                    setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status));
+                    setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status, unlock.credential));
                 }
+                // The account may have moved to a passphrase, or changed it, since this tab last asked.
+                void refreshUnlockParameters();
                 return false;
             }
 
@@ -454,7 +501,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 saltBytes = new Uint8Array(salt);
             }
 
-            const masterKey = await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
+            const masterKey = material
+                ? await openUnlockWrapping(encryptedMasterKey, material.kek)
+                : await unwrapMasterKeyVersioned(encryptedMasterKey, pin, saltBytes);
             if (authorityAttemptGenerationRef.current !== attemptGeneration) {
                 lock();
                 return false;
@@ -697,6 +746,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 user,
                 authErrorMessage,
                 authRecoveryState,
+                unlockCredential,
                 login,
                 setupPin,
                 changePin,
@@ -719,6 +769,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             user,
             authErrorMessage,
             authRecoveryState,
+            unlockCredential,
             login,
             setupPin,
             changePin,

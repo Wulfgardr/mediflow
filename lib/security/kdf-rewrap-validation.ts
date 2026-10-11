@@ -11,7 +11,7 @@ export type KdfRewrapPayload = {
     salt: string;
 };
 
-function hasCanonicalBase64ByteLength(value: string, expectedBytes: number): boolean {
+export function hasCanonicalBase64ByteLength(value: string, expectedBytes: number): boolean {
     if (!BASE64_PATTERN.test(value)) return false;
     try {
         const decoded = Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
