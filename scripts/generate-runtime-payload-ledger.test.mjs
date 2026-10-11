@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
+import { materializeSourceRuntime } from './source-runtime.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const owner = '@mediflow/web-auth-lifecycle-owner';
@@ -87,6 +88,47 @@ test('inventory distinguishes packed closure, locked inputs, missing notices and
   assert.deepEqual(generatePayloadLedger(input), ledger);
   assert.equal(verifyPayloadLedger({ payloadRoot: input.payloadRoot, ledger }).status, 'TRUSTED_ROSTER_BYTES_MATCH');
 });
+
+function sourceAliasFixture(t) {
+  const f = fixture(t), installed = path.join(f.sourceRoot, 'node_modules', owner);
+  fs.mkdirSync(path.dirname(installed), { recursive: true });
+  fs.renameSync(f.payloadRoot, installed);
+  const web = path.join(f.directory, 'standalone');
+  const alias = path.join(web, '.next/node_modules', `${owner}-synthetic`);
+  fs.mkdirSync(path.dirname(alias), { recursive: true });
+  fs.symlinkSync(installed, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  return { ...f, installed, web, alias };
+}
+
+test('source preparation materializes only the proven installed local package, without changing its source', t => {
+  const f = sourceAliasFixture(t);
+  const ledger = generatePayloadLedger({ ...f, payloadRoot: f.installed });
+  assert.throws(() => verifyPayloadLedger({ payloadRoot: f.alias, ledger }), /nonphysical/u);
+  materializeSourceRuntime(f.web, f.sourceRoot);
+  assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), false);
+  assert.equal(verifyPayloadLedger({ payloadRoot: f.alias, ledger }).files, 2);
+  assert.equal(verifyPayloadLedger({ payloadRoot: f.installed, ledger }).files, 2);
+});
+
+for (const mutation of ['tampered installed bytes', 'aliased node_modules', 'aliased source root']) {
+  test(`source preparation rejects ${mutation} before replacing the build alias`, t => {
+    const f = sourceAliasFixture(t);
+    let sourceRoot = f.sourceRoot;
+    if (mutation === 'tampered installed bytes') fs.appendFileSync(path.join(f.installed, 'index.js'), 'changed');
+    if (mutation === 'aliased node_modules') {
+      const modules = path.join(sourceRoot, 'node_modules'), outside = path.join(f.directory, 'foreign-install');
+      fs.renameSync(modules, outside);
+      fs.symlinkSync(outside, modules, process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    if (mutation === 'aliased source root') {
+      sourceRoot = path.join(f.directory, 'source-alias');
+      fs.symlinkSync(f.sourceRoot, sourceRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    assert.throws(() => materializeSourceRuntime(f.web, sourceRoot));
+    assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), true);
+    assert.deepEqual(fs.readdirSync(path.dirname(f.alias)), [path.basename(f.alias)]);
+  });
+}
 
 for (const mutation of ['tampered', 'missing', 'extra', 'wrong-package', 'symlink']) {
   test(`local closure rejects ${mutation} installed members without execution`, t => {
