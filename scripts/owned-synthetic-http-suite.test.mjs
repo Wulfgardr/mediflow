@@ -3,11 +3,11 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { OWNED_HTTP_FILES, SUPERVISOR_HTTP_FILE, ownedHttpInvocations } from './run-owned-synthetic-http-suite.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
-test('owned HTTP recipes cover nineteen files once in seventeen real wrapper invocations', () => {
+test('owned HTTP recipes cover twenty files once in eighteen real wrapper invocations', () => {
     const recipes = ownedHttpInvocations(root);
-    assert.equal(recipes.length, 17);
+    assert.equal(recipes.length, 18);
     const files = recipes.flatMap(recipe => recipe.coveredFiles);
-    assert.equal(files.length, 19);
+    assert.equal(files.length, 20);
     assert.equal(new Set(files).size, files.length);
     assert.deepEqual([...files].sort(), OWNED_HTTP_FILES.filter(file => file !== SUPERVISOR_HTTP_FILE).sort());
     for (const recipe of recipes) {
