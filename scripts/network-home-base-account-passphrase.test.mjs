@@ -27,8 +27,10 @@ test('an account moves from its PIN to a passphrase and the PIN stops opening it
 
     const unlock = passphraseWrapping(masterKey, PASSPHRASE);
     const recovery = recoveryWrapping(masterKey);
-    const adoption = (cookieHeader, overrides = {}) => request('POST', '/api/auth/passphrase', {
-        headers: { Cookie: cookieHeader },
+    // A page of this origin: what a browser adds to a same-origin fetch.
+    const sameOrigin = { Origin: new URL(BASE_URL).origin, 'Sec-Fetch-Site': 'same-origin' };
+    const adoption = (cookieHeader, overrides = {}, headers = sameOrigin) => request('POST', '/api/auth/passphrase', {
+        headers: { Cookie: cookieHeader, ...headers },
         body: {
             currentPin: PIN, encryptedMasterKey: unlock.blob, salt: unlock.salt, verifier: unlock.verifier,
             recovery: { wrappedMasterKey: recovery.blob, salt: recovery.salt, verifier: recovery.verifier },
@@ -42,6 +44,11 @@ test('an account moves from its PIN to a passphrase and the PIN stops opening it
     assert.deepEqual([wrongPin.response.status, wrongPin.json?.code], [401, 'PASSPHRASE_ADOPTION_INVALID_PIN']);
     const pinWrapping = await adoption(pinLogin.cookieHeader, { encryptedMasterKey: pinLogin.json.encryptedMasterKey });
     assert.deepEqual([pinWrapping.response.status, pinWrapping.json?.code], [400, 'PASSPHRASE_ADOPTION_INVALID']);
+    // The right session and the right PIN, asked by anything other than this origin's own page.
+    for (const headers of [{}, { Origin: 'http://attacker.invalid', 'Sec-Fetch-Site': 'cross-site' }, { Origin: sameOrigin.Origin }]) {
+        const foreign = await adoption(pinLogin.cookieHeader, {}, headers);
+        assert.deepEqual([foreign.response.status, foreign.json?.code], [403, 'PASSPHRASE_ADOPTION_UNTRUSTED_REQUEST']);
+    }
     const unchanged = await login({ password: PIN });
     assert.equal(unchanged.response.status, 200);
     assert.equal(unchanged.json.encryptedMasterKey, pinLogin.json.encryptedMasterKey);

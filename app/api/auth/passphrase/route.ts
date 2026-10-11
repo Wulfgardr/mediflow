@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { validatePassphraseAdoptionPayload } from '@/lib/security/passphrase-adoption-validation';
 import { PASSPHRASE_ADOPTION_INVALID_CODE } from '@/lib/security/pin-change';
 import { adoptPassphrase } from '@/lib/security/pin-change-service';
+import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 function failureResponse(status: number, code: string, message: string) {
@@ -15,6 +16,10 @@ function failureResponse(status: number, code: string, message: string) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    // It cannot be undone and the cookie alone authorizes it: only this origin's own page may ask.
+    if (!isTrustedWebMutationRequest(request)) {
+        return failureResponse(403, 'PASSPHRASE_ADOPTION_UNTRUSTED_REQUEST', 'Richiesta non ammessa.');
+    }
 
     try {
         const payload = validatePassphraseAdoptionPayload(await request.json().catch(() => null));
