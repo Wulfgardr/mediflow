@@ -18,7 +18,7 @@ public extension ClinicalScales {
     static let tinettiPOMA28V1 = ClinicalScaleDefinition(
         id: tinettiPOMA28ID,
         title: "Tinetti POMA-28 (v1)",
-        scaleDescription: "POMA-28 v1: equilibrio 16 + andatura 12, in 20 componenti di punteggio. Iniziare da seduti su sedia rigida senza braccioli; in piedi con il terapista, camminare al passo abituale e tornare a passo rapido ma sicuro, con l’ausilio abituale. Resa italiana locale non validata. Fonte: NHS FPS 006 V1 (luglio 2012).",
+        scaleDescription: "POMA-28 v1: equilibrio 16 + andatura 12, in 20 componenti di punteggio. Iniziare da seduti su sedia rigida senza braccioli; in piedi con il terapista, camminare al passo abituale e tornare a passo rapido ma sicuro, con l’ausilio abituale. Richiede osservazione clinica; nessuna categoria automatica universale del rischio. Resa italiana locale non validata. Fonte: NHS FPS 006 V1 (luglio 2012).",
         questions: [
             q("poma28v1.balance.sitting", "Equilibrio da seduto", [("0. Si inclina o scivola", 0), ("1. Fermo e sicuro", 1)]),
             q("poma28v1.balance.rise", "Alzarsi dalla sedia", [("0. Impossibile senza aiuto", 0), ("1. Usa le braccia", 1), ("2. Senza usare le braccia", 2)]),

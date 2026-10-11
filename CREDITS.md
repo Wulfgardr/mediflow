@@ -210,36 +210,45 @@ operativa del cloud.
 
 ## Scale cliniche: fonti, versioni e diritti
 
-Verifica documentale del 8 ottobre 2026. Le fonti seguenti non costituiscono
+Fonti rilette l’11 ottobre 2026. Le fonti seguenti non costituiscono
 approvazione clinica dell'implementazione né autorizzazione generale alla
 riproduzione degli strumenti. La licenza del codice MediFlow non concede
-diritti su scale, traduzioni o manuali di terzi. Nessun accordo privato è stato
-esaminato per questa modifica e nessun revisore clinico o dei diritti ha
-approvato gli strumenti: il registro `lib/scales/scale-use-contract.ts` conserva
-esplicitamente questi campi mancanti.
+diritti su scale, traduzioni o manuali di terzi. L’11 ottobre 2026 il titolare
+del progetto ha attestato il possesso di tutte le autorizzazioni applicabili;
+l’attestazione è registrata in WUL-723 e distinta dalla verifica documentale.
+Gli accordi privati non sono stati esaminati e la revisione clinica resta aperta:
+`lib/scales/scale-use-contract.ts` distingue l’attestazione dai riferimenti ai
+permessi e dai revisori ancora non documentati.
 
-| Strumento nel catalogo | Fonte e perimetro verificato | Decisione ancora necessaria |
-| --- | --- | --- |
-| POMA-28 v1 | [NHS FPS 006 V1, luglio 2012](https://www.shropscommunityhealth.nhs.uk/content/doclib/10756.pdf), mappatura già documentata nell'[ADR 0118](./docs/adr/0118-tinetti-poma28-source-bound-submission.md). Identità, 16+12 punti e assenza di classificazione automatica restano invariati. | Verificare permesso applicabile alla resa italiana locale e all'uso elettronico, insieme alla popolazione e al contesto d'impiego. La resa non validata non è di per sé prova d'invalidità. |
-| ADL locale | [HIGN, Katz, Try This n. 2](https://hign.org/sites/default/files/2020-06/Try_This_General_Assessment_2.pdf). Il riferimento ammette aiuto per allacciare le scarpe; categorie a 4 e 2 punti differiscono da quelle implementate. | Identificare l'adattamento italiano adottato e i diritti di riproduzione/adattamento. Eventuali correzioni degli item o categorie richiedono una nuova definizione approvata; questa modifica non le applica. |
-| IADL locale | [HIGN, Lawton, Try This n. 23](https://hign.org/consultgeri/try-this-series/lawton-instrumental-activities-daily-living-iadl-scale). Il riferimento raccomanda gli otto domini per entrambi i sessi; il codice richiedeva già otto risposte. | Identificare la versione italiana, gli ancoraggi semplificati e il permesso applicabile. Il riferimento esclude l'uso negli anziani istituzionalizzati; l'applicabilità locale richiede revisione. La descrizione ora esplicita il calcolo su otto item. |
-| MMSE locale | [PAR MMSE](https://www.parinc.com/products/MMSE) e [indicazioni PAR sui permessi](https://www.parinc.com/about/connect-with-us/licensing-team). Edizione e traduzione effettivamente implementate non sono identificate. | Il titolare del progetto deve verificare un accordo che copra edizione, lingua, riproduzione, adattamento, incorporamento elettronico e distribuzione. Mancanza di evidenza disponibile non dimostra una violazione. |
-| GDS-15 locale | [Pagina dell'autore Yesavage](https://web.stanford.edu/~yesavage/GDS): strumento di screening; originale nel pubblico dominio; le traduzioni sono distinte e non garantite dall'autore. | Identificare traduzione italiana, periodo di riferimento, corrispondenza degli item e diritti applicabili a quella versione. Il pubblico dominio dell'originale non approva la versione locale. |
+| Strumento nel catalogo | Versione software dell’interpretazione (nuovi risultati) | Fonte e perimetro verificato | Decisione ancora necessaria |
+| --- | --- | --- | --- |
+| POMA-28 v1 | `mediflow.poma28.nonclassification.v1` | [NHS FPS 006 V1, luglio 2012](https://www.shropscommunityhealth.nhs.uk/content/doclib/10756.pdf), mappatura già documentata nell'[ADR 0118](./docs/adr/0118-tinetti-poma28-source-bound-submission.md). Identità, 16+12 punti e assenza di classificazione automatica restano invariati. | Identificare i metadati del permesso attestato per la resa italiana locale e l’uso elettronico; rivedere popolazione e contesto d’impiego. La resa non validata non è di per sé prova d'invalidità. |
+| ADL locale | `mediflow.adl.local-interpretation.v2` | [HIGN, Katz, Try This n. 2](https://hign.org/sites/default/files/2020-06/Try_This_General_Assessment_2.pdf). Revisione 2019: ammette aiuto per scarpe e una parte del corpo nel bagno; le sue categorie non coincidono con le precedenti categorie locali. I nuovi risultati locali riportano solo il totale 0–6, con limiti di fonte, contesto e informante. | Identificare l'adattamento italiano adottato e i metadati del permesso attestato. Gli ancoraggi locali non vengono corretti né dichiarati equivalenti alla fonte. Le categorie di gravità locali non verificate non sono più attribuite ai nuovi risultati. |
+| IADL locale | `mediflow.iadl.local-interpretation.v2` | [HIGN, Lawton, Try This n. 23, rev. 2019](https://hign.org/sites/default/files/2020-06/Try_This_General_Assessment_23.pdf). Otto domini per entrambi i sessi; totale locale 0–8. Attività mai svolte e contesto istituzionale limitano l’interpretazione; nessuna imputazione o riduzione automatica del denominatore. | Identificare la versione italiana, gli ancoraggi semplificati e i metadati del permesso attestato. Il riferimento esclude l'uso negli anziani istituzionalizzati; l'applicabilità locale richiede revisione. Gli ancoraggi locali semplificati non dimostrano equivalenza alla fonte. |
+| MMSE locale | `mediflow.mmse.screening-limits.v2` | [PAR MMSE](https://www.parinc.com/products/MMSE) e [indicazioni PAR sui permessi](https://www.parinc.com/about/connect-with-us/licensing-team). Definizione locale: edizione e traduzione effettivamente implementate non sono identificate. [Foderaro 2022](https://pmc.ncbi.nlm.nih.gov/articles/PMC9018649/) e [correzione 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11470845/) riguardano un testo specifico: le loro norme non sono adottate. Rimane un totale grezzo 0–30, senza correzioni normative. | Identificare edizione e traduzione concreta e documentare i metadati dell’autorizzazione attestata. Non sono stati esaminati accordi, ambiti o scadenze; non si inferisce una violazione. |
+| GDS-15 locale | `mediflow.gds15.screening-limits.v2` | [Pagina dell'autore Yesavage](https://web.stanford.edu/~yesavage/GDS): screening, originale nel pubblico dominio e traduzioni distinte. [Chiesi 2018](https://doi.org/10.1016/j.jad.2017.11.045) riguarda una versione italiana, non approva quella locale; [meta-analisi 2024](https://www.nature.com/articles/s41598-024-68496-3): screening non equivale a diagnosi. Il totale locale 0–15 non attribuisce gravità; comprensione e attendibilità richiedono cautela nella compromissione cognitiva grave, non esclusione automatica per ogni deficit cognitivo. | Identificare fonte della traduzione italiana, periodo di riferimento tuttora non definito per il testo locale, corrispondenza degli item e metadati del permesso attestato. Il pubblico dominio dell'originale non approva la versione locale. |
+
+Le versioni software identificano le formulazioni implementate, non un’edizione
+validata dello strumento o un permesso. ADL, IADL, MMSE e GDS sono dichiarate
+definizioni locali: per i soli nuovi risultati si esplicitano i limiti e si
+aggiornano le versioni dell’interpretazione. POMA conserva testo interpretativo,
+fonte e identità dello strumento; la descrizione ribadisce l’osservazione clinica.
+Item, ancoraggi, risposte e calcoli non cambiano. Le regole di calcolo e il rifiuto
+delle risposte incomplete senza imputazione restano nel registro esistente.
+Non sono introdotte norme, soglie diagnostiche o formule di correzione.
 
 Le condizioni HIGN riguardano la riproduzione del materiale completo per scopi
 educativi senza fini di lucro, con attribuzione; i materiali mantengono il
 copyright della Gerontological Society of America. Non si presume che questo
 permesso copra l'adattamento e la distribuzione di MediFlow.
 
-Per i soli **nuovi risultati**, MMSE usa
-`mediflow.mmse.screening-limits.v1` e GDS-15 usa
-`mediflow.gds15.screening-limits.v1`. Le nuove formulazioni descrivono un
-punteggio grezzo di screening: nessuna diagnosi, esclusione di demenza o
-classificazione della gravità; nessuna nuova soglia o correzione normativa.
-Il principio è coerente con [NICE NG97, 1.2.4](https://www.nice.org.uk/guidance/ng97/chapter/recommendations)
-e con la descrizione GDS dell'autore. La pagina NICE completa ha restituito
-403 durante questa verifica: resta da confermare la fonte corrente completa;
-il testo indicizzato NICE CKS riporta il principio di non esclusione.
+MMSE e GDS mantengono risultati grezzi di screening, non diagnosi o gravità.
+Per MMSE il principio di non esclusione è coerente con
+[NICE NG97, 1.2.4](https://www.nice.org.uk/guidance/ng97/chapter/recommendations),
+confermato nell’estratto ufficiale indicizzato; il recupero della pagina completa
+ha restituito 403. Non si applicano le norme di Foderaro a un testo locale diverso;
+la correzione pubblicata nel 2024 va considerata insieme allo studio originale.
+Per GDS non si presume un periodo di richiamo non identificato nella versione locale.
 
 `interpretationVersion` è distinto da `instrument`: compare nei metadati e nel
 testo dei nuovi risultati Web e Swift. Storico e report leggono il testo
@@ -247,16 +256,18 @@ registrato, senza ricalcolare le risposte. La versione registrata compare nelle
 proiezioni di storico/stampa; FHIR la conserva nella nota testuale. Patient
 Insight include l'identificatore registrato entro il budget esistente, ma la
 sua selezione di estratti non promette l'intero testo della valutazione.
-Versione assente non significa versione corrente. POMA e le registrazioni
-precedenti non vengono migrati o rinominati.
+Versione assente non significa versione corrente. Le registrazioni precedenti,
+comprese quelle POMA, non vengono migrate o rinominate; l’identità dello strumento
+POMA resta separata dalla nuova versione software dell’interpretazione.
 
-Le proposte di sospensione del **nuovo uso** per diritti o applicabilità
-irrisolti restano decisioni aperte per ciascuno strumento; il registro non è un
-blocco runtime e questa modifica non dichiara soddisfatto quel requisito di
-WUL-723. Servono riferimenti minimi agli accordi, ambito e scadenza, revisore
-dei diritti e revisore clinico qualificato con decisione sulla versione concreta.
-Non pubblicare contratti privati. Review AI e test tecnici non sostituiscono
-queste decisioni.
+L’attestazione del titolare non equivale alla revisione clinica delle formulazioni
+né identifica da sola edizioni, traduzioni, ambiti o scadenze. Il registro non è
+un blocco runtime: `hold-proposed-not-enforced` resta una proposta da risolvere
+per applicabilità e versione concreta, non una dichiarazione di diritti ignoti
+o una sospensione attiva. La decisione sul nuovo uso e l’accettazione di WUL-723
+restano nel tracker. Servono metadati minimi dei permessi e la revisione clinica
+qualificata; non pubblicare contratti privati. Review AI e test tecnici non
+sostituiscono queste decisioni.
 
 ## Sviluppo assistito
 
