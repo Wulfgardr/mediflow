@@ -40,16 +40,42 @@ function recognized(input: Uint8Array, text = 'RISULTATO SINTETICO'): AnyDocAppl
 }
 
 test('recognizes a synthetic image offline with bounded PHI-safe provenance', { skip: process.platform !== 'darwin' }, async () => {
-    const result = await extractAnyDocAppleVisionImage(image('DOCUMENTO SINTETICO'));
-    assert.equal(result.status, 'recognized');
-    if (result.status !== 'recognized') return;
-    assert.match(result.text, /DOCUMENTO SINTETICO/iu);
-    assert.match(result.text, /Controllo locale offline/iu);
-    assert.equal(result.receipt.scriptSha256, ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256);
-    assert.deepEqual([result.receipt.engine, result.receipt.network, result.receipt.temporaryInput],
-        ['apple_vision', 'denied', 'none']);
-    assert.deepEqual([result.review, result.writes, result.apply], ['required', 0, 'none']);
-    assert.doesNotMatch(JSON.stringify(result.receipt), /DOCUMENTO|Controllo|(?:\/Users|\/private\/tmp)/u);
+    const scope = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-vision-artifacts-'));
+    const sentinel = 'DOCUMENTO SINTETICO', input = image(sentinel);
+    let retired = 0;
+    const inspect = (directory: string) => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const file = path.join(directory, entry.name);
+            if (entry.isDirectory()) inspect(file);
+            else if (entry.isFile()) {
+                const bytes = fs.readFileSync(file);
+                assert.equal(bytes.includes(input), false, entry.name);
+                assert.equal(bytes.includes(Buffer.from(sentinel)), false, entry.name);
+            }
+        }
+    };
+    const extract = createAnyDocAppleVisionImageExtractorForTest({
+        createTemporaryRoot() { return fs.mkdtempSync(path.join(scope, 'owned-')); },
+        removeTemporaryRoot(directory: string) {
+            inspect(directory); // Observe the real worker's artifacts before normal retirement.
+            fs.rmSync(directory, { recursive: true, force: true }); retired += 1;
+        },
+    });
+    try {
+        const result = await extract(input);
+        assert.equal(result.status, 'recognized');
+        if (result.status !== 'recognized') return;
+        assert.match(result.text, /DOCUMENTO SINTETICO/iu);
+        assert.match(result.text, /Controllo locale offline/iu);
+        assert.equal(result.receipt.scriptSha256, ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256);
+        assert.deepEqual([result.receipt.engine, result.receipt.network, result.receipt.temporaryInput],
+            ['apple_vision', 'denied', 'none']);
+        assert.deepEqual([result.review, result.writes, result.apply], ['required', 0, 'none']);
+        assert.doesNotMatch(JSON.stringify(result.receipt), /DOCUMENTO|Controllo|(?:\/Users|\/private\/tmp)/u);
+        assert.equal((await extract(Buffer.from(sentinel))).status, 'review_required');
+        assert.equal(retired, 2, 'both the successful and malformed-input worker retire their inspected roots');
+        assert.deepEqual(fs.readdirSync(scope), []);
+    } finally { fs.rmSync(scope, { recursive: true, force: true }); }
 });
 
 test('maps owned temporary-root creation and cleanup failures without rejecting', {
