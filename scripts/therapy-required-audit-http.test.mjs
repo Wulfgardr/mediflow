@@ -70,7 +70,7 @@ test('real Web cookie and local v1 token admit therapy writes, enforce 4 MiB and
         seedPatient(patientId, ambulatory.id);
         const route = surface === 'web' ? '/api/therapies' : `/api/v1/patients/${patientId}/therapies`;
         const headers = surface === 'web'
-            ? { Cookie: login.cookieHeader, authorization: `Bearer ${token}`,
+            ? { Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration, authorization: `Bearer ${token}`,
                 'x-mediflow-source-surface': 'job', 'x-actor-ref': 'synthetic-spoof' }
             : { authorization: `Bearer ${token}` };
         const body = { id: therapyId, ...(surface === 'web' ? { patientId } : {}),
@@ -144,7 +144,7 @@ test('real paired therapy create and PUT rollback audit FAIL and IGNORE', async 
     const clientId = confirm.json?.pairedClient?.clientId;
     const clientToken = confirm.json?.pairedClientToken;
     assert.ok(clientId && clientToken);
-    const headers = { Cookie: login.cookieHeader,
+    const headers = { Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration,
         'x-mediflow-paired-client-id': clientId, 'x-mediflow-paired-client-token': clientToken };
 
     const patientId = randomUUID();
