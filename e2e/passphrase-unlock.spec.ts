@@ -256,6 +256,21 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await lockPage.keyboard.down('Space');
     await lockPage.keyboard.up('Space');
     await settled();
+    // The same with the two keys held together: Enter from the field, then Space on the button of
+    // the form; Enter comes up, focus moves to the confirmation, Space repeats and comes up.
+    await input.focus();
+    await lockPage.keyboard.down('Enter');
+    await settled();
+    await lockPage.keyboard.press('Tab');
+    await lockPage.keyboard.press('Tab');
+    await expect(unlock).toBeFocused();
+    await lockPage.keyboard.down('Space');
+    await lockPage.keyboard.up('Enter');
+    await lockPage.keyboard.press('Shift+Tab');
+    await expect(confirm).toBeFocused();
+    await lockPage.keyboard.down('Space');
+    await lockPage.keyboard.up('Space');
+    await settled();
     // A double click that begins on the button of the form and ends where the confirmation is.
     const from = await unlock.boundingBox();
     const to = await confirm.boundingBox();
