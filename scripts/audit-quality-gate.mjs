@@ -48,6 +48,15 @@ const REQUIRED_ROUTE_AUDIT = [
             dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
         }],
     },
+    {
+        route: 'app/api/auth/passphrase/recover/route.ts', events: ['settings.updated'], reason: 'recovery replaces the passphrase and the recovery key of an account',
+        writerContracts: [{
+            handler: 'POST', serviceModule: '@/lib/security/pin-change-service', serviceExport: 'recoverPassphrase',
+            target: 'passphrase-recovery', ownerFile: 'lib/security/pin-change-service.ts', ownerName: 'recoverPassphrase',
+            writerModule: '@/lib/security/audit', writerExport: 'writeAuditEvent', eventType: 'settings.updated',
+            dependencyFallback: { parameter: 'dependencies', property: 'writeAuditEvent' },
+        }],
+    },
     { route: 'app/api/settings/route.ts', events: ['settings.updated'], reason: 'bulk settings mutations must stay auditable' },
     { route: 'app/api/settings/[key]/route.ts', events: ['settings.updated'], reason: 'single-key settings mutations must stay auditable' },
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },
