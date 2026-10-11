@@ -430,10 +430,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 material = await deriveUnlockMaterial(pin, Uint8Array.from(atob(unlock.salt), (character) => character.charCodeAt(0)));
                 if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
             }
-            const verifier = material?.verifier;
             const result = await runAuthorityNetworkRequest(async () => {
                 if (authorityAttemptGenerationRef.current !== attemptGeneration) return null;
-                return verifier ? loginWithVerifierRequest(verifier) : loginWithPinRequest(pin);
+                // Decided by the account, never by what the derivation returned: a passphrase is not sent as a PIN.
+                return material ? loginWithVerifierRequest(material.verifier) : loginWithPinRequest(pin);
             });
             if (!result) return false;
             const { response: res, payload, controlState } = result;
