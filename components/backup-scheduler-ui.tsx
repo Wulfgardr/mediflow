@@ -255,7 +255,7 @@ export default function BackupSchedulerUI() {
                 )}
             </div>
 
-            {status?.observationMessage && <p role="alert" className="text-sm text-amber-700">{status.observationMessage}</p>}
+            {status?.observationMessage && <p role="alert" className="text-sm text-[color:var(--lume-signal-warning)]">{status.observationMessage}</p>}
             {!isLoading && schedulingUnsupported && (
                 <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
                     Lo scheduling automatico non e disponibile su questa piattaforma. Puoi comunque eseguire il backup manuale con «Esegui adesso» e usare la pulizia retention.
