@@ -6,7 +6,8 @@ ma non basta a stabilire se un impiego sia adeguato: occorrono anche decisioni
 organizzative, tecniche e giuridiche riferite al contesto concreto.
 
 Questa guida aiuta a leggere tali distinzioni; non modifica i contratti di
-sicurezza e non attesta una certificazione. Data della guida: 6 settembre 2026.
+sicurezza e non attesta una certificazione. Raccordo delle funzioni correnti: 11 ottobre 2026. Le analisi normative
+datate conservano le proprie fonti e non attestano una nuova valutazione.
 
 ## Nel lavoro quotidiano
 
@@ -19,6 +20,27 @@ L’AI è facoltativa e i provider esterni sono disattivati per impostazione
 predefinita. Scegliere una funzione intelligente richiede di configurarla,
 accertare che sia disponibile e verificare il runtime; non implica che ogni
 modello possa essere usato per qualunque funzione.
+
+## Funzione, scopo d'uso e ruolo da valutare
+
+Questa matrice prepara la valutazione dei flussi attuali; descrive output e
+responsabilità nel prodotto, non assegna ruoli giuridici alla struttura o al
+professionista. Per supporto e protezione prevale la
+[matrice corrente](./STATE_OF_THE_SYSTEM.md#supporto-capacità-e-protezione-correnti).
+
+| Funzione | Scopo e output attuali | Ruolo operativo e decisione ancora pertinente |
+| --- | --- | --- |
+| Cartella e terapia | Raccogliere, ricercare e aggiornare record tramite comandi nominati; terapia sospesa consultabile senza modificarla. | Operatore autorizzato; il professionista decide contenuto clinico e appropriatezza. |
+| Scale | Registrare risposte e calcolare il punteggio della versione dichiarata, senza dedurre una diagnosi automatica. | Professionista somministratore/revisore; accuratezza, traduzioni e diritti restano C08. |
+| Documenti | Estrarre testo e preparare contenuti collegati alla fonte; conferma prima della scrittura clinica. | Medico revisore; illeggibile o proposto non significa salvato o clinicamente valido. |
+| Supporto intelligente | Sintesi, lettura del paziente e ragionamento sulla terapia producono proposte, non prescrizioni autonome. | Medico revisore; finalità concreta, influenza sulle decisioni e canale/modello scelto richiedono valutazione distinta. |
+| Agenti | Lettura e preparazione attraverso capacità nominate; conferma umana non delegabile. | Operatore autorizzato e gestore dell'host; trattamento dopo la consegna al client da accertare per la configurazione reale. |
+| Export e recupero | Produrre derivati espliciti o ripristinare lo stato conservato; nessun invio automatico a un destinatario. | Operatore responsabile di destinatario, custodia e prova di recupero; non è una risposta completa ai diritti dell'interessato. |
+
+Per l'installazione quotidiana l'ammissione resta **non valutata**: il
+professionista e, per l'attività in struttura, il referente autorizzato devono
+indicare contesto, funzioni, archivio, copie e servizi effettivi. Gli scenari e
+le domande per il revisore sono nel [raccordo del 26 settembre](./analysis/2026-09-26-09x-regulatory-delta.md#scenari-da-valutare-separatamente).
 
 ## GDPR: protezione tecnica e trattamento concreto
 

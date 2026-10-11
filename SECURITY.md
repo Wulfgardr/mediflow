@@ -99,17 +99,31 @@ Poiché i pazienti rimossi logicamente restano nei backup, una richiesta di
 erasure deve comprendere anche gli artefatti già esportati. La purge non li
 raggiunge.
 
-### Chiavi e PIN
+### Chiavi, passphrase e recupero
 
-Il PIN **non viene salvato in chiaro**: il server locale lo riceve a ogni accesso
-e ne conserva un hash. Da PIN e salt viene derivata la chiave che protegge la
-master key, chiamata key-encryption key (KEK). La master key è conservata
-cifrata; durante una sessione attiva il browser la tiene decifrata e oggi la
-scrive anche nel proprio `sessionStorage`. La
-[matrice dei dati a riposo](./docs/data-at-rest-matrix.md) elenca che cosa
-resta leggibile senza la chiave e le esposizioni ancora aperte.
+Per gli account v3 vale la policy dell'[ADR 0143](./docs/adr/0143-strong-unlock-credential.md):
+passphrase da 15 a 128 caratteri, normalizzata senza troncamento, derivazione
+PBKDF2-HMAC-SHA256 e chiavi distinte per involucro e verificatore. Il server
+riceve il verificatore di accesso, non la passphrase. La master key sbloccata
+resta non estraibile nella memoria del browser; ricaricare la pagina richiede
+un nuovo sblocco. Non viene salvata in `sessionStorage` nel percorso v3.
 
-> Se cambi il modello PIN / key derivation, devi scrivere prima un ADR.
+Il kit conserva l'involucro di recupero, non la chiave di recupero: questa va
+custodita separatamente, per esempio su carta. Il kit non è un backup dei
+record. Cambio e recupero non ricifrano la cartella e invalidano le sessioni
+precedenti. Il PIN distinto di conferma non avvolge la master key.
+
+Gli account PIN precedenti restano un percorso transitorio dichiarato, con
+avviso e adozione della passphrase. La bonifica conserva un avviso finché le
+copie non sono verificate; non promette cancellazione fisica sicura su SSD.
+I client nativi non aprono account migrati v3 prima della qualifica prevista.
+
+La [matrice dei dati a riposo](./docs/data-at-rest-matrix.md) è la fonte per
+campi in chiaro, copie e prerequisiti: la passphrase non cifra l'intero SQLite.
+Il volume cifrato verificato e il backup di recupero cifrato sono controlli
+separati, non una conseguenza della password.
+
+> Ogni cambiamento del modello delle chiavi richiede prima un ADR.
 
 ---
 
