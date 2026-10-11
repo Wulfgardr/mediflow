@@ -225,7 +225,8 @@ test('linked target or admission root is rejected without opening the target', a
     const f = fixture();
     try {
         const outside = path.join(f.dir, 'outside'); fs.mkdirSync(outside);
-        fs.symlinkSync(outside, store(f.target), 'dir');
+        fs.symlinkSync(outside, store(f.target), process.platform === 'win32' ? 'junction' : 'dir');
+        assert.equal(fs.lstatSync(store(f.target)).isSymbolicLink(), true);
         assert.throws(() => openAdmittedSqlite(f.target), SqliteMaintenanceHoldError);
         assert.deepEqual(fs.readdirSync(outside), []);
         fs.unlinkSync(store(f.target));
