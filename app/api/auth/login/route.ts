@@ -6,7 +6,7 @@ import {
     writeAuditEvent,
 } from '@/lib/security/audit';
 /* @Codex */
-import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
+import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
 /* @Codex */
 import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
@@ -49,15 +49,19 @@ export async function POST(request: Request) {
         const body = await request.json();
         const requestedUsername = typeof body?.username === 'string' ? body.username.trim() : '';
         const password = typeof body?.password === 'string' ? body.password : '';
+        // ADR 0143: an account with a passphrase sends its access verifier, never the secret.
+        const verifier = typeof body?.verifier === 'string' ? body.verifier : '';
 
-        if (!password) {
+        if (!password === !verifier) {
             abortWebAuthControl(attempt);
             attempt = null;
             return authFailureResponse({ error: 'Missing credentials', code: 'AUTH_MISSING_CREDENTIALS' }, 400, mutation.ifMatch);
         }
 
         // The shared verifier records 'auth.login.failed' with Web-only context.
-        const verification = await verifyHostCredentials({ username: requestedUsername, pin: password });
+        const verification = await verifyUnlockCredentials(
+            verifier ? { username: requestedUsername, verifier } : { username: requestedUsername, pin: password },
+        );
         if (verification.kind === 'denied') {
             abortWebAuthControl(attempt);
             attempt = null;

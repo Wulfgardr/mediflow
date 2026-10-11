@@ -2,6 +2,7 @@
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { types } from 'node:util';
 import { and, eq, isNull, lte, or, sql } from 'drizzle-orm';
 
@@ -31,7 +32,12 @@ type Account = Pick<typeof users.$inferSelect,
     | 'role'
     | 'encryptedMasterKey'
     | 'salt'>;
-type Credential = { username: string; pin: string };
+type SecretKind = 'pin' | 'verifier';
+type Credential = { username: string; kind: SecretKind; secret: string };
+/* ADR 0143. 'confirmation' checks the PIN of a person who already holds a session. 'unlock' opens
+   one: an account with a passphrase is opened only by its access verifier, never by the PIN. */
+type Purpose = 'confirmation' | 'unlock';
+type StoredCredentials = Pick<typeof users.$inferSelect, 'id' | 'passwordHash' | 'unlockVerifierHash'>;
 type Denied = {
     kind: 'denied';
     failureClass: 'invalid_credentials' | 'locked';
@@ -57,25 +63,45 @@ const isProxy = types.isProxy;
 const hasOwn = Object.hasOwn;
 
 /** Rejects descriptor-bearing or non-canonical caller objects before dependencies are read. */
-function readCredential(value: unknown): Credential | null {
+function readCredential(value: unknown, accepted: readonly SecretKind[]): Credential | null {
     if (!value || typeof value !== 'object') return null;
     try {
         if (isProxy(value)) return null;
         if (Object.getPrototypeOf(value) !== Object.prototype) return null;
         const fields = Object.getOwnPropertyDescriptors(value);
         if (Reflect.ownKeys(fields).length !== 2) return null;
-        if (!hasOwn(fields, 'username') || !hasOwn(fields, 'pin')) return null;
+        const kind = accepted.find((name) => hasOwn(fields, name));
+        if (!hasOwn(fields, 'username') || !kind) return null;
         const username = fields.username;
-        const pin = fields.pin;
+        const secret = fields[kind];
         if (
-            !username || !pin || !username.enumerable || !pin.enumerable
-            || username.get || username.set || pin.get || pin.set
+            !username || !secret || !username.enumerable || !secret.enumerable
+            || username.get || username.set || secret.get || secret.set
         ) return null;
-        if (typeof username.value !== 'string' || typeof pin.value !== 'string') return null;
-        return { username: username.value.trim(), pin: pin.value };
+        if (typeof username.value !== 'string' || typeof secret.value !== 'string') return null;
+        return { username: username.value.trim(), kind, secret: secret.value };
     } catch {
         return null;
     }
+}
+
+/** The credentials read at the start: a rotation in between makes every later update miss. */
+function sameCredentials(user: StoredCredentials) {
+    return and(
+        eq(users.id, user.id),
+        eq(users.passwordHash, user.passwordHash),
+        user.unlockVerifierHash ? eq(users.unlockVerifierHash, user.unlockVerifierHash) : isNull(users.unlockVerifierHash),
+    );
+}
+
+const ACCESS_VERIFIER = /^[A-Za-z0-9+/]{43}=$/u; // base64 of 32 bytes
+const ACCESS_VERIFIER_HASH = /^[0-9a-f]{64}$/u;
+
+/** The server keeps only SHA-256 of the verifier, which is a 256-bit derived value and not a chosen secret. */
+function accessVerifierMatches(verifier: string, storedHash: string): boolean {
+    if (!ACCESS_VERIFIER.test(verifier) || !ACCESS_VERIFIER_HASH.test(storedHash)) return false;
+    const presented = createHash('sha256').update(Buffer.from(verifier, 'base64')).digest();
+    return timingSafeEqual(presented, Buffer.from(storedHash, 'hex'));
 }
 
 async function database(dependencies: HostCredentialVerifierDependencies): Promise<Database> {
@@ -95,7 +121,7 @@ async function usernameFor(
 
 async function recordFailedLoginAtomically(
     db: Database,
-    user: Pick<typeof users.$inferSelect, 'id' | 'passwordHash'>,
+    user: StoredCredentials,
     now: Date,
 ) {
     const nowSeconds = Math.floor(now.getTime() / 1000);
@@ -124,7 +150,7 @@ async function recordFailedLoginAtomically(
             when ${nextAttempts} >= ${AUTH_LOCKOUT_MAX_FAILURES} then ${lockedUntilSeconds}
             else null
         end`,
-    }).where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash)))
+    }).where(sameCredentials(user))
         .returning({
             failedLoginAttempts: users.failedLoginAttempts,
             firstFailedLoginAt: users.firstFailedLoginAt,
@@ -172,16 +198,35 @@ async function deny(
     };
 }
 
-/** Verifies only host account credentials; it creates no session and accepts no transport credential. */
+/**
+ * Verifies the PIN of a host account; it creates no session and accepts no transport credential.
+ * On an account with a passphrase this is the confirmation PIN: a surface that opens a session
+ * calls verifyUnlockCredentials instead.
+ */
 export async function verifyHostCredentials(
     input: unknown, dependencies: HostCredentialVerifierDependencies = {},
 ): Promise<HostCredentialVerification> {
-    const credential = readCredential(input);
+    return verify(readCredential(input, ['pin']), 'confirmation', dependencies);
+}
+
+/**
+ * For the surfaces that open a session. Takes { username, pin } or { username, verifier } and accepts
+ * only the kind the account unlocks with; the other kind is denied without being compared or counted.
+ */
+export async function verifyUnlockCredentials(
+    input: unknown, dependencies: HostCredentialVerifierDependencies = {},
+): Promise<HostCredentialVerification> {
+    return verify(readCredential(input, ['pin', 'verifier']), 'unlock', dependencies);
+}
+
+async function verify(
+    credential: Credential | null, purpose: Purpose, dependencies: HostCredentialVerifierDependencies,
+): Promise<HostCredentialVerification> {
     if (!credential) return invalid();
     try {
         const db = await database(dependencies);
         const username = await usernameFor(db, credential.username);
-        if (!username || !credential.pin) return deny(username, dependencies);
+        if (!username || !credential.secret) return deny(username, dependencies);
         const user = await db.select().from(users).where(eq(users.username, username)).get();
         const now = dependencies.now?.() ?? new Date();
         if (!(now instanceof Date) || Number.isNaN(now.getTime())) return invalid();
@@ -192,7 +237,11 @@ export async function verifyHostCredentials(
             Math.max(user.failedLoginAttempts ?? AUTH_LOCKOUT_MAX_FAILURES, AUTH_LOCKOUT_MAX_FAILURES),
         );
 
-        const valid = await (dependencies.compare ?? bcrypt.compare)(credential.pin, user.passwordHash);
+        const expected: SecretKind = purpose === 'unlock' && user.unlockVerifierHash ? 'verifier' : 'pin';
+        if (credential.kind !== expected) return deny(user.username, dependencies);
+        const valid = expected === 'verifier'
+            ? accessVerifierMatches(credential.secret, user.unlockVerifierHash ?? '')
+            : await (dependencies.compare ?? bcrypt.compare)(credential.secret, user.passwordHash);
         if (!valid) {
             const next = await recordFailedLoginAtomically(db, user, now);
             if (!next) return deny(user.username, dependencies);
@@ -209,15 +258,11 @@ export async function verifyHostCredentials(
 
         const reset = await db.update(users).set(resetLockoutState())
             .where(and(
-                eq(users.id, user.id),
-                eq(users.passwordHash, user.passwordHash),
+                sameCredentials(user),
                 or(isNull(users.lockedUntil), lte(users.lockedUntil, now)),
             )).returning({ id: users.id }).get();
         if (!reset) {
-            const current = await db.select().from(users).where(and(
-                eq(users.id, user.id),
-                eq(users.passwordHash, user.passwordHash),
-            )).get();
+            const current = await db.select().from(users).where(sameCredentials(user)).get();
             const concurrentLockout = current ? isLockoutActive(current, now) : null;
             if (current && concurrentLockout) return deny(
                 current.username,
