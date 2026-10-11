@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createStdioAccountTransport } from '../../lib/chatgpt-account/account-transport';
 import type { AccountMethod } from '../../lib/chatgpt-account/account-protocol';
 
@@ -26,6 +26,43 @@ function fixture(options: { requestTimeoutMs?: number; killGraceMs?: number; max
     return { process, sent, stdout, stderr, transport, signals, removed: () => removed,
         emit(value: unknown) { stdout.write(`${JSON.stringify(value)}\n`); } };
 }
+
+test('real malformed, oversized, crashed, EOF and blocked-pipe children are reaped without killing a foreign process', async () => {
+    const foreign = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    const foreignClosed = new Promise<void>(resolve => foreign.once('close', () => resolve()));
+    try {
+        for (const scenario of ['malformed', 'oversized', 'crash', 'eof', 'blocked']) {
+            const script = scenario === 'blocked'
+                ? "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);"
+                : `process.stdin.once('data', () => {
+                    process.stderr.write('SYNTHETIC_PRIVATE_DIAGNOSTIC');
+                    ${scenario === 'malformed' ? "process.stdout.write('not-json\\n');"
+                        : scenario === 'oversized' ? "process.stdout.write('x'.repeat(257));"
+                        : scenario === 'crash' ? 'process.exit(73);'
+                        : 'process.stdout.end();'}
+                    setInterval(() => {}, 1000);
+                });`;
+            const child = spawn(process.execPath, ['-e', script], { stdio: ['pipe', 'pipe', 'pipe'] });
+            const childClosed = new Promise<void>(resolve => child.once('close', () => resolve()));
+            const transport = createStdioAccountTransport(child, { requestTimeoutMs: 2000, killGraceMs: 500, maxFrameBytes: 128 });
+            try {
+                const code = scenario === 'blocked' ? 'timeout'
+                    : scenario === 'crash' || scenario === 'eof' ? 'process_exited' : 'protocol_error';
+                await assert.rejects(transport.request('account/read', scenario === 'blocked' ? { synthetic: 'x'.repeat(2 * 1024 * 1024) } : {}),
+                    (error: Error) => error.message === code);
+                assert.equal(await transport.close(), true, scenario);
+                await childClosed;
+                assert.ok(child.exitCode !== null || child.signalCode !== null, scenario);
+                assert.equal(await transport.close(), true);
+                assert.equal(foreign.exitCode, null); assert.equal(foreign.signalCode, null);
+                assert.doesNotThrow(() => process.kill(foreign.pid!, 0));
+            } finally {
+                if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+                await childClosed;
+            }
+        }
+    } finally { foreign.kill('SIGKILL'); await foreignClosed; }
+});
 test('JSONL request IDs correlate split response frames and initialized is a notification', async () => {
     const f = fixture();
     const pending = f.transport.request('initialize', { clientInfo: { name: 'synthetic' } });
