@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Page, Response } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession } from './utils';
 
 // This is the original Linux reproduction, not process.env.E2E_PIN.
 const ALPHANUMERIC_PIN = 'demo086086';
@@ -27,44 +28,21 @@ async function expectUnlocked(page: Page): Promise<void> {
   expect((await page.request.get('/api/patients')).status()).toBe(200);
 }
 
-async function onboard(page: Page, pin: string): Promise<WrappedKey> {
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Chi sei?', exact: true })).toBeVisible();
-  await page.getByLabel('Nome e Cognome', { exact: true }).fill('Dr. PIN Parity Synthetic');
-  await page.getByLabel('Nome Ambulatorio', { exact: true }).fill('Ambulatorio PIN Parity Synthetic');
-  await page.getByRole('button', { name: 'Avanti', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
-  const first = page.locator('#setup-pin');
-  const confirmation = page.locator('#setup-confirm-pin');
-  const submit = page.getByRole('button', { name: 'Concludi Setup', exact: true });
-  for (const input of [first, confirmation]) {
-    await expect(input).toHaveAttribute('type', 'password');
-    await expect(input).toHaveAttribute('inputmode', 'text');
-  }
-  await expect(submit).toBeDisabled();
-  await first.fill('abc');
-  await confirmation.fill('abc');
-  await expect(submit).toBeDisabled();
-  await first.fill(pin);
-  await confirmation.fill(`${pin}x`);
-  await expect(submit).toBeDisabled();
-  await expect(page.getByText('I PIN non corrispondono.', { exact: true })).toBeVisible();
-  await confirmation.fill(pin);
-  await expect(submit).toBeEnabled();
-  const responsePromise = page.waitForResponse(response => isPost(response, '/api/auth/setup'));
-  await submit.click();
+// First use is v3 now. Provision only this compatibility account through the real legacy
+// API, then open it with the ordinary PIN form; the dedicated onboarding spec owns the v3 wizard.
+async function openLegacyPinArchive(page: Page, pin: string): Promise<WrappedKey> {
+  const responsePromise = page.waitForResponse(response => isPost(response, '/api/auth/login'));
+  await bootstrapUnlockedSession(page, pin);
   const response = await responsePromise;
   expect(response.status()).toBe(200);
-  expect(await response.json()).toMatchObject({ success: true });
-  const submitted = response.request().postDataJSON() as WrappedKey & { password: string };
-  expect(submitted.password).toBe(pin);
-  expect(submitted.encryptedMasterKey).toEqual(expect.any(String));
-  expect(submitted.encryptedMasterKey.length).toBeGreaterThan(0);
-  expect(submitted.salt).toEqual(expect.any(String));
-  expect(submitted.salt.length).toBeGreaterThan(0);
-  // The real provider generated/wrapped the key; no substitute crypto blob is supplied.
-  await expectUnlocked(page);
-  return { encryptedMasterKey: submitted.encryptedMasterKey, salt: submitted.salt };
+  expect(response.request().postDataJSON().password).toBe(pin);
+  const wrapping = await response.json() as WrappedKey;
+  expect(wrapping.encryptedMasterKey).toMatch(/^v2:/u);
+  expect(wrapping.salt.length).toBeGreaterThan(0);
+  // The shared fixture has already clicked manual entry; wait for that navigation, not a second click.
+  await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+  expect((await page.request.get('/api/patients')).status()).toBe(200);
+  return { encryptedMasterKey: wrapping.encryptedMasterKey, salt: wrapping.salt };
 }
 
 async function expectReadyLock(page: Page): Promise<void> {
@@ -103,12 +81,12 @@ for (const { name, pin } of [
   { name: 'original alphanumeric reproduction', pin: ALPHANUMERIC_PIN },
   { name: 'numeric control including leading zero', pin: NUMERIC_PIN },
 ]) {
-  test(`${name}: ordinary setup, same-PIN lock/unlock and fresh browser context`, async ({ browser, baseURL }) => {
+  test(`${name}: legacy PIN archive, same-PIN lock/unlock and fresh browser context`, async ({ browser, baseURL }) => {
     let key: WrappedKey;
     const initial = await browser.newContext({ baseURL });
     try {
       const page = await initial.newPage();
-      key = await onboard(page, pin);
+      key = await openLegacyPinArchive(page, pin);
       // Use the real application-lock endpoint from the supplied lifecycle test.
       // Its UI toolbar is outside this capsule; no selector or owner is invented.
       const check = await page.request.get('/api/auth/check', { headers: { 'Cache-Control': 'no-store' } });
@@ -180,7 +158,7 @@ async function holdRealResponse(
 
 test('real renewal: required/pending, short and wrong PIN, loading and focus recovery', async ({ page, browserName }) => {
   expect(browserName, 'Response-gated negative case requires Chromium/CDP; it must not silently skip').toBe('chromium');
-  const key = await onboard(page, ALPHANUMERIC_PIN);
+  const key = await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
   const context = page.context();
   // New page with the real shared cookie, but no opener and no copied tab-local key.
   await page.close();
