@@ -17,6 +17,11 @@ export const users = sqliteTable('users', {
     firstFailedLoginAt: integer('first_failed_login_at', { mode: 'timestamp' }),
     /* @Codex */
     lockedUntil: integer('locked_until', { mode: 'timestamp' }),
+    /* ADR 0143. All four stay null while the account still unlocks with a PIN. */
+    unlockVerifierHash: text('unlock_verifier_hash'),
+    recoveryWrappedMasterKey: text('recovery_wrapped_master_key'),
+    recoverySalt: text('recovery_salt'),
+    recoveryVerifierHash: text('recovery_verifier_hash'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
