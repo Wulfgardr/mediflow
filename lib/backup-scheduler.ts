@@ -4,6 +4,22 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 
+export const BACKUP_SCHEDULER_COMMAND_OPTIONS = { encoding: 'utf8' as const, timeout: 15_000, maxBuffer: 1024 * 1024, killSignal: 'SIGKILL' as const };
+export class BackupSchedulerOutcomeUnknownError extends Error {
+    constructor() { super('Esito del backup automatico non confermato. Rileggi lo stato prima di ripetere l’operazione.'); }
+}
+export function assertBackupSchedulerCommand(result: { error?: Error; status: number | null; signal?: string | null }): void {
+    if (result.error || result.signal || result.status !== 0) throw new BackupSchedulerOutcomeUnknownError();
+}
+export function readBackupLaunchAgentInstalled(): boolean {
+    const result = spawnSync('launchctl', ['list'], BACKUP_SCHEDULER_COMMAND_OPTIONS);
+    assertBackupSchedulerCommand(result);
+    const lines = result.stdout.trim().split(/\r?\n/);
+    if (result.stderr.trim() || !/^PID\s+Status\s+Label$/u.test(lines.shift() ?? '')
+        || lines.some(line => !/^(?:-|\d+)\s+-?\d+\s+\S+$/u.test(line))) throw new BackupSchedulerOutcomeUnknownError();
+    return lines.some(line => line.trim().split(/\s+/).at(-1) === BACKUP_SCHEDULER_LABEL);
+}
+
 export const BACKUP_SCHEDULER_SETTINGS_KEY = 'backupScheduler';
 export const BACKUP_SCHEDULER_LABEL = 'dev.wulfgardr.mediflow.backup';
 export const BACKUP_SCHEDULER_STATE_VERSION = 1 as const;
@@ -48,7 +64,8 @@ export type BackupScheduleKind = 'launchd' | 'schtasks' | 'systemd-timer' | 'cro
 
 export type BackupSchedulerStatus = {
     supported: boolean;
-    installed: boolean;
+    installed: boolean | null;
+    observationMessage?: string;
     plistPath: string | null;
     /** Cross-platform path of the registered schedule (plist/task/unit/crontab marker). */
     schedulePath?: string | null;
@@ -59,6 +76,7 @@ export type BackupSchedulerStatus = {
 
 export type BackupSchedulerScriptResult = {
     ok: boolean;
+    uncertain?: boolean;
     artifactPath?: string;
     createdAt?: string;
     message: string;
@@ -430,6 +448,7 @@ export function installBackupLaunchAgent(state: BackupSchedulerState): string {
         throw new Error('Automatic nightly backup is currently supported only on macOS.');
     }
 
+    const wasInstalled = readBackupLaunchAgentInstalled();
     const plistPath = getBackupLaunchAgentPath();
     fs.mkdirSync(path.dirname(plistPath), { recursive: true });
     fs.mkdirSync(path.join(getDefaultDataDir(), 'logs'), { recursive: true });
@@ -438,12 +457,12 @@ export function installBackupLaunchAgent(state: BackupSchedulerState): string {
     const uid = String(process.getuid?.() ?? '');
     const domain = uid ? `gui/${uid}` : '';
     if (domain) {
-        spawnSync('launchctl', ['bootout', domain, plistPath], { stdio: 'ignore' });
-        const result = spawnSync('launchctl', ['bootstrap', domain, plistPath], { encoding: 'utf8' });
-        if (result.status !== 0) {
-            const message = (result.stderr || result.stdout || 'launchctl bootstrap failed').trim();
-            throw new Error(message);
+        if (wasInstalled) {
+            assertBackupSchedulerCommand(spawnSync('launchctl', ['bootout', domain, plistPath], BACKUP_SCHEDULER_COMMAND_OPTIONS));
+            if (readBackupLaunchAgentInstalled()) throw new BackupSchedulerOutcomeUnknownError();
         }
+        assertBackupSchedulerCommand(spawnSync('launchctl', ['bootstrap', domain, plistPath], BACKUP_SCHEDULER_COMMAND_OPTIONS));
+        if (!readBackupLaunchAgentInstalled()) throw new BackupSchedulerOutcomeUnknownError();
     }
 
     return plistPath;
@@ -455,9 +474,11 @@ export function uninstallBackupLaunchAgent(): void {
     const plistPath = getBackupLaunchAgentPath();
     const uid = String(process.getuid?.() ?? '');
     const domain = uid ? `gui/${uid}` : '';
-    if (domain && fs.existsSync(plistPath)) {
-        spawnSync('launchctl', ['bootout', domain, plistPath], { stdio: 'ignore' });
+    if (!domain) throw new BackupSchedulerOutcomeUnknownError();
+    if (readBackupLaunchAgentInstalled()) {
+        assertBackupSchedulerCommand(spawnSync('launchctl', ['bootout', domain, plistPath], BACKUP_SCHEDULER_COMMAND_OPTIONS));
     }
+    if (readBackupLaunchAgentInstalled()) throw new BackupSchedulerOutcomeUnknownError();
     if (fs.existsSync(plistPath)) {
         fs.unlinkSync(plistPath);
     }
@@ -468,7 +489,7 @@ export function getBackupSchedulerStatus(value: string | null | undefined): Back
     const plistPath = process.platform === 'darwin' ? getBackupLaunchAgentPath() : null;
     return {
         supported: process.platform === 'darwin',
-        installed: Boolean(plistPath && fs.existsSync(plistPath)),
+        installed: plistPath ? readBackupLaunchAgentInstalled() : false,
         plistPath,
         state,
     };
@@ -491,8 +512,12 @@ export function runBackupSchedulerScript(options?: {
     const result = spawnSync(process.execPath, [scriptPath], {
         cwd: projectRoot,
         env,
-        encoding: 'utf8',
+        ...BACKUP_SCHEDULER_COMMAND_OPTIONS,
+        timeout: 5 * 60_000,
     });
+    if (result.error || result.signal || result.status !== 0) return {
+        ok: false, uncertain: true, message: 'Esito del backup non confermato. Rileggi l’ultimo backup prima di ripetere l’operazione.',
+    };
 
     const raw = (result.stdout || result.stderr || '').trim();
     if (!raw) {
