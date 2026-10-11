@@ -317,14 +317,17 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await settled();
     expect(sent()).toEqual([{ password: wrong[0] }]);
 
-    // The same with one distinct press of Space.
+    // The same with one distinct press of Space: it leaves when the key goes down, once, however
+    // long the key is then held and whatever its release finds.
     await input.fill(wrong[1]);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await lockPage.keyboard.press('Tab');
     await expect(confirm).toBeFocused();
-    await lockPage.keyboard.press('Space');
+    await lockPage.keyboard.down('Space');
     await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
+    await lockPage.keyboard.down('Space');
+    await lockPage.keyboard.up('Space');
     await settled();
     expect(sent()).toEqual([{ password: wrong[0] }, { password: wrong[1] }]);
 
