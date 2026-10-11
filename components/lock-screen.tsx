@@ -7,6 +7,9 @@ import { checkPassphrase } from '@/lib/security/unlock-credential';
 import { LONG_PIN_NOTICE } from '@/lib/security/unlock-plan';
 import styles from './kree8/kree8-lock-screen.module.css';
 
+/** Enter submits, Tab leaves the field, a modifier alone does nothing: these keep a held text confirmable. */
+const KEYS_THAT_KEEP_CONFIRMATION = new Set(['Enter', 'Tab', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
+
 export function LockScreen() {
     const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, setupPin, lock } = useSecurity();
     // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
@@ -27,15 +30,16 @@ export function LockScreen() {
     const previousRecoveryState = useRef(authRecoveryState);
 
     // A failed login re-enables and clears the input; deterministically restore focus so the
-    // operator can retry at once. Guards: !loading = input already enabled; optional chaining =
+    // operator can retry at once. A held text asks for a second gesture on the same field, so
+    // focus returns there too. Guards: !loading = input already enabled; optional chaining =
     // safe across unmount, so a successful login (which unmounts this form) never focuses.
     useEffect(() => {
-        if ((failedAttempt > 0 || previousRecoveryState.current === 'pending')
+        if ((failedAttempt > 0 || heldText !== null || previousRecoveryState.current === 'pending')
             && !loading && authRecoveryState === 'ready') {
             pinInputRef.current?.focus();
         }
         previousRecoveryState.current = authRecoveryState;
-    }, [failedAttempt, loading, authRecoveryState]);
+    }, [failedAttempt, heldText, loading, authRecoveryState]);
 
     // If not locked and setup is done, don't render anything
     if (!isLocked && !requiresSetup) return null;
@@ -135,7 +139,10 @@ export function LockScreen() {
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
                             // Any editing gesture ends the confirmation, also one that leaves the same
-                            // text: React reports a change only when the value differs.
+                            // text: React reports a change only when the value differs, and a deletion
+                            // with nothing to delete reports nothing at all. So does every key that
+                            // neither submits the text nor leaves the field.
+                            onKeyDown={(e) => { if (!KEYS_THAT_KEEP_CONFIRMATION.has(e.key)) endConfirmation(); }}
                             onInput={endConfirmation}
                             onPaste={endConfirmation}
                             onCut={endConfirmation}
