@@ -14,9 +14,10 @@ import {
     changePin,
     PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE,
     type PinChangeServiceDependencies,
+    recoverPassphrase,
 } from './pin-change-service';
 import { verifyHostCredentials, verifyUnlockCredentials } from './host-credential-verification';
-import { validatePassphraseAdoptionPayload } from './passphrase-adoption-validation';
+import { validatePassphraseAdoptionPayload, validatePassphraseRecoveryPayload } from './passphrase-adoption-validation';
 import { generateMasterKey } from './security';
 import { createRecoveryWrapping, createUnlockWrapping, hashAccessVerifier } from './unlock-credential';
 import {
@@ -881,4 +882,247 @@ test('a lock established after the PIN was verified is not cleared by the adopti
     } finally {
         sqlite.close();
     }
+});
+
+/** A new passphrase and a new recovery key, authorized by the verifier of the recovery key being replaced. */
+async function recoveryPayload(recoveryVerifier: string) {
+    const masterKey = await generateMasterKey();
+    const unlock = await createUnlockWrapping(masterKey, 'una passphrase del tutto nuova');
+    const recovery = await createRecoveryWrapping(masterKey);
+    const payload = validatePassphraseRecoveryPayload({
+        username: TEST_USERNAME, recoveryVerifier,
+        encryptedMasterKey: unlock.encryptedMasterKey, salt: unlock.salt, verifier: unlock.verifier,
+        recovery: { wrappedMasterKey: recovery.wrappedMasterKey, salt: recovery.salt, verifier: recovery.verifier },
+    });
+    assert.ok(payload, 'the server accepts what the browser primitives produce');
+    return { payload, unlock, recovery };
+}
+const recoveryRequest = () => new Request('http://127.0.0.1/api/auth/passphrase/recover', { headers: { 'x-request-id': 'recovery-test' } });
+
+/** The session the route opens for a recovery through the Web auth control, and what became of it. */
+function recoverySession(available = true) {
+    const opened: WebSessionProjection[] = [];
+    const closed: WebSessionProjection[] = [];
+    return {
+        opened, closed,
+        openSession: (account: { id: string }) => {
+            if (!available) return null;
+            opened.push(session(account.id));
+            return opened.at(-1)!;
+        },
+        retireWebSession: (projection: WebSessionProjection) => { closed.push(projection); },
+    };
+}
+/** A recovery asked with `recoveryVerifier`, with the retirement of the sessions ending in `outcome`. */
+async function recover(db: TestDatabase, recoveryVerifier: string, options: {
+    outcome?: 'completed' | 'failed'; own?: ReturnType<typeof recoverySession>; dependencies?: PinChangeServiceDependencies;
+} = {}) {
+    const own = options.own ?? recoverySession();
+    const candidate = await recoveryPayload(recoveryVerifier);
+    const result = await recoverPassphrase({ request: recoveryRequest(), payload: candidate.payload, openSession: own.openSession }, {
+        db, writeAuditEvent: testAuditWriter(db), ...webRetirement(options.outcome ?? 'completed'), retireWebSession: own.retireWebSession,
+        ...options.dependencies,
+    });
+    return { result, own, ...candidate };
+}
+async function adoptedAccount(db: TestDatabase) {
+    await seedUser(db);
+    const adoption = await adoptionPayload();
+    assert.equal((await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: adoption.payload }, {
+        db, writeAuditEvent: testAuditWriter(db), ...webRetirement(), retirePinEraResidues: residueRemoval().retirePinEraResidues,
+    })).kind, 'success');
+    return adoption;
+}
+
+test('recoverPassphrase sets a new passphrase and a new recovery key in one write, for whoever holds the old recovery key', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const adopted = await adoptedAccount(db);
+        const before = credentialColumns(db);
+        db.update(users).set({ failedLoginAttempts: 3, firstFailedLoginAt: new Date() }).run();
+        const own = recoverySession();
+        let retired: unknown = null;
+        const retirement = webRetirement();
+
+        const { result, unlock, recovery } = await recover(db, adopted.recovery.verifier, { own, dependencies: {
+            // The owner retires the sessions of an account only for an authentic session of that account.
+            prepareWebSessionsForUserRetirement: (projection) => { retired = projection; return retirement.prepareWebSessionsForUserRetirement!(projection); },
+            commitWebSessionsForUserRetirement: retirement.commitWebSessionsForUserRetirement,
+        } });
+        assert.deepEqual(result, { kind: 'success' });
+
+        assert.deepEqual(credentialColumns(db), {
+            passwordHash: before.passwordHash,
+            encryptedMasterKey: unlock.encryptedMasterKey,
+            salt: unlock.salt,
+            unlockVerifierHash: await hashAccessVerifier(unlock.verifier),
+            recoveryWrappedMasterKey: recovery.wrappedMasterKey,
+            recoverySalt: recovery.salt,
+            recoveryVerifierHash: await hashAccessVerifier(recovery.verifier),
+        });
+        assert.equal(storedUser(db).failedLoginAttempts, 0);
+        assert.equal(own.opened.length, 1, 'one session is opened for the recovery');
+        assert.equal(retired, own.opened[0], 'and it is the one that retires every session of the account, itself included');
+        assert.deepEqual(own.closed, [], 'so it is never closed on its own');
+
+        const quiet = { db, writeAuditEvent: async () => 'audit' };
+        assert.equal((await verifyUnlockCredentials({ username: TEST_USERNAME, verifier: unlock.verifier }, quiet)).kind, 'verified');
+        assert.equal((await verifyUnlockCredentials({ username: TEST_USERNAME, verifier: adopted.unlock.verifier }, quiet)).kind, 'denied');
+        assert.equal((await verifyHostCredentials({ username: TEST_USERNAME, pin: SEEDED_PIN }, quiet)).kind, 'verified');
+        db.update(users).set({ failedLoginAttempts: 0, firstFailedLoginAt: null }).run();
+
+        const audit = db.select().from(auditEvents).all().at(-1);
+        const metadata = JSON.parse(audit?.redactedMetadata ?? '{}') as Record<string, unknown>;
+        assert.deepEqual([audit?.subjectRef, audit?.actorRef, metadata.reasonCode], ['security.unlock-credential', 'user-1', 'passphrase_recovered']);
+        assert.deepEqual(metadata.flags, ['credential-rotation', 'recovery-key', 'auth:anonymous']);
+        for (const secret of [adopted.recovery.verifier, adopted.recovery.recoveryKey, unlock.verifier, recovery.verifier, recovery.recoveryKey]) {
+            assert.equal(JSON.stringify(audit).includes(secret), false, 'no secret reaches the audit record');
+        }
+
+        // The recovery key that was typed is spent: it cannot set a third passphrase, and opens no session.
+        const after = credentialColumns(db);
+        const again = await recover(db, adopted.recovery.verifier);
+        assert.deepEqual(again.result.kind === 'denied' && again.result.status, 401);
+        assert.deepEqual(credentialColumns(db), after);
+        assert.deepEqual(again.own.opened, []);
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('a wrong recovery key changes nothing, opens no session and is counted until the account locks; an account on its PIN has no recovery', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        db.update(users).set({ failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null }).run();
+        const onPin = credentialColumns(db);
+        const stranger = (await adoptionPayload()).recovery.verifier;
+        const noRecovery = await recover(db, stranger);
+        assert.equal(noRecovery.result.kind, 'denied');
+        assert.deepEqual(credentialColumns(db), onPin);
+        assert.deepEqual(noRecovery.own.opened, []);
+
+        const adoption = await adoptionPayload();
+        assert.equal((await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: adoption.payload }, {
+            db, writeAuditEvent: testAuditWriter(db), ...webRetirement(), retirePinEraResidues: residueRemoval().retirePinEraResidues,
+        })).kind, 'success');
+        const adopted = credentialColumns(db);
+        const own = recoverySession();
+        const wrong = await recover(db, stranger, { own });
+        assert.deepEqual(wrong.result.kind === 'denied' && [wrong.result.status, wrong.result.body.remainingAttempts], [401, 4]);
+        // The verifier of the passphrase itself is not the recovery key either.
+        assert.equal((await recover(db, adoption.unlock.verifier, { own })).result.kind, 'denied');
+        assert.equal(storedUser(db).failedLoginAttempts, 2);
+        for (let attempt = 3; attempt <= 5; attempt += 1) await recover(db, stranger, { own });
+        assert.ok(storedUser(db).lockedUntil, 'five wrong recovery keys lock the account');
+        // While it is locked, the right recovery key is refused as well.
+        const locked = await recover(db, adoption.recovery.verifier, { own });
+        assert.deepEqual(locked.result.kind === 'denied' && locked.result.status, 423);
+        assert.deepEqual(credentialColumns(db), adopted);
+        assert.deepEqual(own.opened, [], 'no session is opened before the recovery key is verified');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('a recovery that cannot retire the sessions writes nothing and closes the session it opened', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const adopted = await adoptedAccount(db);
+        const before = credentialColumns(db);
+        const unconfirmed = (outcome: Awaited<ReturnType<typeof recover>>['result']) =>
+            outcome.kind === 'failure' && [outcome.status, outcome.code];
+
+        // The Web auth control gives no session: nothing was opened, nothing is written.
+        const noSession = await recover(db, adopted.recovery.verifier, { own: recoverySession(false) });
+        assert.deepEqual(unconfirmed(noSession.result), [409, PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE]);
+        assert.deepEqual(credentialColumns(db), before);
+
+        // The owner will not prepare the retirement: the session opened for the recovery is closed.
+        const refused = await recover(db, adopted.recovery.verifier, { dependencies: { prepareWebSessionsForUserRetirement: () => null } });
+        assert.deepEqual(unconfirmed(refused.result), [409, PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE]);
+        assert.deepEqual(refused.own.closed, refused.own.opened);
+        assert.equal(refused.own.opened.length, 1);
+        assert.deepEqual(credentialColumns(db), before);
+
+        // A lock established after the recovery key was verified stands: the write is refused.
+        const lockedUntil = new Date(Math.floor(Date.now() / 1000) * 1000 + 60_000); // the column keeps whole seconds
+        const lateLock = await recover(db, adopted.recovery.verifier, { dependencies: {
+            prepareNativeSessionsForUserRetirement: (userId) => {
+                db.update(users).set({ lockedUntil }).run();
+                return prepareNativeLegacyUserRetirement(userId);
+            },
+        } });
+        assert.deepEqual(lateLock.result.kind === 'failure' && [lateLock.result.status, lateLock.result.code], [409, 'PASSPHRASE_ADOPTION_CONFLICT']);
+        assert.deepEqual(lateLock.own.closed, lateLock.own.opened);
+        assert.deepEqual(credentialColumns(db), before);
+        assert.equal(storedUser(db).lockedUntil?.getTime(), lockedUntil.getTime());
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('two recoveries at once, or one interrupted inside its write, leave one whole set of credentials', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const adopted = await adoptedAccount(db);
+        const before = credentialColumns(db);
+        const interrupted = new Proxy(db, {
+            get(target, property, receiver) {
+                if (property === 'transaction') return () => { throw new Error('synthetic interruption'); };
+                const value = Reflect.get(target, property, receiver);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
+        }) as TestDatabase;
+        const own = recoverySession();
+        await assert.rejects(() => recover(db, adopted.recovery.verifier, { own, dependencies: { db: interrupted } }), /synthetic interruption/u);
+        assert.deepEqual(credentialColumns(db), before, 'the old passphrase and the old recovery key still stand');
+        assert.deepEqual(own.closed, own.opened, 'and the session opened for the recovery is closed');
+
+        const attempts = await Promise.all([recover(db, adopted.recovery.verifier), recover(db, adopted.recovery.verifier)]);
+        assert.equal(attempts.filter(({ result }) => result.kind === 'success').length, 1);
+        const winner = attempts.find(({ result }) => result.kind === 'success')!;
+        const loser = attempts.find(({ result }) => result.kind !== 'success')!;
+        assert.deepEqual(credentialColumns(db), {
+            passwordHash: before.passwordHash,
+            encryptedMasterKey: winner.unlock.encryptedMasterKey,
+            salt: winner.unlock.salt,
+            unlockVerifierHash: await hashAccessVerifier(winner.unlock.verifier),
+            recoveryWrappedMasterKey: winner.recovery.wrappedMasterKey,
+            recoverySalt: winner.recovery.salt,
+            recoveryVerifierHash: await hashAccessVerifier(winner.recovery.verifier),
+        });
+        assert.deepEqual(loser.own.closed, loser.own.opened, 'the recovery that lost closes whatever it opened');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('when the retirement of the sessions cannot be confirmed after a recovery the new passphrase is already the credential', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const adopted = await adoptedAccount(db);
+        const { result, unlock } = await recover(db, adopted.recovery.verifier, { outcome: 'failed' });
+        assert.deepEqual(result.kind === 'failure' && [result.status, result.code], [409, PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE]);
+        assert.match(result.kind === 'failure' ? result.message : '', /nuova passphrase è attiva/u);
+        assert.equal(storedUser(db).unlockVerifierHash, await hashAccessVerifier(unlock.verifier));
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('the recovery request must carry a new recovery key and nothing that stands in for another secret', async () => {
+    const adopted = await adoptionPayload();
+    const { payload } = await recoveryPayload(adopted.recovery.verifier);
+    const rejected: Array<[string, unknown]> = [
+        ['the old recovery key kept as the new one', { ...payload, recovery: { ...payload.recovery, verifier: payload.recoveryVerifier } }],
+        ['the recovery verifier offered as the new access verifier', { ...payload, verifier: payload.recoveryVerifier }],
+        ['no proof of the recovery key', { ...payload, recoveryVerifier: undefined }],
+        ['a short proof', { ...payload, recoveryVerifier: Buffer.alloc(16, 1).toString('base64') }],
+        ['a PIN wrapping', { ...payload, encryptedMasterKey: `v2:${payload.encryptedMasterKey.slice(3)}` }],
+        ['a username that is not text', { ...payload, username: 7 }],
+    ];
+    for (const [name, candidate] of rejected) assert.equal(validatePassphraseRecoveryPayload(candidate), null, name);
+    const { username: _omitted, ...withoutUsername } = payload;
+    assert.deepEqual(validatePassphraseRecoveryPayload(withoutUsername), { ...payload, username: '' });
 });
