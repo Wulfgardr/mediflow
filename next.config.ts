@@ -128,6 +128,11 @@ const nextConfig: NextConfig = {
   },
   /* @Codex */
   outputFileTracingExcludes: {
+    "**": [
+      // Keep source tests and historical evidence, not their copies in the Web runtime.
+      "./{app,components,hooks,lib,packages,scripts}/**/*.test.*",
+      "./{e2e,test,tests,screenshots}/**/*",
+    ],
     "/*": [
       // @Codex: Treatment runtime/model data are external, explicitly provisioned objects.
       "./**/treatment-reasoning-portable/**",

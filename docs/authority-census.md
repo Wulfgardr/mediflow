@@ -91,7 +91,7 @@ motivata, non un debito automaticamente assegnato a un'altra issue.
 | SQLite vendorizzato | KEEP: [manifest nativo](../native/MediFlowMac/Package.swift) mantiene il target/binding SQLite; sorgenti/licenza non equivalgono al runtime Web distribuito. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
 | Corpora/fixture | KEEP: input delle suite e casi negativi; esclusi dal debito sorgente dal comando inventario, non cancellati per ridurre conteggi. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
 | Archivi package e metadata generati | KEEP dove richiesti da manifest/lock/provenienza e build; [payload ledger](./runtime-payload-ledger.md) distingue artefatto e sorgente. Non assimilare output locali non versionati. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
-| Screenshot/evidenze storiche | KEEP della provenienza; esclusi dal punteggio debito, non prova di software corrente né dipendenza runtime. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
+| Screenshot/evidenze storiche | KEEP della provenienza nel sorgente; esclusi dal punteggio debito e dalle copie nel runtime Web. Non prova di software corrente. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
 | Parsing argomenti benchmark ripetuto | KEEP: CLI con opzioni distinte; il rapporto storico non prova equivalenza semantica, quindi non giustifica un parser generale. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
 | Scaffold route simili | KEEP: ammissioni Web/token/paired e schemi differenti non sono duplicazione equivalente; il CSV espone le differenze. | [WUL-725](https://linear.app/wulfgardr/issue/WUL-725) per authority lifecycle; nessun framework route C01. |
 
