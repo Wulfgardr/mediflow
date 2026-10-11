@@ -125,6 +125,24 @@ closure and pre-execution validation. Their roster can refer to files outside
 this selected directory. A payload ledger does not replace that check, native
 ABI preflight, clean installation, update/rollback or synthetic launch evidence.
 
+## Source production startup
+
+For the 0.9.0 source profiles, `npm run build` requires a clean Git checkout
+(clone or Git bundle, not a source ZIP/TAR without Git metadata). It records
+the actual revision and BUILD_ID, prepares the shared Web/Headless closure and
+assets, and writes `.next/runtime-payload-ledger.json` outside the payload.
+`npm start` and `npm run mcp:intelligent-host:production` verify this complete
+ledger and Node/ABI/platform/architecture before loading application code.
+SQLite preflight uses only `:memory:`. Do not copy or change payload files after
+preparation; rebuild from committed source instead. Alternate Next directories
+retain their own identity and ledger.
+
+Disk caches are disabled rather than exempted from verification. Requests and
+restart must leave the payload unchanged. Trust is in the reviewed source/build,
+launcher and external ledger; this is not a signature against their replacement
+or protection against changes during execution. The native macOS app retains
+its separate roster and launcher. See [ADR 0117](./adr/0117-headless-portable-agent-first-and-capability-first-fabric.md#ammissione-del-runtime-sorgente-090--11-ottobre-2026).
+
 ## Compare with a trusted ledger
 
 For a before/after cleanup comparison, build both selected revisions with the

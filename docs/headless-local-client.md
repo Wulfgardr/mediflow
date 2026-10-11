@@ -34,17 +34,18 @@ Mini è un'altra superficie, non una configurazione MCP.
 
 ## Avvio e prova locale
 
-Da checkout con Node previsto dal contratto e dipendenze fisiche:
+Da checkout Git pulito (clone o bundle Git), con Node previsto dal contratto e
+dipendenze fisiche. Gli ZIP/TAR senza metadati Git non sono un input supportato
+della build di produzione:
 
 ```sh
 npm run build
-node --input-type=module -e "import { cpSync } from 'node:fs'; cpSync('public', '.next/standalone/public', { recursive: true }); cpSync('.next/static', '.next/standalone/.next/static', { recursive: true });"
 npm run mcp:intelligent-host:production
 ```
 
-La copia fisica degli asset serve anche allo smoke: la build standalone da sola
-non include `public` e `.next/static`. Il comando Node vale sui tre profili e non
-usa hard link o dipendenze condivise.
+La build prepara gli asset e il registro completo del payload. Non modificare
+lo standalone dopo la preparazione: Web (`npm start`) e Headless verificano
+lo stesso contenuto prima dell'avvio. Vedi l'[ammissione sorgente](./runtime-payload-ledger.md#source-production-startup).
 
 Il Supervisor possiede Web standalone e MCP come figli separati, con IPC
 ereditato. Aprire il Web locale, autenticarsi e selezionare un paziente prima
