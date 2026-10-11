@@ -56,7 +56,8 @@ async function expectUnlocked(page: Page): Promise<void> {
   expect((await page.request.get('/api/patients')).status()).toBe(200);
 }
 
-test('an account moved to a passphrase is unlocked by it, and the passphrase never reaches the network', async ({ page, browser, baseURL }) => {
+test('an account moved to a passphrase is unlocked by it, and the passphrase never reaches the network', async ({ page, browser, baseURL, browserName }) => {
+  expect(browserName, 'The held answer needs Chromium: it must not be skipped silently').toBe('chromium');
   // Ordinary onboarding with a PIN: the provider generates and wraps the real master key.
   const setup = page.waitForRequest(request => isPost(request, '/api/auth/setup'));
   await bootstrapUnlockedSession(page, PIN);
@@ -81,6 +82,16 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(stalePage.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
   await staleInput.fill(PASSPHRASE);
 
+  // The person submits there at the very moment of the move. The answer to "what unlocks this
+  // account" is produced while it still says PIN, and is held here until the move is done: it is
+  // the oldest answer the browser can act on. Chromium only: the response is paused, not replaced.
+  const cdp = await stale.newCDPSession(stalePage);
+  let heldCheck: string | undefined;
+  cdp.on('Fetch.requestPaused', event => { heldCheck = event.requestId; });
+  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: new URL('/api/auth/check', baseURL).href, requestStage: 'Response' }] });
+  await staleInput.press('Enter');
+  await expect.poll(() => heldCheck, 'the real answer of the server must reach the gate').toBeTruthy();
+
   const adopted = await page.request.post('/api/auth/passphrase', {
     headers: trustedWebRequestHeaders(baseURL), data: { currentPin: PIN, ...credential },
   });
@@ -88,24 +99,23 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   // The move retires the session of the page that asked.
   expect((await page.request.get('/api/patients')).status()).toBe(401);
 
-  // The lock screen left open was filled before the move. Submitted now, what was typed never
-  // travels as a PIN: the browser asks first what unlocks the account. If the field still said
-  // PIN it refuses and asks again; if the page had already learned of the move it sends a verifier.
   try {
-    // A development server may have reloaded the page meanwhile and emptied the field.
-    if (await staleInput.inputValue() !== PASSPHRASE) await staleInput.fill(PASSPHRASE);
-    await staleInput.press('Enter');
+    await cdp.send('Fetch.continueRequest', { requestId: heldCheck! });
+    await cdp.send('Fetch.disable');
+    // The answer said PIN, the field said PIN, and the account now has a passphrase. A text that
+    // long is not sent as a PIN on the first gesture: it stays in the field.
     const refusal = stalePage.locator('#mediflow-lock-error');
-    const shell = stalePage.getByRole('navigation', { name: 'Navigazione principale', exact: true })
-      .or(stalePage.getByRole('link', { name: 'Apri la cartella manualmente', exact: true }));
-    await expect(refusal.or(shell).first()).toBeVisible();
-    if (await refusal.isVisible()) {
-      await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
-      expect(staleLogins).toEqual([]);
-      await expect(stalePage.getByLabel('Passphrase', { exact: true })).toHaveValue('');
-      await staleInput.fill(PASSPHRASE);
-      await staleInput.press('Enter');
-    }
+    await expect(refusal).toHaveText('Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.');
+    await expect(staleInput).toHaveValue(PASSPHRASE);
+    expect(staleLogins).toEqual([]);
+    // On the second gesture the browser asks again, learns of the move and still sends nothing.
+    await staleInput.press('Enter');
+    await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
+    await expect(stalePage.getByLabel('Passphrase', { exact: true })).toHaveValue('');
+    expect(staleLogins).toEqual([]);
+    // Typed into a field that says passphrase, it unlocks, and only its verifier travels.
+    await staleInput.fill(PASSPHRASE);
+    await staleInput.press('Enter');
     await expectUnlocked(stalePage);
     expect(staleLogins.map(body => Object.keys(JSON.parse(body)))).toEqual([['verifier']]);
     expect(staleLogins.join('')).not.toContain(PASSPHRASE);

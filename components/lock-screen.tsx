@@ -11,6 +11,8 @@ export function LockScreen() {
     // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
     const passphrase = !requiresSetup && unlockCredential === 'passphrase';
     const [pin, setPin] = useState('');
+    // Set when the provider held back a text long enough to be a passphrase: the same text, submitted again, is sent.
+    const [longPinConfirmed, setLongPinConfirmed] = useState(false);
     // Counted as the primitives count it, after normalization: what they accept can be submitted.
     const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
     const [confirmPin, setConfirmPin] = useState('');
@@ -44,14 +46,17 @@ export function LockScreen() {
         setError('');
 
         try {
-            const success = await login(pin);
-            if (!success) {
+            const outcome = await login(pin, { shown: passphrase ? 'passphrase' : 'pin', longPinConfirmed });
+            // Nothing was sent: the text stays, so that the person can confirm it or change it.
+            setLongPinConfirmed(outcome === 'confirm');
+            if (outcome === false) {
                 setError('');
                 setPin('');
                 setFailedAttempt((n) => n + 1);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Errore durante il login');
+            setLongPinConfirmed(false);
             setPin('');
             setFailedAttempt((n) => n + 1);
         } finally {
@@ -123,7 +128,7 @@ export function LockScreen() {
                             ref={pinInputRef}
                             type="password"
                             value={pin}
-                            onChange={(e) => setPin(e.target.value)}
+                            onChange={(e) => { setPin(e.target.value); setLongPinConfirmed(false); }}
                             className={styles.pinInput}
                             inputMode="text"
                             autoComplete="off"
