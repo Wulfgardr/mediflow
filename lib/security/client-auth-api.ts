@@ -314,8 +314,13 @@ export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBar
 }
 
 /* @Codex */
-export async function checkAuthHealthRequest() {
-    if (authHealthRequestInFlight) return authHealthRequestInFlight;
+export async function checkAuthHealthRequest(options: { fresh?: boolean } = {}) {
+    // A caller that decides what to send needs an answer produced after its gesture: one already
+    // on its way was produced before, so it is awaited and asked again.
+    while (authHealthRequestInFlight) {
+        if (!options.fresh) return authHealthRequestInFlight;
+        await authHealthRequestInFlight.catch(() => undefined);
+    }
 
     const expectedEtag = currentAuthControlEtag;
     const request = (async (): Promise<AuthControlledJsonRequestResult<AuthHealthPayload>> => {

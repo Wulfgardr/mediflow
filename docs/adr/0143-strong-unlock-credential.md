@@ -234,14 +234,17 @@ nome nell'interfaccia.
 Una review in sola lettura, eseguita da un secondo strumento sul diff
 `41b0ce6b7..41d601004`, non ha trovato errori nella costruzione crittografica
 e ha trovato quattro difetti. Tre sono corretti; il primo va chiuso prima che
-l'interfaccia offra il passaggio.
+l'interfaccia offra il passaggio. Una seconda review, sulle correzioni, ha
+chiesto di chiudere anche la finestra descritta nella seconda riga e ha
+aggiunto l'ultima.
 
 | Difetto | Esito |
 | --- | --- |
 | La copia `medical.db.schema-original-v<N>-<uuid>.db` creata dall'aggiornamento dello schema conserva l'involucro del PIN della stessa master key: dopo il passaggio alla passphrase resta una via d'attacco offline. | Da fare: il passaggio elimina le copie che il prodotto possiede e che precedono la passphrase, in modo riprendibile dopo un'interruzione. È già la regola della tabella delle decisioni; mancava il codice. |
-| Una scheda ferma sulla schermata di blocco da prima del passaggio inviava la passphrase al server come se fosse un PIN. | Corretto: a ogni sblocco il browser chiede prima che cosa sblocca l'account. Se la risposta non lo dice, o se è cambiato rispetto a ciò che il campo mostrava, non invia nulla. |
+| Una scheda ferma sulla schermata di blocco da prima del passaggio inviava la passphrase al server come se fosse un PIN. | Corretto. A ogni sblocco il browser chiede, dopo il gesto, che cosa sblocca l'account; se la risposta non lo dice, o differisce da ciò che il campo mostrava mentre si scriveva, non invia nulla. Quella risposta può però essere già vecchia quando la richiesta parte, perché il passaggio può avvenire nel mezzo: per questo un testo lungo quanto una passphrase non parte mai come PIN al primo gesto. Resta nel campo, e parte solo se la persona lo conferma con un secondo invio, prima del quale il browser chiede di nuovo. Un PIN così lungo esiste solo se è stato scelto al primo avvio. La decisione sta in una funzione sola, `planUnlock`. |
 | Il passaggio verificava il PIN senza contare i tentativi: chi aveva una sessione poteva indovinarlo. | Corretto: usa la verifica condivisa, con contatori e blocco; un blocco nato dopo la verifica ferma la scrittura. Il cambio PIN ha lo stesso limite da prima e resta da allineare. |
 | La schermata di blocco contava la lunghezza prima della normalizzazione, e rifiutava passphrase che le primitive accettano. | Corretto: usa lo stesso controllo delle primitive. |
+| Un PIN sbagliato presentato al passaggio viene registrato come accesso fallito anonimo, senza la sessione che lo ha chiesto. | Noto, non corretto: è ciò che la verifica condivisa registra anche per le conferme di ruolo. Va corretto per tutte insieme, dando alla verifica il contesto di chi la chiama. |
 
 ## Come si prova
 

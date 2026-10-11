@@ -119,6 +119,32 @@ test('a passphrase account sends its verifier under the same fence; a check resp
     } finally { globalThis.fetch = originalFetch; }
 });
 
+test('a check asked to decide what to send is produced after the gesture, not reused from one already on its way', async () => {
+    const originalFetch = globalThis.fetch;
+    const releases: Array<() => void> = [];
+    let calls = 0;
+    try {
+        await bootstrapAuthControl('"fence-fresh"');
+        globalThis.fetch = async () => {
+            calls += 1;
+            const answer = calls;
+            await new Promise<void>((resolve) => { releases.push(resolve); });
+            return jsonResponse({ status: 'ok', isSetup: true, unlock: { credential: answer === 1 ? 'pin' : 'passphrase', kdfVersion: 3, salt: 'c2FsdA==' } }, 200, `"fence-fresh-${answer}"`);
+        };
+        const onItsWay = checkAuthHealthRequest();
+        const shared = checkAuthHealthRequest();
+        const fresh = checkAuthHealthRequest({ fresh: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(calls, 1, 'an ordinary caller shares the request already on its way');
+        releases[0]();
+        assert.equal((await onItsWay).payload?.unlock && (await shared).payload === (await onItsWay).payload, true);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(calls, 2, 'the caller that needs a fresh answer asks again once that one has arrived');
+        releases[1]();
+        assert.deepEqual((await fresh).payload?.unlock, { credential: 'passphrase', kdfVersion: 3, salt: 'c2FsdA==' });
+    } finally { globalThis.fetch = originalFetch; }
+});
+
 test('auth mutations retain the strong check ETag and preserve their public bodies', async () => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
