@@ -13,14 +13,19 @@ export type UnlockParameters =
     | { credential: 'pin' }
     | { credential: 'passphrase'; kdfVersion: number; salt: string };
 
-/** The check response is untrusted input: anything that is not a well-formed passphrase account is a PIN account. */
-export function readUnlockParameters(value: unknown): UnlockParameters {
+/**
+ * The check response is untrusted input. Null unless it says, in a well-formed way, what unlocks
+ * the account: with null the caller sends nothing, because what was typed may be a passphrase
+ * and only a PIN may travel as it is.
+ */
+export function readUnlockParameters(value: unknown): UnlockParameters | null {
     const unlock = value && typeof value === 'object' ? value as Record<string, unknown> : null;
+    if (unlock?.credential === 'pin') return { credential: 'pin' };
     if (unlock?.credential === 'passphrase' && Number.isInteger(unlock.kdfVersion)
         && typeof unlock.salt === 'string' && unlock.salt) {
         return { credential: 'passphrase', kdfVersion: unlock.kdfVersion as number, salt: unlock.salt };
     }
-    return { credential: 'pin' };
+    return null;
 }
 
 /* @Codex */

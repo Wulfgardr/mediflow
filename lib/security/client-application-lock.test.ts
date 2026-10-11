@@ -95,12 +95,14 @@ test('application lock confirmation rejects malformed parsed records and transpo
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test('a passphrase account sends its verifier under the same fence; a check response that is not one means a PIN', async () => {
+test('a passphrase account sends its verifier under the same fence; a check response that does not say what unlocks it says nothing', async () => {
     const passphraseAccount = { credential: 'passphrase', kdfVersion: 3, salt: 'c3ludGhldGljLXNhbHQ=' };
     assert.deepEqual(readUnlockParameters({ ...passphraseAccount, unexpected: 'dropped' }), passphraseAccount);
-    for (const other of [undefined, null, 'passphrase', { credential: 'pin' }, { credential: 'passphrase' },
+    assert.deepEqual(readUnlockParameters({ credential: 'pin', salt: 'ignored' }), { credential: 'pin' });
+    // Anything else says nothing: the caller must then send nothing, because only a PIN may travel as typed.
+    for (const unknown of [undefined, null, 'passphrase', {}, { credential: 'passphrase' },
         { ...passphraseAccount, kdfVersion: '3' }, { ...passphraseAccount, salt: '' }, { ...passphraseAccount, credential: 'other' }]) {
-        assert.deepEqual(readUnlockParameters(other), { credential: 'pin' });
+        assert.equal(readUnlockParameters(unknown), null);
     }
 
     const originalFetch = globalThis.fetch;

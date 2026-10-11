@@ -157,12 +157,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         authRecoveryStateRef.current = state;
         setAuthRecoveryState(state);
     };
+    // What the lock screen asks for. It is what the person saw while typing, never what decides how
+    // the secret travels: that is asked again at every unlock.
     const [unlockCredential, setUnlockCredential] = useState<UnlockParameters['credential']>('pin');
-    const unlockParametersRef = useRef<UnlockParameters>({ credential: 'pin' });
-    const applyUnlockParameters = (value: unknown) => {
+    const shownCredentialRef = useRef<UnlockParameters['credential']>('pin');
+    const applyUnlockParameters = (value: unknown): UnlockParameters | null => {
         const unlock = readUnlockParameters(value);
-        unlockParametersRef.current = unlock;
-        setUnlockCredential(unlock.credential);
+        if (unlock) {
+            shownCredentialRef.current = unlock.credential;
+            setUnlockCredential(unlock.credential);
+        }
+        return unlock;
     };
     /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
@@ -398,15 +403,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         void init();
     }, []);
 
-    /** Asks the server again what unlocks the account, without touching session or lock state. */
-    const refreshUnlockParameters = async () => {
+    /** Asks the server, now, what unlocks the account; null when it cannot be known. Session and lock state are not touched. */
+    const askUnlockParameters = async (): Promise<UnlockParameters | null> => {
         try {
             const { response, payload, controlState } = await checkAuthHealthRequest();
-            if (response.ok && payload?.status === 'ok' && controlState !== 'stale' && controlState !== 'invalid') {
-                applyUnlockParameters(payload.unlock);
-            }
+            if (!response.ok || payload?.status !== 'ok' || controlState === 'invalid') return null;
+            return applyUnlockParameters(payload.unlock);
         } catch {
-            // The next attempt asks again.
+            return null;
         }
     };
 
@@ -416,9 +420,23 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         /* @Codex */
         let unacceptedServerAuthority = false;
-        const unlock = unlockParametersRef.current;
+        const shown = shownCredentialRef.current;
         try {
             setAuthErrorMessage(null);
+            // The account may have moved to a passphrase since this tab last looked. Asked before
+            // anything is sent: a passphrase typed into a field that still said PIN stays here.
+            const unlock = await askUnlockParameters();
+            if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
+            if (!unlock) {
+                setAuthErrorMessage('Non riesco a verificare come si sblocca l’archivio. Riprova.');
+                return false;
+            }
+            if (unlock.credential !== shown) {
+                setAuthErrorMessage(unlock.credential === 'passphrase'
+                    ? 'Questo archivio ora si sblocca con la passphrase. Inseriscila.'
+                    : 'Questo archivio si sblocca con il PIN. Inseriscilo.');
+                return false;
+            }
             // ADR 0143: the passphrase never leaves this function. It becomes the key that opens the
             // wrapping, which stays here, and the verifier, which is all the server receives.
             let material: Awaited<ReturnType<typeof deriveUnlockMaterial>> | null = null;
@@ -450,8 +468,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 if (authorityAttemptGenerationRef.current === attemptGeneration) {
                     setAuthErrorMessage(formatLoginFailure((payload as LoginFailurePayload | null) ?? null, res.status, unlock.credential));
                 }
-                // The account may have moved to a passphrase, or changed it, since this tab last asked.
-                void refreshUnlockParameters();
                 return false;
             }
 
