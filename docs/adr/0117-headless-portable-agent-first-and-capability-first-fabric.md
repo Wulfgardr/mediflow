@@ -439,3 +439,36 @@ eseguiti.
 - La release resta bloccata finché la superficie utile, il quickstart e le
   prove exact-candidate non sono integrati. Un ADR accettato non equivale a
   runtime consegnato, release-ready o release pubblicata.
+
+
+## Ammissione del runtime sorgente 0.9.0 — 11 ottobre 2026
+
+`npm run build` costruisce da un checkout Git pulito e registra commit e
+BUILD_ID nello standalone. Una modifica del checkout durante la build o prima
+dello staging interrompe la preparazione: non si attribuisce una build vecchia
+al commit corrente. Il postbuild materializza soltanto alias interni al payload,
+riusa il tracer Headless esistente, copia gli asset Web e genera il ledger
+`runtime-payload-ledger.json` accanto a `standalone`, mai al suo interno.
+Anche una directory Next alternativa, per esempio `.next-e2e`, mantiene il
+proprio BUILD_ID e viene dichiarata nel manifest runtime.
+
+`npm start` e `npm run mcp:intelligent-host:production` verificano quel ledger
+prima di eseguire codice applicativo: membri mancanti, aggiunti o alterati,
+alias e incompatibilità Node 24/ABI/piattaforma/architettura bloccano l'avvio.
+La prova SQLite successiva usa esclusivamente `:memory:`. Entrambi eseguono lo
+stesso standalone verificato: Headless carica da lì anche Supervisor, loader
+e figlio MCP; non usa il grafo sorgente o le dipendenze del checkout come
+secondo runtime. Il launcher forza il Web su loopback e conserva l'autorità
+IPC, il binding Web e la revoca esistenti. Nessun impatto sul contratto `/api/v1`.
+
+La cache Next su disco è disabilitata (`experimental.isrFlushToDisk=false`):
+restano cache in memoria e seed immutabili di build. Non si escludono directory
+mutabili dal ledger; una nuova cache su disco invalida il prossimo avvio.
+Il riavvio deve quindi essere provato dopo richieste reali, non soltanto a build
+appena prodotta.
+
+La fiducia è nel checkout/build locale e nel launcher e ledger esterni al
+payload. Non è una firma né protegge da chi può sostituire anche questi input
+fidati o modificare file durante l'esecuzione. Il bundle macOS firmato conserva
+il proprio percorso di ammissione separato. Questo requisito riguarda i profili
+sorgente, non installer, qualifica clinica o rilascio.

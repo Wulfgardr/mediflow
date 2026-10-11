@@ -64,8 +64,7 @@ async function assertReaped() {
   ownedPids.clear();
 }
 function launch(dataDir, foreignCwd) {
-  return spawn(process.execPath, layout ? [layout.launcher] : [path.join(ROOT, 'scripts/run-strip-types.mjs'),
-    path.join(ROOT, 'scripts/mediflow-headless-supervisor.mjs')], {
+  return spawn(process.execPath, layout ? [layout.launcher] : [path.join(ROOT, 'scripts/source-runtime.mjs'), 'headless'], {
     cwd: layout ? foreignCwd : ROOT,
     env: layout ? { MEDIFLOW_DATA_DIR: dataDir, PATH: foreignCwd,
       MEDIFLOW_NODE_BINARY: path.join(foreignCwd, 'node'),

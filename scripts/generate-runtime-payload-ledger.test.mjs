@@ -194,3 +194,66 @@ for (const mode of [0o755, 0o4644]) {
     assert.throws(() => generatePayloadLedger(input), /installed member mode mismatch/u);
   });
 }
+
+// Same external ledger and startup path used by npm start and source Headless.
+function sourceStartFixture(t) {
+  const f = fixture(t, 'standalone');
+  const web = path.join(f.sourceRoot, '.next', 'standalone');
+  fs.mkdirSync(path.dirname(web)); fs.renameSync(f.payloadRoot, web); f.payloadRoot = web;
+  f.expectedRuntime = { nodeVersion: process.versions.node, nodeAbi: process.versions.modules,
+    platform: process.platform, arch: process.arch };
+  const marker = path.join(f.directory, 'application-executed');
+  f.put(web, 'mediflow-runtime-contract.json', { schemaVersion: 1,
+    node: { major: 24, version: process.versions.node, moduleVersion: process.versions.modules },
+    platform: process.platform, arch: process.arch });
+  f.put(web, 'server.js', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'web');`);
+  f.put(web, 'scripts/register-strip-types-loader.mjs', '// inert synthetic loader');
+  f.put(web, 'scripts/mediflow-headless-supervisor.mjs', `import fs from 'node:fs';
+    export function runHeadlessSupervisorV1() { fs.writeFileSync(${JSON.stringify(marker)}, 'headless'); }`);
+  f.put(web, 'node_modules/better-sqlite3/package.json', { name: 'better-sqlite3', version: 'synthetic', main: 'index.js' });
+  f.put(web, 'node_modules/better-sqlite3/index.js', `module.exports = class {
+    constructor(name) { if (name !== ':memory:') throw new Error('Non-synthetic database'); }
+    prepare() { return { get: () => ({ value: 1 }) }; } close() {} };`);
+  // The synthetic dependency belongs to the synthetic lock, not the host install.
+  const lock = JSON.parse(fs.readFileSync(path.join(f.sourceRoot, 'package-lock.json')));
+  lock.packages['node_modules/better-sqlite3'] = { version: 'synthetic' };
+  f.put(f.sourceRoot, 'package-lock.json', lock);
+  f.put(f.sourceRoot, '.gitignore', '.next/\n'); f.commit();
+  f.put(web, 'mediflow-build-identity.json', { schemaVersion: 1,
+    revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.sourceRoot, encoding: 'utf8' }).trim(), buildId: 'synthetic-build' });
+  const seal = () => f.put(path.dirname(web), 'runtime-payload-ledger.json', generatePayloadLedger(f));
+  seal();
+  const run = mode => spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import { startSourceRuntime } from ${JSON.stringify(new URL('./source-runtime.mjs', import.meta.url).href)};
+    await startSourceRuntime(${JSON.stringify(mode)}, ${JSON.stringify(f.sourceRoot)});`],
+  { env: { MEDIFLOW_DATA_DIR: f.directory }, encoding: 'utf8', timeout: 15000 });
+  return { ...f, marker, seal, run };
+}
+
+test('source Web and Headless launch the admitted payload, independently of cwd', t => {
+  const f = sourceStartFixture(t);
+  for (const mode of ['web', 'headless']) {
+    const result = f.run(mode); assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(f.marker, 'utf8'), mode); fs.unlinkSync(f.marker);
+  }
+});
+
+for (const mutation of ['missing', 'altered', 'extra', 'node', 'abi', 'arch']) {
+  test(`source startup denies ${mutation} before Web or Headless application execution`, t => {
+    const f = sourceStartFixture(t);
+    if (mutation === 'missing') fs.unlinkSync(path.join(f.payloadRoot, 'scripts/register-strip-types-loader.mjs'));
+    if (mutation === 'altered') fs.appendFileSync(path.join(f.payloadRoot, 'server.js'), '// changed');
+    if (mutation === 'extra') f.put(f.payloadRoot, '.next/server/route-cache/APP_PAGE/extra', 'not admitted');
+    if (mutation === 'node') f.put(f.sourceRoot, '.nvmrc', '26\n');
+    if (mutation === 'abi' || mutation === 'arch') {
+      const contract = JSON.parse(fs.readFileSync(path.join(f.payloadRoot, 'mediflow-runtime-contract.json')));
+      if (mutation === 'abi') { contract.node.moduleVersion = '999'; f.expectedRuntime.nodeAbi = '999'; }
+      else { contract.arch = process.arch === 'x64' ? 'arm64' : 'x64'; f.expectedRuntime.arch = contract.arch; }
+      f.put(f.payloadRoot, 'mediflow-runtime-contract.json', contract); f.seal();
+    }
+    for (const mode of ['web', 'headless']) {
+      assert.notEqual(f.run(mode).status, 0, mutation);
+      assert.equal(fs.existsSync(f.marker), false, `${mode} must not execute before admission`);
+    }
+  });
+}
