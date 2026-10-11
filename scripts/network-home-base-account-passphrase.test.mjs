@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // ADR 0143 over real HTTP: an account moves from its PIN to a passphrase, then only the
-// passphrase opens it. The client side is written here with node:crypto alone, the way a
-// second implementation would follow the documented construction.
+// passphrase opens it, and the recovery key sets a new one when it is lost. The client side is
+// written here with node:crypto alone, the way a second implementation would follow the
+// documented construction.
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -13,10 +14,11 @@ const LOCAL_API_TOKEN = process.env.MEDIFLOW_LOCAL_API_TOKEN || 'mediflow-networ
 const USERNAME = process.env.E2E_USERNAME || 'admin';
 const PIN = process.env.E2E_PIN || '1234';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
+const NEW_PASSPHRASE = 'una passphrase del tutto nuova';
 const PIN_KDF_ITERATIONS = { 1: 100_000, 2: 600_000 };
 const UNLOCK_KDF_ITERATIONS = 2_000_000;
 
-test('an account moves from its PIN to a passphrase and the PIN stops opening it', async () => {
+test('an account moves from its PIN to a passphrase, the PIN stops opening it, and the recovery key sets a new passphrase', async () => {
     const ready = await request('GET', '/api/v1/ambulatories', { headers: { Authorization: `Bearer ${LOCAL_API_TOKEN}` } });
     assert.equal(ready.response.status, 200);
 
@@ -91,6 +93,44 @@ test('an account moves from its PIN to a passphrase and the PIN stops opening it
     assert.deepEqual([rewrap.response.status, rewrap.json?.code], [409, 'KDF_REWRAP_NOT_APPLICABLE']);
     const still = await login({ verifier: material.verifier });
     assert.equal(still.json.encryptedMasterKey, unlock.blob);
+
+    // The passphrase is lost. The kit and the recovery key give the master key back in the browser...
+    const recovered = openRecoveryWrapping(recovery.blob, recovery.salt, recovery.recoveryKey);
+    assert.deepEqual(recovered.masterKey, masterKey);
+    assert.equal(recovered.verifier, recovery.verifier);
+    // ...which wraps it under a new passphrase and a new recovery key, and asks with no session.
+    const next = passphraseWrapping(recovered.masterKey, NEW_PASSPHRASE);
+    const nextRecovery = recoveryWrapping(recovered.masterKey);
+    const recover = (overrides = {}, headers = sameOrigin) => request('POST', '/api/auth/passphrase/recover', {
+        headers,
+        body: {
+            username: USERNAME, recoveryVerifier: recovered.verifier,
+            encryptedMasterKey: next.blob, salt: next.salt, verifier: next.verifier,
+            recovery: { wrappedMasterKey: nextRecovery.blob, salt: nextRecovery.salt, verifier: nextRecovery.verifier },
+            ...overrides,
+        },
+    });
+
+    assert.equal((await recover({}, {})).response.status, 403);
+    const keptKey = await recover({ recovery: { wrappedMasterKey: nextRecovery.blob, salt: nextRecovery.salt, verifier: recovered.verifier } });
+    assert.deepEqual([keptKey.response.status, keptKey.json?.code], [400, 'PASSPHRASE_RECOVERY_INVALID']);
+    const wrongKey = await recover({ recoveryVerifier: crypto.randomBytes(32).toString('base64') });
+    assert.deepEqual([wrongKey.response.status, wrongKey.json?.message], [401, 'Chiave di recupero o kit non validi. Tentativi rimasti: 4.']);
+    assert.equal((await login({ verifier: material.verifier })).response.status, 200, 'refused recoveries change nothing');
+
+    const done = await recover();
+    assert.deepEqual([done.response.status, done.json], [200, { success: true }]);
+
+    // Sessions are retired, the old passphrase and the spent recovery key are refused, the new passphrase opens the same key.
+    const retired = await request('PUT', '/api/auth/profile', { headers: { Cookie: still.cookieHeader }, body: { displayName: 'Synthetic' } });
+    assert.equal(retired.response.status, 401);
+    assert.equal((await login({ verifier: material.verifier })).response.status, 401);
+    assert.equal((await recover()).response.status, 401);
+    assert.deepEqual((await check()).unlock, { credential: 'passphrase', kdfVersion: 3, salt: next.salt });
+    const nextMaterial = unlockMaterial(NEW_PASSPHRASE, next.salt);
+    const nextLogin = await login({ verifier: nextMaterial.verifier });
+    assert.equal(nextLogin.response.status, 200);
+    assert.deepEqual(openWrapping(nextLogin.json.encryptedMasterKey.slice(3), nextMaterial.kek), masterKey);
 });
 
 async function check() { return (await request('GET', '/api/auth/check')).json; }
@@ -136,9 +176,18 @@ function passphraseWrapping(masterKey, passphrase) {
     const { kek, verifier } = unlockMaterial(passphrase, salt);
     return { blob: `v3:${wrap(masterKey, kek)}`, salt, verifier };
 }
+// The recovery key is 160 random bits; HKDF with the salt of the kit separates its two uses.
+function recoveryMaterial(recoveryKey, saltBase64) {
+    const derive = (info) => Buffer.from(crypto.hkdfSync('sha256', recoveryKey, Buffer.from(saltBase64, 'base64'), info, 32));
+    return { kek: derive('mediflow.recovery.kek.v1'), verifier: derive('mediflow.recovery.verifier.v1').toString('base64') };
+}
 function recoveryWrapping(masterKey) {
     const recoveryKey = crypto.randomBytes(20);
-    const salt = crypto.randomBytes(16);
-    const derive = (info) => Buffer.from(crypto.hkdfSync('sha256', recoveryKey, salt, info, 32));
-    return { blob: `r1:${wrap(masterKey, derive('mediflow.recovery.kek.v1'))}`, salt: salt.toString('base64'), verifier: derive('mediflow.recovery.verifier.v1').toString('base64') };
+    const salt = crypto.randomBytes(16).toString('base64');
+    const { kek, verifier } = recoveryMaterial(recoveryKey, salt);
+    return { recoveryKey, blob: `r1:${wrap(masterKey, kek)}`, salt, verifier };
+}
+function openRecoveryWrapping(blob, saltBase64, recoveryKey) {
+    const { kek, verifier } = recoveryMaterial(recoveryKey, saltBase64);
+    return { masterKey: openWrapping(blob.slice(3), kek), verifier };
 }
