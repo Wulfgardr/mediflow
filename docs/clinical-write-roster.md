@@ -7,18 +7,13 @@ read_when:
 # Roster operativo delle scritture cliniche — C05
 
 Roster per [WUL-720](https://linear.app/wulfgardr/issue/WUL-720), ricavato dalla
-base `fe974d1956a72d97bf90fc10fd36d0892b092b8e` e aggiornato con la migrazione
-atomica del diario SISS locale e delle membership ambulatoriali. Le correzioni successive aggiornano la riga
-interessata insieme al codice. Le celle con un gap indicano lavoro ancora aperto
-in C05; la presenza della tabella non ne attesta il completamento.
-
-Una riga HTTP identifica **metodo + adapter + superficie**. Il profilo richiamato
-nella riga ne completa validazione, identificativi, transazione, audit e prove:
-i profili sono parte del roster, non un rinvio a una verifica non eseguita.
-`TX+audit` significa che il core corrente inserisce l'evento nella stessa
-transazione; non significa che tutti gli input e tutti i client siano qualificati.
-`Nessuno` e `al meglio` sono debiti distinti, entrambi aperti quando attestano
-una mutazione clinica. Il request ID resta correlazione, non idempotenza.
+base `fe974d1956a72d97bf90fc10fd36d0892b092b8e` e mantenuto insieme alle migrazioni
+C05. Le righe del CSV sono la mappa corrente C01: distinguono CRUD migrato,
+writer non ordinari e differenze residue, senza riaprire automaticamente C05.
+Una riga HTTP identifica metodo, adapter e superficie; il profilo ne completa
+significato, validazione, identificativi e prove. La transazione con audit non
+qualifica da sola tutti i caller né le sequenze composte. Il request ID è
+correlazione, non una chiave generale di idempotenza.
 
 ## Fonti e regole di lettura
 
@@ -125,7 +120,7 @@ Sorgenti: [lib/api-schemas/patient-bulk.ts](../lib/api-schemas/patient-bulk.ts).
 
 Schema array ID e ambulatorio; lookup pazienti attivi/target. Move richiede mappa patientVersions esatta, CAS e preflight dell’incrementabilità dell’intero batch prima delle membership; duplicate genera UUID e copia le righe nella transazione batch. Assign/unassign richiedono la mappa patientVersions esatta e verificano tutto il batch prima degli effetti. Ogni modifica effettiva aggiorna versione/updatedAt e audit nella stessa transazione immediata; primary resta invariato. No-op con versione corrente non modifica dati né audit; richieste stale e replay di mutazioni restituiscono 409. Anche move e duplicate inseriscono gli eventi obbligatori nella propria transazione immediata e limitano il JSON a 256 KiB. Duplicate include i lookup nello stesso snapshot e conserva campi e versione degli originali nei nuovi cloni.
 
-Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Duplicate richiede sourceAmbulatoryId, patientVersions esatta e duplicateIntentId UUID; verifica appartenenza sorgente e versioni del batch prima degli effetti. Il token viene consumato nella stessa transazione di cloni e audit: qualunque riuso restituisce 409 anche dopo la rimozione dei cloni. Assign/unassign respingono versioni superate anche da fix-orphans, migrate-m2m e clear. Restore C15 e purge seguito da ricreazione dello stesso ID/versione restano casi distinti da risolvere.
+Prove di riferimento: [lib/patient-ambulatory-membership.test.ts](../lib/patient-ambulatory-membership.test.ts). test:patient-ambulatory-membership è riferimento adiacente, non prova completa dei quattro endpoint. Duplicate richiede sourceAmbulatoryId, patientVersions esatta e duplicateIntentId UUID; verifica appartenenza sorgente e versioni del batch prima degli effetti. Il token viene consumato nella stessa transazione di cloni e audit: qualunque riuso restituisce 409 anche dopo la rimozione dei cloni. Assign/unassign respingono versioni superate anche da fix-orphans, migrate-m2m e clear. Export/restore in un nuovo archivio resta C15; il retirement degli ID impedisce la ricreazione dopo purge nell’archivio attivo.
 
 La [suite SQLite delle membership](../lib/patient-membership-required-audit.test.ts),
 selezionata dal profilo unit richiesto, verifica successo con identità host,
@@ -202,95 +197,18 @@ I tre core PR/SP/A sono transazionali immediati. S usa `siss.handoff.*` nella st
 evento solo perché il dominio compare nella taxonomy.
 
 
-## Tabella degli ingressi di mutazione
+## Mappa canonica degli ingressi e dei caller
 
-`Profilo` rinvia alle regole e ai test sopra. I metodi PUT possono includere
-più transizioni ammesse (stato, archiviazione, tombstone/ripristino): queste non
-sono nuovi endpoint. Le righe non elencano GET, preview o route ritirate come commit.
-
-| ID | Superficie, metodo e adapter | Profilo / validazione e body | ID, parent e versione | Owner transazione / audit | Stato e coorte |
-| --- | --- | --- | --- | --- | --- |
-| A-01 | Web PUT [/api/ambulatories/[id]/route.ts](../app/api/ambulatories/[id]/route.ts) | A; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | ambulatory-write; **TX+audit** | Audit e body migrati; prove C05-A sopra |
-| A-02 | Web DELETE [/api/ambulatories/[id]/route.ts](../app/api/ambulatories/[id]/route.ts) | A; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | ambulatory-write; **TX+audit** | Audit e body migrati; prove C05-A sopra |
-| A-03 | Web POST [/api/ambulatories/clear/route.ts](../app/api/ambulatories/clear/route.ts) | A; JSON oggetto ≤ 4 MiB | ambulatoryId + versione; solo test container | ambulatory-write; **TX+audit** | Audit e body migrati; prove C05-A sopra |
-| A-04 | Web POST [/api/ambulatories/route.ts](../app/api/ambulatories/route.ts) | A; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | ambulatory-write; **TX+audit** | Audit, body e campi create validati; prove C05-A sopra |
-| D-01 | Web PUT [/api/attachments/[id]/content/route.ts](../app/api/attachments/[id]/content/route.ts) | D; JSON ≤ resolveMaxAttachmentBytes | ID/currentness del profilo; no patients.version | TX esterna + currentness savepoint; **TX+audit** | Audit migrato; CAS content preservato |
-| D-02 | Web PUT [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; JSON oggetto ≤ 4 MiB | ID, patientId e currentness osservata; no patients.version | TX esterna + currentness savepoint; **TX+audit** | Audit e precondizione client migrati; stale/replay senza effetti |
-| D-03 | Web DELETE [/api/attachments/[id]/route.ts](../app/api/attachments/[id]/route.ts) | D; JSON oggetto ≤ 4 MiB | ID, patientId e currentness osservata | Precheck+delete in TX immediata; **TX+audit** | Audit e CAS migrati; replay/ricreazione respinti |
-| D-04 | Web POST [/api/attachments/route.ts](../app/api/attachments/route.ts) | D; JSON bounded al limite attachment + payload | ID omesso UUID, invalido400, duplicato409; currentness host; parent attivo | attachment-web-create TX immediata; **TX+audit** | Create migrato; altri writer C05-D aperti |
-| C-01 | Web PUT [/api/checkups/[id]/route.ts](../app/api/checkups/[id]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| C-02 | Web DELETE [/api/checkups/[id]/route.ts](../app/api/checkups/[id]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| C-03 | Web POST [/api/checkups/route.ts](../app/api/checkups/route.ts) | C; 4 MiB | Create: ID/parent del profilo; versione host | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-01 | Web PUT [/api/entries/[id]/route.ts](../app/api/entries/[id]/route.ts) | E; 4 MiB | ID path; parent e versione del profilo | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-02 | Web DELETE [/api/entries/[id]/route.ts](../app/api/entries/[id]/route.ts) | E; 4 MiB | ID path; parent e versione del profilo | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-03 | Web POST [/api/entries/route.ts](../app/api/entries/route.ts) | E; 4 MiB | Create: ID/parent del profilo; versione host | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-01 | Web PUT [/api/observations/[id]/route.ts](../app/api/observations/[id]/route.ts) | O; 4 MiB | ID path; parent e versione del profilo | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-02 | Web DELETE [/api/observations/[id]/route.ts](../app/api/observations/[id]/route.ts) | O; 4 MiB | ID path; parent e versione del profilo | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-03 | Web POST [/api/observations/route.ts](../app/api/observations/route.ts) | O; 4 MiB | Create: ID/parent del profilo; versione host | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-01 | Web PUT [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-update-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-02 | Web DELETE [/api/patients/[id]/route.ts](../app/api/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-delete-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| B-01 | Web POST [/api/patients/assign/route.ts](../app/api/patients/assign/route.ts) | B; 256 KiB | Array patientIds, targetAmbulatoryId e mappa patientVersions esatta; CAS | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input e CAS migrati; prova membership sotto |
-| B-02 | Web POST [/api/patients/duplicate/route.ts](../app/api/patients/duplicate/route.ts) | B; 256 KiB | IDs, source/target, versioni esatte e intento UUID; UUID nuovo per clone | Precheck+token+clone+membership in TX immediata; **TX+audit** | CAS/replay archivio attivo migrati; restore nuovo DB resta C15 |
-| B-03 | Web POST [/api/patients/move/route.ts](../app/api/patients/move/route.ts) | B; 256 KiB | Array patientIds, target e mappa patientVersions esatta; CAS | TX immediata adapter; **TX+audit** per paziente | Audit/input migrati; prova move nel profilo B |
-| P-03 | Web POST [/api/patients/route.ts](../app/api/patients/route.ts) | P; 4 MiB | Create: ID/parent del profilo; versione host | TX adapter + patient-create-service; **TX+audit** | Migrato; delta/prove per profilo |
-| B-04 | Web POST [/api/patients/unassign/route.ts](../app/api/patients/unassign/route.ts) | B; 256 KiB | Array patientIds, ambulatoryId e mappa patientVersions esatta; CAS | TX immediata adapter con lookup; **TX+audit** per modifica effettiva | Audit/input e CAS migrati; prova membership sotto |
-| PR-01 | Web PUT [/api/prosthetic-prescriptions/[id]/route.ts](../app/api/prosthetic-prescriptions/[id]/route.ts) | PR; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | prosthetic-prescription-write; **TX+audit** | Audit, body e ID create migrati; prove PR sopra |
-| PR-02 | Web DELETE [/api/prosthetic-prescriptions/[id]/route.ts](../app/api/prosthetic-prescriptions/[id]/route.ts) | PR; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | prosthetic-prescription-write; **TX+audit** | Audit, body e ID create migrati; prove PR sopra |
-| PR-03 | Web POST [/api/prosthetic-prescriptions/route.ts](../app/api/prosthetic-prescriptions/route.ts) | PR; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | prosthetic-prescription-write; **TX+audit** | Audit, body e ID create migrati; prove PR sopra |
-| SP-01 | Web PUT [/api/service-prescription-items/[id]/route.ts](../app/api/service-prescription-items/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-02 | Web DELETE [/api/service-prescription-items/[id]/route.ts](../app/api/service-prescription-items/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-03 | Web POST [/api/service-prescription-items/route.ts](../app/api/service-prescription-items/route.ts) | SP; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-04 | Web PUT [/api/service-prescriptions/[id]/route.ts](../app/api/service-prescriptions/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-05 | Web DELETE [/api/service-prescriptions/[id]/route.ts](../app/api/service-prescriptions/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-06 | Web POST [/api/service-prescriptions/route.ts](../app/api/service-prescriptions/route.ts) | SP; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| S-01 | Web PUT [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; 256 KiB + schema | ID path, patientId/versione osservati | CAS+bump in TX IMMEDIATE; **TX+audit** | Audit/CAS e caller migrati; replay stale409 |
-| S-02 | Web DELETE [/api/siss-handoffs/[id]/route.ts](../app/api/siss-handoffs/[id]/route.ts) | S; 256 KiB + schema | ID path, patientId/versione osservati | CAS+delete in TX IMMEDIATE; **TX+audit** | Audit/CAS e conferma osservata migrati |
-| S-03 | Web POST [/api/siss-handoffs/route.ts](../app/api/siss-handoffs/route.ts) | S; 256 KiB + schema | ID/parent attivo in TX; dup409; versione host1 | TX adapter IMMEDIATE; **TX+audit** | Audit migrato; versione restituita al caller |
-| M-05 | Web GET/POST [/api/system/migrate-m2m/route.ts](../app/api/system/migrate-m2m/route.ts) | M; Web admin; POST strict JSON ≤ 64 KiB | Snapshot esatta paziente/versione/primario/versione target; GET rifiuta preview oltre limite | Confronto completo prima di relink+bump; **TX+audit** | Suite membership: stale, target, replay interposto, rollback, limiti/auth; identità patient ritirate dal purge, C15 distinto |
-| M-01 | Web POST [/api/system/fix-orphans/route.ts](../app/api/system/fix-orphans/route.ts) | M; oggetto ≤ 64 KiB, expectedSnapshot obbligatorio | digest del piano GET coerente; flag purge booleano opzionale | Confronto+preflight prima di default/relink/purge in TX immediata; **TX+audit** | CAS del piano e replay interposto migrati; identità patient ritirate dal purge, C15 distinto |
-| M-02 | Web POST [/api/system/purge-patient/route.ts](../app/api/system/purge-patient/route.ts) | M; JSON oggetto ≤ 64 KiB | patientId/versione osservati; GET coerente con deletedAt | CAS prima di cascade/revoca; **TX+audit** | Suite purge: stale/input senza effetti né revoca; retirement atomico dell’ID patient; CAS non copre snapshot figli, C15 distinto |
-| M-03 | Web POST [/api/system/restore-patient/route.ts](../app/api/system/restore-patient/route.ts) | M; 65.536 byte; solo patientId | patientId/tombstone; versione host nel restore | TX adapter immediata; **TX+audit** | Restore migrato |
-| T-01 | Web PUT [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| T-02 | Web DELETE [/api/therapies/[id]/route.ts](../app/api/therapies/[id]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| T-03 | Web POST [/api/therapies/route.ts](../app/api/therapies/route.ts) | T; 4 MiB | Create: ID/parent del profilo; versione host | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| A-05 | paired PUT [/api/v1/network/ambulatories/[id]/route.ts](../app/api/v1/network/ambulatories/[id]/route.ts) | A; 4 MiB | ID path; parent e versione del profilo | ambulatory-write; **TX+audit** | Audit e body migrati; prove C05-A sopra |
-| A-06 | paired DELETE [/api/v1/network/ambulatories/[id]/route.ts](../app/api/v1/network/ambulatories/[id]/route.ts) | A; 4 MiB | ID path; parent e versione del profilo | ambulatory-write; **TX+audit** | Audit e body migrati; prove C05-A sopra |
-| A-07 | paired POST [/api/v1/network/ambulatories/clear/route.ts](../app/api/v1/network/ambulatories/clear/route.ts) | A; 4 MiB | ambulatoryId + versione; solo test container | ambulatory-write; **TX+audit** | Audit e body migrati; prove C05-A sopra |
-| A-08 | paired POST [/api/v1/network/ambulatories/route.ts](../app/api/v1/network/ambulatories/route.ts) | A; 4 MiB | Create: ID/parent del profilo; versione host | ambulatory-write; **TX+audit** | Audit, body e campi create validati; prove C05-A sopra |
-| D-05 | paired POST [/api/v1/network/patients/[id]/attachments/route.ts](../app/api/v1/network/patients/[id]/attachments/route.ts) | D; payload + 4 MiB; 30 s; 1 in-flight | ID/currentness del profilo; no patients.version | network-attachment-write TX; **TX+audit** | Audit paired migrato; allowlist e scope preservati |
-| C-04 | paired PUT [/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts](../app/api/v1/network/patients/[id]/checkups/[checkupId]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| C-05 | paired POST [/api/v1/network/patients/[id]/checkups/route.ts](../app/api/v1/network/patients/[id]/checkups/route.ts) | C; 4 MiB | Create: ID/parent del profilo; versione host | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-04 | paired PUT [/api/v1/network/patients/[id]/entries/[entryId]/route.ts](../app/api/v1/network/patients/[id]/entries/[entryId]/route.ts) | E; 4 MiB | ID path; parent e versione del profilo | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-05 | paired POST [/api/v1/network/patients/[id]/entries/route.ts](../app/api/v1/network/patients/[id]/entries/route.ts) | E; 4 MiB | Create: ID/parent del profilo; versione host | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-04 | paired PUT [/api/v1/network/patients/[id]/observations/[observationId]/route.ts](../app/api/v1/network/patients/[id]/observations/[observationId]/route.ts) | O; 4 MiB | ID path; parent e versione del profilo | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-05 | paired POST [/api/v1/network/patients/[id]/observations/route.ts](../app/api/v1/network/patients/[id]/observations/route.ts) | O; 4 MiB | Create: ID/parent del profilo; versione host | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-04 | paired POST [/api/v1/network/patients/[id]/restore/route.ts](../app/api/v1/network/patients/[id]/restore/route.ts) | P; 4 MiB | ID path, scope, tombstone e versione attesa/CAS | network-patient-lifecycle restore; **TX+audit** | Migrato; delta/prove per profilo |
-| P-05 | paired PUT [/api/v1/network/patients/[id]/route.ts](../app/api/v1/network/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-update-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-06 | paired DELETE [/api/v1/network/patients/[id]/route.ts](../app/api/v1/network/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | network-patient-lifecycle; **TX+audit** | Migrato; delta/prove per profilo |
-| T-04 | paired PUT [/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts](../app/api/v1/network/patients/[id]/therapies/[therapyId]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| T-05 | paired POST [/api/v1/network/patients/[id]/therapies/route.ts](../app/api/v1/network/patients/[id]/therapies/route.ts) | T; 4 MiB | Create: ID/parent del profilo; versione host | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-07 | paired POST [/api/v1/network/patients/route.ts](../app/api/v1/network/patients/route.ts) | P; 4 MiB | Create: ID/parent del profilo; versione host | network-patient-lifecycle; **TX+audit** | Migrato; delta/prove per profilo |
-| PR-04 | paired PUT [/api/v1/network/prosthetic-prescriptions/[id]/route.ts](../app/api/v1/network/prosthetic-prescriptions/[id]/route.ts) | PR; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | prosthetic-prescription-write; **TX+audit** | Audit, body e ID create migrati; prove PR sopra |
-| PR-05 | paired POST [/api/v1/network/prosthetic-prescriptions/route.ts](../app/api/v1/network/prosthetic-prescriptions/route.ts) | PR; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | prosthetic-prescription-write; **TX+audit** | Audit, body e ID create migrati; prove PR sopra |
-| SP-07 | paired PUT [/api/v1/network/service-prescription-items/[id]/route.ts](../app/api/v1/network/service-prescription-items/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-08 | paired POST [/api/v1/network/service-prescription-items/route.ts](../app/api/v1/network/service-prescription-items/route.ts) | SP; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-09 | paired PUT [/api/v1/network/service-prescriptions/[id]/route.ts](../app/api/v1/network/service-prescriptions/[id]/route.ts) | SP; JSON oggetto ≤ 4 MiB | ID path; parent e versione del profilo | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| SP-10 | paired POST [/api/v1/network/service-prescriptions/route.ts](../app/api/v1/network/service-prescriptions/route.ts) | SP; JSON oggetto ≤ 4 MiB | Create: ID/parent del profilo; versione host | service-prescription-write; **TX+audit** | Audit, body, ID create e ordinal migrati; prove SP sopra |
-| C-06 | v1 PUT [/api/v1/patients/[id]/checkups/[checkupId]/route.ts](../app/api/v1/patients/[id]/checkups/[checkupId]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| C-07 | v1 DELETE [/api/v1/patients/[id]/checkups/[checkupId]/route.ts](../app/api/v1/patients/[id]/checkups/[checkupId]/route.ts) | C; 4 MiB | ID path; parent e versione del profilo | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| C-08 | v1 POST [/api/v1/patients/[id]/checkups/route.ts](../app/api/v1/patients/[id]/checkups/route.ts) | C; 4 MiB | Create: ID/parent del profilo; versione host | checkup-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-06 | v1 PUT [/api/v1/patients/[id]/entries/[entryId]/route.ts](../app/api/v1/patients/[id]/entries/[entryId]/route.ts) | E; 4 MiB | ID path; parent e versione del profilo | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-07 | v1 DELETE [/api/v1/patients/[id]/entries/[entryId]/route.ts](../app/api/v1/patients/[id]/entries/[entryId]/route.ts) | E; 4 MiB | ID path; parent e versione del profilo | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| E-08 | v1 POST [/api/v1/patients/[id]/entries/route.ts](../app/api/v1/patients/[id]/entries/route.ts) | E; 4 MiB | Create: ID/parent del profilo; versione host | entry-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-06 | v1 PUT [/api/v1/patients/[id]/observations/[observationId]/route.ts](../app/api/v1/patients/[id]/observations/[observationId]/route.ts) | O; 4 MiB | ID path; parent e versione del profilo | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-07 | v1 DELETE [/api/v1/patients/[id]/observations/[observationId]/route.ts](../app/api/v1/patients/[id]/observations/[observationId]/route.ts) | O; 4 MiB | ID path; parent e versione del profilo | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| O-08 | v1 POST [/api/v1/patients/[id]/observations/route.ts](../app/api/v1/patients/[id]/observations/route.ts) | O; 4 MiB | Create: ID/parent del profilo; versione host | observation-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-08 | v1 PUT [/api/v1/patients/[id]/route.ts](../app/api/v1/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-update-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-09 | v1 DELETE [/api/v1/patients/[id]/route.ts](../app/api/v1/patients/[id]/route.ts) | P; 4 MiB | ID path; parent e versione del profilo | patient-delete-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| T-06 | v1 PUT [/api/v1/patients/[id]/therapies/[therapyId]/route.ts](../app/api/v1/patients/[id]/therapies/[therapyId]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| T-07 | v1 DELETE [/api/v1/patients/[id]/therapies/[therapyId]/route.ts](../app/api/v1/patients/[id]/therapies/[therapyId]/route.ts) | T; 4 MiB | ID path; parent e versione del profilo | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| T-08 | v1 POST [/api/v1/patients/[id]/therapies/route.ts](../app/api/v1/patients/[id]/therapies/route.ts) | T; 4 MiB | Create: ID/parent del profilo; versione host | therapy-write-operation; **TX+audit** | Migrato; delta/prove per profilo |
-| P-10 | v1 POST [/api/v1/patients/route.ts](../app/api/v1/patients/route.ts) | P; 4 MiB | Create: ID/parent del profilo; versione host | TX adapter create v1; **TX+audit** | Migrato; delta/prove per profilo |
+La fonte unica leggibile da macchina è [clinical-write-surfaces.csv](./clinical-write-surfaces.csv).
+Una riga descrive una mutazione per superficie oppure un caller composto che
+rinvia agli ID dei writer: i rinvii non contano come nuovi commit. Il CSV conserva
+ID e profili delle precedenti righe HTTP, aggiunge gli owner non ordinari e separa
+`active`, export senza caller produzione osservato e worker di prova.
+Autorizzazione, versione/currentness, transazione e audit sono campi distinti;
+`no` indica assenza osservata, non un permesso a omettere la garanzia.
+Le differenze cliniche e le prove di riferimento restano nei profili sopra.
+La [mappa delle altre autorità e disposizioni C01](./authority-census.md) classifica
+restore, schema, processi, rete e custodia, senza confonderli con CRUD clinico.
 
 ## Identificativi: regola trasversale da conservare nel roster
 
@@ -310,23 +228,15 @@ la corrispondenza della mappa versioni per move; create allegato Web accetta ID 
 UUID solo se omesso, mentre upload paired lo genera; duplicate genera UUID per ciascun clone.
 Non introdurre una nuova politica ID trasversale durante la sola migrazione SISS.
 
-## Chiamanti composti, import e seeder
+## Caller composti e percorsi senza commit
 
-| Operazione / ingresso | Validazione, ID e confine | Transazione e audit raggiunti | Test / gap assegnato |
-| --- | --- | --- | --- |
-| Web `seedDatabase` in [seeder.ts](../lib/seeder.ts), UI [data-seeder](../components/data-seeder.tsx) | Opzioni/count e generazione sintetica; add pazienti, terapie, allegati, checkup, diario tramite [ApiTable.add](../lib/db.ts). | Ogni chiamata HTTP ha il confine della sua riga; nessuna transazione comune al seed. Audit ereditato dai writer aggiornati, compresi gli allegati. | [seeder-outcomes](../lib/seeder-outcomes.test.ts) prova il caller con HTTP sintetico: conteggi dei salvataggi confermati, pazienti completati ed errore parziale senza rollback o retry; la UI conserva il progresso e non espone stack. Le garanzie SQLite restano nelle suite dei writer raggiunti. |
-| Web `nukeTestData(false)` | Filtra il prefisso TEST, elimina pazienti con versione, poi cleanup figli tramite facade; catch per tabella. | Scritture separate; ogni errore cleanup viene propagato dopo aver atteso tutte le operazioni già avviate. Le letture non autenticate falliscono; i conteggi includono solo DELETE confermate. Non equivale a purge atomico. | [seeder-outcomes](../lib/seeder-outcomes.test.ts) verifica successo, primo fallimento, errore figlio dopo tombstone e attesa dei cleanup avviati; precondizioni allegati preservate. |
-| Web `nukeTestData(true)` | `clear` di diario, terapie, checkup, allegati, pazienti, conversazioni, messaggi. | [ApiTable.clear](../lib/db.ts) prova DELETE collection e, su 404/405, DELETE individuali; per allegati propaga patientId/currentness della lista osservata. Nessuna TX globale; errore esplicito sui risultati parziali. | [api-table-clear-outcomes](../lib/api-table-clear-outcomes.test.ts) verifica GET non autenticata e attesa dei DELETE avviati. Le precondizioni versione/currentness restano richieste; il reset totale non dichiara conteggi che le risposte bulk non confermano. Nessuna transazione comune dedotta dal successo dei singoli clear. |
-| Web import anagrafico da documento | [patient-document-import-service](../lib/domain/documents/patient-document-import-service.ts), [patient-bulk-import](../lib/patient-bulk-import.ts): revisione e facade; create context vincola la creazione corrente. | Raggiunge create paziente e scritture successive; non assumere TX comune paziente/terapie dal wizard. | [patient-bulk-import.test](../lib/patient-bulk-import.test.ts), [patient-document-import-service.test](../lib/domain/documents/patient-document-import-service.test.ts); `test:patient-document-import`, E2E separato. C05-IMPORT: preservare mappa caller→route e risultati parziali. |
-| Web Patient Insight, salvataggio risultato | [ai-summary-service](../lib/ai-summary-service.ts) aggiorna `aiSummary`, timestamp/hash e versione letta, tramite `db.patients.update`. | Raggiunge P-01: transazione e audit paziente; non crea una prescrizione. | C05-IMPORT/P: includere conflitto e contesto corrente; la prova del core non qualifica da sola il ciclo generazione→salvataggio. |
-| Web Document Synthesis e archivio insights | La UI corrente usa Fabric proposal-only: la funzione legacy `synthesizeDocument` nel [service](../lib/domain/documents/document-synthesis-service.ts) non risulta chiamata dai percorsi esaminati. L’[archivio insight](../lib/domain/documents/document-insights-archive.ts) alimenta il PUT paziente con versione osservata. | P-01, versione paziente letta e audit del core. | [document-insights-archive.test](../lib/domain/documents/document-insights-archive.test.ts); C05-IMPORT/P: mantenere proposta e persistenza distinte, senza nuovi poteri di applicazione. |
-| Web terapia con diagnosi aggiunta al paziente | [therapy-manager](../components/therapy-manager.tsx): create terapia seguito, se necessario, da update diagnosi con versione paziente. | T-03 e P-01 sono commit separati: nessuna TX comune dedotta dalla UI. | C05-IMPORT/T: distinguere terapia creata da aggiornamento diagnosi fallito. |
-| Web edit paziente con checkup | [patient-edit-form](../components/patient-edit-form.tsx) → [patient-edit-session](../lib/patient-edit-session.ts), dipendenze update paziente e create/update/delete checkup. | Raggiunge P e C; non dichiarare atomicità dell'intera sequenza dal singolo core. | [patient-edit-session.test](../lib/patient-edit-session.test.ts); C05-IMPORT/P/C: conservare draft, versioni ed esiti parziali. |
-| Web Smart Import apply client legacy | [patient-smart-import-service](../lib/domain/documents/patient-smart-import-service.ts) prepara selezione/ID, poi `db.applyPatientSmartImport` nella [facade](../lib/db.ts). | La destinazione è l'endpoint ritirato sotto: il codice client presente non dimostra una scrittura attiva riuscita. | C05-IMPORT: visibile come percorso non operativo, nessuna riattivazione implicita. |
-| Web POST create-context | [route](../app/api/patients/create-context/route.ts): autorizza contesto/preview; nessun paziente inserito qui. | Il commit resta nel POST paziente P; non contare il grant come scrittura clinica. | [patient-create-service.test](../lib/patient-create-service.test.ts); C05-P. |
-| Smart Import legacy POST patient | [route ritirata](../app/api/patients/[id]/smart-import/route.ts): fail-closed, nessuna mutazione clinica ammessa. | Non è un writer da migrare riattivandolo. | [test retired](../lib/legacy-smart-import-apply-retired-route.test.ts); capability proposal-only separate. |
-| Allegato local-extraction POST / DELETE | [route](../app/api/attachments/[id]/local-extraction/route.ts): grant, selettore/currentness, proiezione e cancellazione; risultato di estrazione non equivale ad applicazione clinica. | Non sostituisce PUT metadata/content D. Le transizioni indirette dei servizi documentali devono restare nel guard currentness. | [attachment-local-extraction-route.test](../lib/attachment-local-extraction-route.test.ts); C05-D deve seguire i caller dei writer, senza attribuire commit al solo metodo POST. |
-| Allegato ocr-replay legacy | [route](../app/api/attachments/[id]/ocr-replay/route.ts): ritirata, non nuovo ingresso di commit. | Nessuna riattivazione implicita. | [test retired](../lib/attachment-ocr-replay-retired-route.test.ts). |
+I caller composti sono righe `X-*` del CSV, con gli ID delle mutazioni raggiunte.
+[ApiTable](../lib/db.ts) inoltra al writer HTTP; bulkPut/clear possono comporre
+più richieste e non acquisiscono una transazione globale. I test dei caller
+verificano esiti parziali, non sostituiscono le prove SQLite dei profili.
+Create-context, local-extraction e le preview Fabric non applicano dati clinici;
+OCR replay e apply Smart Import ritirati rimangono fail-closed. SOAP e review
+esportati non sono presentati come UI o operazioni MCP disponibili.
 
 Conversazioni e messaggi attraversati da `nukeTestData` sono dati applicativi
 persistenti, non automaticamente cartella clinica. I loro POST/PUT/DELETE sono
@@ -359,26 +269,11 @@ roster non li promuove a un nuovo dominio di commit clinico.
   conservano i propri contratti. I lanci SISS restituiscono handoff, non attestano
   prescrizioni o modifiche del diario SISS persistito.
 
-## Ordine delle coorti e criterio di aggiornamento
+## Aggiornamento del roster
 
-1. **C05-S:** audit e CAS osservato dei writer Web migrati, con binding paziente e bozza stabile. Restore e ricreazione della stessa identità/versione restano distinti; il lancio SISS non equivale al diario persistito.
-2. **C05-B:** assign/unassign migrati per audit atomico, input e CAS; repair/clear
-   invalidano le versioni precedenti. Restore/ricreazione identità restano distinti. Move migrato con il CAS esistente;
-   duplicate usa CAS degli originali e token consumato atomicamente; la garanzia non copre export/restore su nuovo DB (C15).
-3. **C05-D:** create/delete e metadata/content Web, upload paired migrati per audit atomico.
-   Metadata/delete e i caller indiretti esaminati conservano la precondizione osservata; restore resta C15.
-   Conservare sourceRef/revision/freshness e le restrizioni document-derived.
-4. **C05-M:** purge ha CAS della riga paziente; fix-orphans confronta il digest
-   del piano osservato e respinge replay dopo operazioni interposte. Il purge ritira gli ID patient nel registro durevole; create ne impedisce il riuso. Lo snapshot dei figli purge e C15 restano distinti. Restore già migrato rimane
-   una riga di regressione, non la prova dei rami diversi.
-5. **C05-SEED/IMPORT/ID:** raccordare gli ingressi composti alle righe aggiornate;
-   dare esiti espliciti alle sequenze parziali. Le coorti migrate P/E/T/O/C/PR/SP/A
-   conservano test e contratti, senza chiusura globale dedotta dal solo audit.
-
-Per ogni riga modificata, collegare prova di input invalido senza scritture,
-parent/scope/versione, rollback su errore audit e successo dopo commit secondo il
-contratto della famiglia. Registrare quale runner seleziona il test e quale SHA
-è stata eseguita, nelle evidenze della consegna; non copiare log o dati nel roster.
-La lettura mirata dei caller documentali descritti sopra è completata; resta la copertura
-assertiva degli altri flussi composti. La tabella rende questi lavori assegnabili e non
-pretende che il censimento statico dimostri l'assenza di ogni writer indiretto.
+Quando cambia un writer, aggiornare la sua riga CSV e il profilo interessato con
+l'implementazione. Le prove di famiglia rimangono nella suite esistente; CI e PR
+conservano esiti e revisione eseguita, senza copiare qui log o conteggi.
+I limiti di restore/custodia rimangono C15. Differenze nuove rilevate dal censimento
+sono esplicite nella mappa C01 e richiedono destinazione del responsabile, non una
+chiusura o riapertura dedotta dalle etichette storiche delle coorti.
