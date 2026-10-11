@@ -4,8 +4,11 @@
  */
 export const MMSE_INTERPRETATION_VERSION = 'mediflow.mmse.screening-limits.v1';
 export const GDS_INTERPRETATION_VERSION = 'mediflow.gds15.screening-limits.v1';
+export const ADL_INTERPRETATION_VERSION = 'mediflow.adl.local-interpretation.v1';
+export const IADL_INTERPRETATION_VERSION = 'mediflow.iadl.local-interpretation.v1';
+export const POMA_INTERPRETATION_VERSION = 'mediflow.poma28.nonclassification.v1';
 
-export function currentScaleInterpretation(scaleId: string, score: number): {
+export function currentScaleInterpretation(scaleId: string, score: number, existingInterpretation: () => string): {
     interpretation: string;
     interpretationVersion: string;
 } | null {
@@ -17,7 +20,11 @@ export function currentScaleInterpretation(scaleId: string, score: number): {
         interpretationVersion: GDS_INTERPRETATION_VERSION,
         interpretation: `Punteggio grezzo GDS-15: ${score}/15. Screening dei sintomi depressivi: il punteggio non formula una diagnosi né stabilisce la gravità. Valutazione clinica richiesta; versione italiana e periodo di riferimento da verificare.`,
     };
-    return null;
+    // Identify the existing software wording without changing or approving it.
+    const version = scaleId === 'adl' ? ADL_INTERPRETATION_VERSION
+        : scaleId === 'iadl' ? IADL_INTERPRETATION_VERSION
+            : scaleId === 'tinetti-poma28-v1' ? POMA_INTERPRETATION_VERSION : null;
+    return version ? { interpretation: existingInterpretation(), interpretationVersion: version } : null;
 }
 
 const common = {
@@ -28,6 +35,7 @@ const common = {
     clinicalReviewer: null,
     rightsReviewer: null,
     permissionReference: null,
+    permissionAttestation: 'project-owner-attested-2026-10-11',
     // This is an unresolved proposal, not a statement that new use is blocked.
     newUseDecision: 'hold-proposed-not-enforced',
 } as const;
@@ -41,9 +49,10 @@ export const SCALE_USE_CONTRACTS = Object.freeze({
         population: 'mobility-assessment; local applicability requires review',
         scoring: '20 scored components; balance 16 + gait 12; total 0–28',
         interpretation: 'unchanged; no automatic fall-risk category',
+        interpretationVersion: POMA_INTERPRETATION_VERSION,
         translation: 'local-unvalidated',
-        rights: 'local-translation-and-electronic-use-not-verified',
-        reviewGap: 'Verify applicable permission and intended use; unvalidated does not mean invalid.',
+        rights: 'owner-attested-permission-not-inspected',
+        reviewGap: 'Identify permission metadata and intended use; unvalidated does not mean invalid.',
     }),
     adl: Object.freeze({
         ...common,
@@ -53,8 +62,9 @@ export const SCALE_USE_CONTRACTS = Object.freeze({
         population: 'older adults; local applicability not established',
         scoring: '6 explicit binary answers; total 0–6',
         interpretation: 'legacy categories retained; not approved by this change',
+        interpretationVersion: ADL_INTERPRETATION_VERSION,
         translation: 'local-source-unidentified',
-        rights: 'adaptation-and-electronic-use-not-verified',
+        rights: 'owner-attested-permission-not-inspected',
         reviewGap: 'Dressing anchor and severity categories differ from HIGN; requires versioned instrument decision.',
     }),
     iadl: Object.freeze({
@@ -65,9 +75,10 @@ export const SCALE_USE_CONTRACTS = Object.freeze({
         population: 'older adults; source excludes institutionalized use; local applicability needs review',
         scoring: '8 explicit binary answers for every assessment; total 0–8',
         interpretation: 'legacy functional summary retained; no sex-based denominator',
+        interpretationVersion: IADL_INTERPRETATION_VERSION,
         translation: 'local-source-unidentified',
-        rights: 'adaptation-and-electronic-use-not-verified',
-        reviewGap: 'Identify adopted item anchors, translation and permission scope.',
+        rights: 'owner-attested-permission-not-inspected',
+        reviewGap: 'Identify adopted item anchors, translation and metadata of the attested permission.',
     }),
     mmse: Object.freeze({
         ...common,
@@ -77,9 +88,10 @@ export const SCALE_USE_CONTRACTS = Object.freeze({
         population: 'cognitive screening; local language and normative applicability unverified',
         scoring: '28 required components; lang4 0–3, other components 0–1; total 0–30',
         interpretation: MMSE_INTERPRETATION_VERSION,
+        interpretationVersion: MMSE_INTERPRETATION_VERSION,
         translation: 'local-source-unidentified',
-        rights: 'owner-held-permission-not-inspected',
-        reviewGap: 'Verify edition, reproduction, translation, electronic embedding and distribution permission; no inference of infringement.',
+        rights: 'owner-attested-permission-not-inspected',
+        reviewGap: 'Identify edition, translation and metadata of the attested permission; private agreement not inspected.',
     }),
     gds: Object.freeze({
         ...common,
@@ -89,8 +101,9 @@ export const SCALE_USE_CONTRACTS = Object.freeze({
         population: 'depression screening in older adults; local applicability unverified',
         scoring: '15 explicit binary scored answers; total 0–15; no prorating',
         interpretation: GDS_INTERPRETATION_VERSION,
+        interpretationVersion: GDS_INTERPRETATION_VERSION,
         translation: 'local-source-and-timeframe-unidentified',
-        rights: 'original-public-domain; local-translation-unverified',
-        reviewGap: 'Identify translation, reference period and permissions; original public-domain status is not an endorsement of this version.',
+        rights: 'original-public-domain; local-permission-owner-attested-not-inspected',
+        reviewGap: 'Identify translation, reference period and metadata of the attested permission; original public-domain status is not an endorsement of this version.',
     }),
 });

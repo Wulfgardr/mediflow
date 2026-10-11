@@ -103,7 +103,7 @@ public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
             guard !addition.overflow else { throw ClinicalScaleValidationError.invalidDefinition }
             score = addition.partialValue
         }
-        let current = ClinicalScaleInterpretation.current(scaleId: id, score: score)
+        let current = ClinicalScaleInterpretation.current(scaleId: id, score: score) { interpret(score) }
         return ClinicalScaleResult(score: score, interpretation: current?.text ?? interpret(score), answers: answers,
                                    interpretationVersion: current?.version)
     }

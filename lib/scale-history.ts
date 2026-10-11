@@ -25,7 +25,8 @@ export function isSourceBoundTinetti(metadata: Record<string, unknown>): boolean
 export function scaleHistoryNotice(metadata: unknown, entryTitle = ''): string | null {
     const record = metadata !== null && typeof metadata === 'object' && !Array.isArray(metadata)
         ? metadata as Record<string, unknown> : {};
-    if (isSourceBoundTinetti(record)) return SOURCE_BOUND_TINETTI_NOTICE;
+    if (isSourceBoundTinetti(record)) return [SOURCE_BOUND_TINETTI_NOTICE, scaleInterpretationVersionLabel(record)]
+        .filter(Boolean).join(' · ');
     const id = typeof record.scaleId === 'string' ? record.scaleId.toLowerCase() : '';
     const title = typeof record.title === 'string' && record.title.trim() ? record.title : entryTitle;
     return id.startsWith('tinetti') || title.toLowerCase().includes('tinetti')

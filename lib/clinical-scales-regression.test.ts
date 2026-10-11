@@ -81,7 +81,34 @@ test('new interpretation versions persist separately from instruments at every f
             assert.ok(stored.content.endsWith(`Versione interpretazione: ${golden.version}`));
         }
     }
-    assert.equal(prepareScaleSubmission(poma.id, zero).metadata.interpretationVersion, undefined);
+
+});
+
+test('new ADL, IADL and POMA persist policy identity without changing scores or wording', async () => {
+    for (const [id, version, texts] of [
+        ['adl', 'mediflow.adl.local-interpretation.v1', ['Compromissione Grave (0-1/6)', 'Autonomia Conservata (6/6)']],
+        ['iadl', 'mediflow.iadl.local-interpretation.v1', [0, 8].map(score =>
+            `Punteggio totale: ${score}/8. (Minore è il punteggio, maggiore è la dipendenza strumentale).`)],
+        [poma.id, 'mediflow.poma28.nonclassification.v1', [vectors.nonclassification, vectors.nonclassification]],
+    ] as const) {
+        const definition = SCALES[id];
+        for (const maximum of [false, true]) {
+            const answers = Object.fromEntries(definition.questions.map(q =>
+                [q.id, maximum ? Math.max(...q.options!.map(o => o.value as number)) : 0]));
+            const stored = await submitScale(id, answers, submission => JSON.parse(JSON.stringify(submission)));
+            assert.equal(stored.metadata.score, Object.values(answers).reduce((sum, value) => sum + value, 0));
+            assert.equal(stored.metadata.interpretation, texts[maximum ? 1 : 0]);
+            assert.equal(stored.metadata.interpretationVersion, version);
+            assert.deepEqual(stored.metadata.instrument, definition.instrument);
+            assert.ok(stored.content.endsWith(`Versione interpretazione: ${version}`));
+            assert.ok(scaleHistoryNotice(stored.metadata)!.includes(`Versione interpretazione: ${version}`));
+            const { interpretationVersion: omitted, ...historical } = stored.metadata;
+            assert.equal(omitted, version);
+            const bytes = JSON.stringify(historical);
+            assert.equal(scaleHistoryNotice(historical), id === poma.id ? SOURCE_BOUND_TINETTI_NOTICE : null);
+            assert.equal(JSON.stringify(historical), bytes);
+        }
+    }
 });
 
 test('historical MMSE/GDS records and absent or unknown version metadata are not reinterpreted', () => {
@@ -110,11 +137,12 @@ test('catalog review register covers all instruments without inventing permissio
         assert.equal(contract.clinicalReviewer, null);
         assert.equal(contract.rightsReviewer, null);
         assert.equal(contract.permissionReference, null);
+        assert.equal(contract.permissionAttestation, 'project-owner-attested-2026-10-11');
         assert.equal(contract.newUseDecision, 'hold-proposed-not-enforced');
         assert.equal(contract.missingAnswers, 'reject-incomplete-no-imputation');
         assert.ok(contract.sourceId && contract.population && contract.scoring && contract.reviewGap);
     }
-    assert.equal(SCALE_USE_CONTRACTS.gds.rights, 'original-public-domain; local-translation-unverified');
+    assert.equal(SCALE_USE_CONTRACTS.gds.rights, 'original-public-domain; local-permission-owner-attested-not-inspected');
     assert.match(SCALES.iadl.description, /tutte le 8 risposte per ogni persona/);
 });
 
@@ -210,7 +238,7 @@ test('Retired/unknown IDs are never active aliases and historic answer semantics
 
 test('Source-bound display requires every known provenance field; no historical recalculation', () => {
     const metadata = prepareScaleSubmission(poma.id, zero).metadata;
-    assert.equal(scaleHistoryNotice(metadata), SOURCE_BOUND_TINETTI_NOTICE);
+    assert.equal(scaleHistoryNotice(metadata), `${SOURCE_BOUND_TINETTI_NOTICE} · Versione interpretazione: mediflow.poma28.nonclassification.v1`);
     for (const key of Object.keys(vectors.instrument)) {
         const incomplete = { ...vectors.instrument } as Record<string, unknown>;
         delete incomplete[key];
@@ -276,6 +304,6 @@ test('POMA provenance stays metadata through submission and history without fetc
     assert.equal(writes, 1, 'only the explicit synthetic writer is called');
     assert.deepEqual(metadata.instrument, vectors.instrument);
     assert.equal(isSourceBoundTinetti(metadata), true);
-    assert.equal(scaleHistoryNotice(metadata), SOURCE_BOUND_TINETTI_NOTICE);
+    assert.equal(scaleHistoryNotice(metadata), `${SOURCE_BOUND_TINETTI_NOTICE} · Versione interpretazione: mediflow.poma28.nonclassification.v1`);
     assert.equal(fetches, 0, 'no source URL retrieval, including a swallowed fetch failure');
 });

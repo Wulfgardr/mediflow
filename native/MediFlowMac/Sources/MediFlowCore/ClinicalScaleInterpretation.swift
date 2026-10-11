@@ -5,6 +5,9 @@ import Foundation
 public enum ClinicalScaleInterpretation {
     public static let mmseVersion = "mediflow.mmse.screening-limits.v1"
     public static let gdsVersion = "mediflow.gds15.screening-limits.v1"
+    public static let adlVersion = "mediflow.adl.local-interpretation.v1"
+    public static let iadlVersion = "mediflow.iadl.local-interpretation.v1"
+    public static let pomaVersion = "mediflow.poma28.nonclassification.v1"
 
     public static func recordedVersion(_ value: String?) -> String? {
         guard let value else { return nil }
@@ -17,8 +20,12 @@ public enum ClinicalScaleInterpretation {
         return value
     }
 
-    public static func current(scaleId: String, score: Int) -> (text: String, version: String)? {
+    public static func current(scaleId: String, score: Int, existingInterpretation: () -> String) -> (text: String, version: String)? {
         switch scaleId {
+        // Version the existing wording, not its clinical validity or instrument edition.
+        case "adl": return (existingInterpretation(), adlVersion)
+        case "iadl": return (existingInterpretation(), iadlVersion)
+        case "tinetti-poma28-v1": return (existingInterpretation(), pomaVersion)
         case "mmse":
             return ("Punteggio grezzo MMSE: \(score)/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Interpretazione clinica richiesta; nessuna correzione per età, scolarità o lingua applicata.", mmseVersion)
         case "gds":

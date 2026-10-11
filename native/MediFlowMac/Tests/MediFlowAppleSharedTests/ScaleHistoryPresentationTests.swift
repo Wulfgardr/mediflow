@@ -27,6 +27,27 @@ final class ScaleHistoryPresentationTests: XCTestCase {
         XCTAssertEqual(entry.metadata, submission.metadataJSON)
     }
 
+    func testLocalPolicyVersionSurvivesHistoryWithoutEnrichingUnversionedEntries() throws {
+        for definition in [ClinicalScales.adl, ClinicalScales.iadl, ClinicalScales.tinettiPOMA28V1] {
+            let submission = try ClinicalScales.prepareSubmission(definition: definition,
+                answers: Dictionary(uniqueKeysWithValues: definition.questions.map { ($0.id, 0) }))
+            var metadata = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(submission.metadataJSON.utf8)) as? [String: Any])
+            for recorded in [true, false] {
+                if !recorded { metadata.removeValue(forKey: "interpretationVersion") }
+                let raw = String(decoding: try JSONSerialization.data(withJSONObject: metadata), as: UTF8.self)
+                let entry = makeEntry(type: "scale", title: definition.title, content: "Originale", metadata: raw)
+                let item = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry))
+                XCTAssertEqual(item.interpretation, submission.result.interpretation)
+                XCTAssertEqual(item.interpretationVersion, recorded ? submission.result.interpretationVersion : nil)
+                XCTAssertEqual(item.provenanceLabel?.contains("Versione interpretazione:") ?? false, recorded)
+                if definition.instrument != nil {
+                    XCTAssertTrue(item.provenanceLabel?.hasPrefix(ClinicalScales.sourceBoundTinettiNotice) == true)
+                }
+                XCTAssertEqual(entry.metadata, raw)
+            }
+        }
+    }
+
     func testRunnerMetadataBuildsHistoryItemWithNameAndScore() throws {
         let definition = ClinicalScales.adl
         let result = try definition.result(from: ["bath": 1, "dress": 1, "toilet": 0, "transfer": 0, "cont": 0, "feed": 0])
