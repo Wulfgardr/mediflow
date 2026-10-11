@@ -19,8 +19,7 @@ import {
     type LocalCandidateReviewedEnvelope,
 } from './local-candidate-envelope';
 import {
-    advanceOnboarding,
-    startOnboarding,
+    enabledLocalOnboarding,
     type ProviderOnboardingState,
 } from './onboarding';
 import {
@@ -105,14 +104,6 @@ function policyFor(
         provenanceRequired: true,
         fallback: 'none',
     });
-}
-
-function enabledLocalOnboarding(): ProviderOnboardingState {
-    const declared = startOnboarding('ollama', 'local_model');
-    const configured = advanceOnboarding(declared, { type: 'configure' });
-    const credentialed = advanceOnboarding(configured, { type: 'credential_declared' });
-    const attested = advanceOnboarding(credentialed, { type: 'attest_local' });
-    return advanceOnboarding(attested, { type: 'enable' });
 }
 
 function routeGenerative(
