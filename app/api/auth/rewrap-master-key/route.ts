@@ -16,6 +16,7 @@ import { users } from '@/lib/schema';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 /* @Codex */
 import { validateKdfRewrapPayload } from '@/lib/security/kdf-rewrap-validation';
+import { persistKdfRewrap } from '@/lib/security/kdf-rewrap-service';
 
 // Lazy KDF upgrade: persists a re-wrapped master-key blob (and its salt) without
 // touching the PIN. The client calls this after a successful login when the
@@ -46,18 +47,14 @@ export async function POST(request: Request) {
         if (!payload) {
             return failureResponse(400, 'KDF_REWRAP_INVALID', 'Payload di re-wrap non valido.');
         }
-        const { encryptedMasterKey, salt } = payload;
-
         const user = await dbServer.select().from(users).where(eq(users.id, session.userId)).get();
         if (!user) {
             return unauthorizedResponse();
         }
 
-        await dbServer
-            .update(users)
-            .set({ encryptedMasterKey, salt })
-            .where(eq(users.id, user.id))
-            .run();
+        if (!persistKdfRewrap(dbServer, user.id, payload)) {
+            return failureResponse(409, 'KDF_REWRAP_NOT_APPLICABLE', 'Questo account si sblocca con una passphrase: il re-wrap del PIN non si applica.');
+        }
 
         try {
             const context = auditContextFromSession(session);

@@ -172,7 +172,7 @@ C04 classifica questi punti; non dichiara risolta la loro migrazione.
 | [native-login-http.ts:61](../lib/security/native-login-http.ts#L61) | Login nativo: wrapper chiamato a :94 dopo creazione autorità; fallback esplicito. | C10. |
 | [web-auth-logout-server.ts:104](../lib/security/web-auth-logout-server.ts#L104) | Logout: retirement autorevole prima dell'audit; un errore non riattiva la sessione. | C10. |
 | [web-auth-application-lock-server.ts:117](../lib/security/web-auth-application-lock-server.ts#L117) | Lock: retirement/fence precedono audit; errore non annulla il lock. | C10. |
-| [host-credential-verification.ts:141](../lib/security/host-credential-verification.ts#L141) | Diniego credenziali/lockout/conflitto: `deny` conserva il rifiuto anche se audit fallisce; chiamanti :184, :188, :190, :198, :200, :222, :228. | C07/C10; tentativo negato, non successo clinico. |
+| [host-credential-verification.ts:167](../lib/security/host-credential-verification.ts#L167) | Diniego credenziali/lockout/conflitto: `deny` conserva il rifiuto anche se audit fallisce; chiamanti :184, :188, :190, :198, :200, :222, :228. | C07/C10; tentativo negato, non successo clinico. |
 | [backup-scheduler/route.ts:128](../app/api/system/backup-scheduler/route.ts#L128) | Configurazione scheduler: install/uninstall OS e salvataggio DB precedono audit. | C15: due autorità, nessuna transazione distribuita presunta. |
 
 ## Writer con contratto dedicato e conservazione dello storico

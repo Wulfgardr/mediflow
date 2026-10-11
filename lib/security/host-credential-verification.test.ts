@@ -11,8 +11,10 @@ import { eq } from 'drizzle-orm';
 import { users } from '@/lib/schema';
 import {
     verifyHostCredentials,
+    verifyUnlockCredentials,
     type HostCredentialVerifierDependencies,
 } from './host-credential-verification';
+import { deriveUnlockMaterial, hashAccessVerifier } from './unlock-credential';
 
 const PIN = '2468';
 const WRONG_PIN = ['0', '0', '0', '0'].join('');
@@ -34,16 +36,24 @@ function makeDatabase() {
 
 async function seed(db: TestDatabase, state: Partial<{
     passwordHash: string; failedLoginAttempts: number; firstFailedLoginAt: Date | null; lockedUntil: Date | null;
+    unlockVerifierHash: string;
 }> = {}) {
     const passwordHash = state.passwordHash ?? await bcrypt.hash(PIN, 4);
     db.insert(users).values({
         id: 'synthetic-user-1', username: USERNAME, role: 'admin', passwordHash,
         encryptedMasterKey: 'synthetic-key-blob', salt: 'synthetic-salt',
         failedLoginAttempts: state.failedLoginAttempts ?? 0, firstFailedLoginAt: state.firstFailedLoginAt,
-        lockedUntil: state.lockedUntil, createdAt: new Date(),
+        lockedUntil: state.lockedUntil, unlockVerifierHash: state.unlockVerifierHash, createdAt: new Date(),
     }).run();
     return passwordHash;
 }
+
+/** The verifier as the browser derives it, and the hash the server keeps (ADR 0143). */
+async function accessVerifier(passphrase: string) {
+    const { verifier } = await deriveUnlockMaterial(passphrase, new Uint8Array(16).fill(7), 1_000);
+    return { verifier, hash: await hashAccessVerifier(verifier) };
+}
+const attempts = (db: TestDatabase) => db.select().from(users).where(eq(users.username, USERNAME)).get()?.failedLoginAttempts;
 
 test('stays server-only and imports no route, session, cookie, channel, or token authority', () => {
     const source = readFileSync(new URL('./host-credential-verification.ts', import.meta.url), 'utf8');
@@ -406,5 +416,97 @@ test('a password-hash change after bcrypt compare denies rather than authenticat
         assert.equal(result.kind, 'denied'); assert.equal(result.failureClass, 'invalid_credentials');
         const stored = db.select().from(users).where(eq(users.username, USERNAME)).get();
         assert.equal(await bcrypt.compare(PIN, stored!.passwordHash), false);
+    } finally { sqlite.close(); }
+});
+
+test('an account with a passphrase opens a session with its access verifier and with nothing else', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const right = await accessVerifier('cavallo batteria graffetta corretta');
+        const wrong = await accessVerifier('cavallo batteria graffetta sbagliata');
+        await seed(db, { unlockVerifierHash: right.hash });
+        let compares = 0;
+        const dependencies = { db, compare: async () => { compares += 1; return true; }, writeAuditEvent: async () => 'audit' };
+
+        // The PIN is right, and bcrypt would say so: it is still not what opens this account.
+        const pin = await verifyUnlockCredentials({ username: USERNAME, pin: PIN }, dependencies);
+        assert.equal(pin.kind, 'denied'); assert.equal(pin.status, 401);
+        assert.equal(compares, 0, 'the PIN is not even compared');
+        assert.equal(attempts(db), 0, 'and a stale client retrying it cannot lock the account');
+
+        const denied = await verifyUnlockCredentials({ username: USERNAME, verifier: wrong.verifier }, dependencies);
+        assert.equal(denied.kind, 'denied'); assert.equal(denied.body.remainingAttempts, 4);
+        // What a copy of the database holds is not a credential.
+        const stored = await verifyUnlockCredentials(
+            { username: USERNAME, verifier: Buffer.from(right.hash, 'hex').toString('base64') }, dependencies,
+        );
+        assert.equal(stored.kind, 'denied');
+        const malformed = await verifyUnlockCredentials({ username: USERNAME, verifier: right.hash }, dependencies);
+        assert.equal(malformed.kind, 'denied');
+        assert.equal(attempts(db), 3, 'every wrong verifier is counted');
+
+        const verified = await verifyUnlockCredentials({ username: USERNAME, verifier: right.verifier }, dependencies);
+        assert.equal(verified.kind, 'verified');
+        assert.equal(verified.kind === 'verified' && verified.account.encryptedMasterKey, 'synthetic-key-blob');
+        assert.equal(attempts(db), 0);
+        assert.equal(compares, 0);
+    } finally { sqlite.close(); }
+});
+
+test('wrong verifiers lock an account with a passphrase like wrong PINs do', async () => {
+    const { sqlite, db } = makeDatabase(); const now = new Date('2026-10-11T12:00:00.000Z');
+    try {
+        const right = await accessVerifier('cavallo batteria graffetta corretta');
+        const wrong = await accessVerifier('cavallo batteria graffetta sbagliata');
+        await seed(db, { unlockVerifierHash: right.hash, failedLoginAttempts: 4, firstFailedLoginAt: new Date(now.getTime() - 1_000) });
+        const dependencies = { db, now: () => now, writeAuditEvent: async () => 'audit' };
+        const fifth = await verifyUnlockCredentials({ username: USERNAME, verifier: wrong.verifier }, dependencies);
+        assert.equal(fifth.kind, 'denied'); assert.equal(fifth.status, 423);
+        const locked = await verifyUnlockCredentials({ username: USERNAME, verifier: right.verifier }, dependencies);
+        assert.equal(locked.kind, 'denied'); assert.equal(locked.failureClass, 'locked');
+    } finally { sqlite.close(); }
+});
+
+test('an account still on its PIN opens with the PIN and ignores a verifier', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const { verifier } = await accessVerifier('cavallo batteria graffetta corretta');
+        await seed(db);
+        const dependencies = { db, writeAuditEvent: async () => 'audit' };
+        const presented = await verifyUnlockCredentials({ username: USERNAME, verifier }, dependencies);
+        assert.equal(presented.kind, 'denied'); assert.equal(attempts(db), 0);
+        const both = await verifyUnlockCredentials({ username: USERNAME, pin: PIN, verifier }, dependencies);
+        assert.equal(both.kind, 'denied');
+        assert.equal((await verifyUnlockCredentials({ username: USERNAME, pin: WRONG_PIN }, dependencies)).kind, 'denied');
+        assert.equal(attempts(db), 1);
+        assert.equal((await verifyUnlockCredentials({ username: USERNAME, pin: PIN }, dependencies)).kind, 'verified');
+    } finally { sqlite.close(); }
+});
+
+test('the confirmation PIN still verifies on an account with a passphrase and never takes a verifier', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const right = await accessVerifier('cavallo batteria graffetta corretta');
+        await seed(db, { unlockVerifierHash: right.hash });
+        const dependencies = { db, writeAuditEvent: async () => 'audit' };
+        assert.equal((await verifyHostCredentials({ username: USERNAME, pin: PIN }, dependencies)).kind, 'verified');
+        assert.equal((await verifyHostCredentials({ username: USERNAME, pin: WRONG_PIN }, dependencies)).kind, 'denied');
+        assert.equal(attempts(db), 1);
+        const verifier = await verifyHostCredentials({ username: USERNAME, verifier: right.verifier }, dependencies);
+        assert.equal(verifier.kind, 'denied'); assert.equal(attempts(db), 1);
+    } finally { sqlite.close(); }
+});
+
+test('a passphrase changed after the account was read denies the old verifier', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const old = await accessVerifier('cavallo batteria graffetta corretta');
+        const next = await accessVerifier('una passphrase del tutto nuova');
+        await seed(db, { unlockVerifierHash: old.hash });
+        const rotate = () => { db.update(users).set({ unlockVerifierHash: next.hash }).where(eq(users.username, USERNAME)).run(); return new Date(); };
+        const stale = await verifyUnlockCredentials({ username: USERNAME, verifier: old.verifier }, { db, now: rotate, writeAuditEvent: async () => 'audit' });
+        assert.equal(stale.kind, 'denied');
+        const current = await verifyUnlockCredentials({ username: USERNAME, verifier: next.verifier }, { db, writeAuditEvent: async () => 'audit' });
+        assert.equal(current.kind, 'verified');
     } finally { sqlite.close(); }
 });

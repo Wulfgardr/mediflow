@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
 import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
+import { parseWrappedMasterKey } from '@/lib/security/security';
 /* @Codex */
 import {
     bootstrapWebAuthControl,
@@ -43,6 +44,18 @@ function buildPublicDbState(
     state: 'ready' | 'missing' | 'schema-missing' | 'unavailable'
 ) {
     return { state };
+}
+
+/* ADR 0143: what the browser needs before it can authenticate. A PIN account discloses nothing new;
+   an account with a passphrase discloses its salt, without which the access verifier cannot be derived. */
+function unlockParameters(accounts: { encryptedMasterKey: string; salt: string; unlockVerifierHash: string | null }[]) {
+    const [account] = accounts;
+    if (accounts.length !== 1 || !account.unlockVerifierHash) return { credential: 'pin' as const };
+    return {
+        credential: 'passphrase' as const,
+        kdfVersion: parseWrappedMasterKey(account.encryptedMasterKey).version,
+        salt: account.salt,
+    };
 }
 
 /* @Codex */
@@ -134,18 +147,19 @@ export async function GET(request: Request) {
 
     try {
         /* @Codex */
-        const [{ dbServer }, { users }, { count }] = await Promise.all([
+        const [{ dbServer }, { users }] = await Promise.all([
             import('@/lib/db-server'),
             import('@/lib/schema'),
-            import('drizzle-orm'),
         ]);
-        const result = await dbServer.select({ count: count() }).from(users);
-        const userCount = result[0].count;
+        const accounts = await dbServer.select({
+            encryptedMasterKey: users.encryptedMasterKey, salt: users.salt, unlockVerifierHash: users.unlockVerifierHash,
+        }).from(users).limit(2);
         const response = NextResponse.json({
             /* @Codex */
             status: 'ok',
-            isSetup: userCount > 0,
+            isSetup: accounts.length > 0,
             hasSession,
+            ...(accounts.length > 0 ? { unlock: unlockParameters(accounts) } : {}),
             /* @Codex */
             db: buildPublicDbState('ready')
         });
