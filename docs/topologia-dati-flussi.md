@@ -611,7 +611,7 @@ documentati in [SECURITY.md](../SECURITY.md).
 
 ## 📚 6. Mappa file autorevoli per i flussi
 
-- Schema e topologia DB: `lib/schema.ts`
+- Apertura/allineamento DB: `lib/sqlite-schema-open.ts` → `lib/sqlite-schema.ts`; dichiarazioni ORM: `lib/schema.ts`
 - Accesso DB server: `lib/db-server.ts`
 - Facade web + cifratura client: `lib/db.ts`
 - Cifratura web: `lib/security.ts`
