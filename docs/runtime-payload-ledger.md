@@ -127,6 +127,44 @@ ABI preflight, clean installation, update/rollback or synthetic launch evidence.
 
 ## Compare with a trusted ledger
 
+For a before/after cleanup comparison, build both selected revisions with the
+same Node 24 target and an isolated synthetic data directory, then pass their
+checkout paths to this command. It reads both builds without executing them:
+
+```sh
+node --input-type=module - /absolute/before-checkout /absolute/after-checkout <<'NODE'
+import fs from 'node:fs';
+import path from 'node:path';
+const walk = dir => fs.readdirSync(dir, {withFileTypes:true}).flatMap(e =>
+  e.isDirectory() ? walk(path.join(dir,e.name)) : e.isFile() ? [path.join(dir,e.name)] : []);
+const bytes = files => files.reduce((n,p) => n + fs.statSync(p).size, 0);
+for (const root of process.argv.slice(2)) {
+  const lock = JSON.parse(fs.readFileSync(path.join(root,'package-lock.json')));
+  const runtime = Object.entries(lock.packages).filter(([p,v]) => p.includes('node_modules/') && !v.dev);
+  const installed = walk(path.join(root,'node_modules'));
+  const copied = walk(path.join(root,'.next/standalone'));
+  const traces = [path.join(root,'.next/next-server.js.nft.json'),
+    ...walk(path.join(root,'.next/server')).filter(p => p.endsWith('.nft.json'))];
+  const closure = new Set(traces.flatMap(p => JSON.parse(fs.readFileSync(p)).files
+    .map(f => path.resolve(path.dirname(p),f))));
+  const reachable = [...closure].filter(p => fs.existsSync(p) && fs.statSync(p).isFile());
+  console.log(JSON.stringify({root, runtimeLockEntries:runtime.length,
+    installedFiles:installed.length, installedBytes:bytes(installed),
+    tracedFiles:reachable.length, tracedBytes:bytes(reachable),
+    standaloneFiles:copied.length, standaloneBytes:bytes(copied)}));
+}
+NODE
+```
+
+`runtimeLockEntries` includes optional production inputs, even when unavailable
+on the selected host. Installed bytes cover physical files, not filesystem
+allocation or symlink targets. `tracedFiles` is Next's conservative production
+file closure, not proof that every retained function executes; client bundles
+and other copied assets are measured separately in the standalone payload.
+Record the compared source revisions and build identity with the result.
+Use the same target for both builds; a smaller payload alone does not prove
+source simplification or authorize deleting a dependency.
+
 ```sh
 node scripts/generate-runtime-payload-ledger.mjs \
   --source /absolute/source-checkout --payload /absolute/selected-payload \
