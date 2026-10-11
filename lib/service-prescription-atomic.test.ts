@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: synthetic real-SQLite oracle for the ten ordinary service writes. */
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -12,6 +13,7 @@ const dir = mkdtempSync(join(process.env.MEDIFLOW_DATA_DIR!, 'service-atomic-'))
 process.env.MEDIFLOW_DATA_DIR = dir;
 const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer();
+bindSyntheticArchiveSessions('synthetic-session', 'synthetic-native', 'synthetic-local-api');
 const { patients, ambulatories, patientsToAmbulatories, servicePrescriptions, servicePrescriptionItems } = await import('./schema.ts');
 const writer = await import('./service-prescription-write.ts');
 const sql = new Database(join(dir, 'medical.db'));

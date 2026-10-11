@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
@@ -91,6 +93,8 @@ export async function GET(request: Request) {
         const data = await query;
         return NextResponse.json(data.map(serializeAttachment));
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed to fetch attachments" }, { status: 500 });
     }
 }
@@ -98,5 +102,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     return createWebAttachment(request, session);
 }

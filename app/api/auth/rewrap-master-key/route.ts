@@ -1,3 +1,7 @@
+import { assertArchiveGeneration } from '@/lib/archive-generation';
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
@@ -31,6 +35,9 @@ function failureResponse(status: number, code: string, message: string) {
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveGeneration = archiveGenerationForSession(session);
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     let body: unknown;
     try {
@@ -52,7 +59,11 @@ export async function POST(request: Request) {
             return unauthorizedResponse();
         }
 
-        if (!persistKdfRewrap(dbServer, user.id, payload)) {
+        const changed = dbServer.transaction((tx) => {
+            assertArchiveGeneration(tx, archiveGeneration);
+            return persistKdfRewrap(tx, user.id, payload);
+        });
+        if (!changed) {
             return failureResponse(409, 'KDF_REWRAP_NOT_APPLICABLE', 'Questo account si sblocca con una passphrase: il re-wrap del PIN non si applica.');
         }
 
@@ -81,6 +92,8 @@ export async function POST(request: Request) {
         response.headers.set('Cache-Control', 'no-store');
         return response;
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('KDF rewrap error:', error);
         return failureResponse(500, 'KDF_REWRAP_FAILED', 'Errore durante il re-wrap della chiave.');
     }

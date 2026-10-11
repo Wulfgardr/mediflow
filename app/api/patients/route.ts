@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -92,6 +94,8 @@ export async function GET(request: Request) {
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         console.error("API GET /patients error:", error, (error as any)?.message, (error as any)?.stack);
         return NextResponse.json({ error: "Failed to fetch patients" }, { status: 500 });
@@ -102,6 +106,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     const lane = readPatientCreateLane(request.headers);
     if (lane.kind === 'invalid') return NextResponse.json({ error: 'Invalid patient create precondition' }, { status: 400 });
@@ -138,7 +144,7 @@ export async function POST(request: Request) {
             values: typeof normalized.values) => {
             writeAuditEventInTransaction(tx, {
                 eventType: 'patient.created', outcome: 'success',
-                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 subjectType: 'patient', subjectRef: values.id,
                 sourceSurface: auditContext.sourceSurface, requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
@@ -188,6 +194,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ id: normalized.values.id }, { status: 201 });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         if (error instanceof PatientCreateDestinationNotFoundError) return NextResponse.json({ error: 'Ambulatory not found' }, { status: 404 });
         if (error instanceof PatientCreateConflictError) return NextResponse.json({ error: 'Patient create conflict' }, { status: 409 });
         if (lane.kind === 'fenced') {

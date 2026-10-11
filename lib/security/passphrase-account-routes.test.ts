@@ -58,7 +58,7 @@ async function nativeLogin(password: string) {
     let sessions = 0;
     const handler = createNativeLoginHttpHandler({
         consume: async () => ({}) as never,
-        createNativeSession: (() => { sessions += 1; return { id: 'synthetic-native-session' }; }) as never,
+        createNativeSession: (() => { sessions += 1; return { id: `synthetic-native-session-${randomUUID()}`, expiresAt: Date.now() + 60000 }; }) as never,
         audit: async () => undefined,
     });
     const response = await handler(new Request('http://127.0.0.1/api/auth/native/login', { method: 'POST' }), {}, { username: USERNAME, password });
@@ -129,4 +129,22 @@ test('an account moves from its PIN to a passphrase: check, login and re-wrap fo
     assert.equal(persistKdfRewrap(dbServer, account().id, stronger), false);
     assert.equal(account().encryptedMasterKey, wrapping.encryptedMasterKey);
     assert.equal(account().salt, wrapping.salt);
+});
+
+
+test('auth check returns the current control fence after retiring a session from archive A', async () => {
+    const transport = await import('./web-auth-control-transport');
+    const { rotateSqliteArchiveGeneration } = await import('../archive-generation');
+    const control = transport.bootstrapWebAuthControl(null)!;
+    const attempt = transport.beginWebAuthControl('login', Object.freeze({
+        controlId: control.controlId, ifMatch: control.etag, idempotencyKey: randomUUID(),
+    }));
+    const issued = transport.issueWebAuthControl(attempt, { id: account().id, username: USERNAME, role: 'admin' })!;
+    assert.ok(issued);
+    dbServer.$client.transaction(() => rotateSqliteArchiveGeneration(dbServer.$client)).immediate();
+    const response = await check(new Request('http://127.0.0.1/api/auth/check', {
+        headers: { cookie: `mediflow_auth_control=${control.controlId}; mediflow_session=${issued.sessionId}` },
+    }));
+    assert.equal((await response.json()).hasSession, false);
+    assert.equal(response.headers.get('etag'), transport.strongWebAuthControlEtag(transport.bootstrapWebAuthControl(control.controlId)!.etag));
 });

@@ -69,7 +69,8 @@ test('actual patient HTTP route boundaries on synthetic SQL', async t => {
         { id: 'synthetic-A', name: 'Ambulatorio sintetico A', isDefault: true },
         { id: 'synthetic-B', name: 'Ambulatorio sintetico B', isDefault: false },
     ]).run();
-    const state = { database, session: null as Owner.WebSessionProjection | null, cookie: 'synthetic-A' as string | undefined,
+    const generation = '11111111-1111-4111-8111-111111111111';
+    const state = { database, generation, session: null as Owner.WebSessionProjection | null, cookie: 'synthetic-A' as string | undefined,
         cookieReads: 0, authReads: 0, audit: [] as unknown[] };
     const fixtureDirectory = mkdtempSync(join(tmpdir(), 'mediflow-patient-route-'));
     cleanups.push(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
@@ -84,6 +85,7 @@ if (!state) throw new Error('Synthetic route fixture is no longer active');
     // the unchanged loader's CommonJS route emission; no data URLs or SQL mocks.
     const replacements: Record<string, string> = {
         '@/lib/db-server': 'exports.dbServer=state.database;',
+        './archive-session-generation': 'exports.currentArchiveGeneration=()=>state.generation;exports.archiveGenerationForSession=(session)=>session===state.session?state.generation:undefined;',
         'next/headers': `exports.cookies=async function(){state.cookieReads++;return {get(name){return name==='ambulatory_id'&&state.cookie ? {value:state.cookie}:undefined}}};`,
         '@/lib/security/server-auth': `exports.requireSession=async function(){state.authReads++;return state.session};
             exports.unauthorizedResponse=function(){return Response.json({error:'Unauthorized'},{status:401})};`,
@@ -145,7 +147,7 @@ if (!state) throw new Error('Synthetic route fixture is no longer active');
         return await response.json() as PatientCreatePreviewContext;
     };
     const post = (id: string, headers: Record<string, string> = { 'Content-Type': 'application/json' }) => route.POST(new Request('http://synthetic.invalid/api/patients', {
-        method: 'POST', headers, body: JSON.stringify(input(id)),
+        method: 'POST', headers: { ...headers, 'x-mediflow-archive-generation': generation }, body: JSON.stringify(input(id)),
     }));
 
     await t.test('preview GET is authenticated, named, no-store, metadata-only and does not create patients', async st => {

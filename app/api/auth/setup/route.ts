@@ -1,3 +1,6 @@
+import { assertArchiveGeneration } from '@/lib/archive-generation';
+import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { users, settings, ambulatories } from '@/lib/schema';
@@ -43,6 +46,7 @@ export async function POST(request: Request) {
             return setupResponse({ error: 'Setup unavailable', code: 'SETUP_AUTH_UNAVAILABLE' }, 503, mutation.ifMatch);
         }
 
+        const archiveGeneration = currentArchiveGeneration();
         const existingUsers = await dbServer.select().from(users).limit(1);
         if (existingUsers.length > 0) {
             /* @Codex */
@@ -72,6 +76,7 @@ export async function POST(request: Request) {
         // bcrypt.hash already ran above and the values are plain.
         const userId = uuidv4();
         dbServer.transaction((tx) => {
+            assertArchiveGeneration(tx, archiveGeneration);
             tx.insert(users).values({
                 id: userId,
                 username,
@@ -115,12 +120,14 @@ export async function POST(request: Request) {
                 code: 'SETUP_COMMITTED_AUTH_UNAVAILABLE',
             }, 409, mutation.ifMatch);
         }
-        const response = NextResponse.json({ success: true, id: userId });
+        const response = NextResponse.json({ success: true, id: userId, archiveGeneration });
         response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
         setWebAuthControlEtag(response, session.etag);
         return response;
     } catch (error) {
         if (attempt) abortWebAuthControl(attempt);
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Setup error:", error);
         return setupResponse({ error: "Setup failed" }, 500, mutation?.ifMatch);
     }

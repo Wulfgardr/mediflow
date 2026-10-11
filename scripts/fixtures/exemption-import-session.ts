@@ -1,3 +1,5 @@
+import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from '../../lib/security/web-auth-lifecycle-owner-test-fixture';
+import { currentArchiveGeneration } from '../../lib/security/archive-session-generation';
 /* @Codex: invented test identities, issued by the real in-process lifecycle owner. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -13,5 +15,10 @@ export function syntheticExemptionSession() {
     const resolution = resolve(issued.sessionId, control.controlId);
     assert.equal(resolution.status, 'active');
     if (resolution.status !== 'active') throw new Error('Synthetic session unavailable');
+    bindSyntheticArchiveSessions(resolution.projection.id);
     return resolution.projection;
+}
+
+export function syntheticExemptionRequest(input: string | URL | Request, init?: RequestInit) {
+    return syntheticArchiveRequest(currentArchiveGeneration(), input, init);
 }

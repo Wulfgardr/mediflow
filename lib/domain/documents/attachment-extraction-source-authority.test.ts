@@ -129,8 +129,8 @@ test('denies module-copy tokens and disposal clears every pending capability', a
     current.authority.dispose(); assert.equal(current.authority.finalize(begun.operation).status, 'denied'); assert.equal(current.authority.issue({ attachmentId: ATTACHMENT }), null);
 });
 
-test('revokes same-tuple locators and operations before restore while preserving session and selection', async () => {
-    seed(); const current = fixture(); const selectionEpoch = current.projectionOwner.snapshotSelectionEpoch(current.session);
+test('revokes same-tuple locators and operations before restore and rejects the old generation of session and selection', async () => {
+    seed(); const current = fixture(); current.projectionOwner.snapshotSelectionEpoch(current.session);
     const finalizeLocator = current.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(finalizeLocator);
     const abortLocator = current.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(abortLocator);
     const staleLocator = current.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(staleLocator);
@@ -148,10 +148,12 @@ test('revokes same-tuple locators and operations before restore while preserving
     assert.equal(current.authority.abort(abortOperation.operation).status, 'denied'); assert.equal(current.authority.abort(abortOperation.operation).status, 'denied');
     assert.equal(copyAuthority.consume(copyLocator).status, 'denied');
     assert.equal(isCurrentSession(current.session), true);
-    assert.equal(current.projectionOwner.snapshotSelectionEpoch(current.session), selectionEpoch);
-    const freshLocator = current.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(freshLocator);
-    const fresh = current.authority.consume(freshLocator); assert.equal(fresh.status, 'begun');
-    if (fresh.status === 'begun') assert.equal(current.authority.finalize(fresh.operation).status, 'spent');
+    assert.throws(() => current.projectionOwner.snapshotSelectionEpoch(current.session), { code: 'ARCHIVE_REPLACED' });
+    assert.equal(current.authority.issue({ attachmentId: ATTACHMENT }), null);
+    const replacement = fixture();
+    const freshLocator = replacement.authority.issue({ attachmentId: ATTACHMENT }); assert.ok(freshLocator);
+    const fresh = replacement.authority.consume(freshLocator); assert.equal(fresh.status, 'begun');
+    if (fresh.status === 'begun') assert.equal(replacement.authority.finalize(fresh.operation).status, 'spent');
 });
 
 test('keeps restore revocation fail-closed after precondition and transaction failures', async () => {

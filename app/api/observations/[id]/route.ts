@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex: ordinary Web observation mutation adapters; the synchronous operation owns the write and audit. */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
@@ -13,6 +15,8 @@ import { observationChangedFields, parseObservationDeleteInput, readObservationJ
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     try {
         const { id } = await params;
         const parsed = await readObservationJsonObject(request);
@@ -30,12 +34,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const result = updateObservationOperation({
             observationId: id, expectedVersion, values: normalized.values, mode: 'web',
             changedFields: observationChangedFields(normalized.values, parsed.body),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /observations/[id] error:', error);
         return NextResponse.json({ error: 'Failed to update observation' }, { status: 500 });
     }
@@ -44,6 +50,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
     try {
         const { id } = await params;
         const parsed = await readObservationJsonObject(request);
@@ -56,12 +64,14 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         const result = updateObservationOperation({
             observationId: id, expectedVersion: deletion.expectedVersion, values: normalized.values, mode: 'web',
             changedFields: ['deletedAt', 'deletionReason'],
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /observations/[id] error:', error);
         return NextResponse.json({ error: 'Failed to delete observation' }, { status: 500 });
     }

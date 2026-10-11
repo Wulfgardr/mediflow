@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -7,6 +9,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await request.json();
@@ -26,7 +30,9 @@ export async function POST(request: Request) {
         }
 
         return NextResponse.json({ success: true, ambulatoryId });
-    } catch {
+    } catch (archiveError) {
+        const replacement = archiveReplacementResponse(archiveError);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed to set context" }, { status: 500 });
     }
 }

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { openAdmittedSqlite, runWithSqliteMaintenance } from '../lib/sqlite-maintenance-admission.mjs';
 
 /* @Codex */
 import fs from 'node:fs';
@@ -801,93 +802,100 @@ async function main(): Promise<void> {
     if (!args.apply && args.backupOut) {
         throw new Error('--backup-out is only valid together with --apply.');
     }
-    if (args.apply && args.backupOut) {
-        backupDatabase(args.db, args.backupOut);
-    }
-
-    const db = new Database(args.db, { readonly: !args.apply, fileMustExist: true });
-    try {
-        const masterKey = await unlockMasterKey(readUser(db), args.pin);
-        const patientTaxCodes = readPatientTaxCodeMap(db);
-        const archiveIndex = args.recoverArchivePdfText && args.archiveRoot
-            ? buildArchivePdfIndex(args.archiveRoot, new Set(patientTaxCodes.values()))
-            : undefined;
-        const attachmentRows = readAttachmentRows(db);
-        const {
-            attachments,
-            decryptFailures,
-            pdfTextRecovered,
-            pdfTextRecoveryFailures,
-            pdfTextRecoveredChars,
-            archivePatientsMatched,
-            archivePdfsIndexed,
-            archivePdfExactMatches,
-            archivePdfSizeMatches,
-            archivePdfAmbiguousMatches,
-            archivePdfTextRecovered,
-            archivePdfTextRecoveryFailures,
-            archivePdfTextRecoveredChars,
-        } = await toPlannerInputs(attachmentRows, masterKey, {
-            recoverPdfText: args.recoverPdfText,
-            recoverArchivePdfText: args.recoverArchivePdfText,
-            maxPdfPages: args.maxPdfPages,
-            archiveIndex,
-            patientTaxCodes,
-        });
-        const plan = buildDocumentEvidenceBackfillPlan(attachments, {
-            rebuildExisting: args.rebuildExisting,
-        });
-        const salt = args.redactSalt || randomBytes(32).toString('hex');
-        const eligibleCandidates = plan.items.filter((item) => item.candidateArtifact).length;
-        const applyResult = args.apply
-            ? await applyCandidateArtifacts(db, plan, masterKey, attachmentRows)
-            : { attempted: 0, written: 0, skipped: 0 };
-        const applyStats: RedactedLiveDbPlan['apply'] = {
-            mode: args.apply ? 'applied' : 'dry-run',
-            eligibleCandidates,
-            ...applyResult,
-            ...(args.backupOut ? { backupPathHash: hashValue(args.backupOut, salt) } : {}),
-            writesStructuredClinicalFields: false,
-        };
-        const report = buildReport(plan, args.db, {
-            decryptFailures,
-            pdfTextRecovered,
-            pdfTextRecoveryFailures,
-            pdfTextRecoveredChars,
-            archivePatientsMatched,
-            archivePdfsIndexed,
-            archivePdfExactMatches,
-            archivePdfSizeMatches,
-            archivePdfAmbiguousMatches,
-            archivePdfTextRecovered,
-            archivePdfTextRecoveryFailures,
-            archivePdfTextRecoveredChars,
-        }, applyStats, salt, args.redactSalt ? 'provided' : 'random-run');
-        const json = JSON.stringify(report, null, 2) + '\n';
-
-        if (args.out) {
-            writeOutput(args.out, json);
-        } else {
-            process.stdout.write(json);
-        }
-        if (args.markdownOut) {
-            writeOutput(args.markdownOut, renderMarkdown(report));
+    const pin = args.pin;
+    const execute = async () => {
+        if (args.apply && args.backupOut) {
+            backupDatabase(args.db, args.backupOut);
         }
 
-        process.stderr.write([
-            `live document evidence dry-run: ${report.totals.candidates}/${report.totals.attachments} candidates`,
-            `patients with attachments: ${report.totals.patients}`,
-            `decrypt failures: ${report.totals.decryptFailures}`,
-            `pdf text recovered: ${report.totals.pdfTextRecovered}`,
-            `archive pdf text recovered: ${report.totals.archivePdfTextRecovered}`,
-            `apply mode: ${report.apply.mode}`,
-            `apply written: ${report.apply.written}`,
-            args.out ? `json: ${args.out}` : null,
-            args.markdownOut ? `markdown: ${args.markdownOut}` : null,
-        ].filter(Boolean).join('\n') + '\n');
-    } finally {
-        db.close();
-    }
+        const reader = args.apply ? null : openAdmittedSqlite(args.db, { role: 'document-backfill-read', sqliteOptions: { readonly: true, fileMustExist: true } });
+        const db = reader?.database ?? new Database(args.db, { fileMustExist: true });
+        try {
+            const masterKey = await unlockMasterKey(readUser(db), pin);
+            const patientTaxCodes = readPatientTaxCodeMap(db);
+            const archiveIndex = args.recoverArchivePdfText && args.archiveRoot
+                ? buildArchivePdfIndex(args.archiveRoot, new Set(patientTaxCodes.values()))
+                : undefined;
+            const attachmentRows = readAttachmentRows(db);
+            const {
+                attachments,
+                decryptFailures,
+                pdfTextRecovered,
+                pdfTextRecoveryFailures,
+                pdfTextRecoveredChars,
+                archivePatientsMatched,
+                archivePdfsIndexed,
+                archivePdfExactMatches,
+                archivePdfSizeMatches,
+                archivePdfAmbiguousMatches,
+                archivePdfTextRecovered,
+                archivePdfTextRecoveryFailures,
+                archivePdfTextRecoveredChars,
+            } = await toPlannerInputs(attachmentRows, masterKey, {
+                recoverPdfText: args.recoverPdfText,
+                recoverArchivePdfText: args.recoverArchivePdfText,
+                maxPdfPages: args.maxPdfPages,
+                archiveIndex,
+                patientTaxCodes,
+            });
+            const plan = buildDocumentEvidenceBackfillPlan(attachments, {
+                rebuildExisting: args.rebuildExisting,
+            });
+            const salt = args.redactSalt || randomBytes(32).toString('hex');
+            const eligibleCandidates = plan.items.filter((item) => item.candidateArtifact).length;
+            const applyResult = args.apply
+                ? await applyCandidateArtifacts(db, plan, masterKey, attachmentRows)
+                : { attempted: 0, written: 0, skipped: 0 };
+            const applyStats: RedactedLiveDbPlan['apply'] = {
+                mode: args.apply ? 'applied' : 'dry-run',
+                eligibleCandidates,
+                ...applyResult,
+                ...(args.backupOut ? { backupPathHash: hashValue(args.backupOut, salt) } : {}),
+                writesStructuredClinicalFields: false,
+            };
+            const report = buildReport(plan, args.db, {
+                decryptFailures,
+                pdfTextRecovered,
+                pdfTextRecoveryFailures,
+                pdfTextRecoveredChars,
+                archivePatientsMatched,
+                archivePdfsIndexed,
+                archivePdfExactMatches,
+                archivePdfSizeMatches,
+                archivePdfAmbiguousMatches,
+                archivePdfTextRecovered,
+                archivePdfTextRecoveryFailures,
+                archivePdfTextRecoveredChars,
+            }, applyStats, salt, args.redactSalt ? 'provided' : 'random-run');
+            const json = JSON.stringify(report, null, 2) + '\n';
+
+            if (args.out) {
+                writeOutput(args.out, json);
+            } else {
+                process.stdout.write(json);
+            }
+            if (args.markdownOut) {
+                writeOutput(args.markdownOut, renderMarkdown(report));
+            }
+
+            process.stderr.write([
+                `live document evidence dry-run: ${report.totals.candidates}/${report.totals.attachments} candidates`,
+                `patients with attachments: ${report.totals.patients}`,
+                `decrypt failures: ${report.totals.decryptFailures}`,
+                `pdf text recovered: ${report.totals.pdfTextRecovered}`,
+                `archive pdf text recovered: ${report.totals.archivePdfTextRecovered}`,
+                `apply mode: ${report.apply.mode}`,
+                `apply written: ${report.apply.written}`,
+                args.out ? `json: ${args.out}` : null,
+                args.markdownOut ? `markdown: ${args.markdownOut}` : null,
+            ].filter(Boolean).join('\n') + '\n');
+        } finally {
+            if (reader) await reader.close(); else db.close();
+        }
+    };
+    // Applying is an offline operation: live Web/scheduler leases must already be closed.
+    if (args.apply) await runWithSqliteMaintenance(args.db, { timeoutMs: 1000 }, execute);
+    else await execute();
 }
 
 main().catch((error) => {

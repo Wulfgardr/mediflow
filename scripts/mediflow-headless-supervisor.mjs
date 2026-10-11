@@ -30,13 +30,18 @@ function prepareDataDirectory() {
 // @Codex: trusted bundle composition supplies only its physical Web layout; no CLI/env override.
 export async function runHeadlessSupervisorV1(childOptions = {}) {
   const args = process.argv.slice(2);
-  if (args.length > 0 && !(args.length === 1 && args[0] === '--mini')) {
+  if (args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {
     throw new Error('supervisor_arguments_invalid');
   }
   const agentKind = args[0] === '--mini' ? 'mini' : 'mcp';
   assertNodeRuntime(readNodeContract(root));
   verifyNativeBinding(childOptions.webDirectory ?? root);
   prepareDataDirectory();
+
+  if (args[0] === '--maintenance-web') {
+    const { runArchiveMaintenanceWebOwner } = await import('../lib/security/archive-maintenance-owner.ts');
+    return runArchiveMaintenanceWebOwner(root);
+  }
 
   // Any parent-process diagnostics must share stderr; stdout belongs exclusively to the selected agent protocol.
   console.log = console.error.bind(console);

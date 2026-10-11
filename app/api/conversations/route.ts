@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { conversations } from '@/lib/schema';
@@ -19,6 +21,8 @@ export async function GET() {
         const data = await dbServer.select().from(conversations).orderBy(desc(conversations.updatedAt));
         return NextResponse.json(data);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Failed" }, { status: 500 });
     }
 }
@@ -27,6 +31,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const rawBody = await request.json();
@@ -43,6 +49,8 @@ export async function POST(request: Request) {
         });
         return NextResponse.json({ success: true });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         return NextResponse.json({ error: "Create Failed" }, { status: 500 });
     }
 }

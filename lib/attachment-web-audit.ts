@@ -11,7 +11,7 @@ export function writeAttachmentWebAudit(
 ): void {
     const actor = auditContextFromSession(session);
     writeAuditEventInTransaction(tx, {
-        eventType, outcome: 'success', actorType: actor.actorType, actorRef: actor.actorRef,
+        eventType, outcome: 'success', archiveGeneration: actor.archiveGeneration, actorType: actor.actorType, actorRef: actor.actorRef,
         sourceSurface: actor.sourceSurface, subjectType: 'attachment', subjectRef: id,
         requestId: requestIdFromRequest(request), redactedMetadata: withAuditContextMetadata(actor, metadata),
     });

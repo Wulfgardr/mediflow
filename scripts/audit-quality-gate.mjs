@@ -1233,7 +1233,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
-        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'actorType', 'actorRef',
+        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
             'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
     const literal = (name, value) => {
         const node = props?.get(name)?.initializer;
@@ -1330,7 +1330,7 @@ export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSour
     }
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
-        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'actorType', 'actorRef',
+        ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
             'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
     const event = props?.get('eventType')?.initializer;
     const subject = props?.get('subjectType')?.initializer;
@@ -1552,7 +1552,7 @@ export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSour
     }
     const auditInput = unwrap(audit.arguments[1]);
     const props = ts.isObjectLiteralExpression(auditInput)
-        ? exactPropertyAssignments(auditInput, ['eventType', 'outcome', 'actorType', 'actorRef',
+        ? exactPropertyAssignments(auditInput, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
             'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata']) : null;
     const event = props?.get('eventType')?.initializer;
     const outcome = props?.get('outcome')?.initializer;

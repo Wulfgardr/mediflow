@@ -1,3 +1,5 @@
+import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 
 import { validatePassphraseRecoveryPayload } from '@/lib/security/passphrase-adoption-validation';
@@ -36,6 +38,7 @@ export async function POST(request: Request) {
     }
     const mutation = webAuthControlMutationFromRequest(request);
     if (!mutation) return unavailable();
+    const archiveGeneration = currentArchiveGeneration();
     let attempt: unknown | null = beginWebAuthControl('login', mutation);
     if (!attempt) return unavailable(mutation.ifMatch);
     // Whatever the outcome, the browser needs the fence the control holds now.
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
 
         const result = await recoverPassphrase({
             request,
+            archiveGeneration,
             payload,
             openSession: (account) => {
                 const pending = attempt;
@@ -69,6 +73,8 @@ export async function POST(request: Request) {
         }
         return jsonResponse({ success: true }, 200, currentEtag());
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) { setWebAuthControlEtag(replacement, currentEtag()); return replacement; }
         console.error('Passphrase recovery error:', error);
         return jsonResponse({ error: 'Errore durante il recupero.', code: 'PASSPHRASE_RECOVERY_FAILED' }, 500, currentEtag());
     } finally {

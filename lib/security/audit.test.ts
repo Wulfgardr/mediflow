@@ -104,6 +104,7 @@ test('auditContextFromSession preserves the human actor for native requests', ()
             actorRef: 'user-1',
             sourceSurface: 'native',
             authContext: 'local-token',
+            archiveGeneration: undefined,
         },
     );
 
@@ -122,6 +123,7 @@ test('auditContextFromSession preserves the human actor for native requests', ()
             actorRef: 'local-api',
             sourceSurface: 'api',
             authContext: 'local-token',
+            archiveGeneration: undefined,
         },
     );
 });
@@ -189,6 +191,7 @@ test('auditContextFromRequest marks shared routes as native only when a valid lo
             actorRef: 'user-1',
             sourceSurface: 'native',
             authContext: 'local-token',
+            archiveGeneration: undefined,
         },
     );
 
@@ -199,6 +202,7 @@ test('auditContextFromRequest marks shared routes as native only when a valid lo
             actorRef: 'local-api',
             sourceSurface: 'api',
             authContext: 'local-token',
+            archiveGeneration: undefined,
         },
     );
 
@@ -293,7 +297,7 @@ test('buildAuditWriteInputFromRequest derives actor, request id, and PHI-safe me
         {
             eventType: 'therapy.updated',
             outcome: 'success',
-            actorType: 'user',
+            archiveGeneration: undefined, actorType: 'user',
             actorRef: 'user-1',
             subjectType: 'therapy',
             subjectRef: 'therapy-1',

@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,6 +25,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
         ? { url: pathToFileURL(authFile).href, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
 const { GET, POST } = load('../app/api/system/purge-patient/route.ts') as typeof import('../app/api/system/purge-patient/route.ts');
@@ -64,7 +66,7 @@ function snapshot() {
 }
 function request(body = JSON.stringify({ patientId, version: 7 })) {
     return POST(new Request('http://127.0.0.1/api/system/purge-patient', {
-        method: 'POST', headers: { 'content-type': 'application/json', 'x-request-id': requestId,
+        method: 'POST', headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', 'x-request-id': requestId,
             'x-mediflow-source-surface': 'job', 'x-actor-ref': 'spoofed' }, body,
     }));
 }
