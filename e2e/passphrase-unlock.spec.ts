@@ -10,9 +10,8 @@ import { bootstrapUnlockedSession } from './utils';
 const PIN = 'demo086086';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
 const LONG_PIN = 'un pin lungo quanto una frase';
-const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.';
-// A second submit counts only after the notice has been on screen this long (LONG_PIN_NOTICE_MIN_MS), with a margin.
-const NOTICE_READING_MS = 700 + 200;
+const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, confermalo.';
+const LONG_PIN_CONFIRM = 'È il mio PIN';
 
 test.describe.configure({ retries: 0 });
 
@@ -113,9 +112,8 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(staleInput).toHaveValue(PASSPHRASE);
     expect(staleLogins).toEqual([]);
-    // On the second gesture the browser asks again, learns of the move and still sends nothing.
-    await stalePage.waitForTimeout(NOTICE_READING_MS);
-    await staleInput.press('Enter');
+    // Confirmed on the control shown with the notice, the browser asks again, learns of the move and still sends nothing.
+    await stalePage.getByRole('button', { name: LONG_PIN_CONFIRM, exact: true }).click();
     await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
     await expect(notice).toHaveCount(0);
     await expect(stalePage.getByLabel('Passphrase', { exact: true })).toHaveValue('');
@@ -189,7 +187,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   }
 });
 
-test('a PIN as long as a passphrase still opens its archive, on a second gesture made while the notice is on screen', async ({ page, browser, baseURL }) => {
+test('a PIN as long as a passphrase opens its archive only when it is confirmed on the control shown with the notice', async ({ page, browser, baseURL }) => {
   // First setup accepts a PIN of any length: this account has one the policy would accept as a passphrase.
   await bootstrapUnlockedSession(page, LONG_PIN);
 
@@ -198,110 +196,105 @@ test('a PIN as long as a passphrase still opens its archive, on a second gesture
     const lockPage = await locked.newPage();
     const logins: string[] = [];
     lockPage.on('request', request => { if (isPost(request, '/api/auth/login')) logins.push(request.postData() ?? ''); });
+    const sent = () => logins.map(body => JSON.parse(body));
+    // Every gesture below that must send nothing is followed by this: whatever it started has ended.
+    const settled = async () => {
+      await lockPage.waitForLoadState('networkidle');
+      await expect(lockPage.locator('form')).toHaveAttribute('aria-busy', 'false');
+    };
     await lockPage.goto('/');
     const input = lockPage.locator('#mediflow-lock-pin');
     const notice = lockPage.locator('#mediflow-lock-confirm');
+    const confirm = lockPage.getByRole('button', { name: LONG_PIN_CONFIRM, exact: true });
+    const unlock = lockPage.getByRole('button', { name: 'Sblocca', exact: true });
     await expect(lockPage.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
 
     await input.fill(LONG_PIN);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(input).toHaveValue(LONG_PIN);
-    // The second gesture is asked on this field: focus is back on it.
+    // The text can be changed at once: focus is back on the field.
     await expect(input).toBeFocused();
-    expect(logins).toEqual([]);
+    await settled();
+    expect(sent()).toEqual([]);
+
+    // Submitting the form again is never the confirmation, however it is done: Enter again,
+    // Enter held down, the button, a double click on the button, two submits in the same instant.
+    await lockPage.keyboard.press('Enter');
+    await settled();
+    await lockPage.keyboard.down('Enter');
+    await lockPage.keyboard.down('Enter');
+    await lockPage.keyboard.down('Enter');
+    await lockPage.keyboard.up('Enter');
+    await settled();
+    await unlock.click();
+    await settled();
+    await unlock.dblclick();
+    await settled();
+    await lockPage.evaluate(() => { const form = document.querySelector('form')!; form.requestSubmit(); form.requestSubmit(); });
+    await settled();
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(sent()).toEqual([]);
+
+    // Nor is a press that began elsewhere. Enter held down in the field stays one gesture when
+    // focus moves to the confirmation: its repetitions activate nothing.
+    await input.focus();
+    await lockPage.keyboard.down('Enter');
+    await settled();
+    await lockPage.keyboard.press('Tab');
+    await expect(confirm).toBeFocused();
+    await lockPage.keyboard.down('Enter');
+    await lockPage.keyboard.down('Enter');
+    await lockPage.keyboard.up('Enter');
+    await settled();
+    // The second click of a double click that began on another control lands where the confirmation now is.
+    const target = await confirm.boundingBox();
+    await lockPage.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2);
+    await lockPage.mouse.down({ clickCount: 2 });
+    await lockPage.mouse.up({ clickCount: 2 });
+    await settled();
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(sent()).toEqual([]);
 
     // Another message takes the place of the notice, as when an old request of this page comes
-    // back unauthorized. The confirmation goes with the notice: the next submit is a first gesture again.
+    // back unauthorized. The confirmation goes with the notice.
     await lockPage.evaluate(() => window.dispatchEvent(new Event('mediflow:api-auth-unavailable')));
     await expect(lockPage.locator('#mediflow-lock-error')).toHaveText('Sessione scaduta.');
     await expect(notice).toHaveCount(0);
+    await expect(confirm).toHaveCount(0);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins).toEqual([]);
 
-    // An edit ends the confirmation even when the text is typed back before any submit: the
-    // notice does not return by itself and the next submit is a first gesture again.
+    // A text that changes is another text, also when it is typed back before any submit.
     await input.fill(`${LONG_PIN}!`);
-    await expect(notice).toHaveCount(0);
+    await expect(confirm).toHaveCount(0);
     await input.fill(LONG_PIN);
     await expect(notice).toHaveCount(0);
-    await input.press('Enter');
-    await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins).toEqual([]);
+    await expect(confirm).toHaveCount(0);
+    await settled();
+    expect(sent()).toEqual([]);
 
-    // So does an editing gesture that leaves the same text, like pasting it over itself: the
-    // value does not change, the confirmation still ends.
-    await input.selectText();
-    await lockPage.keyboard.insertText(LONG_PIN);
-    await expect(input).toHaveValue(LONG_PIN);
-    await expect(notice).toHaveCount(0);
-    await input.press('Enter');
-    await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins).toEqual([]);
-
-    // So does a key that edits nothing, like a deletion with nothing after the caret.
-    await expect(input).toBeFocused();
-    await input.evaluate((field: HTMLInputElement) => field.setSelectionRange(field.value.length, field.value.length));
-    await lockPage.keyboard.press('Delete');
-    await expect(input).toHaveValue(LONG_PIN);
-    await expect(notice).toHaveCount(0);
-    await input.press('Enter');
-    await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins).toEqual([]);
-
-    // A changed text is another text: it is held in its turn. Confirmed from the keyboard
-    // alone, it leaves as the PIN it claims to be, and the server refuses it.
+    // A changed text is held in its turn. Confirmed from the keyboard alone, with one distinct
+    // press, it leaves as the PIN it claims to be, once, and the server refuses it.
     await input.fill(`${LONG_PIN}!`);
-    await expect(notice).toHaveCount(0);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins).toEqual([]);
     await expect(input).toBeFocused();
-    await lockPage.waitForTimeout(NOTICE_READING_MS);
+    await lockPage.keyboard.press('Tab');
+    await expect(confirm).toBeFocused();
     await lockPage.keyboard.press('Enter');
     await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
-    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
+    await settled();
+    expect(sent()).toEqual([{ password: `${LONG_PIN}!` }]);
 
-    // Enter held down is one gesture, however long it lasts: its repetitions never submit.
+    // The right PIN, confirmed twice in the same instant, leaves once and opens the archive.
     await input.fill(LONG_PIN);
-    await lockPage.keyboard.down('Enter');
+    await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    await expect(input).toBeFocused();
-    await lockPage.waitForTimeout(NOTICE_READING_MS);
-    await lockPage.keyboard.down('Enter');
-    await lockPage.keyboard.down('Enter');
-    await lockPage.waitForTimeout(300);
-    await lockPage.keyboard.up('Enter');
-    await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
-
-    // A submit that follows the first at once, like the second click of a double click, comes
-    // before the notice can be read: it is not the second gesture.
-    await input.press('End');
-    await expect(notice).toHaveCount(0);
-    await lockPage.evaluate(() => new Promise<void>((resolve) => {
-      const form = document.querySelector('form')!;
-      new MutationObserver((_, observer) => {
-        if (!document.getElementById('mediflow-lock-confirm')) return;
-        observer.disconnect();
-        form.requestSubmit();
-        resolve();
-      }).observe(document.body, { childList: true, subtree: true });
-      form.requestSubmit();
-    }));
-    await lockPage.waitForTimeout(300);
-    await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
-
-    // The unchanged text, submitted again once its notice has been on screen, is the PIN and opens
-    // the archive. Leaving the field for the button is not an edit: the second gesture can be made there.
-    await lockPage.waitForTimeout(NOTICE_READING_MS);
-    await input.press('Tab');
-    await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    await lockPage.getByRole('button', { name: 'Sblocca' }).click();
+    await confirm.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
     await expectUnlocked(lockPage);
-    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }, { password: LONG_PIN }]);
+    await lockPage.waitForLoadState('networkidle');
+    expect(sent()).toEqual([{ password: `${LONG_PIN}!` }, { password: LONG_PIN }]);
   } finally {
     await locked.close();
   }

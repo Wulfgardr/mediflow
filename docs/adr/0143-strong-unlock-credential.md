@@ -236,24 +236,16 @@ Una review in sola lettura, eseguita da un secondo strumento sul diff
 e ha trovato quattro difetti. Tre sono corretti; il primo va chiuso prima che
 l'interfaccia offra il passaggio. Una seconda review, sulle correzioni, ha
 chiesto di chiudere anche la finestra descritta nella seconda riga e ha
-aggiunto l'ultima. Una terza ha chiesto che la conferma del testo trattenuto
-non possa sopravvivere al proprio avviso. Una quarta ha giudicato le
-correzioni pronte e ha chiesto che ogni modifica del testo faccia
-ricominciare, anche quando viene annullata prima dell'invio o lascia lo
-stesso testo, come un incolla sopra la selezione. Una quinta ha chiesto lo
-stesso per i tasti che non modificano nulla: ogni tasto premuto nel campo,
-tranne Invio, Tab e i modificatori, fa ricominciare. Quando un testo viene
-trattenuto il fuoco torna sul campo, perché il secondo gesto si possa fare
-dalla tastiera.
-Una sesta ha notato che, con il fuoco sul campo, tenere premuto Invio
-faceva valere come conferma le ripetizioni del tasto: le ripetizioni non
-inviano più nulla, e un invio che segue l'avviso entro 700 millisecondi,
-come il secondo clic di un doppio clic, non conta come secondo gesto.
+aggiunto l'ultima. Le successive hanno mostrato che un secondo invio dello
+stesso modulo non si lascia distinguere in modo affidabile dal primo: un testo
+modificato e riscritto, un incolla che lo lascia uguale, un tasto tenuto
+premuto, un doppio clic. Per questo la conferma non è più un secondo invio:
+è un comando a sé, mostrato con l'avviso.
 
 | Difetto | Esito |
 | --- | --- |
 | La copia `medical.db.schema-original-v<N>-<uuid>.db` creata dall'aggiornamento dello schema conserva l'involucro del PIN della stessa master key: dopo il passaggio alla passphrase resta una via d'attacco offline. | Corretto. Il passaggio elimina le copie del prodotto in cui l'account ha ancora l'involucro del PIN: l'originale dell'aggiornamento dello schema e la copia di riparazione `medical.db.bak-*`. Una prova su archivio sintetico ha mostrato che l'involucro resta anche nel registro WAL dell'archivio aperto: il passaggio lo svuota, senza attendere un lettore. Ciò che un'interruzione o un lettore lasciano indietro viene ripreso al primo sblocco con la passphrase. Le copie fatte dopo il passaggio restano: contengono solo l'involucro della passphrase. La risposta del passaggio dice se qualcosa non è stato tolto. Restano fuori le copie che il prodotto non possiede: Time Machine, copie a mano, il vecchio `medical.db` nella cartella dell'applicazione. La procedura guidata deve dirlo. |
-| Una scheda ferma sulla schermata di blocco da prima del passaggio inviava la passphrase al server come se fosse un PIN. | Corretto. A ogni sblocco il browser chiede, dopo il gesto, che cosa sblocca l'account; se la risposta non lo dice, o differisce da ciò che il campo mostrava mentre si scriveva, non invia nulla. Quella risposta può però essere già vecchia quando la richiesta parte, perché il passaggio può avvenire nel mezzo: per questo un testo che la policy accetterebbe come passphrase (da 15 a 128 caratteri dopo la normalizzazione) non parte mai come PIN al primo gesto. Resta nel campo sotto un avviso proprio, e parte solo se la persona lo invia di nuovo, immutato, mentre quell'avviso è a schermo; prima il browser chiede di nuovo. Se un altro messaggio prende il posto dell'avviso, o nel campo si preme un tasto che non sia Invio, Tab o un modificatore, o il testo viene modificato in altro modo, anche per riscriverlo uguale, si ricomincia. Un PIN così esiste solo se è stato scelto al primo avvio. La decisione sta in una funzione sola, `planUnlock`. Limite accettato: chi scrive la futura passphrase nel campo del PIN di un account ancora sul PIN, e la conferma, la invia; nulla può sapere che è una futura passphrase. |
+| Una scheda ferma sulla schermata di blocco da prima del passaggio inviava la passphrase al server come se fosse un PIN. | Corretto. A ogni sblocco il browser chiede, dopo il gesto, che cosa sblocca l'account; se la risposta non lo dice, o differisce da ciò che il campo mostrava mentre si scriveva, non invia nulla. Quella risposta può però essere già vecchia quando la richiesta parte, perché il passaggio può avvenire nel mezzo: per questo un testo che la policy accetterebbe come passphrase (da 15 a 128 caratteri dopo la normalizzazione) non parte mai come PIN quando si invia il modulo, in qualunque modo lo si invii e quante volte. Resta nel campo sotto un avviso, e con l'avviso compare un comando a sé, "È il mio PIN": parte solo se la persona attiva quel comando, per quel testo immutato, mentre l'avviso è a schermo; prima il browser chiede di nuovo. Le ripetizioni di un tasto tenuto premuto non attivano nulla, il secondo clic di un doppio clic non conferma, e un tentativo già in corso ne esclude un altro. Se un altro messaggio prende il posto dell'avviso, o il testo cambia, anche per essere riscritto uguale, il comando scompare e si ricomincia. Un PIN così esiste solo se è stato scelto al primo avvio. La decisione sta in una funzione sola, `planUnlock`. Limite accettato: chi scrive la futura passphrase nel campo del PIN di un account ancora sul PIN, e la conferma, la invia; nulla può sapere che è una futura passphrase. |
 | Il passaggio verificava il PIN senza contare i tentativi: chi aveva una sessione poteva indovinarlo. | Corretto: usa la verifica condivisa, con contatori e blocco; un blocco nato dopo la verifica ferma la scrittura. Il cambio PIN ha lo stesso limite da prima e resta da allineare. |
 | La schermata di blocco contava la lunghezza prima della normalizzazione, e rifiutava passphrase che le primitive accettano. | Corretto: usa lo stesso controllo delle primitive. |
 | Un PIN sbagliato presentato al passaggio viene registrato come accesso fallito anonimo, senza la sessione che lo ha chiesto. | Noto, non corretto: è ciò che la verifica condivisa registra anche per le conferme di ruolo. Va corretto per tutte insieme, dando alla verifica il contesto di chi la chiama. |
