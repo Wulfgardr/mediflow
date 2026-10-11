@@ -20,8 +20,8 @@ const ts = require('typescript');
 const { chromium } = require(process.env.MEDIFLOW_PIN_PLAYWRIGHT_MODULE || '@playwright/test');
 const sourceRoot = resolve(process.env.MEDIFLOW_PIN_SOURCE_ROOT || fileURLToPath(new URL('../', import.meta.url)));
 const declarations = [
-  ['components/lock-screen.tsx', ['unlock-or-legacy-setup', 'legacy-setup-confirmation']],
-  ['components/onboarding-wizard.tsx', ['onboarding-pin', 'onboarding-confirmation']],
+  ['components/lock-screen.tsx', ['unlock']],
+  ['components/onboarding-wizard.tsx', ['setup-passphrase', 'setup-passphrase-confirmation', 'onboarding-pin', 'onboarding-confirmation']],
   ['components/intelligent-host-checkup-action.tsx', ['fresh-checkup-pin']],
 ];
 const attributeMap = new Map([

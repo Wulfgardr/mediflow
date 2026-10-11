@@ -1,5 +1,8 @@
 /* @Codex */
 import { expect, Locator, Page } from '@playwright/test';
+import { generateMasterKey, wrapMasterKeyVersioned } from '../lib/security/security';
+import { checkPassphrase } from '../lib/security/unlock-credential';
+import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 /* @Codex The widths exercise responsive reflow only. They are intentionally
    not labelled as browser zoom: Playwright does not provide a reliable
@@ -109,21 +112,24 @@ async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
-/* @Codex */
+/* Compatibility fixture only: legacy PIN accounts are provisioned through the real
+   supported API. The dedicated first-use spec qualifies the ordinary v3 wizard. */
 export async function completeOnboardingIfNeeded(page: Page, pin: string): Promise<void> {
   const stepProfile = page.getByRole('heading', { name: 'Chi sei?' });
   if (!(await isVisible(stepProfile))) return;
-
-  await page.getByPlaceholder('es. Dott. Nome Medico').fill('Dr. E2E Smoke');
-  await page.getByPlaceholder('es. Studio Medico Centrale').fill('Ambulatorio E2E');
-  await page.getByRole('button', { name: 'Avanti' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
-  const pinInputs = page.locator('input[placeholder="••••••"]');
-  await pinInputs.nth(0).fill(pin);
-  await pinInputs.nth(1).fill(pin);
-  await page.getByRole('button', { name: 'Concludi Setup' }).click();
-  await page.waitForTimeout(300);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const encryptedMasterKey = await wrapMasterKeyVersioned(await generateMasterKey(), pin, salt);
+  const control = await page.request.get('/api/auth/check');
+  expect(control.status()).toBe(200);
+  const etag = control.headers()['etag'];
+  expect(etag).toBeTruthy();
+  const response = await page.request.post('/api/auth/setup', {
+    headers: { ...trustedWebRequestHeaders(page.url()), 'If-Match': etag, 'Idempotency-Key': crypto.randomUUID() },
+    data: { username: 'admin', password: pin, displayName: 'Dr. E2E Smoke', ambulatoryName: 'Ambulatorio E2E',
+      encryptedMasterKey, salt: Buffer.from(salt).toString('base64') },
+  });
+  expect(response.status()).toBe(200);
+  await page.reload();
 }
 
 /* @Codex */
@@ -143,6 +149,8 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   await expect(pinInput).toHaveValue(pin);
   await expect(unlockButton).toBeEnabled({ timeout: 5_000 });
   await unlockButton.click();
+  const confirm = page.getByRole('button', { name: 'È il mio PIN', exact: true });
+  if (checkPassphrase(pin).ok) { await expect(confirm).toBeVisible(); await confirm.click(); }
   await expect(lockHeading).toBeHidden({ timeout: 5_000 });
 
   const invalidPinError = page.getByText('PIN non valido');

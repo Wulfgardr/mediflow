@@ -416,24 +416,25 @@ test('security provider clears stale persisted authority and fences stale auth p
     for (const pattern of [
         /authorityAttemptGenerationRef\.current === attemptGeneration/,
         /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;[\s\S]{0,160}?return material \? loginWithVerifierRequest\(material\.verifier\) : loginWithPinRequest\(pin\);/,
-        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return setupSecurityRequest\(/,
+        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(generation !== authorityAttemptGenerationRef\.current\) throw new Error/,
+        /preparedAccessRef\.current = \{ generation, commit:/,
         /await persistSecuritySession\(masterKey, userData\);[\s\S]*?clearClientAuthority\(\);/,
-        /setupSecurityRequest[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?SETUP_ALREADY_COMPLETED/,
+        /finishAccessMutation = async[\s\S]*?generation !== authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
         /handleApiAuthUnavailable[\s\S]*?\+\+authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
         /checkAuthStatus[\s\S]*?controlState === 'stale'\) return;[\s\S]*?controlState === 'invalid'[\s\S]*?clearClientAuthority\(\);/,
         /checkAuthStatus[\s\S]*?if \(!data\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(!res\.ok\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(data\?\.status === 'error' \|\| data\?\.error\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(!data\.isSetup\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?catch \(e\)[\s\S]*?clearClientAuthority\(\);/,
         /loginWithPinRequest[\s\S]*?res\.ok && controlState !== 'accepted'[\s\S]*?lock\(\);[\s\S]*?return false;/,
         /unacceptedServerAuthority = true;[\s\S]*?if \(!data[\s\S]*?lock\(\);[\s\S]*?const userData: User = \{[\s\S]*?unacceptedServerAuthority = false;/,
-        /setupSecurityRequest[\s\S]*?res\.ok && controlState !== 'accepted'[\s\S]*?lock\(\);[\s\S]*?return;/,
-        /payload\?\.success !== true[\s\S]*?lock\(\);[\s\S]*?return;/,
-        /wrapMasterKeyVersioned\(masterKey, pin, salt\);[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?runAuthorityNetworkRequest\(async \(\) =>/,
+        /setupSecurityRequest[\s\S]*?result\.response\.ok && result\.controlState !== 'accepted'[\s\S]*?lock\(\);/,
+        /result\.payload\?\.success !== true[\s\S]*?clearClientAuthority\(\);[\s\S]*?updateAuthRecoveryState\('required'\)/,
+        /prepareAccess = async[\s\S]*?generation !== authorityAttemptGenerationRef\.current[\s\S]*?preparedAccessRef\.current =/,
         /let pinMutationDispatched = false;[\s\S]*?pinMutationDispatched = true;[\s\S]*?changePinRequest\(/,
         /changePinRequest[\s\S]*?if \(!res\.ok\)[\s\S]*?return \{ ok: false[\s\S]*?\+\+authorityAttemptGenerationRef\.current;[\s\S]*?clearClientAuthority\(\);[\s\S]*?return \{ ok: true \};[\s\S]*?catch \(e\)[\s\S]*?if \(pinMutationDispatched\) lock\(\);/,
     ]) assert.match(source, pattern);
     assert.doesNotMatch(source, /runAuthorityNetworkRequest\(requestApplicationLockConfirmation\)/);
-    assert.match(source, /res\.status === 409 && payload\?\.code === 'SETUP_ALREADY_COMPLETED'/u);
+    assert.match(source, /result\.response\.status === 409 && result\.payload\?\.code === 'SETUP_ALREADY_COMPLETED'/u);
     const setupAlreadyCompleted = source.match(
-        /if \(res\.status === 409 && payload\?\.code === 'SETUP_ALREADY_COMPLETED'\) \{([\s\S]*?)\n\s*\}/u,
+        /if \(result\.response\.status === 409 && result\.payload\?\.code === 'SETUP_ALREADY_COMPLETED'\) \{([\s\S]*?)\n\s*\}/u,
     );
     assert.ok(setupAlreadyCompleted);
     assert.match(setupAlreadyCompleted[1], /clearClientAuthority\(\);[\s\S]*?setRequiresSetup\(false\);/u);

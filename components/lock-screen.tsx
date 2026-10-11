@@ -2,13 +2,14 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
+import { PassphraseAccessForm } from './recovery-kit';
 import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
 import { LONG_PIN_CONFIRM_LABEL, LONG_PIN_NOTICE } from '@/lib/security/unlock-plan';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
-    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, setupPin, lock } = useSecurity();
+    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, preparePassphraseRecovery, lock } = useSecurity();
     // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
     const passphrase = !requiresSetup && unlockCredential === 'passphrase';
     const [pin, setPin] = useState('');
@@ -18,7 +19,7 @@ export function LockScreen() {
     const attempting = useRef(false);
     // Counted as the primitives count it, after normalization: what they accept can be submitted.
     const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
-    const [confirmPin, setConfirmPin] = useState('');
+    const [recovering, setRecovering] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     // WUL-55: ref + nonce to restore focus to the credential field after a failed login.
@@ -82,27 +83,6 @@ export function LockScreen() {
         if (longPinNotice && e.detail <= 1) void attempt(true);
     };
 
-    const handleSetup = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (pin.length < 4) {
-            setError('Il PIN deve essere di almeno 4 caratteri');
-            return;
-        }
-        if (pin !== confirmPin) {
-            setError('I PIN non corrispondono');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            await setupPin(pin);
-        } catch (err) {
-            setError('Errore durante il setup');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     /* @Codex */
     const recoveryPending = authRecoveryState === 'pending';
     const credentialsDisabled = loading || authRecoveryState !== 'ready';
@@ -128,11 +108,11 @@ export function LockScreen() {
 
                 <div className={styles.headerBlock}>
                     <h1 id="mediflow-lock-title" className={styles.title}>
-                        {requiresSetup ? 'Crea il tuo PIN' : 'Sblocca MediFlow'}
+                        Sblocca MediFlow
                     </h1>
                 </div>
 
-                <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}
+                <form onSubmit={handleLogin} className={styles.form}
                     // A key held down is one gesture: its repetitions activate nothing, on any control of the form.
                     onKeyDown={(e) => { if (e.key === 'Enter' && e.repeat) e.preventDefault(); }}
                     aria-busy={loading || recoveryPending}>
@@ -143,7 +123,7 @@ export function LockScreen() {
                     )}
                     {/* @Codex WUL-55: keep the field name for assistive tech without repeating visible copy. */}
                     <label className="sr-only" htmlFor="mediflow-lock-pin">
-                        {requiresSetup ? 'Nuovo PIN' : passphrase ? 'Passphrase' : 'PIN operatore'}
+                        {passphrase ? 'Passphrase' : 'PIN operatore'}
                     </label>
                     <div className={styles.inputWrap}>
                         <input
@@ -166,27 +146,6 @@ export function LockScreen() {
                             autoFocus
                         />
                     </div>
-
-                    {requiresSetup && (
-                        <div className={styles.inputWrap}>
-                            <label className="sr-only" htmlFor="mediflow-lock-pin-confirm">
-                                Conferma PIN
-                            </label>
-                            <input
-                                id="mediflow-lock-pin-confirm"
-                                type="password"
-                                placeholder="Conferma"
-                                value={confirmPin}
-                                onChange={(e) => setConfirmPin(e.target.value)}
-                                className={styles.pinInput}
-                                inputMode="text"
-                                autoComplete="off"
-                                aria-invalid={Boolean(visibleError)}
-                                aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
-                                disabled={credentialsDisabled}
-                            />
-                        </div>
-                    )}
 
                     {longPinNotice && (
                         <>
@@ -222,17 +181,14 @@ export function LockScreen() {
                         disabled={
                             credentialsDisabled
                             || !longEnough
-                            || (requiresSetup && confirmPin.length < 4)
                         }
                         className={styles.primaryButton}
                     >
                         {loading || recoveryPending ? (
                             <>
                                 <Loader2 className={styles.spinner} size={16} />
-                                {recoveryPending ? 'Attendi la conferma…' : requiresSetup ? 'Sto configurando...' : 'Sto sbloccando...'}
+                                {recoveryPending ? 'Attendi la conferma…' : 'Sto sbloccando...'}
                             </>
-                        ) : requiresSetup ? (
-                            'Imposta'
                         ) : (
                             <>
                                 <Unlock size={16} /> Sblocca
@@ -258,6 +214,12 @@ export function LockScreen() {
                         </div>
                     )}
                 </form>
+                {passphrase && <div className="mt-4 space-y-4">
+                    <button type="button" disabled={credentialsDisabled} className="min-h-11 underline" onClick={() => setRecovering(!recovering)}>Recupera con kit e chiave</button>
+                    {recovering && <PassphraseAccessForm mode="recover" onPrepare={preparePassphraseRecovery} />}
+                </div>}
+                {!passphrase && <p className="mt-4 text-sm">Accesso PIN transitorio. Dopo lo sblocco, adotta una passphrase in Impostazioni → Accesso. Il PIN resterà separato per le conferme.</p>}
+
             </section>
         </div>
     );

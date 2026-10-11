@@ -3,6 +3,7 @@ import { dbServer } from '@/lib/db-server';
 import { users, settings, ambulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import { hashAccessVerifier } from '@/lib/security/unlock-credential';
 /* @Codex */
 import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
@@ -59,9 +60,11 @@ export async function POST(request: Request) {
             setWebAuthControlEtag(parsedBody.response, mutation.ifMatch);
             return parsedBody.response;
         }
-        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = parsedBody.data;
+        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName, verifier, recovery } = parsedBody.data;
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const unlockVerifierHash = verifier ? await hashAccessVerifier(verifier) : null;
+        const recoveryVerifierHash = recovery ? await hashAccessVerifier(recovery.verifier) : null;
 
         // WUL-268 (STREAM A): the admin user and its seed settings must be created
         // atomically so a crash can never leave a user without settings (or vice
@@ -78,6 +81,10 @@ export async function POST(request: Request) {
                 passwordHash: hashedPassword,
                 encryptedMasterKey,
                 salt,
+                unlockVerifierHash,
+                recoveryWrappedMasterKey: recovery?.wrappedMasterKey ?? null,
+                recoverySalt: recovery?.salt ?? null,
+                recoveryVerifierHash,
                 createdAt: new Date()
             }).run();
 
