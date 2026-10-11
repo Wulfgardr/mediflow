@@ -204,6 +204,8 @@ test('a PIN as long as a passphrase still opens its archive, on a second gesture
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(input).toHaveValue(LONG_PIN);
+    // The second gesture is asked on this field: focus is back on it.
+    await expect(input).toBeFocused();
     expect(logins).toEqual([]);
 
     // Another message takes the place of the notice, as when an old request of this page comes
@@ -235,20 +237,38 @@ test('a PIN as long as a passphrase still opens its archive, on a second gesture
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(logins).toEqual([]);
 
-    // A changed text is another text: it is held in its turn.
-    await input.fill(`${LONG_PIN}!`);
+    // So does a key that edits nothing, like a deletion with nothing after the caret.
+    await expect(input).toBeFocused();
+    await input.evaluate((field: HTMLInputElement) => field.setSelectionRange(field.value.length, field.value.length));
+    await lockPage.keyboard.press('Delete');
+    await expect(input).toHaveValue(LONG_PIN);
     await expect(notice).toHaveCount(0);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(logins).toEqual([]);
 
+    // A changed text is another text: it is held in its turn. Confirmed from the keyboard
+    // alone, it leaves as the PIN it claims to be, and the server refuses it.
+    await input.fill(`${LONG_PIN}!`);
+    await expect(notice).toHaveCount(0);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins).toEqual([]);
+    await expect(input).toBeFocused();
+    await lockPage.keyboard.press('Enter');
+    await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
+    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
+
     // The unchanged text, submitted again under its notice, is the PIN and opens the archive.
+    // Leaving the field for the button is not an edit: the second gesture can be made there.
     await input.fill(LONG_PIN);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
-    await input.press('Enter');
+    await input.press('Tab');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    await lockPage.getByRole('button', { name: 'Sblocca' }).click();
     await expectUnlocked(lockPage);
-    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: LONG_PIN }]);
+    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }, { password: LONG_PIN }]);
   } finally {
     await locked.close();
   }
