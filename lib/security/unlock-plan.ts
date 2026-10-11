@@ -11,8 +11,11 @@ export type UnlockPlan =
     | { action: 'send-pin' }
     /** Nothing is sent; the person is told why. */
     | { action: 'refuse'; message: string }
-    /** Nothing is sent yet: the text is long enough to be a passphrase and needs a second, deliberate gesture. */
-    | { action: 'confirm-long-pin'; message: string };
+    /** Nothing is sent yet: the policy would accept the text as a passphrase, so it needs a second, deliberate gesture. */
+    | { action: 'confirm-long-pin' };
+
+/** What the lock screen shows while it holds such a text back. The confirmation is valid only while this is on screen. */
+export const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.';
 
 export type UnlockAttempt = {
     /** What the field said while the person typed. */
@@ -20,7 +23,7 @@ export type UnlockAttempt = {
     /** What the server answered after the gesture; null when it could not be known. */
     current: UnlockParameters | null;
     secret: string;
-    /** The person has already been told the text looks like a passphrase and submitted it again, unchanged. */
+    /** The person submitted the unchanged text again while LONG_PIN_NOTICE was on screen. */
     longPinConfirmed: boolean;
 };
 
@@ -43,14 +46,9 @@ export function planUnlock({ shown, current, secret, longPinConfirmed }: UnlockA
         return { action: 'derive', salt: current.salt };
     }
     // The server's answer may already be old when the request leaves: the account can move to a
-    // passphrase in between. A text that could be that passphrase therefore never leaves on the
-    // first gesture. A PIN that long exists only if it was chosen at first setup, and then the
-    // person confirms it; by that second gesture the server has been asked again.
-    if (checkPassphrase(secret).ok && !longPinConfirmed) {
-        return {
-            action: 'confirm-long-pin',
-            message: 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.',
-        };
-    }
+    // passphrase in between. A text the policy would accept as that passphrase therefore never
+    // leaves on the first gesture. A PIN like that exists only if it was chosen at first setup,
+    // and then the person confirms it; by that second gesture the server has been asked again.
+    if (checkPassphrase(secret).ok && !longPinConfirmed) return { action: 'confirm-long-pin' };
     return { action: 'send-pin' };
 }

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
 import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
+import { LONG_PIN_NOTICE } from '@/lib/security/unlock-plan';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
@@ -11,8 +12,8 @@ export function LockScreen() {
     // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
     const passphrase = !requiresSetup && unlockCredential === 'passphrase';
     const [pin, setPin] = useState('');
-    // Set when the provider held back a text long enough to be a passphrase: the same text, submitted again, is sent.
-    const [longPinConfirmed, setLongPinConfirmed] = useState(false);
+    // The exact text the provider held back because the policy would accept it as a passphrase.
+    const [heldText, setHeldText] = useState<string | null>(null);
     // Counted as the primitives count it, after normalization: what they accept can be submitted.
     const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
     const [confirmPin, setConfirmPin] = useState('');
@@ -46,9 +47,9 @@ export function LockScreen() {
         setError('');
 
         try {
-            const outcome = await login(pin, { shown: passphrase ? 'passphrase' : 'pin', longPinConfirmed });
+            const outcome = await login(pin, { shown: passphrase ? 'passphrase' : 'pin', longPinConfirmed: longPinNotice });
             // Nothing was sent: the text stays, so that the person can confirm it or change it.
-            setLongPinConfirmed(outcome === 'confirm');
+            setHeldText(outcome === 'confirm' ? pin : null);
             if (outcome === false) {
                 setError('');
                 setPin('');
@@ -56,7 +57,7 @@ export function LockScreen() {
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Errore durante il login');
-            setLongPinConfirmed(false);
+            setHeldText(null);
             setPin('');
             setFailedAttempt((n) => n + 1);
         } finally {
@@ -90,6 +91,9 @@ export function LockScreen() {
     const credentialsDisabled = loading || authRecoveryState !== 'ready';
     const visibleError = error || authErrorMessage || (authRecoveryState === 'failed'
         ? 'Chiusura della sessione non confermata. Rinnova di nuovo l’accesso.' : '');
+    // A second submit confirms the held text only while its notice is what the person sees: the
+    // same text, no other message in its place, no lock under way. Anything else starts over.
+    const longPinNotice = heldText !== null && heldText === pin && !visibleError && authRecoveryState === 'ready';
     const recoveryMessage = authRecoveryState === 'required'
         ? 'Una sessione è già attiva. Rinnova l’accesso per usare questa scheda.'
         : recoveryPending ? 'Sto chiudendo la sessione precedente…' : null;
@@ -128,12 +132,12 @@ export function LockScreen() {
                             ref={pinInputRef}
                             type="password"
                             value={pin}
-                            onChange={(e) => { setPin(e.target.value); setLongPinConfirmed(false); }}
+                            onChange={(e) => setPin(e.target.value)}
                             className={styles.pinInput}
                             inputMode="text"
                             autoComplete="off"
                             aria-invalid={Boolean(visibleError)}
-                            aria-describedby={visibleError ? 'mediflow-lock-error' : recoveryMessage ? 'mediflow-auth-recovery' : undefined}
+                            aria-describedby={visibleError ? 'mediflow-lock-error' : longPinNotice ? 'mediflow-lock-confirm' : recoveryMessage ? 'mediflow-auth-recovery' : undefined}
                             disabled={credentialsDisabled}
                             placeholder={passphrase ? 'Passphrase' : undefined}
                             autoFocus
@@ -158,6 +162,13 @@ export function LockScreen() {
                                 aria-describedby={visibleError ? 'mediflow-lock-error' : undefined}
                                 disabled={credentialsDisabled}
                             />
+                        </div>
+                    )}
+
+                    {longPinNotice && (
+                        <div id="mediflow-lock-confirm" className={styles.errorChip} role="status" aria-live="polite">
+                            <AlertCircle size={12} />
+                            <span>{LONG_PIN_NOTICE}</span>
                         </div>
                     )}
 
@@ -203,6 +214,7 @@ export function LockScreen() {
                             <button type="button" disabled={loading || recoveryPending}
                                 className="min-h-11 px-4 py-2 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
                                 onClick={() => {
+                                    setHeldText(null);
                                     setPin('');
                                     setError('');
                                     lock();

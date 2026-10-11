@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { UnlockParameters } from './client-auth-api';
-import { planUnlock } from './unlock-plan';
+import { LONG_PIN_NOTICE, planUnlock } from './unlock-plan';
 
 const PIN_ACCOUNT: UnlockParameters = { credential: 'pin' };
 const PASSPHRASE_ACCOUNT: UnlockParameters = { credential: 'passphrase', kdfVersion: 3, salt: 'c3ludGhldGljLXNhbHQ=' };
@@ -33,14 +33,15 @@ test('what was typed into a field that said one thing is never sent as the other
     assert.equal(plan({ shown: 'passphrase', current: PIN_ACCOUNT, secret: PASSPHRASE }).action, 'refuse');
 });
 
-test('a text long enough to be a passphrase does not leave as a PIN on the first gesture', () => {
+test('a text the policy would accept as a passphrase does not leave as a PIN on the first gesture', () => {
     // The server's answer may be older than the account: it said PIN, the text may be the new passphrase.
-    const first = plan({ secret: PASSPHRASE });
-    assert.equal(first.action, 'confirm-long-pin');
-    assert.match(first.action === 'confirm-long-pin' ? first.message : '', /lungo come una passphrase/u);
+    assert.deepEqual(plan({ secret: PASSPHRASE }), { action: 'confirm-long-pin' });
+    assert.match(LONG_PIN_NOTICE, /lungo come una passphrase/u);
     // Counted as the primitives count it: fifteen characters after normalization, five before.
     assert.equal(plan({ secret: 'ﬃ'.repeat(5) }).action, 'confirm-long-pin');
     assert.equal(plan({ secret: 'a'.repeat(14) }).action, 'send-pin');
+    // Beyond the policy no passphrase exists: a longer text can only be a PIN.
+    assert.equal(plan({ secret: 'a'.repeat(129) }).action, 'send-pin');
     // A PIN chosen that long at first setup still opens its archive, on the second gesture.
     assert.deepEqual(plan({ secret: PASSPHRASE, longPinConfirmed: true }), { action: 'send-pin' });
     // The second gesture does not override what the server says by then.

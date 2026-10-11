@@ -442,9 +442,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
             showUnlockCredential(current);
             const plan = planUnlock({ shown, current, secret: pin, longPinConfirmed: options.longPinConfirmed === true });
-            if (plan.action === 'refuse' || plan.action === 'confirm-long-pin') {
+            // The lock screen shows the notice of a held text itself: no other message may stand in for it.
+            if (plan.action === 'confirm-long-pin') return 'confirm';
+            if (plan.action === 'refuse') {
                 setAuthErrorMessage(plan.message);
-                return plan.action === 'refuse' ? false : 'confirm';
+                return false;
             }
             credential = plan.action === 'derive' ? 'passphrase' : 'pin';
             // ADR 0143: the passphrase never leaves this function. It becomes the key that opens the
