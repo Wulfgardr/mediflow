@@ -34,8 +34,8 @@ function insertPinAccount(db: Database.Database) {
 /** What the move to a passphrase writes on the account. */
 function movePassphrase(db: Database.Database) {
     db.prepare(`UPDATE users SET encrypted_master_key = ?, salt = 'synthetic-new-salt', unlock_verifier_hash = ?,
-        recovery_wrapped_master_key = 'r1:synthetic-recovery-wrapping', recovery_salt = 'synthetic-recovery-salt', recovery_verifier_hash = ?`)
-        .run(PASSPHRASE_WRAPPING, 'a'.repeat(64), 'b'.repeat(64));
+        recovery_wrapped_master_key = 'r1:synthetic-recovery-wrapping', recovery_salt = 'synthetic-recovery-salt', recovery_verifier_hash = ? WHERE id = ?`)
+        .run(PASSPHRASE_WRAPPING, 'a'.repeat(64), 'b'.repeat(64), ACCOUNT);
 }
 
 /** A version 1 archive whose account unlocks with a PIN, upgraded by the product: the upgrade keeps its own original. */
@@ -70,7 +70,7 @@ test('after the move to a passphrase, the copies the product made while the acco
         movePassphrase(live);
         live.close();
 
-        // Copies made after the move hold the passphrase wrapping only: each is the safety net of its own operation.
+        // Canonical snapshots purge free cells; an older repair .bak cannot be certified by its live v3 row.
         const later = [`medical.db.schema-original-v2-${randomUUID()}.db`, 'medical.db.bak-20261012-090000000'];
         for (const name of later) createVerifiedSqliteSnapshotSync(archive.file, at(name));
         // A copy with the same kind of name that holds another account says nothing about this one.
@@ -96,7 +96,7 @@ test('after the move to a passphrase, the copies the product made while the acco
 
         const gone = [archive.original, repairBackup].sort();
         assert.deepEqual([...result.removed].sort(), gone);
-        assert.deepEqual([...result.kept].sort(), [link, unreadable].sort());
+        assert.deepEqual([...result.kept].sort(), [link, unreadable, later[1]].sort());
         assert.deepEqual(fs.readdirSync(archive.directory).sort(),
             before.filter((name) => !gone.includes(name) && !name.startsWith(`${repairBackup}-`)),
             'the two copies and the pages beside them are gone; nothing else was removed or created');
@@ -113,7 +113,7 @@ test('after the move to a passphrase, the copies the product made while the acco
     }
 });
 
-test('the write-ahead log of the open archive still holds the PIN wrapping after the move, until it is emptied', () => {
+test('obsolete PIN material in archive cells and WAL is removed only after compaction and checkpoint succeed', () => {
     const directory = temporaryDirectory();
     const file = path.join(directory, 'medical.db');
     const connection = openVersionedSqliteDatabase(file);
@@ -122,9 +122,19 @@ test('the write-ahead log of the open archive still holds the PIN wrapping after
     const pinMaterialAtRest = () => [file, `${file}-wal`].flatMap((name) => [PIN_WRAPPING, PIN_SALT].filter((text) => holdsBytes(name, text)).map((text) => `${path.basename(name)}: ${text.slice(0, 16)}`));
     try {
         insertPinAccount(connection);
+        // A multi-page users table leaves old cells after UPDATE, unlike the former one-row fixture.
+        for (let index = 0; index < 20; index++) connection.prepare(`INSERT INTO users
+            (id, username, password_hash, encrypted_master_key, salt, display_name) VALUES (?, ?, ?, ?, ?, ?)`)
+            .run(`synthetic-${index}`, `user${index}`, 'h'.repeat(60), `v2:${'x'.repeat(80)}`, 's'.repeat(24), 'n'.repeat(40));
+        connection.prepare('UPDATE users SET display_name = ? WHERE id = ?').run('n'.repeat(40), ACCOUNT);
+        connection.pragma('wal_checkpoint(TRUNCATE)');
+        assert.ok(holdsBytes(file, PIN_WRAPPING), 'the old wrapping is physically in the archive before adoption');
         // The account is used for a while before it moves: its page is written to the log again and again.
         for (let attempt = 1; attempt <= 3; attempt += 1) connection.prepare('UPDATE users SET failed_login_attempts = ?').run(attempt);
         movePassphrase(connection);
+        connection.pragma('wal_checkpoint(TRUNCATE)');
+        assert.ok(holdsBytes(file, PIN_WRAPPING), 'checkpoint alone leaves the obsolete wrapping in free archive cells');
+        connection.prepare('UPDATE users SET failed_login_attempts = 0 WHERE id = ?').run(ACCOUNT);
         assert.notDeepEqual(pinMaterialAtRest(), [], 'the move alone leaves the PIN wrapping in the files of the archive');
         const patience = connection.pragma('busy_timeout', { simple: true });
         assert.ok(Number(patience) >= 1000, 'the product waits for other writers');
@@ -137,26 +147,36 @@ test('the write-ahead log of the open archive still holds the PIN wrapping after
         assert.deepEqual(retirePinEraResidues(ACCOUNT, db, file), { removed: [], kept: [], logEmptied: false, complete: false });
         assert.ok(Date.now() - started < Number(patience) / 2, 'the reader was not waited for');
         assert.equal(connection.pragma('busy_timeout', { simple: true }), patience, 'the patience of the connection is as it was');
-        assert.ok(holdsBytes(`${file}-wal`, PIN_WRAPPING), 'and the PIN wrapping is still in the log');
-        retirePendingPinEraResidues(ACCOUNT, db, file);
-        assert.ok(holdsBytes(`${file}-wal`, PIN_WRAPPING), 'a retry with the reader still there changes nothing');
+        assert.ok(holdsBytes(file, PIN_WRAPPING), 'the old archive cells remain while the checkpoint is blocked');
+        assert.equal(retirePendingPinEraResidues(ACCOUNT, db, file), false);
+        assert.ok(holdsBytes(file, PIN_WRAPPING), 'a retry with the reader still there leaves the old archive cells');
         reader.exec('COMMIT');
         reader.close();
 
         // The next unlock with the passphrase makes up for it.
-        retirePendingPinEraResidues(ACCOUNT, db, file);
+        assert.equal(retirePendingPinEraResidues(ACCOUNT, db, file), true);
         assert.equal(walBytes(), 0);
         assert.deepEqual(pinMaterialAtRest(), [], 'neither the archive nor its log holds the PIN wrapping or its salt');
-        assert.equal(connection.prepare('SELECT encrypted_master_key FROM users').pluck().get(), PASSPHRASE_WRAPPING);
+        assert.equal(connection.prepare('SELECT encrypted_master_key FROM users WHERE id = ?').pluck().get(ACCOUNT), PASSPHRASE_WRAPPING);
+        assert.equal(connection.prepare('SELECT count(*) FROM users').pluck().get(), 21);
+        assert.equal(connection.prepare('SELECT encrypted_master_key FROM users WHERE id = ?').pluck().get('synthetic-10'), `v2:${'x'.repeat(80)}`);
 
         // Settled: later unlocks cost nothing; a new move of the same account always runs in full.
         connection.prepare('UPDATE users SET failed_login_attempts = 0').run();
         const grown = walBytes();
         assert.ok(grown > 0);
-        retirePendingPinEraResidues(ACCOUNT, db, file);
+        assert.equal(retirePendingPinEraResidues(ACCOUNT, db, file), true);
         assert.equal(walBytes(), grown, 'nothing is pending, so the log is left alone');
         assert.deepEqual(retirePinEraResidues(ACCOUNT, db, file), { removed: [], kept: [], logEmptied: true, complete: true });
         assert.equal(walBytes(), 0);
+
+        // A failed SQLite maintenance statement never declares cleanup complete or rolls credentials back.
+        connection.prepare('UPDATE users SET failed_login_attempts = 1').run();
+        const failing = { all: db.all.bind(db), run: () => { throw new Error('synthetic SQLITE_FULL'); } };
+        assert.equal(retirePinEraResidues(ACCOUNT, failing, file).complete, false);
+        assert.equal(connection.pragma('busy_timeout', { simple: true }), patience);
+        assert.equal(connection.prepare('SELECT encrypted_master_key FROM users WHERE id = ?').pluck().get(ACCOUNT), PASSPHRASE_WRAPPING);
+        assert.equal(connection.pragma('integrity_check', { simple: true }), 'ok');
     } finally {
         connection.close();
         fs.rmSync(directory, { recursive: true, force: true });

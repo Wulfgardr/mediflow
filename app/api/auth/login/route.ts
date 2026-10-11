@@ -81,7 +81,7 @@ export async function POST(request: Request) {
         }
         // ADR 0143: nothing beside the archive of a passphrase account may still hold its PIN
         // wrapping. The move removes it; this repeats what an interruption or a busy reader left.
-        if (verifier) retirePendingPinEraResidues(user.id, dbServer);
+        const earlierCopiesCleared = verifier ? retirePendingPinEraResidues(user.id, dbServer) : undefined;
         try {
             await writeAuditEvent({
                 eventType: 'auth.login.succeeded',
@@ -110,7 +110,8 @@ export async function POST(request: Request) {
             ambulatoryName: user.ambulatoryName,
             role: user.role,
             encryptedMasterKey: user.encryptedMasterKey,
-            salt: user.salt
+            salt: user.salt,
+            ...(earlierCopiesCleared !== undefined ? { earlierCopiesCleared } : {}),
         });
         response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
         setWebAuthControlEtag(response, session.etag);

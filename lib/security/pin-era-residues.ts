@@ -29,7 +29,7 @@ export type PinEraCopies = {
 };
 
 export type PinEraResidues = PinEraCopies & {
-    /** The write-ahead log was brought down to zero bytes. */
+    /** Obsolete archive cells were compacted and the write-ahead log brought down to zero bytes. */
     logEmptied: boolean;
     /** Nothing is left to do: every copy was examined, none was kept, the log is empty. */
     complete: boolean;
@@ -64,7 +64,12 @@ export function retirePinEraArchiveCopies(databasePath: string, userId: string):
                 result.kept.push(name);
                 continue;
             }
-            if (!holdsPinWrapping(file, userId)) continue;
+            if (!holdsPinWrapping(file, userId)) {
+                // Repair .bak copies use SQLite backup(), which retains obsolete cells even with a live v3 row.
+                // Preserve this recovery copy; SELECT alone cannot certify removal of its historical PIN material.
+                if (name.includes('.bak-')) result.kept.push(name);
+                continue;
+            }
             // Sidecars first: what an interruption leaves is then a copy the next call still recognizes.
             removeSqliteSidecars(file);
             fs.rmSync(file);
@@ -83,13 +88,16 @@ export function retirePinEraArchiveCopies(databasePath: string, userId: string):
     return result;
 }
 
-type ArchiveConnection = { all: (query: SQL) => unknown };
+type ArchiveConnection = { all: (query: SQL) => unknown; run: (query: SQL) => unknown };
 
-/** Brings the write-ahead log down to zero bytes without waiting for a reader: the server is one thread. */
+/** Uses SQLite's own transactional compaction, not an external file swap; a busy reader leaves cleanup pending. */
 function emptyWriteAheadLog(db: ArchiveConnection): boolean {
     const [{ timeout }] = db.all(sql`PRAGMA busy_timeout`) as { timeout: number }[];
     db.all(sql`PRAGMA busy_timeout = 0`);
     try {
+        // TRUNCATE alone preserves deleted PIN wrappings in free cells, including earlier PIN changes.
+        // VACUUM copies live rows through SQLite's WAL/rollback transaction on this admitted connection.
+        db.run(sql`VACUUM`);
         // TRUNCATE moves every page into the archive and leaves a log of zero bytes; `busy` means a reader prevented it.
         const [checkpoint] = db.all(sql`PRAGMA wal_checkpoint(TRUNCATE)`) as { busy?: number }[];
         return checkpoint?.busy === 0;
@@ -118,7 +126,7 @@ export function retirePinEraResidues(userId: string, db: ArchiveConnection, data
     try {
         logEmptied = emptyWriteAheadLog(db);
     } catch (error) {
-        console.error('[MediFlow] The write-ahead log could not be emptied after the passphrase:', error);
+        console.error('[MediFlow] The archive could not be compacted or its write-ahead log emptied after the passphrase:', error);
     }
     const residues = {
         removed: copies?.removed ?? [],
@@ -140,6 +148,6 @@ export function retirePinEraResidues(userId: string, db: ArchiveConnection, data
  * left nothing to do, so an interruption or a busy reader is made up for and a settled archive
  * costs nothing more.
  */
-export function retirePendingPinEraResidues(userId: string, db: ArchiveConnection, databasePath = resolveDataPath('medical.db')): void {
-    if (!cleared.has(clearedKey(databasePath, userId))) retirePinEraResidues(userId, db, databasePath);
+export function retirePendingPinEraResidues(userId: string, db: ArchiveConnection, databasePath = resolveDataPath('medical.db')): boolean {
+    return cleared.has(clearedKey(databasePath, userId)) || retirePinEraResidues(userId, db, databasePath).complete;
 }
