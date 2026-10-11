@@ -126,7 +126,7 @@ export async function startSourceRuntime(mode, root = ROOT) {
   await import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href);
   const { runHeadlessSupervisorV1 } = await import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href);
   process.argv = process.argv.slice(0, 2);
-  return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js') });
+  return runHeadlessSupervisorV1({ webDirectory: web, webTargetPath: path.join(web, 'server.js'), webBuildIdentity: identity });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

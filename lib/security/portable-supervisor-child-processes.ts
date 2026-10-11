@@ -34,6 +34,8 @@ export type PortableSupervisorChildProcessesOptionsV1 = Readonly<{
   mcpTargetPath?: string;
   webDirectory?: string;
   webTargetPath?: string;
+  /** Identity supplied by the admitted source launcher, never inherited wholesale. */
+  webBuildIdentity?: Readonly<{ revision: string; branch: string; worktreeHash: string; sourceFingerprint: string }>;
 }>;
 
 export type PortableSupervisorProductionChildProcessesV1 = Readonly<{
@@ -130,6 +132,14 @@ export function createPortableSupervisorProductionChildProcessesV1(
   const webEnvironment: NodeJS.ProcessEnv = {
     NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir,
   };
+  if (options.webBuildIdentity) {
+    const identity = options.webBuildIdentity;
+    Object.assign(webEnvironment, {
+      MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12), MEDIFLOW_APP_BRANCH: identity.branch,
+      MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
+      MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint, MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
+    });
+  }
   if (athenaMlxGenerateBin !== undefined) {
     webEnvironment.MEDIFLOW_ATHENA_MLX_GENERATE_BIN = athenaMlxGenerateBin;
   }
