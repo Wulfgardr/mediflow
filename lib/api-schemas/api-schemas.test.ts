@@ -31,6 +31,22 @@ async function expectInvalid400<T>(schema: z.ZodType<T>, payload: unknown): Prom
     assert.deepEqual(await parsed.response.json(), { error: INVALID_API_PAYLOAD_ERROR });
 }
 
+test('passphrase setup requires both complete wrappings before any account can be created', async () => {
+    const bytes = (length: number, value: number) => Buffer.alloc(length, value).toString('base64');
+    const payload = {
+        username: 'admin', password: '1234', encryptedMasterKey: `v3:${bytes(60, 1)}`,
+        salt: bytes(16, 2), verifier: bytes(32, 3),
+        recovery: { wrappedMasterKey: `r1:${bytes(60, 4)}`, salt: bytes(16, 5), verifier: bytes(32, 6) },
+    };
+    const accepted = await expectValid(authSetupSchema, payload);
+    assert.deepEqual(accepted.recovery, payload.recovery);
+    for (const broken of [
+        { ...payload, recovery: undefined }, { ...payload, verifier: undefined },
+        { ...payload, recovery: { ...payload.recovery, verifier: payload.verifier } },
+        { ...payload, encryptedMasterKey: 'v2:legacy-wrapping' },
+    ]) await expectInvalid400(authSetupSchema, broken);
+});
+
 test('attachment schemas accept expected payloads and reject malformed payloads with 400', async () => {
     await expectValid(attachmentCreateSchema, {
         patientId: 'patient-1',

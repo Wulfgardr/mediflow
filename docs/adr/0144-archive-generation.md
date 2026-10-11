@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: Proposed — nessun codice cambia con questo documento
+Status: Accepted, 11 ottobre 2026, con le opzioni raccomandate. Nessun codice cambia con questo documento.
 
 ## Problema e contesto
 
@@ -103,13 +103,17 @@ Chiude la strada b per il client Web, che è l'unico del profilo 0.9.0.
 - Le scritture che non passano da `writeAuditEventInTransaction` non sono
   coperte dal punto 3: vanno elencate e decise una per una.
 
-## Da decidere, con una raccomandazione
+## Decisioni
 
-| Decisione | Opzioni | Raccomandazione |
+L'11 ottobre 2026 Leonardo ha lasciato a chi esegue la scelta della pratica
+migliore sulle tre questioni aperte. Sono adottate le opzioni raccomandate;
+cambiarne una riapre il punto corrispondente.
+
+| Decisione | Scelta | Perché |
 | --- | --- | --- |
-| Client abbinati dopo un ripristino | **A.** Il grant decade e il client si abbina di nuovo. **B.** Il grant resta e il client dichiara la generazione a ogni scrittura. | A nella 0.9.0: soddisfa il criterio 5 senza cambiare le API dei client. B con i client della 0.9.6. |
-| Dove sta la generazione | Tabella dedicata, oppure chiave riservata in `settings`. | Tabella dedicata. |
-| Repair con scambio di file | Riceve la generazione insieme al ripristino, oppure in una tranche successiva con il resto dell'ADR 0142. | Insieme: è lo stesso confine, e lasciarlo fuori terrebbe aperto il criterio 4. |
+| Client abbinati dopo un ripristino | Il grant decade e il client si abbina di nuovo. | Soddisfa il criterio 5 senza cambiare le API dei client. La dichiarazione della generazione a ogni scrittura resta proposta per i client della 0.9.6. |
+| Dove sta la generazione | Tabella dedicata, di una sola riga, fuori dal backup. | `settings` si scrive dalla rotta generica delle impostazioni: una chiave riservata chiederebbe una guardia in più. |
+| Repair con scambio di file | Riceve la generazione insieme al ripristino. | È lo stesso confine, e lasciarlo fuori terrebbe aperto il criterio 4. |
 
 ## Come si prova
 

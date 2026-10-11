@@ -3,7 +3,7 @@ import 'server-only';
 
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 
 /* @Codex */
 import {
@@ -24,7 +24,9 @@ import {
     PIN_CHANGE_REUSE_NOT_ALLOWED_CODE,
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
-import type { PassphraseAdoptionPayload } from '@/lib/security/passphrase-adoption-validation';
+import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseCredentials, PassphraseRecoveryPayload } from '@/lib/security/passphrase-adoption-validation';
+import { verifyHostCredentials, verifyRecoveryCredentials, verifyUnlockCredentials, type HostCredentialVerification } from '@/lib/security/host-credential-verification';
+import { retirePinEraResidues, type PinEraResidues } from '@/lib/security/pin-era-residues';
 /* @Codex */
 import { users } from '@/lib/schema';
 /* @Codex */
@@ -43,6 +45,7 @@ import {
     commitUserRetirement,
     prepareUserRetirement,
     prepareNativeUserRetirement,
+    retire,
     type WebSessionProjection,
 } from '@/lib/security/web-auth-lifecycle-owner-adapter';
 
@@ -62,6 +65,13 @@ export type PinChangeServiceDependencies = {
     commitNativeSessionsForUserRetirement?: typeof commitNativeLegacyUserRetirement;
     abortNativeSessionsForUserRetirement?: typeof abortNativeLegacyUserRetirement;
     readPairedNativeSession?: typeof requirePairedNativeSession;
+    verifyPin?: typeof verifyHostCredentials;
+    verifyRecovery?: typeof verifyRecoveryCredentials;
+    verifyUnlock?: typeof verifyUnlockCredentials;
+    /** Closes the one session a recovery opened for itself, when the recovery then changes nothing. */
+    retireWebSession?: (session: WebSessionProjection, reason: 'delete') => unknown;
+    /** Removes what the product keeps beside the archive that still holds the PIN wrapping. */
+    retirePinEraResidues?: (userId: string, db: PinChangeDatabase) => PinEraResidues;
 };
 
 /* @Codex */
@@ -75,9 +85,10 @@ export type PinChangeServiceInput = {
 };
 
 export type PinChangeServiceResult =
-    | { kind: 'success' }
+    /** `earlierCopiesCleared` is set by the move to a passphrase only. */
+    | { kind: 'success'; earlierCopiesCleared?: boolean }
     | { kind: 'unauthorized' }
-    | { kind: 'failure'; status: 400 | 401 | 409; code: string; message: string };
+    | { kind: 'failure'; status: 400 | 401 | 409 | 423; code: string; message: string };
 
 async function resolveDatabase(dependencies: PinChangeServiceDependencies): Promise<PinChangeDatabase> {
     if (dependencies.db) return dependencies.db;
@@ -302,13 +313,16 @@ export async function adoptPassphrase(
             message: 'Questo account si sblocca già con una passphrase.',
         };
     }
-    if (!await bcrypt.compare(payload.currentPin, user.passwordHash)) {
-        return {
-            kind: 'failure',
-            status: 401,
-            code: PASSPHRASE_ADOPTION_INVALID_PIN_CODE,
-            message: 'Il PIN attuale non è corretto.',
-        };
+    // A session alone must not allow guessing the PIN here: the shared verifier counts wrong
+    // PINs and honours a lock, exactly as it does at login.
+    const verification = await (dependencies.verifyPin ?? verifyHostCredentials)(
+        { username: user.username, pin: payload.currentPin },
+        { db, ...(dependencies.writeAuditEvent ? { writeAuditEvent: dependencies.writeAuditEvent } : {}) },
+    );
+    if (verification.kind === 'denied') {
+        return verification.status === 423
+            ? { kind: 'failure', status: 423, code: verification.body.code, message: verification.body.message }
+            : { kind: 'failure', status: 401, code: PASSPHRASE_ADOPTION_INVALID_PIN_CODE, message: verification.body.message };
     }
 
     const unconfirmed = (message: string): PinChangeServiceResult => ({
@@ -344,7 +358,13 @@ export async function adoptPassphrase(
                 firstFailedLoginAt: null,
                 lockedUntil: null,
             })
-            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash), isNull(users.unlockVerifierHash)))
+            .where(and(
+                eq(users.id, user.id),
+                eq(users.passwordHash, user.passwordHash),
+                isNull(users.unlockVerifierHash),
+                // A lock established after the PIN was verified stands: this write does not clear it.
+                or(isNull(users.lockedUntil), lte(users.lockedUntil, new Date())),
+            ))
             .run()).changes;
     } catch (error) {
         abortPrepared();
@@ -373,6 +393,9 @@ export async function adoptPassphrase(
     } catch {
         nativeOutcome = 'failed';
     }
+    // The copies kept beside the archive and its write-ahead log still hold the PIN wrapping of
+    // the same master key: they go now. What this leaves behind, the next passphrase login retries.
+    const residues = (dependencies.retirePinEraResidues ?? retirePinEraResidues)(user.id, db);
     if (webOutcome !== 'completed' || nativeOutcome !== 'completed') {
         return unconfirmed('La passphrase è attiva, ma il ritiro delle sessioni non è confermato. Accedi di nuovo con la passphrase.');
     }
@@ -396,6 +419,195 @@ export async function adoptPassphrase(
         });
     } catch (error) {
         console.error('Audit passphrase adoption write failed:', error);
+    }
+
+    return { kind: 'success', earlierCopiesCleared: residues.complete };
+}
+
+type RecoveredAccount = Extract<HostCredentialVerification, { kind: 'verified' }>['account'];
+
+export type PassphraseRecoveryInput = {
+    request: Request;
+    payload: PassphraseRecoveryPayload;
+    /**
+     * Recovery arrives without a session, and the Web session owner retires the sessions of an
+     * account only for an authentic session of that account. So, once the recovery key is
+     * verified, the route opens one through the Web auth control, exactly as a login would; it is
+     * never handed to the browser and is retired with all the others in the same request.
+     */
+    openSession: (account: RecoveredAccount) => WebSessionProjection | null;
+};
+export type PassphraseRecoveryResult =
+    | { kind: 'success' }
+    | { kind: 'denied'; status: 401 | 423; body: Extract<HostCredentialVerification, { kind: 'denied' }>['body'] }
+    | { kind: 'failure'; status: 409; code: string; message: string };
+
+/**
+ * ADR 0143: whoever holds the recovery key sets a new passphrase. One UPDATE replaces the
+ * passphrase wrapping, its verifier and the recovery material, or nothing: the recovery key
+ * that was just typed is retired with the passphrase it replaces. Wrong recovery keys are
+ * counted and lock the account like wrong credentials. The PIN is left as it is and every
+ * session of the account is retired.
+ */
+export async function recoverPassphrase(
+    input: PassphraseRecoveryInput,
+    dependencies: PinChangeServiceDependencies = {},
+): Promise<PassphraseRecoveryResult> {
+    return rotatePassphrase({
+        ...input, previousVerifier: input.payload.recoveryVerifier,
+    }, dependencies, 'recovery');
+}
+
+/** The authenticated account changes its own passphrase; its PIN cannot authorize this. */
+export async function changePassphrase(
+    input: { session: WebSessionProjection; request: Request; payload: PassphraseChangePayload },
+    dependencies: PinChangeServiceDependencies = {},
+): Promise<PassphraseRecoveryResult | { kind: 'unauthorized' }> {
+    const db = await resolveDatabase(dependencies);
+    const user = db.select().from(users).where(eq(users.id, input.session.userId)).get();
+    if (!user) return { kind: 'unauthorized' };
+    if (!user.unlockVerifierHash) return {
+        kind: 'failure', status: 409, code: 'PASSPHRASE_ACCOUNT_REQUIRED',
+        message: 'Questo account usa ancora il PIN. Passa prima alla passphrase.',
+    };
+    return rotatePassphrase({
+        request: input.request,
+        payload: { ...input.payload, username: user.username },
+        previousVerifier: input.payload.currentVerifier,
+        openSession: (account) => account.id === input.session.userId ? input.session : null,
+    }, { ...dependencies, db }, 'change');
+}
+
+/** Shared atomic replacement and terminal session retirement for change and recovery. */
+async function rotatePassphrase(
+    input: {
+        request: Request;
+        payload: PassphraseCredentials & { username: string }; previousVerifier: string;
+        openSession: (account: RecoveredAccount) => WebSessionProjection | null;
+    },
+    dependencies: PinChangeServiceDependencies,
+    mode: 'change' | 'recovery',
+): Promise<PassphraseRecoveryResult> {
+    const { payload } = input;
+    const db = await resolveDatabase(dependencies);
+    const verify = mode === 'recovery'
+        ? dependencies.verifyRecovery ?? verifyRecoveryCredentials
+        : dependencies.verifyUnlock ?? verifyUnlockCredentials;
+    const verification = await verify(
+        mode === 'recovery'
+            ? { username: payload.username, recoveryVerifier: input.previousVerifier }
+            : { username: payload.username, verifier: input.previousVerifier },
+        { db, ...(dependencies.writeAuditEvent ? { writeAuditEvent: dependencies.writeAuditEvent } : {}) },
+    );
+    if (verification.kind === 'denied') return { kind: 'denied', status: verification.status, body: verification.body };
+    const account = verification.account;
+
+    const unconfirmed = (message: string): PassphraseRecoveryResult => ({
+        kind: 'failure', status: 409, code: PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE, message,
+    });
+    const session = input.openSession(account);
+    if (!session) return unconfirmed('Il recupero non può essere confermato. Riprova tra poco.');
+    const closeSession = (): void => {
+        if (mode !== 'recovery') return;
+        try { (dependencies.retireWebSession ?? retire)(session, 'delete'); } catch { /* it was never handed out */ }
+    };
+    const nativeRetirement = (dependencies.prepareNativeSessionsForUserRetirement ?? prepareNativeLegacyUserRetirement)(account.id);
+    if (!nativeRetirement) {
+        closeSession();
+        return unconfirmed('Il recupero non può essere confermato. Riprova tra poco.');
+    }
+    const abortNative = (): void => {
+        try { (dependencies.abortNativeSessionsForUserRetirement ?? abortNativeLegacyUserRetirement)(nativeRetirement); } catch { /* nothing was written */ }
+    };
+    const webRetirement = (dependencies.prepareWebSessionsForUserRetirement ?? prepareUserRetirement)(session);
+    if (!webRetirement) {
+        abortNative();
+        closeSession();
+        return unconfirmed('Il recupero non può essere confermato. Riprova tra poco.');
+    }
+    const abortPrepared = (): void => {
+        try { (dependencies.abortWebSessionsForUserRetirement ?? abortUserRetirement)(webRetirement); } catch { /* nothing was written */ }
+        abortNative();
+        closeSession();
+    };
+
+    let changes: number;
+    try {
+        changes = db.transaction((tx) => tx
+            .update(users)
+            .set({
+                encryptedMasterKey: payload.encryptedMasterKey,
+                salt: payload.salt,
+                unlockVerifierHash: verifierHash(payload.verifier),
+                recoveryWrappedMasterKey: payload.recovery.wrappedMasterKey,
+                recoverySalt: payload.recovery.salt,
+                recoveryVerifierHash: verifierHash(payload.recovery.verifier),
+                failedLoginAttempts: 0,
+                firstFailedLoginAt: null,
+                lockedUntil: null,
+            })
+            .where(and(
+                eq(users.id, account.id),
+                mode === 'recovery'
+                    ? eq(users.recoveryVerifierHash, verifierHash(input.previousVerifier))
+                    : eq(users.unlockVerifierHash, verifierHash(input.previousVerifier)),
+                isNotNull(users.unlockVerifierHash),
+                // A lock established after the recovery key was verified stands: this write does not clear it.
+                or(isNull(users.lockedUntil), lte(users.lockedUntil, new Date())),
+            ))
+            .run()).changes;
+    } catch (error) {
+        abortPrepared();
+        throw error;
+    }
+    if (changes !== 1) {
+        abortPrepared();
+        return {
+            kind: 'failure',
+            status: 409,
+            code: PASSPHRASE_ADOPTION_CONFLICT_CODE,
+            message: 'Le credenziali sono state modificate nel frattempo. Nulla è cambiato con questa richiesta.',
+        };
+    }
+
+    // The new passphrase is now the credential: a retirement that fails keeps its fence and is never aborted.
+    let webOutcome: 'completed' | 'failed' | 'denied' = 'failed';
+    try {
+        webOutcome = (dependencies.commitWebSessionsForUserRetirement ?? commitUserRetirement)(webRetirement).outcome;
+    } catch {
+        webOutcome = 'failed';
+    }
+    let nativeOutcome: 'completed' | 'failed' | 'denied' = 'failed';
+    try {
+        nativeOutcome = (dependencies.commitNativeSessionsForUserRetirement ?? commitNativeLegacyUserRetirement)(nativeRetirement).outcome;
+    } catch {
+        nativeOutcome = 'failed';
+    }
+    if (webOutcome !== 'completed' || nativeOutcome !== 'completed') {
+        return unconfirmed('La nuova passphrase è attiva, ma il ritiro delle sessioni non è confermato. Accedi con la nuova passphrase.');
+    }
+
+    try {
+        const context = mode === 'recovery'
+            ? { actorType: 'user' as const, actorRef: account.id, sourceSurface: 'web' as const, authContext: 'anonymous' as const }
+            : auditContextFromSession(session);
+        await (dependencies.writeAuditEvent ?? writeAuditEvent)({
+            eventType: 'settings.updated',
+            outcome: 'success',
+            actorType: 'user',
+            actorRef: account.id,
+            subjectType: 'settings',
+            subjectRef: 'security.unlock-credential',
+            sourceSurface: context.sourceSurface,
+            requestId: requestIdFromRequest(input.request),
+            redactedMetadata: withAuditContextMetadata(context, {
+                changedFields: ['encryptedMasterKey', 'salt', 'unlockVerifierHash', 'recoveryWrappedMasterKey', 'recoverySalt', 'recoveryVerifierHash'],
+                flags: mode === 'recovery' ? ['credential-rotation', 'recovery-key'] : ['credential-rotation'],
+                reasonCode: mode === 'recovery' ? 'passphrase_recovered' : 'passphrase_changed',
+            }),
+        });
+    } catch (error) {
+        console.error('Audit passphrase recovery write failed:', error);
     }
 
     return { kind: 'success' };

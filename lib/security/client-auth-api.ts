@@ -1,4 +1,6 @@
 /* @Codex */
+import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseRecoveryPayload } from './passphrase-adoption-validation';
+
 export type AuthHealthErrorCategory =
     | 'native-dependency-invalid'
     | 'native-dependency-missing'
@@ -13,14 +15,19 @@ export type UnlockParameters =
     | { credential: 'pin' }
     | { credential: 'passphrase'; kdfVersion: number; salt: string };
 
-/** The check response is untrusted input: anything that is not a well-formed passphrase account is a PIN account. */
-export function readUnlockParameters(value: unknown): UnlockParameters {
+/**
+ * The check response is untrusted input. Null unless it says, in a well-formed way, what unlocks
+ * the account: with null the caller sends nothing, because what was typed may be a passphrase
+ * and only a PIN may travel as it is.
+ */
+export function readUnlockParameters(value: unknown): UnlockParameters | null {
     const unlock = value && typeof value === 'object' ? value as Record<string, unknown> : null;
+    if (unlock?.credential === 'pin') return { credential: 'pin' };
     if (unlock?.credential === 'passphrase' && Number.isInteger(unlock.kdfVersion)
         && typeof unlock.salt === 'string' && unlock.salt) {
         return { credential: 'passphrase', kdfVersion: unlock.kdfVersion as number, salt: unlock.salt };
     }
-    return { credential: 'pin' };
+    return null;
 }
 
 /* @Codex */
@@ -68,6 +75,8 @@ type SetupRequestPayload = {
     salt: string;
     displayName: string;
     ambulatoryName: string;
+    verifier?: string;
+    recovery?: { wrappedMasterKey: string; salt: string; verifier: string };
 };
 
 type SetupResponsePayload = {
@@ -309,8 +318,13 @@ export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBar
 }
 
 /* @Codex */
-export async function checkAuthHealthRequest() {
-    if (authHealthRequestInFlight) return authHealthRequestInFlight;
+export async function checkAuthHealthRequest(options: { fresh?: boolean } = {}) {
+    // A caller that decides what to send needs an answer produced after its gesture: one already
+    // on its way was produced before, so it is awaited and asked again.
+    while (authHealthRequestInFlight) {
+        if (!options.fresh) return authHealthRequestInFlight;
+        await authHealthRequestInFlight.catch(() => undefined);
+    }
 
     const expectedEtag = currentAuthControlEtag;
     const request = (async (): Promise<AuthControlledJsonRequestResult<AuthHealthPayload>> => {
@@ -384,6 +398,24 @@ export function changePinRequest(payload: PinChangeRequestPayload) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+    });
+}
+
+export function adoptPassphraseRequest(payload: PassphraseAdoptionPayload) {
+    return requestJson<PinChangeFailurePayload & { earlierCopiesCleared?: boolean }>('/api/auth/passphrase', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+}
+
+export function changePassphraseRequest(payload: PassphraseChangePayload) {
+    return requestJson<PinChangeFailurePayload>('/api/auth/passphrase/change', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+}
+
+export function recoverPassphraseRequest(payload: PassphraseRecoveryPayload) {
+    return requestAuthMutationJson<PinChangeFailurePayload>('/api/auth/passphrase/recover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     });
 }
 

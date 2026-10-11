@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import { users } from '@/lib/schema';
 import {
     verifyHostCredentials,
+    verifyRecoveryCredentials,
     verifyUnlockCredentials,
     type HostCredentialVerifierDependencies,
 } from './host-credential-verification';
@@ -36,14 +37,15 @@ function makeDatabase() {
 
 async function seed(db: TestDatabase, state: Partial<{
     passwordHash: string; failedLoginAttempts: number; firstFailedLoginAt: Date | null; lockedUntil: Date | null;
-    unlockVerifierHash: string;
+    unlockVerifierHash: string; recoveryVerifierHash: string;
 }> = {}) {
     const passwordHash = state.passwordHash ?? await bcrypt.hash(PIN, 4);
     db.insert(users).values({
         id: 'synthetic-user-1', username: USERNAME, role: 'admin', passwordHash,
         encryptedMasterKey: 'synthetic-key-blob', salt: 'synthetic-salt',
         failedLoginAttempts: state.failedLoginAttempts ?? 0, firstFailedLoginAt: state.firstFailedLoginAt,
-        lockedUntil: state.lockedUntil, unlockVerifierHash: state.unlockVerifierHash, createdAt: new Date(),
+        lockedUntil: state.lockedUntil, unlockVerifierHash: state.unlockVerifierHash,
+        recoveryVerifierHash: state.recoveryVerifierHash, createdAt: new Date(),
     }).run();
     return passwordHash;
 }
@@ -508,5 +510,57 @@ test('a passphrase changed after the account was read denies the old verifier', 
         assert.equal(stale.kind, 'denied');
         const current = await verifyUnlockCredentials({ username: USERNAME, verifier: next.verifier }, { db, writeAuditEvent: async () => 'audit' });
         assert.equal(current.kind, 'verified');
+    } finally { sqlite.close(); }
+});
+
+test('the recovery verifier proves the recovery key of a passphrase account, is counted when wrong, and is nothing else', async () => {
+    const { sqlite, db } = makeDatabase(); const now = new Date('2026-10-11T12:00:00.000Z');
+    try {
+        const unlock = await accessVerifier('cavallo batteria graffetta corretta');
+        const recovery = await accessVerifier('stands in for the value derived from the recovery key');
+        const wrong = await accessVerifier('another recovery key');
+        await seed(db, { unlockVerifierHash: unlock.hash, recoveryVerifierHash: recovery.hash });
+        let compares = 0;
+        const dependencies = { db, now: () => now, compare: async () => { compares += 1; return true; }, writeAuditEvent: async () => 'audit' };
+
+        // Neither the PIN nor the unlock verifier is a recovery credential, under any name.
+        for (const other of [{ username: USERNAME, pin: PIN }, { username: USERNAME, verifier: unlock.verifier }]) {
+            assert.equal((await verifyRecoveryCredentials(other, dependencies)).kind, 'denied');
+        }
+        assert.equal((await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: unlock.verifier }, dependencies)).kind, 'denied');
+        assert.equal(attempts(db), 1, 'a wrong recovery verifier is counted; a wrong shape is not');
+        // And the recovery verifier opens no session.
+        assert.equal((await verifyUnlockCredentials({ username: USERNAME, verifier: recovery.verifier }, dependencies)).kind, 'denied');
+        assert.equal(attempts(db), 2);
+
+        const verified = await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: recovery.verifier }, dependencies);
+        assert.equal(verified.kind, 'verified');
+        assert.equal(attempts(db), 0);
+        assert.equal(compares, 0);
+
+        db.update(users).set({ failedLoginAttempts: 4, firstFailedLoginAt: new Date(now.getTime() - 1_000) }).where(eq(users.username, USERNAME)).run();
+        const fifth = await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: wrong.verifier }, dependencies);
+        assert.equal(fifth.kind, 'denied'); assert.equal(fifth.status, 423);
+        const locked = await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: recovery.verifier }, dependencies);
+        assert.equal(locked.kind, 'denied'); assert.equal(locked.failureClass, 'locked');
+    } finally { sqlite.close(); }
+});
+
+test('an account still on its PIN has no recovery, and a recovery key replaced meanwhile is refused', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        const unlock = await accessVerifier('cavallo batteria graffetta corretta');
+        const old = await accessVerifier('the recovery key typed into the browser');
+        const next = await accessVerifier('the recovery key that replaced it');
+        await seed(db);
+        const quiet = { db, writeAuditEvent: async () => 'audit' };
+        assert.equal((await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: old.verifier }, quiet)).kind, 'denied');
+        assert.equal(attempts(db), 0);
+
+        db.update(users).set({ unlockVerifierHash: unlock.hash, recoveryVerifierHash: old.hash }).where(eq(users.username, USERNAME)).run();
+        const rotate = () => { db.update(users).set({ recoveryVerifierHash: next.hash }).where(eq(users.username, USERNAME)).run(); return new Date(); };
+        const stale = await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: old.verifier }, { ...quiet, now: rotate });
+        assert.equal(stale.kind, 'denied');
+        assert.equal((await verifyRecoveryCredentials({ username: USERNAME, recoveryVerifier: next.verifier }, quiet)).kind, 'verified');
     } finally { sqlite.close(); }
 });
