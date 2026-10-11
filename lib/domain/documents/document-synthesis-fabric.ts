@@ -3,7 +3,7 @@ import { createClinicalProposal, declareUncertainty, type ClinicalProposal } fro
 import { getFabricCapabilityDescriptor } from '../../ai-providers/fabric/catalog';
 import { routeCandidateCapability, type CandidateRoutingDecision } from '../../ai-providers/fabric/candidate-router';
 import type { FabricProvenanceRecord } from '../../ai-providers/fabric/contract';
-import { advanceOnboarding, startOnboarding } from '../../ai-providers/fabric/onboarding';
+import { enabledLocalOnboarding } from '../../ai-providers/fabric/onboarding';
 import { admitProvider } from '../../ai-providers/fabric/provider-lifecycle';
 import { observeVenue } from '../../ai-providers/fabric/routing-observability';
 import { buildProvenanceRecord } from '../../ai-providers/fabric/resolver';
@@ -21,13 +21,6 @@ export class DocumentSynthesisFabricDeniedError extends Error {
         super(`Document synthesis denied by Fabric: ${denial.denialCode ?? 'unknown'}`);
         this.name = 'DocumentSynthesisFabricDeniedError';
     }
-}
-
-function localOnboarding() {
-    return ['configure', 'credential_declared', 'attest_local', 'enable'].reduce(
-        (state, type) => advanceOnboarding(state, { type } as Parameters<typeof advanceOnboarding>[1]),
-        startOnboarding('ollama', 'local_model'),
-    );
 }
 
 function modelInfo(value: unknown): Readonly<{
@@ -60,7 +53,7 @@ export function admitDocumentSynthesisFabric(input: Readonly<{ modelInfo: unknow
     const health = input.health as { status?: unknown } | null;
     const healthStatus = health?.status;
     const observation = observeVenue('local_process', healthStatus === 'ok' ? 'available' : 'offline', healthStatus === 'ok' ? null : 'daemon_unreachable');
-    const onboarding = localOnboarding();
+    const onboarding = enabledLocalOnboarding();
     const routing = routeCandidateCapability({
         policy: Object.freeze({
             schemaVersion: 'mediflow.ai.execution-policy.v1', requestId, capability: descriptor.id,
