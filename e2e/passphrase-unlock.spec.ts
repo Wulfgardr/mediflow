@@ -100,6 +100,12 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   // The shell is rendered only after the provider has opened the returned wrapping with the key it derived.
   await expectUnlocked(page);
 
+  // The access settings describe the account as it is now, and no longer offer the PIN rotation the server refuses.
+  await page.goto('/settings/accesso');
+  await expect(page.getByTestId('settings-access-passphrase')).toContainText('Questo archivio si sblocca con la passphrase.');
+  await expect(page.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);
+  await expect(page.getByText('Il blocco richiede la passphrase al prossimo accesso.')).toBeVisible();
+
   // Both attempts sent a verifier and nothing else; the accepted one is the value node:crypto derived.
   expect(logins).toHaveLength(2);
   for (const body of logins) {
