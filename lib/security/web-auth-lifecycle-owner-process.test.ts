@@ -8,7 +8,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const ENTRY = createRequire(import.meta.url).resolve('@mediflow/web-auth-lifecycle-owner');
+const nodeRequire = createRequire(import.meta.url);
+const ENTRY = nodeRequire.resolve('@mediflow/web-auth-lifecycle-owner');
 const PACKAGE = path.dirname(ENTRY);
 const OWNER = path.join(PACKAGE, 'internal/owner.cjs');
 const ACTIVATION = path.join(PACKAGE, 'internal/session-activation.cjs');
