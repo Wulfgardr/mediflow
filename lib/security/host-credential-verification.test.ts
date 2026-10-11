@@ -26,7 +26,8 @@ function makeDatabase() {
     sqlite.exec(`CREATE TABLE users (
         id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, display_name TEXT, ambulatory_name TEXT, role TEXT,
         password_hash TEXT NOT NULL, encrypted_master_key TEXT NOT NULL, salt TEXT NOT NULL,
-        failed_login_attempts INTEGER NOT NULL DEFAULT 0, first_failed_login_at INTEGER, locked_until INTEGER, created_at INTEGER
+        failed_login_attempts INTEGER NOT NULL DEFAULT 0, first_failed_login_at INTEGER, locked_until INTEGER, created_at INTEGER,
+        unlock_verifier_hash TEXT, recovery_wrapped_master_key TEXT, recovery_salt TEXT, recovery_verifier_hash TEXT
     )`);
     return { sqlite, db: drizzle(sqlite) as TestDatabase };
 }

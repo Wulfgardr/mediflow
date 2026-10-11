@@ -32,6 +32,10 @@ function makeDatabase() {
             failed_login_attempts INTEGER NOT NULL DEFAULT 0,
             first_failed_login_at INTEGER,
             locked_until INTEGER,
+            unlock_verifier_hash TEXT,
+            recovery_wrapped_master_key TEXT,
+            recovery_salt TEXT,
+            recovery_verifier_hash TEXT,
             created_at INTEGER
         );
         CREATE TABLE settings (
