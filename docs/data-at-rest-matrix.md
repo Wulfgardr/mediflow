@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 5.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 6.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
 ottobre 2026.
 
@@ -259,10 +259,11 @@ locali salvano ciò che ricevono.
 
 | Artefatto | Dove | Che cosa contiene | Protezione | Fonte |
 | --- | --- | --- | --- | --- |
-| Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file creato `0600`. La directory predefinita è `0700`, anche se esisteva già; una directory scelta con `MEDIFLOW_DATA_DIR` resta com'è se esisteva, nasce `0700` se la crea il prodotto. Su Windows valgono le regole di accesso del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts` |
+| Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file creato `0600`, ed è `0600` anche il file che una riparazione mette al suo posto o ripristina. Con le versioni precedenti una riparazione lo lasciava con i permessi predefiniti del sistema (misurato `0644` con umask `022`): un archivio già riparato resta così, il prodotto non ne restringe i permessi. La directory predefinita è `0700`, anche se esisteva già; una directory scelta con `MEDIFLOW_DATA_DIR` resta com'è se esisteva, nasce `0700` se la crea il prodotto. Su Windows valgono le regole di accesso del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts`, `lib/sqlite-repair.ts` |
 | `medical.db-wal`, `medical.db-shm` | Accanto al database. | Le stesse pagine, compresi valori precedenti finché non vengono riassorbiti. Il passaggio alla passphrase svuota il registro, che conserverebbe l'involucro del PIN. | Come il database. | SQLite, `lib/security/pin-era-residues.ts` |
 | Originale dell'aggiornamento dello schema `medical.db.schema-original-v<N>-<uuid>.db` | Directory dati. | Copia integrale del database com'era prima dell'aggiornamento, compresi `users` e l'involucro della chiave. | Campi cifrati; file `0600`. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `lib/sqlite-schema-open.ts`, `lib/security/pin-era-residues.ts` |
-| Copia di riparazione `medical.db.bak-<data>-<ora>` | Directory dati. | Copia integrale del database com'era prima della riparazione, compresi `users` e l'involucro della chiave. | Campi cifrati. Il file nasce con i permessi predefiniti del sistema (misurato `0644` con umask `022`), non `0600`: verso gli altri account lo protegge solo la directory dati. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `app/api/system/repair-db/route.ts`, `lib/sqlite-repair.ts`, `lib/security/pin-era-residues.ts` |
+| Copia di riparazione `medical.db.bak-<data>-<ora>` | Directory dati. | Copia integrale del database com'era prima della riparazione, compresi `users` e l'involucro della chiave. | Campi cifrati; file `0600`. Le copie lasciate da versioni precedenti restano con i permessi con cui sono nate (misurato `0644` con umask `022`): verso gli altri account le protegge solo la directory dati. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `app/api/system/repair-db/route.ts`, `lib/sqlite-repair.ts`, `lib/security/pin-era-residues.ts` |
+| Istantanee della riparazione `medical.db.swap-recovery/` | Accanto al database. | Durante una riparazione: copia integrale del database di prima, copia di quello che lo sostituisce e registro dello scambio. La directory viene rimossa a riparazione conclusa; dopo un'interruzione resta finché l'avvio successivo non conclude il recupero. | Campi cifrati; directory `0700`, istantanee e registro `0600`. | `lib/sqlite-repair.ts` |
 | Copie di manutenzione `medical.db.old-*`, `.repair-tmp*` | Directory dati. | Copie integrali del database. | Come il database; restano finché non vengono rimosse. | `lib/sqlite-repair.ts` |
 | Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file `0600`, compresi quelli lasciati da versioni precedenti; una destinazione nuova nasce `0700`, una già esistente resta com'è. | `scripts/run-scheduled-backup.mjs` |
 | Backup scaricato dall'interfaccia | Dove lo salva il browser. | Come il backup pianificato. | Campi cifrati. | `app/api/system/backup-restore/route.ts` |
@@ -284,7 +285,7 @@ locali salvano ciò che ricevono.
 | Minaccia | Campi cifrati | Tutto il resto |
 | --- | --- | --- |
 | T1, T2 | Nel profilo PIN transitorio sono protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Gli account v3 usano la passphrase dell'ADR 0143. Il backup non contiene hash né involucro. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
-| T3 | Il database è `0600`. | Directory dati predefinita `0700` e backup pianificati `0600` su macOS e Linux. Restano come le ha impostate l'operatore una directory dati o una destinazione dei backup scelte da lui e già esistenti. |
+| T3 | Il database è `0600`. | Directory dati predefinita `0700`, backup pianificati e copie di riparazione `0600` su macOS e Linux. Restano come le ha impostate l'operatore una directory dati o una destinazione dei backup scelte da lui e già esistenti. |
 | T4 | Nessuna | Non provato: manca il test con la sentinella del criterio 3. |
 
 ## Esposizioni da decidere
@@ -306,6 +307,9 @@ Leonardo.
 5. **Permessi** dei backup pianificati e della directory dati: chiusi dalla
    versione 2 di questa matrice. Resta da decidere se verificare, e come
    segnalare, una directory scelta dall'operatore e leggibile da altri account.
+   Le copie di riparazione nascono `0600` dalla versione 6; quelle già
+   scritte, e un database già passato da una riparazione, restano come sono
+   finché non si decide se restringerne i permessi all'apertura.
 6. **Export FHIR e moduli** in chiaro, con il nome del paziente nel nome del
    file.
 7. **Le rotte Web locali non controllano l'involucro**: un client che invia
@@ -336,3 +340,4 @@ cambia una classificazione.
 | 3 | Tolto dal contratto `messages.reasoning`, che non era una colonna. |
 | 4 | Quattro colonne nuove in `users` per l'ADR 0143, ancora vuote. |
 | 5 | Aggiunti gli originali dell'aggiornamento dello schema e le copie di riparazione, che mancavano. Il passaggio alla passphrase elimina quelle con l'involucro del PIN e svuota il WAL. |
+| 6 | Copie di riparazione `0600`; il database resta `0600` dopo una riparazione o un ripristino. Aggiunte le istantanee in `medical.db.swap-recovery/`, che mancavano. |

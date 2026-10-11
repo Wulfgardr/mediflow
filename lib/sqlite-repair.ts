@@ -98,6 +98,9 @@ function assertIntegrity(file: string): void {
 }
 
 function sealSnapshot(file: string, foreignKeys: 'clean' | 'as-found' = 'clean'): void {
+    // A snapshot is a full copy of the archive and SQLite created it with the
+    // umask default: owner-only before it is sealed, copied or renamed into place.
+    fs.chmodSync(file, 0o600);
     const snapshot = new Database(file, { fileMustExist: true });
     try {
         snapshot.pragma('journal_mode = DELETE');
@@ -198,6 +201,9 @@ function restoreOriginal(context: SwapContext): void {
     for (const suffix of SIDECAR_SUFFIXES) regularFile(context.target + suffix);
     const restore = path.join(context.dir, 'restore.db');
     fs.copyFileSync(original, restore, fs.constants.COPYFILE_EXCL);
+    // restore.db becomes the live database: owner-only even when the snapshot
+    // was prepared by a version that left it with the umask default.
+    fs.chmodSync(restore, 0o600);
     syncFile(restore);
     syncDirectory(context.dir);
     // Keep the failed candidate and its WAL for inspection. The independent
@@ -284,7 +290,6 @@ export function createVerifiedSqliteSnapshotSync(sourcePath: string, destination
     const temporary = path.join(temporaryDirectory, 'original.db');
     try {
         copySqliteDatabaseSync(source, temporary);
-        fs.chmodSync(temporary, 0o600);
         sealSnapshot(temporary, 'as-found');
         syncDirectory(temporaryDirectory);
         if (SIDECAR_SUFFIXES.some(suffix => regularFile(destination + suffix))) {
@@ -383,7 +388,10 @@ export async function replaceSqliteDatabase(options: ReplaceSqliteDatabaseOption
                 const backup = path.resolve(backupPath);
                 if (backup === target || backup === path.resolve(sourcePath) || backup.startsWith(dir + path.sep)) throw new SqliteSwapRecoveryRequiredError();
                 regularFile(backup);
+                // The copy is created with the mode of its source; the chmod does
+                // not leave a full copy of the archive to depend on that.
                 fs.copyFileSync(original, backup, fs.constants.COPYFILE_EXCL);
+                fs.chmodSync(backup, 0o600);
                 syncFile(backup);
                 syncDirectory(path.dirname(backup));
             }
