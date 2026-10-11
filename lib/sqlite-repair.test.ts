@@ -33,6 +33,10 @@ function swapArtifacts(dir: string): string[] {
     return fs.readdirSync(dir).filter((name) => name.includes('.repair-tmp') || name.includes('.old-'));
 }
 
+function permissionBits(file: string): number {
+    return fs.statSync(file).mode & 0o777;
+}
+
 function readNames(dbPath: string): string[] {
     const db = new Database(dbPath, { readonly: true, fileMustExist: true });
     try {
@@ -259,6 +263,99 @@ test('replaceSqliteDatabase restores the previous DB when the swap fails after r
     }
 });
 
+test('replaceSqliteDatabase leaves the backup, its snapshots and the swapped-in database owner-only', async () => {
+    const dir = makeTempDir();
+    const sourcePath = path.join(dir, 'legacy.db');
+    const destPath = path.join(dir, 'medical.db');
+    const backupPath = path.join(dir, 'medical.db.bak');
+    const recoveryDir = `${destPath}.swap-recovery`;
+    // With this umask SQLite and a plain copy create 0644 files, so the
+    // assertions below cannot pass by accident on a host with a stricter one.
+    const previousUmask = process.umask(0o022);
+    createDatabase(sourcePath, ['Giulia Bianchi'], 'wal').close();
+
+    const live = createDatabase(destPath, ['Mario Rossi', 'Anna Verdi'], 'wal');
+    // The product creates medical.db owner-only; a repair must not widen it.
+    fs.chmodSync(destPath, 0o600);
+    let reopened: Database.Database | null = null;
+    const snapshotModes: number[] = [];
+    try {
+        await replaceSqliteDatabase({
+            sourcePath,
+            destPath,
+            backupPath,
+            connection: live,
+            reopenConnection: () => {
+                reopened = new Database(destPath);
+            },
+            onPhaseForTest: (phase) => {
+                if (phase !== 'prepared') return;
+                for (const name of ['original.db', 'replacement.db']) {
+                    snapshotModes.push(permissionBits(path.join(recoveryDir, name)));
+                }
+            },
+        });
+
+        // Windows has no owner-only mode: there the swap runs, the modes are not asserted.
+        if (process.platform !== 'win32') {
+            assert.deepEqual(snapshotModes, [0o600, 0o600]);
+            assert.equal(permissionBits(backupPath), 0o600);
+            assert.equal(permissionBits(destPath), 0o600);
+        }
+        // Tightening the modes changes neither copy.
+        assert.deepEqual(readNames(backupPath), ['Mario Rossi', 'Anna Verdi']);
+        assert.deepEqual(readNames(destPath), ['Giulia Bianchi']);
+        assert.equal(fs.existsSync(recoveryDir), false);
+    } finally {
+        process.umask(previousUmask);
+        if (reopened) (reopened as Database.Database).close();
+        if (live.open) live.close();
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
+test('replaceSqliteDatabase restores an owner-only database from a snapshot left with wider permissions', async () => {
+    const dir = makeTempDir();
+    const sourcePath = path.join(dir, 'legacy.db');
+    const destPath = path.join(dir, 'medical.db');
+    const previousUmask = process.umask(0o022);
+    createDatabase(sourcePath, ['Giulia Bianchi'], 'wal').close();
+
+    const live = createDatabase(destPath, ['Mario Rossi', 'Anna Verdi'], 'wal');
+    fs.chmodSync(destPath, 0o600);
+    const failure = new Error('simulated rename failure');
+    try {
+        await assert.rejects(
+            replaceSqliteDatabase({
+                sourcePath,
+                destPath,
+                backupPath: null,
+                connection: live,
+                reopenConnection: () => {},
+                onPhaseForTest: (phase) => {
+                    // What a swap prepared before the modes were tightened left on
+                    // disk. The journal already holds the digest of this file: the
+                    // restore below proves that a mode change does not invalidate it.
+                    if (phase === 'prepared') fs.chmodSync(path.join(`${destPath}.swap-recovery`, 'original.db'), 0o644);
+                },
+                beforeSwapInForTest: () => {
+                    throw failure;
+                },
+            }),
+            (error: unknown) => error === failure,
+        );
+
+        assert.deepEqual(readNames(destPath), ['Mario Rossi', 'Anna Verdi']);
+        if (process.platform !== 'win32') assert.equal(permissionBits(destPath), 0o600);
+        assert.deepEqual(swapArtifacts(dir), []);
+        assert.equal(fs.existsSync(`${destPath}.swap-recovery`), false);
+    } finally {
+        process.umask(previousUmask);
+        if (live.open) live.close();
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
 test('copySqliteDatabaseSync captures rows still in the WAL of an open writer', () => {
     const dir = makeTempDir();
     const sourcePath = path.join(dir, 'source.db');
@@ -317,6 +414,7 @@ test('removeSqliteSidecars deletes -wal and -shm files and tolerates missing one
 
 test('verified schema snapshot includes committed WAL, schema version and valid references', () => {
     const dir = makeTempDir(), sourcePath = path.join(dir, 'source.db'), destination = path.join(dir, 'original.db');
+    const previousUmask = process.umask(0o022);
     const source = createDatabase(sourcePath, ['synthetic-original'], 'wal');
     try {
         source.pragma('user_version = 7');
@@ -333,12 +431,13 @@ test('verified schema snapshot includes committed WAL, schema version and valid 
             assert.deepEqual(snapshot.prepare('SELECT name FROM patients_fixture').all(), [{ name: 'synthetic-original' }]);
         } finally { snapshot.close(); }
         assert.equal(fs.statSync(destination).nlink, 1);
+        if (process.platform !== 'win32') assert.equal(permissionBits(destination), 0o600);
         assert.equal(fs.existsSync(destination + '-wal'), false);
         assert.equal(fs.existsSync(destination + '-shm'), false);
         assert.deepEqual(fs.readdirSync(dir).filter(name => name.startsWith('.schema-snapshot-')), []);
         source.prepare("UPDATE patients_fixture SET name = 'synthetic-new'").run();
         assert.deepEqual(readNames(destination), ['synthetic-original']);
-    } finally { source.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+    } finally { process.umask(previousUmask); source.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('verified schema snapshot keeps existing orphans and rejects corrupt input without changing source', () => {
