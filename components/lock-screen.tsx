@@ -3,15 +3,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
 import { AlertCircle, Loader2, Unlock } from 'lucide-react';
-import { PASSPHRASE_POLICY } from '@/lib/security/unlock-credential';
+import { checkPassphrase } from '@/lib/security/unlock-credential';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
     const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, setupPin, lock } = useSecurity();
     // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
     const passphrase = !requiresSetup && unlockCredential === 'passphrase';
-    const minimumLength = passphrase ? PASSPHRASE_POLICY.minLength : 4;
     const [pin, setPin] = useState('');
+    // Counted as the primitives count it, after normalization: what they accept can be submitted.
+    const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -172,7 +173,7 @@ export function LockScreen() {
                         type="submit"
                         disabled={
                             credentialsDisabled
-                            || pin.length < minimumLength
+                            || !longEnough
                             || (requiresSetup && confirmPin.length < 4)
                         }
                         className={styles.primaryButton}

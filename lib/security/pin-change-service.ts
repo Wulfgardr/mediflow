@@ -3,7 +3,7 @@ import 'server-only';
 
 import bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, lte, or } from 'drizzle-orm';
 
 /* @Codex */
 import {
@@ -25,6 +25,7 @@ import {
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
 import type { PassphraseAdoptionPayload } from '@/lib/security/passphrase-adoption-validation';
+import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
 /* @Codex */
 import { users } from '@/lib/schema';
 /* @Codex */
@@ -62,6 +63,7 @@ export type PinChangeServiceDependencies = {
     commitNativeSessionsForUserRetirement?: typeof commitNativeLegacyUserRetirement;
     abortNativeSessionsForUserRetirement?: typeof abortNativeLegacyUserRetirement;
     readPairedNativeSession?: typeof requirePairedNativeSession;
+    verifyPin?: typeof verifyHostCredentials;
 };
 
 /* @Codex */
@@ -77,7 +79,7 @@ export type PinChangeServiceInput = {
 export type PinChangeServiceResult =
     | { kind: 'success' }
     | { kind: 'unauthorized' }
-    | { kind: 'failure'; status: 400 | 401 | 409; code: string; message: string };
+    | { kind: 'failure'; status: 400 | 401 | 409 | 423; code: string; message: string };
 
 async function resolveDatabase(dependencies: PinChangeServiceDependencies): Promise<PinChangeDatabase> {
     if (dependencies.db) return dependencies.db;
@@ -302,13 +304,16 @@ export async function adoptPassphrase(
             message: 'Questo account si sblocca già con una passphrase.',
         };
     }
-    if (!await bcrypt.compare(payload.currentPin, user.passwordHash)) {
-        return {
-            kind: 'failure',
-            status: 401,
-            code: PASSPHRASE_ADOPTION_INVALID_PIN_CODE,
-            message: 'Il PIN attuale non è corretto.',
-        };
+    // A session alone must not allow guessing the PIN here: the shared verifier counts wrong
+    // PINs and honours a lock, exactly as it does at login.
+    const verification = await (dependencies.verifyPin ?? verifyHostCredentials)(
+        { username: user.username, pin: payload.currentPin },
+        { db, ...(dependencies.writeAuditEvent ? { writeAuditEvent: dependencies.writeAuditEvent } : {}) },
+    );
+    if (verification.kind === 'denied') {
+        return verification.status === 423
+            ? { kind: 'failure', status: 423, code: verification.body.code, message: verification.body.message }
+            : { kind: 'failure', status: 401, code: PASSPHRASE_ADOPTION_INVALID_PIN_CODE, message: verification.body.message };
     }
 
     const unconfirmed = (message: string): PinChangeServiceResult => ({
@@ -344,7 +349,13 @@ export async function adoptPassphrase(
                 firstFailedLoginAt: null,
                 lockedUntil: null,
             })
-            .where(and(eq(users.id, user.id), eq(users.passwordHash, user.passwordHash), isNull(users.unlockVerifierHash)))
+            .where(and(
+                eq(users.id, user.id),
+                eq(users.passwordHash, user.passwordHash),
+                isNull(users.unlockVerifierHash),
+                // A lock established after the PIN was verified stands: this write does not clear it.
+                or(isNull(users.lockedUntil), lte(users.lockedUntil, new Date())),
+            ))
             .run()).changes;
     } catch (error) {
         abortPrepared();

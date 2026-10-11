@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 4** — C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 4.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
 ottobre 2026.
 
@@ -65,190 +65,190 @@ dei client abbinati (`lib/network-*-write.ts`) e sulla sostituzione del
 contenuto di un allegato (`lib/api-schemas/attachments.ts`). Le rotte Web
 locali salvano ciò che ricevono.
 
-### `ambulatories` — sedi e contenitori di lavoro
+### `ambulatories`: sedi e contenitori di lavoro
 
 - In chiaro: `id`, `name`, `address`, `parent_id`, `type`, `description`, `is_default`, `created_at`, `version`
 - Leggibile senza chiave: nome e indirizzo delle sedi.
 
-### `attachments` — documenti allegati e loro estratti
+### `attachments`: documenti allegati e loro estratti
 
 - Cifrate: `name`, `path`, `data`, `summary_snapshot`, `parse_evidence_artifact_snapshot`
 - In chiaro: `id`, `patient_id`, `type`, `size`, `created_at`, `ocr_queue_state`, `ocr_queue_reason`, `ocr_queue_updated_at`, `ocr_replay_artifact_snapshot`, `document_source_ref`, `document_revision`, `document_freshness_epoch`
 - Leggibile senza chiave: tipo MIME, dimensione, stato della coda OCR e identificativo del paziente. `ocr_replay_artifact_snapshot` non ha oggi un writer e non è nel contratto.
 
-### `audit_events` — registro di audit
+### `audit_events`: registro di audit
 
 - In chiaro: `event_id`, `schema_version`, `event_type`, `occurred_at`, `outcome`, `actor_type`, `actor_ref`, `subject_type`, `subject_ref`, `source_surface`, `request_id`, `redacted_metadata`, `created_at`
 - Leggibile senza chiave: tipo di evento, attore, identificativo del soggetto e metadati minimizzati.
 
-### `checkups` — controlli programmati
+### `checkups`: controlli programmati
 
 - Cifrate: `notes`, `deletion_reason`
 - In chiaro: `id`, `patient_id`, `date`, `title`, `status`, `created_at`, `source`, `version`, `updated_at`, `deleted_at`
 - Leggibile senza chiave: titolo, data e stato del controllo.
 
-### `conversations` — conversazioni con l'assistente
+### `conversations`: conversazioni con l'assistente
 
 - Cifrate: `title`
 - In chiaro: `id`, `updated_at`, `is_archived`, `created_at`, `is_deleted`
 - Leggibile senza chiave: date e stato di archiviazione.
 
-### `document_diagnosis_proposals` — proposte di diagnosi dai documenti
+### `document_diagnosis_proposals`: proposte di diagnosi dai documenti
 
 - In chiaro: `id`, `patient_id`, `source_document_key`, `attachment_id`, `document_insight_id`, `candidate_key`, `payload`, `status`, `confidence`, `decided_at`, `decision_actor_type`, `decision_actor_ref`, `decision_payload`, `version`, `created_at`, `updated_at`
 - Leggibile senza chiave: la tabella non ha oggi un writer; `payload` e `decision_payload` non sono nel contratto.
 
-### `drugs` — catalogo farmaci AIFA
+### `drugs`: catalogo farmaci AIFA
 
 - In chiaro: `aic`, `name`, `active_principle`, `company`, `packaging`, `class`, `price`, `atc`, `aic_search`, `name_search`, `active_principle_search`, `packaging_search`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
-### `durable_review_command_operations` — comandi di revisione, idempotenza
+### `durable_review_command_operations`: comandi di revisione, idempotenza
 
 - In chiaro: `id`, `review_id`, `idempotency_key`, `command_digest`, `result_snapshot`, `audit_event_id`, `created_at`
 - Leggibile senza chiave: riferimenti, digest e istantanea del risultato.
 
-### `durable_review_command_states` — comandi di revisione, stato
+### `durable_review_command_states`: comandi di revisione, stato
 
 - In chiaro: `review_id`, `review_state`, `revision`, `action`, `created_at`
 - Leggibile senza chiave: stato e revisione della revisione.
 
-### `durable_review_operations` — operazioni di revisione durevole
+### `durable_review_operations`: operazioni di revisione durevole
 
 - In chiaro: `id`, `review_id`, `idempotency_key`, `operation`, `expected_review_revision`, `operation_digest`, `record_snapshot`, `created_at`
 - Leggibile senza chiave: riferimenti e digest; `record_snapshot` ripete il valore sigillato del record.
 
-### `durable_review_patient_links` — collegamento fra revisione e paziente
+### `durable_review_patient_links`: collegamento fra revisione e paziente
 
 - In chiaro: `review_id`, `patient_id`, `created_at`, `updated_at`
 - Leggibile senza chiave: coppia revisione-paziente.
 
-### `durable_review_records` — record di revisione durevole
+### `durable_review_records`: record di revisione durevole
 
 - Altra protezione: `sealed_ciphertext`
 - In chiaro: `id`, `patient_ref`, `review_id`, `review_revision`, `receipt_ref`, `provenance_ref`, `receipt_binding`, `provenance_binding`, `presentation_version`, `sealed_digest`, `created_at`
 - Leggibile senza chiave: riferimenti, digest e versione di presentazione. Il contenuto è in `sealed_ciphertext`, che la validazione del backup accetta solo come valore `ENC:`.
 
-### `entries` — diario clinico
+### `entries`: diario clinico
 
 - Cifrate: `title`, `content`, `metadata`, `attachments`, `deletion_reason`
 - In chiaro: `id`, `patient_id`, `type`, `date`, `created_at`, `setting`, `deleted_at`, `version`, `updated_at`
 - Leggibile senza chiave: tipo, data e setting della nota; chi è il paziente.
 
-### `exemption_import_receipts` — ricevute di import delle esenzioni
+### `exemption_import_receipts`: ricevute di import delle esenzioni
 
 - In chiaro: `id`, `operation_key`, `receipt_json`
 - Leggibile senza chiave: dato di riferimento.
 
-### `exemptions` — catalogo esenzioni
+### `exemptions`: catalogo esenzioni
 
 - In chiaro: `code`, `description`, `type`, `source`, `start_date`, `end_date`, `is_pharma`, `is_specialist`, `is_national`, `updated_at`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
-### `headless_checkup_active_role_attestations` — attestazione di ruolo per i controlli
+### `headless_checkup_active_role_attestations`: attestazione di ruolo per i controlli
 
 - In chiaro: `attestation_ref`, `actor_ref`, `schema_version`, `role`, `operation_id`, `policy_version`, `status`, `attestation_version`, `issuer_ref`, `expires_at`, `activated_at`, `revocation_generation`, `revoked_at`, `created_at`, `updated_at`
 - Leggibile senza chiave: stato e scadenze dell'abilitazione; nessun dato clinico.
 
-### `headless_soap_active_role_attestations` — attestazione di ruolo SOAP
+### `headless_soap_active_role_attestations`: attestazione di ruolo SOAP
 
 - In chiaro: `attestation_ref`, `actor_ref`, `schema_version`, `role`, `operation_id`, `policy_version`, `status`, `attestation_version`, `issuer_ref`, `expires_at`, `activated_at`, `revocation_generation`, `revoked_at`, `created_at`, `updated_at`
 - Leggibile senza chiave: stato e scadenze dell'abilitazione; nessun dato clinico.
 
-### `headless_soap_entry_commits` — registro dei commit SOAP headless
+### `headless_soap_entry_commits`: registro dei commit SOAP headless
 
 - In chiaro: `idempotency_key`, `approval_ref`, `authorization_proof_digest`, `command_id`, `entry_id`, `audit_event_id`, `receipt_ref`, `binding_snapshot`, `binding_digest`, `entry_digest`, `audit_snapshot`, `audit_digest`, `receipt_snapshot`, `receipt_digest`, `committed_at`
 - Leggibile senza chiave: riferimenti, digest e istantanee di binding, audit e ricevuta. Il testo della nota resta nei campi cifrati di `entries`.
 
-### `messages` — messaggi delle conversazioni
+### `messages`: messaggi delle conversazioni
 
 - Cifrate: `content`, `metadata`, `attachment_base64`
 - In chiaro: `id`, `conversation_id`, `role`, `attachment_type`, `created_at`
 - Leggibile senza chiave: ruolo e tipo di allegato.
 
-### `observations` — osservazioni e valori di laboratorio
+### `observations`: osservazioni e valori di laboratorio
 
 - Cifrate: `notes`, `deletion_reason`
 - In chiaro: `id`, `patient_id`, `code_system`, `code`, `display`, `unit_system`, `unit_code`, `value`, `observed_at`, `source`, `version`, `created_at`, `updated_at`, `deleted_at`, `ref_low`, `ref_high`, `ref_text`, `service_prescription_item_id`
 - Leggibile senza chiave: codice, descrizione, valore, unità, intervallo di riferimento e data.
 
-### `patient_duplicate_intents` — intenti di duplicazione
+### `patient_duplicate_intents`: intenti di duplicazione
 
 - In chiaro: `id`, `created_at`
 - Leggibile senza chiave: identificativi tecnici.
 
-### `patient_retired_ids` — identificativi ritirati
+### `patient_retired_ids`: identificativi ritirati
 
 - In chiaro: `id`, `retired_at`
 - Leggibile senza chiave: identificativi tecnici.
 
-### `patients` — anagrafica e sintesi clinica
+### `patients`: anagrafica e sintesi clinica
 
 - Cifrate: `address`, `phone`, `caregiver`, `exemptions`, `diagnoses`, `status_reason`, `notes`, `ai_summary`, `document_insights`, `archive_reason`, `archive_note`, `deletion_reason`
 - In chiaro: `id`, `first_name`, `last_name`, `tax_code`, `birth_date`, `is_adi`, `is_archived`, `ambulatory_id`, `created_at`, `updated_at`, `monitoring_profile`, `version`, `deleted_at`, `ai_summary_generated_at`, `ai_summary_context_hash`
 - Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione.
 
-### `patients_to_ambulatories` — appartenenza dei pazienti alle sedi
+### `patients_to_ambulatories`: appartenenza dei pazienti alle sedi
 
 - In chiaro: `patient_id`, `ambulatory_id`, `assigned_at`
 - Leggibile senza chiave: coppia paziente-sede.
 
-### `physician_review_attestations` — attestazione di revisione medica
+### `physician_review_attestations`: attestazione di revisione medica
 
 - In chiaro: `actor_ref`, `schema_version`, `capability`, `status`, `attestation_version`, `policy_version`, `revoked_at`, `created_at`, `updated_at`
 - Leggibile senza chiave: stato dell'abilitazione; nessun dato clinico.
 
-### `prosthetic_prescriptions` — prescrizioni protesiche
+### `prosthetic_prescriptions`: prescrizioni protesiche
 
 - Cifrate: `description`, `measures`, `clinical_reason`, `regional_prescription_id`, `supplier`, `collaudo_outcome`, `document_refs`, `notes`
 - In chiaro: `id`, `patient_id`, `prescribed_at`, `status`, `category`, `iso_code`, `collaudo_at`, `source`, `version`, `created_at`, `updated_at`
 - Leggibile senza chiave: categoria, codice ISO, stato e date.
 
-### `prosthetics_catalog_entries` — repertorio della protesica
+### `prosthetics_catalog_entries`: repertorio della protesica
 
 - In chiaro: `id`, `code_system`, `code`, `description`, `version`, `source`, `scope`, `start_date`, `end_date`, `source_sha256`, `operation_key`, `imported_at`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
-### `prosthetics_catalog_receipts` — ricevute di import della protesica
+### `prosthetics_catalog_receipts`: ricevute di import della protesica
 
 - In chiaro: `id`, `operation_key`, `receipt_json`
 - Leggibile senza chiave: dato di riferimento.
 
-### `service_catalog_entries` — repertorio delle prestazioni
+### `service_catalog_entries`: repertorio delle prestazioni
 
 - In chiaro: `id`, `code_system`, `service_code`, `display_name`, `category`, `branch_code`, `synonyms`, `source`, `version`, `active`, `imported_at`, `updated_at`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
-### `service_prescription_items` — voci delle prescrizioni di prestazione
+### `service_prescription_items`: voci delle prescrizioni di prestazione
 
 - Cifrate: `service_name`, `catalog_display_name`, `evidence`, `notes`, `outcome_note`
 - In chiaro: `id`, `patient_id`, `prescription_id`, `ordinal`, `status`, `category`, `code_system`, `service_code`, `catalog_entry_id`, `match_status`, `confidence`, `scheduled_at`, `performed_at`, `report_received_at`, `version`, `created_at`, `updated_at`
 - Leggibile senza chiave: categoria, codice della prestazione, stato e date.
 
-### `service_prescriptions` — prescrizioni di prestazione
+### `service_prescriptions`: prescrizioni di prestazione
 
 - Cifrate: `service_name`, `clinical_question`, `provider`, `outcome_note`, `request_reference`, `document_refs`, `notes`
 - In chiaro: `id`, `patient_id`, `prescribed_at`, `status`, `category`, `priority`, `code_system`, `service_code`, `scheduled_at`, `performed_at`, `report_received_at`, `source`, `version`, `created_at`, `updated_at`
 - Leggibile senza chiave: categoria, priorità, codice della prestazione, stato e date.
 
-### `settings` — configurazione locale
+### `settings`: configurazione locale
 
 - In chiaro: `key`, `value`
 - Leggibile senza chiave: nome del medico e dello studio, indirizzi dei servizi AI locali, percorso dei backup, stato dell'abbinamento dei client (dei token conserva l'hash SHA-256).
 
-### `siss_handoff_events` — passaggi verso SISS
+### `siss_handoff_events`: passaggi verso SISS
 
 - Cifrate: `reason`, `next_action`, `notes`, `correlation_id`
 - In chiaro: `id`, `version`, `patient_id`, `action`, `module_label`, `started_at`, `completed_at`, `outcome`, `created_at`, `updated_at`
 - Leggibile senza chiave: azione, modulo, esito e date.
 
-### `therapies` — terapie farmacologiche
+### `therapies`: terapie farmacologiche
 
 - Cifrate: `motivation`, `deletion_reason`
 - In chiaro: `id`, `patient_id`, `drug_name`, `dosage`, `status`, `start_date`, `end_date`, `created_at`, `active_principle`, `diagnosis_code`, `diagnosis_name`, `version`, `updated_at`, `deleted_at`, `aic`, `atc`
 - Leggibile senza chiave: farmaco, dosaggio, principio attivo, codice e nome della diagnosi, AIC, ATC, stato e date.
 
-### `users` — account locale e involucro della chiave
+### `users`: account locale e involucro della chiave
 
 - Altra protezione: `password_hash`, `encrypted_master_key`, `unlock_verifier_hash`, `recovery_wrapped_master_key`, `recovery_verifier_hash`
 - In chiaro: `id`, `username`, `display_name`, `ambulatory_name`, `role`, `salt`, `created_at`, `failed_login_attempts`, `first_failed_login_at`, `locked_until`, `recovery_salt`
@@ -275,7 +275,7 @@ locali salvano ciò che ricevono.
 | Home dell'account ChatGPT | `mediflow-chatgpt-account-*` nella directory temporanea del sistema. | Configurazione isolata dell'integrazione facoltativa. | Directory `0700`, file `0600`. | `lib/chatgpt-account/account-host.ts` |
 | Log | Output del processo; `<directory dati>/logs` per il backup pianificato su macOS; `.pm2/logs` per il runner MLX. | Ciò che il codice scrive, entro le regole di SECURITY.md. | Nessuna prova automatica che non contengano dati clinici. | `lib/backup-scheduler.ts`, `ecosystem.config.js`, [SECURITY.md](../SECURITY.md) |
 | Chiavi dei provider remoti | Variabili d'ambiente `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`. | Il prodotto le legge e non le scrive. | Fuori dal prodotto. | `lib/ai-providers/v2/provider-secret-broker.ts` |
-| Stato della manutenzione | `medical.db.maintenance-admission/` accanto al database. | Lease e intent; nessun dato clinico. | — | [ADR 0142](./adr/0142-sqlite-maintenance-admission.md) |
+| Stato della manutenzione | `medical.db.maintenance-admission/` accanto al database. | Lease e intent; nessun dato clinico. | Non serve | [ADR 0142](./adr/0142-sqlite-maintenance-admission.md) |
 
 ## Che cosa copre oggi
 
@@ -283,7 +283,7 @@ locali salvano ciò che ricevono.
 | --- | --- | --- |
 | T1, T2 | Protetti quanto il PIN: con hash e involucro in mano, un segreto di pochi caratteri si prova per intero fuori dal computer. Il backup non contiene hash né involucro. | Leggibile: nomi, codici fiscali, date di nascita, farmaci e dosaggi, valori di laboratorio, titoli dei controlli. |
 | T3 | Il database è `0600`. | Directory dati predefinita `0700` e backup pianificati `0600` su macOS e Linux. Restano come le ha impostate l'operatore una directory dati o una destinazione dei backup scelte da lui e già esistenti. |
-| T4 | — | Non provato: manca il test con la sentinella del criterio 3. |
+| T4 | Nessuna | Non provato: manca il test con la sentinella del criterio 3. |
 
 ## Esposizioni da decidere
 

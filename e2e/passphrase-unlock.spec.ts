@@ -63,12 +63,55 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   const pinWrapping = (await setup).postDataJSON() as { encryptedMasterKey: string; salt: string };
   const credential = passphraseCredential(openPinWrapping(pinWrapping.encryptedMasterKey, pinWrapping.salt));
 
+  // Asked by another site with this browser's cookie, the move is refused.
+  const foreign = await page.request.post('/api/auth/passphrase', {
+    headers: { Origin: 'http://attacker.invalid', 'Sec-Fetch-Site': 'cross-site' }, data: { currentPin: PIN, ...credential },
+  });
+  expect(foreign.status()).toBe(403);
+  expect((await page.request.get('/api/patients')).status()).toBe(200);
+
+  // Another browser reaches the lock screen while the account still unlocks with its PIN, and stays there.
+  const stale = await browser.newContext({ baseURL });
+  const stalePage = await stale.newPage();
+  const staleLogins: string[] = [];
+  stalePage.on('request', request => { if (isPost(request, '/api/auth/login')) staleLogins.push(request.postData() ?? ''); });
+  await stalePage.goto('/');
+  // The person starts typing while the field still says PIN; what they type is the passphrase they are about to set.
+  const staleInput = stalePage.locator('#mediflow-lock-pin');
+  await expect(stalePage.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
+  await staleInput.fill(PASSPHRASE);
+
   const adopted = await page.request.post('/api/auth/passphrase', {
     headers: trustedWebRequestHeaders(baseURL), data: { currentPin: PIN, ...credential },
   });
   expect(adopted.status()).toBe(200);
   // The move retires the session of the page that asked.
   expect((await page.request.get('/api/patients')).status()).toBe(401);
+
+  // The lock screen left open was filled before the move. Submitted now, what was typed never
+  // travels as a PIN: the browser asks first what unlocks the account. If the field still said
+  // PIN it refuses and asks again; if the page had already learned of the move it sends a verifier.
+  try {
+    // A development server may have reloaded the page meanwhile and emptied the field.
+    if (await staleInput.inputValue() !== PASSPHRASE) await staleInput.fill(PASSPHRASE);
+    await staleInput.press('Enter');
+    const refusal = stalePage.locator('#mediflow-lock-error');
+    const shell = stalePage.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+      .or(stalePage.getByRole('link', { name: 'Apri la cartella manualmente', exact: true }));
+    await expect(refusal.or(shell).first()).toBeVisible();
+    if (await refusal.isVisible()) {
+      await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
+      expect(staleLogins).toEqual([]);
+      await expect(stalePage.getByLabel('Passphrase', { exact: true })).toHaveValue('');
+      await staleInput.fill(PASSPHRASE);
+      await staleInput.press('Enter');
+    }
+    await expectUnlocked(stalePage);
+    expect(staleLogins.map(body => Object.keys(JSON.parse(body)))).toEqual([['verifier']]);
+    expect(staleLogins.join('')).not.toContain(PASSPHRASE);
+  } finally {
+    await stale.close();
+  }
 
   const logins: string[] = [];
   page.on('request', request => { if (isPost(request, '/api/auth/login')) logins.push(request.postData() ?? ''); });

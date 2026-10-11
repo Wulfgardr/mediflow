@@ -2,7 +2,7 @@
 
 Date: 2026-10-10
 
-Status: Accepted — 10 ottobre 2026, con le opzioni raccomandate; emendato l'11 ottobre 2026 ([Emendamento del passo 2](#emendamento-del-passo-2-11-ottobre-2026))
+Status: Accepted, 10 ottobre 2026, con le opzioni raccomandate. Emendato l'11 ottobre 2026: [passo 2](#emendamento-del-passo-2-11-ottobre-2026), [decisioni e review indipendente](#decisioni-e-review-indipendente-11-ottobre-2026).
 
 ## Problema e contesto
 
@@ -214,6 +214,34 @@ Dove questo emendamento e il testo sopra divergono, vale l'emendamento.
 Il passo 4 dell'ordine di consegna si riduce di conseguenza: dare al PIN di
 conferma un cambio proprio, che aggiorna solo l'hash, e chiamarlo con il suo
 nome nell'interfaccia.
+
+## Decisioni e review indipendente (11 ottobre 2026)
+
+### Decisioni di Leonardo
+
+- **Recupero con la chiave di recupero.** Passa dal controllo di accesso Web
+  come un login ritirato nella stessa richiesta. Il recupero non ha una
+  sessione, e il proprietario delle sessioni Web ritira le sessioni di un
+  account solo a partire da una sessione autentica di quell'account, mai da un
+  identificativo utente: così la regola resta intatta e il pacchetto
+  `web-auth-lifecycle-owner` non cambia. La sessione aperta per il recupero non
+  viene mai consegnata al browser.
+- **App native.** Restano fuori dagli account passati alla passphrase finché
+  non adottano la versione 3. È accettato: oggi nessuno le usa.
+
+### Review indipendente del codice integrato
+
+Una review in sola lettura, eseguita da un secondo strumento sul diff
+`41b0ce6b7..41d601004`, non ha trovato errori nella costruzione crittografica
+e ha trovato quattro difetti. Tre sono corretti; il primo va chiuso prima che
+l'interfaccia offra il passaggio.
+
+| Difetto | Esito |
+| --- | --- |
+| La copia `medical.db.schema-original-v<N>-<uuid>.db` creata dall'aggiornamento dello schema conserva l'involucro del PIN della stessa master key: dopo il passaggio alla passphrase resta una via d'attacco offline. | Da fare: il passaggio elimina le copie che il prodotto possiede e che precedono la passphrase, in modo riprendibile dopo un'interruzione. È già la regola della tabella delle decisioni; mancava il codice. |
+| Una scheda ferma sulla schermata di blocco da prima del passaggio inviava la passphrase al server come se fosse un PIN. | Corretto: a ogni sblocco il browser chiede prima che cosa sblocca l'account. Se la risposta non lo dice, o se è cambiato rispetto a ciò che il campo mostrava, non invia nulla. |
+| Il passaggio verificava il PIN senza contare i tentativi: chi aveva una sessione poteva indovinarlo. | Corretto: usa la verifica condivisa, con contatori e blocco; un blocco nato dopo la verifica ferma la scrittura. Il cambio PIN ha lo stesso limite da prima e resta da allineare. |
+| La schermata di blocco contava la lunghezza prima della normalizzazione, e rifiutava passphrase che le primitive accettano. | Corretto: usa lo stesso controllo delle primitive. |
 
 ## Come si prova
 

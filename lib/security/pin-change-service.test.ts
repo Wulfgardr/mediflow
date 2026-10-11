@@ -645,6 +645,10 @@ async function adoptionPayload(currentPin = '1234') {
 const SEEDED_PIN = '1234'; // the PIN seedUser gives the account
 const adoptionRequest = () => new Request('http://127.0.0.1/api/auth/passphrase', { headers: { 'x-request-id': 'adoption-test' } });
 const storedUser = (db: TestDatabase) => db.select().from(users).where(eq(users.id, 'user-1')).get()!;
+const credentialColumns = (db: TestDatabase) => {
+    const { passwordHash, encryptedMasterKey, salt, unlockVerifierHash, recoveryWrappedMasterKey, recoverySalt, recoveryVerifierHash } = storedUser(db);
+    return { passwordHash, encryptedMasterKey, salt, unlockVerifierHash, recoveryWrappedMasterKey, recoverySalt, recoveryVerifierHash };
+};
 
 test('adoptPassphrase moves the account to the passphrase in one write and keeps the PIN for confirmations', async () => {
     const { sqlite, db } = makeDatabase();
@@ -689,7 +693,7 @@ test('adoptPassphrase needs the current PIN and happens once: the PIN cannot rep
     const { sqlite, db } = makeDatabase();
     try {
         await seedUser(db);
-        const before = storedUser(db);
+        const before = credentialColumns(db);
         let prepared = 0;
         const retirement = webRetirement();
         const dependencies: PinChangeServiceDependencies = {
@@ -701,7 +705,8 @@ test('adoptPassphrase needs the current PIN and happens once: the PIN cannot rep
 
         const wrongPin = await adopt((await adoptionPayload('0000')).payload);
         assert.deepEqual(wrongPin.kind === 'failure' && [wrongPin.status, wrongPin.code], [401, 'PASSPHRASE_ADOPTION_INVALID_PIN']);
-        assert.deepEqual(storedUser(db), before);
+        assert.deepEqual(credentialColumns(db), before);
+        assert.equal(storedUser(db).failedLoginAttempts, 1, 'a wrong PIN is counted here as it is at login');
         assert.equal(prepared, 0, 'no session is prepared for retirement before the PIN is verified');
 
         assert.deepEqual(await adopt((await adoptionPayload()).payload), { kind: 'success' });
@@ -802,4 +807,53 @@ test('the adoption request is accepted only in the shapes the browser primitives
     ];
     for (const [name, candidate] of rejected) assert.equal(validatePassphraseAdoptionPayload(candidate), null, name);
     assert.deepEqual(validatePassphraseAdoptionPayload({ ...payload, unexpected: 'ignored' }), payload);
+});
+
+test('a session cannot guess the PIN through the adoption: wrong PINs lock the account, and a lock stops the right one', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        db.update(users).set({ failedLoginAttempts: 0, firstFailedLoginAt: null, lockedUntil: null }).run();
+        const before = credentialColumns(db);
+        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement() };
+        const adopt = async (pin: string) =>
+            adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: (await adoptionPayload(pin)).payload }, dependencies);
+
+        for (let attempt = 1; attempt <= 4; attempt += 1) {
+            const wrong = await adopt('0000');
+            assert.deepEqual(wrong.kind === 'failure' && wrong.status, 401, `attempt ${attempt}`);
+        }
+        const fifth = await adopt('0000');
+        assert.deepEqual(fifth.kind === 'failure' && [fifth.status, fifth.code], [423, 'AUTH_LOCKED']);
+        const whileLocked = await adopt(SEEDED_PIN);
+        assert.deepEqual(whileLocked.kind === 'failure' && whileLocked.status, 423);
+        assert.deepEqual(credentialColumns(db), before);
+        assert.ok(storedUser(db).lockedUntil, 'the lock stands');
+    } finally {
+        sqlite.close();
+    }
+});
+
+test('a lock established after the PIN was verified is not cleared by the adoption', async () => {
+    const { sqlite, db } = makeDatabase();
+    try {
+        await seedUser(db);
+        const before = credentialColumns(db);
+        const lockedUntil = new Date(Date.now() + 10 * 60 * 1000);
+        const result = await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload: (await adoptionPayload()).payload }, {
+            db, writeAuditEvent: testAuditWriter(db), ...webRetirement(),
+            // The PIN is verified, then five wrong attempts elsewhere lock the account before the write.
+            verifyPin: async (input, verifierDependencies) => {
+                const { verifyHostCredentials: verify } = await import('./host-credential-verification');
+                const verified = await verify(input, verifierDependencies);
+                db.update(users).set({ failedLoginAttempts: 5, lockedUntil }).run();
+                return verified;
+            },
+        });
+        assert.deepEqual(result.kind === 'failure' && result.code, 'PASSPHRASE_ADOPTION_CONFLICT');
+        assert.deepEqual(credentialColumns(db), before);
+        assert.equal(storedUser(db).lockedUntil?.getTime(), Math.floor(lockedUntil.getTime() / 1000) * 1000);
+    } finally {
+        sqlite.close();
+    }
 });
