@@ -66,7 +66,7 @@ test('real cookie Web and local token diary writes are audited; 4 MiB + 1 return
         const patientId = randomUUID();
         const entryId = randomUUID();
         seedPatient(patientId, ambulatory.id);
-        const headers = surface === 'web' ? { Cookie: login.cookieHeader } : { authorization: `Bearer ${token}` };
+        const headers = surface === 'web' ? { Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration } : { authorization: `Bearer ${token}` };
         const route = surface === 'web' ? '/api/entries' : `/api/v1/patients/${patientId}/entries`;
         const body = { id: entryId, ...(surface === 'web' ? { patientId } : {}), type: 'note',
             title: 'ENC:dGl0bGVpdg==:dGl0bGVjaXBoZXI=', content: 'ENC:Y29udGVudGl2:Y29udGVudGNpcGhlcg==',
