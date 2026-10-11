@@ -11,6 +11,8 @@ const PIN = 'demo086086';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
 const LONG_PIN = 'un pin lungo quanto una frase';
 const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.';
+// A second submit counts only after the notice has been on screen this long (LONG_PIN_NOTICE_MIN_MS), with a margin.
+const NOTICE_READING_MS = 700 + 200;
 
 test.describe.configure({ retries: 0 });
 
@@ -112,6 +114,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
     await expect(staleInput).toHaveValue(PASSPHRASE);
     expect(staleLogins).toEqual([]);
     // On the second gesture the browser asks again, learns of the move and still sends nothing.
+    await stalePage.waitForTimeout(NOTICE_READING_MS);
     await staleInput.press('Enter');
     await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
     await expect(notice).toHaveCount(0);
@@ -255,15 +258,45 @@ test('a PIN as long as a passphrase still opens its archive, on a second gesture
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     expect(logins).toEqual([]);
     await expect(input).toBeFocused();
+    await lockPage.waitForTimeout(NOTICE_READING_MS);
     await lockPage.keyboard.press('Enter');
     await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
     expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
 
-    // The unchanged text, submitted again under its notice, is the PIN and opens the archive.
-    // Leaving the field for the button is not an edit: the second gesture can be made there.
+    // Enter held down is one gesture, however long it lasts: its repetitions never submit.
     await input.fill(LONG_PIN);
-    await input.press('Enter');
+    await lockPage.keyboard.down('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    await expect(input).toBeFocused();
+    await lockPage.waitForTimeout(NOTICE_READING_MS);
+    await lockPage.keyboard.down('Enter');
+    await lockPage.keyboard.down('Enter');
+    await lockPage.waitForTimeout(300);
+    await lockPage.keyboard.up('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
+
+    // A submit that follows the first at once, like the second click of a double click, comes
+    // before the notice can be read: it is not the second gesture.
+    await input.press('End');
+    await expect(notice).toHaveCount(0);
+    await lockPage.evaluate(() => new Promise<void>((resolve) => {
+      const form = document.querySelector('form')!;
+      new MutationObserver((_, observer) => {
+        if (!document.getElementById('mediflow-lock-confirm')) return;
+        observer.disconnect();
+        form.requestSubmit();
+        resolve();
+      }).observe(document.body, { childList: true, subtree: true });
+      form.requestSubmit();
+    }));
+    await lockPage.waitForTimeout(300);
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: `${LONG_PIN}!` }]);
+
+    // The unchanged text, submitted again once its notice has been on screen, is the PIN and opens
+    // the archive. Leaving the field for the button is not an edit: the second gesture can be made there.
+    await lockPage.waitForTimeout(NOTICE_READING_MS);
     await input.press('Tab');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await lockPage.getByRole('button', { name: 'Sblocca' }).click();

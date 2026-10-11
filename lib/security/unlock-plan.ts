@@ -16,6 +16,8 @@ export type UnlockPlan =
 
 /** What the lock screen shows while it holds such a text back. The confirmation is valid only while this is on screen. */
 export const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.';
+/** How long the notice must have been on screen before a submit can confirm: the second click of a double click is not a second gesture. */
+export const LONG_PIN_NOTICE_MIN_MS = 700;
 
 export type UnlockAttempt = {
     /** What the field said while the person typed. */
