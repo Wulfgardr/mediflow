@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 const SYNTHETIC_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9X8gAAAABJRU5ErkJggg==',
@@ -24,8 +25,10 @@ test('document upload saves its source before any local extraction request', asy
   });
 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = randomUUID();
   const patientResponse = await page.request.post('/api/patients', {
+    headers: archiveHeaders,
     data: {
       firstName: 'Documento', lastName: 'Pre Scheda',
       taxCode: `DOC${marker.replaceAll('-', '').slice(0, 13)}`,
