@@ -11,13 +11,13 @@ export type UnlockPlan =
     | { action: 'send-pin' }
     /** Nothing is sent; the person is told why. */
     | { action: 'refuse'; message: string }
-    /** Nothing is sent yet: the policy would accept the text as a passphrase, so it needs a second, deliberate gesture. */
+    /** Nothing is sent yet: the policy would accept the text as a passphrase, so it needs a gesture of its own on another control. */
     | { action: 'confirm-long-pin' };
 
-/** What the lock screen shows while it holds such a text back. The confirmation is valid only while this is on screen. */
-export const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.';
-/** How long the notice must have been on screen before a submit can confirm: the second click of a double click is not a second gesture. */
-export const LONG_PIN_NOTICE_MIN_MS = 700;
+/** What the lock screen shows while it holds such a text back. */
+export const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, confermalo.';
+/** The control shown with the notice. Only its activation confirms: submitting the form again never does. */
+export const LONG_PIN_CONFIRM_LABEL = 'È il mio PIN';
 
 export type UnlockAttempt = {
     /** What the field said while the person typed. */
@@ -25,7 +25,7 @@ export type UnlockAttempt = {
     /** What the server answered after the gesture; null when it could not be known. */
     current: UnlockParameters | null;
     secret: string;
-    /** The person submitted the unchanged text again while LONG_PIN_NOTICE was on screen. */
+    /** The person activated the confirmation shown with LONG_PIN_NOTICE, for the unchanged text. */
     longPinConfirmed: boolean;
 };
 
@@ -49,8 +49,9 @@ export function planUnlock({ shown, current, secret, longPinConfirmed }: UnlockA
     }
     // The server's answer may already be old when the request leaves: the account can move to a
     // passphrase in between. A text the policy would accept as that passphrase therefore never
-    // leaves on the first gesture. A PIN like that exists only if it was chosen at first setup,
-    // and then the person confirms it; by that second gesture the server has been asked again.
+    // leaves when the form is submitted. A PIN like that exists only if it was chosen at first
+    // setup, and then the person confirms it on the control shown with the notice; by then the
+    // server has been asked again.
     if (checkPassphrase(secret).ok && !longPinConfirmed) return { action: 'confirm-long-pin' };
     return { action: 'send-pin' };
 }
