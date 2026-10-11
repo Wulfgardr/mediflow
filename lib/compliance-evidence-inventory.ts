@@ -93,14 +93,14 @@ export const COMPLIANCE_EVIDENCE_INVENTORY = Object.freeze({
         evidenceRecord({
             id: 'ai_transparency',
             label: 'Trasparenza delle funzioni AI',
-            summary: 'Il registro Fabric separa dichiarato, osservato, venue, egress e proposte revisionabili senza autorizzare apply clinico.',
+            summary: 'Il registro delle funzioni separa configurazione, esecuzione osservata, sede, uscita dei dati e proposte da rivedere: non applica modifiche cliniche.',
             status: 'source_evidence_with_limit',
             evidence: [
                 'docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json',
                 'lib/ai-providers/fabric/status.ts',
                 'app/settings/ai/fabric/page.tsx',
             ],
-            limitation: 'Senza receipt dell’operazione corrente, esecuzione, venue ed egress effettivi restano non osservati.',
+            limitation: 'Senza prova dell’operazione corrente, esecuzione, sede e uscita dei dati effettive restano non osservati.',
             owner: 'Responsabile tecnico e governance clinica',
             externalReferences: [],
         }),

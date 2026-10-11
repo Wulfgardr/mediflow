@@ -54,7 +54,7 @@ test('Compliance settings renders the technical evidence inventory without a leg
   const aiTransparency = surface.getByTestId('compliance-evidence-ai_transparency');
   await expect(aiTransparency.getByRole('heading', { name: 'Trasparenza delle funzioni AI' })).toBeVisible();
   await expect(aiTransparency).toContainText('app/settings/ai/fabric/page.tsx');
-  await expect(aiTransparency).toContainText('Senza receipt dell’operazione corrente');
+  await expect(aiTransparency).toContainText('Senza prova dell’operazione corrente');
 
   const legalApplicability = surface.getByTestId('compliance-evidence-legal_applicability');
   await expect(legalApplicability.getByRole('heading', {

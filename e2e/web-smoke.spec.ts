@@ -131,6 +131,46 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await patientsSearch.fill('smoke');
   await patientsSearch.fill('');
 
+  // Real patient edit/readback fills the gap left by the mocked snapshot spec.
+  const patient = await page.evaluate(async () => {
+    const marker = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
+    const taxCode = `C17${marker}X`;
+    const response = await fetch('/api/patients', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: 'Sintetico', lastName: 'Percorso', taxCode,
+        birthDate: '1980-01-01T00:00:00.000Z' }) });
+    if (response.status !== 201) throw new Error(`Synthetic patient: HTTP ${response.status}`);
+    return { ...(await response.json()), taxCode } as { id: string; taxCode: string };
+  });
+  await page.reload(); // Real route rereads the newly prepared fixture.
+  await patientsSearch.fill(patient.taxCode);
+  const row = page.getByRole('option').filter({ hasText: 'Percorso Sintetico' });
+  await row.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+  await page.getByTestId('lume-scheda-header').getByRole('button', { name: 'Azioni', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  const edit = page.locator(`a[href="/patients/${patient.id}/edit"]`).first();
+  await edit.focus(); await page.keyboard.press('Enter');
+  const firstName = page.getByRole('textbox', { name: /^Nome/ });
+  await expect(firstName).toHaveValue('Sintetico');
+  await firstName.fill('');
+  await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
+  await expect(firstName).toBeFocused();
+  await expect(firstName).toHaveAttribute('aria-invalid', 'true');
+  await expect(firstName).toHaveAttribute('aria-describedby', 'patient-firstName-error');
+  await expect(page.locator('#patient-firstName-error')).toHaveAttribute('role', 'alert');
+  await expect(page.getByRole('textbox', { name: /^Cognome/ })).toHaveValue('Percorso');
+  await firstName.fill('Modificato');
+  const update = page.getByRole('button', { name: 'Aggiorna scheda', exact: true });
+  await update.focus(); await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+  await page.reload();
+  await expect(page.getByTestId('lume-scheda-header')).toContainText('Modificato');
+  const stored = await page.request.get(`/api/patients/${patient.id}`);
+  expect(stored.status()).toBe(200);
+  expect(await stored.json()).toMatchObject({ firstName: 'Modificato', taxCode: patient.taxCode, version: 2 });
+
   // @Codex ADR 0123: the ordinary settings link owns the canonical /settings route.
   const settingsNav = page.getByRole('link', { name: 'Impostazioni', exact: true });
   await expect(settingsNav).toBeVisible();

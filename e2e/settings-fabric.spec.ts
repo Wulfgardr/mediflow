@@ -27,7 +27,7 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
   await expect(page.getByTestId('fabric-provider-athena_mlx')).toContainText('ATHENA');
   await expect(page.getByTestId('fabric-provider-openai')).toContainText('Esecuzione disabilitata');
   await expect(page.getByTestId('fabric-provider-anthropic')).toContainText('Un abbonamento consumer non equivale all’accesso API.');
-  await expect(providers).toContainText('Non osservata: serve una receipt dell’operazione corrente.');
+  await expect(providers).toContainText('Non osservata: serve una prova dell’operazione corrente.');
   await expect(providers).not.toContainText(/actorRef|receiptRef|hostTimestamp|endpoint|token|segreto|\bOCR\b/i);
   await expect(providers.locator('form, input, select, textarea, button, a, [role="switch"], [contenteditable="true"]')).toHaveCount(0);
 
