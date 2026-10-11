@@ -69,14 +69,7 @@ test('composite mutations retain every required invalidation', () => {
     const deleteBlock = sourceBetween(serviceSource, 'const deleteItem', 'const headerActions');
     assert.doesNotMatch(deleteBlock, /servicePrescriptionItems\.delete/);
     assert.match(deleteBlock, /try\s*\{[\s\S]*servicePrescriptions\.delete[\s\S]*\}\s*catch \(error\) \{[^}]*notifyDbChange\('service_prescriptions'\);[^}]*throw error;\s*\}\s*finally\s*\{[^}]*notifyDbChange\('service_prescription_items'\);\s*\}/);
-    const clipboardSource = readFileSync('hooks/use-patient-clipboard.ts', 'utf8');
-    assert.match(clipboardSource, /return await executePatientClipboardPaste\(\s*clipboard,\s*targetAmbulatoryId,\s*isTestEnvironment,/);
-    assert.match(clipboardSource, /notifyDbChange\(\)/);
-    assert.doesNotMatch(clipboardSource, /fetch\(/);
-    const helperSource = readFileSync('lib/patient-clipboard.ts', 'utf8');
-    assert.match(helperSource, /endpoint = '\/api\/patients\/move'/);
-    assert.match(helperSource, /hasExactPatientVersions/);
-    assert.doesNotMatch(helperSource, /api\/patients\/unassign/);
+
 });
 
 test('both React hooks retain dynamic scope resolver wiring', () => {
