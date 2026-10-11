@@ -8,11 +8,27 @@ export type AuthHealthErrorCategory =
     | 'query-failed'
     | 'unknown';
 
+/** ADR 0143: what the browser learns before it authenticates. Only a passphrase account discloses its salt. */
+export type UnlockParameters =
+    | { credential: 'pin' }
+    | { credential: 'passphrase'; kdfVersion: number; salt: string };
+
+/** The check response is untrusted input: anything that is not a well-formed passphrase account is a PIN account. */
+export function readUnlockParameters(value: unknown): UnlockParameters {
+    const unlock = value && typeof value === 'object' ? value as Record<string, unknown> : null;
+    if (unlock?.credential === 'passphrase' && Number.isInteger(unlock.kdfVersion)
+        && typeof unlock.salt === 'string' && unlock.salt) {
+        return { credential: 'passphrase', kdfVersion: unlock.kdfVersion as number, salt: unlock.salt };
+    }
+    return { credential: 'pin' };
+}
+
 /* @Codex */
 export type AuthHealthPayload = {
     status: 'ok' | 'error';
     isSetup?: boolean;
     hasSession?: boolean;
+    unlock?: unknown;
     error?: {
         code?: string;
         category?: AuthHealthErrorCategory;
@@ -341,6 +357,15 @@ export function loginWithPinRequest(pin: string) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pin }),
+    });
+}
+
+/** ADR 0143: an account with a passphrase sends the verifier derived from it; the passphrase stays in the browser. */
+export function loginWithVerifierRequest(verifier: string) {
+    return requestAuthMutationJson<LoginSuccessPayload | LoginFailurePayload>('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verifier }),
     });
 }
 

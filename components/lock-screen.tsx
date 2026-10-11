@@ -3,10 +3,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
 import { AlertCircle, Loader2, Unlock } from 'lucide-react';
+import { PASSPHRASE_POLICY } from '@/lib/security/unlock-credential';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
-    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, login, setupPin, lock } = useSecurity();
+    const { isLocked, requiresSetup, authErrorMessage, authRecoveryState, unlockCredential, login, setupPin, lock } = useSecurity();
+    // ADR 0143: an account with a passphrase is unlocked by it; the field, its name and its minimum follow.
+    const passphrase = !requiresSetup && unlockCredential === 'passphrase';
+    const minimumLength = passphrase ? PASSPHRASE_POLICY.minLength : 4;
     const [pin, setPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
@@ -110,7 +114,7 @@ export function LockScreen() {
                     )}
                     {/* @Codex WUL-55: keep the field name for assistive tech without repeating visible copy. */}
                     <label className="sr-only" htmlFor="mediflow-lock-pin">
-                        {requiresSetup ? 'Nuovo PIN' : 'PIN operatore'}
+                        {requiresSetup ? 'Nuovo PIN' : passphrase ? 'Passphrase' : 'PIN operatore'}
                     </label>
                     <div className={styles.inputWrap}>
                         <input
@@ -125,6 +129,7 @@ export function LockScreen() {
                             aria-invalid={Boolean(visibleError)}
                             aria-describedby={visibleError ? 'mediflow-lock-error' : recoveryMessage ? 'mediflow-auth-recovery' : undefined}
                             disabled={credentialsDisabled}
+                            placeholder={passphrase ? 'Passphrase' : undefined}
                             autoFocus
                         />
                     </div>
@@ -167,7 +172,7 @@ export function LockScreen() {
                         type="submit"
                         disabled={
                             credentialsDisabled
-                            || pin.length < 4
+                            || pin.length < minimumLength
                             || (requiresSetup && confirmPin.length < 4)
                         }
                         className={styles.primaryButton}
@@ -199,7 +204,7 @@ export function LockScreen() {
                                 }}>
                                 Rinnova accesso
                             </button>
-                            <p className="px-2 text-xs leading-5">Chiude la sessione condivisa con le altre schede. Poi inserisci di nuovo il PIN.</p>
+                            <p className="px-2 text-xs leading-5">Chiude la sessione condivisa con le altre schede. Poi inserisci di nuovo {passphrase ? 'la passphrase' : 'il PIN'}.</p>
                         </div>
                     )}
                 </form>
