@@ -11,6 +11,29 @@ final class ClinicalScaleInterpretationTests: XCTestCase {
         }
     }
 
+    func testNewLocalInterpretationVersionsPreserveScoringAndWording() throws {
+        for (definition, version, texts) in [
+            (ClinicalScales.adl, "mediflow.adl.local-interpretation.v1", ["Compromissione Grave (0-1/6)", "Autonomia Conservata (6/6)"]),
+            (ClinicalScales.iadl, "mediflow.iadl.local-interpretation.v1", [0, 8].map { "Punteggio totale: \($0)/8. (Minore è il punteggio, maggiore è la dipendenza strumentale)." }),
+            (ClinicalScales.tinettiPOMA28V1, "mediflow.poma28.nonclassification.v1", Array(repeating: "Punteggio POMA-28: interpretazione clinica richiesta; nessuna classificazione automatica del rischio.", count: 2))
+        ] {
+            for maximum in [false, true] {
+                let answers = Dictionary(uniqueKeysWithValues: definition.questions.map {
+                    ($0.id, maximum ? $0.options.map(\.value).max()! : 0)
+                })
+                let submission = try ClinicalScales.prepareSubmission(definition: definition, answers: answers)
+                XCTAssertEqual(submission.result.score, answers.values.reduce(0, +))
+                XCTAssertEqual(submission.result.interpretation, texts[maximum ? 1 : 0])
+                XCTAssertEqual(submission.result.interpretationVersion, version)
+                let metadata = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(submission.metadataJSON.utf8)) as? [String: Any])
+                XCTAssertEqual(metadata["interpretationVersion"] as? String, version)
+                XCTAssertEqual(metadata["instrument"] == nil, definition.instrument == nil)
+                XCTAssertTrue(ClinicalScales.contentSummary(definition: definition, result: submission.result)
+                    .hasSuffix("Versione interpretazione: \(version)"))
+            }
+        }
+    }
+
     func testNewVersionsCrossFormerBoundariesWithoutDiagnosticLabels() throws {
         let cases: [(ClinicalScaleDefinition, [String], [Int], String)] = [
             (ClinicalScales.mmse,
