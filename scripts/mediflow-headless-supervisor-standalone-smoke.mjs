@@ -93,9 +93,11 @@ const META = Object.freeze({
   'io.modelcontextprotocol/clientCapabilities': {},
   'io.modelcontextprotocol/clientInfo': { name: 'mediflow-production-smoke', version: '1.0.0' },
 });
-function webMutationHeaders(cookieHeader, hasJsonBody = true) {
+function webMutationHeaders(cookieHeader, archiveGeneration, hasJsonBody = true) {
+  assert.match(archiveGeneration, /^[0-9a-f-]{36}$/u);
   return {
     Cookie: cookieHeader,
+    'x-mediflow-archive-generation': archiveGeneration,
     ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
     Origin: BASE_URL,
     'Sec-Fetch-Site': 'same-origin',
@@ -204,7 +206,7 @@ async function activateSyntheticSelection() {
   const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: '1234' });
   assert.equal(login.response.status, 200);
   assert.ok(login.cookieHeader);
-  const jsonHeaders = webMutationHeaders(login.cookieHeader);
+  const jsonHeaders = webMutationHeaders(login.cookieHeader, login.json.archiveGeneration);
   const ambulatoryResponse = await fetch(new URL('/api/ambulatories', BASE_URL),
     { headers: { Cookie: login.cookieHeader } });
   assert.equal(ambulatoryResponse.status, 200);
@@ -278,7 +280,7 @@ async function activateSyntheticSelection() {
   assert.match(uiBindingRef, /^hcub_[0-9a-f]{64}$/u);
   assert.equal(resourceTitle, CHECKUP_TITLE);
   assert.equal(resourceRevision, 1);
-  return Object.freeze({ cookieHeader: login.cookieHeader, checkupRef, uiBindingRef,
+  return Object.freeze({ cookieHeader: login.cookieHeader, archiveGeneration: login.json.archiveGeneration, checkupRef, uiBindingRef,
     resourceTitle, resourceRevision });
 }
 function verifyCommittedTransition(dataDir, receipt) {
@@ -295,9 +297,9 @@ function verifyCommittedTransition(dataDir, receipt) {
     assert.deepEqual(audit.receipt, receipt);
   } finally { database.close(); }
 }
-async function verifyOrdinaryWeb(child, cookieHeader) {
+async function verifyOrdinaryWeb(child, cookieHeader, archiveGeneration) {
   assert.equal(child.exitCode, null, 'Agent teardown interrupted independent Web');
-  const headers = { ...webMutationHeaders(cookieHeader), Origin: ORDINARY_URL };
+  const headers = { ...webMutationHeaders(cookieHeader, archiveGeneration), Origin: ORDINARY_URL };
   const response = await fetch(new URL('/api/patients', ORDINARY_URL), {
     method: 'POST', headers,
     body: JSON.stringify({ id: 'patient.synthetic.independent-web', firstName: 'Synthetic',
@@ -344,8 +346,9 @@ async function main() {
     assert.equal(prebind.result.isError, true);
     assert.equal(prebind.result.content[0].text, 'MediFlow operation denied: host_unbound.');
     const selection = await activateSyntheticSelection();
+    assert.equal(ordinaryLogin.json.archiveGeneration, selection.archiveGeneration, 'Independent Web must use the same archive');
     const { cookieHeader, checkupRef, uiBindingRef, resourceTitle, resourceRevision } = selection;
-    const jsonHeaders = webMutationHeaders(cookieHeader);
+    const jsonHeaders = webMutationHeaders(cookieHeader, selection.archiveGeneration);
     const cloudProbe = await fetch(new URL('/api/system/cloud-provider-probe', BASE_URL), {
       method: 'POST', headers: jsonHeaders,
       body: JSON.stringify({ intent: 'run_synthetic_nonclinical_probe' }),
@@ -448,7 +451,7 @@ async function main() {
     assert.equal(committedCheckup.version, 2);
     const operationRevocationResponse = await fetch(
       new URL(`/api/patients/${PATIENT_ID}/intelligent-host/checkup-status`, BASE_URL),
-      { method: 'DELETE', headers: webMutationHeaders(cookieHeader, false) },
+      { method: 'DELETE', headers: webMutationHeaders(cookieHeader, selection.archiveGeneration, false) },
     );
     assert.equal(operationRevocationResponse.status, 200);
     assert.deepEqual(await operationRevocationResponse.json(), { state: 'revoked' });
@@ -475,13 +478,13 @@ async function main() {
     assert.equal(authenticatedCheck.status, 200);
     assert.equal((await authenticatedCheck.json()).hasSession, true);
     const logout = await fetch(new URL('/api/auth/logout', BASE_URL), {
-      method: 'POST', headers: webMutationHeaders(cookieHeader, false),
+      method: 'POST', headers: webMutationHeaders(cookieHeader, selection.archiveGeneration, false),
     });
     assert.equal(logout.status, 204);
     assert.equal(await withTimeout(exit, 'Supervisor terminal exit'), 0);
     verifyCommittedTransition(dataDir, receipt);
     await prebindShutdown(dataDir, foreignCwd, 'EOF');
-    await verifyOrdinaryWeb(ordinary, ordinaryLogin.cookieHeader);
+    await verifyOrdinaryWeb(ordinary, ordinaryLogin.cookieHeader, ordinaryLogin.json.archiveGeneration);
     if (APP) await assertReaped();
     rpc.assertHealthy();
     assert.equal(rpc.pending.size, 0);
