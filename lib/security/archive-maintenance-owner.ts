@@ -10,6 +10,13 @@ import { readSqliteArchiveGeneration, rotateSqliteArchiveGeneration } from '../a
 const REQUEST = 'mediflow:archive-maintenance:repair-legacy';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
+// Keep the repair producer's canonical name so credential cleanup recognizes PIN-era copies.
+function repairBackupTimestamp(): string {
+    const now = new Date();
+    const pad = (value: number) => value.toString().padStart(2, '0');
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}${now.getMilliseconds().toString().padStart(3, '0')}`;
+}
+
 /** Only the existing supervisor's explicitly selected Web-only mode owns this lifecycle. */
 export async function runArchiveMaintenanceWebOwner(root: string): Promise<void> {
     const configuredData = process.env.MEDIFLOW_DATA_DIR;
@@ -114,7 +121,7 @@ export async function runArchiveMaintenanceWebOwner(root: string): Promise<void>
                 try {
                     if (readSqliteArchiveGeneration(current) !== expectedGeneration) throw new Error('archive_generation_changed');
                     await replaceSqliteDatabase({ sourcePath: preparedSource, destPath: target,
-                        backupPath: `${target}.bak-${randomUUID()}`, connection: current,
+                        backupPath: `${target}.bak-${repairBackupTimestamp()}`, connection: current,
                         prepareReplacement: staging => {
                             const replacement = openVersionedSqliteDatabase(staging);
                             try { replacement.transaction(() => rotateSqliteArchiveGeneration(replacement)).immediate(); }

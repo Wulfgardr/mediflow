@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import { openVersionedSqliteDatabase } from '../sqlite-schema-open';
 import { readSqliteArchiveGeneration } from '../archive-generation';
+import { retirePinEraResidues } from './pin-era-residues';
 
 const repo = path.resolve('.');
 async function until<T>(read: () => T | undefined): Promise<T> {
@@ -16,7 +18,7 @@ async function until<T>(read: () => T | undefined): Promise<T> {
     throw new Error('Synthetic owner did not reach the expected state.');
 }
 
-for (const sourceCase of ['canonical', 'tracked-baseline', 'incompatible', 'weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger', 'post-stop-io-failure'])
+for (const sourceCase of ['canonical', 'tracked-baseline', 'incompatible', 'weakened-trigger', 'audit-index-failure', 'quoted-type', 'extra-trigger', 'post-stop-io-failure', 'backup-collision'])
 test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A without restart`, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-managed-web-synthetic-'));
     const data = path.join(root, 'data');
@@ -29,6 +31,14 @@ test(`owned Web repair ${sourceCase}: close, validate, commit or preserve A with
         finally { db.close(); }
     };
     const before = seed(path.join(data, 'medical.db'), 'Archive A');
+    const account = 'synthetic-repair-account';
+    const wrapping = sourceCase === 'tracked-baseline' ? 'v3:synthetic-passphrase' : 'v2:synthetic-pin';
+    const prior = new Database(path.join(data, 'medical.db'));
+    prior.prepare('INSERT INTO users (id, username, password_hash, encrypted_master_key, salt) VALUES (?, ?, ?, ?, ?)')
+        .run(account, account, 'synthetic-hash', wrapping, 'synthetic-salt');
+    prior.close();
+    const collision = path.join(data, 'medical.db.bak-20261011-101500123');
+    if (sourceCase === 'backup-collision') fs.writeFileSync(collision, 'existing recovery copy');
     let sourceGeneration: string | undefined;
     const sourceFile = path.join(root, 'medical.db');
     if (sourceCase === 'tracked-baseline') {
@@ -78,7 +88,7 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
 }, 150); });
 `);
     const launcher = path.join(root, 'owner.mjs');
-    fs.writeFileSync(launcher, `import { runArchiveMaintenanceWebOwner } from ${JSON.stringify(path.join(repo, 'lib/security/archive-maintenance-owner.ts'))}; await runArchiveMaintenanceWebOwner(${JSON.stringify(root)});`);
+    fs.writeFileSync(launcher, `${sourceCase === 'backup-collision' ? `globalThis.Date = class extends Date { constructor(...args) { super(...(args.length ? args : [2026, 9, 11, 10, 15, 0, 123])); } };` : ''} import { runArchiveMaintenanceWebOwner } from ${JSON.stringify(path.join(repo, 'lib/security/archive-maintenance-owner.ts'))}; await runArchiveMaintenanceWebOwner(${JSON.stringify(root)});`);
     const owner = spawn(process.execPath, ['--experimental-strip-types', '--import',
         path.join(repo, 'scripts/register-strip-types-loader.mjs'), launcher], {
         cwd: repo, env: { ...process.env, MEDIFLOW_DATA_DIR: data }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -92,7 +102,7 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
         });
         const response = await fetch(`http://127.0.0.1:${ready.port}/repair`);
         assert.equal(response.status, 200); await response.text();
-        if (sourceCase === 'post-stop-io-failure') {
+        if (['post-stop-io-failure', 'backup-collision'].includes(sourceCase)) {
             assert.equal(await closed, 1, stderr);
             fs.chmodSync(data, 0o700);
             assert.equal(fs.readFileSync(path.join(data, 'terminal.txt'), 'utf8').trim(), before);
@@ -105,6 +115,7 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
             } finally { retained.close(); }
             assert.deepEqual(fs.readFileSync(sourceFile), sourceBytes);
             assert.match(stderr, /requires recovery; Web was not restarted/u);
+            if (sourceCase === 'backup-collision') assert.equal(fs.readFileSync(collision, 'utf8'), 'existing recovery copy');
             return;
         }
         if (!['canonical', 'tracked-baseline'].includes(sourceCase)) {
@@ -146,6 +157,23 @@ process.on('SIGTERM', () => { server.close(); setTimeout(() => {
         owner.kill('SIGTERM');
         assert.equal(await closed, 0, stderr);
         assert.deepEqual(fs.readdirSync(path.join(data, 'medical.db.maintenance-admission', 'leases')), []);
+        // Exercise the real producer and C07 retirer together, not a fabricated backup filename.
+        const backups = fs.readdirSync(data).filter(name => name.startsWith('medical.db.bak-'));
+        assert.equal(backups.length, 1);
+        assert.match(backups[0], /^medical\.db\.bak-\d{8}-\d{9}$/u);
+        const backup = new Database(path.join(data, backups[0]), { readonly: true });
+        try { assert.equal(backup.prepare('SELECT encrypted_master_key FROM users WHERE id = ?').pluck().get(account), wrapping); }
+        finally { backup.close(); }
+        const upgraded = openVersionedSqliteDatabase(path.join(data, 'medical.db'));
+        try {
+            upgraded.prepare('INSERT INTO users (id, username, password_hash, encrypted_master_key, salt) VALUES (?, ?, ?, ?, ?)')
+                .run(account, account, 'synthetic-hash', 'v3:synthetic-passphrase', 'synthetic-new-salt');
+            const retired = retirePinEraResidues(account, drizzle(upgraded), path.join(data, 'medical.db'));
+            assert.deepEqual(retired.removed, sourceCase === 'canonical' ? backups : []);
+            assert.deepEqual(retired.kept, sourceCase === 'canonical' ? [] : backups);
+            assert.equal(retired.complete, sourceCase === 'canonical', 'a v3 repair copy remains pending: live rows do not certify its obsolete cells');
+            assert.equal(fs.existsSync(path.join(data, backups[0])), sourceCase !== 'canonical');
+        } finally { upgraded.close(); }
     } finally {
         if (owner.exitCode === null && owner.signalCode === null) { owner.kill('SIGTERM'); await closed; }
         fs.chmodSync(data, 0o700);
