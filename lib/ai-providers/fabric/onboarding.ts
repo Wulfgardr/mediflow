@@ -134,6 +134,14 @@ export function advanceOnboarding(
     }
 }
 
+export function enabledLocalOnboarding(): ProviderOnboardingState {
+    const declared = startOnboarding('ollama', 'local_model');
+    const configured = advanceOnboarding(declared, { type: 'configure' });
+    const credentialed = advanceOnboarding(configured, { type: 'credential_declared' });
+    const attested = advanceOnboarding(credentialed, { type: 'attest_local' });
+    return advanceOnboarding(attested, { type: 'enable' });
+}
+
 function freezeState(
     provider: string,
     credentialClass: CredentialClass,
