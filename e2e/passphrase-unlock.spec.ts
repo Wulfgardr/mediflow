@@ -9,6 +9,8 @@ import { bootstrapUnlockedSession } from './utils';
 
 const PIN = 'demo086086';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
+const LONG_PIN = 'un pin lungo quanto una frase';
+const LONG_PIN_NOTICE = 'Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.';
 
 test.describe.configure({ retries: 0 });
 
@@ -102,15 +104,17 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   try {
     await cdp.send('Fetch.continueRequest', { requestId: heldCheck! });
     await cdp.send('Fetch.disable');
-    // The answer said PIN, the field said PIN, and the account now has a passphrase. A text that
-    // long is not sent as a PIN on the first gesture: it stays in the field.
+    // The answer said PIN, the field said PIN, and the account now has a passphrase. A text the
+    // policy accepts as a passphrase is not sent as a PIN on the first gesture: it stays in the field.
+    const notice = stalePage.locator('#mediflow-lock-confirm');
     const refusal = stalePage.locator('#mediflow-lock-error');
-    await expect(refusal).toHaveText('Questo archivio si sblocca con il PIN, e ciò che hai scritto è lungo come una passphrase. Se è il tuo PIN, premi di nuovo Sblocca.');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(staleInput).toHaveValue(PASSPHRASE);
     expect(staleLogins).toEqual([]);
     // On the second gesture the browser asks again, learns of the move and still sends nothing.
     await staleInput.press('Enter');
     await expect(refusal).toHaveText('Questo archivio ora si sblocca con la passphrase. Inseriscila.');
+    await expect(notice).toHaveCount(0);
     await expect(stalePage.getByLabel('Passphrase', { exact: true })).toHaveValue('');
     expect(staleLogins).toEqual([]);
     // Typed into a field that says passphrase, it unlocks, and only its verifier travels.
@@ -179,5 +183,53 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
     await expectUnlocked(second);
   } finally {
     await reopened.close();
+  }
+});
+
+test('a PIN as long as a passphrase still opens its archive, on a second gesture made while the notice is on screen', async ({ page, browser, baseURL }) => {
+  // First setup accepts a PIN of any length: this account has one the policy would accept as a passphrase.
+  await bootstrapUnlockedSession(page, LONG_PIN);
+
+  const locked = await browser.newContext({ baseURL });
+  try {
+    const lockPage = await locked.newPage();
+    const logins: string[] = [];
+    lockPage.on('request', request => { if (isPost(request, '/api/auth/login')) logins.push(request.postData() ?? ''); });
+    await lockPage.goto('/');
+    const input = lockPage.locator('#mediflow-lock-pin');
+    const notice = lockPage.locator('#mediflow-lock-confirm');
+    await expect(lockPage.getByLabel('PIN operatore', { exact: true })).toBeEnabled();
+
+    await input.fill(LONG_PIN);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    await expect(input).toHaveValue(LONG_PIN);
+    expect(logins).toEqual([]);
+
+    // Another message takes the place of the notice, as when an old request of this page comes
+    // back unauthorized. The confirmation goes with the notice: the next submit is a first gesture again.
+    await lockPage.evaluate(() => window.dispatchEvent(new Event('mediflow:api-auth-unavailable')));
+    await expect(lockPage.locator('#mediflow-lock-error')).toHaveText('Sessione scaduta.');
+    await expect(notice).toHaveCount(0);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins).toEqual([]);
+
+    // A changed text is another text: it is held in its turn.
+    await input.fill(`${LONG_PIN}!`);
+    await expect(notice).toHaveCount(0);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    expect(logins).toEqual([]);
+
+    // The unchanged text, submitted again under its notice, is the PIN and opens the archive.
+    await input.fill(LONG_PIN);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    await input.press('Enter');
+    await expectUnlocked(lockPage);
+    expect(logins.map(body => JSON.parse(body))).toEqual([{ password: LONG_PIN }]);
+  } finally {
+    await locked.close();
   }
 });
