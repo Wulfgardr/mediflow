@@ -69,6 +69,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
         'app/api/checkups/[id]/route.ts', 'lib/patient-edit-session.ts', 'lib/schema.ts',
         'lib/patient-lifecycle.ts', 'lib/checkup-concurrency.ts', 'lib/version-concurrency.ts',
         'lib/api-v1-clinical-lifecycle.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts',
+        'lib/api-error-response.ts', 'lib/archive-generation.ts', 'lib/security/archive-write-request.ts',
         'lib/checkup-json-body.ts', 'lib/bounded-request-body.ts', 'lib/checkup-write-operation.ts',
     ]);
     const auditDouble = {
@@ -104,6 +105,7 @@ export function createHarness({ sharedWal = false, sourceOverrides = {} } = {}) 
             // The mutation operation uses relative imports for these same fixture seams.
             if (target === 'lib/db-server.ts') return { dbServer };
             if (target === 'lib/security/audit.ts') return auditDouble;
+            if (target === 'lib/security/archive-session-generation.ts') return { archiveGenerationForSession: () => undefined, currentArchiveGeneration: () => undefined };
             return load(target);
         };
         new Function('require', 'module', 'exports', result.outputText)(require, loadedModule, loadedModule.exports);

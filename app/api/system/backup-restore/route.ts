@@ -1,3 +1,7 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { assertArchiveGeneration } from '@/lib/archive-generation';
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
@@ -183,6 +187,8 @@ export async function GET() {
             },
         });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] Backup export failed:', error);
         return NextResponse.json({ success: false, error: 'Backup export failed.' }, { status: 500 });
     }
@@ -195,6 +201,9 @@ export async function POST(request: Request) {
     if (!isTrustedWebMutationRequest(request)) {
         return apiFailure('request_transport_invalid', 'Ripristino backup non disponibile.', 403);
     }
+    const archiveGeneration = archiveGenerationForSession(session);
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await request.json();
@@ -206,7 +215,10 @@ export async function POST(request: Request) {
             );
         }
 
-        const restored = restoreBackupArtifact(artifact, disposeCheckupStatusTransitionForHostV1);
+        const restored = restoreBackupArtifact(artifact, () => {
+            assertArchiveGeneration(dbServer, archiveGeneration);
+            return disposeCheckupStatusTransitionForHostV1();
+        });
 
         return NextResponse.json({
             success: true,

@@ -25,6 +25,7 @@ const { RequestCookies } = await import('next/dist/server/web/spec-extension/coo
 const { dbServer } = await import('./db-server.ts');
 const { users, settings } = await import('./schema.ts');
 const { eq } = await import('drizzle-orm');
+const { bindSessionToArchive, currentArchiveGeneration } = await import('./security/archive-session-generation');
 const { createNativeServerSession, deleteSession } = await import('./security/server-session.ts');
 const { issueSyntheticWebSession, retireSyntheticWebSession } = await import('./security/web-auth-lifecycle-owner-test-fixture.ts');
 const { NETWORK_MODE_KEY } = await import('./network-contract.ts');
@@ -37,7 +38,7 @@ const syntheticUsername = ['synthetic', 'native', 'admin'].join('-');
 const user = { id: syntheticUsername, username: syntheticUsername, role: 'admin' };
 const clientId = 'synthetic-mac'; const token = 'synthetic-native-pairing-token';
 const binding = { clientId, clientPlatform: 'macos' as const, tokenHash: hashNetworkPairedClientToken(token) };
-const pairings = { intents: [], clients: [{ ...binding, deviceName: 'Synthetic Mac', appVersion: '0.8.6', pairedAt: new Date().toISOString(), sourceIntentId: 'synthetic-intent', grantedCapabilities: ['network.discovery.read'] }] };
+const pairings = { archiveGeneration: currentArchiveGeneration(), intents: [], clients: [{ ...binding, deviceName: 'Synthetic Mac', appVersion: '0.8.6', pairedAt: new Date().toISOString(), sourceIntentId: 'synthetic-intent', grantedCapabilities: ['network.discovery.read'] }] };
 const grant = { schemaVersion: 'mediflow.native-ai-grants.v1', grants: [{ grantId: 'synthetic-config-grant', userId: user.id, clientId, capability: 'native.ai.configure', expiresAt: Date.now() + 60_000 }] };
 const writeGrant = (value = grant) => fs.writeFileSync(process.env.MEDIFLOW_NATIVE_AI_CONFIG_GRANTS_FILE!, JSON.stringify(value), { mode: 0o600 });
 dbServer.insert(users).values({ ...user, passwordHash: 'synthetic-not-a-login-hash', encryptedMasterKey: 'synthetic-only', salt: 'synthetic-only' }).run();
@@ -45,6 +46,7 @@ set(NETWORK_MODE_KEY, 'network-home-base'); set(NETWORK_PAIRING_STATE_KEY, JSON.
 for (const key of Object.values(FUNCTION_SWITCH_KEYS)) set(key, 'disabled');
 set('aiProvider', 'ollama'); set('aiModel', 'synthetic-model:1');
 const session = createNativeServerSession(user, binding);
+bindSessionToArchive(session, currentArchiveGeneration());
 function call(handler: (request: Request) => Promise<Response>, body?: unknown, sessionId = session.id, pairingToken = token) {
     const headers = new Headers({ cookie: `mediflow_session=${sessionId}`, 'x-mediflow-paired-client-id': clientId, 'x-mediflow-paired-client-token': pairingToken });
     if (body !== undefined) headers.set('content-type', 'application/json');

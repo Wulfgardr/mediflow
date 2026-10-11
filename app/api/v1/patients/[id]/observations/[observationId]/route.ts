@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
@@ -79,6 +80,8 @@ export async function GET(
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/observations/[observationId] error:', error);
         return NextResponse.json({ error: 'Failed to fetch observation' }, { status: 500 });
     }
@@ -107,12 +110,14 @@ export async function PUT(request: Request,
         const result = updateObservationOperation({
             patientId: id, observationId, expectedVersion, values: normalized.values, mode: 'v1',
             changedFields: observationChangedFields(normalized.values, parsed.body),
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /api/v1/patients/[id]/observations/[observationId] error:', error);
         return NextResponse.json({ error: 'Failed to update observation' }, { status: 500 });
     }
@@ -135,12 +140,14 @@ export async function DELETE(request: Request,
         const result = updateObservationOperation({
             patientId: id, observationId, expectedVersion: deletion.expectedVersion,
             values: normalized.values, mode: 'v1', changedFields: ['deletedAt', 'deletionReason'],
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /api/v1/patients/[id]/observations/[observationId] error:', error);
         return NextResponse.json({ error: 'Failed to delete observation' }, { status: 500 });
     }

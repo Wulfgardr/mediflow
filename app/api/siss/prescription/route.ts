@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 /* @Codex */
@@ -20,6 +22,8 @@ import { buildSissPrescriptionLaunchAuditMetadata } from '@/lib/siss-audit';
 export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     let auditPatientId: string | null = null;
 
@@ -59,6 +63,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         if (error instanceof SissPrescriptionError) {
             if (auditPatientId) {
                 await safeWriteAuditEventFromRequest(request, session, {

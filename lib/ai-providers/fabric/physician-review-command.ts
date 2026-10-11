@@ -1,3 +1,6 @@
+import { assertArchiveGeneration } from '../../archive-generation';
+import { currentArchiveGeneration } from '../../security/archive-session-generation';
+import { assertArchiveRequestInTransaction } from '../../security/archive-request-context';
 /* @Codex */
 import 'server-only';
 import { createHash } from 'node:crypto';
@@ -87,6 +90,7 @@ function preflight(resolved: Context, input: Command): void {
 export function createPhysicianReviewCommandService(sources: PhysicianReviewCommandSources) {
     return Object.freeze({ execute(value: unknown): PhysicianReviewCommandResult {
         const input = command(value); let resolved: Context;
+        const archiveGeneration = currentArchiveGeneration();
         try { resolved = context(sources.resolveContext()); } catch (error) { if (error instanceof PhysicianReviewCommandError) throw error; return fail('context_unavailable'); }
         if (input.action === 'accept' && resolved.uncertaintyAcknowledgmentRequired && !input.uncertaintyAcknowledged) fail('uncertainty_acknowledgment_required');
         const digestValue = commandDigest(input, resolved.actorRef);
@@ -99,6 +103,8 @@ export function createPhysicianReviewCommandService(sources: PhysicianReviewComm
         if (typeof eventId !== 'string' || !EVENT.test(eventId) || typeof now !== 'number' || !Number.isSafeInteger(now) || now < 0) return fail('context_unavailable');
         const state = stateFor(input.action); const outcome = Object.freeze({ reviewId: resolved.reviewId, state, revision: input.expectedRevision + 1, eventId });
         try { return runDbServerImmediateTransaction(() => {
+            assertArchiveGeneration(dbServer, archiveGeneration);
+            assertArchiveRequestInTransaction(dbServer);
             const previous = replay(resolved, input, digestValue); if (previous) return previous;
             preflight(resolved, input);
             dbServer.insert(durableReviewCommandStates).values({ reviewId: outcome.reviewId, reviewState: outcome.state, revision: outcome.revision, action: input.action }).run();

@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 // Real SISS handlers, synthetic SQLite and an authenticated session seam.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -32,6 +33,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web-session');
 openDbServer();
 const { patients, sissHandoffEvents } = load('./schema.ts') as typeof import('./schema.ts');
 const createRoute = load('../app/api/siss-handoffs/route.ts') as typeof import('../app/api/siss-handoffs/route.ts');
@@ -64,7 +66,7 @@ function snapshot() {
 }
 function invoke(method: 'POST' | 'PUT' | 'DELETE', raw?: string, id = 'synthetic-handoff') {
     const request = new Request('http://localhost/api/siss-handoffs', { method,
-        headers: { 'content-type': 'application/json', 'authorization': 'Bearer c05-siss-synthetic-token',
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', 'authorization': 'Bearer c05-siss-synthetic-token',
             'x-request-id': 'synthetic-siss-request' }, ...(raw === undefined ? {} : { body: raw }) });
     return method === 'POST' ? createRoute.POST(request) : itemRoute[method](request, { params: Promise.resolve({ id }) });
 }

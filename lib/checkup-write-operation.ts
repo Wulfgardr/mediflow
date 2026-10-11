@@ -49,7 +49,7 @@ export function createCheckupOperation(input: CreateInput): Result {
         if (inserted.changes !== 1) throw new Error('Checkup create did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: 'checkup.created', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'checkup', subjectRef: input.checkupId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields, resourceVersion: 1, flags: input.audit.flags },
@@ -83,7 +83,7 @@ export function updateCheckupOperation(input: UpdateInput): Result {
         if (changed.changes !== 1) throw new Error('Checkup update did not write exactly one row');
         writeAuditEventInTransaction(tx, {
             eventType: input.values.deletedAt ? 'checkup.deleted' : 'checkup.updated', outcome: 'success',
-            actorType: input.audit.actorType, actorRef: input.audit.actorRef,
+            archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
             subjectType: 'checkup', subjectRef: input.checkupId,
             sourceSurface: input.audit.sourceSurface, requestId: input.audit.requestId,
             redactedMetadata: { changedFields: input.changedFields,

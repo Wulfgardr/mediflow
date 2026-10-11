@@ -2,7 +2,9 @@
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
-import { dbServer } from '@/lib/db-server';
+import { dbServer, runDbServerImmediateTransaction } from '@/lib/db-server';
+import { assertArchiveGeneration } from './archive-generation';
+import { currentArchiveGeneration } from './security/archive-session-generation';
 import { settings } from '@/lib/schema';
 import type {
     NetworkCapabilitiesResponse,
@@ -139,8 +141,19 @@ export async function getNetworkIdentitySummary(
 
 /* @Codex */
 export async function loadNetworkPairingState(): Promise<NetworkPairingState> {
+    const generation = currentArchiveGeneration();
     const rawValue = await loadSettingValue(NETWORK_PAIRING_STATE_KEY);
-    return parseNetworkPairingState(rawValue);
+    return pairingStateForGeneration(rawValue, generation);
+}
+
+function pairingStateForGeneration(rawValue: string | null, generation: string): NetworkPairingState {
+    try {
+        const stored = rawValue === null ? null : JSON.parse(rawValue);
+        if (stored?.archiveGeneration === generation && currentArchiveGeneration() === generation) {
+            return parseNetworkPairingState(rawValue);
+        }
+    } catch { /* Unbound or obsolete grants never acquire current authority. */ }
+    return parseNetworkPairingState(null);
 }
 
 const PAIRING_STATE_CAS_ATTEMPTS = 5;
@@ -157,37 +170,45 @@ export type PairingStateMutationOutcome<T> =
 export async function mutateNetworkPairingState<T>(
     mutator: (state: NetworkPairingState) => PairingStateMutationOutcome<T>,
 ): Promise<{ readonly conflict: false; readonly result: T } | { readonly conflict: true }> {
+    const generation = currentArchiveGeneration();
     for (let attempt = 0; attempt < PAIRING_STATE_CAS_ATTEMPTS; attempt += 1) {
         const rawValue = await loadSettingValue(NETWORK_PAIRING_STATE_KEY);
-        const state = parseNetworkPairingState(rawValue);
+        if (currentArchiveGeneration() !== generation) return { conflict: true };
+        const state = pairingStateForGeneration(rawValue, generation);
         const outcome = mutator(state);
         if (!outcome.write) {
             return { conflict: false, result: outcome.result };
         }
 
-        const serialized = serializeNetworkPairingState(outcome.nextState);
-        if (rawValue === null) {
-            const insertResult = dbServer
-                .insert(settings)
-                .values({ key: NETWORK_PAIRING_STATE_KEY, value: serialized })
-                .onConflictDoNothing()
-                .run();
-            if (insertResult.changes === 1) {
-                return { conflict: false, result: outcome.result };
+        const serialized = JSON.stringify({ ...JSON.parse(serializeNetworkPairingState(outcome.nextState)),
+            archiveGeneration: generation });
+        const changed = runDbServerImmediateTransaction(() => {
+            assertArchiveGeneration(dbServer, generation);
+            if (rawValue === null) {
+                const insertResult = dbServer
+                    .insert(settings)
+                    .values({ key: NETWORK_PAIRING_STATE_KEY, value: serialized })
+                    .onConflictDoNothing()
+                    .run();
+                if (insertResult.changes === 1) {
+                    return true;
+                }
+            } else {
+                const updateResult = dbServer
+                    .update(settings)
+                    .set({ value: serialized })
+                    .where(and(
+                        eq(settings.key, NETWORK_PAIRING_STATE_KEY),
+                        eq(settings.value, rawValue),
+                    ))
+                    .run();
+                if (updateResult.changes === 1) {
+                    return true;
+                }
             }
-        } else {
-            const updateResult = dbServer
-                .update(settings)
-                .set({ value: serialized })
-                .where(and(
-                    eq(settings.key, NETWORK_PAIRING_STATE_KEY),
-                    eq(settings.value, rawValue),
-                ))
-                .run();
-            if (updateResult.changes === 1) {
-                return { conflict: false, result: outcome.result };
-            }
-        }
+            return false;
+        });
+        if (changed) return { conflict: false, result: outcome.result };
     }
     return { conflict: true };
 }

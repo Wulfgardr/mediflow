@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 // WUL-306 (ADR 0066): audited admin purge of a soft-deleted patient (GDPR Art. 17 tool).
 // Modeled on fix-orphans: GET dry-run with per-table counts, POST execute, admin only.
 import { NextResponse } from 'next/server';
@@ -56,6 +58,8 @@ export async function GET(request: Request) {
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] Purge patient dry-run failed:', error);
         return NextResponse.json({ error: 'Purge dry-run failed' }, { status: 500 });
     }
@@ -65,6 +69,8 @@ export async function POST(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const parsed = await readBoundedJsonBody(request, PURGE_JSON_MAX_BYTES, 'request-json',
@@ -111,7 +117,7 @@ export async function POST(request: Request) {
             if (deleted.changes !== 1) throw new Error('Patient purge did not delete exactly one row');
             writeAuditEventInTransaction(tx, {
                 eventType: 'patient.purged', outcome: 'success',
-                actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                 subjectType: 'patient', subjectRef: patientId,
                 sourceSurface: auditContext.sourceSurface, requestId,
                 redactedMetadata: withAuditContextMetadata(auditContext, {
@@ -127,6 +133,8 @@ export async function POST(request: Request) {
 
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('[MediFlow] Purge patient failed:', error);
         return NextResponse.json({ error: 'Purge failed' }, { status: 500 });
     }

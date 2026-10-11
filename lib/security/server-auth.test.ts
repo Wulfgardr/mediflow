@@ -111,6 +111,11 @@ let requireSessionOrLocalToken: (request: Request) => Promise<Record<string, unk
 let requireLocalApiActorSession: (request: Request) => Promise<Record<string, unknown> | null>;
 moduleApi._load = function (request, parent, isMain) {
     if (request === 'server-only') return {};
+    if (request === './archive-session-generation') return {
+        sessionMatchesArchive: () => true,
+        currentArchiveGeneration: () => '11111111-1111-4111-8111-111111111111',
+        archiveGenerationForSession: () => '11111111-1111-4111-8111-111111111111',
+    };
     if (request === 'next/headers') return {
         cookies: () => { state.cookiesCalls += 1; state.onCookies?.(); return state.cookieResult; },
     };

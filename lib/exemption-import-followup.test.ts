@@ -13,7 +13,7 @@ import { createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stabl
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 import { commitExemptionImport, previewExemptionImport, readExemptionImportStatus, ExemptionImportError } from './exemption-catalog-import';
 import { readExemptionImportRequest } from './exemption-import-http';
-import { syntheticExemptionSession } from '../scripts/fixtures/exemption-import-session';
+import { syntheticExemptionSession, syntheticExemptionRequest } from '../scripts/fixtures/exemption-import-session';
 import { retireForUser } from './security/web-auth-lifecycle-owner-adapter';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mf-exemptions-followup-synthetic-'));
@@ -114,7 +114,7 @@ function pendingRequest(value: unknown, signal?: AbortSignal) {
     let controller: ReadableStreamDefaultController<Uint8Array>;
     let cancelled = false;
     const stream = new ReadableStream<Uint8Array>({ start(c) { controller = c; }, cancel() { cancelled = true; } });
-    const request = new Request('http://localhost/api/exemptions/import/preview', {
+    const request = syntheticExemptionRequest('http://localhost/api/exemptions/import/preview', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: stream, signal, duplex: 'half',
     } as RequestInit & { duplex: 'half' });
     return { request, cancelled: () => cancelled, finish() { controller.enqueue(new TextEncoder().encode(JSON.stringify(value))); controller.close(); } };
@@ -155,7 +155,7 @@ test('completed body after a session retirement cannot publish a preview even if
     const session = activeSession(), value = source('ZZ_STALE');
     retireForUser(session);
     // Ordinary stale request: admission fixture still returns the old projection; owner must deny it.
-    const request = new Request('http://localhost/api/exemptions/import/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceName: value.sourceName, base64: value.bytes.toString('base64') }) });
+    const request = syntheticExemptionRequest('http://localhost/api/exemptions/import/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceName: value.sourceName, base64: value.bytes.toString('base64') }) });
     const before = snapshot();
     const response = await previewRoute.POST(request);
     assert.equal(response.status, 401);
@@ -192,4 +192,23 @@ test('scheduled export from a historical SQLite without the receipt table produc
         assert.deepEqual(artifact.payload.exemptionImportReceipts, []);
         assert.equal(artifact.payload.exemptions[0].code, 'ZZ_HISTORIC');
     } finally { fs.rmSync(historic, { recursive: true, force: true }); }
+});
+
+
+test('a restore admitted on A cannot overwrite B after waiting for its body', async () => {
+    activeSession();
+    const artifact = await (await backupRoute.GET()).json();
+    const request = syntheticExemptionRequest('http://localhost/api/system/backup-restore', { method: 'POST', headers: { origin: 'http://localhost', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' } });
+    const { rotateSqliteArchiveGeneration, readSqliteArchiveGeneration } = await import('./archive-generation');
+    let generationB: string;
+    Object.defineProperty(request, 'json', { value: async () => {
+        db.transaction(() => { generationB = rotateSqliteArchiveGeneration(db); }).immediate();
+        return artifact;
+    } });
+    const before = snapshot();
+    const response = await backupRoute.POST(request);
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, 'ARCHIVE_REPLACED');
+    assert.equal(readSqliteArchiveGeneration(db), generationB!);
+    assert.deepEqual(snapshot(), before);
 });

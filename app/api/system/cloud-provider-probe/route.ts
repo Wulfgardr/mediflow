@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 
@@ -102,6 +103,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         await audit(request, session, 'denied', 'input_invalid');
         return apiFailure('input_invalid', MESSAGE, 400);
     }
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     /* @Codex: parsing is an await boundary; re-read the exact admin session
        immediately before constructing and executing the egress capability. */
@@ -111,6 +114,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         await audit(request, currentSession, 'denied', 'session_changed');
         return unauthorizedResponse();
     }
+    const currentArchiveDenial = archiveWriteRequestDenial(request, currentSession);
+    if (currentArchiveDenial) return currentArchiveDenial;
 
     const lifecycle = bindProbeToSession(currentSession);
     if (!lifecycle) {

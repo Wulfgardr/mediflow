@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { bindSessionToArchive, currentArchiveGeneration } from './archive-session-generation';
 /* @Codex */
 import {
     begin,
@@ -30,6 +33,8 @@ export function issueSyntheticWebSessionContext(user: SyntheticWebUser, suffix: 
     if (!issued) throw new Error('Synthetic Web issue unavailable');
     const resolution = resolve(issued.sessionId, control.controlId);
     if (resolution.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+    if (process.env.MEDIFLOW_DATA_DIR && existsSync(join(process.env.MEDIFLOW_DATA_DIR, 'medical.db')))
+        bindSessionToArchive(resolution.projection, currentArchiveGeneration());
     return Object.freeze({
         session: resolution.projection as ServerSession,
         controlId: control.controlId,
@@ -47,4 +52,17 @@ export function retireSyntheticWebSession(session: ServerSession): void {
 
 export function retireSyntheticWebSessionsForUser(session: ServerSession): void {
     retireForUser(session);
+}
+
+/** Bind explicit synthetic auth-seam identities without changing the production admission rules. */
+export function bindSyntheticArchiveSessions(...ids: string[]): string {
+    const generation = currentArchiveGeneration();
+    for (const id of ids) bindSessionToArchive({ id, expiresAt: Date.now() + 3_600_000 }, generation);
+    return generation;
+}
+
+export function syntheticArchiveRequest(generation: string, input: RequestInfo | URL, init: RequestInit = {}): Request {
+    const headers = new Headers(init.headers);
+    headers.set('x-mediflow-archive-generation', generation);
+    return new Request(input, { ...init, headers });
 }

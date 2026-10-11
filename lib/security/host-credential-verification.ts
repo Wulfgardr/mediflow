@@ -32,12 +32,13 @@ type Account = Pick<typeof users.$inferSelect,
     | 'role'
     | 'encryptedMasterKey'
     | 'salt'>;
-type SecretKind = 'pin' | 'verifier';
+type SecretKind = 'pin' | 'verifier' | 'recoveryVerifier';
 type Credential = { username: string; kind: SecretKind; secret: string };
 /* ADR 0143. 'confirmation' checks the PIN of a person who already holds a session. 'unlock' opens
-   one: an account with a passphrase is opened only by its access verifier, never by the PIN. */
-type Purpose = 'confirmation' | 'unlock';
-type StoredCredentials = Pick<typeof users.$inferSelect, 'id' | 'passwordHash' | 'unlockVerifierHash'>;
+   one: an account with a passphrase is opened only by its access verifier, never by the PIN.
+   'recovery' proves possession of the recovery key of such an account, and opens nothing. */
+type Purpose = 'confirmation' | 'unlock' | 'recovery';
+type StoredCredentials = Pick<typeof users.$inferSelect, 'id' | 'passwordHash' | 'unlockVerifierHash' | 'recoveryVerifierHash'>;
 type Denied = {
     kind: 'denied';
     failureClass: 'invalid_credentials' | 'locked';
@@ -91,6 +92,7 @@ function sameCredentials(user: StoredCredentials) {
         eq(users.id, user.id),
         eq(users.passwordHash, user.passwordHash),
         user.unlockVerifierHash ? eq(users.unlockVerifierHash, user.unlockVerifierHash) : isNull(users.unlockVerifierHash),
+        user.recoveryVerifierHash ? eq(users.recoveryVerifierHash, user.recoveryVerifierHash) : isNull(users.recoveryVerifierHash),
     );
 }
 
@@ -219,6 +221,17 @@ export async function verifyUnlockCredentials(
     return verify(readCredential(input, ['pin', 'verifier']), 'unlock', dependencies);
 }
 
+/**
+ * For recovery. Takes { username, recoveryVerifier }, the value the browser derives from the recovery
+ * key and the salt of the recovery kit. Only an account that unlocks with a passphrase has one.
+ * Wrong values are counted and lock the account like wrong credentials; it creates no session.
+ */
+export async function verifyRecoveryCredentials(
+    input: unknown, dependencies: HostCredentialVerifierDependencies = {},
+): Promise<HostCredentialVerification> {
+    return verify(readCredential(input, ['recoveryVerifier']), 'recovery', dependencies);
+}
+
 async function verify(
     credential: Credential | null, purpose: Purpose, dependencies: HostCredentialVerifierDependencies,
 ): Promise<HostCredentialVerification> {
@@ -237,11 +250,14 @@ async function verify(
             Math.max(user.failedLoginAttempts ?? AUTH_LOCKOUT_MAX_FAILURES, AUTH_LOCKOUT_MAX_FAILURES),
         );
 
-        const expected: SecretKind = purpose === 'unlock' && user.unlockVerifierHash ? 'verifier' : 'pin';
+        const expected: SecretKind = purpose === 'recovery' ? 'recoveryVerifier'
+            : purpose === 'unlock' && user.unlockVerifierHash ? 'verifier' : 'pin';
         if (credential.kind !== expected) return deny(user.username, dependencies);
-        const valid = expected === 'verifier'
-            ? accessVerifierMatches(credential.secret, user.unlockVerifierHash ?? '')
-            : await (dependencies.compare ?? bcrypt.compare)(credential.secret, user.passwordHash);
+        // An account still on its PIN has nothing to recover: its PIN is the credential.
+        if (purpose === 'recovery' && !(user.unlockVerifierHash && user.recoveryVerifierHash)) return deny(user.username, dependencies);
+        const valid = expected === 'pin'
+            ? await (dependencies.compare ?? bcrypt.compare)(credential.secret, user.passwordHash)
+            : accessVerifierMatches(credential.secret, (expected === 'verifier' ? user.unlockVerifierHash : user.recoveryVerifierHash) ?? '');
         if (!valid) {
             const next = await recordFailedLoginAtomically(db, user, now);
             if (!next) return deny(user.username, dependencies);

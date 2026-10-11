@@ -23,7 +23,7 @@ async function bootstrapAuthControl(etag: string): Promise<void> {
     globalThis.fetch = async (input, init) => {
         assert.equal(input, '/api/auth/check');
         assert.deepEqual(init, { cache: 'no-store', credentials: 'same-origin' });
-        return new Response(JSON.stringify({ status: 'ok', isSetup: true }), { status: 200, headers: { ETag: etag } });
+        return new Response(JSON.stringify({ archiveGeneration: '00000000-0000-4000-8000-000000000001', status: 'ok', isSetup: true }), { status: 200, headers: { ETag: etag } });
     };
     try {
         const { response, controlState } = await checkAuthHealthRequest();
@@ -95,12 +95,14 @@ test('application lock confirmation rejects malformed parsed records and transpo
     } finally { globalThis.fetch = originalFetch; }
 });
 
-test('a passphrase account sends its verifier under the same fence; a check response that is not one means a PIN', async () => {
+test('a passphrase account sends its verifier under the same fence; a check response that does not say what unlocks it says nothing', async () => {
     const passphraseAccount = { credential: 'passphrase', kdfVersion: 3, salt: 'c3ludGhldGljLXNhbHQ=' };
     assert.deepEqual(readUnlockParameters({ ...passphraseAccount, unexpected: 'dropped' }), passphraseAccount);
-    for (const other of [undefined, null, 'passphrase', { credential: 'pin' }, { credential: 'passphrase' },
+    assert.deepEqual(readUnlockParameters({ credential: 'pin', salt: 'ignored' }), { credential: 'pin' });
+    // Anything else says nothing: the caller must then send nothing, because only a PIN may travel as typed.
+    for (const unknown of [undefined, null, 'passphrase', {}, { credential: 'passphrase' },
         { ...passphraseAccount, kdfVersion: '3' }, { ...passphraseAccount, salt: '' }, { ...passphraseAccount, credential: 'other' }]) {
-        assert.deepEqual(readUnlockParameters(other), { credential: 'pin' });
+        assert.equal(readUnlockParameters(unknown), null);
     }
 
     const originalFetch = globalThis.fetch;
@@ -114,6 +116,32 @@ test('a passphrase account sends its verifier under the same fence; a check resp
         assert.equal(calls[0].input, '/api/auth/login');
         assert.equal(calls[0].init?.body, JSON.stringify({ verifier: 'synthetic-verifier' }));
         assert.equal(new Headers(calls[0].init?.headers).get('If-Match'), '"fence-verifier"');
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test('a check asked to decide what to send is produced after the gesture, not reused from one already on its way', async () => {
+    const originalFetch = globalThis.fetch;
+    const releases: Array<() => void> = [];
+    let calls = 0;
+    try {
+        await bootstrapAuthControl('"fence-fresh"');
+        globalThis.fetch = async () => {
+            calls += 1;
+            const answer = calls;
+            await new Promise<void>((resolve) => { releases.push(resolve); });
+            return jsonResponse({ archiveGeneration: '00000000-0000-4000-8000-000000000001', status: 'ok', isSetup: true, unlock: { credential: answer === 1 ? 'pin' : 'passphrase', kdfVersion: 3, salt: 'c2FsdA==' } }, 200, `"fence-fresh-${answer}"`);
+        };
+        const onItsWay = checkAuthHealthRequest();
+        const shared = checkAuthHealthRequest();
+        const fresh = checkAuthHealthRequest({ fresh: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(calls, 1, 'an ordinary caller shares the request already on its way');
+        releases[0]();
+        assert.equal((await onItsWay).payload?.unlock && (await shared).payload === (await onItsWay).payload, true);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.equal(calls, 2, 'the caller that needs a fresh answer asks again once that one has arrived');
+        releases[1]();
+        assert.deepEqual((await fresh).payload?.unlock, { credential: 'passphrase', kdfVersion: 3, salt: 'c2FsdA==' });
     } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -163,7 +191,7 @@ test('a late auth check response cannot roll the retained fence back', async () 
     try {
         const lateCheck = checkAuthHealthRequest();
         await loginWithPinRequest('123456');
-        resolveCheck(jsonResponse({ status: 'ok', isSetup: true, hasSession: false }, 200, '"fence-cas-stale"'));
+        resolveCheck(jsonResponse({ archiveGeneration: '00000000-0000-4000-8000-000000000001', status: 'ok', isSetup: true, hasSession: false }, 200, '"fence-cas-stale"'));
         const lateResult = await lateCheck;
         assert.equal(lateResult.controlState, 'stale');
         assert.equal(lateResult.payload?.hasSession, false);
@@ -180,14 +208,14 @@ test('concurrent auth checks share one bootstrap request and release the latch a
     globalThis.fetch = async () => {
         calls += 1;
         if (calls === 1) return deferred;
-        return jsonResponse({ status: 'ok', isSetup: true }, 200, '"fence-bootstrap-b"');
+        return jsonResponse({ archiveGeneration: '00000000-0000-4000-8000-000000000001', status: 'ok', isSetup: true }, 200, '"fence-bootstrap-b"');
     };
     try {
         const first = checkAuthHealthRequest();
         const second = checkAuthHealthRequest();
         await Promise.resolve();
         assert.equal(calls, 1);
-        release(jsonResponse({ status: 'ok', isSetup: true }, 200, '"fence-bootstrap-a"'));
+        release(jsonResponse({ archiveGeneration: '00000000-0000-4000-8000-000000000001', status: 'ok', isSetup: true }, 200, '"fence-bootstrap-a"'));
         const [firstResult, secondResult] = await Promise.all([first, second]);
         assert.equal(firstResult.controlState, 'accepted');
         assert.strictEqual(firstResult, secondResult);
@@ -204,7 +232,7 @@ test('a rejected shared auth check releases the bootstrap latch for retry', asyn
     globalThis.fetch = async () => {
         calls += 1;
         if (calls === 1) throw new Error('synthetic bootstrap failure');
-        return jsonResponse({ status: 'ok', isSetup: true }, 200, '"fence-bootstrap-recovered"');
+        return jsonResponse({ archiveGeneration: '00000000-0000-4000-8000-000000000001', status: 'ok', isSetup: true }, 200, '"fence-bootstrap-recovered"');
     };
     try {
         const first = checkAuthHealthRequest();
@@ -324,7 +352,7 @@ test('lock replays a post-CAS body-read failure with the same logical key', asyn
 test('application lock confirmation rejects forbidden Object.prototype keys present before import', () => {
     const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
     for (const key of ['then', 'value', 'schemaVersion', 'state']) {
-        const script = `import ts from 'typescript'; const output = ts.transpileModule(${JSON.stringify(source)}, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText; Object.defineProperty(Object.prototype, ${JSON.stringify(key)}, { configurable: true, value: undefined }); globalThis.fetch = async (input) => input === '/api/auth/check' ? new Response('{"status":"ok"}', { status: 200, headers: { ETag: '"fence-poison"' } }) : new Response(${JSON.stringify(JSON.stringify(confirmedReceipt))}, { status: 200, headers: { ETag: '"fence-poison-next"' } }); const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64')); await api.checkAuthHealthRequest(); if (await api.requestApplicationLockConfirmation()) process.exitCode = 1;`;
+        const script = `import ts from 'typescript'; const output = ts.transpileModule(${JSON.stringify(source)}, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText; Object.defineProperty(Object.prototype, ${JSON.stringify(key)}, { configurable: true, value: undefined }); globalThis.fetch = async (input) => input === '/api/auth/check' ? new Response('{"status":"ok","archiveGeneration":"00000000-0000-4000-8000-000000000001"}', { status: 200, headers: { ETag: '"fence-poison"' } }) : new Response(${JSON.stringify(JSON.stringify(confirmedReceipt))}, { status: 200, headers: { ETag: '"fence-poison-next"' } }); const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64')); await api.checkAuthHealthRequest(); if (await api.requestApplicationLockConfirmation()) process.exitCode = 1;`;
         execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
     }
 });
@@ -388,24 +416,25 @@ test('security provider clears stale persisted authority and fences stale auth p
     for (const pattern of [
         /authorityAttemptGenerationRef\.current === attemptGeneration/,
         /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;[\s\S]{0,160}?return material \? loginWithVerifierRequest\(material\.verifier\) : loginWithPinRequest\(pin\);/,
-        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return setupSecurityRequest\(/,
+        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(generation !== authorityAttemptGenerationRef\.current\) throw new Error/,
+        /preparedAccessRef\.current = \{ generation, commit:/,
         /await persistSecuritySession\(masterKey, userData\);[\s\S]*?clearClientAuthority\(\);/,
-        /setupSecurityRequest[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?SETUP_ALREADY_COMPLETED/,
+        /finishAccessMutation = async[\s\S]*?generation !== authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
         /handleApiAuthUnavailable[\s\S]*?\+\+authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
         /checkAuthStatus[\s\S]*?controlState === 'stale'\) return;[\s\S]*?controlState === 'invalid'[\s\S]*?clearClientAuthority\(\);/,
         /checkAuthStatus[\s\S]*?if \(!data\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(!res\.ok\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(data\?\.status === 'error' \|\| data\?\.error\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?if \(!data\.isSetup\)[\s\S]*?clearClientAuthority\(\);[\s\S]*?catch \(e\)[\s\S]*?clearClientAuthority\(\);/,
         /loginWithPinRequest[\s\S]*?res\.ok && controlState !== 'accepted'[\s\S]*?lock\(\);[\s\S]*?return false;/,
         /unacceptedServerAuthority = true;[\s\S]*?if \(!data[\s\S]*?lock\(\);[\s\S]*?const userData: User = \{[\s\S]*?unacceptedServerAuthority = false;/,
-        /setupSecurityRequest[\s\S]*?res\.ok && controlState !== 'accepted'[\s\S]*?lock\(\);[\s\S]*?return;/,
-        /payload\?\.success !== true[\s\S]*?lock\(\);[\s\S]*?return;/,
-        /wrapMasterKeyVersioned\(masterKey, pin, salt\);[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?runAuthorityNetworkRequest\(async \(\) =>/,
+        /setupSecurityRequest[\s\S]*?result\.response\.ok && result\.controlState !== 'accepted'[\s\S]*?lock\(\);/,
+        /result\.payload\?\.success !== true[\s\S]*?clearClientAuthority\(\);[\s\S]*?updateAuthRecoveryState\('required'\)/,
+        /prepareAccess = async[\s\S]*?generation !== authorityAttemptGenerationRef\.current[\s\S]*?preparedAccessRef\.current =/,
         /let pinMutationDispatched = false;[\s\S]*?pinMutationDispatched = true;[\s\S]*?changePinRequest\(/,
         /changePinRequest[\s\S]*?if \(!res\.ok\)[\s\S]*?return \{ ok: false[\s\S]*?\+\+authorityAttemptGenerationRef\.current;[\s\S]*?clearClientAuthority\(\);[\s\S]*?return \{ ok: true \};[\s\S]*?catch \(e\)[\s\S]*?if \(pinMutationDispatched\) lock\(\);/,
     ]) assert.match(source, pattern);
     assert.doesNotMatch(source, /runAuthorityNetworkRequest\(requestApplicationLockConfirmation\)/);
-    assert.match(source, /res\.status === 409 && payload\?\.code === 'SETUP_ALREADY_COMPLETED'/u);
+    assert.match(source, /result\.response\.status === 409 && result\.payload\?\.code === 'SETUP_ALREADY_COMPLETED'/u);
     const setupAlreadyCompleted = source.match(
-        /if \(res\.status === 409 && payload\?\.code === 'SETUP_ALREADY_COMPLETED'\) \{([\s\S]*?)\n\s*\}/u,
+        /if \(result\.response\.status === 409 && result\.payload\?\.code === 'SETUP_ALREADY_COMPLETED'\) \{([\s\S]*?)\n\s*\}/u,
     );
     assert.ok(setupAlreadyCompleted);
     assert.match(setupAlreadyCompleted[1], /clearClientAuthority\(\);[\s\S]*?setRequiresSetup\(false\);/u);
@@ -415,4 +444,24 @@ test('security provider clears stale persisted authority and fences stale auth p
     assert.doesNotMatch(authApiSource, /export function isExactApplicationLockReceipt/);
     assert.match(authApiSource, /forbiddenLockObjectPrototypeKeys = Object\.freeze\(\['then', 'value', 'schemaVersion', 'state'\]/);
     assert.match(authApiSource, /hasUnchangedObjectPrototype\(\)/);
+});
+
+
+test('one document stays on A after observing B and stamps A even over caller-supplied B', () => {
+    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
+const output = ts.transpileModule(${JSON.stringify(source)}, {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64'));
+const A='11111111-1111-4111-8111-111111111111', B='22222222-2222-4222-8222-222222222222';
+const events=[]; let reloads=0; let observed; let rejected=false;
+globalThis.window={location:{href:'http://localhost/',origin:'http://localhost',reload(){reloads++;}},dispatchEvent(event){events.push(event.type);},fetch:async(_input,init)=>{observed=new Headers(init.headers);return Response.json(rejected?{code:'ARCHIVE_REPLACED'}:{},{status:rejected?409:200});}};
+api.observeArchiveGeneration(A); const dispose=api.installArchiveGenerationTransport();
+await window.fetch('/api/patients',{method:'PUT',headers:{'x-mediflow-archive-generation':B}});
+assert.equal(observed.get('x-mediflow-archive-generation'),A);
+assert.throws(()=>api.observeArchiveGeneration(B),/ARCHIVE_REPLACED/);
+assert.deepEqual(events,['mediflow:archive-replaced']); assert.equal(reloads,1);
+await window.fetch('/api/patients',{method:'PUT'}); assert.equal(observed.get('x-mediflow-archive-generation'),A);
+rejected=true; await assert.rejects(window.fetch('/api/patients',{method:'PUT'}),/ARCHIVE_REPLACED/);
+assert.equal(reloads,2); dispose();`;
+    execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
 });

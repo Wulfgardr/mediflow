@@ -1,3 +1,5 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
+import { assertArchiveGeneration } from './archive-generation';
 import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
 import type { dbServer } from './db-server';
@@ -37,14 +39,19 @@ function currentSession(context: NetworkWriteContext): boolean {
 export async function prepareNetworkPatientCommitGuard(
     context: NetworkWriteContext, capability: string,
 ): Promise<NetworkPatientCommitGuard> {
+    const generation = archiveGenerationForSession(context.session);
     const activeAmbulatoryId = (await cookies()).get('ambulatory_id')?.value ?? null;
     return (tx) => {
         // Fixed reads under the patient's IMMEDIATE write lock. No await occurs
         // from these checks through clinical/membership/required-audit commit.
         const setting = (key: string) => tx.select({ value: settings.value }).from(settings)
             .where(eq(settings.key, key)).get()?.value ?? null;
+        assertArchiveGeneration(tx, generation);
+        const rawPairing = setting(NETWORK_PAIRING_STATE_KEY);
+        let bound = false;
+        try { bound = rawPairing !== null && JSON.parse(rawPairing).archiveGeneration === generation; } catch { /* Invalid grants fail closed. */ }
         const paired = authenticatePairedClientRequest(context.request,
-            parseNetworkPairingState(setting(NETWORK_PAIRING_STATE_KEY)).clients);
+            parseNetworkPairingState(bound ? rawPairing : null).clients);
         if (!paired || paired.clientId !== context.pairedClient.clientId
             || paired.tokenHash !== context.pairedClient.tokenHash
             || paired.clientPlatform !== context.pairedClient.clientPlatform) {

@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -80,6 +81,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/entries error:', error);
         return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 });
     }
@@ -90,8 +93,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (authError) return authError;
 
     try {
-        /* @Codex */
         const auditSession = await requireLocalApiActorSession(request);
+        /* @Codex */
         const { id } = await params;
         const parsed = await readEntryJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
@@ -100,11 +103,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const context = auditContextFromSession(auditSession);
         const result = createEntryOperation({ patientId: id, id: prepared.id, values: prepared.values,
             changedFields: prepared.changedFields, mode: 'v1', audit: {
-                actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
+                archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],
             } });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API POST /api/v1/patients/[id]/entries error:', error);
         return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 });
     }

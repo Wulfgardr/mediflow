@@ -6,10 +6,11 @@
  */
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
-import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
+import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow } from './utils';
 import { parseWorkProfileState } from '../lib/work-profile';
 
 const PIN = 'FirstUse086'; // Synthetic; exercise the existing text PIN, never a new PIN policy.
+const PASSPHRASE = 'Primo avvio sintetico sicuro';
 const endpoint = '/api/onboarding/work-profile';
 const panelSelector = '[data-testid="work-profile-onboarding"]';
 const setupSelector = '[data-testid="onboarding-setup"]';
@@ -105,7 +106,41 @@ async function capture(page: Page, info: TestInfo, name: string, selector: strin
     await info.attach(name, { body, contentType: 'image/png' });
 }
 
+async function unlockPassphrase(page: Page, passphrase = PASSPHRASE) {
+    const lock = page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true });
+    await expect(lock.or(page.getByTestId('work-profile-onboarding')).or(page.getByTestId('settings-access-section')).first()).toBeVisible();
+    if (!await lock.isVisible()) return;
+    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+    if (await renew.isVisible()) await renew.click();
+    const field = page.getByLabel('Passphrase', { exact: true });
+    await expect(field).toBeEnabled(); await field.fill(passphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(lock).toHaveCount(0);
+    expect(await page.evaluate(() => [sessionStorage.getItem('mediflow_session_key'), sessionStorage.getItem('mediflow_user')])).toEqual([null, null]);
+}
+
+async function conserveKit(page: Page) {
+    const panel = page.getByTestId('recovery-kit');
+    const activate = panel.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true });
+    await expect(activate).toBeDisabled();
+    const key = await panel.getByLabel('Chiave di recupero', { exact: true }).innerText();
+    const download = page.waitForEvent('download');
+    await panel.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click();
+    const artifact = await download;
+    const { readFile } = await import('node:fs/promises');
+    const content = await readFile((await artifact.path())!, 'utf8');
+    const kit = JSON.parse(content);
+    expect(Object.keys(kit).sort()).toEqual(['salt', 'schemaVersion', 'username', 'wrappedMasterKey']);
+    expect(kit.schemaVersion).toBe('mediflow.recovery-kit.v1');
+    expect(content).not.toContain(key); expect(content).not.toContain(PASSPHRASE);
+    await expect(activate).toBeDisabled();
+    await panel.getByRole('checkbox').check(); await expect(activate).toBeEnabled();
+    return { kit, key, content, activate };
+}
+
 async function setup(page: Page, info?: TestInfo) {
+    const setupBodies: string[] = [];
+    page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/auth/setup') setupBodies.push(request.postData() ?? ''); });
     const root = page.getByTestId('onboarding-setup');
     await expect(page).toHaveTitle(/MediFlow/);
     await expect(root.getByRole('heading', { name: 'Chi sei?', exact: true })).toBeVisible();
@@ -127,13 +162,15 @@ async function setup(page: Page, info?: TestInfo) {
     await next.press('Enter');
     await expect(root.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
     await expect(root.getByLabel('Avanzamento setup', { exact: true })).toHaveText('Passo 2 di 2');
-    await expect(root.locator('#setup-pin-help')).toContainText('almeno 4 caratteri');
-    const pin = root.getByLabel('PIN di accesso e cifratura', { exact: true });
+    await expect(root.locator('#setup-pin-help')).toContainText('da 4 a 64 caratteri');
+    const pin = root.getByLabel('PIN di conferma', { exact: true });
     const confirmation = root.getByLabel('Conferma PIN', { exact: true });
     const submit = root.getByRole('button', { name: 'Concludi Setup', exact: true });
     await expect(pin).toHaveAttribute('type', 'password');
     await expect(pin).toHaveAttribute('inputmode', 'text');
     await expect(confirmation).toHaveAttribute('type', 'password');
+    await root.getByLabel('Passphrase di accesso', { exact: true }).fill(PASSPHRASE);
+    await root.getByLabel('Conferma passphrase', { exact: true }).fill(PASSPHRASE);
     await pin.fill('abc');
     await confirmation.fill('abc');
     await expect(submit).toBeDisabled();
@@ -144,12 +181,25 @@ async function setup(page: Page, info?: TestInfo) {
     await expect(submit).toBeDisabled();
     await confirmation.fill(PIN);
     await expect(confirmation).toHaveAttribute('aria-invalid', 'false');
+    const passphrase = root.getByLabel('Passphrase di accesso', { exact: true });
+    const passphraseConfirmation = root.getByLabel('Conferma passphrase', { exact: true });
+    for (const outside of ['a'.repeat(14), 'a'.repeat(129)]) {
+        await passphrase.fill(outside); await passphraseConfirmation.fill(outside); await expect(submit).toBeDisabled();
+    }
+    await passphrase.fill(PASSPHRASE.replace('P', 'Ｐ')); await passphraseConfirmation.fill(PASSPHRASE);
     await expect(submit).toBeEnabled();
     if (info) await capture(page, info, 'pin', setupSelector);
     const response = page.waitForResponse(item => item.request().method() === 'POST'
         && new URL(item.url()).pathname === '/api/auth/setup');
     await submit.click();
+    const { activate, key } = await conserveKit(page);
+    expect(setupBodies).toEqual([]);
+    await activate.click();
     expect((await response).status()).toBe(200);
+    expect(setupBodies).toHaveLength(1);
+    expect(JSON.parse(setupBodies[0])).toMatchObject({ password: PIN, encryptedMasterKey: expect.stringMatching(/^v3:/u) });
+    for (const secret of [PASSPHRASE, key]) expect(setupBodies[0]).not.toContain(secret);
+    await unlockPassphrase(page);
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
@@ -180,7 +230,7 @@ async function profileSettings(page: Page) {
     const panel = page.getByTestId('work-profile-onboarding');
     const lock = page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true });
     await expect(panel.or(lock).first()).toBeVisible();
-    await unlockIfNeeded(page, PIN);
+    await unlockPassphrase(page);
     await expect(panel).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
 }
@@ -263,6 +313,39 @@ test('first use: manual entry creates the first synthetic patient without saving
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ firstName: 'Prima', lastName: 'Sintetica', taxCode: 'SYNTHETIC0000086' });
     expect(await readProfile(page)).toEqual(before);
+    // The same synthetic record remains readable after changing and recovering the access wrapping.
+    const nextPassphrase = 'Cambio sintetico sicuro nuovo';
+    const recoveredPassphrase = 'Recupero sintetico sicuro nuovo';
+    const mutations: string[] = [];
+    page.on('request', request => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname.startsWith('/api/auth/')) mutations.push(request.postData() ?? '');
+    });
+    await page.goto('/settings/accesso'); await unlockPassphrase(page);
+    await page.getByLabel('Passphrase attuale', { exact: true }).fill(PASSPHRASE);
+    await page.getByLabel('Nuova passphrase', { exact: true }).fill(nextPassphrase);
+    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(nextPassphrase);
+    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+    const saved = await conserveKit(page);
+    const change = page.waitForResponse(item => new URL(item.url()).pathname === '/api/auth/passphrase/change');
+    await saved.activate.click(); expect((await change).status()).toBe(200);
+    await unlockPassphrase(page, nextPassphrase);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
+    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+    if (await renew.isVisible()) await renew.click();
+    await page.getByRole('button', { name: 'Recupera con kit e chiave', exact: true }).click();
+    await page.getByLabel('Kit di recupero', { exact: true }).setInputFiles({ name: 'synthetic-kit.json', mimeType: 'application/json', buffer: Buffer.from(saved.content) });
+    await page.getByLabel('Chiave di recupero', { exact: true }).fill(saved.key);
+    await page.getByLabel('Nuova passphrase', { exact: true }).fill(recoveredPassphrase);
+    await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(recoveredPassphrase);
+    await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+    const recovered = await conserveKit(page);
+    const recovery = page.waitForResponse(item => new URL(item.url()).pathname === '/api/auth/passphrase/recover');
+    await recovered.activate.click(); expect((await recovery).status()).toBe(200);
+    await unlockPassphrase(page, recoveredPassphrase);
+    const preserved = await page.request.get('/api/patients');
+    expect(preserved.status()).toBe(200); expect(await preserved.json()).toEqual(rows);
+    for (const secret of [PASSPHRASE, nextPassphrase, recoveredPassphrase, saved.key, recovered.key]) expect(mutations.join('')).not.toContain(secret);
     await check(info);
 });
 

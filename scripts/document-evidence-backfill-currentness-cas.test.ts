@@ -1,6 +1,11 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { mkdtempSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { openAdmittedSqlite } from '../lib/sqlite-maintenance-admission.mjs';
 import Database from 'better-sqlite3';
 
 import { applyDocumentEvidenceArtifactsWithCurrentness } from './document-evidence-backfill-currentness-cas';
@@ -125,5 +130,28 @@ test('rolls back the complete batch when one update fails', () => {
         });
     } finally {
         db.close();
+    }
+});
+
+
+test('offline backfill refuses a live archive lease before backup or writes', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'mediflow-backfill-offline-'));
+    const filename = path.join(directory, 'medical.db');
+    const backup = path.join(directory, 'backup.db');
+    const live = openAdmittedSqlite(filename, { role: 'synthetic-live-web' });
+    try {
+        live.database.exec("CREATE TABLE sentinel (value TEXT); INSERT INTO sentinel VALUES ('unchanged')");
+        const result = spawnSync(process.execPath, ['scripts/run-strip-types.mjs',
+            'scripts/document-evidence-backfill-live-db.ts', '--db', filename,
+            '--apply', '--confirm-apply', 'DOCUMENT_EVIDENCE_ARTIFACTS_ONLY', '--backup-out', backup], {
+            cwd: process.cwd(), env: { ...process.env, MEDIFLOW_PIN: 'synthetic-pin' }, encoding: 'utf8', timeout: 15_000,
+        });
+        assert.equal(result.status, 1, result.stderr);
+        assert.match(result.stderr, /leases did not drain|SQLITE_MAINTENANCE_HOLD/);
+        assert.equal(existsSync(backup), false);
+        assert.deepEqual(live.database.prepare('SELECT value FROM sentinel').get(), { value: 'unchanged' });
+    } finally {
+        live.closeSync();
+        rmSync(directory, { recursive: true, force: true });
     }
 });

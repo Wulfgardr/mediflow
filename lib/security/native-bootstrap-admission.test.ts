@@ -33,8 +33,9 @@ function syntheticClient(id = clientId, value = token) {
     return { clientId: id, deviceName: 'Dispositivo sintetico', clientPlatform: 'ipados' as const, appVersion: null, grantedCapabilities: [], pairedAt: '2026-08-27T08:00:00.000Z', lastSeenAt: null, sourceIntentId: `intent-${id}`, tokenHash: hashNetworkPairedClientToken(value) };
 }
 
+const { currentArchiveGeneration } = await import('./archive-session-generation');
 function writeClients(clients: ReturnType<typeof syntheticClient>[]): void {
-    dbServer.insert(settings).values({ key: NETWORK_PAIRING_STATE_KEY, value: serializeNetworkPairingState({ intents: [], clients }) }).onConflictDoUpdate({ target: settings.key, set: { value: serializeNetworkPairingState({ intents: [], clients }) } }).run();
+    dbServer.insert(settings).values({ key: NETWORK_PAIRING_STATE_KEY, value: JSON.stringify({ ...JSON.parse(serializeNetworkPairingState({ intents: [], clients })), archiveGeneration: currentArchiveGeneration() }) }).onConflictDoUpdate({ target: settings.key, set: { value: JSON.stringify({ ...JSON.parse(serializeNetworkPairingState({ intents: [], clients })), archiveGeneration: currentArchiveGeneration() }) } }).run();
 }
 
 writeClients([syntheticClient()]);

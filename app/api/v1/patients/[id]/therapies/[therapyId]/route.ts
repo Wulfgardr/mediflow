@@ -1,3 +1,4 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -63,6 +64,8 @@ export async function GET(
 
         return NextResponse.json(result);
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API GET /api/v1/patients/[id]/therapies/[therapyId] error:', error);
         return NextResponse.json({ error: 'Failed to fetch therapy' }, { status: 500 });
     }
@@ -94,12 +97,14 @@ export async function PUT(
         const result = updateTherapyOperation({
             patientId: id, therapyId, expectedVersion, values: normalized.values,
             changedFields: therapyChangedFields(normalized.values, parsed.body), mode: 'v1',
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API PUT /api/v1/patients/[id]/therapies/[therapyId] error:', error);
         return NextResponse.json({ error: 'Failed to update therapy' }, { status: 500 });
     }
@@ -125,12 +130,14 @@ export async function DELETE(
         const result = updateTherapyOperation({
             patientId: id, therapyId, expectedVersion: parsedBody.expectedVersion,
             values: normalized.values, changedFields: ['deletedAt', 'deletionReason'], mode: 'v1',
-            audit: { actorType: context.actorType, actorRef: context.actorRef,
+            audit: { archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef,
                 sourceSurface: context.sourceSurface, requestId: requestIdFromRequest(request),
                 flags: [`auth:${context.authContext}`] },
         });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error('API DELETE /api/v1/patients/[id]/therapies/[therapyId] error:', error);
         return NextResponse.json({ error: 'Failed to delete therapy' }, { status: 500 });
     }

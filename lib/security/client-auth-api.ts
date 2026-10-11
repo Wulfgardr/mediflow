@@ -1,4 +1,6 @@
 /* @Codex */
+import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseRecoveryPayload } from './passphrase-adoption-validation';
+
 export type AuthHealthErrorCategory =
     | 'native-dependency-invalid'
     | 'native-dependency-missing'
@@ -13,18 +15,24 @@ export type UnlockParameters =
     | { credential: 'pin' }
     | { credential: 'passphrase'; kdfVersion: number; salt: string };
 
-/** The check response is untrusted input: anything that is not a well-formed passphrase account is a PIN account. */
-export function readUnlockParameters(value: unknown): UnlockParameters {
+/**
+ * The check response is untrusted input. Null unless it says, in a well-formed way, what unlocks
+ * the account: with null the caller sends nothing, because what was typed may be a passphrase
+ * and only a PIN may travel as it is.
+ */
+export function readUnlockParameters(value: unknown): UnlockParameters | null {
     const unlock = value && typeof value === 'object' ? value as Record<string, unknown> : null;
+    if (unlock?.credential === 'pin') return { credential: 'pin' };
     if (unlock?.credential === 'passphrase' && Number.isInteger(unlock.kdfVersion)
         && typeof unlock.salt === 'string' && unlock.salt) {
         return { credential: 'passphrase', kdfVersion: unlock.kdfVersion as number, salt: unlock.salt };
     }
-    return { credential: 'pin' };
+    return null;
 }
 
 /* @Codex */
 export type AuthHealthPayload = {
+    archiveGeneration?: string;
     status: 'ok' | 'error';
     isSetup?: boolean;
     hasSession?: boolean;
@@ -52,6 +60,7 @@ export type LoginFailurePayload = {
 };
 
 type LoginSuccessPayload = {
+    archiveGeneration: string;
     id: string;
     username: string;
     displayName?: string;
@@ -68,6 +77,8 @@ type SetupRequestPayload = {
     salt: string;
     displayName: string;
     ambulatoryName: string;
+    verifier?: string;
+    recovery?: { wrappedMasterKey: string; salt: string; verifier: string };
 };
 
 type SetupResponsePayload = {
@@ -77,6 +88,8 @@ type SetupResponsePayload = {
 };
 
 type RepairDbPayload = {
+    status?: 'accepted';
+    requestId?: string;
     success?: boolean;
     error?: string;
     backupCreated?: boolean;
@@ -309,8 +322,13 @@ export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBar
 }
 
 /* @Codex */
-export async function checkAuthHealthRequest() {
-    if (authHealthRequestInFlight) return authHealthRequestInFlight;
+export async function checkAuthHealthRequest(options: { fresh?: boolean } = {}) {
+    // A caller that decides what to send needs an answer produced after its gesture: one already
+    // on its way was produced before, so it is awaited and asked again.
+    while (authHealthRequestInFlight) {
+        if (!options.fresh) return authHealthRequestInFlight;
+        await authHealthRequestInFlight.catch(() => undefined);
+    }
 
     const expectedEtag = currentAuthControlEtag;
     const request = (async (): Promise<AuthControlledJsonRequestResult<AuthHealthPayload>> => {
@@ -318,6 +336,7 @@ export async function checkAuthHealthRequest() {
             cache: 'no-store',
             credentials: 'same-origin',
         });
+        if (result.response.ok && result.payload?.status === 'ok') observeArchiveGeneration(result.payload.archiveGeneration);
         const observation = retainAuthControlEtag(result.response, expectedEtag);
         return { ...result, controlState: observation.state };
     })();
@@ -348,6 +367,9 @@ async function requestAuthMutationJson<T>(
     const controlState = response.ok && observation.state === 'accepted' && observation.etag === etag
         ? 'invalid'
         : observation.state;
+    if (response.ok && typeof payload === 'object' && payload !== null && 'archiveGeneration' in payload) {
+        observeArchiveGeneration((payload as { archiveGeneration: unknown }).archiveGeneration);
+    }
     return { response, payload, controlState };
 }
 
@@ -387,6 +409,24 @@ export function changePinRequest(payload: PinChangeRequestPayload) {
     });
 }
 
+export function adoptPassphraseRequest(payload: PassphraseAdoptionPayload) {
+    return requestJson<PinChangeFailurePayload & { earlierCopiesCleared?: boolean }>('/api/auth/passphrase', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+}
+
+export function changePassphraseRequest(payload: PassphraseChangePayload) {
+    return requestJson<PinChangeFailurePayload>('/api/auth/passphrase/change', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+}
+
+export function recoverPassphraseRequest(payload: PassphraseRecoveryPayload) {
+    return requestAuthMutationJson<PinChangeFailurePayload>('/api/auth/passphrase/recover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+}
+
 /* @Codex */
 export function rewrapMasterKeyRequest(payload: { encryptedMasterKey: string; salt: string }) {
     return requestJson<{ success?: boolean; error?: string; code?: string }>('/api/auth/rewrap-master-key', {
@@ -399,4 +439,48 @@ export function rewrapMasterKeyRequest(payload: { encryptedMasterKey: string; sa
 /* @Codex */
 export function repairLegacyDbRequest() {
     return requestJson<RepairDbPayload>('/api/system/repair-db', { method: 'POST' });
+}
+
+const GENERATION = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+export const ARCHIVE_REPLACED_EVENT = 'mediflow:archive-replaced';
+let documentGeneration: string | null = null;
+
+/** Never relatch a document that still contains records from the preceding archive. */
+export function rejectReplacedArchive(): never {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(ARCHIVE_REPLACED_EVENT));
+        window.location.reload();
+    }
+    throw new Error('ARCHIVE_REPLACED');
+}
+
+export function observeArchiveGeneration(value: unknown): void {
+    if (typeof value !== 'string' || !GENERATION.test(value)) throw new Error('Archive generation unavailable.');
+    if (documentGeneration === null) { documentGeneration = value; return; }
+    if (documentGeneration === value) return;
+    rejectReplacedArchive();
+}
+
+/** One document-wide transport fence also reaches controllers that use plain fetch. */
+export function installArchiveGenerationTransport(): () => void {
+    const original = window.fetch;
+    const guarded: typeof fetch = (input, init) => {
+        const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
+        const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+        if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')
+            || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return original(input, init);
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        // A caller cannot silently change which archive this document has displayed.
+        if (documentGeneration) headers.set('x-mediflow-archive-generation', documentGeneration);
+        else headers.delete('x-mediflow-archive-generation');
+        return original(input, { ...init, headers }).then(async response => {
+            if (response.status === 409) {
+                const payload = await response.clone().json().catch(() => null);
+                if (payload?.code === 'ARCHIVE_REPLACED') rejectReplacedArchive();
+            }
+            return response;
+        });
+    };
+    window.fetch = guarded;
+    return () => { if (window.fetch === guarded) window.fetch = original; };
 }

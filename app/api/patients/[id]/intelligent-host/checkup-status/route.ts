@@ -1,3 +1,4 @@
+import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
 /* @Codex */
 import { createHeadlessCheckupStatusTransitionWebHttpHandlersV1 } from
   '@/lib/security/headless-checkup-status-transition-web-http';
@@ -16,5 +17,5 @@ const handlers = createHeadlessCheckupStatusTransitionWebHttpHandlersV1({
   confirm: confirmCheckupStatusTransitionProposalV1,
   revoke: revokeCheckupStatusTransitionForHostV1,
 });
-export const POST = handlers.select;
-export const DELETE = handlers.revoke;
+export const POST = withArchiveRequestContext(handlers.select);
+export const DELETE = withArchiveRequestContext(handlers.revoke);

@@ -11,6 +11,7 @@ import {
     retireServerSessionForLogout, SESSION_COOKIE_NAME, type ServerSession,
 } from './server-session';
 import { requireSession } from './server-auth';
+import { sessionMatchesArchive } from './archive-session-generation';
 
 export type PairedNativeSession = ServerSession & { authChannel: 'native' };
 
@@ -23,7 +24,8 @@ export async function requirePairedNativeSession(request: Request): Promise<Pair
         if (!bearer || !/^[a-f0-9]{64}$/u.test(bearer)) return null;
         const session = peekSession(bearer);
         const binding = { clientId: client.clientId, clientPlatform: client.clientPlatform, tokenHash: client.tokenHash };
-        if (!session || session.authChannel !== 'native' || !isPairedNativeServerSession(session, binding)) return null;
+        if (!session || session.authChannel !== 'native' || !isPairedNativeServerSession(session, binding)
+            || !sessionMatchesArchive(session)) return null;
         const user = dbServer.select({ id: users.id, username: users.username, role: users.role })
             .from(users).where(eq(users.id, session.userId)).get();
         if (!user || user.username !== session.username || (user.role ?? 'user') !== session.role) {

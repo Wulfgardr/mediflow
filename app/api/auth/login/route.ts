@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 /* @Codex */
 import {
     requestIdFromRequest,
@@ -20,6 +21,8 @@ import {
 } from '@/lib/security/web-auth-control-transport';
 /* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
+import { retirePendingPinEraResidues } from '@/lib/security/pin-era-residues';
+import { dbServer } from '@/lib/db-server';
 
 /* @Codex */
 function authFailureResponse(payload: Record<string, unknown>, status: number, etag?: string) {
@@ -77,6 +80,10 @@ export async function POST(request: Request) {
         if (!session) {
             return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503, mutation.ifMatch);
         }
+        // ADR 0143: nothing beside the archive of a passphrase account may still hold its PIN
+        // wrapping. The move removes it; this repeats what an interruption or a busy reader left.
+        const earlierCopiesCleared = verifier ? retirePendingPinEraResidues(user.id, dbServer) : undefined;
+        const issuedArchiveGeneration = archiveGenerationForSession({ id: session.sessionId, expiresAt: 0 });
         try {
             await writeAuditEvent({
                 eventType: 'auth.login.succeeded',
@@ -99,13 +106,15 @@ export async function POST(request: Request) {
         }
         const response = NextResponse.json({
             success: true,
+            archiveGeneration: issuedArchiveGeneration,
             id: user.id,
             username: user.username,
             displayName: user.displayName,
             ambulatoryName: user.ambulatoryName,
             role: user.role,
             encryptedMasterKey: user.encryptedMasterKey,
-            salt: user.salt
+            salt: user.salt,
+            ...(earlierCopiesCleared !== undefined ? { earlierCopiesCleared } : {}),
         });
         response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
         setWebAuthControlEtag(response, session.etag);

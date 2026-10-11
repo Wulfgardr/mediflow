@@ -1,3 +1,4 @@
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { NextResponse } from 'next/server';
 import { execFile } from 'child_process';
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
     if (!isLocalRequest(request)) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         if (fs.existsSync(APP_PATH)) {

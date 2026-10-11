@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 /* @Codex */
 /* @Codex */
 import {
@@ -116,7 +117,7 @@ export async function writeNetworkPatientAuditEvent(input: {
         await writeAuditEvent({
             eventType: input.eventType,
             outcome: 'success',
-            actorType: 'user',
+            archiveGeneration: archiveGenerationForSession(input.context.session), actorType: 'user',
             actorRef: input.context.session.userId,
             subjectType: 'patient',
             subjectRef: input.context.patientId,
@@ -166,7 +167,7 @@ export async function updateNetworkScopedPatient(
         setPrimaryAmbulatory: hasOwn(body, 'ambulatoryId'),
         scopeAmbulatoryId: context.scopeAmbulatoryId,
         audit: {
-            actorType: 'user', actorRef: context.session.userId,
+            archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user', actorRef: context.session.userId,
             sourceSurface: 'native', requestId: requestIdFromRequest(context.request),
             flags: [
                 'auth:paired-client',

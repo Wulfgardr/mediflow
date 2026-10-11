@@ -1,8 +1,12 @@
+import { assertArchiveGeneration } from '@/lib/archive-generation';
+import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
+import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { users, settings, ambulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import { hashAccessVerifier } from '@/lib/security/unlock-credential';
 /* @Codex */
 import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 /* @Codex */
@@ -42,6 +46,7 @@ export async function POST(request: Request) {
             return setupResponse({ error: 'Setup unavailable', code: 'SETUP_AUTH_UNAVAILABLE' }, 503, mutation.ifMatch);
         }
 
+        const archiveGeneration = currentArchiveGeneration();
         const existingUsers = await dbServer.select().from(users).limit(1);
         if (existingUsers.length > 0) {
             /* @Codex */
@@ -59,9 +64,11 @@ export async function POST(request: Request) {
             setWebAuthControlEtag(parsedBody.response, mutation.ifMatch);
             return parsedBody.response;
         }
-        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName } = parsedBody.data;
+        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName, verifier, recovery } = parsedBody.data;
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const unlockVerifierHash = verifier ? await hashAccessVerifier(verifier) : null;
+        const recoveryVerifierHash = recovery ? await hashAccessVerifier(recovery.verifier) : null;
 
         // WUL-268 (STREAM A): the admin user and its seed settings must be created
         // atomically so a crash can never leave a user without settings (or vice
@@ -69,6 +76,7 @@ export async function POST(request: Request) {
         // bcrypt.hash already ran above and the values are plain.
         const userId = uuidv4();
         dbServer.transaction((tx) => {
+            assertArchiveGeneration(tx, archiveGeneration);
             tx.insert(users).values({
                 id: userId,
                 username,
@@ -78,6 +86,10 @@ export async function POST(request: Request) {
                 passwordHash: hashedPassword,
                 encryptedMasterKey,
                 salt,
+                unlockVerifierHash,
+                recoveryWrappedMasterKey: recovery?.wrappedMasterKey ?? null,
+                recoverySalt: recovery?.salt ?? null,
+                recoveryVerifierHash,
                 createdAt: new Date()
             }).run();
 
@@ -108,12 +120,14 @@ export async function POST(request: Request) {
                 code: 'SETUP_COMMITTED_AUTH_UNAVAILABLE',
             }, 409, mutation.ifMatch);
         }
-        const response = NextResponse.json({ success: true, id: userId });
+        const response = NextResponse.json({ success: true, id: userId, archiveGeneration });
         response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
         setWebAuthControlEtag(response, session.etag);
         return response;
     } catch (error) {
         if (attempt) abortWebAuthControl(attempt);
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Setup error:", error);
         return setupResponse({ error: "Setup failed" }, 500, mutation?.ifMatch);
     }

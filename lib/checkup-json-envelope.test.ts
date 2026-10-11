@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -35,6 +36,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, checkups } = load('./schema.ts') as typeof import('./schema.ts');
 const webCreate = load('../app/api/checkups/route.ts') as typeof import('../app/api/checkups/route.ts');
@@ -78,7 +80,7 @@ function validBody(surface: Surface, operation: Operation) {
             : { version: 3, title: 'Synthetic update', notes: 'ENC:synthetic:notes' };
 }
 function request(operation: Operation, body?: string | Uint8Array | ReadableStream<Uint8Array>, headers: Record<string, string> = {}, signal?: AbortSignal) {
-    const init = { method: operation, body, signal, headers: { 'content-type': 'application/json', ...headers },
+    const init = { method: operation, body, signal, headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...headers },
         ...(body instanceof ReadableStream ? { duplex: 'half' } : {}) } as RequestInit;
     return new Request('http://127.0.0.1/api/checkups', init);
 }

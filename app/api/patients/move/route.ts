@@ -1,3 +1,5 @@
+import { archiveReplacementResponse } from '@/lib/api-error-response';
+import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { canIncrementVersion } from '@/lib/version-concurrency';
 import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
@@ -22,6 +24,8 @@ export async function POST(request: Request) {
     /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
+    const archiveDenial = archiveWriteRequestDenial(request, session);
+    if (archiveDenial) return archiveDenial;
 
     try {
         const body = await readBoundedJsonBody(request, MOVE_JSON_MAX_BYTES, 'request-json',
@@ -112,7 +116,7 @@ export async function POST(request: Request) {
                 }
                 writeAuditEventInTransaction(tx, {
                     eventType: 'patient.updated', outcome: 'success',
-                    actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                    archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
                     subjectType: 'patient', subjectRef: patient.id,
                     sourceSurface: auditContext.sourceSurface, requestId,
                     redactedMetadata: withAuditContextMetadata(auditContext, {
@@ -136,6 +140,8 @@ export async function POST(request: Request) {
         }, { behavior: 'immediate' });
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
         console.error("Move patients error:", error);
         return NextResponse.json({ error: "Failed to move patients" }, { status: 500 });
     }

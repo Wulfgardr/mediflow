@@ -18,7 +18,7 @@ process.env.MEDIFLOW_DATA_DIR = dataDir;
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, {
     cookies: new Map([['ambulatory_id', 'c04-a']]),
 });
-const state = { webAllowed: true, v1Allowed: true, v1ActorLocal: true };
+const state = { webAllowed: true, v1Allowed: true, v1ActorLocal: true, generation: '', sessionId: 'synthetic-web' };
 const priorLocalApiToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'c04-synthetic-local-token';
 const stateKey = Symbol.for(`mediflow-c04-auth-${dataDir}`);
@@ -29,9 +29,9 @@ const { registerHooks } = load('node:module') as {
 };
 const authPath = join(dataDir, 'auth-seam.cjs');
 writeFileSync(authPath, `const state=globalThis[Symbol.for(${JSON.stringify(`mediflow-c04-auth-${dataDir}`)})];
-exports.requireSession=async()=>state.webAllowed?({userId:'synthetic-user',role:'admin'}):null;
+exports.requireSession=async()=>state.webAllowed?({id:state.sessionId,userId:'synthetic-user',role:'admin',authChannel:'web',expiresAt:9999999999999}):null;
 exports.unauthorizedResponse=()=>Response.json({error:'Unauthorized'},{status:401});
-exports.requireLocalApiActorSession=async()=>state.v1ActorLocal?({id:'local-api',userId:'local-api',role:'admin'}):({id:'synthetic-session',userId:'synthetic-user',role:'admin'});`, { mode: 0o600 });
+exports.requireLocalApiActorSession=async()=>state.v1ActorLocal?({id:'local-api',userId:'local-api',role:'admin',archiveGeneration:state.generation}):({id:'native:synthetic-user',userId:'synthetic-user',role:'admin',authChannel:'native',archiveGeneration:state.generation});`, { mode: 0o600 });
 const tokenPath = join(dataDir, 'token-seam.cjs');
 writeFileSync(tokenPath, `const state=globalThis[Symbol.for(${JSON.stringify(`mediflow-c04-auth-${dataDir}`)})];
 exports.requireLocalApiToken=()=>state.v1Allowed?null:Response.json({error:'Unauthorized'},{status:401});
@@ -43,6 +43,9 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 openDbServer();
+const generations = load('./security/archive-session-generation.ts') as typeof import('./security/archive-session-generation');
+state.generation = generations.currentArchiveGeneration();
+generations.bindSessionToArchive({ id: 'synthetic-web', expiresAt: 9999999999999 }, state.generation);
 const web = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route.ts');
 const v1 = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route.ts');
 const { updateNetworkScopedPatient } = load('./network-patient-write.ts') as typeof import('./network-patient-write.ts');
@@ -78,6 +81,7 @@ async function put(route: typeof web | typeof v1, body: Record<string, unknown>)
     return route.PUT(new Request('http://127.0.0.1/api/patients/c04-patient', {
         method: 'PUT', headers: {
             'content-type': 'application/json', 'x-request-id': 'c04-synthetic-request',
+            'x-mediflow-archive-generation': state.generation,
             'authorization': route === v1 ? 'Bearer c04-synthetic-local-token' : '',
             'x-actor-ref': 'spoofed-actor', 'x-mediflow-source-surface': 'job',
         },
@@ -140,7 +144,7 @@ if (mode === 'before-audit') {
 const result = updatePatientOperation({ patientId:'c04-isolated', expectedVersion:3,
   values:{firstName:'Child',ambulatoryId:'c04-b',version:999,updatedAt:new Date()},
   setPrimaryAmbulatory:true,
-  audit:{actorType:'user',actorRef:'c04-child',sourceSurface:'web',requestId:'c04-child',flags:['auth:session']}
+  audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation, actorType:'user',actorRef:'c04-child',sourceSurface:'web',requestId:'c04-child',flags:['auth:session']}
 });
 if (mode === 'retry') { console.log(JSON.stringify({status:result.status})); }
 else { process.kill(process.pid, 'SIGKILL'); }
@@ -295,7 +299,7 @@ test('core derives committed version and audit version from expectedVersion, not
         patientId: 'c04-patient', expectedVersion: 3,
         values: { firstName: 'Core', version: 999, updatedAt: new Date() },
         setPrimaryAmbulatory: false,
-        audit: { actorType: 'user', actorRef: 'c04-host', sourceSurface: 'web',
+        audit: { archiveGeneration: String((sql.prepare('SELECT generation FROM archive_generation WHERE id = 1').get() as { generation: string }).generation), actorType: 'user', actorRef: 'c04-host', sourceSurface: 'web',
             requestId: 'c04-core-request', flags: ['auth:session'] },
     });
     assert.equal(result.status, 200);
@@ -320,7 +324,7 @@ test('SQLITE_FULL in required audit insert rolls back patient and membership', a
             patientId: 'c04-patient', expectedVersion: 3,
             values: { firstName: 'Full', ambulatoryId: 'c04-b', version: 999, updatedAt: new Date() },
             setPrimaryAmbulatory: true,
-            audit: { actorType: 'user', actorRef: 'c04-host', sourceSurface: 'web',
+            audit: { archiveGeneration: String((sql.prepare('SELECT generation FROM archive_generation WHERE id = 1').get() as { generation: string }).generation), actorType: 'user', actorRef: 'c04-host', sourceSurface: 'web',
                 requestId: 'c04-full-request', flags: ['auth:session'] },
         }), { code: 'SQLITE_FULL' });
         const response = await put(web, { version: 3, firstName: 'Full', ambulatoryId: 'c04-b' });
@@ -369,9 +373,10 @@ test('two independent writers for one version yield one success and one required
     writeFileSync(script, `import { createRequire } from 'node:module';
 const load = createRequire(import.meta.url);
 const { updatePatientOperation } = load(${JSON.stringify(join(repo, 'lib/patient-update-operation.ts'))});
+const { dbServer } = load(${JSON.stringify(join(repo, 'lib/db-server.ts'))});
 const result = updatePatientOperation({patientId:'c04-patient',expectedVersion:3,
   values:{firstName:process.argv[2],version:4,updatedAt:new Date()},setPrimaryAmbulatory:false,
-  audit:{actorType:'user',actorRef:'c04-writer',sourceSurface:'web',requestId:'c04-compete',flags:['auth:session']}});
+  audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation, actorType:'user',actorRef:'c04-writer',sourceSurface:'web',requestId:'c04-compete',flags:['auth:session']}});
 console.log(JSON.stringify({status:result.status}));
 `, { mode: 0o600 });
     async function writer(name: string): Promise<number> {
@@ -394,4 +399,98 @@ console.log(JSON.stringify({status:result.status}));
     assert.deepEqual(statuses.sort(), [200, 409]);
     assert.equal(patientState().version, 4);
     assert.equal(events().length, before + 1);
+});
+
+
+test('an admitted A write cannot change B; a new B session cannot promote an A document', async () => {
+    reset();
+    const oldGeneration = state.generation;
+    let body!: ReadableStreamDefaultController<Uint8Array>;
+    const request = new Request('http://127.0.0.1/api/patients/c04-patient', {
+        method: 'PUT', headers: { 'x-mediflow-archive-generation': oldGeneration },
+        body: new ReadableStream<Uint8Array>({ start(controller) { body = controller; } }),
+        duplex: 'half',
+    } as RequestInit);
+    const pending = web.PUT(request, { params: Promise.resolve({ id: 'c04-patient' }) });
+    while (!request.bodyUsed) await new Promise(resolve => setImmediate(resolve));
+    const { rotateSqliteArchiveGeneration } = load('./archive-generation.ts') as typeof import('./archive-generation');
+    sql.transaction(() => {
+        state.generation = rotateSqliteArchiveGeneration(sql);
+        sql.prepare('UPDATE patients SET first_name=? WHERE id=?').run('Replacement B', 'c04-patient');
+    }).immediate();
+    const before = patientState();
+    const auditBefore = events();
+    body.enqueue(new TextEncoder().encode(JSON.stringify({ version: 3, firstName: 'Stale A' })));
+    body.close();
+    const denied = await pending;
+    assert.equal(denied.status, 409);
+    assert.equal((await denied.json()).code, 'ARCHIVE_REPLACED');
+    assert.deepEqual(patientState(), before);
+    assert.deepEqual(events(), auditBefore);
+
+    state.sessionId = 'synthetic-web-b';
+    generations.bindSessionToArchive({ id: state.sessionId, expiresAt: 9999999999999 }, state.generation);
+    const staleDocument = await web.PUT(new Request('http://127.0.0.1/api/patients/c04-patient', {
+        method: 'PUT', headers: { 'x-mediflow-archive-generation': oldGeneration },
+        body: JSON.stringify({ version: 3, firstName: 'Stale tab with new cookie' }),
+    }), { params: Promise.resolve({ id: 'c04-patient' }) });
+    assert.equal(staleDocument.status, 409);
+    assert.deepEqual(patientState(), before);
+    assert.deepEqual(events(), auditBefore);
+    assert.equal((await put(web, { version: 3, firstName: 'Current B' })).status, 200);
+});
+
+
+test('local-token admission also carries A across an awaited body and denies B', async () => {
+    reset();
+    let body!: ReadableStreamDefaultController<Uint8Array>;
+    const request = new Request('http://127.0.0.1/api/v1/patients/c04-patient', {
+        method: 'PUT', headers: { authorization: 'Bearer c04-synthetic-local-token' },
+        body: new ReadableStream<Uint8Array>({ start(controller) { body = controller; } }), duplex: 'half',
+    } as RequestInit);
+    const pending = v1.PUT(request, { params: Promise.resolve({ id: 'c04-patient' }) });
+    while (!request.bodyUsed) await new Promise(resolve => setImmediate(resolve));
+    const { rotateSqliteArchiveGeneration } = load('./archive-generation.ts') as typeof import('./archive-generation');
+    sql.transaction(() => { state.generation = rotateSqliteArchiveGeneration(sql); }).immediate();
+    const before = patientState(), auditBefore = events();
+    body.enqueue(new TextEncoder().encode(JSON.stringify({ version: 3, firstName: 'Old local-token A' })));
+    body.close();
+    const response = await pending;
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).code, 'ARCHIVE_REPLACED');
+    assert.deepEqual(patientState(), before);
+    assert.deepEqual(events(), auditBefore);
+});
+
+test('opaque request context preserves auth/scope denials and cannot be bypassed by a forged bearer header', async () => {
+    const { withArchiveRequestContext, assertArchiveRequestAfterAdmission } = load('./security/archive-request-context.ts') as typeof import('./security/archive-request-context');
+    const session = { id: 'synthetic-context-session', authChannel: 'web', expiresAt: 9999999999999 } as import('./security/server-session').ServerSession;
+    generations.bindSessionToArchive(session, state.generation);
+    let egress = 0;
+    const { createHeadlessCheckupStatusTransitionWebHttpHandlersV1 } = load('./security/headless-checkup-status-transition-web-http.ts') as typeof import('./security/headless-checkup-status-transition-web-http');
+    const { HeadlessCheckupStatusTransitionV1Error } = load('../packages/aip/src/checkup-status-transition.ts') as typeof import('../packages/aip/src/checkup-status-transition');
+    const handler = (status: number) => withArchiveRequestContext(createHeadlessCheckupStatusTransitionWebHttpHandlersV1({
+        readAuthenticated: async () => status !== 401,
+        select: async () => {
+            if (status === 403) throw new HeadlessCheckupStatusTransitionV1Error('role_unavailable');
+            assertArchiveRequestAfterAdmission(session);
+            egress += 1;
+            return { checkupRef: `hcsr_${'a'.repeat(64)}`, uiBindingRef: `hcub_${'b'.repeat(64)}`,
+                resourceTitle: 'Synthetic checkup', resourceRevision: 1 };
+        },
+        read: async () => null, confirm: async () => null, revoke: async () => false,
+    }).select);
+    const request = (generation?: string) => new Request('http://127.0.0.1/api/clinical-operation', {
+        method: 'POST', headers: { authorization: 'Bearer spoofed', origin: 'http://127.0.0.1',
+            'sec-fetch-site': 'same-origin', 'content-type': 'application/json',
+            ...(generation ? { 'x-mediflow-archive-generation': generation } : {}) },
+        body: JSON.stringify({ checkupId: 'synthetic-checkup' }),
+    });
+    const context = { params: Promise.resolve({ id: 'c04-patient' }) };
+    assert.equal((await handler(401)(request(), context)).status, 401);
+    assert.equal((await handler(403)(request(), context)).status, 403);
+    assert.equal((await handler(200)(request(), context)).status, 409);
+    assert.equal(egress, 0);
+    assert.equal((await handler(200)(request(state.generation), context)).status, 200);
+    assert.equal(egress, 1);
 });

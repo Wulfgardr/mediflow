@@ -1,3 +1,4 @@
+import { archiveGenerationForSession } from './security/archive-session-generation';
 /* @Codex: paired-network admission remains at the route; this export preserves its write boundary. */
 import { requestIdFromRequest } from './security/audit';
 import { entryExpectedVersion, prepareEntryCreate, prepareEntryUpdate } from './entry-write-input';
@@ -41,7 +42,7 @@ function networkBoundary(body: Record<string, unknown>, forbidden: Set<string>):
 
 function audit(context: Context) {
     return {
-        actorType: 'user' as const, actorRef: context.session.userId,
+        archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user' as const, actorRef: context.session.userId,
         sourceSurface: 'native' as const, requestId: requestIdFromRequest(context.request),
         flags: ['auth:paired-client', `paired-client:${context.pairedClient.clientId}`, 'scope:ambulatory'],
     };

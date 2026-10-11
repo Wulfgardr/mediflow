@@ -1,3 +1,4 @@
+import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* @Codex: synthetic real-SQLite candidate oracle for required therapy audit and eight route contracts. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -44,6 +45,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
     return url ? { url, shortCircuit: true } : next(specifier, context);
 } });
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('../lib/db-server.ts');
+const archiveGeneration = bindSyntheticArchiveSessions('synthetic-web', 'synthetic-local', 'synthetic-native');
 openDbServer();
 const { ambulatories, patients, patientsToAmbulatories, therapies } = load('./schema.ts') as typeof import('../lib/schema.ts');
 const webCreate = load('../app/api/therapies/route.ts') as typeof import('../app/api/therapies/route.ts');
@@ -98,7 +100,7 @@ type Surface = 'web' | 'v1' | 'network';
 type Operation = 'POST' | 'PUT' | 'DELETE';
 function request(method: Operation, body: unknown, surface: Surface, raw?: string, headers: Record<string,string> = {}) {
     return new Request('http://127.0.0.1/api/therapies', { method,
-        headers: { 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-therapy-synthetic-token' }), ...headers },
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...(surface === 'web' ? {} : { authorization: 'Bearer c05-therapy-synthetic-token' }), ...headers },
         body: raw ?? JSON.stringify(body),
     });
 }
@@ -466,7 +468,7 @@ function streamedRequest(surface: Surface, operation: Operation, chunks: Uint8Ar
         cancel() { cancels += 1; },
     }, { highWaterMark: 0 });
     const req = new Request('http://127.0.0.1/api/therapies', { method: operation, body: stream,
-        headers: { 'content-type': 'application/json',
+        headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json',
             ...(surface === 'v1' ? { authorization: 'Bearer c05-therapy-synthetic-token' } : {}),
             ...headers }, duplex: 'half' } as RequestInit);
     return { req, counts: () => ({ pulls, cancels }) };
