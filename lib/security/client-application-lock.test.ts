@@ -9,6 +9,8 @@ import {
     checkAuthHealthRequest,
     createClientAuthorityNetworkBarrier,
     loginWithPinRequest,
+    loginWithVerifierRequest,
+    readUnlockParameters,
     requestApplicationLockConfirmation,
     setupSecurityRequest,
 } from './client-auth-api';
@@ -90,6 +92,28 @@ test('application lock confirmation rejects malformed parsed records and transpo
             text: async () => { throw new Error('response body failed'); },
         }) as unknown as Response;
         await assert.rejects(requestApplicationLockConfirmation(), /response body failed/);
+    } finally { globalThis.fetch = originalFetch; }
+});
+
+test('a passphrase account sends its verifier under the same fence; a check response that is not one means a PIN', async () => {
+    const passphraseAccount = { credential: 'passphrase', kdfVersion: 3, salt: 'c3ludGhldGljLXNhbHQ=' };
+    assert.deepEqual(readUnlockParameters({ ...passphraseAccount, unexpected: 'dropped' }), passphraseAccount);
+    for (const other of [undefined, null, 'passphrase', { credential: 'pin' }, { credential: 'passphrase' },
+        { ...passphraseAccount, kdfVersion: '3' }, { ...passphraseAccount, salt: '' }, { ...passphraseAccount, credential: 'other' }]) {
+        assert.deepEqual(readUnlockParameters(other), { credential: 'pin' });
+    }
+
+    const originalFetch = globalThis.fetch;
+    const calls: Array<{ input: RequestInfo | URL; init?: RequestInit }> = [];
+    try {
+        await bootstrapAuthControl('"fence-verifier"');
+        globalThis.fetch = async (input, init) => { calls.push({ input, init }); return jsonResponse({ id: 'synthetic-user' }, 200, '"fence-verifier-next"'); };
+        const login = await loginWithVerifierRequest('synthetic-verifier');
+        assert.equal(login.controlState, 'accepted');
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].input, '/api/auth/login');
+        assert.equal(calls[0].init?.body, JSON.stringify({ verifier: 'synthetic-verifier' }));
+        assert.equal(new Headers(calls[0].init?.headers).get('If-Match'), '"fence-verifier"');
     } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -363,7 +387,7 @@ test('security provider clears stale persisted authority and fences stale auth p
     assert.ok(lockStart >= 0 && source.indexOf('clearClientAuthority();', lockStart) < requestStart);
     for (const pattern of [
         /authorityAttemptGenerationRef\.current === attemptGeneration/,
-        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return loginWithPinRequest\(pin\);/,
+        /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return verifier \? loginWithVerifierRequest\(verifier\) : loginWithPinRequest\(pin\);/,
         /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;\s*return setupSecurityRequest\(/,
         /await persistSecuritySession\(masterKey, userData\);[\s\S]*?clearClientAuthority\(\);/,
         /setupSecurityRequest[\s\S]*?authorityAttemptGenerationRef\.current !== attemptGeneration[\s\S]*?SETUP_ALREADY_COMPLETED/,
