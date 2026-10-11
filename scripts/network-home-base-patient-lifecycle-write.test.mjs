@@ -42,7 +42,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
 
     const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(login.response.status, 200);
-    const cookieHeader = login.cookieHeader;
+    const sessionHeaders = login.webHeaders;
 
     const patientId = crypto.randomUUID();
     const suffix = patientId.replace(/-/g, '').slice(0, 13).toUpperCase();
@@ -80,7 +80,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const readOnlyCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 id: readOnlyPatientId,
@@ -102,7 +102,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const readOnlyTrash = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(readOnlyTrash.response.status, 403);
@@ -110,7 +110,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const plaintextCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 id: crypto.randomUUID(),
@@ -126,7 +126,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const aiCreate = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 id: crypto.randomUUID(),
@@ -142,7 +142,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const create = await request('POST', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 id: patientId,
@@ -169,7 +169,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assertLifecycleAudit(afterCreate.audit, ['patient.created'], [1], lifecycleClient.pairedClientId, patientId);
 
         const duplicateCreate = await request('POST', '/api/v1/network/patients', {
-            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
+            headers: { ...pairedHeaders(lifecycleClient), ...sessionHeaders },
             body: { id: patientId, firstName: 'Lifecycle', lastName: 'Writer', taxCode: `LCW${suffix}` },
         });
         assert.equal(duplicateCreate.response.status, 409);
@@ -178,7 +178,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const detail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -190,7 +190,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const staleDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 999,
@@ -203,7 +203,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assert.deepEqual(patientMutationSnapshot(patientId), afterCreate);
 
         const readOnlyDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
-            headers: { ...pairedHeaders(readOnlyClient), Cookie: cookieHeader },
+            headers: { ...pairedHeaders(readOnlyClient), ...sessionHeaders },
             body: { version: 1, deletionReason: sealed.deletionReason },
         });
         assert.equal(readOnlyDelete.response.status, 403);
@@ -216,7 +216,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const deletion = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -232,7 +232,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assert.deepEqual(afterDelete.memberships, afterCreate.memberships);
         assertLifecycleAudit(afterDelete.audit, ['patient.created', 'patient.deleted'], [1, 2], lifecycleClient.pairedClientId, patientId);
         const repeatedDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
-            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
+            headers: { ...pairedHeaders(lifecycleClient), ...sessionHeaders },
             body: { version: 1, deletionReason: sealed.deletionReason },
         });
         assert.equal(repeatedDelete.response.status, 404);
@@ -241,13 +241,13 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(deletedDetail.response.status, 404);
 
         const deletedActiveList = await request('GET', '/api/v1/network/patients', {
-            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader },
+            headers: { ...pairedHeaders(lifecycleClient), ...sessionHeaders },
         });
         assert.equal(deletedActiveList.response.status, 200);
         assert.ok(Array.isArray(deletedActiveList.json));
@@ -256,7 +256,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const trashList = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(trashList.response.status, 200);
@@ -271,7 +271,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const staleRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -281,7 +281,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assert.equal(staleRestore.json?.code, 'VERSION_CONFLICT');
         assert.equal(staleRestore.json?.currentVersion, 2);
         const readOnlyRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
-            headers: { ...pairedHeaders(readOnlyClient), Cookie: cookieHeader }, body: { version: 2 },
+            headers: { ...pairedHeaders(readOnlyClient), ...sessionHeaders }, body: { version: 2 },
         });
         assert.equal(readOnlyRestore.response.status, 403);
         const missingSessionRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
@@ -293,7 +293,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const restore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 2,
@@ -308,7 +308,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         assert.deepEqual(afterRestore.memberships, afterCreate.memberships);
         assertLifecycleAudit(afterRestore.audit, ['patient.created', 'patient.deleted', 'patient.restored'], [1, 2, 3], lifecycleClient.pairedClientId, patientId);
         const repeatedRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
-            headers: { ...pairedHeaders(lifecycleClient), Cookie: cookieHeader }, body: { version: 2 },
+            headers: { ...pairedHeaders(lifecycleClient), ...sessionHeaders }, body: { version: 2 },
         });
         assert.equal(repeatedRestore.response.status, 404);
         assert.deepEqual(patientMutationSnapshot(patientId), afterRestore);
@@ -316,7 +316,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const activeList = await request('GET', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(activeList.response.status, 200);
@@ -325,7 +325,7 @@ test('paired patient lifecycle create, tombstone, and restore preserves sealed s
         const postRestoreList = await request('GET', '/api/v1/network/patients?includeDeleted=true', {
             headers: {
                 ...pairedHeaders(lifecycleClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(postRestoreList.response.status, 200);
@@ -363,14 +363,14 @@ test('paired lifecycle rejects wrong-scope rows without patient or audit changes
     try {
         const active = patientMutationSnapshot(patientId);
         const deniedDelete = await request('DELETE', `/api/v1/network/patients/${patientId}`, {
-            headers: { ...pairedHeaders(client), Cookie: login.cookieHeader }, body: { version: 3 },
+            headers: { ...pairedHeaders(client), ...login.webHeaders }, body: { version: 3 },
         });
         assert.equal(deniedDelete.response.status, 404);
         assert.deepEqual(patientMutationSnapshot(patientId), active);
         markSyntheticPatientDeleted(patientId);
         const deleted = patientMutationSnapshot(patientId);
         const deniedRestore = await request('POST', `/api/v1/network/patients/${patientId}/restore`, {
-            headers: { ...pairedHeaders(client), Cookie: login.cookieHeader }, body: { version: 3 },
+            headers: { ...pairedHeaders(client), ...login.webHeaders }, body: { version: 3 },
         });
         assert.equal(deniedRestore.response.status, 404);
         assert.deepEqual(patientMutationSnapshot(patientId), deleted);
@@ -385,7 +385,7 @@ test('concurrent HTTP deletes and restores have one winner and no replay audit',
     assert.equal(login.response.status, 200);
     const patientId = crypto.randomUUID();
     const suffix = patientId.replace(/-/g, '').slice(0, 13).toUpperCase();
-    const headers = { ...pairedHeaders(client), Cookie: login.cookieHeader };
+    const headers = { ...pairedHeaders(client), ...login.webHeaders };
     try {
         const createBody = { id: patientId, firstName: 'Concurrency', lastName: 'Synthetic', taxCode: `CON${suffix}` };
         const creates = await Promise.all([0, 1].map(() => request('POST', '/api/v1/network/patients', {

@@ -46,8 +46,8 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
     const recovery = recoveryWrapping(masterKey);
     // A page of this origin: what a browser adds to a same-origin fetch.
     const sameOrigin = { Origin: new URL(BASE_URL).origin, 'Sec-Fetch-Site': 'same-origin' };
-    const adoption = (cookieHeader, overrides = {}, headers = sameOrigin) => request('POST', '/api/auth/passphrase', {
-        headers: { Cookie: cookieHeader, ...headers },
+    const adoption = (sessionHeaders, overrides = {}, headers = sameOrigin) => request('POST', '/api/auth/passphrase', {
+        headers: { ...sessionHeaders, ...headers },
         body: {
             currentPin: PIN, encryptedMasterKey: unlock.blob, salt: unlock.salt, verifier: unlock.verifier,
             recovery: { wrappedMasterKey: recovery.blob, salt: recovery.salt, verifier: recovery.verifier },
@@ -57,13 +57,13 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
 
     // Refused requests change nothing: the PIN still opens the same wrapping.
     assert.equal((await adoption('')).response.status, 401);
-    const wrongPin = await adoption(pinLogin.cookieHeader, { currentPin: `${PIN}-wrong` });
+    const wrongPin = await adoption(pinLogin.webHeaders, { currentPin: `${PIN}-wrong` });
     assert.deepEqual([wrongPin.response.status, wrongPin.json?.code], [401, 'PASSPHRASE_ADOPTION_INVALID_PIN']);
-    const pinWrapping = await adoption(pinLogin.cookieHeader, { encryptedMasterKey: pinLogin.json.encryptedMasterKey });
+    const pinWrapping = await adoption(pinLogin.webHeaders, { encryptedMasterKey: pinLogin.json.encryptedMasterKey });
     assert.deepEqual([pinWrapping.response.status, pinWrapping.json?.code], [400, 'PASSPHRASE_ADOPTION_INVALID']);
     // The right session and the right PIN, asked by anything other than this origin's own page.
     for (const headers of [{}, { Origin: 'http://attacker.invalid', 'Sec-Fetch-Site': 'cross-site' }, { Origin: sameOrigin.Origin }]) {
-        const foreign = await adoption(pinLogin.cookieHeader, {}, headers);
+        const foreign = await adoption(pinLogin.webHeaders, {}, headers);
         assert.deepEqual([foreign.response.status, foreign.json?.code], [403, 'PASSPHRASE_ADOPTION_UNTRUSTED_REQUEST']);
     }
     const unchanged = await login({ password: PIN });
@@ -71,7 +71,7 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
     assert.equal(unchanged.json.encryptedMasterKey, pinLogin.json.encryptedMasterKey);
     assert.ok(fs.existsSync(pinEraCopy), 'refused requests and PIN logins leave the copy where it is');
 
-    const adopted = await adoption(unchanged.cookieHeader);
+    const adopted = await adoption(unchanged.webHeaders);
     assert.deepEqual([adopted.response.status, adopted.json], [200, { success: true, earlierCopiesCleared: true }]);
     // Nothing the product keeps beside the archive holds the PIN wrapping or its salt any more:
     // not the copy, not the archive, not its write-ahead log.
@@ -79,8 +79,8 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
     assert.deepEqual([...filesHolding(pinLogin.json.encryptedMasterKey), ...filesHolding(pinLogin.json.salt)], []);
 
     // Every session of the account is retired, including the one that asked.
-    for (const cookieHeader of [pinLogin.cookieHeader, unchanged.cookieHeader]) {
-        const profile = await request('PUT', '/api/auth/profile', { headers: { Cookie: cookieHeader }, body: { displayName: 'Synthetic' } });
+    for (const sessionHeaders of [pinLogin.webHeaders, unchanged.webHeaders]) {
+        const profile = await request('PUT', '/api/auth/profile', { headers: { ...sessionHeaders }, body: { displayName: 'Synthetic' } });
         assert.equal(profile.response.status, 401);
     }
 
@@ -98,17 +98,17 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
     assert.deepEqual(openWrapping(passphraseLogin.json.encryptedMasterKey.slice(3), material.kek), masterKey);
 
     // With a session, the PIN still cannot put another wrapping in place of the passphrase one.
-    const again = await adoption(passphraseLogin.cookieHeader);
+    const again = await adoption(passphraseLogin.webHeaders);
     assert.deepEqual([again.response.status, again.json?.code], [409, 'PASSPHRASE_ALREADY_ADOPTED']);
     const pinSalt = crypto.randomBytes(16);
     const pinBlob = `v2:${wrap(masterKey, crypto.pbkdf2Sync(PIN, pinSalt, PIN_KDF_ITERATIONS[2], 32, 'sha256'))}`;
     const changePin = await request('POST', '/api/auth/change-pin', {
-        headers: { Cookie: passphraseLogin.cookieHeader },
+        headers: { ...passphraseLogin.webHeaders },
         body: { currentPin: PIN, newPin: '97531', encryptedMasterKey: pinBlob, salt: pinSalt.toString('base64') },
     });
     assert.deepEqual([changePin.response.status, changePin.json?.code], [409, 'PIN_CHANGE_PASSPHRASE_ACCOUNT']);
     const rewrap = await request('POST', '/api/auth/rewrap-master-key', {
-        headers: { Cookie: passphraseLogin.cookieHeader }, body: { encryptedMasterKey: pinBlob, salt: pinSalt.toString('base64') },
+        headers: { ...passphraseLogin.webHeaders }, body: { encryptedMasterKey: pinBlob, salt: pinSalt.toString('base64') },
     });
     assert.deepEqual([rewrap.response.status, rewrap.json?.code], [409, 'KDF_REWRAP_NOT_APPLICABLE']);
     const still = await login({ verifier: material.verifier });
@@ -149,8 +149,8 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
     assert.equal(controlAfter.json.hasSession, false);
 
     // Every session is retired, the old passphrase and the spent recovery key are refused, the new passphrase opens the same key.
-    for (const cookieHeader of [still.cookieHeader, afterRefusals.cookieHeader]) {
-        const retired = await request('PUT', '/api/auth/profile', { headers: { Cookie: cookieHeader }, body: { displayName: 'Synthetic' } });
+    for (const sessionHeaders of [still.webHeaders, afterRefusals.webHeaders]) {
+        const retired = await request('PUT', '/api/auth/profile', { headers: { ...sessionHeaders }, body: { displayName: 'Synthetic' } });
         assert.equal(retired.response.status, 401);
     }
     assert.equal((await login({ verifier: material.verifier })).response.status, 401);
