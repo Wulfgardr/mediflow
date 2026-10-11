@@ -2,10 +2,14 @@
 import assert from 'node:assert/strict';
 /* @Codex */
 import test from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 /* @Codex */
 import {
     buildSissSessionStatusFromHistory,
     resolveSissObservedModuleFromUrl,
+    readSissSessionStatusFromAtlasHistory,
 } from './siss-session-observer';
 
 test('resolveSissObservedModuleFromUrl maps Atlas-observed operator paths to stable modules', () => {
@@ -86,4 +90,33 @@ test('buildSissSessionStatusFromHistory returns unavailable when Atlas rows are 
     assert.equal(status.sessionHealth, 'none');
     assert.equal(status.warning, 'Cronologia Atlas non disponibile su questa macchina.');
     assert.equal(status.lastModule, null);
+});
+
+test('failed history copy removes only its owned temporary root and preserves the error', (t) => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-siss-copy-test-')));
+    const source = path.join(root, 'synthetic-history');
+    const unrelated = path.join(root, 'unrelated');
+    fs.writeFileSync(source, 'synthetic partial copy');
+    fs.writeFileSync(unrelated, 'keep');
+    const { mkdtempSync, copyFileSync, existsSync } = fs;
+    const failure = new Error('synthetic copy failure');
+    let copyRoot = '';
+    try {
+        // Discovery is synthetic: none of these calls reads the real Atlas history.
+        t.mock.method(fs, 'existsSync', () => true);
+        t.mock.method(fs, 'readdirSync', () => [{ name: 'synthetic-profile', isDirectory: () => true }]);
+        t.mock.method(fs, 'statSync', () => ({ mtimeMs: 1 }));
+        t.mock.method(fs, 'mkdtempSync', () => (copyRoot = mkdtempSync(path.join(root, 'owned-'))));
+        t.mock.method(fs, 'copyFileSync', (_input: string, destination: string) => {
+            copyFileSync(source, destination); // Leave a real partial file before failure.
+            throw failure;
+        });
+        assert.throws(() => readSissSessionStatusFromAtlasHistory(), (error: unknown) => error === failure);
+        assert.notEqual(copyRoot, '');
+        assert.equal(existsSync(copyRoot), false);
+        assert.equal(existsSync(source), true);
+        assert.equal(fs.readFileSync(unrelated, 'utf8'), 'keep');
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
 });

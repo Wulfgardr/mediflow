@@ -173,8 +173,13 @@ function resolveAtlasHistoryCandidates(): Array<{ profile: string; historyPath: 
 function copySqliteDb(sourcePath: string): { tempDir: string; tempPath: string } {
     const tempDir = fs.mkdtempSync(path.join(/* turbopackIgnore: true */ os.tmpdir(), 'mediflow-siss-atlas-history-'));
     const tempPath = path.join(tempDir, 'History');
-    fs.copyFileSync(/* turbopackIgnore: true */ sourcePath, tempPath);
-    return { tempDir, tempPath };
+    try {
+        fs.copyFileSync(/* turbopackIgnore: true */ sourcePath, tempPath);
+        return { tempDir, tempPath };
+    } catch (error) {
+        fs.rmSync(/* turbopackIgnore: true */ tempDir, { recursive: true, force: true });
+        throw error;
+    }
 }
 
 function chromeTimeToIso(value: number | bigint | null | undefined): string | null {
