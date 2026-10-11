@@ -6,7 +6,8 @@ import { AlertTriangle, CheckCircle, Clock3, FolderArchive, RefreshCw, Save } fr
 
 type BackupSchedulerResponse = {
     supported: boolean;
-    installed: boolean;
+    installed: boolean | null;
+    observationMessage?: string;
     plistPath: string | null;
     state: {
         config: {
@@ -86,6 +87,7 @@ export default function BackupSchedulerUI() {
             setRetentionKeepArtifacts(payload.state.config.retentionKeepArtifacts);
         } catch (error) {
             const text = error instanceof Error ? error.message : 'Errore caricamento backup automatico.';
+            setStatus(null);
             setMessage({ type: 'error', text });
         } finally {
             setIsLoading(false);
@@ -123,12 +125,15 @@ export default function BackupSchedulerUI() {
                 }),
             });
             const payload = await response.json();
-            if (!response.ok) throw new Error(payload?.error || 'Salvataggio configurazione fallito.');
+            if (!response.ok) {
+                throw new Error(payload?.error || 'Esito non confermato. Rileggi lo stato prima di ripetere il salvataggio.');
+            }
             setStatus(payload);
             setRetentionPreview(null);
             setMessage({ type: 'success', text: enabled ? 'Backup automatico attivato.' : 'Backup automatico disattivato.' });
         } catch (error) {
-            const text = error instanceof Error ? error.message : 'Salvataggio configurazione fallito.';
+            setStatus(previous => previous ? { ...previous, installed: null } : null);
+            const text = error instanceof Error ? error.message : 'Esito non confermato. Rileggi lo stato prima di ripetere il salvataggio.';
             setMessage({ type: 'error', text });
         } finally {
             setIsSaving(false);
@@ -245,11 +250,12 @@ export default function BackupSchedulerUI() {
                 </div>
                 {status && (
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300' : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
-                        {status.installed ? 'Installato' : 'Non installato'}
+                        {status.installed === null ? 'Stato non confermato' : status.installed ? 'Installato' : 'Non installato'}
                     </span>
                 )}
             </div>
 
+            {status?.observationMessage && <p role="alert" className="text-sm text-amber-700">{status.observationMessage}</p>}
             {!isLoading && schedulingUnsupported && (
                 <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
                     Lo scheduling automatico non e disponibile su questa piattaforma. Puoi comunque eseguire il backup manuale con «Esegui adesso» e usare la pulizia retention.
@@ -308,9 +314,12 @@ export default function BackupSchedulerUI() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+                <button type="button" onClick={() => void load()} disabled={isLoading || isSaving || isRunning} className={SECONDARY_BUTTON_CLASS}>
+                    <RefreshCw className="w-4 h-4" /> Rileggi stato
+                </button>
                 <button
                     onClick={save}
-                    disabled={isSaving || schedulingUnsupported}
+                    disabled={isSaving || isLoading || !status || status.installed === null || schedulingUnsupported}
                     className={PRIMARY_BUTTON_CLASS}
                 >
                     {isSaving ? <RefreshCw className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -379,7 +388,7 @@ export default function BackupSchedulerUI() {
             )}
 
             {message && (
-                <div className={`rounded-[18px] border px-4 py-3 flex items-center gap-2 text-sm ${
+                <div role={message.type === 'error' ? 'alert' : 'status'} className={`rounded-[18px] border px-4 py-3 flex items-center gap-2 text-sm ${
                     message.type === 'success'
                         ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300'
                         : message.type === 'error'
