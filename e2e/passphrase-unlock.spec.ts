@@ -247,9 +247,23 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await lockPage.keyboard.down('Enter');
     await lockPage.keyboard.up('Enter');
     await settled();
-    // The second click of a double click that began on another control lands where the confirmation now is.
-    const target = await confirm.boundingBox();
-    await lockPage.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2);
+    // Space behaves the other way round: it activates a button when it comes up. Held down on
+    // the button of the form and released on the confirmation, it is still the press that began there.
+    await unlock.focus();
+    await lockPage.keyboard.down('Space');
+    await lockPage.keyboard.press('Shift+Tab');
+    await expect(confirm).toBeFocused();
+    await lockPage.keyboard.down('Space');
+    await lockPage.keyboard.up('Space');
+    await settled();
+    // A double click that begins on the button of the form and ends where the confirmation is.
+    const from = await unlock.boundingBox();
+    const to = await confirm.boundingBox();
+    await lockPage.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+    await lockPage.mouse.down({ clickCount: 1 });
+    await lockPage.mouse.up({ clickCount: 1 });
+    await settled();
+    await lockPage.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2);
     await lockPage.mouse.down({ clickCount: 2 });
     await lockPage.mouse.up({ clickCount: 2 });
     await settled();
@@ -275,8 +289,9 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     expect(sent()).toEqual([]);
 
     // A changed text is held in its turn. Confirmed from the keyboard alone, with one distinct
-    // press, it leaves as the PIN it claims to be, once, and the server refuses it.
-    await input.fill(`${LONG_PIN}!`);
+    // press of Enter on the confirmation, it leaves as the PIN it claims to be and the server refuses it.
+    const wrong = [`${LONG_PIN}!`, `${LONG_PIN}?`, `${LONG_PIN}.`];
+    await input.fill(wrong[0]);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await expect(input).toBeFocused();
@@ -285,16 +300,36 @@ test('a PIN as long as a passphrase opens its archive only when it is confirmed 
     await lockPage.keyboard.press('Enter');
     await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
     await settled();
-    expect(sent()).toEqual([{ password: `${LONG_PIN}!` }]);
+    expect(sent()).toEqual([{ password: wrong[0] }]);
 
-    // The right PIN, confirmed twice in the same instant, leaves once and opens the archive.
-    await input.fill(LONG_PIN);
+    // The same with one distinct press of Space.
+    await input.fill(wrong[1]);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    await lockPage.keyboard.press('Tab');
+    await expect(confirm).toBeFocused();
+    await lockPage.keyboard.press('Space');
+    await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
+    await settled();
+    expect(sent()).toEqual([{ password: wrong[0] }, { password: wrong[1] }]);
+
+    // Activated twice in the same instant, it leaves once.
+    await input.fill(wrong[2]);
     await input.press('Enter');
     await expect(notice).toHaveText(LONG_PIN_NOTICE);
     await confirm.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
+    await expect(lockPage.locator('#mediflow-lock-error')).toBeVisible();
+    await settled();
+    expect(sent()).toEqual(wrong.map(password => ({ password })));
+
+    // The right PIN, confirmed with one click, opens the archive.
+    await input.fill(LONG_PIN);
+    await input.press('Enter');
+    await expect(notice).toHaveText(LONG_PIN_NOTICE);
+    await confirm.click();
     await expectUnlocked(lockPage);
     await lockPage.waitForLoadState('networkidle');
-    expect(sent()).toEqual([{ password: `${LONG_PIN}!` }, { password: LONG_PIN }]);
+    expect(sent()).toEqual([...wrong, LONG_PIN].map(password => ({ password })));
   } finally {
     await locked.close();
   }
