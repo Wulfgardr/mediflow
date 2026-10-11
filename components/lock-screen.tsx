@@ -16,8 +16,6 @@ export function LockScreen() {
     const [heldText, setHeldText] = useState<string | null>(null);
     // One attempt at a time, whatever the controls look like when a second one arrives.
     const attempting = useRef(false);
-    // Enter or Space went down on a control other than the confirmation and has not come up since.
-    const pressBeganElsewhere = useRef(false);
     // Counted as the primitives count it, after normalization: what they accept can be submitted.
     const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
     const [confirmPin, setConfirmPin] = useState('');
@@ -40,16 +38,6 @@ export function LockScreen() {
         }
         previousRecoveryState.current = authRecoveryState;
     }, [failedAttempt, heldText, loading, authRecoveryState]);
-
-    // The key may come up anywhere, also on a control that was disabled meanwhile. The click a key
-    // makes arrives while the key comes up: the press is over only after that.
-    useEffect(() => {
-        const endPress = (e: KeyboardEvent) => {
-            if (e.key === 'Enter' || e.key === ' ') setTimeout(() => { pressBeganElsewhere.current = false; }, 0);
-        };
-        window.addEventListener('keyup', endPress);
-        return () => window.removeEventListener('keyup', endPress);
-    }, []);
 
     // If not locked and setup is done, don't render anything
     if (!isLocked && !requiresSetup) return null;
@@ -89,21 +77,17 @@ export function LockScreen() {
     };
 
     // The confirmation is a gesture of its own, on the control shown with the notice. The second
-    // click of a double click belongs to the gesture that came before it, wherever that began,
-    // and so does the click a key makes when it went down on another control and comes up here.
+    // click of a double click belongs to the gesture that came before it, wherever that began.
     const confirmHeldText = (e: React.MouseEvent) => {
-        const madeByAKey = e.detail === 0;
-        if (longPinNotice && e.detail <= 1 && !(madeByAKey && pressBeganElsewhere.current)) void attempt(true);
+        if (longPinNotice && e.detail <= 1) void attempt(true);
     };
 
-    const followPress = (e: React.KeyboardEvent) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        // A key held down is one gesture: the repetitions of Enter activate nothing, on any control of the form.
-        if (e.repeat) {
-            if (e.key === 'Enter') e.preventDefault();
-            return;
-        }
-        pressBeganElsewhere.current = (e.target as HTMLElement).id !== 'mediflow-lock-confirm-pin';
+    // A key held down is one gesture. Its repetitions activate nothing: Enter on any control of
+    // the form, Space on its buttons, where a repetition would arm the click that the key makes
+    // when it comes up. A key therefore activates only the control on which it went down.
+    const cancelRepeats = (e: React.KeyboardEvent) => {
+        if (!e.repeat) return;
+        if (e.key === 'Enter' || (e.key === ' ' && e.target instanceof HTMLButtonElement)) e.preventDefault();
     };
 
     const handleSetup = async (e: React.FormEvent) => {
@@ -157,7 +141,7 @@ export function LockScreen() {
                 </div>
 
                 <form onSubmit={requiresSetup ? handleSetup : handleLogin} className={styles.form}
-                    onKeyDown={followPress}
+                    onKeyDown={cancelRepeats}
                     aria-busy={loading || recoveryPending}>
                     {recoveryMessage && (
                         <p id="mediflow-auth-recovery" role="status" className="px-2 text-center text-sm leading-6">
