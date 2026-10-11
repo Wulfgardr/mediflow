@@ -111,3 +111,56 @@ la vecchia scheda. Il supervisor viene provato con figlio reale: ingresso
 concorrente, rifiuto della sorgente prima dello stop, stop terminale prima dello
 swap e errore post-stop senza riavvio automatico. Il percorso operativo passa
 anche da Next standalone, setup, repair accettato, riavvio e nuovo archivio.
+
+
+## Backup completo cifrato e recupero offline
+
+L’esportazione portabile `.mediflow` resta distinta: non esporta account e
+involucri delle chiavi e mantiene il blocco sui comandi durevoli. Il backup
+completo `.mediflow-recovery` conserva invece **tutte le tabelle SQLite**, senza
+un registro di collezioni: account, involucri, impostazioni, ledger e audit
+originale compresi. Non copia token locali, configurazioni o file esterni a
+SQLite. La directory di lavoro e quella di recupero devono stare su un volume
+cifrato; l’artefatto scaricato è cifrato separatamente.
+
+Un amministratore Web sbloccato con passphrase richiede una copia consistente
+con `VACUUM INTO`, sotto l’ammissione del processo esistente. La copia isolata
+è verificata e restituita solo al browser same-origin autenticato, con
+`no-store`; non viene offerta come download in chiaro. La directory temporanea
+sta accanto all’archivio ed è rimossa prima della risposta. Il browser genera una
+chiave AES-256 casuale per il backup, cifra la copia e avvolge quella chiave
+con la master key residente **senza esportarla**. La chiave clinica non arriva
+al server Web. Un cambio di autorità durante gli await annulla il download.
+
+Il formato v1 è binario e limitato a 256 MiB di SQLite. Il prefisso `MDFREC01`
+(8 byte) è seguito da nonce casuale di wrapping (12), chiave avvolta con tag
+(48), nonce casuale del contenuto (12) e contenuto cifrato con tag (almeno 116).
+Entrambi usano AES-256-GCM con tag da 128 bit. Il wrapping usa l’AAD
+`mediflow.recovery-backup.key.v1`; il contenuto autentica tutti gli 80 byte
+dell’intestazione. Non ci sono nome utente, kit o metadati clinici in chiaro.
+Il kit resta un file separato; la chiave cartacea non viene salvata nel backup.
+
+Il recupero canonico è una CLI **offline**, non un endpoint anonimo: legge la
+chiave da terminale senza eco, mai da argomenti, variabili d’ambiente o log.
+Solo quel processo dedicato recupera temporaneamente la master key in memoria.
+Autenticità, limite, integrità SQLite, schema corrente completo, relazioni e
+corrispondenza del kit all’account amministratore nello snapshot sono verificati
+prima dell’apertura mutante della destinazione. Un kit di un’altra rotazione
+è rifiutato: va conservato il kit corrispondente a ciascun backup.
+
+La destinazione deve essere assente oppure un archivio inizializzato senza
+alcuna riga, eccetto la generazione. Un `local-api-token` già presente o un
+override `MEDIFLOW_LOCAL_API_TOKEN` fanno rifiutare il recupero: non devono
+ereditare autorità sui dati ripristinati. Non vanno ricopiati o riutilizzati
+all’avvio successivo. Dopo la nuova verifica sotto ammissione
+esclusiva, il recupero riusa lo swap con journal: nessun secondo owner o motore
+di ripristino. La copia preparata ruota la generazione e elimina i legami delle
+sessioni; i processi devono essere chiusi e i dispositivi riabbinati. Ledger e
+audit restano byte per byte nei loro valori; i comandi non vengono rieseguiti.
+Il recupero della passphrase successivo usa il percorso dell’ADR 0143.
+
+Il lease impedisce la doppia autorità **locale sullo stesso archivio**, non la
+riaccensione di una copia su un altro computer. L’operatore deve ritirare
+l’installazione sorgente prima di lavorare su quella recuperata; la CLI richiede
+questa conferma. Non è una prevenzione tecnica dei cloni remoti. La UI distingue
+backup creato, autenticità della cifratura verificata e ripristino provato.
