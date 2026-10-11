@@ -57,13 +57,13 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const cookieHeader = login.cookieHeader;
+        const sessionHeaders = login.webHeaders;
 
         await setNetworkMode('local-only');
         const disabledDiaryRead = await request('GET', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(disabledDiaryRead.response.status, 403);
@@ -84,11 +84,11 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         }
         assert.ok(pairedAiRuntime.json?.surfaces?.includes('treatment-reasoning'), 'AI runtime must advertise treatment-reasoning');
 
-        const auditBeforeVisitDraft = await listAuditEvents(cookieHeader);
+        const auditBeforeVisitDraft = await listAuditEvents(sessionHeaders);
         const patientScopedVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 patientId,
@@ -100,7 +100,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const emptyVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {},
         });
@@ -109,7 +109,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const tooLongVisitDraft = await request('POST', '/api/v1/network/visit-draft', {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: { transcript: 'x'.repeat(12_001) },
         });
@@ -118,7 +118,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const visitDraft = await request('POST', '/api/v1/network/visit-draft', {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 transcript: 'S: tosse persistente. P: continuare terapia e rivalutare.',
@@ -132,12 +132,12 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.equal(visitDraft.json?.safety?.reviewRequired, true);
         assert.equal(visitDraft.json?.safety?.rawAudioPersisted, false);
         assert.deepEqual(visitDraft.json?.safety?.writesPerformed, []);
-        assert.deepEqual(await listAuditEvents(cookieHeader), auditBeforeVisitDraft);
+        assert.deepEqual(await listAuditEvents(sessionHeaders), auditBeforeVisitDraft);
 
         const readOnlyCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(readOnlyClient),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 type: 'note',
@@ -162,7 +162,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const plaintextClinicalField = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 type: 'note',
@@ -187,7 +187,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const create = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: createBody,
         });
@@ -200,7 +200,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const entryList = await request('GET', `/api/v1/network/patients/${patientId}/entries?type=note&limit=10`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(entryList.response.status, 200);
@@ -213,7 +213,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const idempotentCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: createBody,
         });
@@ -225,7 +225,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const conflictingCreate = await request('POST', `/api/v1/network/patients/${patientId}/entries`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 ...createBody,
@@ -237,7 +237,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const detail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(detail.response.status, 200);
@@ -250,7 +250,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const plaintextAttachmentArray = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -263,7 +263,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const plaintextAttachmentJson = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -276,7 +276,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const emptyAttachmentArray = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -289,7 +289,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const detailAfterRejectedArray = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(detailAfterRejectedArray.response.status, 200);
@@ -299,7 +299,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const clearAttachments = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 1,
@@ -312,7 +312,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const clearDetail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(clearDetail.response.status, 200);
@@ -322,7 +322,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const update = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 2,
@@ -335,7 +335,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const updatedDetail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(updatedDetail.response.status, 200);
@@ -345,7 +345,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const conflict = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 2,
@@ -361,7 +361,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const aiField = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 3,
@@ -374,7 +374,7 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const softDelete = await request('PUT', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
             body: {
                 version: 3,
@@ -387,14 +387,14 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         const deletedDetail = await request('GET', `/api/v1/network/patients/${patientId}/entries/${entryId}`, {
             headers: {
                 ...pairedHeaders(diaryWriter),
-                Cookie: cookieHeader,
+                ...sessionHeaders,
             },
         });
         assert.equal(deletedDetail.response.status, 200);
         assert.equal(deletedDetail.json?.version, 4);
         assert.equal(deletedDetail.json?.deletedAt, '2026-05-02T10:00:00.000Z');
 
-        const createdAudit = await findAuditEvent('entry.created', entryId, cookieHeader);
+        const createdAudit = await findAuditEvent('entry.created', entryId, sessionHeaders);
         assert.equal(createdAudit.actorType, 'user');
         assert.equal(createdAudit.sourceSurface, 'native');
         assert.ok(createdAudit.redactedMetadata?.flags?.includes('auth:paired-client'));
@@ -402,11 +402,11 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
         assert.deepEqual(createdAudit.redactedMetadata?.changedFields, ['type', 'title', 'date', 'content', 'setting', 'metadata', 'attachments']);
         assert.equal(createdAudit.redactedMetadata?.resourceVersion, 1);
 
-        const updatedAudit = await findAuditEvent('entry.updated', entryId, cookieHeader, ['content']);
+        const updatedAudit = await findAuditEvent('entry.updated', entryId, sessionHeaders, ['content']);
         assert.deepEqual(updatedAudit.redactedMetadata?.changedFields, ['content']);
         assert.equal(updatedAudit.redactedMetadata?.resourceVersion, 3);
 
-        const deletedAudit = await findAuditEvent('entry.deleted', entryId, cookieHeader);
+        const deletedAudit = await findAuditEvent('entry.deleted', entryId, sessionHeaders);
         assert.deepEqual(deletedAudit.redactedMetadata?.changedFields, ['deletedAt', 'deletionReason']);
         assert.equal(deletedAudit.redactedMetadata?.resourceVersion, 4);
 
@@ -442,18 +442,18 @@ test('paired diary write requires capability, session, scope, version, and PHI-s
     }
 });
 
-async function findAuditEvent(eventType, subjectRef, cookieHeader, changedFields) {
-    const auditEvents = await listAuditEvents(cookieHeader, `eventType=${eventType}&subjectType=entry&limit=20`);
+async function findAuditEvent(eventType, subjectRef, sessionHeaders, changedFields) {
+    const auditEvents = await listAuditEvents(sessionHeaders, `eventType=${eventType}&subjectType=entry&limit=20`);
     const event = auditEvents.find((row) => row.subjectRef === subjectRef
         && (!changedFields || JSON.stringify(row.redactedMetadata?.changedFields) === JSON.stringify(changedFields)));
     assert.ok(event, `Expected ${eventType} audit event for ${subjectRef}`);
     return event;
 }
 
-async function listAuditEvents(cookieHeader, query = 'limit=500') {
+async function listAuditEvents(sessionHeaders, query = 'limit=500') {
     const audit = await request('GET', `/api/system/audit?${query}`, {
         headers: {
-            Cookie: cookieHeader,
+            ...sessionHeaders,
         },
     });
     assert.equal(audit.response.status, 200);

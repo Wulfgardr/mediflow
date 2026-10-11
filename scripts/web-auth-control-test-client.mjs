@@ -60,5 +60,11 @@ export async function loginWithWebAuthControl(baseUrl, credentials, fetchImpleme
     const json = await responseJson(response);
     const sessionCookie = exactCookie(response, 'mediflow_session', SESSION_COOKIE, false);
     const cookieHeader = sessionCookie ? `${sessionCookie}; ${controlCookie}` : null;
-    return Object.freeze({ response, json, sessionCookie, controlCookie, cookieHeader, controlEtag: successorEtag });
+    const webHeaders = sessionCookie ? Object.freeze({
+        Cookie: cookieHeader, 'x-mediflow-archive-generation': json?.archiveGeneration,
+    }) : null;
+    if (webHeaders && !/^[0-9a-f-]{36}$/u.test(webHeaders['x-mediflow-archive-generation'] ?? '')) {
+        throw new Error('Authenticated synthetic client lacks its archive generation.');
+    }
+    return Object.freeze({ response, json, sessionCookie, controlCookie, cookieHeader, webHeaders, controlEtag: successorEtag });
 }

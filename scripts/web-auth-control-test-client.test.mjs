@@ -9,6 +9,7 @@ const CONTROL_ID = 'c'.repeat(64);
 const INITIAL_ETAG = `"${'e'.repeat(64)}"`;
 const SUCCESSOR_ETAG = `"${'f'.repeat(64)}"`;
 const SESSION_ID = 'a'.repeat(64);
+const ARCHIVE_GENERATION = '12345678-1234-1234-1234-123456789abc';
 
 test('bootstraps one control and binds the synthetic login mutation to its cookie and fence', async () => {
     const calls = [];
@@ -20,7 +21,7 @@ test('bootstraps one control and binds the synthetic login mutation to its cooki
                 headers: { ETag: INITIAL_ETAG, 'Set-Cookie': `mediflow_auth_control=${CONTROL_ID}; Path=/; HttpOnly` },
             });
         }
-        return new Response('{"id":"synthetic-user"}', {
+        return new Response(JSON.stringify({ id: 'synthetic-user', archiveGeneration: ARCHIVE_GENERATION }), {
             status: 200,
             headers: { ETag: SUCCESSOR_ETAG, 'Set-Cookie': `mediflow_session=${SESSION_ID}; Path=/; HttpOnly` },
         });
@@ -40,7 +41,8 @@ test('bootstraps one control and binds the synthetic login mutation to its cooki
     assert.match(headers.get('idempotency-key') ?? '', /^[0-9a-f-]{36}$/u);
     assert.deepEqual(JSON.parse(calls[1].init.body), { username: 'synthetic-admin', password: '2468' });
     assert.equal(result.response.status, 200);
-    assert.deepEqual(result.json, { id: 'synthetic-user' });
+    assert.deepEqual(result.json, { id: 'synthetic-user', archiveGeneration: ARCHIVE_GENERATION });
+    assert.deepEqual(result.webHeaders, { Cookie: result.cookieHeader, 'x-mediflow-archive-generation': ARCHIVE_GENERATION });
     assert.equal(result.sessionCookie, `mediflow_session=${SESSION_ID}`);
     assert.equal(
         result.cookieHeader,
@@ -86,7 +88,7 @@ test('Node smoke callers delegate login to the exact control helper', () => {
         assert.match(source, /loginWithWebAuthControl/u, caller);
         assert.doesNotMatch(source, /request\(\s*['"]POST['"]\s*,\s*['"]\/api\/auth\/login['"]/u, caller);
         assert.doesNotMatch(source, /fetch\([^)]*\/api\/auth\/login/u, caller);
-        assert.match(source, /\.cookieHeader\b/u, caller);
+        assert.match(source, /\.(?:cookieHeader|webHeaders)\b/u, caller);
         assert.doesNotMatch(source, /extractSessionCookie/u, caller);
         assert.doesNotMatch(source, /\.sessionCookie\b/u, caller);
     }
