@@ -650,6 +650,16 @@ const credentialColumns = (db: TestDatabase) => {
     return { passwordHash, encryptedMasterKey, salt, unlockVerifierHash, recoveryWrappedMasterKey, recoverySalt, recoveryVerifierHash };
 };
 
+/** Stands for the removal of what still holds the PIN wrapping beside the archive, and records whom it ran for. */
+function residueRemoval(complete = true) {
+    const runs: string[] = [];
+    const retirePinEraResidues: NonNullable<PinChangeServiceDependencies['retirePinEraResidues']> = (userId) => {
+        runs.push(userId);
+        return { removed: [], kept: [], logEmptied: complete, complete };
+    };
+    return { runs, retirePinEraResidues };
+}
+
 test('adoptPassphrase moves the account to the passphrase in one write and keeps the PIN for confirmations', async () => {
     const { sqlite, db } = makeDatabase();
     try {
@@ -657,9 +667,13 @@ test('adoptPassphrase moves the account to the passphrase in one write and keeps
         const before = storedUser(db);
         const projection = session('user-1');
         const { payload, unlock, recovery } = await adoptionPayload();
-        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement('completed', projection) };
+        const residues = residueRemoval();
+        const dependencies: PinChangeServiceDependencies = {
+            db, writeAuditEvent: testAuditWriter(db), ...webRetirement('completed', projection), retirePinEraResidues: residues.retirePinEraResidues,
+        };
 
-        assert.deepEqual(await adoptPassphrase({ session: projection, request: adoptionRequest(), payload }, dependencies), { kind: 'success' });
+        assert.deepEqual(await adoptPassphrase({ session: projection, request: adoptionRequest(), payload }, dependencies), { kind: 'success', earlierCopiesCleared: true });
+        assert.deepEqual(residues.runs, ['user-1'], 'what still held the PIN wrapping beside the archive is removed for this account');
 
         assert.deepEqual(storedUser(db), {
             ...before,
@@ -696,8 +710,9 @@ test('adoptPassphrase needs the current PIN and happens once: the PIN cannot rep
         const before = credentialColumns(db);
         let prepared = 0;
         const retirement = webRetirement();
+        const residues = residueRemoval();
         const dependencies: PinChangeServiceDependencies = {
-            db, writeAuditEvent: testAuditWriter(db), ...retirement,
+            db, writeAuditEvent: testAuditWriter(db), ...retirement, retirePinEraResidues: residues.retirePinEraResidues,
             prepareWebSessionsForUserRetirement: (projection) => { prepared += 1; return retirement.prepareWebSessionsForUserRetirement!(projection); },
         };
         const adopt = (payload: Awaited<ReturnType<typeof adoptionPayload>>['payload']) =>
@@ -708,8 +723,9 @@ test('adoptPassphrase needs the current PIN and happens once: the PIN cannot rep
         assert.deepEqual(credentialColumns(db), before);
         assert.equal(storedUser(db).failedLoginAttempts, 1, 'a wrong PIN is counted here as it is at login');
         assert.equal(prepared, 0, 'no session is prepared for retirement before the PIN is verified');
+        assert.deepEqual(residues.runs, [], 'and no copy of the archive is touched');
 
-        assert.deepEqual(await adopt((await adoptionPayload()).payload), { kind: 'success' });
+        assert.deepEqual(await adopt((await adoptionPayload()).payload), { kind: 'success', earlierCopiesCleared: true });
         const adopted = storedUser(db);
 
         // The right PIN and a well-formed request, again: this is how a PIN would take the archive back.
@@ -717,6 +733,7 @@ test('adoptPassphrase needs the current PIN and happens once: the PIN cannot rep
         assert.deepEqual(again.kind === 'failure' && [again.status, again.code], [409, 'PASSPHRASE_ALREADY_ADOPTED']);
         assert.deepEqual(storedUser(db), adopted);
         assert.equal(prepared, 1);
+        assert.deepEqual(residues.runs, ['user-1'], 'only the move itself removes the copies');
     } finally {
         sqlite.close();
     }
@@ -726,12 +743,16 @@ test('two adoptions at once leave one whole set of credentials, never a mix', as
     const { sqlite, db } = makeDatabase();
     try {
         await seedUser(db);
-        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement() };
+        const residues = residueRemoval(false);
+        const dependencies: PinChangeServiceDependencies = { db, writeAuditEvent: testAuditWriter(db), ...webRetirement(), retirePinEraResidues: residues.retirePinEraResidues };
         const candidates = await Promise.all([adoptionPayload(), adoptionPayload()]);
         const results = await Promise.all(candidates.map(({ payload }) =>
             adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, dependencies)));
 
         assert.equal(results.filter((result) => result.kind === 'success').length, 1);
+        assert.deepEqual(results.find((result) => result.kind === 'success'), { kind: 'success', earlierCopiesCleared: false },
+            'the move says when something that holds the PIN wrapping could not be cleared');
+        assert.deepEqual(residues.runs, ['user-1'], 'the adoption that lost removes nothing');
         const winner = candidates[results.findIndex((result) => result.kind === 'success')];
         const stored = storedUser(db);
         assert.deepEqual(
@@ -759,16 +780,18 @@ test('an interruption inside the write leaves the PIN account as it was, with it
         }) as TestDatabase;
         const outcomes: string[] = [];
         const retirement = webRetirement();
+        const residues = residueRemoval();
         const { payload } = await adoptionPayload();
 
         await assert.rejects(() => adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, {
-            db: interrupted, writeAuditEvent: testAuditWriter(db), ...retirement,
+            db: interrupted, writeAuditEvent: testAuditWriter(db), ...retirement, retirePinEraResidues: residues.retirePinEraResidues,
             commitWebSessionsForUserRetirement: (capability) => { outcomes.push('committed'); return retirement.commitWebSessionsForUserRetirement!(capability); },
             abortWebSessionsForUserRetirement: (capability) => { outcomes.push('aborted'); return retirement.abortWebSessionsForUserRetirement!(capability); },
         }), /synthetic interruption/u);
 
         assert.deepEqual(storedUser(db), before);
         assert.deepEqual(outcomes, ['aborted'], 'the sessions prepared for retirement are released, not retired');
+        assert.deepEqual(residues.runs, [], 'the copies of an account still on its PIN are its safety net: they stay');
         const quiet = { db, writeAuditEvent: async () => 'audit' };
         assert.equal((await verifyUnlockCredentials({ username: TEST_USERNAME, pin: SEEDED_PIN }, quiet)).kind, 'verified');
     } finally {
@@ -781,11 +804,13 @@ test('when the retirement of the sessions cannot be confirmed the passphrase is 
     try {
         await seedUser(db);
         const { payload, unlock } = await adoptionPayload();
+        const residues = residueRemoval();
         const result = await adoptPassphrase({ session: session('user-1'), request: adoptionRequest(), payload }, {
-            db, writeAuditEvent: testAuditWriter(db), ...webRetirement('failed'),
+            db, writeAuditEvent: testAuditWriter(db), ...webRetirement('failed'), retirePinEraResidues: residues.retirePinEraResidues,
         });
         assert.deepEqual(result.kind === 'failure' && [result.status, result.code], [409, PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE]);
         assert.match(result.kind === 'failure' ? result.message : '', /passphrase è attiva/u);
+        assert.deepEqual(residues.runs, ['user-1'], 'the PIN wrapping beside the archive goes all the same: the passphrase is the credential');
         assert.equal(storedUser(db).unlockVerifierHash, await hashAccessVerifier(unlock.verifier));
     } finally {
         sqlite.close();

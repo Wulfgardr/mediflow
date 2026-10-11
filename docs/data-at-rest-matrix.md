@@ -7,7 +7,7 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 4.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+**Versione 5.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
 criterio 1. Letta sul codice di `main` alla revisione `bcb7af46a`, il 10
 ottobre 2026.
 
@@ -260,7 +260,9 @@ locali salvano ciò che ricevono.
 | Artefatto | Dove | Che cosa contiene | Protezione | Fonte |
 | --- | --- | --- | --- | --- |
 | Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file creato `0600`. La directory predefinita è `0700`, anche se esisteva già; una directory scelta con `MEDIFLOW_DATA_DIR` resta com'è se esisteva, nasce `0700` se la crea il prodotto. Su Windows valgono le regole di accesso del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts` |
-| `medical.db-wal`, `medical.db-shm` | Accanto al database. | Le stesse pagine, compresi valori precedenti finché non vengono riassorbiti. | Come il database. | SQLite |
+| `medical.db-wal`, `medical.db-shm` | Accanto al database. | Le stesse pagine, compresi valori precedenti finché non vengono riassorbiti. Il passaggio alla passphrase svuota il registro, che conserverebbe l'involucro del PIN. | Come il database. | SQLite, `lib/security/pin-era-residues.ts` |
+| Originale dell'aggiornamento dello schema `medical.db.schema-original-v<N>-<uuid>.db` | Directory dati. | Copia integrale del database com'era prima dell'aggiornamento, compresi `users` e l'involucro della chiave. | Campi cifrati; file `0600`. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `lib/sqlite-schema-open.ts`, `lib/security/pin-era-residues.ts` |
+| Copia di riparazione `medical.db.bak-<data>-<ora>` | Directory dati. | Copia integrale del database com'era prima della riparazione, compresi `users` e l'involucro della chiave. | Campi cifrati. Il file nasce con i permessi predefiniti del sistema (misurato `0644` con umask `022`), non `0600`: verso gli altri account lo protegge solo la directory dati. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `app/api/system/repair-db/route.ts`, `lib/sqlite-repair.ts`, `lib/security/pin-era-residues.ts` |
 | Copie di manutenzione `medical.db.old-*`, `.repair-tmp*` | Directory dati. | Copie integrali del database. | Come il database; restano finché non vengono rimosse. | `lib/sqlite-repair.ts` |
 | Backup pianificato `.mediflow` | `<directory dati>/backups` o la destinazione configurata. | Le collezioni cliniche in JSON: i valori `ENC:` restano tali, il resto è in chiaro. Non contiene `users` né `settings`, quindi nemmeno l'involucro della chiave. | Campi cifrati; file `0600`, compresi quelli lasciati da versioni precedenti; una destinazione nuova nasce `0700`, una già esistente resta com'è. | `scripts/run-scheduled-backup.mjs` |
 | Backup scaricato dall'interfaccia | Dove lo salva il browser. | Come il backup pianificato. | Campi cifrati. | `app/api/system/backup-restore/route.ts` |
@@ -312,8 +314,12 @@ Leonardo.
    diagnosi sono colonne senza writer e fuori dal contratto. Il campo
    `messages.reasoning`, nel contratto senza essere una colonna, è stato tolto
    nella versione 3.
-9. **Copie del database e residui** (`.old-*`, WAL, pagine libere) conservano
-   valori precedenti.
+9. **Copie del database e residui** (`.old-*`, originali dell'aggiornamento,
+   copie di riparazione, WAL, pagine libere) conservano valori precedenti. Per
+   l'involucro del PIN di un account passato alla passphrase, le copie del
+   prodotto e il WAL sono chiusi dalla versione 5; restano le copie fuori
+   dalla directory dati (Time Machine, copie a mano, il vecchio `medical.db`
+   nella cartella dell'applicazione).
 10. **File temporanei e log** non sono coperti da una prova.
 
 ## Come si aggiorna
@@ -328,3 +334,4 @@ cambia una classificazione.
 | 2 | Backup pianificati `0600` e directory dati predefinita `0700`. |
 | 3 | Tolto dal contratto `messages.reasoning`, che non era una colonna. |
 | 4 | Quattro colonne nuove in `users` per l'ADR 0143, ancora vuote. |
+| 5 | Aggiunti gli originali dell'aggiornamento dello schema e le copie di riparazione, che mancavano. Il passaggio alla passphrase elimina quelle con l'involucro del PIN e svuota il WAL. |

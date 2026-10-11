@@ -26,6 +26,7 @@ import {
 } from '@/lib/security/pin-change';
 import type { PassphraseAdoptionPayload } from '@/lib/security/passphrase-adoption-validation';
 import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
+import { retirePinEraResidues, type PinEraResidues } from '@/lib/security/pin-era-residues';
 /* @Codex */
 import { users } from '@/lib/schema';
 /* @Codex */
@@ -64,6 +65,8 @@ export type PinChangeServiceDependencies = {
     abortNativeSessionsForUserRetirement?: typeof abortNativeLegacyUserRetirement;
     readPairedNativeSession?: typeof requirePairedNativeSession;
     verifyPin?: typeof verifyHostCredentials;
+    /** Removes what the product keeps beside the archive that still holds the PIN wrapping. */
+    retirePinEraResidues?: (userId: string, db: PinChangeDatabase) => PinEraResidues;
 };
 
 /* @Codex */
@@ -77,7 +80,8 @@ export type PinChangeServiceInput = {
 };
 
 export type PinChangeServiceResult =
-    | { kind: 'success' }
+    /** `earlierCopiesCleared` is set by the move to a passphrase only. */
+    | { kind: 'success'; earlierCopiesCleared?: boolean }
     | { kind: 'unauthorized' }
     | { kind: 'failure'; status: 400 | 401 | 409 | 423; code: string; message: string };
 
@@ -384,6 +388,9 @@ export async function adoptPassphrase(
     } catch {
         nativeOutcome = 'failed';
     }
+    // The copies kept beside the archive and its write-ahead log still hold the PIN wrapping of
+    // the same master key: they go now. What this leaves behind, the next passphrase login retries.
+    const residues = (dependencies.retirePinEraResidues ?? retirePinEraResidues)(user.id, db);
     if (webOutcome !== 'completed' || nativeOutcome !== 'completed') {
         return unconfirmed('La passphrase è attiva, ma il ritiro delle sessioni non è confermato. Accedi di nuovo con la passphrase.');
     }
@@ -409,5 +416,5 @@ export async function adoptPassphrase(
         console.error('Audit passphrase adoption write failed:', error);
     }
 
-    return { kind: 'success' };
+    return { kind: 'success', earlierCopiesCleared: residues.complete };
 }
