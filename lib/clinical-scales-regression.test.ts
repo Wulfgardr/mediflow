@@ -50,14 +50,14 @@ test('new interpretation versions persist separately from instruments at every f
                 'reg1', 'reg2', 'reg3', 'att1', 'att2', 'att3', 'att4', 'att5', 'rec1', 'rec2', 'rec3',
                 'lang1', 'lang2', 'lang3', 'lang4', 'lang5', 'lang6', 'lang7'],
             totals: [0, 9, 10, 17, 18, 23, 24, 30],
-            version: 'mediflow.mmse.screening-limits.v1',
-            text: (total: number) => `Punteggio grezzo MMSE: ${total}/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Interpretazione clinica richiesta; nessuna correzione per età, scolarità o lingua applicata.`,
+            version: 'mediflow.mmse.screening-limits.v2',
+            text: (total: number) => `Punteggio grezzo MMSE: ${total}/30. Screening cognitivo: il punteggio da solo non conferma né esclude una demenza. Definizione locale: edizione e variante italiana non identificate. Interpretazione clinica richiesta; nessuna correzione normativa applicata.`,
         },
         gds: {
             keys: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'g8', 'g9', 'g10', 'g11', 'g12', 'g13', 'g14', 'g15'],
             totals: [0, 5, 6, 10, 11, 15],
-            version: 'mediflow.gds15.screening-limits.v1',
-            text: (total: number) => `Punteggio grezzo GDS-15: ${total}/15. Screening dei sintomi depressivi: il punteggio non formula una diagnosi né stabilisce la gravità. Valutazione clinica richiesta; versione italiana e periodo di riferimento da verificare.`,
+            version: 'mediflow.gds15.screening-limits.v2',
+            text: (total: number) => `Punteggio grezzo GDS-15: ${total}/15. Screening dei sintomi depressivi: il punteggio non formula una diagnosi né stabilisce la gravità. Definizione locale: fonte della traduzione italiana e periodo di riferimento non identificati. Valutare comprensione e attendibilità delle risposte, con particolare cautela nella compromissione cognitiva grave. Valutazione clinica richiesta.`,
         },
     };
     for (const [id, golden] of Object.entries(domains)) {
@@ -84,11 +84,11 @@ test('new interpretation versions persist separately from instruments at every f
 
 });
 
-test('new ADL, IADL and POMA persist policy identity without changing scores or wording', async () => {
+test('new local functional policies persist totals and limits while POMA wording stays unchanged', async () => {
     for (const [id, version, texts] of [
-        ['adl', 'mediflow.adl.local-interpretation.v1', ['Compromissione Grave (0-1/6)', 'Autonomia Conservata (6/6)']],
-        ['iadl', 'mediflow.iadl.local-interpretation.v1', [0, 8].map(score =>
-            `Punteggio totale: ${score}/8. (Minore è il punteggio, maggiore è la dipendenza strumentale).`)],
+        ['adl', 'mediflow.adl.local-interpretation.v2', [0, 6].map(score => `Punteggio ADL locale: ${score}/6. Risposte ai sei domini di autonomia, senza attribuzione di una classe di gravità. Fonte della versione locale e adattamento italiano da verificare. Interpretare considerando osservazione clinica, contesto e informazioni della persona o dell’informante.`)],
+        ['iadl', 'mediflow.iadl.local-interpretation.v2', [0, 8].map(score =>
+            `Punteggio IADL locale: ${score}/8. Otto domini per ogni persona, indipendentemente dal sesso. Definizione locale con ancoraggi semplificati; equivalenza a una versione validata non verificata. Attività mai svolte e contesto istituzionale limitano l’interpretazione; nessuna imputazione o riduzione automatica del denominatore.`)],
         [poma.id, 'mediflow.poma28.nonclassification.v1', [vectors.nonclassification, vectors.nonclassification]],
     ] as const) {
         const definition = SCALES[id];
@@ -111,16 +111,21 @@ test('new ADL, IADL and POMA persist policy identity without changing scores or 
     }
 });
 
-test('historical MMSE/GDS records and absent or unknown version metadata are not reinterpreted', () => {
+test('historical local-scale records and absent or unknown version metadata are not reinterpreted', () => {
     for (const [id, score, text] of [
         ['mmse', 24, 'Assenza di decadimento cognitivo (24-30)'],
         ['gds', 6, 'Depressione Lieve (6-10)'],
+        ['adl', 4, 'Compromissione Lieve (4-5/6)'],
+        ['iadl', 8, 'Punteggio totale: 8/8. (Minore è il punteggio, maggiore è la dipendenza strumentale).'],
     ] as const) {
         const stored = { scaleId: id, score, interpretation: text, answers: { legacyPartial: 1 } };
         const bytes = JSON.stringify(stored);
         assert.equal(scaleHistoryNotice(stored), null);
         assert.equal(JSON.stringify(stored), bytes);
         assert.equal(stored.interpretation, text);
+        const previous = { ...stored, interpretationVersion: 'recorded.policy.v1' };
+        assert.equal(scaleHistoryNotice(previous), 'Versione interpretazione: recorded.policy.v1');
+        assert.equal(previous.interpretation, text);
         const future = { ...stored, interpretationVersion: 'future.policy.v9' };
         assert.equal(scaleHistoryNotice(future), 'Versione interpretazione: future.policy.v9');
         assert.equal(future.interpretation, text);

@@ -5,7 +5,9 @@ import XCTest
 final class ScaleHistoryPresentationTests: XCTestCase {
     func testStoredScreeningTextAndVersionRemainIndependentOfCurrentPolicy() throws {
         for (id, score, interpretation) in [("mmse", 24, "Assenza di decadimento cognitivo (24-30)"),
-                                           ("gds", 6, "Depressione Lieve (6-10)")] {
+                                           ("gds", 6, "Depressione Lieve (6-10)"),
+                                           ("adl", 4, "Compromissione Lieve (4-5/6)"),
+                                           ("iadl", 8, "Punteggio totale: 8/8. (Minore è il punteggio, maggiore è la dipendenza strumentale).")] {
             let raw = "{\"scaleId\":\"\(id)\",\"score\":\(score),\"interpretation\":\"\(interpretation)\"}"
             let entry = makeEntry(type: "scale", title: id, content: "Storico originale", metadata: raw)
             let item = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry))
@@ -22,8 +24,8 @@ final class ScaleHistoryPresentationTests: XCTestCase {
             content: ClinicalScales.contentSummary(definition: definition, result: submission.result), metadata: submission.metadataJSON)
         let item = try XCTUnwrap(ScaleHistoryPresentation.item(from: entry))
         XCTAssertEqual(item.interpretation, submission.result.interpretation)
-        XCTAssertEqual(item.interpretationVersion, "mediflow.gds15.screening-limits.v1")
-        XCTAssertEqual(item.provenanceLabel, "Versione interpretazione: mediflow.gds15.screening-limits.v1")
+        XCTAssertEqual(item.interpretationVersion, "mediflow.gds15.screening-limits.v2")
+        XCTAssertEqual(item.provenanceLabel, "Versione interpretazione: mediflow.gds15.screening-limits.v2")
         XCTAssertEqual(entry.metadata, submission.metadataJSON)
     }
 
@@ -62,7 +64,7 @@ final class ScaleHistoryPresentationTests: XCTestCase {
 
         XCTAssertEqual(item?.title, "ADL (Indice di Katz)")
         XCTAssertEqual(item?.scoreLabel, "2/6")
-        XCTAssertEqual(item?.interpretation, "Compromissione Moderata (2-3/6)")
+        XCTAssertEqual(item?.interpretation, "Punteggio ADL locale: 2/6. Risposte ai sei domini di autonomia, senza attribuzione di una classe di gravità. Fonte della versione locale e adattamento italiano da verificare. Interpretare considerando osservazione clinica, contesto e informazioni della persona o dell’informante.")
     }
 
     func testHistoryItemFallsBackToEntryFieldsWhenMetadataIsMissing() {

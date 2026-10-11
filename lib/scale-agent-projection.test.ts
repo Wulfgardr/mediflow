@@ -34,7 +34,7 @@ test('actual Patient Insight builder carries a bounded stored version without re
         const before = JSON.stringify(entry);
         const current = await buildPatientInsightContext('synthetic-patient');
         const line = current.sourceRefs.find(ref => ref.evidenceSourceId === 'diary:synthetic-scale')!.promptLine;
-        assert.match(line, /Versione interpretazione: mediflow\.gds15\.screening-limits\.v1/);
+        assert.match(line, /Versione interpretazione: mediflow\.gds15\.screening-limits\.v2/);
         assert.equal(JSON.stringify(entry), before);
 
         for (const id of ['adl', 'iadl', 'tinetti-poma28-v1']) {
