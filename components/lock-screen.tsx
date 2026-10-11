@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSecurity } from './security-provider';
 import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
-import { LONG_PIN_NOTICE } from '@/lib/security/unlock-plan';
+import { LONG_PIN_NOTICE, LONG_PIN_NOTICE_MIN_MS } from '@/lib/security/unlock-plan';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 /** Enter submits, Tab leaves the field, a modifier alone does nothing: these keep a held text confirmable. */
@@ -17,6 +17,7 @@ export function LockScreen() {
     const [pin, setPin] = useState('');
     // The exact text the provider held back because the policy would accept it as a passphrase.
     const [heldText, setHeldText] = useState<string | null>(null);
+    const heldSince = useRef(0);
     const endConfirmation = () => setHeldText(null);
     // Counted as the primitives count it, after normalization: what they accept can be submitted.
     const longEnough = passphrase ? checkPassphrase(pin).ok : pin.length >= 4;
@@ -48,12 +49,16 @@ export function LockScreen() {
         e.preventDefault();
         /* @Codex: Enter cannot bypass a pending or unconfirmed recovery. */
         if (authRecoveryState !== 'ready') return;
+        // A submit that follows the notice at once, like the second click of a double click, comes
+        // before the notice can be read: it is not the second gesture, and nothing happens.
+        if (longPinNotice && performance.now() - heldSince.current < LONG_PIN_NOTICE_MIN_MS) return;
         setLoading(true);
         setError('');
 
         try {
             const outcome = await login(pin, { shown: passphrase ? 'passphrase' : 'pin', longPinConfirmed: longPinNotice });
             // Nothing was sent: the text stays, so that the person can confirm it or change it.
+            heldSince.current = performance.now();
             setHeldText(outcome === 'confirm' ? pin : null);
             if (outcome === false) {
                 setError('');
@@ -142,7 +147,11 @@ export function LockScreen() {
                             // text: React reports a change only when the value differs, and a deletion
                             // with nothing to delete reports nothing at all. So does every key that
                             // neither submits the text nor leaves the field.
-                            onKeyDown={(e) => { if (!KEYS_THAT_KEEP_CONFIRMATION.has(e.key)) endConfirmation(); }}
+                            onKeyDown={(e) => {
+                                // A key held down is one gesture: its repetitions never submit.
+                                if (e.key === 'Enter' && e.repeat) e.preventDefault();
+                                else if (!KEYS_THAT_KEEP_CONFIRMATION.has(e.key)) endConfirmation();
+                            }}
                             onInput={endConfirmation}
                             onPaste={endConfirmation}
                             onCut={endConfirmation}

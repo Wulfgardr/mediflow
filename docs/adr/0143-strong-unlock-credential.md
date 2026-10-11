@@ -245,6 +245,10 @@ stesso per i tasti che non modificano nulla: ogni tasto premuto nel campo,
 tranne Invio, Tab e i modificatori, fa ricominciare. Quando un testo viene
 trattenuto il fuoco torna sul campo, perché il secondo gesto si possa fare
 dalla tastiera.
+Una sesta ha notato che, con il fuoco sul campo, tenere premuto Invio
+faceva valere come conferma le ripetizioni del tasto: le ripetizioni non
+inviano più nulla, e un invio che segue l'avviso entro 700 millisecondi,
+come il secondo clic di un doppio clic, non conta come secondo gesto.
 
 | Difetto | Esito |
 | --- | --- |
