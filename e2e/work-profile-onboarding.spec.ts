@@ -1,6 +1,7 @@
 /* @Codex */
 import { expect, test } from '@playwright/test';
 import { completeOnboardingIfNeeded, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 const endpoint = '/api/onboarding/work-profile';
 
@@ -30,6 +31,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(page).toHaveTitle(/MediFlow/);
     await completeOnboardingIfNeeded(page, process.env.E2E_PIN || '1234');
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel.getByRole('heading', { name: 'Il tuo modo di lavorare' })).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
@@ -143,7 +145,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Agent');
     expectedLostResponse = false;
     const current = await read();
-    const replay = await context.request.put(endpoint, { data: current.lastCommand });
+    const replay = await context.request.put(endpoint, { headers: archiveHeaders, data: current.lastCommand });
     expect(await replay.json()).toEqual(current);
     await panel.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
     await expect(page).toHaveURL(/[?&]area=turno/);

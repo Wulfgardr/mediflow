@@ -4,6 +4,7 @@ import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 
 const NATIVE_TEXT = 'PRIMA PAGINA TESTUALE - DOCUMENTO SINTETICO';
@@ -40,8 +41,10 @@ async function syntheticDocument(scenario: Scenario): Promise<Buffer> {
 }
 
 async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Buffer) {
+  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = randomUUID();
   const patientResponse = await page.request.post('/api/patients', {
+    headers: archiveHeaders,
     data: {
       firstName: 'Documento', lastName: 'Sintetico OCR',
       taxCode: `OCR${marker.replaceAll('-', '').slice(0, 13)}`,
@@ -73,7 +76,7 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   expect(persisted.data).toBe(uploaded.data);
   for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'])
     expect(persisted).not.toHaveProperty(key); // Preserve the ordinary API projection.
-  return { id, name, persisted };
+  return { id, name, persisted, archiveHeaders };
 
 }
 
@@ -187,7 +190,7 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
     release.resolve(); await delivered.promise;
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     const replay = await page.request.post(endpoint, { data: bytes, headers: {
-      Origin: new URL(page.url()).origin, 'Content-Type': 'application/octet-stream',
+      ...attachment.archiveHeaders, 'Content-Type': 'application/octet-stream',
       'X-MediFlow-Extraction-Action': 'project', 'X-MediFlow-Extraction-Grant': token,
     } });
     expect(replay.status()).toBe(409);

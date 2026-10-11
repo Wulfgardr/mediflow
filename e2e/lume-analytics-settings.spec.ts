@@ -2,6 +2,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { bootstrapUnlockedSession } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 type ViewCase = {
   register: 'giorno' | 'grafite';
@@ -18,8 +19,10 @@ const CASES: ViewCase[] = [
 ];
 
 async function createAnalyticsFixture(page: Page): Promise<void> {
+  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const suffix = `${Date.now()}`.slice(-8) + Math.random().toString(36).slice(2, 7).toUpperCase();
   const response = await page.request.post('/api/patients', {
+    headers: archiveHeaders,
     data: {
       firstName: `Analisi${suffix.slice(0, 5)}`,
       lastName: `Sintetica${suffix.slice(5)}`,

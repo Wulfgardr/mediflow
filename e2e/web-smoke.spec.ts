@@ -2,6 +2,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 /* @Codex: ordinary UI smoke observes every console error and uncaught page error. */
 type ObservedConsoleError = Readonly<{ text: string; url: string }>;
@@ -228,11 +229,12 @@ test('web smoke: Rivedi agenda focuses its controlled heading without leaving tu
    identities; the standalone review's AI queue and hidden lens are not product controls. */
 test('web smoke: live decision CTAs always open their declared patient context', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
   const createPatient = async (firstName: string, exemptions: string[]) => {
     const lastName = `Smoke${marker}`;
     const taxCode = `SMK${firstName[0]}${marker}00`;
-    const response = await page.request.post('/api/patients', { data: {
+    const response = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
       firstName, lastName, taxCode, birthDate: '1980-01-01T00:00:00.000Z', exemptions,
       notes: `Contesto sintetico ${firstName}. Nessun dato reale.`, diagnoses: [],
     } });
@@ -248,7 +250,7 @@ test('web smoke: live decision CTAs always open their declared patient context',
   const rows = await latest.json() as Array<{ date: string }>;
   const date = new Date(Math.max(Date.now(), ...rows.map(row => Date.parse(row.date)).filter(Number.isFinite)) + 1_000).toISOString();
   const entryTitle = `Follow-up sintetico ${marker}`;
-  const entryResponse = await page.request.post('/api/entries', { data: {
+  const entryResponse = await page.request.post('/api/entries', { headers: archiveHeaders, data: {
     patientId: quadroPatient.id, type: 'note', title: entryTitle,
     content: 'Voce sintetica per verificare la destinazione della CTA.', date, setting: 'ambulatory',
   } });
@@ -308,13 +310,13 @@ test('web smoke: live decision CTAs always open their declared patient context',
   await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Contesto sintetico Quadro.');
 
   // Retire only records created here through the versioned, supported endpoints.
-  const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { data: { version: entry.version } });
+  const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { headers: archiveHeaders, data: { version: entry.version } });
   expect(removedEntry.status()).toBe(200);
   for (const resource of [`/api/patients/${documentsPatient.id}`, `/api/patients/${quadroPatient.id}`]) {
     const current = await page.request.get(resource);
     expect(current.status()).toBe(200);
     const { version } = await current.json() as { version: number };
-    const removed = await page.request.delete(resource, { data: { version } });
+    const removed = await page.request.delete(resource, { headers: archiveHeaders, data: { version } });
     expect(removed.status()).toBe(200);
   }
 });
