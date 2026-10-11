@@ -11,6 +11,7 @@ import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import {
     BACKUP_SCHEDULER_SETTINGS_KEY,
+    BackupSchedulerOutcomeUnknownError,
     applyBackupRetention,
     applyRetentionResultToState,
     mergeBackupSchedulerConfig,
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
             adapter.uninstall();
         }
 
+        if (adapter.getStatus().installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
         await saveSchedulerSettingValue(JSON.stringify(nextState));
 
         try {
@@ -149,8 +151,16 @@ export async function POST(request: Request) {
             console.error('Audit backup scheduler write failed:', error);
         }
 
-        return NextResponse.json(buildBackupSchedulerStatus(JSON.stringify(nextState)));
+        const observed = buildBackupSchedulerStatus(JSON.stringify(nextState));
+        if (observed.installed !== nextState.config.enabled) throw new BackupSchedulerOutcomeUnknownError();
+        return NextResponse.json(observed);
     } catch (error) {
+        if (error instanceof BackupSchedulerOutcomeUnknownError) {
+            return NextResponse.json({
+                error: error.message, code: 'backup_scheduler_outcome_unconfirmed',
+                status: buildBackupSchedulerStatus(await loadSchedulerSettingValue()),
+            }, { status: 503 });
+        }
         /* Il messaggio grezzo qui contiene la destinazione del backup. */
         return apiInternalError('POST backup scheduler', error, {
             code: 'backup_scheduler_save_failed',
