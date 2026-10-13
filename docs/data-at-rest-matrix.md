@@ -7,9 +7,9 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 8.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Aggiornata l’11 ottobre 2026 per credenziali v3 e generazione
-dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
+**Versione 9.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Aggiornata il 13 ottobre 2026 per i permessi del database adottato dalla cartella
+dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
 
 MediFlow cifra alcuni campi, non il database. Questa matrice dice, per ogni
 colonna e per ogni file che il prodotto scrive, che cosa si legge senza la
@@ -270,7 +270,7 @@ locali salvano ciò che ricevono.
 
 | Artefatto | Dove | Che cosa contiene | Protezione | Fonte |
 | --- | --- | --- | --- | --- |
-| Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file di nuova creazione `0600` (l’adozione storica nella directory predefinita usa i permessi del sistema), ed è `0600` anche il file che una riparazione mette al suo posto o ripristina. Con le versioni precedenti una riparazione lo lasciava con i permessi predefiniti del sistema (misurato `0644` con umask `022`): un archivio già riparato resta così, il prodotto non ne restringe i permessi. La directory predefinita è `0700`, anche se esisteva già; una directory scelta con `MEDIFLOW_DATA_DIR` resta com'è se esisteva, nasce `0700` se la crea il prodotto. Su Windows valgono le regole di accesso del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts`, `lib/sqlite-repair.ts` |
+| Database `medical.db` | Directory dati: `~/Library/Application Support/MediFlow` su macOS, `~/.mediflow` altrove, oppure `MEDIFLOW_DATA_DIR`. | Le tabelle sopra. | Campi cifrati; file `0600` sia quando nasce vuoto, sia quando il primo avvio adotta un `medical.db` storico dalla cartella dell’applicazione, sia quando una riparazione lo mette al suo posto o lo ripristina. Con le versioni precedenti l’adozione e la riparazione lo lasciavano con i permessi predefiniti del sistema (misurato `0644` con umask `022` sulla copia): un archivio già adottato o già riparato resta così, il prodotto non ne restringe i permessi. La directory predefinita è `0700`, anche se esisteva già; una directory scelta con `MEDIFLOW_DATA_DIR` resta com'è se esisteva, nasce `0700` se la crea il prodotto. Su Windows valgono le regole di accesso del sistema. | `lib/data-dir.ts`, `lib/sqlite-schema-open.ts`, `lib/sqlite-repair.ts` |
 | `medical.db-wal`, `medical.db-shm` | Accanto al database. | Le stesse pagine, compresi valori precedenti finché non vengono riassorbiti. Il passaggio alla passphrase svuota il registro, che conserverebbe l'involucro del PIN. | Come il database. | SQLite, `lib/security/pin-era-residues.ts` |
 | Originale dell'aggiornamento dello schema `medical.db.schema-original-v<N>-<uuid>.db` | Directory dati. | Copia integrale del database com'era prima dell'aggiornamento, compresi `users` e l'involucro della chiave. | Campi cifrati; file `0600`. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `lib/sqlite-schema-open.ts`, `lib/security/pin-era-residues.ts` |
 | Copia di riparazione `medical.db.bak-<data>-<ora>` | Directory dati. | Copia integrale del database com'era prima della riparazione, compresi `users` e l'involucro della chiave. | Campi cifrati; file `0600`. Le copie lasciate da versioni precedenti restano con i permessi con cui sono nate (misurato `0644` con umask `022`): verso gli altri account le protegge solo la directory dati. Resta finché non viene rimossa; il passaggio alla passphrase elimina quelle in cui l'account ha ancora l'involucro del PIN. | `app/api/system/repair-db/route.ts`, `lib/sqlite-repair.ts`, `lib/security/pin-era-residues.ts` |
@@ -323,7 +323,7 @@ conservata separatamente secondo il sistema operativo.
 4. **Il server riceve il PIN** negli accessi del profilo transitorio. Per v3
    riceve solo il verificatore; il PIN separato rimane nelle conferme.
 5. **Permessi** dei backup pianificati e della directory dati: chiusi dalla
-   versione 2 di questa matrice. Una destinazione scelta dall’operatore richiede permessi limitati al suo account; su Windows si verificano le ACL, non si deducono dai bit POSIX. Le copie e i database riparati dalle versioni precedenti conservano i permessi originari: verso altri account li protegge la directory dati riservata al proprietario.
+   versione 2 di questa matrice. Una destinazione scelta dall’operatore richiede permessi limitati al suo account; su Windows si verificano le ACL, non si deducono dai bit POSIX. Le copie e i database adottati o riparati dalle versioni precedenti conservano i permessi originari: verso altri account li protegge la directory dati riservata al proprietario.
 6. **Export FHIR e moduli** in chiaro, con il nome del paziente nel nome del
    file. Destinazione controllata dall’operatore, volume cifrato e condivisione deliberata: nessuna cifratura dell’export è dichiarata.
 7. **Le rotte Web locali non controllano l'involucro**: un client che invia
@@ -360,3 +360,4 @@ cambia una classificazione.
 | 6 | Generazione e legame sessioni; chiave v3 solo in memoria; limiti espliciti della pulizia dei residui. |
 | 7 | Recupero completo cifrato distinto dall’export portabile, snapshot temporanei e disposizioni verificabili delle esposizioni. |
 | 8 | Copie e istantanee di riparazione `0600`, anche al ritorno; permessi storici e adozione distinti dalla nuova creazione. |
+| 9 | Database adottato dalla cartella dell’applicazione `0600`, come ogni copia fatta attraverso SQLite; restano com'erano gli archivi adottati dalle versioni precedenti. |

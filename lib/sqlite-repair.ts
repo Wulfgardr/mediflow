@@ -264,10 +264,15 @@ export async function backupSqliteDatabase(sourcePath: string, destPath: string)
  * legacy migration). VACUUM INTO reads through SQLite, so committed pages still
  * sitting in a -wal sidecar are included, unlike fs.copyFileSync, which tears
  * a WAL-mode database. destPath must not exist yet.
+ *
+ * The copy is owner-only from its first byte: SQLite would create it with the
+ * umask default, so the empty file is reserved 0600 first (VACUUM INTO accepts
+ * an empty destination) and never exists with wider permissions.
  */
 export function copySqliteDatabaseSync(sourcePath: string, destPath: string): void {
     const source = new Database(sourcePath, { readonly: true, fileMustExist: true });
     try {
+        fs.closeSync(fs.openSync(destPath, 'wx', 0o600));
         source.prepare('VACUUM INTO ?').run(destPath);
     } finally {
         source.close();
