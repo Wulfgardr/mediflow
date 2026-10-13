@@ -395,6 +395,26 @@ test('copySqliteDatabaseSync recovers the WAL sidecar left behind by a crashed p
     }
 });
 
+test('copySqliteDatabaseSync leaves an owner-only copy whatever the umask and refuses an existing destination', () => {
+    const dir = makeTempDir();
+    const sourcePath = path.join(dir, 'source.db');
+    const copyPath = path.join(dir, 'copy.db');
+    createDatabase(sourcePath, ['Mario Rossi'], 'delete').close();
+    // SQLite alone would create the copy 0644 under this umask.
+    const previousUmask = process.umask(0o022);
+    try {
+        fs.chmodSync(sourcePath, 0o644);
+        copySqliteDatabaseSync(sourcePath, copyPath);
+        assert.deepEqual(readNames(copyPath), ['Mario Rossi']);
+        if (process.platform !== 'win32') assert.equal(permissionBits(copyPath), 0o600);
+        assert.throws(() => copySqliteDatabaseSync(sourcePath, copyPath), { code: 'EEXIST' });
+        assert.deepEqual(readNames(copyPath), ['Mario Rossi']);
+    } finally {
+        process.umask(previousUmask);
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+});
+
 test('removeSqliteSidecars deletes -wal and -shm files and tolerates missing ones', () => {
     const dir = makeTempDir();
     const dbPath = path.join(dir, 'medical.db');
