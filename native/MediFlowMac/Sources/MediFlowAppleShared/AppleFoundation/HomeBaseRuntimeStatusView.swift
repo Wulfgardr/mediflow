@@ -110,8 +110,7 @@ public struct HomeBaseRuntimeStatusView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
         .accessibilityIdentifier("homebase-runtime-status-card")
         .task {
             await refreshOptionalServices()

@@ -102,7 +102,7 @@ public struct AppleFoundationWindowContent: View {
         AppleFoundationOverviewView(snapshot: snapshot)
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(PlatformColors.groupedBackground)
+            .background(PlatformColors.chartCardSurface)
     }
 }
 
@@ -155,8 +155,9 @@ public struct AppleFoundationOverviewView: View {
                 }
             }
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 
     private var lanes: some View {
@@ -229,8 +230,9 @@ public struct AppleCapabilityLaneCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 
     private func platformHeader(_ title: String) -> some View {
@@ -536,7 +538,7 @@ public struct AppleFoundationMobileRootView: View {
         case .overview:
             AppleFoundationOverviewView(snapshot: snapshot)
                 .padding(20)
-                .background(PlatformColors.groupedBackground)
+                .background(PlatformColors.chartCardSurface)
                 .accessibilityIdentifier("apple-foundation-overview-view")
         case .repertori:
             // Catalogue browsing is a macOS surface for now; mobile reaches the
@@ -552,7 +554,7 @@ public struct AppleFoundationMobileRootView: View {
                 HomeBaseRuntimeStatusView()
                     .padding(20)
             }
-            .background(PlatformColors.groupedBackground)
+            .background(PlatformColors.chartCardSurface)
             .accessibilityIdentifier("apple-foundation-runtime-view")
         case .milestones:
             ScrollView {
@@ -563,7 +565,7 @@ public struct AppleFoundationMobileRootView: View {
                 }
                 .padding(20)
             }
-            .background(PlatformColors.groupedBackground)
+            .background(PlatformColors.chartCardSurface)
             .accessibilityIdentifier("apple-foundation-milestones-view")
         }
     }
@@ -593,7 +595,8 @@ public struct AppleMilestoneCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 }

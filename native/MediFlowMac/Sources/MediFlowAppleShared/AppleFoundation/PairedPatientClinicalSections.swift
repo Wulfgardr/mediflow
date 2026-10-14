@@ -84,21 +84,23 @@ struct PairedPatientClinicalSections: View {
 
             Divider()
 
-            checkupForm(
-                title: "Nuovo controllo online",
-                checkupTitle: $model.newCheckupTitle,
-                notes: $model.newCheckupNotes,
-                status: $model.newCheckupStatus,
-                date: $model.newCheckupDate,
-                primaryLabel: "Salva controllo",
-                primaryIdentifier: "homebase-create-checkup-button",
-                canSubmit: model.canCreateCheckup,
-                onCancel: nil,
-                onSubmit: { Task { await model.createCheckupForSelectedPatient() } }
-            )
-            Text("Solo campi manuali non-AI. Nessuna coda offline o import documentale.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuovo controllo", identifier: "checkup-create-disclosure") {
+                checkupForm(
+                    title: "Nuovo controllo online",
+                    checkupTitle: $model.newCheckupTitle,
+                    notes: $model.newCheckupNotes,
+                    status: $model.newCheckupStatus,
+                    date: $model.newCheckupDate,
+                    primaryLabel: "Salva controllo",
+                    primaryIdentifier: "homebase-create-checkup-button",
+                    canSubmit: model.canCreateCheckup,
+                    onCancel: nil,
+                    onSubmit: { Task { await model.createCheckupForSelectedPatient() } }
+                )
+                Text("Solo campi manuali non-AI. Nessuna coda offline o import documentale.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -106,7 +108,7 @@ struct PairedPatientClinicalSections: View {
     private var observationsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             PairedPatientSectionHeader(model: model,
-                title: "Osservazioni",
+                title: "Misure",
                 subtitle: "Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) osservazioni",
                 systemImage: "waveform.path.ecg",
                 refreshIdentifier: "homebase-refresh-observations-button",
@@ -157,31 +159,33 @@ struct PairedPatientClinicalSections: View {
 
             Divider()
 
-            observationForm(
-                title: "Nuova osservazione online",
-                display: $model.newObservationDisplay,
-                code: $model.newObservationCode,
-                value: $model.newObservationValue,
-                unitCode: $model.newObservationUnitCode,
-                notes: $model.newObservationNotes,
-                observedAt: $model.newObservationObservedAt,
-                codeResults: model.newObservationCodeTerminologyResults,
-                unitResults: model.newObservationUnitTerminologyResults,
-                isSearchingCode: model.isSearchingNewObservationCodeTerminology,
-                isSearchingUnit: model.isSearchingNewObservationUnitTerminology,
-                primaryLabel: "Salva osservazione",
-                primaryIdentifier: "homebase-create-observation-button",
-                canSubmit: model.canCreateObservation,
-                onCodeQueryChanged: { model.scheduleNewObservationCodeTerminologySearch() },
-                onUnitQueryChanged: { model.scheduleNewObservationUnitTerminologySearch() },
-                onSelectCode: { model.selectNewObservationCodeTerminology($0) },
-                onSelectUnit: { model.selectNewObservationUnitTerminology($0) },
-                onCancel: nil,
-                onSubmit: { Task { await model.createObservationForSelectedPatient() } }
-            )
-            Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuova misura", identifier: "observation-create-disclosure") {
+                observationForm(
+                    title: "Nuova osservazione online",
+                    display: $model.newObservationDisplay,
+                    code: $model.newObservationCode,
+                    value: $model.newObservationValue,
+                    unitCode: $model.newObservationUnitCode,
+                    notes: $model.newObservationNotes,
+                    observedAt: $model.newObservationObservedAt,
+                    codeResults: model.newObservationCodeTerminologyResults,
+                    unitResults: model.newObservationUnitTerminologyResults,
+                    isSearchingCode: model.isSearchingNewObservationCodeTerminology,
+                    isSearchingUnit: model.isSearchingNewObservationUnitTerminology,
+                    primaryLabel: "Salva osservazione",
+                    primaryIdentifier: "homebase-create-observation-button",
+                    canSubmit: model.canCreateObservation,
+                    onCodeQueryChanged: { model.scheduleNewObservationCodeTerminologySearch() },
+                    onUnitQueryChanged: { model.scheduleNewObservationUnitTerminologySearch() },
+                    onSelectCode: { model.selectNewObservationCodeTerminology($0) },
+                    onSelectUnit: { model.selectNewObservationUnitTerminology($0) },
+                    onCancel: nil,
+                    onSubmit: { Task { await model.createObservationForSelectedPatient() } }
+                )
+                Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -322,11 +326,7 @@ struct PairedPatientClinicalSections: View {
                             .accessibilityLabel(glyph.label)
                     }
                     Text(observation.value)
-                        #if os(macOS)
                         .font(.title3.weight(.semibold))
-                        #else
-                        .font(.caption2.weight(.semibold))
-                        #endif
                         .registro()
                         .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
                     Text(observation.unitCode)

@@ -46,10 +46,12 @@ struct PairedPatientPrescriptionSections: View {
             }
 
             Divider()
-            servicePrescriptionForm
-            Text("Creazione unica. Dopo il salvataggio la modifica testuale resta sul web; dal client nativo sono disponibili solo le transizioni di stato previste.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuova prestazione", identifier: "service-create-disclosure") {
+                servicePrescriptionForm
+                Text("Creazione unica. Dopo il salvataggio la modifica testuale resta sul web; dal client nativo sono disponibili solo le transizioni di stato previste.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -83,10 +85,12 @@ struct PairedPatientPrescriptionSections: View {
             }
 
             Divider()
-            prostheticPrescriptionForm
-            Text("Creazione manuale completa. Nessun edit post-create e nessun hard delete dal client nativo.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuova prescrizione protesica", identifier: "prosthetic-create-disclosure") {
+                prostheticPrescriptionForm
+                Text("Creazione manuale completa. Nessun edit post-create e nessun hard delete dal client nativo.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

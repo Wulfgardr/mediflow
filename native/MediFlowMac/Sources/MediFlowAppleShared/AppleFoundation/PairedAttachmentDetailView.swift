@@ -6,27 +6,45 @@ struct PairedAttachmentDetailView: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     let summary: HomeBaseAttachmentSummary
     let onClose: () -> Void
+    var isEmbedded = false
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let detail = model.selectedAttachmentDetail, detail.id == summary.id {
-                    detailContent(detail)
-                } else if model.isWorking {
-                    ProgressView("Caricamento documento…")
-                        .padding(20)
-                } else {
-                    Text("Documento non disponibile.")
-                        .foregroundStyle(.secondary)
-                        .padding(20)
+        Group {
+            if isEmbedded {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(summary.name.isEmpty ? "Documento" : summary.name)
+                            .font(.headline).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
+                        Button("Chiudi", systemImage: "xmark", action: onClose)
+                            .labelStyle(.iconOnly)
+                    }.padding(16)
+                    Divider()
+                    document
+                }
+                .background(PlatformColors.chartCardSurface)
+            } else {
+                NavigationStack {
+                    document
+                        .navigationTitle(summary.name.isEmpty ? "Documento" : summary.name)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Chiudi", action: onClose)
+                            }
+                        }
                 }
             }
-            .navigationTitle(summary.name.isEmpty ? "Documento" : summary.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Chiudi", action: onClose)
-                }
-            }
+        }
+    }
+
+    @ViewBuilder
+    private var document: some View {
+        if let detail = model.selectedAttachmentDetail, detail.id == summary.id {
+            detailContent(detail)
+        } else if model.isWorking {
+            ProgressView("Caricamento documento…").padding(20)
+        } else {
+            Text("Documento non disponibile.").foregroundStyle(.secondary).padding(20)
         }
     }
 

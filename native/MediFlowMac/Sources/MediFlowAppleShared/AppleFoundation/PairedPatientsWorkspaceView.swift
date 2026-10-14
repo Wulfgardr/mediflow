@@ -5,6 +5,7 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.clinicalPatientNavigation) private var linkedPatient // @Codex
     @Environment(\.clinicalNavigationInteraction) private var navigationInteraction // @Codex
     @State private var navigationInteractionID = UUID() // @Codex
@@ -190,7 +191,9 @@ struct PairedPatientsWorkspaceView: View {
         }
         // @Codex: The diary and documents share this presenter even when only
         // one clinical section is mounted. Opening a document never saves a draft.
-        .sheet(item: $attachmentDetailCandidate, onDismiss: { model.dismissAttachmentDetail() }) { summary in
+        .sheet(item: attachmentSheetCandidate, onDismiss: {
+            if !usesInlineAttachmentPreview { model.dismissAttachmentDetail() }
+        }) { summary in
             PairedAttachmentDetailView(model: model, summary: summary, onClose: {
                 attachmentDetailCandidate = nil
             })
@@ -409,6 +412,22 @@ struct PairedPatientsWorkspaceView: View {
             compactPatientID = isWide ? nil : linkedPatient.patientID
         }
         linkedPatient.consume()
+    }
+
+    private var usesInlineAttachmentPreview: Bool {
+        guard model.activePatientSection == .documents else { return false }
+        #if os(macOS)
+        return true
+        #else
+        return horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+        #endif
+    }
+
+    private var attachmentSheetCandidate: Binding<HomeBaseAttachmentSummary?> {
+        Binding(
+            get: { usesInlineAttachmentPreview ? nil : attachmentDetailCandidate },
+            set: { if !usesInlineAttachmentPreview { attachmentDetailCandidate = $0 } }
+        )
     }
 
     private var navigationPresentationIsOpen: Bool {
@@ -1471,7 +1490,8 @@ struct PairedPatientsWorkspaceView: View {
                 fseValidationKind: $fseValidationKind,
                 selectedFseTherapyId: $selectedFseTherapyId,
                 selectedFseObservationId: $selectedFseObservationId,
-                expandedInsightId: $expandedInsightId
+                expandedInsightId: $expandedInsightId,
+                usesInlinePreview: usesInlineAttachmentPreview
             )
             .chartCard()
             }

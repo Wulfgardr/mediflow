@@ -103,7 +103,7 @@ struct PairedPatientFlagChip: View {
             Text(text)
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(isOnProminentBackground ? Color.white : toneColor)
+        .foregroundStyle(isOnProminentBackground ? Color.primary : toneColor)
         .accessibilityElement(children: .combine)
     }
 
@@ -243,43 +243,24 @@ struct PairedPatientCounterStrip: View {
     let identifier: String
 
     var body: some View {
-        Group {
-            if dynamicTypeSize >= .accessibility1 {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(values, id: \.0) { label, value in
-                        HStack(spacing: 6) {
-                            Text("\(value)")
-                                .font(.caption.weight(.semibold))
-                                .registro()
-                            Text(label)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(minWidth: 58, alignment: .leading)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 8)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            } else {
-                HStack(spacing: 8) {
-                    ForEach(values, id: \.0) { label, value in
-                        VStack(spacing: 2) {
-                            Text("\(value)")
-                                .font(.caption.weight(.semibold))
-                                .registro()
-                            Text(label)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(minWidth: 58)
-                        .padding(.vertical, 6)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 20) { counters }
+            VStack(alignment: .leading, spacing: 8) { counters }
+        }
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
+        .accessibilityIdentifier(identifier)
+    }
+
+    @ViewBuilder
+    private var counters: some View {
+        ForEach(values, id: \.0) { label, value in
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(value)").inkRegister(weight: .semibold).monospacedDigit()
+                Text(label).chartMetadata()
             }
         }
-        .accessibilityIdentifier(identifier)
     }
 }
 

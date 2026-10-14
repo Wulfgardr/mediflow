@@ -349,6 +349,7 @@ public struct MediFlowMacRootView: View {
                 }
                 .padding(20)
             }
+            .background(PlatformColors.chartCardSurface)
             .accessibilityIdentifier("apple-foundation-milestones-view")
         }
     }

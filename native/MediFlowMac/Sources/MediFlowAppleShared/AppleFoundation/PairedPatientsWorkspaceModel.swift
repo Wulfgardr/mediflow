@@ -3640,13 +3640,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         // of treating the intentionally offline demo as a failed paired load.
         if Self.isUITestSeeded {
             guard let patientId = selectedPatient?.id else { return }
-            attachments = []
+            attachments = AppleFoundationDemoMode.isDemoDataset ? [AppleFoundationDemoMode.documentSummary(patientId: patientId)] : []
             attachmentsPatientId = patientId
             attachmentsLoadState = .loaded // @Codex
             selectedAttachmentDetail = nil
             attachmentShareURL = nil
             errorMessage = nil
-            if reportStatus { statusMessage = "Nessun documento caricato per questo paziente." }
+            if reportStatus { statusMessage = attachments.isEmpty ? "Nessun documento caricato per questo paziente." : "Documento sintetico di esempio caricato." }
             return
         }
         #endif
@@ -3715,6 +3715,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// stays in memory: the decrypted data URL is decoded straight into PDFKit /
     /// UIImage-NSImage without ever writing the bytes to disk (D12).
     func openAttachmentDetail(_ summary: HomeBaseAttachmentSummary) async {
+        #if DEBUG
+        if AppleFoundationDemoMode.isDemoDataset, summary.id == "demo-document", summary.patientId == selectedPatient?.id {
+            attachmentShareURL = nil
+            selectedAttachmentDetail = AppleFoundationDemoMode.document(patientId: summary.patientId)
+            return
+        }
+        #endif
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else { return }
         guard summary.patientId == patientId else { return }
         attachmentShareURL = nil

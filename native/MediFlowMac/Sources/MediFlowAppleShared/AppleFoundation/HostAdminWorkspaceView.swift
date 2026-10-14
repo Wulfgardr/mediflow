@@ -110,6 +110,7 @@ struct HostAdminWorkspaceView: View {
             .frame(maxWidth: 900, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(PlatformColors.chartCardSurface)
         .task(id: workspaceModel.clinicalWorkspaceConnection?.identity) {
             await refresh()
         }
@@ -356,9 +357,9 @@ struct HostAdminWorkspaceView: View {
                 .accessibilityHeading(.h2)
             content()
         }
-        .padding(16)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .lumeSurface(zone: .field)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 }
 #endif
