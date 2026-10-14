@@ -1,7 +1,7 @@
 'use client';
 
-/* @Codex */
 import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -224,15 +224,15 @@ export default function TreatmentReasoningPanel({
     };
 
     return (
-        <div className={ink.surface + " patient-detail-section overflow-hidden border p-0"} data-testid="treatment-reasoning-panel">
-            <div className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] p-5">
+        <div className={`${styles.register} ${styles.review}`} data-testid="treatment-reasoning-panel">
+            <div className={styles.toolbar}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]">
                             <BrainCircuit className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
-                            <p className="section-kicker">Review terapie</p>
+
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <span className="apple-chip">{sourceSummary.total} fonti</span>
@@ -250,7 +250,7 @@ export default function TreatmentReasoningPanel({
                         onClick={loadProposal}
                         disabled={!canPrepare}
                         aria-describedby="treatment-reasoning-boundary-note"
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`${styles.control} ${styles.primary}`}
                     >
                         {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                         {publication ? 'Aggiorna bozza' : 'Genera bozza'}
@@ -303,9 +303,9 @@ export default function TreatmentReasoningPanel({
                     </div>
                 ) : null}
 
-                <div className="grid gap-2 sm:grid-cols-5">
+                <div className={styles.reviewCounts}>
                     {sourceSummaryItems.map(([label, value]) => (
-                        <div key={label} className={ink.record}>
+                        <div key={label}>
                             <span className="block text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
                             <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{value}</span>
                         </div>
@@ -372,7 +372,7 @@ export default function TreatmentReasoningPanel({
                                 {publication.value.data.keyEvidence.length === 0 ? (
                                     <p className={`rounded-[14px] border p-3 text-xs ${semanticSignalSurfaceClass('critical')}`}>Nessuna evidenza chiave strutturata.</p>
                                 ) : publication.value.data.keyEvidence.map((evidence) => (
-                                    <div key={evidence.id} className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3">
+                                    <div key={evidence.id} className={styles.proposalRow}>
                                         <p className="text-sm font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
                                         <DocumentReferenceChip references={[...evidence.evidenceRefs]} />
                                     </div>
@@ -399,9 +399,9 @@ export default function TreatmentReasoningPanel({
                         {publication.value.data.suggestedActions.length > 0 ? (
                             <div className="space-y-3">
                                 <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
-                                <div className="grid gap-3 md:grid-cols-2">
+                                <div className="min-w-0">
                                     {publication.value.data.suggestedActions.map((action) => (
-                                        <div key={action.id} className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3">
+                                        <div key={action.id} className={styles.proposalRow}>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="text-sm font-semibold text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
                                                 <span className="apple-chip">{actionPolicyLabel(action)}</span>
@@ -438,7 +438,7 @@ export default function TreatmentReasoningPanel({
                             </summary>
                             <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3">
                                 {publication.sourceBindings.map((binding) => (
-                                    <div key={binding.claimPath} className="rounded-[12px] bg-[color:var(--lume-surface-focal)] p-3 text-xs">
+                                    <div key={binding.claimPath} className={styles.proposalRow}>
                                         <span className="break-all lume-code text-xs text-[color:var(--lume-ink-muted)]">{binding.claimPath}</span>
                                         <p className="mt-1 font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
                                         <DocumentReferenceChip references={[...binding.evidenceRefs]} />

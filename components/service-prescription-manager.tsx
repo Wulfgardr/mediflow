@@ -1,6 +1,6 @@
 'use client';
 
-import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import {
     CalendarCheck,
@@ -183,7 +183,6 @@ function parseItemDrafts(value: string, fallbackName: string): Array<{ serviceNa
     });
 }
 
-/* @Codex */
 function childServiceCodeForDraft(
     draft: { serviceName: string; serviceCode?: string },
     inheritedServiceCode: string | undefined,
@@ -201,7 +200,6 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     /* @Codex: the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
 
-    /* @Codex */
     const prescriptions = useLiveQuery(
         async () => {
             const items = await db.servicePrescriptions
@@ -331,7 +329,6 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         }
     };
 
-    /* @Codex */
     const updatePrescriptionAndItems = async (
         item: ServicePrescription,
         update: Partial<ServicePrescription>,
@@ -427,7 +424,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     );
 
     return (
-        <section id={embedded ? undefined : 'prestazioni'} className={`${ink.surface} ${embedded ? '' : 'patient-detail-section border p-5 md:p-6'}`}>
+        <section id={embedded ? undefined : 'prestazioni'} className={styles.register}>
             {embedded ? (
                 <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
             ) : (
@@ -449,7 +446,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             {isFormOpen && (
                 <form
                     onSubmit={handleSubmit}
-                    className={ink.draft + " mb-5 p-4"}
+                    className={styles.form}
                 >
                     <div className="grid gap-3 md:grid-cols-2">
                         <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
@@ -667,15 +664,16 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                 </form>
             )}
 
-            {!prescriptions ? null : prescriptions.length === 0 ? (
-                <div className="rounded-[8px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] px-4 py-6 text-center">
+            {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
+                <div className={styles.empty}>
                     <ClipboardList className="mx-auto mb-2 h-5 w-5 text-[color:var(--lume-ink-muted)]" aria-hidden />
                     <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessuna prestazione prescritta registrata. Aggiungi visite, esami o riabilitazione quando vuoi seguirne stato ed esito.
                     </p>
                 </div>
             ) : (
-                <div className="grid gap-3">
+                <div className="min-w-0">
+                    <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Prestazione</th><th className={styles.secondaryColumn}>Prescritta il</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
                     {prescriptions.map((item) => {
                         const refs = parseDocumentRefs(item.documentRefs);
                         const isClosed = item.status === 'performed' || item.status === 'report_received' || item.status === 'cancelled';
@@ -685,28 +683,10 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         const canCancel = item.status !== 'cancelled' && item.status !== 'performed' && item.status !== 'report_received';
                         const priority = item.priority ?? 'unknown';
                         const childItems = itemsByPrescription.get(item.id) ?? [];
-                        return (
-                            <article
-                                key={item.id}
-                                className={ink.record}
-                            >
-                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip lume-registro">{formatDate(item.prescribedAt) ?? '–'}</span>
-                                            <Badge tone={serviceStatusSignal(item.status)} size="xs">{statusLabel(item.status)}</Badge>
-                                            <Badge tone="plum" size="xs">{categoryLabel(item.category)}</Badge>
-                                            {priority !== 'unknown' && <Badge tone={servicePrioritySignal(priority)} size="xs">{priorityLabel(priority)}</Badge>}
-                                            {childItems.length > 0 && (
-                                                <span className="apple-chip inline-flex items-center gap-1">
-                                                    <ListChecks className="h-3 w-3" aria-hidden />
-                                                    {childItems.length} {childItems.length === 1 ? 'voce' : 'voci'}
-                                                </span>
-                                            )}
-                                            {item.source === 'document_review' && <Badge tone="plum" size="xs">document-backed</Badge>}
-                                            {item.source === 'legacy_therapy_cleanup' && <Badge tone="plum" size="xs">da pulizia diario</Badge>}
-                                        </div>
-                                        <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.serviceName}</h3>
+                        return <tr key={item.id}>
+                            <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${childItems.length} voci` : ''}</small>
+                                <details className={styles.recordDetails}><summary>Dettagli, referti e documenti</summary>
+                                    <p>Prescritta il {formatDate(item.prescribedAt) ?? '–'}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
                                             {item.serviceCode && (
                                                 <p>
@@ -796,8 +776,16 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                         {item.notes && (
                                             <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>
                                         )}
-                                    </div>
-                                    <div className="flex shrink-0 flex-wrap gap-2 md:flex-col md:items-stretch">
+
+                                </details>
+                            </td>
+                            <td className={`${styles.secondaryColumn} lume-registro`}>{formatDate(item.prescribedAt) ?? '–'}</td>
+                            <td><Badge tone={serviceStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge>
+                                {priority !== 'unknown' && <div><Badge tone={servicePrioritySignal(priority)} size="xs" className={styles.status}>{priorityLabel(priority)}</Badge></div>}
+                                {item.source === 'document_review' && <small>Da documento</small>}{item.source === 'legacy_therapy_cleanup' && <small>Da pulizia diario</small>}
+                            </td>
+                            <td>
+                                    <div className={styles.controls}>
                                         {canBook && (
                                             <button
                                                 type="button"
@@ -849,10 +837,11 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                             </button>
                                         )}
                                     </div>
-                                </div>
-                            </article>
-                        );
+
+                            </td>
+                        </tr>;
                     })}
+                    </tbody></table>
                 </div>
             )}
         </section>

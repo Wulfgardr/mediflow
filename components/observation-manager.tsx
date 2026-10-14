@@ -1,11 +1,10 @@
 'use client';
 
-/* @Codex */
-import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
-import { Activity, ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronDown, Minus, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { searchStaticTerminology } from '@/lib/terminology';
@@ -19,7 +18,6 @@ import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
-/* @Codex */
 function toLocalDateTimeInput(date: Date): string {
     const offsetMs = date.getTimezoneOffset() * 60_000;
     return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
@@ -40,7 +38,7 @@ function toNumeric(value: number | string): number | null {
     return Number.isFinite(n) ? n : null;
 }
 
-/* @Codex Sparkline compatta, valori in ordine cronologico crescente. */
+
 function Sparkline({ values }: { values: number[] }) {
     if (values.length < 2) return null;
     const width = 56;
@@ -78,7 +76,6 @@ function Sparkline({ values }: { values: number[] }) {
 
 export type { ObservationPrefill } from '@/lib/observation-prefill';
 
-/* @Codex */
 export default function ObservationManager({
     patientId,
     embedded = false,
@@ -104,11 +101,13 @@ export default function ObservationManager({
     const [valueError, setValueError] = useState<string | null>(null);
     const initialObservedAt = useRef(observedAt);
     const codeSelectRef = useRef<HTMLSelectElement>(null);
+    const formDisclosureRef = useRef<HTMLDetailsElement>(null);
     const valueInputRef = useRef<HTMLInputElement>(null);
     /* @Codex WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
        parametri in polifarmaco); "full" espande l'intera storia oltre le ultime 5. */
     const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
     const [fullGroups, setFullGroups] = useState<Set<string>>(new Set());
+    const selectionPatient = useRef<string | null>(null);
     /* @Codex WUL-UIUX (Fase 3): "Per data" legge un prelievo/pannello a colpo
        d'occhio (piu analiti dello stesso giorno). "Stesso giorno" e un'euristica
        onesta di UI (label "Misure del giorno", non "Referto"): senza panelId nello
@@ -137,7 +136,10 @@ export default function ObservationManager({
         setUnitCode(applied.unitCode);
         setServicePrescriptionItemId(applied.servicePrescriptionItemId);
         setServicePrescriptionItem(applied.servicePrescriptionItem);
-        requestAnimationFrame(() => valueInputRef.current?.focus());
+        requestAnimationFrame(() => {
+            if (formDisclosureRef.current) formDisclosureRef.current.open = true;
+            valueInputRef.current?.focus();
+        });
     }, [loincOptions, prefill]);
 
     const toggleGroup = (analyteCode: string) =>
@@ -158,6 +160,7 @@ export default function ObservationManager({
     const prefillGroup = (analyteCode: string, unit: string) => {
         setCode(analyteCode);
         if (unit) setUnitCode(unit);
+        if (formDisclosureRef.current) formDisclosureRef.current.open = true;
         valueInputRef.current?.focus();
     };
 
@@ -166,7 +169,6 @@ export default function ObservationManager({
     const italianLoincLabel = (analyteCode: string, fallback: string) =>
         loincOptions.find((item) => item.code === analyteCode)?.displayIt ?? fallback;
 
-    /* @Codex */
     const observations = useLiveQuery(
         async () => {
             const items = await db.observations.filter((o) => o.patientId === patientId).toArray();
@@ -209,6 +211,13 @@ export default function ObservationManager({
         );
         return result;
     }, [observations]);
+
+    useEffect(() => {
+        if (!groups || selectionPatient.current === patientId) return;
+        selectionPatient.current = patientId;
+        setOpenGroups(new Set(groups[0] ? [groups[0].code] : []));
+        setFullGroups(new Set());
+    }, [groups, patientId]);
 
     /* @Codex WUL-UIUX (Fase 3): raggruppamento per giorno locale di observedAt,
        per leggere insieme le misure dello stesso prelievo. Giorni piu recenti in
@@ -321,21 +330,11 @@ export default function ObservationManager({
     };
 
     return (
-        <div className={`${ink.surface} ${embedded ? 'space-y-5' : 'patient-detail-section lume-panel border p-6 space-y-5'}`}>
-            {!embedded && (
-                <div>
-                    <p className="section-kicker">Parametri</p>
-                    <div className="mt-1 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-[color:var(--lume-ink-muted)]" />
-                        <h3 className="text-lg font-semibold text-[color:var(--lume-ink)]">Parametri clinici</h3>
-                    </div>
-                    <p className="mt-1 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                        Valori misurati per il paziente, raggruppati per parametro. La codifica clinica resta visibile come metadata.
-                    </p>
-                </div>
-            )}
-
-            <form onSubmit={saveObservation} className={ink.draft + " grid grid-cols-1 gap-3 p-4 md:grid-cols-2"}>
+        <div className={styles.register} data-clinical-register="observations">
+            {!embedded && <header className={styles.toolbar}><h2>Parametri clinici</h2></header>}
+            <details ref={formDisclosureRef} className={styles.formDisclosure}>
+                <summary>Nuova misura</summary>
+            <form onSubmit={saveObservation} className={styles.form + " grid grid-cols-1 gap-3 md:grid-cols-2"}>
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
                     <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3.5 py-2.5">
                         <span className="text-sm text-[color:var(--lume-ink)]">
@@ -474,240 +473,67 @@ export default function ObservationManager({
                     </button>
                 </div>
             </form>
-
-            <div className="space-y-3">
-                {groups && groups.length > 0 ? (
-                    <div className="flex justify-end">
-                        <div role="group" aria-label="Vista parametri" className="inline-flex rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-0.5 text-xs">
-                            <button
-                                type="button"
-                                aria-pressed={viewMode === 'parametro'}
-                                onClick={() => setViewMode('parametro')}
-                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'parametro' ? 'bg-[color:var(--lume-ink)] text-white' : 'text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
-                            >
-                                Per parametro
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={viewMode === 'data'}
-                                onClick={() => setViewMode('data')}
-                                className={`rounded-full px-3 py-1 font-medium transition-colors ${viewMode === 'data' ? 'bg-[color:var(--lume-ink)] text-white' : 'text-[color:var(--lume-ink-muted)] hover:text-[color:var(--lume-ink)]'}`}
-                            >
-                                Per data
-                            </button>
-                        </div>
-                    </div>
-                ) : null}
-                {groups === undefined ? (
-                    <div className="space-y-2" aria-hidden>
-                        {[0, 1, 2].map((row) => (
-                            <div
-                                key={row}
-                                className="mf-skeleton h-16 border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]"
-                            />
-                        ))}
-                    </div>
-                ) : groups.length === 0 ? (
-                    <p className="text-sm italic text-[color:var(--lume-ink-muted)]">
-                        Nessun parametro registrato. Usa il modulo qui sopra per registrare la prima misura.
-                    </p>
-                ) : viewMode === 'data' ? (
-                    (byDay ?? []).map((day) => (
-                        <section
-                            key={day.key}
-                            className={ink.group}
-                        >
-                            <header className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-3.5 py-2">
-                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">
-                                    Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                </span>
-                                <span className="ml-2 text-xs text-[color:var(--lume-ink-muted)]">
-                                    {day.items.length} {day.items.length === 1 ? 'misura' : 'misure'}
-                                </span>
-                            </header>
-                            <div className="divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)]">
-                                {day.items.map((item) => {
-                                    const flag = classifyObservationRange(item.value, item.refLow, item.refHigh);
-                                    const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
-                                    return (
-                                        <div key={item.id} className="grid grid-cols-[1fr_auto] items-center gap-2 px-3.5 py-1.5">
-                                            <span className="min-w-0 truncate text-[13px] text-[color:var(--lume-ink)]">
-                                                {italianLoincLabel(item.code, item.display)}
-                                            </span>
-                                            <span className="inline-flex items-center gap-2">
-                                                <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]' : 'text-sm tabular-nums text-[color:var(--lume-ink)]'}>
-                                                    {item.value}{item.unitCode ? ` ${item.unitCode}` : ''}
-                                                </span>
-                                                {range ? <span className="text-xs text-[color:var(--lume-ink-muted)]">rif {range}</span> : null}
-                                                {flag ? (
-                                                    <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                                                        {flag === 'alto' ? 'Alto' : 'Basso'}
-                                                    </span>
-                                                ) : null}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </section>
-                    ))
-                ) : (
-                    groups.map((group) => {
-                        const latest = group.items[0];
-                        const previous = group.items[1];
-                        const latestNum = toNumeric(latest.value);
-                        const previousNum = previous ? toNumeric(previous.value) : null;
-                        const delta =
-                            latestNum !== null && previousNum !== null ? latestNum - previousNum : 0;
-                        const hasTrend = latestNum !== null && previousNum !== null;
-                        const chartValues = [...group.items]
-                            .slice(0, 12)
-                            .reverse()
-                            .map((item) => toNumeric(item.value))
-                            .filter((n): n is number => n !== null);
-                        const label = italianLoincLabel(group.code, group.display);
-                        const isOpen = openGroups.has(group.code);
-                        const isFull = fullGroups.has(group.code);
-                        const regionId = `param-region-${group.code}`;
-                        const visibleItems = isFull ? group.items : group.items.slice(0, 5);
-                        return (
-                            <section
-                                key={group.code}
-                                className={ink.group}
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => toggleGroup(group.code)}
-                                    aria-expanded={isOpen}
-                                    aria-controls={regionId}
-                                    className="mf-listrow !rounded-none justify-between px-3.5 py-2.5"
-                                >
-                                    <span className="min-w-0">
-                                        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                            <span className="text-sm font-semibold text-[color:var(--lume-ink)]">
-                                                {label}
-                                            </span>
-                                            <span className="text-xs text-[color:var(--lume-ink-muted)]">
-                                                {group.unitCode} · {group.items.length}{' '}
-                                                {group.items.length === 1 ? 'misura' : 'misure'}
-                                            </span>
-                                        </span>
-                                        <span className="block lume-code text-xs uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                            {group.codeSystem} {group.code}
-                                        </span>
-                                    </span>
-                                    <span className="flex shrink-0 items-center gap-2.5">
-                                        <Sparkline values={chartValues} />
-                                        <span className={`text-base font-semibold tabular-nums ${classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ? 'text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]' : 'text-[color:var(--lume-ink)]'}`}>
-                                            {latest.value}
-                                        </span>
-                                        {hasTrend ? (
-                                            delta > 0 ? (
-                                                <TrendingUp className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-label="in aumento" />
-                                            ) : delta < 0 ? (
-                                                <TrendingDown className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-label="in calo" />
-                                            ) : (
-                                                <Minus className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-label="stabile" />
-                                            )
-                                        ) : null}
-                                        <ChevronDown
-                                            className={`h-4 w-4 text-[color:var(--lume-ink-muted)] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-                                            aria-hidden
-                                        />
-                                    </span>
-                                </button>
-
-                                <div id={regionId} hidden={!isOpen}>
-                                    {isOpen ? (
-                                        <>
-                                            <div className="divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)]">
-                                                {visibleItems.map((item) => {
-                                                    const interpretation = classifyObservationRange(item.value, item.refLow, item.refHigh);
-                                                    const rangeLabel = formatReferenceRange(item.refLow, item.refHigh, item.refText);
-                                                    return (
-                                                        <div
-                                                            key={item.id}
-                                                            className="grid grid-cols-[72px_1fr_auto] items-center gap-2 px-3.5 py-1.5"
-                                                        >
-                                                            <span
-                                                                className="text-xs tabular-nums text-[color:var(--lume-ink-muted)]"
-                                                                title={new Date(item.observedAt).toLocaleString('it-IT')}
-                                                            >
-                                                                {new Date(item.observedAt).toLocaleDateString('it-IT', {
-                                                                    day: '2-digit',
-                                                                    month: '2-digit',
-                                                                    year: '2-digit',
-                                                                })}
-                                                            </span>
-                                                            <div className="min-w-0">
-                                                                <span className="inline-flex items-center gap-2">
-                                                                    <span
-                                                                        className={
-                                                                            interpretation
-                                                                                ? 'text-sm font-semibold tabular-nums text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]'
-                                                                                : 'text-sm tabular-nums text-[color:var(--lume-ink)]'
-                                                                        }
-                                                                    >
-                                                                        {item.value}
-                                                                    </span>
-                                                                    {rangeLabel ? (
-                                                                        <span className="text-xs text-[color:var(--lume-ink-muted)]">
-                                                                            rif {rangeLabel}
-                                                                        </span>
-                                                                    ) : null}
-                                                                    {interpretation ? (
-                                                                        <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                                                                            {interpretation === 'alto' ? 'Alto' : 'Basso'}
-                                                                        </span>
-                                                                    ) : null}
-                                                                </span>
-                                                                {item.notes ? (
-                                                                    <span
-                                                                        className="block truncate text-xs italic text-[color:var(--lume-ink-muted)]"
-                                                                        title={item.notes}
-                                                                    >
-                                                                        {item.notes}
-                                                                    </span>
-                                                                ) : null}
-                                                            </div>
-                                                            <button
-                                                                onClick={() => deleteObservation(item.id)}
-                                                                className="rounded-lg p-1.5 text-[color:var(--lume-ink-muted)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
-                                                                title="Elimina misura"
-                                                                aria-label={`Elimina misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <div className="flex items-center justify-between gap-2 px-3.5 py-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => prefillGroup(group.code, group.unitCode)}
-                                                    className="text-xs font-medium text-[color:var(--lume-ink)] hover:underline"
-                                                >
-                                                    Registra nuova misura
-                                                </button>
-                                                {group.items.length > 5 ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleFull(group.code)}
-                                                        className="text-xs font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]"
-                                                    >
-                                                        {isFull ? 'Mostra meno' : `Mostra tutte le ${group.items.length} misure`}
-                                                    </button>
-                                                ) : null}
-                                            </div>
-                                        </>
-                                    ) : null}
-                                </div>
-                            </section>
-                        );
-                    })
-                )}
+            </details>
+            <div className={styles.toolbar}>
+                <h2>Ultime misure <span className={styles.muted}>{groups?.length ?? ''}</span></h2>
+                {groups && groups.length > 0 && <div role="group" aria-label="Vista parametri" className={styles.controls}>
+                    <button type="button" aria-pressed={viewMode === 'parametro'} onClick={() => setViewMode('parametro')}>Per parametro</button>
+                    <button type="button" aria-pressed={viewMode === 'data'} onClick={() => setViewMode('data')}>Per data</button>
+                </div>}
             </div>
+            {groups === undefined ? <div className={styles.loading} role="status" aria-label="Caricamento misure"><span className="sr-only">Caricamento misure…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div>
+            : groups.length === 0 ? <p className={styles.empty}>Nessun parametro registrato. Apri “Nuova misura” per registrare la prima misura.</p>
+            : viewMode === 'data' ? (byDay ?? []).map(day => <section key={day.key}>
+                <header className={styles.sectionHead}><h3>Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}</h3><span>{day.items.length} misure</span></header>
+                <table className={styles.table}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
+                    {day.items.map(item => { const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); return <tr key={item.id}>
+                        <td>{italianLoincLabel(item.code, item.display)}</td>
+                        <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{item.value} {item.unitCode}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▲ Basso'}</small>}</td>
+                        <td className={styles.muted}>{formatReferenceRange(item.refLow, item.refHigh, item.refText) || '—'}</td>
+                    </tr>; })}
+                </tbody></table>
+            </section>) : <div className={styles.split}>
+                <div><table className={styles.table}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Data</th><th className={styles.secondaryColumn}>Variazione</th></tr></thead><tbody>
+                    {groups.map(group => {
+                        const latest = group.items[0]; const previous = group.items[1];
+                        const latestNum = toNumeric(latest.value); const previousNum = previous ? toNumeric(previous.value) : null;
+                        const delta = latestNum !== null && previousNum !== null ? latestNum - previousNum : null;
+                        const flag = classifyObservationRange(latest.value, latest.refLow, latest.refHigh);
+                        return <tr key={group.code} className={openGroups.has(group.code) ? styles.selected : undefined}>
+                            <td><button type="button" onClick={() => toggleGroup(group.code)} aria-expanded={openGroups.has(group.code)} aria-controls={`param-region-${group.code}`} className={styles.rowButton}>
+                                {italianLoincLabel(group.code, group.display)} <ChevronDown size={14} aria-hidden className="inline" />
+                            </button></td>
+                            <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{group.unitCode}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▲ Basso'}</small>}</td>
+                            <td className={styles.muted}><time>{new Date(latest.observedAt).toLocaleDateString('it-IT')}</time></td>
+                            <td className={styles.secondaryColumn}>{delta === null ? '—' : <span className="inline-flex items-center gap-1">{delta > 0 ? <TrendingUp size={14} aria-label="in aumento" /> : delta < 0 ? <TrendingDown size={14} aria-label="in calo" /> : <Minus size={14} aria-label="stabile" />}{delta > 0 ? '+' : ''}{delta.toLocaleString('it-IT')}</span>}</td>
+                        </tr>;
+                    })}
+                </tbody></table></div>
+                <aside className={styles.detail} aria-label="Andamento e storia delle misure">
+                    {groups.every(group => !openGroups.has(group.code)) && <p className={styles.empty}>Scegli una misura per leggere l’andamento e le registrazioni precedenti. Puoi confrontare più parametri.</p>}
+                    {groups.map(group => {
+                        const isOpen = openGroups.has(group.code); const isFull = fullGroups.has(group.code);
+                        const label = italianLoincLabel(group.code, group.display);
+                        const chartValues = group.items.slice(0,12).reverse().map(item => toNumeric(item.value)).filter((n): n is number => n !== null);
+                        const visibleItems = isFull ? group.items : group.items.slice(0,5);
+                        return <section key={group.code} id={`param-region-${group.code}`} hidden={!isOpen}>
+                            {isOpen && <>
+                                <header className={styles.sectionHead}><h3>{label}</h3><span>{group.unitCode}</span></header>
+                                <p className={`${styles.muted} lume-code`}>{group.codeSystem} {group.code}</p>
+                                <div className={styles.trend}><Sparkline values={chartValues} /></div>
+                                <table className={styles.table}><thead><tr><th>Data</th><th>Valore</th><th aria-label="Azioni" /></tr></thead><tbody>{visibleItems.map(item => {
+                                    const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
+                                    return <tr key={item.id}><td className={styles.muted}><time title={new Date(item.observedAt).toLocaleString('it-IT')}>{new Date(item.observedAt).toLocaleDateString('it-IT')}</time></td>
+                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▲ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
+                                        <td><button type="button" onClick={() => deleteObservation(item.id)} className={styles.control} title="Elimina misura" aria-label={`Elimina misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}><Trash2 size={16} aria-hidden /></button></td>
+                                    </tr>;
+                                })}</tbody></table>
+                                <div className={`${styles.controls} mt-3`}><button type="button" onClick={() => prefillGroup(group.code, group.unitCode)}>Registra nuova misura</button>{group.items.length > 5 && <button type="button" onClick={() => toggleFull(group.code)}>{isFull ? 'Ultime 5' : `Tutte (${group.items.length})`}</button>}</div>
+                            </>}
+                        </section>;
+                    })}
+                </aside>
+            </div>}
         </div>
     );
 }

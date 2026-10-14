@@ -1,6 +1,7 @@
-/* @Codex */
+
 'use client';
 
+import styles from './clinical-register.module.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { FileSearch, Loader2, RotateCcw, ShieldCheck } from 'lucide-react';
 
@@ -120,7 +121,7 @@ function DocumentSynthesisFabricReviewCardSession({
 
     return (
         <section
-            className={disclosure.synthesis}
+            className={`${styles.register} ${styles.proposal}`}
             data-testid={`document-synthesis-fabric-review-${attachmentId}`}
             aria-busy={phase === 'loading' || phase === 'running'}
         >
@@ -224,7 +225,7 @@ function DocumentSynthesisFabricReviewCardSession({
             {phase === 'terminal' && publication && providerBindingReceipt && (
                 <div className="mt-4 grid min-w-0 gap-4" data-testid="document-synthesis-fabric-result">
                     {/* @Codex: summary, sources and receipt share the document reading plane. */}
-                    <div className={disclosure.synthesisSection}>
+                    <div className={styles.proposalRow}>
                         <p className="font-semibold text-[color:var(--lume-ink)]">Riepilogo da rivedere</p>
                         <p className="mt-2 break-words text-[color:var(--lume-ink)]">
                             <PrivacyBlur intensity="sm">{publication.output.summary}</PrivacyBlur>
@@ -232,7 +233,7 @@ function DocumentSynthesisFabricReviewCardSession({
                         <p className="mt-3 text-[color:var(--lume-ink-muted)]">Questa proposta non aggiunge né modifica informazioni nella cartella.</p>
                     </div>
 
-                    <div className={disclosure.synthesisSection}>
+                    <div className={styles.proposalRow}>
                         <p className="font-semibold text-[color:var(--lume-ink)]">{providerBindingReceipt.provider === 'chatgpt_subscription' ? 'Elaborato con OpenAI' : 'Elaborato sul computer'}</p>
                         <dl className="mt-2 grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
                             <dt className="text-[color:var(--lume-ink-muted)]">Servizio</dt><dd className="text-[color:var(--lume-ink)]">{providerBindingReceipt.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : 'Ollama · locale'}</dd>
@@ -248,7 +249,7 @@ function DocumentSynthesisFabricReviewCardSession({
                             {publication.citations.map((citation) => (
                                 <li
                                     key={`${citation.label}-${citation.quoteSha256}`}
-                                    className={`${disclosure.citation} text-[color:var(--lume-ink)]`}
+                                    className={styles.proposalRow}
                                 >
                                     <p className="font-semibold">{citation.label} · <PrivacyBlur intensity="sm">{attachmentName}</PrivacyBlur></p>
                                     <blockquote className="mt-2 whitespace-pre-wrap break-words"><PrivacyBlur intensity="sm">{citation.quote}</PrivacyBlur></blockquote>

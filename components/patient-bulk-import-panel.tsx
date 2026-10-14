@@ -197,9 +197,8 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                 {snapshot.phase === 'reading' ? <p role="status">Lettura e validazione locale. Nessuna scheda viene salvata.</p> : null}
                 {snapshot.preview ? (
                     <section className={styles.section} aria-labelledby="bulk-preview-title">
+                        <div className={styles.previewLayout}><div>
                         <h2 id="bulk-preview-title" tabIndex={-1} ref={previewTitle}>2. Controlla l’anteprima</h2>
-                        <p data-testid="patient-bulk-destination">Destinazione dell’anteprima: <strong>{snapshot.ambulatoryName}</strong>. L’anteprima scade entro 5 minuti; dopo la scadenza seleziona nuovamente il file.</p>
-                        <p data-testid="patient-bulk-preview-count">{eligible} da aggiungere · {snapshot.preview.rows.length - eligible} escluse · {snapshot.preview.rows.length} righe totali</p>
                         <table className={`${styles.table} ${styles.preview}`} role="table">
                             <caption>Anteprima delle righe del file: nessun salvataggio prima della conferma.</caption>
                             <thead><tr><th scope="col">Riga</th><th scope="col">Anagrafica</th><th scope="col">Codice fiscale</th><th scope="col">Controllo</th></tr></thead>
@@ -225,7 +224,11 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                                 </tr>
                             ))}</tbody>
                         </table>
-                        {snapshot.phase === 'preview' ? <>
+                        </div>
+                        {snapshot.phase === 'preview' ? <aside className={styles.confirmation}>
+                        <h3>Da aggiungere</h3>
+                        <p data-testid="patient-bulk-destination">Destinazione dell’anteprima: <strong>{snapshot.ambulatoryName}</strong>. L’anteprima scade entro 5 minuti; dopo la scadenza seleziona nuovamente il file.</p>
+                        <p data-testid="patient-bulk-preview-count">{eligible} da aggiungere · {snapshot.preview.rows.length - eligible} escluse · {snapshot.preview.rows.length} righe totali</p>
                             <p>Verranno aggiunte solo le {eligible} righe valide e non duplicate. In caso di errore, le schede già salvate restano presenti.</p>
                             <label className={styles.consent}>
                                 <input type="checkbox" checked={reviewed} disabled={eligible === 0}
@@ -239,7 +242,8 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                                 </button>
                                 <button type="button" className={styles.secondary} onClick={() => session?.cancel()}>Annulla anteprima</button>
                             </div>
-                        </> : null}
+                        </aside> : null}
+                        </div>
                     </section>
                 ) : null}
                 {busy && snapshot.phase !== 'reconciling' ? <div className={styles.actions}>

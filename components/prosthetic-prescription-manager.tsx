@@ -1,7 +1,6 @@
 'use client';
 
-/* @Codex */
-import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import { Accessibility, CheckCircle2, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, type ProstheticPrescriptionStatus } from '@/lib/db';
@@ -123,7 +122,6 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     /* @Codex: the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
 
-    /* @Codex */
     const prescriptions = useLiveQuery(
         async () => {
             const items = await db.prostheticPrescriptions
@@ -222,7 +220,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     );
 
     return (
-        <section className={`${ink.surface} ${embedded ? '' : 'patient-detail-section rounded-[20px] border p-5 md:p-6'}`}>
+        <section className={styles.register}>
             {embedded ? (
                 <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
             ) : (
@@ -253,7 +251,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
 
             {isFormOpen && (
-                <form onSubmit={handleSubmit} className={ink.draft + " mb-5 p-4"}>
+                <form onSubmit={handleSubmit} className={styles.form}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
@@ -330,27 +328,21 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                 </form>
             )}
 
-            {!prescriptions ? null : prescriptions.length === 0 ? (
-                <div className="rounded-[18px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] px-4 py-6 text-center">
+            {!prescriptions ? <p role="status" className={styles.empty}>Caricamento prescrizioni…</p> : prescriptions.length === 0 ? (
+                <div className={styles.empty}>
                     <p className="text-sm text-[color:var(--lume-ink-muted)]">
                         Nessuna prescrizione protesica registrata per questo paziente.
                     </p>
                 </div>
             ) : (
-                <div className="grid gap-3">
+                <div className="min-w-0">
+                    <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Ausilio</th><th className={styles.secondaryColumn}>Prescritta il</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>
                     {prescriptions.map((item) => {
                         const refs = parseDocumentRefs(item.documentRefs);
-                        return (
-                            <article key={item.id} className={ink.record}>
-                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="apple-chip lume-registro">{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</span>
-                                            <Badge tone={prostheticStatusSignal(item.status)} size="xs">{statusLabel(item.status)}</Badge>
-                                            <Badge tone="plum" size="xs">{categoryLabel(item.category)}</Badge>
-                                            {item.source === 'document_review' && <Badge tone="plum" size="xs">document-backed</Badge>}
-                                        </div>
-                                        <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.description}</h3>
+                         return <tr key={item.id}>
+                            <td><strong>{item.description}</strong><small>{categoryLabel(item.category)}</small>
+                                <details className={styles.recordDetails}><summary>Misure, collaudo e documenti</summary>
+                                    <p>Prescritta il {new Date(item.prescribedAt).toLocaleDateString('it-IT')}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
                                             {item.isoCode && <p><span className="font-semibold text-[color:var(--lume-ink)]">ISO:</span> <span className="lume-code">{item.isoCode}</span></p>}
                                             {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--lume-ink)]">Pratica:</span> <span className="lume-code">{item.regionalPrescriptionId}</span></p>}
@@ -362,8 +354,13 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                         {item.collaudoOutcome && <p className="mt-2 text-sm text-[color:var(--lume-ink-muted)]">{item.collaudoOutcome}</p>}
                                         <DocumentReferenceChip references={refs} />
                                         {item.notes && <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>}
-                                    </div>
-                                    <div className="flex shrink-0 gap-2">
+
+                                </details>
+                            </td>
+                            <td className={`${styles.secondaryColumn} lume-registro`}>{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</td>
+                            <td><Badge tone={prostheticStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge></td>
+                            <td>
+                                    <div className={styles.controls}>
                                         {item.status !== 'tested' && (
                                             <button type="button" className="ui-btn-secondary h-9 px-3 text-xs" onClick={() => void markTested(item)}>
                                                 <CheckCircle2 className="h-4 w-4" />
@@ -374,10 +371,10 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                             <Trash2 className="h-4 w-4" />
                                         </button>
                                     </div>
-                                </div>
-                            </article>
-                        );
-                    })}
+
+                            </td>
+                        </tr>;                    })}
+                    </tbody></table>
                 </div>
             )}
         </section>

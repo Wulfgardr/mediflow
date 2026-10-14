@@ -84,3 +84,12 @@
 .panel { font: 14px/1.5 var(--lume-font-sans); }
 .preview tbody td { color: var(--lume-ink-pencil); }
 .preview td:nth-child(2) { text-decoration: underline dashed; text-underline-offset: 4px; }
+.previewLayout { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,.4fr); gap: 40px; align-items: start; }
+.previewLayout > div { min-width: 0; }
+.confirmation { position: sticky; top: 16px; display: grid; gap: 16px; min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); }
+.confirmation h3 { margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 12px/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
+.confirmation .actions { align-items: stretch; flex-direction: column; }
+@media (max-width: 1000px) {
+ .previewLayout { grid-template-columns: minmax(0,1fr); gap: 24px; }
+ .confirmation { position: static; padding: 16px 0 0; border-left: 0; border-top: 1px solid var(--lume-rule); }
+}
