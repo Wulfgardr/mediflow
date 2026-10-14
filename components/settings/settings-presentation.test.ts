@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { presentAccount, accountNotices } from '../../lib/chatgpt-account/account-presentation.ts';
 import type { AccountBrowserView } from '../../lib/chatgpt-account/account-browser.ts';
@@ -112,8 +113,11 @@ test('readiness preserves counts and codes while observation and non-disabled st
     assert.match(text(tree), /synthetic-machine-state/); assert.match(text(tree), /--owner operatore-demo/);
     assert.equal(buttons(tree).length, 1, 'readiness is read-only with one reread action');
     assert.equal(flatten(tree).filter(node => node.props.role === 'switch').length, 0);
+    const disclosureCss = readFileSync(new URL('./ai-utilities.module.css', import.meta.url), 'utf8');
+    assert.match(disclosureCss, /\.disclosure\s*\{[^}]*min-height:\s*44px/);
+    assert.match(disclosureCss, /\.disclosure:focus-visible\s*\{[^}]*outline:\s*2px solid/);
     for (const node of flatten(tree).filter(node => node.type === 'summary')) {
-        assert.match(String(node.props.className), /focus-visible/); assert.match(String(node.props.className), /min-h-11/);
+        assert.match(String(node.props.className), /fixture-disclosure/);
     }
 });
 

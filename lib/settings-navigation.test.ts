@@ -109,9 +109,9 @@ test('overview is searchable and only the exact settings page is current', () =>
 });
 
 /* @Codex: the explicit OpenAI demo is a peer, not an account or local-model alias. */
-test('OpenAI demo is reachable and searchable under Funzioni intelligenti', () => {
+test('OpenAI demo is reachable and searchable under Intelligenza', () => {
     const group = SETTINGS_NAV_GROUPS.find((entry) => entry.id === 'ai');
-    assert.equal(group?.label, 'Funzioni intelligenti');
+    assert.equal(group?.label, 'Intelligenza');
     const item = group?.items.find((entry) => entry.id === 'ai-chatgpt');
     assert.ok(item);
     assert.equal(item.href, '/settings/ai/chatgpt');
