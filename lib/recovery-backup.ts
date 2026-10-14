@@ -3,7 +3,8 @@ const MAGIC = new TextEncoder().encode('MDFREC01');
 const KEY_CONTEXT = new TextEncoder().encode('mediflow.recovery-backup.key.v1');
 const SQLITE_MAGIC = new TextEncoder().encode('SQLite format 3\0');
 const HEADER_BYTES = 80; // magic(8), wrapping nonce(12), wrapped AES-256 key + tag(48), payload nonce(12)
-export const MAX_RECOVERY_DATABASE_BYTES = 256 * 1024 * 1024;
+// Bounded because browser encryption holds the snapshot and ciphertext in memory.
+export const MAX_RECOVERY_DATABASE_BYTES = 512 * 1024 * 1024;
 export const MAX_RECOVERY_BACKUP_BYTES = MAX_RECOVERY_DATABASE_BYTES + HEADER_BYTES + 16;
 
 const source = (bytes: Uint8Array): BufferSource => bytes as unknown as BufferSource;

@@ -116,7 +116,7 @@ Per recuperare su un computer nuovo:
 6. Nella prova sintetica controlla una nota cifrata, lo storico e una ricevuta
    già applicata; la ricevuta non deve produrre una seconda scrittura.
 
-Il backup è limitato a 256 MiB e allo schema corrente. File incompleto, alterato,
+Il backup è limitato a 512 MiB e allo schema corrente. File incompleto, alterato,
 chiave o kit errati, schema incompatibile e destinazione non vuota vengono
 rifiutati prima dello swap. La prova automatica del confine SQLite è
 `lib/recovery-backup.test.ts`: usa solo archivi sintetici e verifica anche che

@@ -70,6 +70,21 @@ test('unknown constraints, triggers, columns, indices, incoming FK and staging c
     }
 });
 
+test('released ALTER TABLE FK without a delete action upgrades without changing stored values', () => {
+    const f = fixture(':memory:', ddl => ddl.replace(
+        'service_prescription_item_id TEXT REFERENCES service_prescription_items(id) ON DELETE SET NULL',
+        'service_prescription_item_id TEXT REFERENCES service_prescription_items(id)'));
+    try {
+        const before = rows(f.db);
+        run(f.db, f.canonical);
+        assert.deepEqual(rows(f.db), before);
+        assert.deepEqual(schemaSnapshot(f.db).observations, schemaSnapshot(f.canonical).observations);
+        f.db.prepare("DELETE FROM service_prescription_items WHERE id='synthetic-item'").run();
+        assert.equal(f.db.prepare('SELECT count(*) FROM observations WHERE service_prescription_item_id IS NULL').pluck().get(), 2);
+        assert.deepEqual(f.db.pragma('foreign_key_check'), []);
+    } finally { f.close(); }
+});
+
 test('unknown CHECK on an existing column is not discarded', () => {
     const f = fixture(':memory:', ddl => ddl.replace('value TEXT NOT NULL', "value TEXT NOT NULL CHECK (length(value) > 0)"));
     try {
