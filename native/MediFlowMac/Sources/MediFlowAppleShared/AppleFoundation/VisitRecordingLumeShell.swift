@@ -204,7 +204,11 @@ struct VisitRecordingLumeShell: View {
             Label("Trascrizione da rivedere · Proposta", systemImage: "circle")
                 .foregroundStyle(PlatformColors.pencil)
             TextEditor(text: $coordinator.reviewText)
+                #if os(macOS)
+                .inkRegister()
+                #else
                 .inkVoice(17, relativeTo: .body)
+                #endif
                 .foregroundStyle(PlatformColors.pencil)
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(PlatformColors.pencil, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
                 .scrollContentBackground(.hidden)

@@ -258,7 +258,11 @@ struct VisitDraftComposerView: View {
             }
 #endif
             TextEditor(text: $model.newEntryVisitTranscript)
+                #if os(macOS)
+                .inkRegister()
+                #else
                 .inkVoice(17, relativeTo: .body)
+                #endif
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 70)
                 // A TextEditor is not a TextField, so the style applied at the

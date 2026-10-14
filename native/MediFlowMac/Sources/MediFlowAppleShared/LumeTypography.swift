@@ -53,20 +53,5 @@ public extension View {
 }
 
 public extension View {
-    func inkWorkspaceTitle(_ title: String) -> some View {
-        #if os(iOS)
-        navigationTitle(title)
-        #else
-        navigationTitle(title)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(title).inkVoice(26)
-                        Circle().fill(PlatformColors.ink).frame(width: 6, height: 6)
-                            .accessibilityHidden(true)
-                    }.accessibilityAddTraits(.isHeader)
-                }
-            }
-        #endif
-    }
+    func inkWorkspaceTitle(_ title: String) -> some View { navigationTitle(title) }
 }

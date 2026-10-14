@@ -204,8 +204,8 @@ struct PairedPatientsWorklistView: View {
         VStack(alignment: .leading, spacing: 0) {
             macOSWorklistHeader
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
             if let presentation = model.conflictPresentation {
                 conflictBanner(presentation)
                     .padding(.horizontal, 12)
@@ -270,11 +270,11 @@ struct PairedPatientsWorklistView: View {
     /* @Codex */
     private var macOSWorklistHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Pazienti")
-                .inkVoice(26)
-                .accessibilityHeading(.h1)
+            Text("Elenco")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHeading(.h2)
                 .accessibilityIdentifier("patient-worklist-title")
-            Spacer(minLength: 8)
             // A count describes the loaded, filtered rows, never the host total.
             // An unread empty array must not announce an empty patient archive.
             if !model.patients.isEmpty || model.connectionState == .pairedOnline {
@@ -289,6 +289,10 @@ struct PairedPatientsWorklistView: View {
                     .help("Risultati nell'elenco caricato, dopo ricerca e filtro di stato.")
                     .accessibilityIdentifier("patient-worklist-count")
             }
+            Spacer(minLength: 4)
+            patientSortMenu
+                .labelsHidden()
+                .controlSize(.small)
         }
     }
 
@@ -733,20 +737,8 @@ struct PairedPatientsWorklistView: View {
             patientViewModePicker
                 .controlSize(.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            // The scope gets a whole row; sort and reset share the second only
-            // while both fit, so neither compresses the segmented control.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    patientSortMenu
-                    Spacer(minLength: 8)
-                    resetFiltersButton
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    patientSortMenu
-                    resetFiltersButton
-                }
-            }
-            .controlSize(.small)
+            resetFiltersButton
+                .controlSize(.small)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -930,7 +922,6 @@ private extension View {
     func worklistTranslucentBackground() -> some View {
         if #available(macOS 14.0, *) {
             scrollContentBackground(.hidden)
-                .background(PlatformColors.groupedBackground)
         } else {
             self
         }

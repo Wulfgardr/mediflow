@@ -36,9 +36,9 @@ public enum ClinicalContentRendering {
         styled.enumerateAttribute(.font, in: NSRange(location: 0, length: styled.length)) { value, range, _ in
             #if canImport(AppKit)
             let original = value as? NSFont
-            let base = NSFont(name: "Newsreader16pt-Regular", size: 17) ?? NSFont.systemFont(ofSize: 17)
+            let base = NSFont.systemFont(ofSize: 13.5)
             let traits = original?.fontDescriptor.symbolicTraits ?? []
-            let font = NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits), size: 17) ?? base
+            let font = NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits), size: 13.5) ?? base
             styled.addAttributes([.font: font, .foregroundColor: NSColor.labelColor], range: range)
             #elseif canImport(UIKit)
             let original = value as? UIFont

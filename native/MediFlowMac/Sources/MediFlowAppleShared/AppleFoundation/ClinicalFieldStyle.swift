@@ -9,6 +9,9 @@ struct ClinicalTextFieldStyle: TextFieldStyle {
     // swiftlint:disable:next identifier_name
     func _body(configuration: TextField<Self._Label>) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+        #if os(macOS)
+        configuration.textFieldStyle(.roundedBorder).controlSize(.regular)
+        #else
         let shape = RoundedRectangle(cornerRadius: LumeGeometry.controlRadius)
         configuration
             .textFieldStyle(.plain)
@@ -18,6 +21,8 @@ struct ClinicalTextFieldStyle: TextFieldStyle {
             .background(palette.field.opacity(isEnabled ? 1 : 0.5), in: shape)
             .overlay(shape.strokeBorder(palette.strongRule, lineWidth: 1))
             .contentShape(Rectangle())
+        #endif
+
 
     }
 }

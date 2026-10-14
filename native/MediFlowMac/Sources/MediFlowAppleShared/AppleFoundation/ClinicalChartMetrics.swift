@@ -7,9 +7,14 @@ enum ClinicalChartMetrics {
     static let innerRadius: CGFloat = 0
     static let rowRadius: CGFloat = 0
     static let fieldRadius = LumeGeometry.controlRadius
+    #if os(macOS)
+    static let groupSpacing: CGFloat = 16
+    static let sectionSpacing: CGFloat = 20
+    #else
     static let groupSpacing: CGFloat = 28
-    static let itemSpacing: CGFloat = 8
     static let sectionSpacing: CGFloat = 28
+    #endif
+    static let itemSpacing: CGFloat = 8
 }
 
 extension View {
@@ -26,9 +31,15 @@ extension View {
     func chartRowTitle() -> some View { inkRegister(weight: .semibold) }
 
     func chartProse() -> some View {
+        #if os(macOS)
+        inkRegister().lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 540, alignment: .leading)
+        #else
         inkVoice(17, relativeTo: .body).lineSpacing(5)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: 640, alignment: .leading)
+        #endif
     }
 
     func chartMetadata() -> some View {
