@@ -99,33 +99,7 @@ if ! node "$HELPER" identity-summary; then
 fi
 echo ""
 
-# --- 1. Start Ollama (AI Engine) ---
-echo "🤖 [1/2] Controllo AI Engine (Ollama)..."
-if ! pgrep -x "ollama" > /dev/null; then
-    echo "   ⚠️  Ollama non attivo. Avvio in corso..."
-    if command -v ollama &> /dev/null; then
-        ollama serve &
-        # Probe di readiness reale invece di uno sleep fisso: poll su /api/tags
-        # (l'endpoint usato anche da getHealth) con backoff, fino a ~15s.
-        OLLAMA_READY=0
-        for _attempt in $(seq 1 15); do
-            if curl -sf -o /dev/null --max-time 2 "http://127.0.0.1:11434/api/tags"; then
-                OLLAMA_READY=1
-                break
-            fi
-            sleep 1
-        done
-        if [ "$OLLAMA_READY" = "1" ]; then
-            echo "   ✅ Ollama avviato e pronto."
-        else
-            echo "   ⚠️  Ollama avviato ma non ancora pronto dopo 15s: le funzioni AI potrebbero tardare."
-        fi
-    else
-        echo "   ❌ Ollama non trovato. Installa da https://ollama.com"
-    fi
-else
-    echo "   ✅ Ollama già attivo."
-fi
+node "$HELPER" check-source-current || exit 1
 
 PORT_INSPECTION="$(node "$HELPER" inspect-port "$MEDIFLOW_PORT" || true)"
 IFS='|' read -r PORT_STATUS PORT_LISTENER_PID PORT_INSPECTION_REASON <<< "$PORT_INSPECTION"
@@ -175,6 +149,12 @@ if [ "$PORT_STATUS" = "occupied" ]; then
     echo "   ⏭️  Riutilizzo l'istanza esistente senza avviare un secondo server."
     QUIET_EXIT=1
     exit 0
+fi
+
+# The optional local AI service must not delay the medical record or its port checks.
+if ! pgrep -x "ollama" > /dev/null && command -v ollama &> /dev/null; then
+    nohup ollama serve > /dev/null 2>&1 < /dev/null &
+    echo "   Avvio Ollama in background. MediFlow può aprirsi mentre il servizio AI si prepara."
 fi
 
 reset_next_cache_if_revision_changed
