@@ -37,11 +37,25 @@ public struct LumeRegisterPalette: Equatable, Sendable {
     public var minerale: Color { Color(lumeHex: mineraleHex) }
 
     public var isDark: Bool { inkPrimaryHex != "#14161a" }
-    public var pencil: Color { Color(lumeHex: isDark ? "#9aa3b0" : "#5f6878") }
-    public var rule: Color { Color(lumeHex: isDark ? "#2a2e35" : "#dfe2e7") }
-    public var strongRule: Color { Color(lumeHex: isDark ? "#3b414b" : "#c9ced6") }
-    public var writing: Color { Color(lumeHex: isDark ? "#1d2333" : "#f3f6fd") }
-    public var selection: Color { Color(lumeHex: isDark ? "#232a3d" : "#eef2fb") }
+    private var isGuardia: Bool { self == LumePalette.guardia }
+    public var pencilHex: String { isGuardia ? inkMutedHex : isDark ? "#9aa3b0" : "#5f6878" }
+    public var ruleHex: String { isGuardia ? inkMutedHex : isDark ? "#2a2e35" : "#dfe2e7" }
+    public var strongRuleHex: String { isGuardia ? inkMutedHex : isDark ? "#3b414b" : "#c9ced6" }
+    public var draftRuleHex: String { isGuardia ? inkMutedHex : isDark ? "#2f3a5c" : "#d9e0f3" }
+    public var writingHex: String { isGuardia ? focalHex : isDark ? "#1d2333" : "#f3f6fd" }
+    public var selectionHex: String { isGuardia ? focalHex : isDark ? "#232a3d" : "#eef2fb" }
+    public var hoverHex: String { isGuardia ? focalHex : isDark ? "#20242a" : "#f5f6f8" }
+    public var thresholdHex: String { isGuardia ? focalHex : inkPrimaryHex }
+    public var thresholdInkHex: String { isGuardia ? inkPrimaryHex : isDark ? "#14161a" : "#ffffff" }
+    public var pencil: Color { Color(lumeHex: pencilHex) }
+    public var rule: Color { Color(lumeHex: ruleHex) }
+    public var strongRule: Color { Color(lumeHex: strongRuleHex) }
+    public var draftRule: Color { Color(lumeHex: draftRuleHex) }
+    public var writing: Color { Color(lumeHex: writingHex) }
+    public var selection: Color { Color(lumeHex: selectionHex) }
+    public var hover: Color { Color(lumeHex: hoverHex) }
+    public var threshold: Color { Color(lumeHex: thresholdHex) }
+    public var thresholdInk: Color { Color(lumeHex: thresholdInkHex) }
 
     public func surface(for zone: LumeZone) -> Color {
         switch zone {
@@ -147,42 +161,30 @@ public enum LumePalette {
     }
 
     /// Code-first mirror used by the fail-closed JSON parity test.
-    public static let tokenHexValues: [String: String] = [
-        "register.giorno.surface.canvas": giorno.canvasHex,
-        "register.giorno.surface.field": giorno.fieldHex,
-        "register.giorno.surface.focal": giorno.focalHex,
-        "register.giorno.surface.chrome": giorno.chromeHex,
-        "register.giorno.ink.primary": giorno.inkPrimaryHex,
-        "register.giorno.ink.muted": giorno.inkMutedHex,
-        "register.giorno.accent.minerale": giorno.mineraleHex,
-        "register.grafite.surface.canvas": grafite.canvasHex,
-        "register.grafite.surface.field": grafite.fieldHex,
-        "register.grafite.surface.focal": grafite.focalHex,
-        "register.grafite.surface.chrome": grafite.chromeHex,
-        "register.grafite.ink.primary": grafite.inkPrimaryHex,
-        "register.grafite.ink.muted": grafite.inkMutedHex,
-        "register.grafite.accent.minerale": grafite.mineraleHex,
-        "register.guardia.surface.canvas": guardia.canvasHex,
-        "register.guardia.surface.field": guardia.fieldHex,
-        "register.guardia.surface.focal": guardia.focalHex,
-        "register.guardia.surface.chrome": guardia.chromeHex,
-        "register.guardia.ink.primary": guardia.inkPrimaryHex,
-        "register.guardia.ink.muted": guardia.inkMutedHex,
-        "register.guardia.accent.minerale": guardia.mineraleHex,
-        "register.giorno.signal.warning": "#8a5a1c",
-        "register.giorno.signal.critical": "#a33a2f",
-        "register.giorno.signal.success": "#3f5a49",
-        "register.grafite.signal.warning": "#d9a75f",
-        "register.grafite.signal.critical": "#f08a7d",
-        "register.grafite.signal.success": "#8fbf9f",
-        "register.guardia.signal.warning": warningHex,
-        "register.guardia.signal.critical": criticalHex,
-        "register.guardia.signal.success": successHex,
-        "signal.warning": warningHex,
-        "signal.critical": criticalHex,
-        "signal.success": successHex,
-        "signal.plum": plumHex
-    ]
+    public static let tokenHexValues: [String: String] = {
+        var tokens = ["signal.warning": warningHex, "signal.critical": criticalHex,
+                      "signal.success": successHex, "signal.plum": plumHex]
+        for (name, palette) in [("giorno", giorno), ("grafite", grafite), ("guardia", guardia)] {
+            let values = [
+                "surface.canvas": palette.canvasHex, "surface.field": palette.fieldHex,
+                "surface.focal": palette.focalHex, "surface.chrome": palette.chromeHex,
+                "surface.draft": palette.writingHex, "surface.selected": palette.selectionHex,
+                "surface.hover": palette.hoverHex, "surface.threshold": palette.thresholdHex,
+                "ink.primary": palette.inkPrimaryHex, "ink.muted": palette.inkMutedHex,
+                "ink.fresh": palette.mineraleHex, "ink.pencil": palette.pencilHex,
+                "ink.secondary": palette.inkMutedHex, "ink.threshold": palette.thresholdInkHex,
+                "accent.minerale": palette.mineraleHex,
+                "rule.default": palette.ruleHex, "rule.strong": palette.strongRuleHex,
+                "rule.draft": palette.draftRuleHex,
+                "signal.warning": hex(for: .attention, using: palette),
+                "signal.critical": hex(for: .critical, using: palette),
+                "signal.success": hex(for: .positive, using: palette),
+            ]
+            for (role, value) in values { tokens["register.\(name).\(role)"] = value }
+        }
+        return tokens
+    }()
+
 }
 
 private extension Color {
