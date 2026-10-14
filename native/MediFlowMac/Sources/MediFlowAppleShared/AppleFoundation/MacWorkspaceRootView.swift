@@ -190,7 +190,6 @@ public struct MediFlowMacRootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .foregroundStyle(PlatformColors.ink)
         }
         .navigationSplitViewStyle(.balanced)
         .modifier(MacPatientInspectorPresentationModifier(
