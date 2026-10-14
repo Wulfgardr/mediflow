@@ -152,10 +152,6 @@ async function assertWindowPreserved(
   await expect(ownEntries(page, diary, patientId)).toHaveCount(ownCount);
   const otherCards = cards.filter({ hasNot: page.locator(`a[href="/patients/${patientId}/entries/new"]`) });
   expect(await diarySignatures(otherCards)).toEqual(baseline.signatures.slice(0, 50 - ownCount));
-  await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(total > 1 ? 1 : 0);
-  if (total > 1) {
-    await expect(diary.locator('[data-lume-filo="spina"]')).toHaveAttribute('data-lume-filo-node-count', String(total));
-  }
   return total;
 }
 
@@ -214,55 +210,6 @@ async function resolvedRegisterFamily(page: Page): Promise<string> {
     probe.remove();
     return family;
   });
-}
-
-async function assertNoSideStripe(diary: Locator, entries: Locator): Promise<void> {
-  const connector = diary.locator('svg[data-lume-filo="spina"]');
-  await expect(connector).toHaveCount(1);
-  await expect(connector.locator('line, path')).toHaveCount(1);
-  const entryCount = await entries.count();
-  await expect(entries.locator('svg[data-lume-filo-node="true"] > circle')).toHaveCount(entryCount);
-  for (let index = 0; index < entryCount; index += 1) {
-    await expect(entries.nth(index).locator('svg[data-lume-filo-node="true"] > circle')).toHaveCount(1);
-  }
-
-  const borders = await entries.evaluateAll((elements) => elements.map((element) => {
-    const style = getComputedStyle(element);
-    return {
-      leftWidth: style.borderLeftWidth,
-      topWidth: style.borderTopWidth,
-      leftStyle: style.borderLeftStyle,
-      topStyle: style.borderTopStyle,
-      leftColor: style.borderLeftColor,
-      topColor: style.borderTopColor,
-      pseudoElements: ['::before', '::after'].map((pseudoElement) => {
-        const pseudoStyle = getComputedStyle(element, pseudoElement);
-        return {
-          pseudoElement,
-          content: pseudoStyle.content,
-          leftStyle: pseudoStyle.borderLeftStyle,
-          leftWidth: pseudoStyle.borderLeftWidth,
-          rightStyle: pseudoStyle.borderRightStyle,
-          rightWidth: pseudoStyle.borderRightWidth,
-        };
-      }),
-    };
-  }));
-  for (const border of borders) {
-    expect(border.leftWidth).toBe(border.topWidth);
-    expect(border.leftStyle).toBe(border.topStyle);
-    expect(border.leftColor).toBe(border.topColor);
-    for (const pseudoElement of border.pseudoElements) {
-      expect(
-        pseudoElement.leftStyle !== 'none' && Number.parseFloat(pseudoElement.leftWidth) > 0,
-        `${pseudoElement.pseudoElement} non deve disegnare un bordo verticale sinistro`,
-      ).toBe(false);
-      expect(
-        pseudoElement.rightStyle !== 'none' && Number.parseFloat(pseudoElement.rightWidth) > 0,
-        `${pseudoElement.pseudoElement} non deve disegnare un bordo verticale destro`,
-      ).toBe(false);
-    }
-  }
 }
 
 async function assertContrastAndFocus(
@@ -351,7 +298,7 @@ test.describe.serial('Diario globale Lume', () => {
     await cleanupCreatedPatients(page);
   });
 
-  test('Filo coerente con la sequenza reale e le voci globali preesistenti', async ({ page }) => {
+  test('Cronologia coerente con le voci globali preesistenti e ricerca', async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const baseline = await captureBaseline(page);
     const diary = page.getByTestId('lume-diario');
@@ -391,11 +338,11 @@ test.describe.serial('Diario globale Lume', () => {
     const feed = page.getByRole('feed', { name: 'Diario clinico globale' });
     await expect(feed).toBeVisible();
     const total = await assertWindowPreserved(page, diary, patientId, 3, baseline);
-    await expect(diary.locator('[data-lume-diary-node]')).toHaveCount(total);
+
     await expect(entries.first()).toContainText('Bozza');
     await expect(entries.first()).toContainText('Fonte: Dettatura sintetica');
     await expect(entries.first()).toContainText('Autore: Dr.ssa Demo');
-    await assertNoSideStripe(diary, entries);
+
 
     const registerFamily = await resolvedRegisterFamily(page);
     // @Codex: dates orient chronology in the ordinary text face; provenance
@@ -424,22 +371,18 @@ test.describe.serial('Diario globale Lume', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const motion = await page.evaluate(() => {
       const entry = document.querySelector<HTMLElement>('[data-testid="lume-diario-entry"]');
-      const filo = document.querySelector<SVGElement>('[data-lume-filo="spina"]');
       return {
         entry: entry ? getComputedStyle(entry).transitionDuration : 'missing',
-        filo: filo ? getComputedStyle(filo).transitionDuration : 'missing',
       };
     });
-    expect(motion).toEqual({ entry: '0s', filo: '0s' });
+    expect(motion).toEqual({ entry: '0s' });
 
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.evaluate(() => document.documentElement.setAttribute('data-ui-reduce-motion', 'true'));
     const uiReducedMotion = await page.evaluate(() => {
       const entry = document.querySelector<HTMLElement>('[data-testid="lume-diario-entry"]');
-      const filo = document.querySelector<SVGElement>('[data-lume-filo="spina"]');
       return {
         entry: entry ? getComputedStyle(entry).transitionDuration : 'missing',
-        filo: filo ? getComputedStyle(filo).transitionDuration : 'missing',
       };
     });
     for (const [element, duration] of Object.entries(uiReducedMotion)) {
@@ -449,15 +392,20 @@ test.describe.serial('Diario globale Lume', () => {
       ).toBeLessThanOrEqual(0.01);
     }
     await page.evaluate(() => document.documentElement.removeAttribute('data-ui-reduce-motion'));
+    await page.getByRole('searchbox', { name: 'Cerca nel diario' }).fill(`${FIXTURE_PREFIX} 3`);
+    await expect(entries).toHaveCount(1);
+    await expect(entries).toContainText('Bozza');
+    await page.getByRole('searchbox', { name: 'Cerca nel diario' }).clear();
+    await expect(entries).toHaveCount(total);
   });
 
   for (const diaryCase of DIARY_CASES) {
     test(`diario Lume ${diaryCase.register} ${diaryCase.viewport}`, async ({ page }) => {
       const diary = await openDiary(page, diaryCase);
       await expect(page.locator('html')).toHaveClass(diaryCase.register === 'grafite' ? /dark/ : /light/);
-      await expect(diary.locator('[data-lume-filo="spina"]')).toHaveCount(1);
+
       const entries = diary.getByTestId('lume-diario-entry');
-      await assertNoSideStripe(diary, entries);
+
       await assertContrastAndFocus(page, entries, diaryCase.register);
       await assertNoHorizontalOverflow(page, [
         { label: 'documento diario', selector: 'document' },

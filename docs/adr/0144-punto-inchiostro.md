@@ -32,6 +32,12 @@ Windows e Linux usano il runtime web esistente. Mini conserva il suo
 contratto JSON/NDJSON: una nuova interfaccia terminale non è implicita.
 L'icona candidata Giorno/Grafite è approvata il 14 ottobre.
 
+L’accettazione comprende la composizione di tutte le schermate esistenti:
+moduli clinici, Agenda, Diario, Repertori, Analisi, Scale, Impostazioni e
+moduli anagrafici seguono il banco e la mappa del dossier, oltre ai token.
+Il banco navigabile viene pubblicato come simulazione distinta dalle
+catture del prodotto sul sito.
+
 ## Confini e verifica
 
 Questo cambiamento è presentazionale: non introduce atomicità fra allegati

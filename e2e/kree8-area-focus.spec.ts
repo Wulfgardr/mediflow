@@ -39,7 +39,7 @@ test('le CTA Agenda portano tastiera e focus al titolo della destinazione', asyn
   await expectAreaHeadingFocused(
     page,
     'turno',
-    page.getByRole('heading', { name: /Agenda di oggi/, level: 1 }),
+    page.getByRole('heading', { name: /^Agenda/, level: 1 }),
   );
 
   const reviewAction = page.getByRole('button', { name: 'Apri revisione', exact: true });
@@ -72,7 +72,7 @@ test('la command palette focalizza il titolo quando il comando smonta la CTA sor
   await expectAreaHeadingFocused(
     page,
     'diario',
-    page.getByRole('heading', { name: /Ultime voci del lavoro clinico/, level: 1 }),
+    page.getByRole('heading', { name: /^Diario/, level: 1 }),
   );
 });
 

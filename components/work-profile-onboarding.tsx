@@ -229,5 +229,11 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
 
 export function WorkProfileSettings() {
     const controller = useWorkProfile();
-    return <WorkProfileOnboarding controller={controller} />;
+    const { state, busy, error, reload } = controller;
+    return <section className={styles.settingsProfile} aria-labelledby="work-profile-title" data-testid="work-profile-onboarding" aria-busy={busy}>
+        <h2 id="work-profile-title">Il tuo modo di lavorare</h2>
+        {error && <div role="alert"><p>{error}</p><button type="button" disabled={busy} className={styles.secondaryAction} onClick={() => void reload()}>Rileggi lo stato</button></div>}
+        {busy && <p role="status">Lettura o salvataggio del profilo…</p>}
+        {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
+    </section>;
 }
