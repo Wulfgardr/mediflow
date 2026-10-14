@@ -275,7 +275,7 @@ struct RepertoriWorkspaceView: View {
                     List(response.entries) { entry in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(entry.code).font(.body.weight(.medium)).registro()
+                                Text(entry.code).font(.body.weight(.medium)).codice()
                                 Spacer()
                                 Button("Controlla codice") { store.check(entry) }
                             }
@@ -392,7 +392,7 @@ struct RepertoriWorkspaceView: View {
                     HStack(spacing: 6) {
                         Text(exemption.code)
                             .font(.body.weight(.medium))
-                            .registro()
+                            .codice()
                         exemptionTags(exemption)
                     }
                     Text(exemption.description)

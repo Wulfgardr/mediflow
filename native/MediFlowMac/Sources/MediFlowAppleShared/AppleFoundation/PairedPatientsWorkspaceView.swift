@@ -579,7 +579,7 @@ struct PairedPatientsWorkspaceView: View {
     private func compactHeightPatientNavigation(_ detail: HomeBasePatientDetail) -> some View {
         HStack(spacing: 12) {
             Text("\(detail.lastName) \(detail.firstName)")
-                .font(.headline)
+                .inkVoice(28)
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("patient-workspace-header")
@@ -608,12 +608,12 @@ struct PairedPatientsWorkspaceView: View {
     private func mobileWidePatientHeader(_ detail: HomeBasePatientDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(detail.lastName) \(detail.firstName)")
-                .font(.title2.weight(.semibold))
+                .inkVoice(28)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHeading(.h1)
             Text(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))
                 .font(.subheadline)
-                .registro()
+                .codice()
                 .foregroundStyle(.secondary)
             if let birth = detail.birthDate {
                 Text("Nato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))")
@@ -874,7 +874,7 @@ struct PairedPatientsWorkspaceView: View {
     /* @Codex */
     private func patientWorkspaceHeaderName(_ name: String) -> some View {
         Text(name)
-            .font(.largeTitle.weight(.semibold))
+            .inkVoice(28)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -1012,8 +1012,8 @@ struct PairedPatientsWorkspaceView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.4)))
+            .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LumePalette.warning.opacity(0.4)))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("homebase-connection-banner")
         }
@@ -1165,7 +1165,7 @@ struct PairedPatientsWorkspaceView: View {
         // content on screen look like a link to somewhere else. The chevron keeps
         // the tint, because the chevron really is the control.
         let name = Text("\(detail.lastName) \(detail.firstName)")
-            .font(.headline)
+            .inkVoice(28)
             .foregroundStyle(.primary)
         let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate)
         Group {
@@ -1208,7 +1208,7 @@ struct PairedPatientsWorkspaceView: View {
         if let error = model.errorMessage {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .chartMetadata()
-                .foregroundStyle(.red)
+                .foregroundStyle(LumePalette.critical)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-error-message")

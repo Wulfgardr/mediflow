@@ -435,8 +435,8 @@ final class VisitRecordingLumeCoordinatorTests: XCTestCase {
 
         for required in [
             "Consenti microfono e continua",
-            "Installa asset italiano",
-            "Registrazione visita in corso",
+            "Installa la lingua italiana",
+            "In ascolto",
             "clinical-workspace-visit-recording-stop",
             ".onDisappear",
             "phase != .active",

@@ -61,7 +61,7 @@ var targets: [Target] = [
 // Fase 1 it re-exports MediFlowCore (compatibility shim). It will later split into
 // MediFlowAppleSync + MediFlowAppleUI.
 products.append(.library(name: "MediFlowAppleShared", targets: ["MediFlowAppleShared"]))
-targets.append(.target(name: "MediFlowAppleShared", dependencies: ["MediFlowCore"]))
+targets.append(.target(name: "MediFlowAppleShared", dependencies: ["MediFlowCore"], resources: [.process("Resources")]))
 targets.append(.testTarget(name: "MediFlowAppleSharedTests", dependencies: ["MediFlowAppleShared"],
                            sources: testSources["MediFlowAppleSharedTests"]!))
 #endif

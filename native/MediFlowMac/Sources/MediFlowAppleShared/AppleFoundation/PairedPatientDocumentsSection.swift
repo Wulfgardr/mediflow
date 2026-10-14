@@ -115,7 +115,7 @@ struct PairedPatientDocumentsSection: View {
             if let pickerError = attachmentPickerError {
                 Text(pickerError)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(LumePalette.critical)
             }
         }
         .fileImporter(isPresented: $isPickingAttachmentFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
@@ -264,7 +264,7 @@ struct PairedPatientDocumentsSection: View {
                     if let queueLabel = HomeBaseDocumentOcrQueuePresentation.describe(state: attachment.ocrQueueState, reason: attachment.ocrQueueReason) {
                         Text(queueLabel)
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(LumePalette.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -373,7 +373,7 @@ struct PairedPatientDocumentsSection: View {
                     if !insight.appliedDiagnoses.isEmpty {
                         Text("Diagnosi aggiunte alla scheda: \(insight.appliedDiagnoses.joined(separator: ", "))")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(LumePalette.success)
                     }
                     if !insight.summary.isEmpty {
                         Text(insight.summary)
@@ -543,12 +543,12 @@ struct PairedPatientDocumentsSection: View {
                 ForEach(Array(result.errors.enumerated()), id: \.offset) { _, issue in
                     Text("Errore: \(issue.message)")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(LumePalette.critical)
                 }
                 ForEach(Array(result.warnings.enumerated()), id: \.offset) { _, issue in
                     Text("Avviso: \(issue.message)")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(LumePalette.warning)
                 }
             }
         }

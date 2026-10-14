@@ -196,7 +196,7 @@ public struct MediFlowMacRootView: View {
                         }
                     } else {
                         startupState
-                            .navigationTitle(scene.section.title)
+                            .inkWorkspaceTitle(scene.section.title)
                             .navigationSubtitle("Avvio in corso")
                     }
                 }
@@ -238,6 +238,9 @@ public struct MediFlowMacRootView: View {
         .environment(\.dynamicTypeSize, scene.launchDynamicTypeSizeOverride ?? inheritedDynamicTypeSize)
         .respectsAppleMotionPreference()
         .privacyShield(appearance: appearance)
+        .tint(PlatformColors.freshInk)
+        .foregroundStyle(PlatformColors.ink)
+        .inkRegister()
     }
 
     /* @Codex */
@@ -394,7 +397,7 @@ private struct MacDetailChrome<Content: View>: View {
 
     var body: some View {
         content
-            .navigationTitle(section.title)
+            .inkWorkspaceTitle(section.title)
             .navigationSubtitle(subtitle)
     }
 

@@ -44,10 +44,6 @@ struct VisitRecordingLumeShell: View {
         Group {
             if #available(macOS 26.0, *) {
                 supportedContent
-            } else {
-                unavailableContent(
-                    "La registrazione locale richiede macOS 26 o successivo. Nessun permesso è stato richiesto."
-                )
             }
         }
         .padding(12)
@@ -87,7 +83,7 @@ struct VisitRecordingLumeShell: View {
     @ViewBuilder
     private var supportedContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Registrazione visita", systemImage: "waveform.badge.mic")
+            Label("Ascolto della visita", systemImage: "mic")
                 .font(.caption.weight(.semibold))
 
             switch coordinator.state {
@@ -102,27 +98,27 @@ struct VisitRecordingLumeShell: View {
             case .ready:
                 readyContent
             case .starting:
-                progressContent("Avvio della registrazione locale…")
+                progressContent("Avvio dell’ascolto…")
             case .recording:
                 recordingContent
             case .finalizing:
-                progressContent("Finalizzo la trascrizione sul Mac…")
+                progressContent("Trascrizione in corso…")
             case .transcriptReview:
                 transcriptReviewContent
             case .completed:
-                Label("Trascrizione trasferita nel campo di revisione.", systemImage: "checkmark.circle")
+                Label("Trascrizione portata nel campo di revisione. Rivedila prima di registrare.", systemImage: "checkmark.circle")
                     .font(.caption)
                     .foregroundStyle(LumePalette.success)
             case .permissionDenied:
                 permissionDeniedContent
             case .unavailable:
-                unavailableContent("Registrazione locale non disponibile.")
+                unavailableContent("L’ascolto non è disponibile su questo computer. Puoi scrivere la voce a mano.")
             case let .denied(denial):
                 unavailableContent(denialMessage(denial))
             }
 
             if coordinator.canBeginNewSession {
-                Button("Nuova registrazione") {
+                Button("Nuovo ascolto") {
                     coordinator.beginNewSessionAfterExplicitRequest()
                 }
                 .frame(minHeight: 44)
@@ -133,7 +129,7 @@ struct VisitRecordingLumeShell: View {
 
     private var disclosureContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("L'audio viene elaborato solo su questo Mac e non viene salvato. La trascrizione finale resta una bozza da rivedere; puoi interrompere in qualsiasi momento.")
+            Text("L’audio viene elaborato solo su questo computer e non viene salvato. La trascrizione arriva a matita: resta una proposta finché non la porti nella voce. Informa il paziente prima di cominciare.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Button {
@@ -161,7 +157,7 @@ struct VisitRecordingLumeShell: View {
             Button {
                 Task { await coordinator.installAssets() }
             } label: {
-                Label("Installa asset italiano", systemImage: "arrow.down.circle")
+                Label("Installa la lingua italiana", systemImage: "arrow.down.circle")
                     .frame(minHeight: 44)
             }
             .accessibilityIdentifier("clinical-workspace-visit-recording-install-assets")
@@ -170,13 +166,13 @@ struct VisitRecordingLumeShell: View {
 
     private var readyContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Microfono e trascrizione italiana sono pronti. L'avvio resta manuale.")
+            Text("Microfono e lingua italiana sono pronti. L’avvio resta manuale. Durata massima 90 minuti.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Button {
                 Task { await coordinator.start() }
             } label: {
-                Label("Avvia registrazione", systemImage: "record.circle")
+                Label("Ascolta la visita", systemImage: "mic")
                     .frame(minHeight: 44)
             }
             .accessibilityIdentifier("clinical-workspace-visit-recording-start")
@@ -185,15 +181,15 @@ struct VisitRecordingLumeShell: View {
 
     private var recordingContent: some View {
         HStack(spacing: 12) {
-            Label("Registrazione visita in corso", systemImage: "record.circle.fill")
+            Label("In ascolto", systemImage: "circle")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(LumePalette.critical)
-                .accessibilityLabel("Registrazione visita in corso")
+                .foregroundStyle(PlatformColors.pencil)
+                .accessibilityLabel("In ascolto. Solo su questo computer, audio non salvato")
             Spacer(minLength: 8)
             Button {
                 Task { await coordinator.stop() }
             } label: {
-                Label("Interrompi", systemImage: "stop.fill")
+                Label("Ferma l’ascolto", systemImage: "stop.fill")
                     .frame(minHeight: 44)
             }
             .accessibilityIdentifier("clinical-workspace-visit-recording-stop")
@@ -205,7 +201,12 @@ struct VisitRecordingLumeShell: View {
             Text("Rivedi la trascrizione finale. Cambiando sezione resta qui, separata dal campo trascrizione. Nessuna bozza clinica viene generata automaticamente.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+            Label("Trascrizione da rivedere · Proposta", systemImage: "circle")
+                .foregroundStyle(PlatformColors.pencil)
             TextEditor(text: $coordinator.reviewText)
+                .inkVoice(17, relativeTo: .body)
+                .foregroundStyle(PlatformColors.pencil)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(PlatformColors.pencil, style: StrokeStyle(lineWidth: 1, dash: [4, 4])))
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 90)
                 .clinicalMultilineFieldShape()
@@ -243,7 +244,7 @@ struct VisitRecordingLumeShell: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
-            Button("Scarta trascrizione", role: .destructive) {
+            Button("Scarta la trascrizione", role: .destructive) {
                 Task { await coordinator.cancelForLifecycle() }
             }
             .frame(minHeight: 44)
@@ -298,14 +299,14 @@ struct VisitRecordingLumeShell: View {
     private func denialMessage(_ denial: VisitRecordingDenial) -> String {
         switch denial {
         case .permissionDenied: return "Accesso al microfono negato."
-        case .interrupted: return "Registrazione interrotta dal sistema. Avvia una nuova sessione."
+        case .interrupted: return "L’ascolto si è interrotto. La trascrizione non è completa ed è stata scartata."
         case .assetUnavailable: return "Asset di trascrizione non disponibile."
-        case .staleBinding: return "Il contesto paziente è cambiato. La sessione è stata annullata."
-        case .bufferExceeded: return "Registrazione interrotta per limite di memoria."
-        case .sessionDurationExceeded: return "Durata massima della registrazione raggiunta."
+        case .staleBinding: return "Il paziente o la scheda sono cambiati. La trascrizione è stata scartata."
+        case .bufferExceeded: return "L’ascolto si è interrotto per il limite di memoria. La trascrizione è stata scartata."
+        case .sessionDurationExceeded: return "Durata massima dell’ascolto raggiunta."
         case .transcriptExceeded: return "Trascrizione oltre il limite consentito."
-        case .invalidUsage, .failed: return "Registrazione locale terminata in sicurezza."
-        case .cancelled: return "Registrazione annullata."
+        case .invalidUsage, .failed: return "L’ascolto si è interrotto. La trascrizione è stata scartata."
+        case .cancelled: return "Ascolto annullato."
         }
     }
 }

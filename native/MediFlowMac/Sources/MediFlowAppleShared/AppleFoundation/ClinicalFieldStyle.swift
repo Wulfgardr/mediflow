@@ -1,17 +1,6 @@
 import SwiftUI
 
-/// The shape of an input in the clinical chart.
-///
-/// Cards round at 22, pills round fully, and the text fields were drawing the
-/// system's near-rectangle: three geometries in one column, and the one carrying
-/// the sharpest corner was the one the reader touches most. An input is the same
-/// kind of object as a pill — a self-contained token you act on — so it takes the
-/// pill's curvature.
-///
-/// A `TextFieldStyle` rather than a modifier at each call site: it travels
-/// through the environment, so a section applies it once and every field inside
-/// it, however deeply nested, is shaped the same. There are several dozen fields
-/// across the chart and none of them should be able to disagree.
+/// Consistent controls preserve the native focus ring and touch target.
 struct ClinicalTextFieldStyle: TextFieldStyle {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
@@ -20,30 +9,16 @@ struct ClinicalTextFieldStyle: TextFieldStyle {
     // swiftlint:disable:next identifier_name
     func _body(configuration: TextField<Self._Label>) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
-        #if os(iOS)
-        // @Codex: A text field is a writing surface, with room for touch and text.
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: LumeGeometry.controlRadius)
         configuration
             .textFieldStyle(.plain)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(minHeight: 44)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(minHeight: LumeGeometry.rowHeight)
             .background(palette.field.opacity(isEnabled ? 1 : 0.5), in: shape)
-            .overlay(shape.strokeBorder(palette.inkMuted.opacity(0.22), lineWidth: 0.5))
+            .overlay(shape.strokeBorder(palette.strongRule, lineWidth: 1))
             .contentShape(Rectangle())
-        #else
-        configuration
-            .textFieldStyle(.plain)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .background(palette.field.opacity(isEnabled ? 1 : 0.5), in: Capsule())
-            .overlay(
-                Capsule().strokeBorder(palette.inkMuted.opacity(0.22), lineWidth: 0.5)
-            )
-            // A tap anywhere on the pill puts the caret in the field, not only on
-            // the glyphs. The plain style's hit area is the text itself.
-            .contentShape(Capsule())
-        #endif
+
     }
 }
 
@@ -76,6 +51,6 @@ private struct ClinicalMultilineFieldShape: ViewModifier {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(palette.field, in: shape)
-            .overlay(shape.strokeBorder(palette.inkMuted.opacity(0.22), lineWidth: 0.5))
+            .overlay(shape.strokeBorder(palette.strongRule, lineWidth: 1))
     }
 }

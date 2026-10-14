@@ -120,7 +120,7 @@ private struct NativeOrdinaryProposalView: View {
     let result: NativeOrdinaryJSON
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Proposta da rivedere").font(.headline)
+            Label("Proposta da rivedere", systemImage: "circle").font(.subheadline.weight(.semibold))
             switch function {
             case .patientInsight:
                 let proposal = result["preview"]["proposal"]
@@ -156,10 +156,10 @@ private struct NativeOrdinaryProposalView: View {
                     }
                 }
             }
-        }.textSelection(.enabled)
+        }.foregroundStyle(PlatformColors.pencil).textSelection(.enabled)
     }
     @ViewBuilder private func paragraph(_ value: NativeOrdinaryJSON) -> some View {
-        if let text = value.string, !text.isEmpty { Text(text) }
+        if let text = value.string, !text.isEmpty { Text(text).chartProse() }
     }
     @ViewBuilder private func lines(_ title: String, _ value: NativeOrdinaryJSON) -> some View {
         if !value.array.isEmpty {
