@@ -434,19 +434,26 @@ struct PairedPatientClinicalSections: View {
                 // Left at caption it was indistinguishable from the placeholder
                 // text of the fields it introduces.
                 .chartGroupHeading()
-            TextField("Titolo", text: checkupTitle)
-                .accessibilityIdentifier("\(primaryIdentifier)-title")
-            Picker("Stato", selection: status) {
-                ForEach(PairedCheckupStatus.allCases) { status in
-                    Text(status.title).tag(status)
+            ClinicalFormColumns {
+                ChartGroup("Controllo") {
+                    TextField("Titolo", text: checkupTitle)
+                        .accessibilityIdentifier("\(primaryIdentifier)-title")
+                }
+            } trailing: {
+                ChartGroup("Programmazione") {
+                    Picker("Stato", selection: status) {
+                        ForEach(PairedCheckupStatus.allCases) { status in
+                            Text(status.title).tag(status)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("\(primaryIdentifier)-status")
+                    DatePicker("Data", selection: date, displayedComponents: [.date, .hourAndMinute])
+                        .accessibilityIdentifier("\(primaryIdentifier)-date")
+                    TextField("Note (opzionale)", text: notes)
+                        .accessibilityIdentifier("\(primaryIdentifier)-notes")
                 }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("\(primaryIdentifier)-status")
-            DatePicker("Data", selection: date, displayedComponents: [.date, .hourAndMinute])
-                .accessibilityIdentifier("\(primaryIdentifier)-date")
-            TextField("Note (opzionale)", text: notes)
-                .accessibilityIdentifier("\(primaryIdentifier)-notes")
             PairedPatientFormButtons(
                 primaryLabel: primaryLabel,
                 primaryIdentifier: primaryIdentifier,
@@ -487,40 +494,47 @@ struct PairedPatientClinicalSections: View {
                 // Left at caption it was indistinguishable from the placeholder
                 // text of the fields it introduces.
                 .chartGroupHeading()
-            TextField("Parametro LOINC", text: display)
-                .accessibilityIdentifier("\(primaryIdentifier)-display")
-            TextField("Codice LOINC", text: code)
-                .accessibilityIdentifier("\(primaryIdentifier)-code")
-                .onChange(of: code.wrappedValue) { _ in
-                    onCodeQueryChanged()
+            ClinicalFormColumns {
+                ChartGroup("Parametro") {
+                    TextField("Parametro LOINC", text: display)
+                        .accessibilityIdentifier("\(primaryIdentifier)-display")
+                    TextField("Codice LOINC", text: code)
+                        .accessibilityIdentifier("\(primaryIdentifier)-code")
+                        .onChange(of: code.wrappedValue) { _ in
+                            onCodeQueryChanged()
+                        }
+                    terminologyResultsList(
+                        title: "LOINC",
+                        results: codeResults,
+                        isLoading: isSearchingCode,
+                        primaryIdentifier: primaryIdentifier,
+                        onSelect: onSelectCode
+                    )
                 }
-            terminologyResultsList(
-                title: "LOINC",
-                results: codeResults,
-                isLoading: isSearchingCode,
-                primaryIdentifier: primaryIdentifier,
-                onSelect: onSelectCode
-            )
-            HStack(spacing: 8) {
-                TextField("Valore", text: value)
-                    .accessibilityIdentifier("\(primaryIdentifier)-value")
-                TextField("Unità UCUM", text: unitCode)
-                    .accessibilityIdentifier("\(primaryIdentifier)-unit-code")
-                    .onChange(of: unitCode.wrappedValue) { _ in
-                        onUnitQueryChanged()
+            } trailing: {
+                ChartGroup("Rilevazione") {
+                    HStack(spacing: 8) {
+                        TextField("Valore", text: value)
+                            .accessibilityIdentifier("\(primaryIdentifier)-value")
+                        TextField("Unità UCUM", text: unitCode)
+                            .accessibilityIdentifier("\(primaryIdentifier)-unit-code")
+                            .onChange(of: unitCode.wrappedValue) { _ in
+                                onUnitQueryChanged()
+                            }
                     }
+                    terminologyResultsList(
+                        title: "UCUM",
+                        results: unitResults,
+                        isLoading: isSearchingUnit,
+                        primaryIdentifier: primaryIdentifier,
+                        onSelect: onSelectUnit
+                    )
+                    DatePicker("Rilevata", selection: observedAt, displayedComponents: [.date, .hourAndMinute])
+                        .accessibilityIdentifier("\(primaryIdentifier)-observed-at")
+                    TextField("Note (opzionale)", text: notes)
+                        .accessibilityIdentifier("\(primaryIdentifier)-notes")
+                }
             }
-            terminologyResultsList(
-                title: "UCUM",
-                results: unitResults,
-                isLoading: isSearchingUnit,
-                primaryIdentifier: primaryIdentifier,
-                onSelect: onSelectUnit
-            )
-            DatePicker("Rilevata", selection: observedAt, displayedComponents: [.date, .hourAndMinute])
-                .accessibilityIdentifier("\(primaryIdentifier)-observed-at")
-            TextField("Note (opzionale)", text: notes)
-                .accessibilityIdentifier("\(primaryIdentifier)-notes")
             PairedPatientFormButtons(
                 primaryLabel: primaryLabel,
                 primaryIdentifier: primaryIdentifier,
