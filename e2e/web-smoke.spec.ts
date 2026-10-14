@@ -115,6 +115,8 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(lockScreen.getByLabel('PIN operatore')).toBeVisible();
 
   await bootstrapUnlockedSession(page, pin);
+  await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+    .getByRole('link', { name: 'Pazienti', exact: true }).click();
 
   // Search is now a persistent field in the patient list, without a toolbar trigger.
   const patientsSearch = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
