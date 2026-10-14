@@ -1,22 +1,23 @@
 /* @Codex */
 .overview {
-    --lume-settings-register-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
+    --lume-settings-register-family: var(--lume-font-sans);
     display: grid;
     gap: 2rem;
 }
 .overview :global(.lume-registro),
 .navRoot :global(.lume-registro) {
-    font-family: var(--lume-settings-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-family: var(--lume-font-sans);
 }
 .overviewFocus {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 2rem;
     align-items: end;
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-    border-radius: var(--lume-radius-panel);
-    background: var(--lume-surface-focal);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    border: 0;
+    border-block: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
     padding: clamp(1.25rem, 3vw, 2rem);
 }
 .overviewFocus h2,
@@ -43,7 +44,7 @@
 .navGroupLabel {
     margin: 0;
     color: var(--lume-ink-muted);
-    font-family: var(--lume-settings-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-family: var(--lume-font-sans);
     font-size: 0.7rem;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
@@ -82,8 +83,8 @@
     transition: background-color 150ms cubic-bezier(0.22, 0.61, 0.36, 1), color 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .primaryAction {
-    border: 1px solid var(--lume-accent);
-    background: var(--lume-accent);
+    border: 1px solid var(--lume-ink-fresh);
+    background: var(--lume-ink-fresh);
     color: var(--lume-surface-focal);
 }
 .primaryAction:disabled {
@@ -95,13 +96,13 @@
     height: 0.95rem;
 }
 .secondaryAction {
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+    border: 1px solid var(--lume-rule-strong);
     background: var(--lume-surface-field);
     color: var(--lume-ink);
 }
 .primaryAction:hover,
 .primaryAction:focus-visible {
-    background: color-mix(in srgb, var(--lume-accent) 88%, var(--lume-ink));
+    background: color-mix(in srgb, var(--lume-ink-fresh) 88%, var(--lume-ink));
 }
 .primaryAction:focus-visible,
 .secondaryAction:focus-visible,
@@ -110,7 +111,7 @@
 .mobileToggle:focus-visible,
 .mobileSearch:focus-visible,
 .searchButton:focus-visible {
-    outline: 2px solid var(--lume-accent);
+    outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 2px;
 }
 .previewSection {
@@ -127,7 +128,7 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.3rem 1rem;
-    border-radius: var(--lume-radius-card);
+    border-radius: 0;
     background: var(--lume-surface-focal);
     padding: 0.9rem 1rem;
     color: var(--lume-ink-muted);
@@ -241,13 +242,14 @@
     line-height: 1.55;
 }
 .settingSurface {
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-    border-radius: var(--lume-radius-panel);
-    background: var(--lume-surface-focal);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
+    border: 0;
+    border-block: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 .quietShadow {
-    box-shadow: 0 10px 22px color-mix(in srgb, var(--lume-ink) 4%, transparent);
+    box-shadow: none;
 }
 .settingLayer {
     border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
@@ -257,7 +259,7 @@
 .settingInput {
     width: 100%;
     min-height: 2.75rem;
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+    border: 1px solid var(--lume-rule-strong);
     border-radius: var(--lume-radius-control);
     background: var(--lume-surface-field);
     color: var(--lume-ink);
@@ -265,8 +267,8 @@
     font-size: 0.85rem;
 }
 .settingInput:focus {
-    border-color: var(--lume-accent);
-    outline: 2px solid var(--lume-accent);
+    border-color: var(--lume-ink-fresh);
+    outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 1px;
 }
 .settingLabel {
@@ -310,8 +312,9 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 0.75rem;
     align-items: start;
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-    border-radius: var(--lume-radius-card);
+    border: 0;
+    border-block: 1px solid var(--lume-rule);
+    border-radius: 0;
     background: var(--lume-surface-field);
     padding: 0.85rem 1rem;
 }
@@ -387,7 +390,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
+    border: 1px solid var(--lume-rule-strong);
     border-radius: 999px;
     background: var(--lume-surface-field);
     color: var(--lume-ink);
@@ -519,13 +522,13 @@
     line-height: 1.45;
 }
 .fabricKillSwitch a {
-    color: var(--lume-accent);
+    color: var(--lume-ink-fresh);
     font-weight: 650;
     text-underline-offset: 0.18rem;
 }
 .fabricKillSwitch a:focus-visible {
     border-radius: 0.2rem;
-    outline: 2px solid var(--lume-accent);
+    outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 2px;
 }
 .fabricKillSwitch span {
@@ -568,7 +571,8 @@
 .mobileToggle,
 .mobileSearch,
 .searchButton {
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border: 0;
+    border-block: 1px solid var(--lume-rule);
     border-radius: var(--lume-radius-control);
     background: var(--lume-surface-chrome);
     color: var(--lume-ink);
@@ -625,8 +629,9 @@
 }
 .mobileGroups {
     margin-top: 0.5rem;
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-    border-radius: var(--lume-radius-card);
+    border: 0;
+    border-block: 1px solid var(--lume-rule);
+    border-radius: 0;
     background: var(--lume-surface-chrome);
     padding: 0.75rem;
 }
@@ -662,8 +667,8 @@
     background: color-mix(in srgb, var(--lume-surface-focal) 72%, transparent);
 }
 .navItemActive {
-    background: var(--lume-surface-focal);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 9%, transparent);
+    background: transparent;
+    box-shadow: none;
 }
 .navItemCopy {
     min-width: 0;
@@ -684,12 +689,12 @@
 :global(html[data-runtime-twin-design='proposal']) .navItemDescription { font-size: 0.75rem; line-height: 1.5; }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive {
     border-color: color-mix(in srgb, var(--lume-ink) 17%, transparent);
-    background: var(--lume-surface-focal);
-    box-shadow: 0 2px 4px color-mix(in srgb, var(--lume-surface-chrome) 60%, transparent);
+    background: transparent;
+    box-shadow: none;
 }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive:hover { background: var(--lume-surface-focal); }
 :global(html[data-runtime-twin-design='proposal']) .navItem:focus-visible {
-    outline: 2px solid var(--lume-accent);
+    outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 2px;
 }
 :global(html[data-runtime-twin-design='proposal']) .currentLabel {
@@ -743,7 +748,8 @@
     height: 0.85rem;
 }
 .searchButton kbd {
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border: 0;
+    border-block: 1px solid var(--lume-rule);
     border-radius: 0.35rem;
     padding: 0.1rem 0.35rem;
     font-size: 0.62rem;
@@ -809,7 +815,7 @@
 :global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px; box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .navItemDescription { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 11px; }
-:global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-ink); color: var(--lume-surface-focal); box-shadow: none; }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive :is(strong, span, svg) { color: inherit; }
 :global(html[data-runtime-twin-design='proposal']) .currentLabel { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .searchButton { background: var(--lume-surface-focal); font-size: 12px; }
@@ -851,4 +857,15 @@
 }
 .returnLink svg { flex-shrink: 0; }
 .returnLink:hover { background: var(--lume-surface-field); }
-.returnLink:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
+.returnLink:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
+
+.sectionIntro h2 { font: 400 26px/1.2 var(--lume-font-voice); }
+.settingSurface { padding-inline: 0; }
+.settingLayer { background: transparent; }
+.navRoot { font-family: var(--lume-font-sans); }
+.navItemLabel, .indexLink strong { font-size: 14px; font-weight: 600; }
+.navItemDescription, .indexLink small { font-size: 13px; }
+.navItemActive { background: var(--lume-surface-selected); }
+.fabricCount, .fabricStatusPill { border: 0; border-radius: 0; background: transparent; padding-inline: 0; }
+:global(html[data-runtime-twin-design='proposal']) .sectionIntro h2 { font: 400 26px/1.2 var(--lume-font-voice); }
+:global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); }

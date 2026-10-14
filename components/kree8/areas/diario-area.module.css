@@ -12,7 +12,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 0 2px 13px;
-  border-bottom: 1px solid var(--lume-border-color);
+  border-bottom: 1px solid var(--lume-rule);
 }
 
 .sectionTitle {
@@ -87,7 +87,7 @@
   padding: 13px 14px 12px;
   border: 0;
   border-radius: 0;
-  border-bottom: 1px solid var(--lume-border-color);
+  border-bottom: 1px solid var(--lume-rule);
   outline: 0;
   background: transparent;
   color: var(--lume-ink);
@@ -141,9 +141,9 @@
 
 .stateLabel {
   flex: none;
-  padding: 1px 5px;
-  border: 1px solid var(--lume-border-color);
-  border-radius: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   color: var(--lume-ink-muted);
   font-size: 9.5px;
   font-weight: 650;
@@ -159,18 +159,17 @@
 }
 
 .preview {
-  max-width: 72ch;
+  max-width: 64ch;
   margin: 5px 0 0;
   color: var(--lume-ink);
-  font-size: 13px;
-  line-height: 1.55;
+  font: 17px/1.5 var(--lume-font-voice);
   overflow-wrap: anywhere;
   transition: color var(--lume-dur-firma) var(--lume-ease);
 }
 
 .entry[data-lume-entry-state='draft'] .entryTitle,
 .entry[data-lume-entry-state='draft'] .preview {
-  color: var(--lume-ink-muted);
+  color: var(--lume-ink-fresh);
   font-weight: 520;
 }
 
@@ -195,7 +194,7 @@
   gap: 8px 12px;
   margin-top: 10px;
   padding-top: 9px;
-  border-top: 1px solid var(--lume-border-color);
+  border-top: 1px solid var(--lume-rule);
   color: var(--lume-ink-muted);
   font-size: 11px;
 }
@@ -306,4 +305,20 @@
 :global(:root[data-ui-reduce-motion='true']) .entryTitle,
 :global(:root[data-ui-reduce-motion='true']) .preview {
   transition: none;
+}
+
+.entry[data-active='true'] { background: var(--lume-surface-selected); }
+.entryTop .entryTitle { font: 600 14px/1.5 var(--lume-font-sans); }
+.date, .provenance, .entryFooter, .stateLabel { font-size: 13px; letter-spacing: 0; text-transform: none; }
+.patientIdentity strong { font: 400 22px/1.2 var(--lume-font-voice); }
+.entry[data-lume-entry-state='draft'] { background: var(--lume-surface-draft); }
+
+.entry { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 0 16px; padding: 16px 0; }
+.entryTop { display: contents; }
+.titleGroup, .preview, .provenance, .entryFooter { grid-column: 2; }
+.date { grid-column: 1; grid-row: 1 / span 3; white-space: normal; }
+@media (max-width: 700px) {
+  .entry { grid-template-columns: minmax(0, 1fr); }
+  .titleGroup, .preview, .provenance, .entryFooter { grid-column: 1; }
+  .date { grid-row: 1; margin-bottom: 8px; }
 }

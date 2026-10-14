@@ -2,27 +2,27 @@
 .loadingState {
     margin: 0;
     border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
-    border-radius: var(--lume-radius-card);
+    border-radius: 0;
     background: var(--lume-surface-field);
     color: var(--lume-ink-muted);
     padding: 1.25rem;
     font-size: 0.875rem;
 }
 .focusSurface {
-    --lume-analytics-register-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
+    --lume-analytics-register-family: var(--lume-font-sans);
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(17rem, 0.8fr);
     gap: 2rem;
     scroll-margin-top: 8rem;
     border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-    border-radius: var(--lume-radius-panel);
+    border-radius: 0;
     background: var(--lume-surface-field);
     box-shadow: none;
     padding: clamp(1.25rem, 3vw, 2rem);
 }
 .focusSurface :global(.lume-registro),
 .layerSection :global(.lume-registro) {
-    font-family: var(--lume-analytics-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-family: var(--lume-font-sans);
 }
 .answer {
     min-width: 0;
@@ -75,7 +75,7 @@
 .sectionLabel {
     margin: 0;
     color: var(--lume-ink-muted);
-    font-family: var(--lume-analytics-register-family, "IBM Plex Mono", var(--font-registro), "SF Mono", monospace);
+    font-family: var(--lume-font-sans);
     font-size: 0.72rem;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
@@ -92,7 +92,7 @@
     align-self: stretch;
     display: grid;
     gap: 1rem;
-    border-radius: var(--lume-radius-card);
+    border-radius: 0;
     background: var(--lume-surface-field);
     padding: 1.1rem;
 }
@@ -189,7 +189,7 @@
     display: block;
     height: 100%;
     border-radius: inherit;
-    background: var(--lume-accent);
+    background: var(--lume-ink);
 }
 .tableScroller {
     max-width: 100%;
@@ -197,7 +197,7 @@
     overflow-x: auto;
     overscroll-behavior-inline: contain;
     border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
-    border-radius: var(--lume-radius-card);
+    border-radius: 0;
     background: var(--lume-surface-field);
 }
 .tableScroller:focus-visible {
@@ -370,3 +370,12 @@
     font-size: var(--twin-type-caption);
     line-height: var(--twin-body-leading);
 }
+
+.focusSurface { border: 0; border-bottom: 1px solid var(--lume-rule-strong); background: transparent; padding: 0 0 28px; }
+.answer h2, .sectionHeading h2 { font: 400 22px/1.2 var(--lume-font-voice); }
+.tableScroller { border: 0; background: transparent; }
+.dataTable { font: 14px/1.5 var(--lume-font-sans); }
+.dataTable th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; border-color: var(--lume-rule-strong); }
+:global(html[data-runtime-twin-design='proposal']) .focusSurface { border-radius: 0; padding-inline: 0; }
+:global(html[data-runtime-twin-design='proposal']) .answer h2,
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 { font: 400 22px/1.2 var(--lume-font-voice); }

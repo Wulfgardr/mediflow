@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import ink from './ink-secondary.module.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from '@/lib/live-query';
 import { v4 as uuidv4 } from 'uuid';
@@ -320,7 +321,7 @@ export default function ObservationManager({
     };
 
     return (
-        <div className={embedded ? 'space-y-5' : 'patient-detail-section lume-panel border p-6 space-y-5'}>
+        <div className={`${ink.surface} ${embedded ? 'space-y-5' : 'patient-detail-section lume-panel border p-6 space-y-5'}`}>
             {!embedded && (
                 <div>
                     <p className="section-kicker">Parametri</p>
@@ -334,7 +335,7 @@ export default function ObservationManager({
                 </div>
             )}
 
-            <form onSubmit={saveObservation} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <form onSubmit={saveObservation} className={ink.draft + " grid grid-cols-1 gap-3 p-4 md:grid-cols-2"}>
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
                     <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3.5 py-2.5">
                         <span className="text-sm text-[color:var(--lume-ink)]">
@@ -375,7 +376,7 @@ export default function ObservationManager({
                         ))}
                     </select>
                     {selectedLoinc ? (
-                        <span className="block text-[10.5px] font-mono uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                        <span className="block text-xs lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                             LOINC {selectedLoinc.code}
                         </span>
                     ) : null}
@@ -406,7 +407,7 @@ export default function ObservationManager({
                         className="mf-input"
                     />
                     {valueError ? (
-                        <span className="block text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{valueError}</span>
+                        <span className="block text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{valueError}</span>
                     ) : null}
                 </label>
 
@@ -424,7 +425,7 @@ export default function ObservationManager({
                             </option>
                         ))}
                     </select>
-                    <span className="block text-[10.5px] font-mono uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                    <span className="block text-xs lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                         UCUM {unitCode}
                     </span>
                 </label>
@@ -514,13 +515,13 @@ export default function ObservationManager({
                     (byDay ?? []).map((day) => (
                         <section
                             key={day.key}
-                            className="overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]"
+                            className={ink.group}
                         >
                             <header className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-3.5 py-2">
                                 <span className="text-sm font-semibold text-[color:var(--lume-ink)]">
                                     Misure del {day.date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })}
                                 </span>
-                                <span className="ml-2 text-[11px] text-[color:var(--lume-ink-muted)]">
+                                <span className="ml-2 text-xs text-[color:var(--lume-ink-muted)]">
                                     {day.items.length} {day.items.length === 1 ? 'misura' : 'misure'}
                                 </span>
                             </header>
@@ -537,9 +538,9 @@ export default function ObservationManager({
                                                 <span className={flag ? 'text-sm font-semibold tabular-nums text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]' : 'text-sm tabular-nums text-[color:var(--lume-ink)]'}>
                                                     {item.value}{item.unitCode ? ` ${item.unitCode}` : ''}
                                                 </span>
-                                                {range ? <span className="text-[10px] text-[color:var(--lume-ink-muted)]">rif {range}</span> : null}
+                                                {range ? <span className="text-xs text-[color:var(--lume-ink-muted)]">rif {range}</span> : null}
                                                 {flag ? (
-                                                    <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-[10px] font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
+                                                    <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                         {flag === 'alto' ? 'Alto' : 'Basso'}
                                                     </span>
                                                 ) : null}
@@ -572,7 +573,7 @@ export default function ObservationManager({
                         return (
                             <section
                                 key={group.code}
-                                className="overflow-hidden rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)]"
+                                className={ink.group}
                             >
                                 <button
                                     type="button"
@@ -586,12 +587,12 @@ export default function ObservationManager({
                                             <span className="text-sm font-semibold text-[color:var(--lume-ink)]">
                                                 {label}
                                             </span>
-                                            <span className="text-[11px] text-[color:var(--lume-ink-muted)]">
+                                            <span className="text-xs text-[color:var(--lume-ink-muted)]">
                                                 {group.unitCode} · {group.items.length}{' '}
                                                 {group.items.length === 1 ? 'misura' : 'misure'}
                                             </span>
                                         </span>
-                                        <span className="block font-mono text-[10px] uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                        <span className="block lume-code text-xs uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                             {group.codeSystem} {group.code}
                                         </span>
                                     </span>
@@ -650,19 +651,19 @@ export default function ObservationManager({
                                                                         {item.value}
                                                                     </span>
                                                                     {rangeLabel ? (
-                                                                        <span className="text-[10px] text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="text-xs text-[color:var(--lume-ink-muted)]">
                                                                             rif {rangeLabel}
                                                                         </span>
                                                                     ) : null}
                                                                     {interpretation ? (
-                                                                        <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-[10px] font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
+                                                                        <span className="rounded-md border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] px-1.5 py-0.5 text-xs font-semibold text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                                             {interpretation === 'alto' ? 'Alto' : 'Basso'}
                                                                         </span>
                                                                     ) : null}
                                                                 </span>
                                                                 {item.notes ? (
                                                                     <span
-                                                                        className="block truncate text-[11px] italic text-[color:var(--lume-ink-muted)]"
+                                                                        className="block truncate text-xs italic text-[color:var(--lume-ink-muted)]"
                                                                         title={item.notes}
                                                                     >
                                                                         {item.notes}

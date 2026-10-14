@@ -1,3 +1,4 @@
+import ink from '@/components/ink-secondary.module.css';
 import { useState } from 'react';
 import Link from 'next/link';
 import {
@@ -103,7 +104,7 @@ function DiarioArea({
     : visibleEntries[0]?.id;
 
   return (
-    <div className={styles.areaShell} data-testid="lume-diario">
+    <div className={`${styles.areaShell} ${ink.surface}`} data-testid="lume-diario">
       <header className={styles.areaHeader}>
         <div>
           <p className={styles.areaCaption}>Diario clinico</p>
@@ -205,7 +206,7 @@ function DiarioArea({
                     <div className={diaryStyles.entryFooter}>
                       <span className={diaryStyles.patientIdentity}>
                         <strong>{entry.patientName}</strong>
-                        <span className="lume-registro">{entry.patientCode}</span>
+                        <span className="lume-code">{entry.patientCode}</span>
                       </span>
                       {entry.attachmentCount > 0 ? (
                         <span className={diaryStyles.attachmentCount}>

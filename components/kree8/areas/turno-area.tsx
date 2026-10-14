@@ -1,3 +1,4 @@
+import ink from '@/components/ink-secondary.module.css';
 import { useMemo, useRef } from 'react';
 import {
   ArrowUpRight,
@@ -174,7 +175,7 @@ function TurnoArea({
   };
 
   return (
-    <div className={styles.areaShell}>
+    <div className={`${styles.areaShell} ${ink.surface}`}>
       <header className={styles.areaHeader}>
         <div>
           <p className={styles.areaCaption}>Oggi</p>

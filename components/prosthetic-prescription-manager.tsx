@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import ink from './ink-secondary.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import { Accessibility, CheckCircle2, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, type ProstheticPrescriptionStatus } from '@/lib/db';
@@ -221,7 +222,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     );
 
     return (
-        <section className={embedded ? '' : 'patient-detail-section rounded-[20px] border p-5 md:p-6'}>
+        <section className={`${ink.surface} ${embedded ? '' : 'patient-detail-section rounded-[20px] border p-5 md:p-6'}`}>
             {embedded ? (
                 <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
             ) : (
@@ -252,7 +253,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             )}
 
             {isFormOpen && (
-                <form onSubmit={handleSubmit} className="mb-5 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
+                <form onSubmit={handleSubmit} className={ink.draft + " mb-5 p-4"}>
                     <div className="grid gap-3 md:grid-cols-2">
                         <label className="space-y-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                             Data prescrizione
@@ -340,7 +341,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                     {prescriptions.map((item) => {
                         const refs = parseDocumentRefs(item.documentRefs);
                         return (
-                            <article key={item.id} className="rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
+                            <article key={item.id} className={ink.record}>
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
                                         <div className="flex flex-wrap items-center gap-2">
@@ -351,8 +352,8 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                         </div>
                                         <h3 className="mt-3 text-base font-semibold text-[color:var(--lume-ink)]">{item.description}</h3>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
-                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--lume-ink)]">ISO:</span> <span className="lume-registro">{item.isoCode}</span></p>}
-                                            {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--lume-ink)]">Pratica:</span> <span className="lume-registro">{item.regionalPrescriptionId}</span></p>}
+                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--lume-ink)]">ISO:</span> <span className="lume-code">{item.isoCode}</span></p>}
+                                            {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--lume-ink)]">Pratica:</span> <span className="lume-code">{item.regionalPrescriptionId}</span></p>}
                                             {item.measures && <p><span className="font-semibold text-[color:var(--lume-ink)]">Misure:</span> {item.measures}</p>}
                                             {item.clinicalReason && <p><span className="font-semibold text-[color:var(--lume-ink)]">Motivo:</span> {item.clinicalReason}</p>}
                                             {item.supplier && <p><span className="font-semibold text-[color:var(--lume-ink)]">Fornitore:</span> {item.supplier}</p>}

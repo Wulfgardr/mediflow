@@ -1,5 +1,6 @@
 'use client';
 
+import ink from './ink-secondary.module.css';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
 import { useLiveQuery } from '@/lib/live-query';
@@ -40,7 +41,7 @@ type TherapyRecovery = {
     readComplete?: boolean;
 };
 
-const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-[11px]';
+const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-xs';
 const inputClassName = 'w-full rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2.5 text-sm text-[color:var(--lume-ink)] outline-none transition-colors placeholder:text-[color:var(--lume-ink-muted)] focus-visible:border-[color:color-mix(in_srgb,var(--lume-ink)_28%,transparent)] focus-visible:shadow-[var(--lume-focus-ring)] read-only:bg-[color:var(--lume-surface-focal)]';
 const textareaClassName = `${inputClassName} min-h-[88px] resize-y`;
 const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_26%,transparent)] hover:bg-[color:var(--lume-surface-focal)]';
@@ -375,7 +376,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     ) : null;
 
     return (
-        <section className={embedded ? '' : 'patient-detail-section border p-5 md:p-6'}>
+        <section className={`${ink.surface} ${embedded ? '' : 'patient-detail-section border p-5 md:p-6'}`}>
             {embedded ? (
                 newButton ? <div className="mb-4 flex justify-end">{newButton}</div> : null
             ) : (
@@ -448,7 +449,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
             )}
 
             {isAdding && (
-                <div className="mb-6 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 shadow-[var(--lume-shadow-focal)] animate-in fade-in slide-in-from-top-4 md:p-5">
+                <div className={ink.draft + " mb-6 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 shadow-[var(--lume-shadow-focal)] animate-in fade-in slide-in-from-top-4 md:p-5"}>
                     <div className="mb-5 flex items-start justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_11%,transparent)] pb-4">
                         <div>
                             <p className="section-kicker">Registro terapia</p>
@@ -498,7 +499,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <div className="space-y-1">
                                 <label className={fieldLabelClassName}>
                                     <span>Farmaco</span>
-                                    {!isGalenic && <span className="inline-flex items-center gap-1 text-[10px] text-[color:var(--lume-ink-muted)]"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
+                                    {!isGalenic && <span className="inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
                                 </label>
 
                                 {isGalenic ? (
@@ -652,11 +653,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                         )}
                         {/* ACTIVE */}
                         {activeTherapies.map(t => (
-                            <div key={t.id} className="flex flex-col items-start justify-between gap-4 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_13%,transparent)] bg-[color:var(--lume-surface-field)] p-4 shadow-[var(--lume-shadow-focal)] sm:flex-row">
+                            <div key={t.id} className={ink.record + " flex flex-col items-start justify-between gap-4 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_13%,transparent)] bg-[color:var(--lume-surface-field)] p-4 shadow-[var(--lume-shadow-focal)] sm:flex-row"}>
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">{t.drugName}</h4>
-                                        <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--lume-ink-muted)]">
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--lume-ink-muted)]" aria-hidden />
                                             Attiva
                                         </span>
@@ -665,13 +666,13 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     <p className="mt-1 text-base leading-6 font-medium text-[color:var(--lume-ink)]">{t.dosage}</p>
                                     {t.startDate && (
                                         <p className="mt-0.5 text-xs text-[color:var(--lume-ink-muted)]">
-                                            In corso dal <span className="lume-registro">{format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</span>
+                                            In corso dal <span className="tabular-nums">{format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</span>
                                         </p>
                                     )}
 
                                     {t.diagnosisCode && (
                                         <div className="mt-1 flex items-center gap-1.5">
-                                            <span className="rounded border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--lume-ink-muted)]">
+                                            <span className="rounded border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-1.5 py-0.5 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                                                 {t.diagnosisCode}
                                             </span>
                                             <span className="max-w-[220px] truncate text-xs text-[color:var(--lume-ink-muted)]" title={t.diagnosisName}>
@@ -683,7 +684,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     {t.motivation && <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{t.motivation}</p>}
 
                                     {(t.atc || t.aic) && (
-                                        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] font-mono uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                             {t.atc ? <span>ATC {t.atc}</span> : null}
                                             {t.aic ? <span>AIC {t.aic}</span> : null}
                                         </p>
@@ -740,7 +741,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     <Clock className="w-3 h-3" /> Terapie sospese
                                 </h5>
                                 {suspendedTherapies.map(t => (
-                                    <div key={t.id} className="flex flex-col items-start justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 sm:flex-row sm:items-center">
+                                    <div key={t.id} className={ink.record + " flex flex-col items-start justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 sm:flex-row sm:items-center"}>
                                         <div className="min-w-0 flex-1 break-words">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <span className="font-semibold text-[color:var(--lume-ink)]">{t.drugName}</span>
@@ -778,11 +779,11 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     <h5 className="section-kicker mb-3">Terapie concluse</h5>
                     <div className="space-y-2">
                         {endedTherapies.map(t => (
-                            <div key={t.id} className="group flex items-center justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] p-3">
+                            <div key={t.id} className={ink.record + " group flex items-center justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] p-3"}>
                                 <div>
                                     <span className="font-semibold text-[color:var(--lume-ink-muted)] line-through decoration-[color:color-mix(in_srgb,var(--lume-ink)_42%,transparent)]">{t.drugName}</span>
                                     <div className="text-xs text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
-                                        Conclusa il <span className="lume-registro">{format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</span>
+                                        Conclusa il <span className="tabular-nums">{format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</span>
                                     </div>
                                 </div>
                                 <div className="flex gap-2 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
