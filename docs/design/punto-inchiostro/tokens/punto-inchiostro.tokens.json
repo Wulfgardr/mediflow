@@ -1,0 +1,302 @@
+{
+  "$description": "Punto d'inchiostro: token di destinazione scelti da Leonardo il 9 ottobre 2026. Formato DTCG. Non sono ancora collegati al runtime: la sorgente attiva resta docs/design/lume/tokens/lume.tokens.json finche' WUL-765 non li porta li'. Il banco (../banco/index.html) usa questi stessi valori e puo' esportarne una variante.",
+  "colore": {
+    "$type": "color",
+    "giorno": {
+      "penombra": {
+        "$value": "#e8eaee",
+        "$description": "Fondo, navigazione, contesto"
+      },
+      "piano": {
+        "$value": "#ffffff",
+        "$description": "La superficie in luce"
+      },
+      "filetto": {
+        "$value": "#dfe2e7",
+        "$description": "Separazione di righe"
+      },
+      "filetto-forte": {
+        "$value": "#c9ced6",
+        "$description": "Sotto le intestazioni, bordo dei controlli"
+      },
+      "inchiostro-asciutto": {
+        "$value": "#14161a",
+        "$description": "Testo registrato. Contrasto 18,1 su piano"
+      },
+      "inchiostro-fresco": {
+        "$value": "#2346b0",
+        "$description": "Bozza, azione principale, fuoco. Contrasto 8,2 su piano"
+      },
+      "matita": {
+        "$value": "#5f6878",
+        "$description": "Proposte di modelli e agenti. Contrasto 5,6 su piano, 4,7 su penombra"
+      },
+      "secondario": {
+        "$value": "#555e6b",
+        "$description": "Etichette, metadati. Contrasto 6,6 su piano"
+      },
+      "fresco-fondo": {
+        "$value": "#f3f6fd",
+        "$description": "Fondo della voce in scrittura"
+      },
+      "fresco-filetto": {
+        "$value": "#d9e0f3",
+        "$description": "Bordo e filetti della voce in scrittura"
+      },
+      "riga-passaggio": {
+        "$value": "#f5f6f8",
+        "$description": "Riga sotto il puntatore, pannello di anteprima"
+      },
+      "riga-selezionata": {
+        "$value": "#eef2fb",
+        "$description": "Riga selezionata"
+      },
+      "avviso": {
+        "$value": "#8a5a1c",
+        "$description": "Sempre con il segno ▲ e un testo"
+      },
+      "critico": {
+        "$value": "#a33a2f",
+        "$description": "Sempre con il segno ◆ oppure ✕ e un testo"
+      },
+      "esito-positivo": {
+        "$value": "#3f5a49",
+        "$description": "Sempre con il segno ✓ e un testo"
+      },
+      "soglia": {
+        "$value": "#14161a",
+        "$description": "Fondo della soglia in conferma"
+      },
+      "soglia-testo": {
+        "$value": "#ffffff"
+      }
+    },
+    "grafite": {
+      "penombra": {
+        "$value": "#101216"
+      },
+      "piano": {
+        "$value": "#1a1d22"
+      },
+      "filetto": {
+        "$value": "#2a2e35"
+      },
+      "filetto-forte": {
+        "$value": "#3b414b"
+      },
+      "inchiostro-asciutto": {
+        "$value": "#e9ecef",
+        "$description": "Contrasto 14,3 su piano"
+      },
+      "inchiostro-fresco": {
+        "$value": "#9db4ff",
+        "$description": "Contrasto 8,4 su piano"
+      },
+      "matita": {
+        "$value": "#9aa3b0",
+        "$description": "Contrasto 6,6 su piano"
+      },
+      "secondario": {
+        "$value": "#a3acb8",
+        "$description": "Contrasto 7,4 su piano"
+      },
+      "fresco-fondo": {
+        "$value": "#1d2333"
+      },
+      "fresco-filetto": {
+        "$value": "#2f3a5c"
+      },
+      "riga-passaggio": {
+        "$value": "#20242a"
+      },
+      "riga-selezionata": {
+        "$value": "#232a3d"
+      },
+      "avviso": {
+        "$value": "#d9a75f"
+      },
+      "critico": {
+        "$value": "#f08a7d"
+      },
+      "esito-positivo": {
+        "$value": "#8fbf9f"
+      },
+      "soglia": {
+        "$value": "#e9ecef",
+        "$description": "In Grafite la soglia in conferma e' chiara: resta il blocco di massimo contrasto"
+      },
+      "soglia-testo": {
+        "$value": "#14161a"
+      }
+    }
+  },
+  "carattere": {
+    "voce": {
+      "$type": "fontFamily",
+      "$value": [
+        "Newsreader",
+        "Georgia",
+        "Times New Roman",
+        "serif"
+      ],
+      "$description": "Nome del paziente in testata e anteprima, prosa clinica, titoli di pagina, nome del prodotto. Mai nelle righe di tabella. File locale OFL"
+    },
+    "registro": {
+      "$type": "fontFamily",
+      "$value": [
+        "system-ui"
+      ],
+      "$description": "Controlli, etichette, tabelle: il carattere di sistema della piattaforma"
+    },
+    "dati": {
+      "$type": "fontFamily",
+      "$value": [
+        "IBM Plex Mono",
+        "ui-monospace",
+        "Menlo",
+        "monospace"
+      ],
+      "$description": "Solo codici: ICD, ATC, codice fiscale, identificativi, riga di comando. Date, dosi e valori usano il registro con cifre tabulari. File locale OFL"
+    }
+  },
+  "corpo": {
+    "$type": "dimension",
+    "nome-paziente": {
+      "$value": "28px",
+      "$description": "Voce 400, interlinea 1,1. 26px in larghezza compatta"
+    },
+    "titolo-pagina": {
+      "$value": "26px",
+      "$description": "Voce 400"
+    },
+    "nome-anteprima": {
+      "$value": "22px",
+      "$description": "Voce 400"
+    },
+    "prosa": {
+      "$value": "17px",
+      "$description": "Voce 400, interlinea 1,5, al massimo 64 caratteri per riga"
+    },
+    "soglia-titolo": {
+      "$value": "15px",
+      "$description": "Registro 600"
+    },
+    "registro": {
+      "$value": "14px",
+      "$description": "Web, interlinea 1,5. macOS 13,5, Windows e Linux 14, iOS e iPadOS 15,5"
+    },
+    "registro-secondario": {
+      "$value": "13px",
+      "$description": "Date, ore, variazioni, metadati"
+    },
+    "intestazione-sezione": {
+      "$value": "12px",
+      "$description": "Registro 600, maiuscolo, spaziatura 0,05em"
+    },
+    "codici": {
+      "$value": "12px",
+      "$description": "Mono 400"
+    }
+  },
+  "misura": {
+    "$type": "dimension",
+    "unita": {
+      "$value": "4px",
+      "$description": "Ogni distanza e' un multiplo. Passi usati: 2, 3, 4, 5, 7, 10"
+    },
+    "riga": {
+      "$value": "40px",
+      "$description": "Con puntatore"
+    },
+    "riga-tocco": {
+      "$value": "44px",
+      "$description": "Al tocco e con l'opzione Righe ampie"
+    },
+    "bersaglio-minimo": {
+      "$value": "44px",
+      "$description": "Ogni comando al tocco; l'area puo' estendersi oltre il disegno"
+    },
+    "margine-piano": {
+      "$value": "28px",
+      "$description": "7 unita'. 16px in larghezza compatta"
+    },
+    "distanza-colonne": {
+      "$value": "40px",
+      "$description": "10 unita'. 24px in larghezza media"
+    },
+    "colonna-margine-diario": {
+      "$value": "84px"
+    },
+    "navigazione": {
+      "$value": "192px",
+      "$description": "160px in larghezza media"
+    },
+    "anteprima": {
+      "$value": "304px"
+    },
+    "raggio-record": {
+      "$value": "0px"
+    },
+    "raggio-controllo": {
+      "$value": "10px",
+      "$description": "Web. macOS 8, Windows 4, Linux 6, iOS e iPadOS 12"
+    },
+    "raggio-piano": {
+      "$value": "16px",
+      "$description": "Web. macOS 12, Windows 8, Linux 10, iOS e iPadOS 18"
+    },
+    "raggio-voce-in-scrittura": {
+      "$value": "12px"
+    },
+    "punto": {
+      "$value": "0.44em",
+      "$description": "0,24em quando chiude un titolo o il nome del prodotto"
+    },
+    "distanza-sezioni": {
+      "$value": "28px",
+      "$description": "7 unita', sopra ogni intestazione di sezione"
+    }
+  },
+  "larghezza": {
+    "$type": "dimension",
+    "compatta": {
+      "$value": "700px",
+      "$description": "Sotto: una colonna, schede in basso"
+    },
+    "media": {
+      "$value": "1000px",
+      "$description": "Fra 700 e 1000: navigazione stretta, colonne ravvicinate, colonne secondarie nascoste"
+    }
+  },
+  "movimento": {
+    "$type": "duration",
+    "immediato": {
+      "$value": "0ms",
+      "$description": "Tastiera, selezione di righe, passaggio del puntatore"
+    },
+    "rapido": {
+      "$value": "80ms",
+      "$description": "Pressione di un comando"
+    },
+    "moderato": {
+      "$value": "160ms",
+      "$description": "Segmenti, interruttori, menu"
+    },
+    "lento": {
+      "$value": "240ms",
+      "$description": "Fogli e pannelli. Uscita 160ms"
+    },
+    "posa-del-punto": {
+      "$value": "520ms",
+      "$description": "Curva cubic-bezier(.3,1.5,.5,1), una sola volta alla registrazione"
+    },
+    "asciugatura": {
+      "$value": "1500ms",
+      "$description": "Solo colore, da inchiostro fresco ad asciutto, ease-out"
+    },
+    "ascolto": {
+      "$value": "1400ms",
+      "$description": "Respiro del punto vuoto durante l'ascolto, in ciclo"
+    }
+  }
+}

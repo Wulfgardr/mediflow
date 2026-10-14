@@ -7,7 +7,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
-import { useRuntimeTwinDesign, useRuntimeTwinFolder } from '@/components/runtime-twin-design';
+import { useRuntimeTwinFolder } from '@/components/runtime-twin-design';
 
 interface CollapsibleSectionProps {
     id?: string;
@@ -46,9 +46,8 @@ export function CollapsibleSection({
     const [open, setOpen] = useState(defaultOpen);
     const reactId = useId();
     const regionId = `${reactId}-region`;
-    const { composition } = useRuntimeTwinDesign();
     const folderSection = useRuntimeTwinFolder();
-    const folderActive = folderSection === id || (composition === 'stream' && folderSection === 'quadro' && id === 'timeline');
+    const folderActive = folderSection === id || (folderSection === 'quadro' && id === 'diario');
     const expanded = open || folderActive;
     // A visited proposal pane retains its form even when navigating elsewhere.
     const [visited, setVisited] = useState(false);

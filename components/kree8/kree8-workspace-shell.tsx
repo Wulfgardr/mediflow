@@ -127,7 +127,7 @@ export function Kree8WorkspaceShell({
       const section = sections.includes(href) ? href.slice(1)
         : target?.closest<HTMLElement>(sections.map((item) => `#${CSS.escape(item.slice(1))}`).join(','))?.id;
       if (folderMode) {
-        setFolderSection(section ?? (composition === 'stream' ? 'diario' : 'quadro'));
+        setFolderSection(section ?? 'quadro');
         setFolderNavOpen(false);
       }
       if (!target || !section) return;

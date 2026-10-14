@@ -65,11 +65,13 @@
 
   /* @Codex WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
-  --lume-font-sans: var(--font-voce), "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --lume-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --lume-font-voice: var(--font-voce), Georgia, serif;
 
 }
 
 body {
+  --lume-font-voice: var(--font-voce), Georgia, serif;
   background: var(--background);
   color: var(--foreground);
   /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
@@ -80,10 +82,33 @@ body {
 }
 
 .lume-registro {
-  font-family: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font-family: var(--lume-font-sans);
   font-variant-numeric: tabular-nums;
-  font-size: 0.95em;
 }
+
+.lume-code, code, kbd {
+  font-family: var(--font-registro), "SF Mono", "Cascadia Code", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.lume-voice { font-family: var(--lume-font-voice); font-weight: 400; }
+.lume-ink-state { display: inline-flex; align-items: baseline; gap: 0.5em; }
+.lume-ink-state[data-ink='pencil'] { color: var(--lume-ink-pencil); }
+.lume-ink-state[data-ink='fresh'] { color: var(--lume-ink-fresh); }
+.lume-ink-state[data-ink='dry'] { color: var(--lume-ink); }
+.lume-point { display: inline-block; flex: none; width: 0.44em; height: 0.44em; border: 1.5px solid currentColor; border-radius: 50%; background: currentColor; }
+[data-ink='pencil'] > .lume-point { background: transparent; }
+[data-ink='pencil'] > .lume-ink-copy { text-decoration: underline dashed; text-underline-offset: 4px; }
+.lume-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 12px/1.5 var(--lume-font-sans); letter-spacing: 0.05em; text-transform: uppercase; }
+.lume-section-heading > span { font-weight: 400; color: var(--lume-ink-muted); }
+.lume-rule-table { width: 100%; border-collapse: collapse; font: 14px/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
+.lume-rule-table :is(th, td) { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--lume-rule); }
+.lume-rule-table th { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-color: var(--lume-rule-strong); }
+.lume-rule-table tbody tr:hover { background: var(--lume-surface-hover); }
+
+body { caret-color: var(--lume-ink-fresh); }
+:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
+input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); opacity: 1; }
 
 /* Ensure selected text is readable in dark mode */
 ::selection {
@@ -511,8 +536,10 @@ body {
   /* @Codex */
   .clinical-rich-text,
   .clinical-rich-editor {
+    font-family: var(--lume-font-voice);
+    font-size: 17px;
     color: var(--lume-ink);
-    line-height: 1.75;
+    line-height: 1.5;
   }
 
   .clinical-rich-text :first-child,
@@ -1552,7 +1579,7 @@ textarea.input-field {
   position: sticky;
   top: 1rem;
   z-index: 20;
-  border-radius: 34px;
+  border-radius: var(--lume-radius-panel);
   padding: 0.7rem;
   background: var(--lume-surface-chrome);
   border-color: var(--lume-border-color);
@@ -1565,7 +1592,7 @@ textarea.input-field {
 
 :root[data-ui-style='redesign'] .patient-liquid-lens {
   min-height: clamp(25rem, 50vh, 36rem);
-  border-radius: 46px;
+  border-radius: var(--lume-radius-panel);
   padding: clamp(1.5rem, 4vw, 3.25rem);
   background: var(--lume-surface-focal);
   border-color: var(--lume-border-color);
@@ -1595,7 +1622,7 @@ textarea.input-field {
 :root[data-ui-style='redesign'] .patient-detail-side-section,
 :root[data-ui-style='redesign'] .patient-actions-dock,
 :root[data-ui-style='redesign'] .patient-ai-insight-panel {
-  border-radius: 34px;
+  border-radius: var(--lume-radius-panel);
   border-color: var(--lume-border-color);
   background: var(--lume-surface-field);
   box-shadow: var(--lume-shadow-resting);
@@ -1606,7 +1633,7 @@ textarea.input-field {
 }
 
 :root[data-ui-style='redesign'] .patient-liquid-stream-shell {
-  border-radius: 30px;
+  border-radius: var(--lume-radius-panel);
   border-color: var(--lume-border-color);
   background: var(--lume-surface-canvas);
   box-shadow: none;
@@ -1631,7 +1658,7 @@ textarea.input-field {
 :root[data-ui-style='redesign'] .clinical-river-card,
 :root[data-ui-style='redesign'] .evidence-stack-tile,
 :root[data-ui-style='redesign'] .apple-list-row {
-  border-radius: 22px;
+  border-radius: var(--lume-radius-card);
   border-color: var(--lume-border-color);
   background: var(--lume-surface-field);
   box-shadow: none;
@@ -1781,4 +1808,16 @@ textarea.input-field {
 :root.dark[data-ui-style='redesign'] [class*="text-purple-"]:not(.mf-chroma-keep),
 :root.dark[data-ui-style='redesign'] [class*="text-violet-"]:not(.mf-chroma-keep) {
   color: var(--lume-ink) !important;
+}
+
+/* The working plane carries depth; clinical rows remain on that plane. */
+:root[data-ui-style='redesign'] .apple-list-row { border-radius: 0; border-width: 0 0 1px; border-color: var(--lume-rule); }
+.clinical-rich-editor { color: var(--lume-ink-fresh); }
+.clinical-rich-text { max-width: 64ch; }
+@media (prefers-contrast: more) {
+  :root { --lume-rule: var(--lume-rule-strong); --lume-ink-pencil: var(--lume-ink-secondary); }
+}
+@media (forced-colors: active) {
+  .lume-point { forced-color-adjust: auto; }
+  :focus-visible { outline-color: Highlight; }
 }

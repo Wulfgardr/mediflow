@@ -26,12 +26,12 @@
 :root {
   --lume-motion-factor: 1;
   --lume-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --lume-dur-riga: calc(100ms * var(--lume-motion-factor));
+  --lume-dur-riga: 0ms;
   --lume-dur-fuoco: calc(165ms * var(--lume-motion-factor));
   --lume-dur-firma: calc(210ms * var(--lume-motion-factor));
   --lume-dur-anello: calc(350ms * var(--lume-motion-factor));
-  --lume-radius-panel: 20px;
-  --lume-radius-card: 14px;
+  --lume-radius-panel: 16px;
+  --lume-radius-card: 0px;
   --lume-radius-control: 10px;
   --lume-border-color: color-mix(in srgb, var(--lume-ink) 14%, transparent);
   --lume-shadow-resting: none;
@@ -50,11 +50,11 @@
 }
 
 .lume-press:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .lume-press:active {
-  transform: scale(0.97);
+  transform: none;
 }
 
 .lume-anello {
@@ -166,7 +166,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --lume-motion-factor: 0.5;
+    --lume-motion-factor: 0;
   }
 
   .lume-anello {
@@ -203,7 +203,7 @@
 }
 
 :root[data-ui-reduce-motion='true'] {
-  --lume-motion-factor: 0.5;
+  --lume-motion-factor: 0;
 }
 
 :root[data-ui-reduce-motion='true'] .lume-anello {

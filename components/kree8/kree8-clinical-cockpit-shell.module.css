@@ -20,8 +20,8 @@
   --k8-hairline-soft-strength: 8%;
   --k8-hairline: color-mix(in srgb, var(--lume-ink) var(--k8-hairline-strength), transparent);
   --k8-hairline-soft: color-mix(in srgb, var(--lume-ink) var(--k8-hairline-soft-strength), transparent);
-  --line: var(--k8-hairline-soft);
-  --line-strong: var(--k8-hairline);
+  --line: var(--lume-rule);
+  --line-strong: var(--lume-rule-strong);
   /* Lume: bordo di controllo interattivo (WCAG 1.4.11), derivato dall'alias
      ink-muted Lume (>= 4,5:1 su ogni superficie attiva; ri-risolve per registro). */
   --control-border: var(--lume-ink-muted);
@@ -37,7 +37,7 @@
      gradiente ornamentale; le azioni piene usano l'inchiostro Lume. */
   --accent-ai: var(--lume-accent);
   --accent-ai-fg: var(--lume-surface-focal);
-  --solid-action-bg: var(--lume-ink);
+  --solid-action-bg: var(--lume-ink-fresh);
   --solid-action-fg: var(--lume-surface-focal);
   --brand-dot-bg: var(--lume-ink);
   --brand-dot-fg: var(--lume-surface-focal);
@@ -107,7 +107,7 @@
   --rail-slate: var(--lume-ink-muted);
   --accent-ai: var(--lume-accent);
   --accent-ai-fg: var(--lume-surface-focal);
-  --solid-action-bg: var(--lume-ink);
+  --solid-action-bg: var(--lume-ink-fresh);
   --solid-action-fg: var(--lume-surface-focal);
   --brand-dot-bg: var(--lume-ink);
   --brand-dot-fg: var(--lume-surface-focal);
@@ -831,3 +831,8 @@
 :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 26px 30px 40px; background: transparent; }
 :global(html[data-runtime-twin-design='proposal']) .focusSurface { background: transparent; }
 @media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 20px 14px; } :global(html[data-runtime-twin-design='proposal']) .toolbar { padding-inline: 14px; } }
+
+:global(html[data-runtime-twin-design='proposal']) .canvas { padding: 0; }
+:global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 20px 28px 28px; }
+:global(html[data-runtime-twin-design='proposal']) .toolbar { padding: 6px 28px; min-height: 40px; }
+@media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 16px; } }

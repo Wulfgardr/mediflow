@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDown, ClipboardList, Clock, FileCheck2, FileText, Home, Loader2, Mic, MicOff, Paperclip, Pause, Play, RotateCcw, Save, Square, Stethoscope, Upload, Video, Wand2, X } from 'lucide-react';
 
 /* @Codex */
+import { InkState } from '@/components/ui/ink-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
@@ -632,7 +633,7 @@ export default function NewEntryPage() {
                                 className="mt-1 h-4 w-4 rounded border-[color:color-mix(in_srgb,var(--lume-ink)_22%,transparent)] text-[color:var(--lume-accent)]"
                             />
                             <span>
-                                Ho rivisto questa bozza prima di usarla nel resoconto.
+                                Ho rivisto questa proposta prima di usarla nel resoconto.
                             </span>
                         </label>
                         <button
@@ -707,7 +708,7 @@ export default function NewEntryPage() {
                 <div className={composerStyles.editorHeading}>
                     <h2>Resoconto clinico</h2>
                     <p data-testid="lume-entry-draft-state" role="status">
-                        {acceptedNoteHasContent ? 'Da registrare' : 'Vuoto'}
+                        <InkState state="fresh">{acceptedNoteHasContent ? 'Bozza non registrata' : 'Bozza vuota'}</InkState>
                     </p>
                 </div>
             ) : (
@@ -879,7 +880,7 @@ export default function NewEntryPage() {
                     </details>
                 ) : null}
                 <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
-                    {proposal && hasUnsavedChanges ? <p role="status">Non salvata</p> : null}
+                    {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : 'Caricamento paziente…'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
                     <button
                         type="submit"
                         disabled={isSubmitting}
