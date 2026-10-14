@@ -121,7 +121,7 @@ export default function PatientDocumentImportReview({
 
     return (
         <div className={`${styles.register} ${styles.review}`}>
-            <div className="flex flex-col gap-5 border-b border-black/5 pb-6 dark:border-white/5 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-5 border-b border-[color:var(--lume-rule)] pb-6 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone.icon}`}>
                         <ClipboardCheck className="h-6 w-6" />
