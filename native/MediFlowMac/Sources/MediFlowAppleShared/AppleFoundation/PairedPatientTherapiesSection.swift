@@ -332,42 +332,49 @@ struct PairedPatientTherapiesSection: View {
                 primaryIdentifier: primaryIdentifier,
                 onSelect: onSelectDrug
             )
-            TextField("Codice AIC (opzionale)", text: aic)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("\(primaryIdentifier)-aic")
-            TextField("Codice ATC (opzionale)", text: atc)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("\(primaryIdentifier)-atc")
-            TextField("Principio attivo (opzionale)", text: activePrinciple)
-                .accessibilityIdentifier("\(primaryIdentifier)-active-principle")
-            TextField("Posologia", text: dosage)
-                .accessibilityIdentifier("\(primaryIdentifier)-dosage")
-            TextField("Motivazione (opzionale)", text: motivation)
-                .accessibilityIdentifier("\(primaryIdentifier)-motivation")
-            if !diagnosisOptions.isEmpty {
-                Picker("Diagnosi collegata", selection: diagnosisCode) {
-                    Text("Nessuna").tag("")
-                    ForEach(diagnosisOptions, id: \.code) { diagnosis in
-                        Text(diagnosis.displayText).tag(diagnosis.code)
+            ClinicalFormColumns {
+                ChartGroup("Farmaco e posologia") {
+                    TextField("Codice AIC (opzionale)", text: aic)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("\(primaryIdentifier)-aic")
+                    TextField("Codice ATC (opzionale)", text: atc)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("\(primaryIdentifier)-atc")
+                    TextField("Principio attivo (opzionale)", text: activePrinciple)
+                        .accessibilityIdentifier("\(primaryIdentifier)-active-principle")
+                    TextField("Posologia", text: dosage)
+                        .accessibilityIdentifier("\(primaryIdentifier)-dosage")
+                    TextField("Motivazione (opzionale)", text: motivation)
+                        .accessibilityIdentifier("\(primaryIdentifier)-motivation")
+                    if !diagnosisOptions.isEmpty {
+                        Picker("Diagnosi collegata", selection: diagnosisCode) {
+                            Text("Nessuna").tag("")
+                            ForEach(diagnosisOptions, id: \.code) { diagnosis in
+                                Text(diagnosis.displayText).tag(diagnosis.code)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("\(primaryIdentifier)-diagnosis")
                     }
                 }
-                .pickerStyle(.menu)
-                .accessibilityIdentifier("\(primaryIdentifier)-diagnosis")
-            }
-            Picker("Stato", selection: status) {
-                ForEach(PairedTherapyStatus.allCases) { status in
-                    Text(status.title).tag(status)
+            } trailing: {
+                ChartGroup("Periodo e stato") {
+                    Picker("Stato", selection: status) {
+                        ForEach(PairedTherapyStatus.allCases) { status in
+                            Text(status.title).tag(status)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("\(primaryIdentifier)-status")
+                    DatePicker("Inizio", selection: startDate, displayedComponents: .date)
+                        .accessibilityIdentifier("\(primaryIdentifier)-start-date")
+                    Toggle("Fine terapia", isOn: hasEndDate)
+                        .accessibilityIdentifier("\(primaryIdentifier)-has-end-date")
+                    if hasEndDate.wrappedValue {
+                        DatePicker("Fine", selection: endDate, displayedComponents: .date)
+                            .accessibilityIdentifier("\(primaryIdentifier)-end-date")
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("\(primaryIdentifier)-status")
-            DatePicker("Inizio", selection: startDate, displayedComponents: .date)
-                .accessibilityIdentifier("\(primaryIdentifier)-start-date")
-            Toggle("Fine terapia", isOn: hasEndDate)
-                .accessibilityIdentifier("\(primaryIdentifier)-has-end-date")
-            if hasEndDate.wrappedValue {
-                DatePicker("Fine", selection: endDate, displayedComponents: .date)
-                    .accessibilityIdentifier("\(primaryIdentifier)-end-date")
             }
             HStack(spacing: 8) {
                 if let onCancel {

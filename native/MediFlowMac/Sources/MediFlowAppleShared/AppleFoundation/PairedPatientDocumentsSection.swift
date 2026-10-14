@@ -28,10 +28,10 @@ struct PairedPatientDocumentsSection: View {
             if usesInlinePreview, let attachment = attachmentDetailCandidate {
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .top, spacing: 20) {
-                        archiveColumn.frame(minWidth: 280, maxWidth: 360, alignment: .topLeading)
+                        archiveColumn.frame(width: 240, alignment: .topLeading)
                         Divider()
-                        original(attachment).frame(minWidth: 320)
-                    }.frame(minWidth: 680)
+                        original(attachment).frame(width: 399)
+                    }.frame(width: 680, alignment: .leading)
                     VStack(alignment: .leading, spacing: 20) {
                         archiveColumn
                         Divider()

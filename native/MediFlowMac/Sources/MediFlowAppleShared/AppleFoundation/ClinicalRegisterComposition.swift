@@ -22,6 +22,21 @@ struct ClinicalCreationDisclosure<Content: View>: View {
     }
 }
 
+struct ClinicalFormColumns<Leading: View, Trailing: View>: View {
+    @ViewBuilder let leading: Leading
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 24) {
+                leading.frame(maxWidth: .infinity, alignment: .leading)
+                trailing.frame(maxWidth: .infinity, alignment: .leading)
+            }.frame(minWidth: 560)
+            VStack(alignment: .leading, spacing: 20) { leading; trailing }
+        }
+    }
+}
+
 extension View {
     func clinicalRegisterList() -> some View {
         listStyle(.plain)
