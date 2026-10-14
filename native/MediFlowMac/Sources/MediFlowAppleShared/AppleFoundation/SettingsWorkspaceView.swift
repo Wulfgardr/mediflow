@@ -427,7 +427,7 @@ struct SettingsWorkspaceView: View {
                         }
                     }
                     .listStyle(.sidebar)
-                    .frame(width: 176)
+                    .frame(width: sidebarWidth)
                     .accessibilityIdentifier("settings-area-navigation")
                     Divider()
                     settingsDetail
@@ -491,6 +491,14 @@ struct SettingsWorkspaceView: View {
         } message: {
             Text(pendingClear.map { "I dati di test di \($0.name) verranno rimossi." } ?? "I dati di test verranno rimossi.")
         }
+    }
+
+    private var sidebarWidth: CGFloat {
+        #if os(macOS)
+        176
+        #else
+        240
+        #endif
     }
 
     private var usesSidebar: Bool {
