@@ -790,15 +790,15 @@ struct PairedPatientsWorkspaceView: View {
                     workspaceFeedbackLine
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
                 // The worklist owns its own padding and its own vertical
                 // distribution: applied here, every one of its top-level
                 // elements got the frame and spread across the column.
                 patientsListContent
             }
-            .frame(minWidth: 260, idealWidth: 300, maxWidth: 340, maxHeight: .infinity)
+            .frame(minWidth: 240, idealWidth: 270, maxWidth: 300, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
             // @Codex: The identity is outside the scrolling plane, including
@@ -807,8 +807,8 @@ struct PairedPatientsWorkspaceView: View {
                 if let detail = model.selectedPatient {
                     patientWorkspaceHeader(detail)
                     MacPatientSectionNavigation(selection: $model.activePatientSection)
-                        .padding(.horizontal, 28)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
                     Divider()
                 }
                 // @Codex: Keep the split pane stable while resetting only its scroll
@@ -816,7 +816,7 @@ struct PairedPatientsWorkspaceView: View {
                 ScrollViewReader { scroll in
                     ScrollView {
                         patientDetailContent
-                            .padding(28)
+                            .padding(20)
                             // Keep clinical rows within a comfortable reading width.
                             .frame(maxWidth: 1000, alignment: .leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -853,9 +853,9 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 24)
-        .padding(.bottom, 20)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name). \(metadata)")

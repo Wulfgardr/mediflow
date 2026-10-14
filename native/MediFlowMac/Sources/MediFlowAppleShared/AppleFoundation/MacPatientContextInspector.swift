@@ -48,7 +48,7 @@ struct MacPatientInspectorContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Contesto paziente")
-                .inkVoice(26)
+                .font(.headline)
                 .accessibilityHeading(.h1)
                 .accessibilityIdentifier("clinical-workspace-patient-inspector")
 
