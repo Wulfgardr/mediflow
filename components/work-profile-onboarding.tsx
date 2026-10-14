@@ -235,5 +235,10 @@ export function WorkProfileSettings() {
         {error && <div role="alert"><p>{error}</p><button type="button" disabled={busy} className={styles.secondaryAction} onClick={() => void reload()}>Rileggi lo stato</button></div>}
         {busy && <p role="status">Lettura o salvataggio del profilo…</p>}
         {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
+        <nav className={styles.links} aria-label="Percorsi sempre disponibili">
+            <Link className={styles.textAction} href="/?area=turno">Apri la cartella manualmente</Link>
+            <Link className={styles.textAction} href="/settings/ai/fabric">Configurazione AI facoltativa</Link>
+            <Link className={styles.textAction} href="/settings/diagnostica">Diagnostica della postazione</Link>
+        </nav>
     </section>;
 }

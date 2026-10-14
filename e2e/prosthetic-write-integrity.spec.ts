@@ -49,7 +49,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     await pane.getByRole('button', { name: 'Salva voce', exact: true }).click();
     const created = await create; expect(created.status()).toBe(201);
     const { id } = await created.json() as { id: string };
-    await expect(pane.getByRole('heading', { name: 'Ausilio sintetico di verifica', exact: true })).toBeVisible();
+    await expect(pane.getByText('Ausilio sintetico di verifica', { exact: true })).toBeVisible();
     const initial = read(id); expect(initial.row).toMatchObject({ version: 1, patient_id: patientId });
     expect(String(initial.row?.clinical_reason)).toMatch(/^ENC:/u);
     expect(initial.events.map(x => x.event_type)).toEqual(['prosthetic.prescription.created']);
@@ -67,7 +67,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     await pane.getByRole('button', { name: 'Elimina Ausilio sintetico di verifica', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await remove).status()).toBe(200);
-    await expect(pane.getByRole('heading', { name: 'Ausilio sintetico di verifica', exact: true })).toHaveCount(0);
+    await expect(pane.getByText('Ausilio sintetico di verifica', { exact: true })).toHaveCount(0);
     const deleted = read(id); expect(deleted.row).toBeUndefined(); expect((await http()).find(x => x.id === id)).toBeUndefined();
     expect(deleted.events.map(x => x.event_type)).toEqual(['prosthetic.prescription.created', 'prosthetic.prescription.updated', 'prosthetic.prescription.deleted']);
     expect(deleted.events.every(x => x.source_surface === 'web')).toBe(true);
