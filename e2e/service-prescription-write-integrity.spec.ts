@@ -53,7 +53,7 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     const created = page.waitForResponse(r => new URL(r.url()).pathname === '/api/service-prescriptions' && r.request().method() === 'POST');
     await pane.getByRole('button', { name: 'Salva prestazione', exact: true }).click();
     expect((await created).status()).toBe(201);
-    await expect(pane.getByRole('heading', { name: 'Controllo sintetico di verifica', exact: true })).toBeVisible();
+    await expect(pane.getByText('Controllo sintetico di verifica', { exact: true })).toBeVisible();
     await expect.poll(() => read().items.length).toBe(2);
     const initial = read();
     expect(initial.rows).toHaveLength(1);
@@ -82,7 +82,7 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     await pane.getByRole('button', { name: 'Elimina voce', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await removed).status()).toBe(200);
-    await expect(pane.getByRole('heading', { name: 'Controllo sintetico di verifica', exact: true })).toHaveCount(0);
+    await expect(pane.getByText('Controllo sintetico di verifica', { exact: true })).toHaveCount(0);
     const deleted = read();
     expect(deleted.rows).toHaveLength(0); expect(deleted.items).toHaveLength(0);
     expect(await http('service-prescriptions')).toHaveLength(0); expect(await http('service-prescription-items')).toHaveLength(0);
