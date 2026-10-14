@@ -21,6 +21,7 @@ import { encryptRecoveryBackup, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYT
 import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
 import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
 import { LockScreen } from '@/components/lock-screen';
+import { AppStartupScreen } from '@/components/app-startup-screen';
 /* @Codex */
 import { AuthHealthScreen } from '@/components/auth-health-screen';
 /* @Codex */
@@ -851,7 +852,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     // Loading state
     if (requiresSetup === null) {
-        return <div className="flex h-screen items-center justify-center bg-[color:var(--lume-surface-canvas)] text-[color:var(--lume-ink-muted)]">Caricamento sicurezza...</div>;
+        return <AppStartupScreen />;
     }
 
     // Onboarding Wizard for first-time setup
