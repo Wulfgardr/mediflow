@@ -1,7 +1,7 @@
 /* @Codex: compact Lume controls; 12px soft cards and 44px targets. */
 .panel { display:grid; gap:var(--lume-group-gap,16px); min-width:0; color:var(--lume-ink); }
-.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); gap:12px; }
-.card { display:grid; align-content:start; gap:12px; min-width:0; border:1px solid var(--lume-border-color); border-radius:var(--lume-control-radius,12px); padding:var(--lume-group-gap,16px); background:var(--lume-surface-field); }
+.grid { display:grid; grid-template-columns:minmax(0,1fr); gap:0; }
+.card { display:grid; align-content:start; gap:12px; min-width:0; border:0; border-bottom:1px solid var(--lume-rule); border-radius:0; padding:16px 0; background:transparent; }
 .card h3,.card h4,.panel p { margin:0; }
 .card h3 { font-size:1rem; }
 .panel p,.card p { font-size:.875rem; line-height:1.5; overflow-wrap:anywhere; }

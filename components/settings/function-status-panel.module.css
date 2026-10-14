@@ -5,8 +5,8 @@
 .header p, .checkedAt { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: var(--lume-ink-muted); }
 .group { display: grid; gap: 12px; min-width: 0; }
 .group > h3 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 16px; padding: 0; margin: 0; list-style: none; }
-.card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border: 1px solid var(--lume-border-color); border-radius: var(--lume-radius-panel); background: var(--lume-surface-field); }
+.cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; margin: 0; list-style: none; }
+.card { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 16px 0; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; background: transparent; }
 .cardHeader { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .card h4 { margin: 0; font-size: 16px; line-height: 1.5; font-weight: 600; }
 .card p { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }

@@ -372,10 +372,10 @@
 }
 
 .focusSurface { border: 0; border-bottom: 1px solid var(--lume-rule-strong); background: transparent; padding: 0 0 28px; }
-.answer h2, .sectionHeading h2 { font: 400 22px/1.2 var(--lume-font-voice); }
+.answer h2, .sectionHeading h2 { font: 600 14px/1.5 var(--lume-font-sans); }
 .tableScroller { border: 0; background: transparent; }
 .dataTable { font: 14px/1.5 var(--lume-font-sans); }
 .dataTable th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; border-color: var(--lume-rule-strong); }
 :global(html[data-runtime-twin-design='proposal']) .focusSurface { border-radius: 0; padding-inline: 0; }
 :global(html[data-runtime-twin-design='proposal']) .answer h2,
-:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 { font: 400 22px/1.2 var(--lume-font-voice); }
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 { font: 600 14px/1.5 var(--lume-font-sans); }

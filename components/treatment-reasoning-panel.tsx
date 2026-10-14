@@ -305,7 +305,7 @@ export default function TreatmentReasoningPanel({
 
                 <div className="grid gap-2 sm:grid-cols-5">
                     {sourceSummaryItems.map(([label, value]) => (
-                        <div key={label} className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 py-2">
+                        <div key={label} className={ink.record}>
                             <span className="block text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
                             <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{value}</span>
                         </div>
