@@ -32,9 +32,6 @@ export default function SettingsAiModelsPage() {
             <SettingsSectionIntro kicker="Intelligenza locale" title="Modelli e hardware"
                 description="Collega Ollama, scegli i modelli installati e salva. Le funzioni cliniche richiedono un’abilitazione separata e revisione delle proposte." />
 
-            {/* @Codex: account control is separate from function/model preferences. */}
-            <ChatGptAccountPanel />
-
             {aiSettingsLoadState !== 'ready' && <p role="status">
                 {aiSettingsLoadState === 'loading' ? 'Caricamento delle impostazioni…'
                     : 'Impossibile leggere le impostazioni. Ricarica questa pagina prima di modificarle.'}
@@ -42,41 +39,6 @@ export default function SettingsAiModelsPage() {
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni dei modelli locali" data-testid="ai-settings-controls"
                 className={`min-w-0 border-0 p-0 ${styles.surface}`}>
-
-            {/* @Codex: presets remain explicit draft changes through the existing controller. */}
-            <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
-                <h3 className="text-base font-semibold">Configurazioni consigliate</h3>
-                <p>Parti dalla memoria del computer, poi scegli i modelli per le tue attività.</p>
-                <div className={styles.presets}>
-                    {([
-                        ['low', 'Leggero · meno di 16 GB', 'Qwen 2.5 7B'],
-                        ['medium', 'Bilanciato · 16–32 GB', 'Qwen 2.5 14B'],
-                        ['high', 'Avanzato · oltre 32 GB', 'Qwen 3.5 35B A3B'],
-                    ] as const).map(([profile, label, model]) => (
-                        <button type="button" key={profile} className={styles.preset}
-                            aria-pressed={hardwareProfile === profile} onClick={() => applyHardwareProfile(profile)}>
-                            <span className="block font-semibold">{label}</span>
-                            <span className={styles.hint}>{model}</span>
-                            <span className={styles.presetAction}>Applica alla bozza</span>
-                        </button>
-                    ))}
-                </div>
-                <p className={styles.hint}>Il preset aggiorna la bozza. Verifica i modelli installati e salva per applicarlo.</p>
-                <details>
-                <summary>Cosa cambia con un preset</summary>
-                <dl className={styles.roles}>
-                    <div>
-                        <dt className="font-semibold">Sintesi e organizzazione</dt>
-                        <dd className={styles.hint}>Modello di testo generale per riassumere e organizzare le informazioni estratte dai documenti.</dd>
-                    </div>
-                    <div>
-                        <dt className="font-semibold">Ragionamento testuale</dt>
-                        <dd className={styles.hint}>Modello per elaborare e confrontare informazioni testuali. Puoi sceglierne uno diverso nel passo 2.</dd>
-                    </div>
-                </dl>
-                <p className={styles.hint}>Il preset sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
-                </details>
-            </div>
 
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
                 <h3 className="text-base font-semibold">1. Verifica la connessione</h3>
@@ -121,6 +83,40 @@ export default function SettingsAiModelsPage() {
                 ]} />
             </div>
 
+            <details className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
+                <summary>Configurazioni consigliate</summary>
+                <p>Parti dalla memoria del computer, poi scegli i modelli per le tue attività.</p>
+                <div className={styles.presets}>
+                    {([
+                        ['low', 'Leggero · meno di 16 GB', 'Qwen 2.5 7B'],
+                        ['medium', 'Bilanciato · 16–32 GB', 'Qwen 2.5 14B'],
+                        ['high', 'Avanzato · oltre 32 GB', 'Qwen 3.5 35B A3B'],
+                    ] as const).map(([profile, label, model]) => (
+                        <button type="button" key={profile} className={styles.preset}
+                            aria-pressed={hardwareProfile === profile} onClick={() => applyHardwareProfile(profile)}>
+                            <span className="block font-semibold">{label}</span>
+                            <span className={styles.hint}>{model}</span>
+                            <span className={styles.presetAction}>Applica alla bozza</span>
+                        </button>
+                    ))}
+                </div>
+                <p className={styles.hint}>Il preset aggiorna la bozza. Verifica i modelli installati e salva per applicarlo.</p>
+                <details>
+                <summary>Cosa cambia con un preset</summary>
+                <dl className={styles.roles}>
+                    <div>
+                        <dt className="font-semibold">Sintesi e organizzazione</dt>
+                        <dd className={styles.hint}>Modello di testo generale per riassumere e organizzare le informazioni estratte dai documenti.</dd>
+                    </div>
+                    <div>
+                        <dt className="font-semibold">Ragionamento testuale</dt>
+                        <dd className={styles.hint}>Modello per elaborare e confrontare informazioni testuali. Puoi sceglierne uno diverso nel passo 2.</dd>
+                    </div>
+                </dl>
+                <p className={styles.hint}>Il preset sceglie lo stesso modello per i due ruoli, senza scaricarlo o salvarlo. La memoria è un’indicazione orientativa: compatibilità e qualità vanno verificate. OCR e revisione terapeutica ATHENA hanno una configurazione separata.</p>
+                </details>
+            </details>
+
             <div className={`${SETTINGS_CARD_CLASS} ${styles.card} ${styles.stack}`}>
                 <h3 className="text-base font-semibold">3. Salva e verifica le funzioni</h3>
                 <div className={styles.actions}>
@@ -136,6 +132,7 @@ export default function SettingsAiModelsPage() {
             </div>
 
             </fieldset>
+            <details className={styles.accountDetails}><summary>Account OpenAI · ChatGPT</summary><ChatGptAccountPanel /></details>
             <LocalProviderOnboardingPanel />
         </section>
     );

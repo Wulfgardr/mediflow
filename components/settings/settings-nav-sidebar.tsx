@@ -1,24 +1,13 @@
 'use client';
 
-import { ChevronDown, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
 
 import { SETTINGS_NAV_GROUPS, isSettingsItemActive } from '@/lib/settings-navigation';
-import type { SettingsNavGroup, SettingsNavItem } from '@/lib/settings-navigation';
 import { cn } from '@/lib/utils';
 
 import styles from './settings-lume.module.css';
-
-function findActiveEntry(pathname: string): { group: SettingsNavGroup; item: SettingsNavItem } | null {
-    for (const group of SETTINGS_NAV_GROUPS) {
-        for (const item of group.items) {
-            if (isSettingsItemActive(item, pathname)) return { group, item };
-        }
-    }
-    return null;
-}
 
 function NavGroups({
     pathname,
@@ -70,81 +59,17 @@ function NavGroups({
 /* @Codex LUME-110/68 */
 export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () => void }) {
     const pathname = usePathname();
-    const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-    const mobileToggleRef = useRef<HTMLButtonElement>(null);
-    const restoreFocusAfterNavigation = useRef(false);
-    const activeEntry = findActiveEntry(pathname);
-
-    useEffect(() => {
-        setIsMobileNavOpen(false);
-        if (!restoreFocusAfterNavigation.current) return;
-        restoreFocusAfterNavigation.current = false;
-        requestAnimationFrame(() => mobileToggleRef.current?.focus());
-    }, [pathname]);
-
-    const closeMobileNavigation = (isActive: boolean) => {
-        if (isActive) {
-            restoreFocusAfterNavigation.current = false;
-            setIsMobileNavOpen(false);
-            requestAnimationFrame(() => mobileToggleRef.current?.focus());
-            return;
-        }
-        restoreFocusAfterNavigation.current = true;
-        setIsMobileNavOpen(false);
-    };
-
-    const closeMobileDisclosure = () => {
-        setIsMobileNavOpen(false);
-        requestAnimationFrame(() => mobileToggleRef.current?.focus());
-    };
-
     return (
         <nav aria-label="Sezioni impostazioni" data-testid="settings-nav-sidebar" className={styles.navRoot}>
-            <div className={styles.mobileBar}>
-                <button
-                    ref={mobileToggleRef}
-                    type="button"
-                    onClick={() => setIsMobileNavOpen((current) => !current)}
-                    aria-expanded={isMobileNavOpen}
-                    aria-controls="settings-nav-mobile-groups"
-                    aria-label={`${isMobileNavOpen ? 'Chiudi' : 'Apri'} navigazione impostazioni. Sezione attiva: ${activeEntry?.item.label ?? 'Panoramica'}`}
-                    data-testid="settings-nav-mobile-toggle"
-                    className={styles.mobileToggle}
-                >
-                    <span className={styles.mobileCurrent}>
-                        <span>{activeEntry?.group.label ?? 'Impostazioni'}</span>
-                        <strong>{activeEntry?.item.label ?? 'Panoramica'}</strong>
-                    </span>
-                    <ChevronDown
-                        aria-hidden="true"
-                        className={cn(styles.disclosureIcon, isMobileNavOpen && styles.disclosureIconOpen)}
-                    />
-                </button>
-                {onSearchRequest ? (
-                    <button
-                        type="button"
-                        onClick={onSearchRequest}
-                        aria-label="Cerca impostazione"
-                        data-testid="settings-search-trigger-mobile"
-                        className={styles.mobileSearch}
-                    >
-                        <Search aria-hidden="true" />
-                    </button>
-                ) : null}
+            <div className={styles.mobileStrip}>
+                {SETTINGS_NAV_GROUPS.flatMap(group => group.items).map(item => {
+                    const active = isSettingsItemActive(item, pathname);
+                    return <Link key={item.id} href={item.href} data-testid={`settings-nav-mobile-${item.id}`}
+                        data-state={active ? 'active' : 'idle'} aria-current={active ? 'page' : undefined}
+                        className={cn(styles.navItem, active && styles.navItemActive)}>{item.label}</Link>;
+                })}
             </div>
-
-            <div
-                id="settings-nav-mobile-groups"
-                hidden={!isMobileNavOpen}
-                className={styles.mobileGroups}
-                onKeyDown={(event) => {
-                    if (event.key !== 'Escape') return;
-                    event.preventDefault();
-                    closeMobileDisclosure();
-                }}
-            >
-                <NavGroups pathname={pathname} testIdPrefix="settings-nav-mobile-" onNavigate={closeMobileNavigation} />
-            </div>
+            {onSearchRequest && <button type="button" onClick={onSearchRequest} aria-label="Cerca impostazione" data-testid="settings-search-trigger-mobile" className={styles.mobileStripSearch}><Search size={16} aria-hidden="true" />Cerca impostazione</button>}
 
             <div className={styles.desktopSidebar}>
                 {onSearchRequest ? (

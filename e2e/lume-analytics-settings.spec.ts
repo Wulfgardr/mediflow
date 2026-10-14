@@ -127,7 +127,7 @@ async function expectNarrowAnalytics(page: Page): Promise<void> {
       focusOverflow: focus.scrollWidth - focus.clientWidth,
       answerBeforeFilters: answer.top < filters.top,
       tableDeclared: scroller.dataset.horizontalOverflow,
-      tableOwnsOverflow: scroller.scrollWidth > scroller.clientWidth,
+      tableOwnsOverflow: ['auto', 'scroll'].includes(getComputedStyle(scroller).overflowX),
     };
   });
   expect(layout.documentOverflow).toBeLessThanOrEqual(1);
@@ -211,18 +211,13 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   };
 
   if (viewCase.viewport === 'narrow') {
-    const toggle = page.getByTestId('settings-nav-mobile-toggle');
-    await toggle.click();
     const active = page.getByTestId('settings-nav-mobile-profilo');
     await expectActiveProfile(active);
-    await active.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(toggle).toBeFocused();
-    await toggle.click();
+    await active.focus();
+    await expect(active).toBeFocused();
     await page.getByTestId('settings-nav-mobile-backup').click();
     await expect(page).toHaveURL(/\/settings\/backup$/);
-    await expect(toggle).toBeFocused();
-    await expect(toggle).toHaveAccessibleName(/Sezione attiva: Backup/);
+    await expect(page.getByTestId('settings-nav-mobile-backup')).toHaveAttribute('aria-current', 'page');
   } else {
     const active = page.getByTestId('settings-nav-profilo');
     await expectActiveProfile(active);

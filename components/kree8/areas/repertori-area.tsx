@@ -5,15 +5,11 @@ import {
   ArrowUpRight,
   ChevronRight,
   Database,
-  Stethoscope,
 } from 'lucide-react';
 
 import { useLiveQuery } from '@/lib/live-query';
-/* @Codex */
-import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import {
   PillBadge,
-  classNames,
 } from '../cockpit-shared';
 import type {
   Kree8CatalogClientState,
@@ -25,10 +21,7 @@ import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
 import { getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
 import type { ICDReadiness } from '@/lib/icd-service';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
-import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
-/* @Codex */
-import catalogLayout from '@/components/settings/repertori-layout.module.css';
 
 
 const REVIEW_CATALOGS: Kree8CatalogRow[] = [
@@ -158,7 +151,6 @@ function buildLiveCatalogState(
 /* ───────────────────────── Repertori ───────────────────────── */
 
 function RepertoriArea({ isReview }: { isReview: boolean }) {
-  const { proposal } = useRuntimeTwinDesign();
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
   /* @Codex */
   const catalogState = useLiveQuery<Kree8CatalogClientState, Kree8CatalogClientState>(
@@ -194,150 +186,42 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
   const availableCatalogs = catalogs.filter((catalog) => catalog.freshness === 'fresh' || catalog.freshness === 'ok').length;
   const needsImport = catalogs.some((catalog) => catalog.freshness === 'broken');
   const isLoading = catalogState?.status === 'loading' || catalogState?.status === 'idle';
-  const freshnessTier: Kree8CatalogFreshness =
-    catalogState?.status === 'error' ? 'broken' : needsImport ? 'stale' : 'fresh';
   const freshnessTitle =
     catalogState?.status === 'error'
       ? 'Repertori non leggibili'
       : needsImport
         ? 'Import repertori incompleto'
         : 'Repertori disponibili';
-  const freshnessPct = catalogs.length
-    ? Math.round((availableCatalogs / catalogs.length) * 100)
-    : isLoading
-      ? 0
-      : 0;
-  const freshnessClass = classNames(
-    repertoriStyles.freshness,
-    // @Codex: freshness usa lo stesso vocabolario delle pillole: fresh, stale e broken
-    // mantengono rispettivamente success, warning e critical anche sulla rail.
-    freshnessTier === 'fresh' && repertoriStyles.freshnessOk,
-    freshnessTier === 'stale' && repertoriStyles.freshnessStale,
-    freshnessTier === 'broken' && repertoriStyles.freshnessBroken,
-  );
-
   return (
     <div className={`${styles.areaShell} ${ink.surface}`}>
       <header className={styles.areaHeader}>
         <div>
-          <p className={styles.areaCaption}>Repertori clinici</p>
-          <h1 className={styles.areaTitle}>
-            AIFA, esenzioni e ICD <em>· {isLoading ? 'lettura locale' : `${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record`}</em>
-          </h1>
-          <p className={styles.areaSubtitle}>
-            Consultazione rapida dei repertori durante la compilazione della cartella.
-            Import e cancellazioni restano nelle impostazioni complete, con azione
-            esplicita dell&apos;operatore.
-          </p>
+          <h1 className={styles.areaTitle}>Repertori<span aria-hidden="true">.</span></h1>
+          <p className={styles.areaSubtitle}>{isLoading ? 'Lettura locale…' : `${availableCatalogs} di ${catalogs.length} cataloghi disponibili · ${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record indicizzati`}</p>
         </div>
-        <div className={styles.headerActions}>
-          <Link href="/settings/repertori" className={styles.ghostBtn}>
-            <Database size={13} />
-            Gestisci repertori
-          </Link>
-        </div>
+        <div className={styles.headerActions}><Link href="/settings/repertori" className={styles.ghostBtn}><Database size={14} />Gestisci repertori</Link></div>
       </header>
-
-      <section className={styles.panel}>
-        <div className={freshnessClass}>
-          <Database size={18} color="var(--ink-muted)" />
-          <div className={repertoriStyles.freshnessLabel}>
-            {proposal
-              ? <h2 className={styles.panelTitle}>{freshnessTitle}</h2>
-              : <span className={repertoriStyles.freshnessTitle}>{freshnessTitle}</span>}
-            <span className={repertoriStyles.freshnessSub}>
-              {isLoading
-                ? 'lettura in corso'
-                : `${availableCatalogs} di ${catalogs.length} pacchetti disponibili`}
-            </span>
-          </div>
-          <span className={repertoriStyles.freshnessNum}>{freshnessPct}%</span>
-        </div>
-
-        {catalogState?.status === 'error' ? (
-          <p className={styles.panelSubtitle}>Impossibile leggere i conteggi locali in questa sessione.</p>
-        ) : !selectedCatalog ? (
-          <p className={styles.panelSubtitle}>Caricamento stato repertori locali.</p>
-        ) : null}
+      <section aria-label="Repertori rapidi">
+        <h2 className={styles.panelTitle}>{freshnessTitle}</h2>
+        {catalogState?.status === 'error' && <p role="status">Impossibile leggere i conteggi locali in questa sessione.</p>}
+        <div className={repertoriStyles.catalogHeader} aria-hidden="true"><span>Catalogo</span><span>Contenuto locale</span><span>Stato</span><span /></div>
+        {catalogs.map((c) => {
+          const labelText = { fresh: 'Disponibile', ok: 'Da verificare', stale: 'Da aggiornare', broken: 'Import richiesto', off: 'Disattivato' }[c.freshness];
+          return <div key={c.id} className={repertoriStyles.catalogRow} data-selected={c.id === selectedCatalog?.id}>
+            <strong className={repertoriStyles.catalogName}>{c.name}</strong>
+            <span className={repertoriStyles.catalogSub}>{c.age}</span>
+            <PillBadge variant={catalogFreshnessSignal(c.freshness) as PillVariant}>{labelText}</PillBadge>
+            <button type="button" className={styles.ghostBtnSm} aria-label={`Mostra dettaglio repertorio ${c.name}`} aria-pressed={c.id === selectedCatalog?.id} onClick={() => setSelectedCatalogId(c.id)}>Dettagli<ChevronRight size={13} /></button>
+          </div>;
+        })}
+        {!catalogs.length && <p className={styles.emptyState}>{isLoading ? 'Caricamento repertori locali.' : 'Nessun repertorio disponibile.'}</p>}
       </section>
-
-      <section className={styles.panel}>
-        <header className={styles.panelHeader}>
-          <h2 className={styles.panelTitle}>Repertori rapidi</h2>
-        </header>
-
-        <div style={{ marginTop: 8 }}>
-          {catalogs.map((c) => {
-            const variant: PillVariant = catalogFreshnessSignal(c.freshness);
-            const labelText = {
-              fresh: 'fresco',
-              ok: 'da verificare',
-              stale: 'invecchiato',
-              broken: 'import manuale richiesto',
-              off: 'disattivato',
-            }[c.freshness];
-
-            return (
-              <div key={c.id} className={`${repertoriStyles.catalogRow} ${catalogLayout.row}`}>
-                <span className={repertoriStyles.catalogIcon}>
-                  <Stethoscope size={13} />
-                </span>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span className={repertoriStyles.catalogName}>{c.name}</span>
-                  <span className={repertoriStyles.catalogSub}>{c.sub}</span>
-                </div>
-                <span className={styles.rowSub} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {c.age}
-                </span>
-                <div className={catalogLayout.status}><PillBadge variant={variant}>{labelText}</PillBadge></div>
-                <button
-                  type="button"
-                  className={styles.ghostBtnSm}
-                  aria-label={`Mostra dettaglio repertorio ${c.name}`}
-                  onClick={() => {
-                    setSelectedCatalogId(c.id);
-                  }}
-                >
-                  Dettagli
-                  <ChevronRight size={13} />
-                </button>
-              </div>
-            );
-          })}
-          {!catalogs.length ? (
-            <p className={styles.panelSubtitle}>Caricamento repertori locali.</p>
-          ) : null}
-        </div>
-        {selectedCatalog && (
-          <div className={styles.compositeCard} style={{ marginTop: 12 }}>
-            <header className={styles.panelHeader}>
-              <span className={styles.evidenceTitle}>{selectedCatalog.name}</span>
-              <PillBadge
-                variant={catalogFreshnessSignal(selectedCatalog.freshness)}
-              >
-                {{
-                  fresh: 'fresco',
-                  ok: 'da verificare',
-                  stale: 'invecchiato',
-                  broken: 'import manuale richiesto',
-                  off: 'disattivato',
-                }[selectedCatalog.freshness]}
-              </PillBadge>
-            </header>
-            <p className={styles.rowSub} style={{ margin: 0 }}>
-              {selectedCatalog.sub} · aggiornamento {selectedCatalog.age}
-            </p>
-            {selectedCatalog.href ? (
-              <div className={patientStyles.caseLensActions} style={{ marginTop: 10 }}>
-                <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>
-                  {selectedCatalog.actionLabel ?? 'Apri'}
-                  <ArrowUpRight size={12} />
-                </Link>
-              </div>
-            ) : null}
-          </div>
-        )}
-      </section>
+      {selectedCatalog && <section className={repertoriStyles.detail} aria-label={`Dettaglio ${selectedCatalog.name}`}>
+        <h2 className={styles.panelTitle}>{selectedCatalog.name}</h2>
+        <p>{selectedCatalog.sub}</p>
+        <span className={styles.rowSub}>Contenuto locale: {selectedCatalog.age}</span>
+        {selectedCatalog.href && <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>{selectedCatalog.actionLabel ?? 'Apri'}<ArrowUpRight size={13} /></Link>}
+      </section>}
     </div>
   );
 }

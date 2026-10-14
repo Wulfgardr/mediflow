@@ -80,7 +80,7 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await commandSearch.press('Enter');
   await expect(page.getByTestId('lume-frame-canvas')).toHaveAttribute('data-lume-context', 'diario');
   await expect(search).not.toBeVisible();
-  const diaryHeading = page.getByRole('heading', { name: /Ultime voci del lavoro clinico/, level: 1 });
+  const diaryHeading = page.getByRole('heading', { name: /^Diario/, level: 1 });
   await expect(diaryHeading).toBeFocused();
 
   await page.keyboard.press('?');
@@ -144,7 +144,7 @@ test('L9: i comandi raggiungono Analisi e Scale una sola volta senza scorciatoie
   await expect(analyticsCommand).not.toHaveAttribute('aria-disabled', 'true');
   await commandSearch.press('Enter');
   await expect(page).toHaveURL(/\/analytics$/);
-  await expect(page.getByRole('heading', { name: 'Cruscotto locale', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Analisi', level: 1 })).toBeVisible();
 
   await page.goto('/?area=incarico');
   await commandTrigger.focus();

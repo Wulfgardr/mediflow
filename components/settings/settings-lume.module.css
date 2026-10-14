@@ -871,3 +871,41 @@
 :global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); }
 .navRoot.navRoot .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); }
 .navRoot.navRoot .navItemActive :is(strong, span, svg) { color: inherit; }
+
+.settingsRows { min-width: 0; margin: 28px 0; padding: 0; border: 0; }
+.settingsRows > legend, .settingsRows > h3 { width: 100%; margin: 0; padding: 0 0 12px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 14px/1.5 var(--lume-font-sans); }
+.settingsWorkspace .settingRow { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 64px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; background: transparent; color: var(--lume-ink); text-align: left; font: 14px/1.5 var(--lume-font-sans); }
+.settingRow > span:first-child { min-width: 0; display: grid; gap: 4px; }
+.settingRow strong { font-weight: 500; }
+.settingRow > span:first-child > span { color: var(--lume-ink-muted); font-size: 13px; }
+.settingRow > span:last-child, .settingRow > input { flex-shrink: 0; }
+.settingRow > input { width: 18px; height: 18px; accent-color: var(--lume-ink-fresh); }
+.settingRow:hover { background: var(--lume-surface-field); }
+.settingRow:has(input:focus-visible) { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
+.settingsWorkspace :is(.settingSurface, .settingLayer) { padding: 24px 0; border: 0; border-top: 1px solid var(--lume-rule); background: transparent; }
+.settingsWorkspace :global(.mf-section) { padding: 20px 0; border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; background: transparent; box-shadow: none; }
+.settingsWorkspace :is(div, section, article):is(:global(.rounded-xl), :global(.rounded-2xl), :global(.rounded-lg)):not([role]) { border-radius: 0; box-shadow: none; }
+.settingsWorkspace :global(.section-kicker) { font-size: 12px; letter-spacing: 0; text-transform: none; }
+.settingsWorkspace .navItem, :global(html[data-runtime-twin-design='proposal']) .settingsWorkspace .navItem { min-height: 40px; padding: 8px 10px; border: 0; border-radius: 0; }
+.settingsWorkspace .navItemDescription { display: none; }
+.settingsWorkspace .navGroups { gap: 24px; }
+.settingsWorkspace .searchButton { background: transparent; border-radius: 0; padding-inline: 0; }
+.settingsWorkspace .searchButton kbd { display: none; }
+.settingsWorkspace .navItemActive { box-shadow: inset 2px 0 var(--lume-ink-fresh); }
+.settingsWorkspace .navGroupLabel { padding: 0 10px 8px; font-size: 12px; font-weight: 400; }
+@media(pointer:coarse) { .settingsWorkspace .navItem { min-height: 44px; } }
+
+.mobileStrip { display: flex; min-width: 0; max-width: 100%; overflow-x: auto; gap: 4px; border-bottom: 1px solid var(--lume-rule); scrollbar-width: thin; }
+.mobileStrip .navItem { flex-shrink: 0; }
+.mobileStripSearch { display: inline-flex; align-items: center; gap: 8px; padding: 8px 0; border: 0; background: transparent; color: var(--lume-ink-muted); }
+@media(min-width:1024px) { .mobileStrip, .mobileStripSearch { display: none; } }
+
+.backupSchedule { display: grid; gap: 20px; padding: 24px 0; border-top: 1px solid var(--lume-rule); }
+.backupField { display: grid; grid-template-columns: minmax(0,1fr) minmax(12rem,1fr); align-items: center; gap: 16px; min-height: 64px; padding: 12px 0; border-bottom: 1px solid var(--lume-rule); }
+.backupField input { margin: 0; }
+.backupField input[type='checkbox'] { justify-self: end; width: 18px; height: 18px; }
+.backupActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.backupActions > :last-child { margin-left: auto; }
+.backupActionRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-top: 1px solid var(--lume-rule); }
+.backupActionRow > span { flex: 1; min-width: 180px; }
+@media(max-width:700px) { .backupField { grid-template-columns: minmax(0,1fr); gap: 8px; } .backupField:has(input[type='checkbox']) { grid-template-columns: minmax(0,1fr) auto; } .backupActionRow > span { flex-basis: 100%; } }

@@ -15,11 +15,12 @@ export type { ScaleQuestion, ScaleDefinition } from '@/lib/scale-validation';
 interface ScaleEngineProps {
     scale: ScaleDefinition;
     showHeading?: boolean;
+    patientLabel?: string;
     onComplete: (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => void | Promise<void>;
     onCancel: () => void;
 }
 
-export default function ScaleEngine({ scale, onComplete, onCancel, showHeading = true }: ScaleEngineProps) {
+export default function ScaleEngine({ scale, onComplete, onCancel, showHeading = true, patientLabel }: ScaleEngineProps) {
     const confirm = useConfirm();
     const answerGroupId = useId();
     const [answers, setAnswers] = useState<Record<string, string | number>>({});
@@ -87,11 +88,19 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     );
     if (!currentQuestion || scale.retired) return <p role="alert">Scala non disponibile per nuove valutazioni.</p>;
 
+    const answeredQuestions = scale.questions.filter(question => Object.prototype.hasOwnProperty.call(answers, question.id));
+    let draftResult: ReturnType<typeof calculateScaleResult> | null = null;
+    if (scale.questions.every(question => isScaleAnswerValid(question, answers[question.id], Object.prototype.hasOwnProperty.call(answers, question.id)))) {
+        draftResult = calculateScaleResult(scale, answers);
+    }
+
     return (
         /* @Codex WUL-678: one readable question on the workspace plane. */
         <div className={`${styles.workspace} ${styles.engine}`} aria-busy={isSubmitting}>
             {showHeading && <header><h2>{scale.title}</h2><p>{scale.description}</p></header>}
             {validationError && <p role="alert">{validationError}</p>}
+            <div className={styles.formColumns}>
+            <div>
             <p className={styles.progress} aria-live="polite">Domanda {currentStep + 1} di {scale.questions.length}</p>
             <fieldset className={styles.questionGroup} disabled={isSubmitting}>
                 <legend className={styles.legend}>
@@ -147,7 +156,17 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                 </div>
             </fieldset>
 
+            </div>
+            <aside className={styles.draftSummary} aria-label="Risultato in bozza">
+                <h3>Risultato in bozza</h3>
+                <p className={styles.draftState}>● Fresco · non registrato</p>
+                {draftResult ? <><p className={styles.score}>{draftResult.score}</p><p>{draftResult.interpretation}</p></> : <p>{answeredQuestions.length} risposte su {scale.questions.length}. Il punteggio sarà disponibile a compilazione completa.</p>}
+                <details className={styles.answerDetails}><summary>Risposte compilate · {answeredQuestions.length}</summary><dl>{answeredQuestions.map(question => <div key={question.id}><dt>{question.text}</dt><dd>{question.options?.find(option => option.value === answers[question.id])?.label ?? String(answers[question.id])}</dd></div>)}</dl></details>
+                {scale.instrument && <p className={styles.source}>Fonte: {scale.instrument.sourceId} · {scale.instrument.instrumentVersion}</p>}
+            </aside>
+            </div>
             <div className={styles.actions}>
+                <span className={styles.thresholdContext}>{patientLabel && <strong>{patientLabel}</strong>}<span>{scale.title} · risultato da registrare</span></span>
                 <button
                     type="button"
                     disabled={isSubmitting}

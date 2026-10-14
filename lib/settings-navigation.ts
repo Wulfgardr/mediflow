@@ -35,7 +35,7 @@ export type SettingsNavGroup = {
 export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     {
         id: 'generale',
-        label: 'Generale',
+        label: 'Postazione',
         items: [
             /* @Codex */
             {
@@ -70,7 +70,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     },
     {
         id: 'sicurezza-dati',
-        label: 'Dati e sicurezza',
+        label: 'Dati',
         items: [
             {
                 id: 'accesso',
@@ -105,7 +105,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     },
     {
         id: 'ai',
-        label: 'Funzioni intelligenti',
+        label: 'Intelligenza',
         items: [
             {
                 id: 'ai-fabric',
@@ -162,7 +162,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     },
     {
         id: 'avanzate',
-        label: 'Sistema',
+        label: 'Supporto',
         items: [
             {
                 id: 'diagnostica',

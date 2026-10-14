@@ -320,3 +320,12 @@
         border-color: Highlight;
     }
 }
+
+.settingsProfile { padding: 24px 0; border-top: 1px solid var(--lume-rule); font: 14px/1.5 var(--lume-font-sans); }
+.settingsProfile h2 { margin: 0 0 20px; font: 600 14px/1.5 var(--lume-font-sans); }
+.settingsProfile .heading { gap: 8px; }
+.settingsProfile .stack { gap: 16px; }
+.settingsProfile .heading p { margin: 0; }
+.settingsProfile .actions { gap: 12px; }
+.settingsProfile :is(.option, .confirmation, .rollback, .disclosure) { border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; padding: 12px 0; background: transparent; box-shadow: none; }
+.settingsProfile .options { display: grid; grid-template-columns: minmax(0,1fr); gap: 0; }
