@@ -258,7 +258,7 @@
   margin-top: 8px;
   padding: 10px 14px;
   border: 1px solid var(--lume-ink-muted);
-  border-radius: 12px;
+  border-radius: var(--lume-radius-control);
   background: var(--lume-surface-field);
   color: var(--lume-ink);
   font-size: 13px;
