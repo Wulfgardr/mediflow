@@ -60,7 +60,7 @@ test('a patient read completing during navigation cannot restore the previous ar
     await navigationReceived.promise;
     releasePatients.release();
     // This text is published only after the real patient list has been rendered.
-    await expect(page.getByText('Rivedi i passaggi della giornata: i filtri in alto ordinano l’agenda per urgenze, suggerimenti AI e passaggi manuali.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/(?:scheda pronta|schede pronte) nell’archivio locale\.$/u)).toBeVisible();
     releaseNavigation.release();
     delayNavigation = false;
     await expect(page.getByRole('heading', { name: /^Pazienti$/u, level: 1 })).toBeVisible();
