@@ -106,7 +106,7 @@ export default function ScaleRunnerPage() {
                     <p>Con Completa salvi punteggio, interpretazione e risposte nel diario del paziente.</p>
                 </details>
                 {!patient ? <p role="status">Caricamento paziente…</p> : (
-                    <ScaleEngine key={`${patientId}:${scaleDef.id}`} scale={scaleDef} showHeading={false}
+                    <ScaleEngine key={`${patientId}:${scaleDef.id}`} scale={scaleDef} showHeading={false} patientLabel={patientLabel}
                         onComplete={handleComplete} onCancel={handleCancel} />
                 )}
             </section>

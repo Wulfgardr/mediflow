@@ -1,14 +1,14 @@
 /* @Codex WUL-676: the patient workspace replaces the old nested card shell. */
 .patientShell { min-height: 100%; background: var(--lume-surface-focal); color: var(--lume-ink); }
-.patientHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 26px 32px 22px; }
+.patientHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 28px; }
 .identity { min-width: 0; }
-.identity h1 { margin: 0; font-size: clamp(22px, 2vw, 28px); font-weight: 620; line-height: 1.25; letter-spacing: -.035em; }
-.identity p { margin-top: 6px; font-size: 12px; color: var(--lume-ink-muted); }
+.identity h1 { margin: 0; font: 400 28px/1.1 var(--lume-font-voice); letter-spacing: 0; }
+.identity p { margin-top: 6px; font-size: 13px; color: var(--lume-ink-muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
 /* @Codex: same command geometry for every action in the patient header. */
 .actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 12px); font-size: 14px; font-weight: 600; line-height: 22px; }
-.primary { padding: 9px 13px; background: var(--lume-ink); color: var(--lume-surface-focal); }
-.patientBody { padding: 30px 32px 60px; }
+.primary { padding: 9px 13px; background: var(--lume-ink-fresh); color: var(--lume-surface-focal); }
+.patientBody { padding: 28px; }
 .readingPane { max-width: 1160px; margin: 0 auto; }
 .readingPane > div { display: flex; flex-direction: column; gap: 28px; }
 .readingPane :global([data-folder-pane][data-folder-active='false']) { display: none; }
@@ -25,7 +25,7 @@
 .patientBody :global([data-folder-pane] > h3 > div > span > span[class*='kicker']) { display: none; }
 :global(html[data-twin-composition='stream']) .patientBody { max-width: 1020px; margin: auto; }
 :global(html[data-twin-composition='stream']) .patientHeader { max-width: 1020px; margin: auto; }
-:global(html[data-twin-composition='stream']) .patientBody[data-folder-section='quadro'] :global(#timeline) { display: block; order: 1; }
+
 @media (max-width: 750px) { .patientHeader { padding: 22px 20px 18px; flex-direction: column; align-items: stretch; gap: 16px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px 20px 40px; } .actions > :is(a,button) { min-height: 44px; } }
 
 .patientShell {
@@ -37,8 +37,8 @@
   /* Lume: due soli livelli di inchiostro; subtle confluisce nell'attenuato
      misurato (>= 4,5:1 su ogni superficie). */
   --k8-subtle: var(--lume-ink-muted);
-  --k8-line: color-mix(in srgb, var(--lume-ink) 5%, transparent);
-  --k8-line-strong: color-mix(in srgb, var(--lume-ink) 10%, transparent);
+  --k8-line: var(--lume-rule);
+  --k8-line-strong: var(--lume-rule-strong);
   /* Lume: bordo dei controlli interattivi (WCAG 1.4.11) dall'alias misurato
      ink-muted, mai un separatore a bassa opacita. */
   --k8-control-border: var(--lume-ink-muted);
@@ -53,7 +53,7 @@
   --k8-pill-warning-fg: color-mix(in srgb, var(--lume-signal-warning) 64%, var(--lume-ink));
   --k8-pill-critical-bg: color-mix(in srgb, var(--lume-signal-critical) 12%, var(--lume-surface-field));
   --k8-pill-critical-fg: color-mix(in srgb, var(--lume-signal-critical) 66%, var(--lume-ink));
-  --k8-primary-bg: var(--lume-ink);
+  --k8-primary-bg: var(--lume-ink-fresh);
   --k8-primary-fg: var(--lume-surface-focal);
   /* Lume: accento minerale interattivo (ed e anche il filo, quando un contenuto
      interno segna il fuoco clinico, e ora anche l'anello di focus del guscio). */
@@ -70,3 +70,20 @@
   --k8-focal-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 .patientCanvas { min-height: 100%; }
+
+/* The overview places the existing diary beside the clinical context. */
+.patientBody[data-folder-section='quadro'] .readingPane > div { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 40px; align-items: start; }
+.patientBody[data-folder-section='quadro'] :global(#diario) { display: block; }
+.patientBody[data-folder-section='quadro'] :global(#attenzione) { grid-column: 1 / -1; }
+.patientBody :global([data-folder-pane] > h3 > div) { min-height: 36px; border-bottom: 1px solid var(--lume-rule-strong); }
+.patientBody :global([data-folder-pane] > h3 > div > span > span:first-child) { font: 600 12px/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
+.patientBody :global([data-folder-pane] > h3 .apple-chip) { border: 0; background: none; font: 13px var(--lume-font-sans); color: var(--lume-ink-muted); }
+.patientBody :global([data-folder-pane] > div) { padding-inline: 0; }
+@media (max-width: 1000px) {
+ .patientBody[data-folder-section='quadro'] .readingPane > div { display: flex; gap: 28px; }
+}
+@media (max-width: 700px) {
+ .patientHeader { padding: 20px 16px; }
+ .identity h1 { font-size: 26px; }
+ .patientBody { padding: 20px 16px 32px; }
+}

@@ -84,21 +84,23 @@ struct PairedPatientClinicalSections: View {
 
             Divider()
 
-            checkupForm(
-                title: "Nuovo controllo online",
-                checkupTitle: $model.newCheckupTitle,
-                notes: $model.newCheckupNotes,
-                status: $model.newCheckupStatus,
-                date: $model.newCheckupDate,
-                primaryLabel: "Salva controllo",
-                primaryIdentifier: "homebase-create-checkup-button",
-                canSubmit: model.canCreateCheckup,
-                onCancel: nil,
-                onSubmit: { Task { await model.createCheckupForSelectedPatient() } }
-            )
-            Text("Solo campi manuali non-AI. Nessuna coda offline o import documentale.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuovo controllo", identifier: "checkup-create-disclosure") {
+                checkupForm(
+                    title: "Nuovo controllo online",
+                    checkupTitle: $model.newCheckupTitle,
+                    notes: $model.newCheckupNotes,
+                    status: $model.newCheckupStatus,
+                    date: $model.newCheckupDate,
+                    primaryLabel: "Salva controllo",
+                    primaryIdentifier: "homebase-create-checkup-button",
+                    canSubmit: model.canCreateCheckup,
+                    onCancel: nil,
+                    onSubmit: { Task { await model.createCheckupForSelectedPatient() } }
+                )
+                Text("Solo campi manuali non-AI. Nessuna coda offline o import documentale.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -106,7 +108,7 @@ struct PairedPatientClinicalSections: View {
     private var observationsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             PairedPatientSectionHeader(model: model,
-                title: "Osservazioni",
+                title: "Misure",
                 subtitle: "Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) osservazioni",
                 systemImage: "waveform.path.ecg",
                 refreshIdentifier: "homebase-refresh-observations-button",
@@ -157,31 +159,33 @@ struct PairedPatientClinicalSections: View {
 
             Divider()
 
-            observationForm(
-                title: "Nuova osservazione online",
-                display: $model.newObservationDisplay,
-                code: $model.newObservationCode,
-                value: $model.newObservationValue,
-                unitCode: $model.newObservationUnitCode,
-                notes: $model.newObservationNotes,
-                observedAt: $model.newObservationObservedAt,
-                codeResults: model.newObservationCodeTerminologyResults,
-                unitResults: model.newObservationUnitTerminologyResults,
-                isSearchingCode: model.isSearchingNewObservationCodeTerminology,
-                isSearchingUnit: model.isSearchingNewObservationUnitTerminology,
-                primaryLabel: "Salva osservazione",
-                primaryIdentifier: "homebase-create-observation-button",
-                canSubmit: model.canCreateObservation,
-                onCodeQueryChanged: { model.scheduleNewObservationCodeTerminologySearch() },
-                onUnitQueryChanged: { model.scheduleNewObservationUnitTerminologySearch() },
-                onSelectCode: { model.selectNewObservationCodeTerminology($0) },
-                onSelectUnit: { model.selectNewObservationUnitTerminology($0) },
-                onCancel: nil,
-                onSubmit: { Task { await model.createObservationForSelectedPatient() } }
-            )
-            Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuova misura", identifier: "observation-create-disclosure") {
+                observationForm(
+                    title: "Nuova osservazione online",
+                    display: $model.newObservationDisplay,
+                    code: $model.newObservationCode,
+                    value: $model.newObservationValue,
+                    unitCode: $model.newObservationUnitCode,
+                    notes: $model.newObservationNotes,
+                    observedAt: $model.newObservationObservedAt,
+                    codeResults: model.newObservationCodeTerminologyResults,
+                    unitResults: model.newObservationUnitTerminologyResults,
+                    isSearchingCode: model.isSearchingNewObservationCodeTerminology,
+                    isSearchingUnit: model.isSearchingNewObservationUnitTerminology,
+                    primaryLabel: "Salva osservazione",
+                    primaryIdentifier: "homebase-create-observation-button",
+                    canSubmit: model.canCreateObservation,
+                    onCodeQueryChanged: { model.scheduleNewObservationCodeTerminologySearch() },
+                    onUnitQueryChanged: { model.scheduleNewObservationUnitTerminologySearch() },
+                    onSelectCode: { model.selectNewObservationCodeTerminology($0) },
+                    onSelectUnit: { model.selectNewObservationUnitTerminology($0) },
+                    onCancel: nil,
+                    onSubmit: { Task { await model.createObservationForSelectedPatient() } }
+                )
+                Text("LOINC + UCUM manuali. Nessun AI plane remoto, OCR o coda offline.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -322,11 +326,7 @@ struct PairedPatientClinicalSections: View {
                             .accessibilityLabel(glyph.label)
                     }
                     Text(observation.value)
-                        #if os(macOS)
                         .font(.title3.weight(.semibold))
-                        #else
-                        .font(.caption2.weight(.semibold))
-                        #endif
                         .registro()
                         .foregroundStyle(observation.deletedAt == nil ? Color.primary : Color.secondary)
                     Text(observation.unitCode)
@@ -434,19 +434,26 @@ struct PairedPatientClinicalSections: View {
                 // Left at caption it was indistinguishable from the placeholder
                 // text of the fields it introduces.
                 .chartGroupHeading()
-            TextField("Titolo", text: checkupTitle)
-                .accessibilityIdentifier("\(primaryIdentifier)-title")
-            Picker("Stato", selection: status) {
-                ForEach(PairedCheckupStatus.allCases) { status in
-                    Text(status.title).tag(status)
+            ClinicalFormColumns {
+                ChartGroup("Controllo") {
+                    TextField("Titolo", text: checkupTitle)
+                        .accessibilityIdentifier("\(primaryIdentifier)-title")
+                }
+            } trailing: {
+                ChartGroup("Programmazione") {
+                    Picker("Stato", selection: status) {
+                        ForEach(PairedCheckupStatus.allCases) { status in
+                            Text(status.title).tag(status)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("\(primaryIdentifier)-status")
+                    DatePicker("Data", selection: date, displayedComponents: [.date, .hourAndMinute])
+                        .accessibilityIdentifier("\(primaryIdentifier)-date")
+                    TextField("Note (opzionale)", text: notes)
+                        .accessibilityIdentifier("\(primaryIdentifier)-notes")
                 }
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("\(primaryIdentifier)-status")
-            DatePicker("Data", selection: date, displayedComponents: [.date, .hourAndMinute])
-                .accessibilityIdentifier("\(primaryIdentifier)-date")
-            TextField("Note (opzionale)", text: notes)
-                .accessibilityIdentifier("\(primaryIdentifier)-notes")
             PairedPatientFormButtons(
                 primaryLabel: primaryLabel,
                 primaryIdentifier: primaryIdentifier,
@@ -487,40 +494,47 @@ struct PairedPatientClinicalSections: View {
                 // Left at caption it was indistinguishable from the placeholder
                 // text of the fields it introduces.
                 .chartGroupHeading()
-            TextField("Parametro LOINC", text: display)
-                .accessibilityIdentifier("\(primaryIdentifier)-display")
-            TextField("Codice LOINC", text: code)
-                .accessibilityIdentifier("\(primaryIdentifier)-code")
-                .onChange(of: code.wrappedValue) { _ in
-                    onCodeQueryChanged()
+            ClinicalFormColumns {
+                ChartGroup("Parametro") {
+                    TextField("Parametro LOINC", text: display)
+                        .accessibilityIdentifier("\(primaryIdentifier)-display")
+                    TextField("Codice LOINC", text: code)
+                        .accessibilityIdentifier("\(primaryIdentifier)-code")
+                        .onChange(of: code.wrappedValue) { _ in
+                            onCodeQueryChanged()
+                        }
+                    terminologyResultsList(
+                        title: "LOINC",
+                        results: codeResults,
+                        isLoading: isSearchingCode,
+                        primaryIdentifier: primaryIdentifier,
+                        onSelect: onSelectCode
+                    )
                 }
-            terminologyResultsList(
-                title: "LOINC",
-                results: codeResults,
-                isLoading: isSearchingCode,
-                primaryIdentifier: primaryIdentifier,
-                onSelect: onSelectCode
-            )
-            HStack(spacing: 8) {
-                TextField("Valore", text: value)
-                    .accessibilityIdentifier("\(primaryIdentifier)-value")
-                TextField("Unità UCUM", text: unitCode)
-                    .accessibilityIdentifier("\(primaryIdentifier)-unit-code")
-                    .onChange(of: unitCode.wrappedValue) { _ in
-                        onUnitQueryChanged()
+            } trailing: {
+                ChartGroup("Rilevazione") {
+                    HStack(spacing: 8) {
+                        TextField("Valore", text: value)
+                            .accessibilityIdentifier("\(primaryIdentifier)-value")
+                        TextField("Unità UCUM", text: unitCode)
+                            .accessibilityIdentifier("\(primaryIdentifier)-unit-code")
+                            .onChange(of: unitCode.wrappedValue) { _ in
+                                onUnitQueryChanged()
+                            }
                     }
+                    terminologyResultsList(
+                        title: "UCUM",
+                        results: unitResults,
+                        isLoading: isSearchingUnit,
+                        primaryIdentifier: primaryIdentifier,
+                        onSelect: onSelectUnit
+                    )
+                    DatePicker("Rilevata", selection: observedAt, displayedComponents: [.date, .hourAndMinute])
+                        .accessibilityIdentifier("\(primaryIdentifier)-observed-at")
+                    TextField("Note (opzionale)", text: notes)
+                        .accessibilityIdentifier("\(primaryIdentifier)-notes")
+                }
             }
-            terminologyResultsList(
-                title: "UCUM",
-                results: unitResults,
-                isLoading: isSearchingUnit,
-                primaryIdentifier: primaryIdentifier,
-                onSelect: onSelectUnit
-            )
-            DatePicker("Rilevata", selection: observedAt, displayedComponents: [.date, .hourAndMinute])
-                .accessibilityIdentifier("\(primaryIdentifier)-observed-at")
-            TextField("Note (opzionale)", text: notes)
-                .accessibilityIdentifier("\(primaryIdentifier)-notes")
             PairedPatientFormButtons(
                 primaryLabel: primaryLabel,
                 primaryIdentifier: primaryIdentifier,
@@ -558,7 +572,7 @@ struct PairedPatientClinicalSections: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(item.code)
                                 .font(.caption.monospaced().weight(.semibold))
-                                .registro()
+                                .codice()
                             Text(item.display)
                                 .font(.caption)
                                 .lineLimit(2)

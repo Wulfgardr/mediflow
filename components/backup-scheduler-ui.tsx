@@ -3,6 +3,7 @@
 /* @Codex */
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, Clock3, FolderArchive, RefreshCw, Save } from 'lucide-react';
+import styles from '@/components/settings/settings-lume.module.css';
 
 type BackupSchedulerResponse = {
     supported: boolean;
@@ -236,12 +237,12 @@ export default function BackupSchedulerUI() {
     const schedulingUnsupported = Boolean(status && !status.supported);
 
     return (
-        <div className="mf-section lume-focal space-y-5 p-6 md:p-7">
+        <div className={styles.backupSchedule}>
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="section-kicker">Continuità operativa</p>
                     <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
-                        <Clock3 className="w-5 h-5 text-indigo-500" />
+                        <Clock3 className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
                         Backup automatico notturno
                     </h3>
                     <p className="mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
@@ -249,7 +250,7 @@ export default function BackupSchedulerUI() {
                     </p>
                 </div>
                 {status && (
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300' : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'graphite-chip-tone-success' : 'graphite-chip-tone-muted'}`}>
                         {status.installed === null ? 'Stato non confermato' : status.installed ? 'Installato' : 'Non installato'}
                     </span>
                 )}
@@ -257,24 +258,24 @@ export default function BackupSchedulerUI() {
 
             {status?.observationMessage && <p role="alert" className="text-sm text-[color:var(--lume-signal-warning)]">{status.observationMessage}</p>}
             {!isLoading && schedulingUnsupported && (
-                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
+                <div className="mf-alert mf-alert-warning px-3 py-2 text-sm">
                     Lo scheduling automatico non e disponibile su questa piattaforma. Puoi comunque eseguire il backup manuale con «Esegui adesso» e usare la pulizia retention.
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label className="flex items-center gap-3 text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
+            <div className={styles.backupFields}>
+                <label className={styles.backupField}>
+                    <span>Attiva backup notturno</span>
                     <input
                         type="checkbox"
                         checked={enabled}
                         disabled={schedulingUnsupported}
                         onChange={(event) => setEnabled(event.target.checked)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                        className="rounded border-[color:var(--lume-rule-strong)] accent-[color:var(--lume-ink-fresh)] focus:ring-[color:var(--lume-ink-fresh)] disabled:opacity-50"
                     />
-                    Attiva backup notturno
                 </label>
 
-                <label className="text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
+                <label className={styles.backupField}>
                     Orario
                     <input
                         type="time"
@@ -285,7 +286,7 @@ export default function BackupSchedulerUI() {
                     />
                 </label>
 
-                <label className="text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
+                <label className={styles.backupField}>
                     Destinazione
                     <input
                         type="text"
@@ -296,7 +297,7 @@ export default function BackupSchedulerUI() {
                     />
                 </label>
 
-                <label className="text-sm font-medium" style={{ color: 'var(--lume-ink)' }}>
+                <label className={styles.backupField}>
                     Mantieni ultimi backup
                     <input
                         type="number"
@@ -309,11 +310,11 @@ export default function BackupSchedulerUI() {
                 </label>
             </div>
 
-            <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
+            <div className={styles.supportingCopy}>
                 La retention automatica e limitata ai file `mediflow-backup-v1-*.mediflow` e ai `.tmp` orfani nella cartella configurata. Nessun allegato clinico o file arbitrario viene toccato.
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className={styles.backupActions}>
                 <button type="button" onClick={() => void load()} disabled={isLoading || isSaving || isRunning} className={SECONDARY_BUTTON_CLASS}>
                     <RefreshCw className="w-4 h-4" /> Rileggi stato
                 </button>
@@ -325,6 +326,8 @@ export default function BackupSchedulerUI() {
                     {isSaving ? <RefreshCw className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                     Salva schedulazione
                 </button>
+            </div>
+            <div className={styles.backupActionRow}><span>Backup manuale</span>
                 <button
                     onClick={runNow}
                     disabled={isRunning}
@@ -333,6 +336,8 @@ export default function BackupSchedulerUI() {
                     {isRunning ? <RefreshCw className="w-4 h-4" /> : <FolderArchive className="w-4 h-4" />}
                     Esegui adesso
                 </button>
+            </div>
+            <div className={styles.backupActionRow}><span>Pulizia degli archivi precedenti</span>
                 <button
                     onClick={previewRetention}
                     disabled={isPreviewingRetention}
@@ -388,12 +393,12 @@ export default function BackupSchedulerUI() {
             )}
 
             {message && (
-                <div role={message.type === 'error' ? 'alert' : 'status'} className={`rounded-[18px] border px-4 py-3 flex items-center gap-2 text-sm ${
+                <div role={message.type === 'error' ? 'alert' : 'status'} className={`mf-alert px-4 py-3 flex items-center gap-2 text-sm ${
                     message.type === 'success'
-                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300'
+                        ? 'mf-alert-success'
                         : message.type === 'error'
-                            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-300'
-                            : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-300'
+                            ? 'mf-alert-critical'
+                            : 'mf-alert-info'
                 }`}>
                     {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                     <span>{message.text}</span>

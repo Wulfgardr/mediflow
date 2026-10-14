@@ -125,15 +125,29 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
     const heading = element.querySelector('h3')!;
     const number = element.querySelector(':scope > strong')!;
     const date = element.querySelector(':scope > span')!;
-    return { heading: parseFloat(getComputedStyle(heading).fontSize), number: parseFloat(getComputedStyle(number).fontSize), date: parseFloat(getComputedStyle(date).fontSize) };
+    return { heading: parseFloat(getComputedStyle(heading).fontSize), number: parseFloat(getComputedStyle(number).fontSize),
+      headingWeight: parseFloat(getComputedStyle(heading).fontWeight), dateWeight: parseFloat(getComputedStyle(date).fontWeight) };
   });
-  expect(hierarchy.heading).toBeGreaterThan(hierarchy.date);
+  expect(hierarchy.headingWeight).toBeGreaterThan(hierarchy.dateWeight);
   expect(hierarchy.number).toBeGreaterThan(hierarchy.heading);
+
+  const diary = page.locator('#diario');
+  await expect(diary).toBeVisible();
+  const overview = await quadro.boundingBox();
+  const diaryBox = await diary.boundingBox();
+  expect(overview).not.toBeNull();
+  expect(diaryBox).not.toBeNull();
+  if (page.viewportSize()!.width > 1000) {
+    expect(diaryBox!.x).toBeGreaterThanOrEqual(overview!.x + overview!.width);
+    expect(Math.abs(diaryBox!.y - overview!.y)).toBeLessThanOrEqual(1);
+  } else {
+    expect(diaryBox!.y).toBeGreaterThanOrEqual(overview!.y + overview!.height);
+  }
 
   const primary = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Nuova voce', exact: true });
   await expect(primary).toHaveCount(1);
   await expect(primary).toHaveAttribute('href', `/patients/${patient.id}/entries/new`);
-  await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink'));
+  await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink-fresh'));
   await assertNotClippedInViewport(primary, 'azione primaria quadro');
   await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');
   for (const link of await quadro.getByRole('link').all()) await assertNotClippedInViewport(link, await link.innerText());
@@ -162,7 +176,9 @@ test('la navigazione Quadro del paziente selezionato converge sulla Scheda', asy
   await page.goto(`/?area=incarico&paziente=${patient.id}`);
   const row = page.getByRole('option').filter({ has: page.getByText(patient.name, { exact: true }) });
   await expect(row).toBeVisible();
-  await row.click();
+  await row.focus();
+  await expect(row).toBeFocused();
+  await row.press('Enter');
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toBeVisible();

@@ -136,7 +136,7 @@ for (const width of [1280, 390, 320]) {
     test(`scale and complete counters reflow at ${width}px`, async t => {
         const page = await pageFor(t, '/scale', { width, height: 900 });
         await noHorizontalOverflow(page);
-        const field = await page.getByRole('group').evaluate(element => getComputedStyle(element).borderTopWidth);
+        const field = await page.getByRole('group', { name: 'Scelta sintetica' }).evaluate(element => getComputedStyle(element).borderTopWidth);
         assert.equal(field, '0px', 'no native duplicate fieldset frame');
         const choice = await page.locator('label').first().boundingBox(); assert.ok(choice && choice.height >= 44);
         await page.goto(harness.origin + '/signals'); await harness.expect(page.getByText('123456789', { exact: true })).toBeVisible();

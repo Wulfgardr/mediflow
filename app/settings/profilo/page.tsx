@@ -74,9 +74,6 @@ export default function SettingsProfilePage() {
                 description="Identità mostrata nei documenti generati: intestazione, ricette e referti."
             />
 
-            {/* @Codex: work preferences have their own reversible owner, separate from identity. */}
-            <WorkProfileSettings />
-
             <div className={SETTINGS_CARD_CLASS}>
                 {/* @Codex WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
                 <div className="mb-5 flex items-start gap-3">
@@ -135,6 +132,7 @@ export default function SettingsProfilePage() {
                     </div>
                 </div>
             </div>
+            <WorkProfileSettings />
         </section>
     );
 }

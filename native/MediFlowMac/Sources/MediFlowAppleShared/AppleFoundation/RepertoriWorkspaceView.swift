@@ -189,6 +189,7 @@ struct RepertoriWorkspaceView: View {
             if store.catalogue == .terminology { whoControls.padding(.horizontal, 20).padding(.bottom, 10) }
             Divider()
             results.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(PlatformColors.chartCardSurface)
         }
         .searchable(text: $store.query, placement: .toolbar, prompt: store.catalogue.prompt)
         .onSubmit(of: .search) { store.submitSearch() }
@@ -275,14 +276,14 @@ struct RepertoriWorkspaceView: View {
                     List(response.entries) { entry in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(entry.code).font(.body.weight(.medium)).registro()
+                                Text(entry.code).font(.body.weight(.medium)).codice()
                                 Spacer()
                                 Button("Controlla codice") { store.check(entry) }
                             }
                             Text(entry.description).fixedSize(horizontal: false, vertical: true)
                             Text(entry.canonicalUri).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         }.padding(.vertical, 3)
-                    }.accessibilityIdentifier("repertori-who-results")
+                    }.clinicalRegisterList().accessibilityIdentifier("repertori-who-results")
                 }
             }
         } else if let response = store.whoCheck {
@@ -384,6 +385,7 @@ struct RepertoriWorkspaceView: View {
                 .padding(.vertical, 3)
                 .accessibilityElement(children: .combine)
             }
+            .clinicalRegisterList()
             .accessibilityIdentifier("repertori-drugs-list")
 
         case .exemptions:
@@ -392,7 +394,7 @@ struct RepertoriWorkspaceView: View {
                     HStack(spacing: 6) {
                         Text(exemption.code)
                             .font(.body.weight(.medium))
-                            .registro()
+                            .codice()
                         exemptionTags(exemption)
                     }
                     Text(exemption.description)
@@ -403,6 +405,7 @@ struct RepertoriWorkspaceView: View {
                 .padding(.vertical, 3)
                 .accessibilityElement(children: .combine)
             }
+            .clinicalRegisterList()
             .accessibilityIdentifier("repertori-exemptions-list")
 
         case .terminology:

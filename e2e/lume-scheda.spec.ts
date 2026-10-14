@@ -158,7 +158,7 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   await expect(nav.locator('a')).toHaveCount(sections.length);
   expect((await nav.locator('a').evaluateAll(links => links.map(link => link.getAttribute('href')))).sort())
     .toEqual(sections.map(id => `#${id}`).sort());
-  await expectCurrentSection(page, 'diario');
+  await expectCurrentSection(page, 'quadro');
   const disclosure = nav.locator('summary');
   const details = nav.locator('details');
   await disclosure.focus();
@@ -166,7 +166,7 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   await expect(details).toHaveAttribute('open', '');
   await disclosure.press('Enter');
   await expect(details).not.toHaveAttribute('open');
-  await expectCurrentSection(page, 'diario');
+  await expectCurrentSection(page, 'quadro');
   for (const id of sections) {
     const link = nav.locator(`a[href="#${id}"]`);
     if (!(await link.isVisible())) {
@@ -204,7 +204,7 @@ test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page
   const geometryTolerance = 0.5;
   expect(geometry.width).toBeGreaterThanOrEqual(44 - geometryTolerance);
   expect(geometry.height).toBeGreaterThanOrEqual(44 - geometryTolerance);
-  expect(geometry.radius).toBe('12px');
+  expect(geometry.radius).toBe('10px');
 
   await action.click();
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/edit#pianificazione$`));
@@ -235,7 +235,7 @@ for (const schedaCase of CASES) {
     await expect(header.getByRole('heading', { name: patient.name, level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
     // Late settings must not steal the active folder section or reveal documents.
-    await expectCurrentSection(page, 'diario');
+    await expectCurrentSection(page, 'quadro');
     await expect(page.locator('#documenti')).toBeHidden();
     await expectSurfaceHierarchyAndNeutralChrome(page, header, schedaCase.viewport === 'narrow' ? 44 : 28);
     await expectInViewport(header);

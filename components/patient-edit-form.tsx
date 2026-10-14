@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex */
+import styles from './clinical-register.module.css';
 import { useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { ApiConflictError, db } from '@/lib/db';
@@ -121,7 +121,7 @@ export default function PatientEditForm({ initialRecord, onSaved, onReloaded }: 
                     {!conflict && <button type="button" onClick={() => void save()} disabled={busy} className="mf-btn-secondary">Riprova operazioni residue</button>}
                 </section>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 md:px-6">
+            <div className={styles.toolbar}>
                 <p className="text-sm">Il modulo conserva i dati dell’apertura. La rilettura richiede una conferma.</p>
                 <button type="button" onClick={() => void reload()} disabled={busy} className="mf-btn-secondary">Rileggi i dati salvati</button>
             </div>

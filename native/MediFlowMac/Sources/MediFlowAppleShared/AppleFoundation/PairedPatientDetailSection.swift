@@ -10,35 +10,9 @@ struct PairedPatientDetailSection: View {
     @Binding var icdQuery: String
     @Binding var confirmsFHIRExport: Bool
 
-    // @Codex: navigation only; the patient editor and all writers keep their owners.
-    @State private var overviewArea: PatientOverviewArea = .clinical
-
-    private enum PatientOverviewArea: String, CaseIterable, Identifiable {
-        case identity = "Anagrafica", clinical = "Clinica", administration = "Amministrazione"
-        var id: String { rawValue }
-    }
-
-    private var showsIdentity: Bool {
-        #if os(macOS)
-        overviewArea == .identity
-        #else
-        true
-        #endif
-    }
-    private var showsClinical: Bool {
-        #if os(macOS)
-        overviewArea == .clinical
-        #else
-        true
-        #endif
-    }
-    private var showsAdministration: Bool {
-        #if os(macOS)
-        overviewArea == .administration
-        #else
-        true
-        #endif
-    }
+    private var showsIdentity: Bool { true }
+    private var showsClinical: Bool { true }
+    private var showsAdministration: Bool { true }
 
     /// Groups now carry their own internal rhythm through `ChartGroup`, so the
     /// per-platform spacing constants this view used to keep are gone: 4 points
@@ -49,16 +23,7 @@ struct PairedPatientDetailSection: View {
         let exemptions = ExemptionCodesCodec.decode(detail.exemptions)
         let groupSpacing = ClinicalChartMetrics.groupSpacing
         return VStack(alignment: .leading, spacing: groupSpacing) {
-            #if os(macOS)
-            // @Codex: each area keeps a distinct reading purpose within the same chart.
-            Picker("Dati della scheda", selection: $overviewArea) {
-                ForEach(PatientOverviewArea.allCases) { area in
-                    Text(area.rawValue).tag(area)
-                }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("patient-overview-area-picker")
-            #else
+            #if !os(macOS)
             // On iOS the card is titled by the patient, and the actions sit on
             // that line rather than above it.
             //
@@ -70,7 +35,7 @@ struct PairedPatientDetailSection: View {
             // behind an overflow rather than in front of the record.
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("\(detail.lastName) \(detail.firstName)")
-                    .chartCardTitle()
+                    .inkVoice(28)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
@@ -185,7 +150,6 @@ struct PairedPatientDetailSection: View {
                         .registro()
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Esenzioni: \(exemptions.joined(separator: ", "))")
                     #else
                     // @Codex: Codes wrap as text rather than overflowing a row of chips.
                     Text(exemptions.joined(separator: ", "))
@@ -270,7 +234,6 @@ struct PairedPatientDetailSection: View {
                 patientEditForm
             }
         }
-        .onChange(of: detail.id) { _ in overviewArea = .clinical }
     }
 
     /* @Codex: Read-only review signals from this patient's decrypted snapshot.
@@ -343,7 +306,7 @@ struct PairedPatientDetailSection: View {
     private var macPatientFacts: some View {
         let contacts: [(label: String, value: String, isCode: Bool)] = [
             ("Indirizzo", cleanedPatientWorkspaceValue(detail.address), false),
-            ("Telefono", cleanedPatientWorkspaceValue(detail.phone), true),
+            ("Telefono", cleanedPatientWorkspaceValue(detail.phone), false),
         ].compactMap { label, value, isCode in value.map { (label, $0, isCode) } }
         let care: [(label: String, value: String, isCode: Bool)] = [
             ("Caregiver", cleanedPatientWorkspaceValue(detail.caregiver), false),
@@ -356,7 +319,7 @@ struct PairedPatientDetailSection: View {
             ChartGroup("Identità") {
                 macPatientFact("Codice fiscale", detail.taxCode, isCode: true)
                 if let birth = detail.birthDate {
-                    macPatientFact("Data di nascita", birthDateText(birth), isCode: true) // @Codex
+                    macPatientFact("Data di nascita", birthDateText(birth), isCode: false) // @Codex
                 }
             }
             if !contacts.isEmpty {
@@ -415,7 +378,7 @@ struct PairedPatientDetailSection: View {
                 .foregroundStyle(.secondary)
             Group {
                 if isCode {
-                    Text(value).registro()
+                    Text(value).codice()
                 } else {
                     Text(value)
                 }
@@ -425,7 +388,8 @@ struct PairedPatientDetailSection: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label): \(value)")
     }
     #endif
 
@@ -828,7 +792,7 @@ struct PairedPatientDetailSection: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(exemption.code)
                                 .font(.caption.monospaced().weight(.semibold))
-                                .registro()
+                                .codice()
                             Text(exemption.description)
                                 .font(.caption)
                                 .lineLimit(2)

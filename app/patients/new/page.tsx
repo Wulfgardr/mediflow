@@ -1,5 +1,7 @@
 'use client';
 
+import ink from '@/components/ink-secondary.module.css';
+
 import { useState } from 'react';
 import {
     db,
@@ -242,18 +244,19 @@ export default function NewPatientPage() {
             navItems={navItems}
             primaryAction={{ href: "/patients/import", label: "Importa elenco CSV", icon: FileSpreadsheet }}
         >
+            <div className={`${ink.surface} ${ink.form} ${ink.stack}`}>
             <section id="documento" className="patient-detail-section mf-section p-6 md:p-8 space-y-5 scroll-mt-40">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]">
                             <FileSearch className="h-5 w-5" />
                         </div>
                         <div className="space-y-1">
                             <p className="mf-eyebrow">Documento clinico</p>
-                            <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+                            <h2 className="text-xl font-semibold tracking-tight text-[color:var(--lume-ink)]">
                                 Usa un documento quando è utile
                             </h2>
-                            <p className="max-w-3xl text-sm leading-relaxed text-slate-600">
+                            <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
                                 MediFlow propone anagrafica, diagnosi e terapie dal documento: confermi tu cosa usare.
                             </p>
                         </div>
@@ -346,6 +349,7 @@ export default function NewPatientPage() {
                     defaultValues={importedData || undefined}
                     key={`patient-form-${formSeed}-${importedData ? 'loaded' : 'empty'}`}
                 />
+            </div>
             </div>
         </Kree8WorkspaceShell>
     );

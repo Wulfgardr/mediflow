@@ -1,66 +1,62 @@
-// MediFlow icon v6 (finale): il Filo del diario, verticale puro. Tempo, e il presente in luce.
+// Rasterize the approved SVG sources without adding masks or changing the mark.
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const OUT = process.argv[2] || './out6';
-mkdirSync(OUT, { recursive: true });
+const root = fileURLToPath(new URL('../', import.meta.url));
+const source = join(root, 'public/brand/mediflow');
+const out = process.argv[2] || join(root, 'out-icons');
+mkdirSync(out, { recursive: true });
 
-const REG = {
-  giorno:  { c0: '#fbfaf7', c1: '#eef0f2', line: '#33506b', nodeCore: '#ffffff' },
-  grafite: { c0: '#191c21', c1: '#121417', line: '#8fb0cc', nodeCore: '#fbfaf7' },
-};
-
-function strokeFor(px) {
-  if (px <= 16) return 200;
-  if (px <= 32) return 156;
-  if (px <= 64) return 116;
-  if (px <= 128) return 94;
-  return 76;
-}
-
-function master(reg, { stroke = 76, fg = false } = {}) {
-  const r = REG[reg];
-  const focalR = Math.max(128, stroke * 1.7);
-  const smallR = Math.max(54, stroke * 0.72);
-  const ringW = Math.max(28, stroke * 0.37);
-  const bg = fg ? '' : `
-    <defs>
-      <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="${r.c0}"/>
-        <stop offset="1" stop-color="${r.c1}"/>
-      </linearGradient>
-    </defs>
-    <rect width="1024" height="1024" fill="url(#bg)"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">${bg}
-    <line x1="512" y1="150" x2="512" y2="870" stroke="${r.line}" stroke-width="${stroke}" stroke-linecap="round"/>
-    <circle cx="512" cy="150" r="${smallR}" fill="${r.line}"/>
-    <circle cx="512" cy="870" r="${smallR}" fill="${r.line}"/>
-    <circle cx="512" cy="510" r="${focalR}" fill="${r.nodeCore}" stroke="${r.line}" stroke-width="${ringW}"/>
-  </svg>`;
-}
-
-for (const reg of ['giorno', 'grafite']) {
-  writeFileSync(join(OUT, `mediflow-icon-${reg}.svg`), master(reg, {}));
-  writeFileSync(join(OUT, `mediflow-icon-${reg}-fg.svg`), master(reg, { fg: true }));
-}
+const giorno = readFileSync(join(source, 'punto-giorno.svg'), 'utf8');
+const grafite = readFileSync(join(source, 'punto-grafite.svg'), 'utf8');
+const foreground = readFileSync(join(source, 'punto-fg.svg'), 'utf8');
+const adaptive = giorno.replace('<defs>', `<style>
+  @media (prefers-color-scheme: dark) {
+    #bg stop:first-child { stop-color: #1a1d22; }
+    #bg stop:last-child { stop-color: #101216; }
+    path:first-child { stroke: #9aa3b0; }
+    path:last-child { stroke: #9db4ff; }
+    circle { fill: #e9ecef; }
+  }
+</style><defs>`);
+writeFileSync(join(out, 'icon.svg'), adaptive);
 
 const browser = await chromium.launch();
-const page = await browser.newPage();
-for (const reg of ['giorno', 'grafite']) {
-  for (const px of [1024, 512, 256, 128, 64, 32, 16]) {
-    const svg = master(reg, { stroke: strokeFor(px) });
-    await page.setViewportSize({ width: px, height: px });
-    await page.setContent(`<style>*{margin:0}</style><div style="width:${px}px;height:${px}px">${svg.replace('<svg ', `<svg width="${px}" height="${px}" `)}</div>`);
-    await page.screenshot({ path: join(OUT, `mediflow-${reg}-${px}.png`), clip: { x: 0, y: 0, width: px, height: px } });
+try {
+  const page = await browser.newPage({ deviceScaleFactor: 1 });
+  async function raster(svg, size) {
+    await page.setViewportSize({ width: size, height: size });
+    await page.setContent(`<style>html,body{margin:0;background:transparent}svg{display:block;width:100%;height:100%}</style>${svg}`);
+    return page.screenshot({ omitBackground: true });
   }
+  for (const [name, svg] of [['giorno', giorno], ['grafite', grafite]]) {
+    for (const size of [192, 512]) {
+      writeFileSync(join(out, `punto-${name}-${size}.png`), await raster(svg, size));
+    }
+  }
+  writeFileSync(join(out, 'apple-icon.png'), await raster(giorno, 180));
+
+  // ICO stores three PNG frames; the foreground keeps the tab icon transparent.
+  const frames = [];
+  for (const size of [16, 32, 48]) frames.push({ size, png: await raster(foreground, size) });
+  const directory = Buffer.alloc(6 + frames.length * 16);
+  directory.writeUInt16LE(1, 2);
+  directory.writeUInt16LE(frames.length, 4);
+  let offset = directory.length;
+  for (const [index, { size, png }] of frames.entries()) {
+    const entry = 6 + index * 16;
+    directory[entry] = size;
+    directory[entry + 1] = size;
+    directory.writeUInt16LE(1, entry + 4);
+    directory.writeUInt16LE(32, entry + 6);
+    directory.writeUInt32LE(png.length, entry + 8);
+    directory.writeUInt32LE(offset, entry + 12);
+    offset += png.length;
+  }
+  writeFileSync(join(out, 'favicon.ico'), Buffer.concat([directory, ...frames.map(frame => frame.png)]));
+} finally {
+  await browser.close();
 }
-for (const reg of ['giorno', 'grafite']) {
-  const svg = master(reg, {});
-  await page.setViewportSize({ width: 512, height: 512 });
-  await page.setContent(`<style>*{margin:0}body{background:${reg==='giorno'?'#d8dce0':'#0a0a0c'}}</style>
-    <div style="width:432px;height:432px;margin:40px;border-radius:96px;overflow:hidden">${svg.replace('<svg ', '<svg width="432" height="432" ')}</div>`);
-  await page.screenshot({ path: join(OUT, `masked-${reg}-512.png`) });
-}
-await browser.close();
-console.log('v6 done');
+console.log(`Web icons written to ${out}`);

@@ -448,3 +448,5 @@ tra archivi, sessioni e copie di sicurezza.
 WUL-756 di un plugin con soli esempi inventati. Il
 [pacchetto sintetico](../plugins/mediflow-synthetic/README.md) conserva setup,
 prove e limiti: non qualifica host reale, accesso clinico o distribuzione.
+
+- [Punto d’inchiostro](./design/punto-inchiostro/README.md): specifica visiva e asset della famiglia MediFlow.

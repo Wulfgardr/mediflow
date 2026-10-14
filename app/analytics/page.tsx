@@ -125,7 +125,7 @@ export default function AnalyticsPage() {
             <Kree8WorkspaceShell
                 variant="overview"
                 eyebrow="Analisi"
-                title="Cruscotto locale"
+                title="Analisi"
                 subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
                 backHref="/?area=incarico"
                 backLabel="Torna ai pazienti"
@@ -141,7 +141,7 @@ export default function AnalyticsPage() {
         <Kree8WorkspaceShell
             variant="overview"
             eyebrow="Analisi"
-            title="Cruscotto locale"
+            title="Analisi"
             subtitle="Una domanda alla volta sui dati già registrati in questa postazione."
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
@@ -200,6 +200,7 @@ export default function AnalyticsPage() {
                 </div>
             </section>
 
+            <div className={styles.analysisGrid}>
             <section id="indicatori" className={styles.layerSection} data-testid="analytics-layer-section">
                 <SectionHeading
                     label="Indicatori"
@@ -266,7 +267,7 @@ export default function AnalyticsPage() {
                             {stats.topDiagnoses.map((diagnosis) => (
                                 <tr key={diagnosis.key}>
                                     <td>{diagnosis.description}</td>
-                                    <td className="lume-registro" data-lume-register-value="true">{diagnosis.system} {diagnosis.code}</td>
+                                    <td className="lume-code" data-lume-register-value="true">{diagnosis.system} {diagnosis.code}</td>
                                     <td className="lume-registro" data-lume-register-value="true">{diagnosis.count}</td>
                                 </tr>
                             ))}
@@ -282,6 +283,7 @@ export default function AnalyticsPage() {
                 </div>
             </section>
 
+            </div>
             <section id="audit" className={styles.layerSection}>
                 <div className={styles.auditHeading}>
                     <SectionHeading

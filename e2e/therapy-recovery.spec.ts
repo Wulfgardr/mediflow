@@ -43,8 +43,7 @@ async function fixture(page: Page): Promise<Fixture> {
 async function openDraft(page: Page, data: Fixture): Promise<void> {
   await page.goto(`/patients/${data.patientId}/modules`);
   await openPatientSection(page, 'terapie');
-  await page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })
-    .locator('..').locator('..').locator('..').getByRole('button', { name: 'Modifica', exact: true }).click();
+  await page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico principale', { exact: true }) }).getByRole('button', { name: 'Modifica', exact: true }).click();
   await dosage(page).fill('Dose della bozza sintetica');
   await note(page).fill('Nota sintetica da conservare');
 }
@@ -107,9 +106,9 @@ for (const width of [1440, 390]) {
     await page.reload();
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
-    const suspendedCard = page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })
-      .locator('..').locator('..').locator('..');
-    await expect(suspendedCard.getByText('Sospesa', { exact: true })).toBeVisible();
+    const suspendedCard = page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico principale', { exact: true }) });
+    await expect(page.locator('#terapie').getByRole('heading', { name: 'Terapie sospese', exact: true })).toBeVisible();
+    await suspendedCard.getByText('Dettagli terapia', { exact: true }).click();
     await expect(suspendedCard.getByText('Dose della bozza sintetica', { exact: true })).toBeVisible();
     await expect(suspendedCard.getByText('Nota sintetica da conservare', { exact: true })).toBeVisible();
     await expect(suspendedCard.getByRole('textbox')).toHaveCount(0);
@@ -127,8 +126,7 @@ test('a list refresh during editing cannot silently advance the draft version', 
   await openDraft(page, data);
   await concurrentEdit(page, data);
   const refreshed = page.waitForResponse(response => response.request().method() === 'GET' && response.url().includes('/api/therapies?'));
-  await page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico secondario', exact: true })
-    .locator('..').locator('..').locator('..').getByRole('button', { name: 'Sospendi', exact: true }).click();
+  await page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico secondario', { exact: true }) }).getByRole('button', { name: 'Sospendi', exact: true }).click();
   expect((await refreshed).status()).toBe(200);
   await expect(page.locator('#terapie').getByText('Dose concorrente 2', { exact: true })).toBeVisible();
   const response = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith(`/api/therapies/${data.therapyId}`));
@@ -287,7 +285,7 @@ const deletionReason = 'Inserimento duplicato sintetico: motivazione da conserva
 async function openTherapies(page: Page, data: Fixture): Promise<void> {
   await page.goto(`/patients/${data.patientId}/modules`);
   await openPatientSection(page, 'terapie');
-  await expect(page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })).toBeVisible();
+  await expect(page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })).toBeVisible();
 }
 
 async function requestDeletion(page: Page): Promise<void> {
@@ -607,13 +605,14 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
       const otherRow = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true }).getByRole('option');
       await expect(otherRow).toHaveCount(1);
       await otherRow.click();
+      await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`/patients/${other.patientId}/modules`));
       const openRecords = page.getByRole('navigation', { name: 'Cartelle aperte', exact: true });
       await openRecords.locator(`a[href="/patients/${original.patientId}/modules"]`).click();
       await expect(page).toHaveURL(new RegExp(`/patients/${original.patientId}/modules`));
       await expect(openRecords.locator(`a[href="/patients/${other.patientId}/modules"]`)).toBeVisible();
       await openPatientSection(page, 'terapie');
-      await expect(page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico principale', exact: true })).toBeVisible();
+      await expect(page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })).toBeVisible();
       // The lifecycle transition must retain this document; a reload would
       // destroy callbacks and could falsely appear to prove controller fencing.
       const documentMarker = await page.evaluate(() => {
@@ -677,7 +676,7 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
           await expect(page).toHaveURL(new RegExp(`/patients/${original.patientId}/modules`));
         }
         await openPatientSection(page, 'terapie');
-        await expect(page.locator('#terapie').getByRole('heading', { name: 'Farmaco sintetico secondario', exact: true })).toBeVisible();
+        await expect(page.locator('#terapie').getByText('Farmaco sintetico secondario', { exact: true })).toBeVisible();
         await expect(deleteRecovery(page)).toHaveCount(0);
         // Establish a fresh prompt before releasing the old result. It must
         // retain an empty reason and remain cancellable without another DELETE.

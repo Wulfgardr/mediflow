@@ -5,6 +5,7 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.clinicalPatientNavigation) private var linkedPatient // @Codex
     @Environment(\.clinicalNavigationInteraction) private var navigationInteraction // @Codex
     @State private var navigationInteractionID = UUID() // @Codex
@@ -190,7 +191,9 @@ struct PairedPatientsWorkspaceView: View {
         }
         // @Codex: The diary and documents share this presenter even when only
         // one clinical section is mounted. Opening a document never saves a draft.
-        .sheet(item: $attachmentDetailCandidate, onDismiss: { model.dismissAttachmentDetail() }) { summary in
+        .sheet(item: attachmentSheetCandidate, onDismiss: {
+            if !usesInlineAttachmentPreview { model.dismissAttachmentDetail() }
+        }) { summary in
             PairedAttachmentDetailView(model: model, summary: summary, onClose: {
                 attachmentDetailCandidate = nil
             })
@@ -411,6 +414,22 @@ struct PairedPatientsWorkspaceView: View {
         linkedPatient.consume()
     }
 
+    private var usesInlineAttachmentPreview: Bool {
+        guard model.activePatientSection == .documents else { return false }
+        #if os(macOS)
+        return true
+        #else
+        return horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+        #endif
+    }
+
+    private var attachmentSheetCandidate: Binding<HomeBaseAttachmentSummary?> {
+        Binding(
+            get: { usesInlineAttachmentPreview ? nil : attachmentDetailCandidate },
+            set: { if !usesInlineAttachmentPreview { attachmentDetailCandidate = $0 } }
+        )
+    }
+
     private var navigationPresentationIsOpen: Bool {
         showsConnectionSetup || confirmsClearingPairing || presentingScale != nil
             || entryDeletionCandidate != nil || patientLifecycleSheet != nil
@@ -579,7 +598,7 @@ struct PairedPatientsWorkspaceView: View {
     private func compactHeightPatientNavigation(_ detail: HomeBasePatientDetail) -> some View {
         HStack(spacing: 12) {
             Text("\(detail.lastName) \(detail.firstName)")
-                .font(.headline)
+                .inkVoice(28)
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("patient-workspace-header")
@@ -608,12 +627,12 @@ struct PairedPatientsWorkspaceView: View {
     private func mobileWidePatientHeader(_ detail: HomeBasePatientDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(detail.lastName) \(detail.firstName)")
-                .font(.title2.weight(.semibold))
+                .inkVoice(28)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHeading(.h1)
             Text(PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode))
                 .font(.subheadline)
-                .registro()
+                .codice()
                 .foregroundStyle(.secondary)
             if let birth = detail.birthDate {
                 Text("Nato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: birth))")
@@ -790,15 +809,15 @@ struct PairedPatientsWorkspaceView: View {
                     workspaceFeedbackLine
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
                 // The worklist owns its own padding and its own vertical
                 // distribution: applied here, every one of its top-level
                 // elements got the frame and spread across the column.
                 patientsListContent
             }
-            .frame(minWidth: 260, idealWidth: 300, maxWidth: 340, maxHeight: .infinity)
+            .frame(minWidth: 240, idealWidth: 270, maxWidth: 300, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
             // @Codex: The identity is outside the scrolling plane, including
@@ -807,8 +826,8 @@ struct PairedPatientsWorkspaceView: View {
                 if let detail = model.selectedPatient {
                     patientWorkspaceHeader(detail)
                     MacPatientSectionNavigation(selection: $model.activePatientSection)
-                        .padding(.horizontal, 28)
-                        .padding(.bottom, 12)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
                     Divider()
                 }
                 // @Codex: Keep the split pane stable while resetting only its scroll
@@ -816,7 +835,7 @@ struct PairedPatientsWorkspaceView: View {
                 ScrollViewReader { scroll in
                     ScrollView {
                         patientDetailContent
-                            .padding(28)
+                            .padding(20)
                             // Keep clinical rows within a comfortable reading width.
                             .frame(maxWidth: 1000, alignment: .leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -853,9 +872,9 @@ struct PairedPatientsWorkspaceView: View {
                 }
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 24)
-        .padding(.bottom, 20)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(name). \(metadata)")
@@ -874,7 +893,7 @@ struct PairedPatientsWorkspaceView: View {
     /* @Codex */
     private func patientWorkspaceHeaderName(_ name: String) -> some View {
         Text(name)
-            .font(.largeTitle.weight(.semibold))
+            .inkVoice(28)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -1012,8 +1031,8 @@ struct PairedPatientsWorkspaceView: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.4)))
+            .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LumePalette.warning.opacity(0.4)))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("homebase-connection-banner")
         }
@@ -1165,7 +1184,7 @@ struct PairedPatientsWorkspaceView: View {
         // content on screen look like a link to somewhere else. The chevron keeps
         // the tint, because the chevron really is the control.
         let name = Text("\(detail.lastName) \(detail.firstName)")
-            .font(.headline)
+            .inkVoice(28)
             .foregroundStyle(.primary)
         let birthYear = PairedPatientsWorkspaceSupport.birthYearText(from: detail.birthDate)
         Group {
@@ -1208,7 +1227,7 @@ struct PairedPatientsWorkspaceView: View {
         if let error = model.errorMessage {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .chartMetadata()
-                .foregroundStyle(.red)
+                .foregroundStyle(LumePalette.critical)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("workspace-error-message")
@@ -1471,7 +1490,8 @@ struct PairedPatientsWorkspaceView: View {
                 fseValidationKind: $fseValidationKind,
                 selectedFseTherapyId: $selectedFseTherapyId,
                 selectedFseObservationId: $selectedFseObservationId,
-                expandedInsightId: $expandedInsightId
+                expandedInsightId: $expandedInsightId,
+                usesInlinePreview: usesInlineAttachmentPreview
             )
             .chartCard()
             }

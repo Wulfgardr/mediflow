@@ -1,6 +1,7 @@
 'use client';
 
-/* @Codex */
+import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -223,20 +224,20 @@ export default function TreatmentReasoningPanel({
     };
 
     return (
-        <div className="patient-detail-section overflow-hidden border p-0" data-testid="treatment-reasoning-panel">
-            <div className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] p-5">
+        <div className={`${styles.register} ${styles.review}`} data-testid="treatment-reasoning-panel">
+            <div className={styles.toolbar}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className="flex min-w-0 items-start gap-3">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]">
                             <BrainCircuit className="h-5 w-5" aria-hidden="true" />
                         </div>
                         <div className="min-w-0">
-                            <p className="section-kicker">Review terapie</p>
+
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <span className="apple-chip">{sourceSummary.total} fonti</span>
                                 <span className="apple-chip">review-only</span>
-                                <span className="text-[10px] font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
                                 </span>
                             </div>
@@ -249,7 +250,7 @@ export default function TreatmentReasoningPanel({
                         onClick={loadProposal}
                         disabled={!canPrepare}
                         aria-describedby="treatment-reasoning-boundary-note"
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[12px] bg-[color:var(--lume-ink)] px-4 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                        className={`${styles.control} ${styles.primary}`}
                     >
                         {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                         {publication ? 'Aggiorna bozza' : 'Genera bozza'}
@@ -302,10 +303,10 @@ export default function TreatmentReasoningPanel({
                     </div>
                 ) : null}
 
-                <div className="grid gap-2 sm:grid-cols-5">
+                <div className={styles.reviewCounts}>
                     {sourceSummaryItems.map(([label, value]) => (
-                        <div key={label} className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 py-2">
-                            <span className="block text-[9px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
+                        <div key={label}>
+                            <span className="block text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
                             <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{value}</span>
                         </div>
                     ))}
@@ -320,7 +321,7 @@ export default function TreatmentReasoningPanel({
                 {isGenerating ? (
                     <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
                         <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                        <p className="text-xs font-bold uppercase tracking-widest text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
+                        <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
                     </div>
                 ) : null}
 
@@ -329,13 +330,13 @@ export default function TreatmentReasoningPanel({
                         <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Anteprima da rivedere</p>
+                                <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Anteprima da rivedere</p>
                             </div>
-                            <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
+                            <p className={ink.pencil + " mt-2 text-sm leading-6"}>
                                 <PrivacyBlur intensity="sm">{publication.value.data.recommendation || publication.value.summary}</PrivacyBlur>
                             </p>
                             {publication.value.summary !== publication.value.data.recommendation ? (
-                                <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
+                                <p className={ink.pencil + " mt-2 text-sm leading-6"}>
                                     <PrivacyBlur intensity="sm">{publication.value.summary}</PrivacyBlur>
                                 </p>
                             ) : null}
@@ -349,7 +350,7 @@ export default function TreatmentReasoningPanel({
                             <div className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-4 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em]">Dati mancanti e limiti</h4>
+                                    <h4 className="text-xs font-bold uppercase tracking-normal">Dati mancanti e limiti</h4>
                                 </div>
                                 <ul className="mt-3 space-y-2 text-sm leading-5">
                                     {publication.value.data.caveats.map((caveat, index) => (
@@ -366,12 +367,12 @@ export default function TreatmentReasoningPanel({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <ClipboardList className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
+                                    <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
                                 </div>
                                 {publication.value.data.keyEvidence.length === 0 ? (
                                     <p className={`rounded-[14px] border p-3 text-xs ${semanticSignalSurfaceClass('critical')}`}>Nessuna evidenza chiave strutturata.</p>
                                 ) : publication.value.data.keyEvidence.map((evidence) => (
-                                    <div key={evidence.id} className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3">
+                                    <div key={evidence.id} className={styles.proposalRow}>
                                         <p className="text-sm font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
                                         <DocumentReferenceChip references={[...evidence.evidenceRefs]} />
                                     </div>
@@ -381,7 +382,7 @@ export default function TreatmentReasoningPanel({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
+                                    <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
                                 </div>
                                 {publication.value.data.safetyFlags.length === 0 ? (
                                     <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato nella proposta.</p>
@@ -397,15 +398,15 @@ export default function TreatmentReasoningPanel({
 
                         {publication.value.data.suggestedActions.length > 0 ? (
                             <div className="space-y-3">
-                                <h4 className="text-[10px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
-                                <div className="grid gap-3 md:grid-cols-2">
+                                <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
+                                <div className="min-w-0">
                                     {publication.value.data.suggestedActions.map((action) => (
-                                        <div key={action.id} className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3">
+                                        <div key={action.id} className={styles.proposalRow}>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="text-sm font-semibold text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
                                                 <span className="apple-chip">{actionPolicyLabel(action)}</span>
                                             </div>
-                                            <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]"><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
+                                            <p className={ink.pencil + " mt-2 text-sm leading-6"}><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
                                             <DocumentReferenceChip references={[...action.evidenceRefs]} />
                                         </div>
                                     ))}
@@ -437,8 +438,8 @@ export default function TreatmentReasoningPanel({
                             </summary>
                             <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3">
                                 {publication.sourceBindings.map((binding) => (
-                                    <div key={binding.claimPath} className="rounded-[12px] bg-[color:var(--lume-surface-focal)] p-3 text-xs">
-                                        <span className="break-all font-mono text-[10px] text-[color:var(--lume-ink-muted)]">{binding.claimPath}</span>
+                                    <div key={binding.claimPath} className={styles.proposalRow}>
+                                        <span className="break-all lume-code text-xs text-[color:var(--lume-ink-muted)]">{binding.claimPath}</span>
                                         <p className="mt-1 font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
                                         <DocumentReferenceChip references={[...binding.evidenceRefs]} />
                                     </div>
@@ -470,7 +471,7 @@ export default function TreatmentReasoningPanel({
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Revisione sorgente</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.sourceRevision}</dd>
+                                    <dd className="mt-1 break-all lume-code text-xs text-[color:var(--lume-ink)]">{publication.sourceRevision}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Receipt Fabric</dt>
@@ -482,11 +483,11 @@ export default function TreatmentReasoningPanel({
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione receipt</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
+                                    <dd className="mt-1 break-all lume-code text-xs text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
                                 </div>
                                 <div>
                                     <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione provenienza</dt>
-                                    <dd className="mt-1 break-all font-mono text-[10px] text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
+                                    <dd className="mt-1 break-all lume-code text-xs text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
                                 </div>
                             </dl>
                         </details>

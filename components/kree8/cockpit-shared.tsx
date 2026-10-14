@@ -714,10 +714,6 @@ function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
 }
 
 function Toolbar({
-  activeArea,
-  filter,
-  setFilter,
-  onOpenArea,
   onSearchRequest,
   onOpenCommand,
   operatorName,
@@ -741,31 +737,6 @@ function Toolbar({
       >
         <Search size={14} />
         <span>Cerca nella lista pazienti</span>
-      </button>
-      {activeArea === 'turno' ? STATUS_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            aria-pressed={filter === f.id}
-            className={classNames(
-              shellStyles.toolChip,
-              filter !== f.id && shellStyles.toolChipMuted,
-            )}
-            onClick={() => setFilter(f.id)}
-          >
-            <Filter size={12} />
-            {f.label}
-          </button>
-        )) : null}
-      <Link href="/patients/new" className={shellStyles.toolChip}>
-        <Upload size={13} />
-        Nuova scheda da documento
-      </Link>
-      {/* @Codex WUL-UIUX: apre la revisione documenti, non una funzione AI:
-          icona e stile standard per non promettere piu di quanto consegna. */}
-      <button type="button" className={shellStyles.toolChip} onClick={() => onOpenArea('revisione')}>
-        <FileSearch size={13} />
-        Documenti paziente
       </button>
       {/* @Codex: scorciatoia esplicita per la palette read-only di navigazione e aiuto. */}
       <button

@@ -87,16 +87,10 @@ final class ClinicalContrastTests: XCTestCase {
         )
     }
 
-    /// The assertions above verify that the colours *chosen* are a legible pair.
-    /// They cannot see which colours the view actually asks for — and the defect
-    /// was precisely that: the fill was fine and the text was `.primary`, which
-    /// the selection style then repainted white. So this one reads the source and
-    /// requires the chips to state their ink outright.
-    ///
-    /// A source assertion is a blunt instrument. It is here because the
-    /// alternative that would catch this properly is pixel snapshots, and until
-    /// those exist a blunt guard beats the honour system.
-    func testChipsStateTheirInkExplicitlyRatherThanDeferringToPrimary() throws {
+    /// The current tokens have no fill of their own. System-selected ink is
+    /// safe only while that remains true; adding a light chip behind `.primary`
+    /// would restore the white-on-light regression measured above.
+    func testTransparentTokensPreserveNativeSelectionInk() throws {
         let source = try String(
             contentsOf: URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()   // MediFlowAppleSharedTests
@@ -111,20 +105,12 @@ final class ClinicalContrastTests: XCTestCase {
             declaration(named: "ClinicalCodePill", in: source),
             "ClinicalCodePill must stay in this file for the guard to see it"
         )
-        XCTAssertTrue(
-            pill.contains("foregroundStyle(palette.inkPrimary)"),
-            """
-            ClinicalCodePill must name its ink. `.primary` is resolved by the \
-            environment, and on a selected row the environment resolves it to \
-            white — over the chip's own light fill that measured 1.09:1.
-            """
-        )
+        XCTAssertFalse(pill.contains(".background("), "A selected code must not acquire an independent light fill")
+        XCTAssertTrue(pill.contains("isOnProminentBackground ? Color.primary : palette.inkMuted"))
 
         let chip = try XCTUnwrap(declaration(named: "PairedPatientFlagChip", in: source))
-        XCTAssertTrue(
-            chip.contains("foregroundStyle(toneColor)"),
-            "PairedPatientFlagChip must name its tone colour for the same reason"
-        )
+        XCTAssertFalse(chip.contains(".background("), "A selected flag must share the native row surface")
+        XCTAssertTrue(chip.contains("isOnProminentBackground ? Color.primary : toneColor"))
     }
 
     /// The body of `struct <name>`, up to the start of the next top-level

@@ -14,6 +14,13 @@ final class LumeKitTests: XCTestCase {
         XCTAssertEqual(LumePalette.palette(for: .light, isGuardia: true), LumePalette.giorno)
     }
 
+    func testVoiceAndCodeFontsAreBundledAndRegistered() throws {
+        _ = LumeTypography.voice(28)
+        _ = LumeTypography.code
+        XCTAssertNotNil(NSFont(name: "Newsreader16pt-Regular", size: 28))
+        XCTAssertNotNil(NSFont(name: "IBMPlexMono-Regular", size: 12))
+    }
+
     func testCompatibilityAliasesPreserveClinicalToneCases() {
         let legacyTone: VetroTone = .critical
         XCTAssertEqual(legacyTone, LumeTone.critical)

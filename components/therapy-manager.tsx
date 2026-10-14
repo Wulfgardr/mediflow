@@ -1,5 +1,6 @@
 'use client';
 
+import styles from './clinical-register.module.css';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createTherapyDeleteRecovery, type DeleteRecovery } from '@/lib/therapy-delete-recovery';
 import { useLiveQuery } from '@/lib/live-query';
@@ -21,9 +22,9 @@ import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 
 const therapySchema = z.object({
     drugName: z.string().min(2, "Il nome del farmaco è richiesto"),
-    /* @Codex */
+
     aic: z.string().optional(),
-    /* @Codex */
+
     atc: z.string().optional(),
     activePrinciple: z.string().optional(),
     dosage: z.string().min(1, "La posologia è richiesta"),
@@ -40,12 +41,11 @@ type TherapyRecovery = {
     readComplete?: boolean;
 };
 
-const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-[11px]';
+const fieldLabelClassName = 'section-kicker flex items-center justify-between gap-2 text-xs';
 const inputClassName = 'w-full rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-2.5 text-sm text-[color:var(--lume-ink)] outline-none transition-colors placeholder:text-[color:var(--lume-ink-muted)] focus-visible:border-[color:color-mix(in_srgb,var(--lume-ink)_28%,transparent)] focus-visible:shadow-[var(--lume-focus-ring)] read-only:bg-[color:var(--lume-surface-focal)]';
 const textareaClassName = `${inputClassName} min-h-[88px] resize-y`;
 const quietButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 text-xs font-semibold text-[color:var(--lume-ink)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_26%,transparent)] hover:bg-[color:var(--lume-surface-focal)]';
 const recoveryButtonClassName = `${quietButtonClassName.replace('h-9', 'min-h-11')} whitespace-normal py-2 text-left`;
-const statusButtonClassName = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-[11px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-3 text-xs font-semibold text-[color:var(--lume-ink-muted)] transition-colors hover:border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] hover:text-[color:var(--lume-ink)]';
 const chipClassName = 'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors';
 
 export default function TherapyManager({ patientId, embedded = false }: { patientId: string; embedded?: boolean }) {
@@ -137,9 +137,9 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         setIsAdding(true);
         setEditingDrugName(therapy.drugName);
         setValue('drugName', therapy.drugName);
-        /* @Codex */
+
         setValue('aic', therapy.aic || '');
-        /* @Codex */
+
         setValue('atc', therapy.atc || '');
         setValue('activePrinciple', therapy.activePrinciple || '');
         setValue('dosage', therapy.dosage);
@@ -375,7 +375,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     ) : null;
 
     return (
-        <section className={embedded ? '' : 'patient-detail-section border p-5 md:p-6'}>
+        <section className={styles.register} data-clinical-register="therapies">
             {embedded ? (
                 newButton ? <div className="mb-4 flex justify-end">{newButton}</div> : null
             ) : (
@@ -448,7 +448,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
             )}
 
             {isAdding && (
-                <div className="mb-6 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 shadow-[var(--lume-shadow-focal)] animate-in fade-in slide-in-from-top-4 md:p-5">
+                <div className={styles.form}>
                     <div className="mb-5 flex items-start justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_11%,transparent)] pb-4">
                         <div>
                             <p className="section-kicker">Registro terapia</p>
@@ -477,9 +477,9 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                     const next = e.target.checked;
                                     setIsGalenic(next);
                                     if (next) {
-                                        /* @Codex */
+
                                         setValue('aic', '');
-                                        /* @Codex */
+
                                         setValue('atc', '');
                                     }
                                 }}
@@ -498,7 +498,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <div className="space-y-1">
                                 <label className={fieldLabelClassName}>
                                     <span>Farmaco</span>
-                                    {!isGalenic && <span className="inline-flex items-center gap-1 text-[10px] text-[color:var(--lume-ink-muted)]"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
+                                    {!isGalenic && <span className="inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]"><Database className="w-3 h-3" /> Banca dati AIFA</span>}
                                 </label>
 
                                 {isGalenic ? (
@@ -513,9 +513,9 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                             key={editingId ?? 'new'}
                                             onSelect={(drug: AifaDrug) => {
                                                 setValue('drugName', drug.name);
-                                                /* @Codex */
+
                                                 setValue('aic', drug.aic);
-                                                /* @Codex */
+
                                                 setValue('atc', drug.atc || '');
                                                 setValue('activePrinciple', drug.activePrinciple);
                                             }}
@@ -588,9 +588,9 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 </p>
                             </div>
                         </fieldset>
-                        {/* @Codex */}
+
                         <input type="hidden" {...register('aic')} />
-                        {/* @Codex */}
+
                         <input type="hidden" {...register('atc')} />
                         {recovery && (
                             <div ref={recoveryRef} role="alert" aria-atomic="true" tabIndex={-1} className="rounded-[14px] border border-[color:var(--lume-signal-critical)] p-4 text-sm leading-6 focus-visible:shadow-[var(--lume-focus-ring)]">
@@ -629,176 +629,41 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                 </div>
             )}
 
-            <div className="space-y-4">
-                {therapies === undefined ? (
-                    <div className="space-y-2" aria-hidden>
-                        {[0, 1, 2].map((row) => (
-                            <div key={row} className="mf-skeleton h-20" />
-                        ))}
-                    </div>
-                ) : activeTherapies.length === 0 && suspendedTherapies.length === 0 ? (
-                    <div className="rounded-[18px] border border-dashed border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:var(--lume-surface-focal)] p-8 text-center">
-                        <p className="text-sm leading-6 text-[color:var(--lume-ink-muted)]">
-                            Nessuna terapia attiva registrata. Aggiungi una terapia quando serve tenere traccia di farmaco e posologia.
-                        </p>
-                    </div>
-                ) : (
-                    <>
-                        {activeTherapies.length > 0 && (
-                            <h5 className="flex flex-wrap items-baseline gap-2 text-base font-semibold text-[color:var(--lume-ink)]">
-                                {/* @Codex WUL-678: therapy counts use the heading baseline and UI type. */}
-                                Terapie attive <span className="tabular-nums">{activeTherapies.length}</span>
-                            </h5>
-                        )}
-                        {/* ACTIVE */}
-                        {activeTherapies.map(t => (
-                            <div key={t.id} className="flex flex-col items-start justify-between gap-4 rounded-[18px] border border-[color:color-mix(in_srgb,var(--lume-ink)_13%,transparent)] bg-[color:var(--lume-surface-field)] p-4 shadow-[var(--lume-shadow-focal)] sm:flex-row">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">{t.drugName}</h4>
-                                        <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--lume-ink-muted)]">
-                                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--lume-ink-muted)]" aria-hidden />
-                                            Attiva
-                                        </span>
-                                        {t.activePrinciple && <span className="rounded-full bg-[color:var(--lume-surface-focal)] px-2 py-0.5 text-xs font-medium text-[color:var(--lume-ink-muted)]">{t.activePrinciple}</span>}
-                                    </div>
-                                    <p className="mt-1 text-base leading-6 font-medium text-[color:var(--lume-ink)]">{t.dosage}</p>
-                                    {t.startDate && (
-                                        <p className="mt-0.5 text-xs text-[color:var(--lume-ink-muted)]">
-                                            In corso dal <span className="lume-registro">{format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</span>
-                                        </p>
-                                    )}
-
-                                    {t.diagnosisCode && (
-                                        <div className="mt-1 flex items-center gap-1.5">
-                                            <span className="rounded border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--lume-ink-muted)]">
-                                                {t.diagnosisCode}
-                                            </span>
-                                            <span className="max-w-[220px] truncate text-xs text-[color:var(--lume-ink-muted)]" title={t.diagnosisName}>
-                                                {t.diagnosisName}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {t.motivation && <p className="mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{t.motivation}</p>}
-
-                                    {(t.atc || t.aic) && (
-                                        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] font-mono uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                            {t.atc ? <span>ATC {t.atc}</span> : null}
-                                            {t.aic ? <span>AIC {t.aic}</span> : null}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <button
-                                        disabled={!!deleteRecovery}
-                                        onClick={() => startEditing(t)}
-                                        className={quietButtonClassName}
-                                        title="Modifica terapia"
-                                    >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                        Modifica
-                                    </button>
-
-                                    <button
-                                        disabled={!!deleteRecovery}
-                                        onClick={() => updateStatus(t.id, 'suspended')}
-                                        className={statusButtonClassName}
-                                        title="Sospendi temporaneamente"
-                                    >
-                                        <Clock className="w-3.5 h-3.5" />
-                                        Sospendi
-                                    </button>
-
-                                    <button
-                                        disabled={!!deleteRecovery}
-                                        onClick={() => updateStatus(t.id, 'completed')}
-                                        className={statusButtonClassName}
-                                        title="Termina terapia"
-                                    >
-                                        <StopCircle className="w-3.5 h-3.5" />
-                                        Concludi
-                                    </button>
-
-                                    <button
-                                        disabled={!!deleteRecovery || isAdding}
-                                        onClick={() => handleSoftDelete(t.id)}
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-[11px] text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
-                                        title="Elimina solo se inserito per errore"
-                                        aria-label={`Elimina ${t.drugName} solo se inserito per errore`}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-
-                        {/* SUSPENDED */}
-                        {suspendedTherapies.length > 0 && (
-                            <div className="space-y-2 mt-4">
-                                <h5 className="section-kicker mb-2 flex items-center gap-2">
-                                    <Clock className="w-3 h-3" /> Terapie sospese
-                                </h5>
-                                {suspendedTherapies.map(t => (
-                                    <div key={t.id} className="flex flex-col items-start justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 sm:flex-row sm:items-center">
-                                        <div className="min-w-0 flex-1 break-words">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className="font-semibold text-[color:var(--lume-ink)]">{t.drugName}</span>
-                                                <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold text-[color:var(--lume-ink-muted)]">Sospesa</span>
-                                            </div>
-                                            <p className="mt-0.5 whitespace-pre-wrap text-sm text-[color:var(--lume-ink-muted)]">{t.dosage}</p>
-                                            {t.motivation && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[color:var(--lume-ink-muted)]">{t.motivation}</p>}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                disabled={!!deleteRecovery}
-                                                onClick={() => updateStatus(t.id, 'active')}
-                                                className={quietButtonClassName}
-                                            >
-                                                <Play className="w-3 h-3" /> Riprendi
-                                            </button>
-                                            <button
-                                                disabled={!!deleteRecovery}
-                                                onClick={() => updateStatus(t.id, 'completed')}
-                                                className={statusButtonClassName}
-                                            >
-                                                <StopCircle className="w-3 h-3" /> Concludi
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-
-            {endedTherapies.length > 0 && (
-                <div className="mt-6 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_11%,transparent)] pt-4">
-                    <h5 className="section-kicker mb-3">Terapie concluse</h5>
-                    <div className="space-y-2">
-                        {endedTherapies.map(t => (
-                            <div key={t.id} className="group flex items-center justify-between gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] p-3">
-                                <div>
-                                    <span className="font-semibold text-[color:var(--lume-ink-muted)] line-through decoration-[color:color-mix(in_srgb,var(--lume-ink)_42%,transparent)]">{t.drugName}</span>
-                                    <div className="text-xs text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]">
-                                        Conclusa il <span className="lume-registro">{format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</span>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                                    <button
-                                        disabled={!!deleteRecovery}
-                                        onClick={() => updateStatus(t.id, 'active')}
-                                        className={quietButtonClassName}
-                                    >
-                                        Riattiva
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+            {therapies === undefined ? <div className={styles.loading} role="status" aria-label="Caricamento terapie"><span className="sr-only">Caricamento terapie…</span>{[0,1,2].map(row => <div key={row} className="mf-skeleton" aria-hidden />)}</div> : <>
+                {activeTherapies.length === 0 && suspendedTherapies.length === 0 && <p className={styles.empty}>Nessuna terapia attiva registrata. Aggiungi una terapia quando serve tenere traccia di farmaco e posologia.</p>}
+                {[
+                    { title: 'Terapie attive', rows: activeTherapies, status: 'active' },
+                    { title: 'Terapie sospese', rows: suspendedTherapies, status: 'suspended' },
+                    { title: 'Terapie concluse', rows: endedTherapies, status: 'completed' },
+                ].filter(group => group.rows.length > 0).map(group => <section key={group.status}>
+                    <header className={styles.sectionHead}><h3>{group.title}</h3><span>{group.rows.length}</span></header>
+                    <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th className={styles.secondaryColumn}>Periodo</th><th className={styles.secondaryColumn}>Codici</th><th>Azioni</th></tr></thead><tbody>
+                        {group.rows.map(t => <tr key={t.id}>
+                            <td><strong>{t.drugName}</strong>{t.activePrinciple && <small>{t.activePrinciple}</small>}
+                                {(t.motivation || t.diagnosisCode || t.atc || t.aic || t.startDate) && <details className={styles.recordDetails}><summary>Dettagli terapia</summary>
+                                    {t.startDate && <p>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</p>}
+                                    {t.motivation && <p>{t.motivation}</p>}{t.diagnosisCode && <p><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</p>}
+                                    {(t.atc || t.aic) && <p className="lume-code">{t.atc && <>ATC {t.atc} </>}{t.aic && <>AIC {t.aic}</>}</p>}
+                                </details>}
+                            </td>
+                            <td className="lume-registro">{t.dosage}</td>
+                            <td className={`${styles.secondaryColumn} ${styles.muted}`}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>
+                            <td className={`${styles.secondaryColumn} lume-code`}>{t.atc && <div>ATC {t.atc}</div>}{t.aic && <div>AIC {t.aic}</div>}{!t.atc && !t.aic && '—'}</td>
+                            <td><div className={styles.controls}>
+                                {group.status === 'active' ? <>
+                                    <button disabled={!!deleteRecovery} onClick={() => startEditing(t)} title="Modifica terapia"><Pencil size={14} aria-hidden />Modifica</button>
+                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'suspended')} title="Sospendi temporaneamente"><Clock size={14} aria-hidden />Sospendi</button>
+                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'completed')} title="Termina terapia"><StopCircle size={14} aria-hidden />Concludi</button>
+                                    <button disabled={!!deleteRecovery || isAdding} onClick={() => handleSoftDelete(t.id)} title="Elimina solo se inserito per errore" aria-label={`Elimina ${t.drugName} solo se inserito per errore`}><Trash2 size={16} aria-hidden /></button>
+                                </> : group.status === 'suspended' ? <>
+                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'active')}><Play size={14} aria-hidden />Riprendi</button>
+                                    <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'completed')}><StopCircle size={14} aria-hidden />Concludi</button>
+                                </> : <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'active')}>Riattiva</button>}
+                            </div>{group.status === 'completed' && <small className={styles.compactOnly}>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</small>}</td>
+                        </tr>)}
+                    </tbody></table>
+                </section>)}
+            </>}
         </section>
     );
 }

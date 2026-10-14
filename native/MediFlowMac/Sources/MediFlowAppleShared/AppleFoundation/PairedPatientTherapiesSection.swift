@@ -11,26 +11,11 @@ struct PairedPatientTherapiesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Five controls beside the title do not fit a phone. Left to compress
-            // they did not truncate, they hyphenated: "Ter-apie", "Aggior-na",
-            // "Es-porta". Same ladder the diary header uses, with one more rung,
-            // because this header can carry two share actions the diary cannot.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    therapiesHeaderTitle
-                    Spacer(minLength: 8)
-                    therapiesHeaderControls
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    therapiesHeaderTitle
-                    therapiesHeaderControls
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    therapiesHeaderTitle
-                    Spacer(minLength: 8)
-                    therapiesOverflowMenu
-                    therapiesStatusFilter
-                }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                therapiesHeaderTitle
+                Spacer(minLength: 8)
+                therapiesOverflowMenu
+                therapiesStatusFilter
             }
 
             if model.therapies.isEmpty {
@@ -90,34 +75,36 @@ struct PairedPatientTherapiesSection: View {
 
             Divider()
 
-            therapyForm(
-                title: "Nuova terapia online",
-                drugName: $model.newTherapyDrugName,
-                aic: $model.newTherapyAIC,
-                atc: $model.newTherapyATC,
-                activePrinciple: $model.newTherapyActivePrinciple,
-                dosage: $model.newTherapyDosage,
-                motivation: $model.newTherapyMotivation,
-                status: $model.newTherapyStatus,
-                startDate: $model.newTherapyStartDate,
-                hasEndDate: $model.newTherapyHasEndDate,
-                endDate: $model.newTherapyEndDate,
-                diagnosisCode: $model.newTherapyDiagnosisCode,
-                diagnosisOptions: model.currentPatientDiagnoses,
-                drugCatalogResults: model.newTherapyDrugCatalogResults,
-                isSearchingDrugCatalog: model.isSearchingNewTherapyDrugCatalog,
-                drugCatalogStatusMessage: model.drugCatalogStatusMessage,
-                primaryLabel: "Salva terapia",
-                primaryIdentifier: "homebase-create-therapy-button",
-                canSubmit: model.canCreateTherapy,
-                onDrugQueryChanged: { model.scheduleNewTherapyDrugCatalogSearch() },
-                onSelectDrug: { model.selectNewTherapyDrugCatalogResult($0) },
-                onCancel: nil,
-                onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
-            )
-            Text("Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuova terapia", identifier: "therapy-create-disclosure") {
+                therapyForm(
+                    title: "Nuova terapia online",
+                    drugName: $model.newTherapyDrugName,
+                    aic: $model.newTherapyAIC,
+                    atc: $model.newTherapyATC,
+                    activePrinciple: $model.newTherapyActivePrinciple,
+                    dosage: $model.newTherapyDosage,
+                    motivation: $model.newTherapyMotivation,
+                    status: $model.newTherapyStatus,
+                    startDate: $model.newTherapyStartDate,
+                    hasEndDate: $model.newTherapyHasEndDate,
+                    endDate: $model.newTherapyEndDate,
+                    diagnosisCode: $model.newTherapyDiagnosisCode,
+                    diagnosisOptions: model.currentPatientDiagnoses,
+                    drugCatalogResults: model.newTherapyDrugCatalogResults,
+                    isSearchingDrugCatalog: model.isSearchingNewTherapyDrugCatalog,
+                    drugCatalogStatusMessage: model.drugCatalogStatusMessage,
+                    primaryLabel: "Salva terapia",
+                    primaryIdentifier: "homebase-create-therapy-button",
+                    canSubmit: model.canCreateTherapy,
+                    onDrugQueryChanged: { model.scheduleNewTherapyDrugCatalogSearch() },
+                    onSelectDrug: { model.selectNewTherapyDrugCatalogResult($0) },
+                    onCancel: nil,
+                    onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
+                )
+                Text("Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -128,14 +115,6 @@ struct PairedPatientTherapiesSection: View {
             ClinicalSectionTitle("Terapie", systemImage: "pills", accent: .terapie)
             Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) terapie")
                 .chartMetadata()
-        }
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var therapiesHeaderControls: some View {
-        HStack(spacing: 8) {
-            therapyActions
-            therapiesStatusFilter
         }
         .fixedSize(horizontal: true, vertical: false)
     }
@@ -353,42 +332,49 @@ struct PairedPatientTherapiesSection: View {
                 primaryIdentifier: primaryIdentifier,
                 onSelect: onSelectDrug
             )
-            TextField("Codice AIC (opzionale)", text: aic)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("\(primaryIdentifier)-aic")
-            TextField("Codice ATC (opzionale)", text: atc)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("\(primaryIdentifier)-atc")
-            TextField("Principio attivo (opzionale)", text: activePrinciple)
-                .accessibilityIdentifier("\(primaryIdentifier)-active-principle")
-            TextField("Posologia", text: dosage)
-                .accessibilityIdentifier("\(primaryIdentifier)-dosage")
-            TextField("Motivazione (opzionale)", text: motivation)
-                .accessibilityIdentifier("\(primaryIdentifier)-motivation")
-            if !diagnosisOptions.isEmpty {
-                Picker("Diagnosi collegata", selection: diagnosisCode) {
-                    Text("Nessuna").tag("")
-                    ForEach(diagnosisOptions, id: \.code) { diagnosis in
-                        Text(diagnosis.displayText).tag(diagnosis.code)
+            ClinicalFormColumns {
+                ChartGroup("Farmaco e posologia") {
+                    TextField("Codice AIC (opzionale)", text: aic)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("\(primaryIdentifier)-aic")
+                    TextField("Codice ATC (opzionale)", text: atc)
+                        .autocorrectionDisabled()
+                        .accessibilityIdentifier("\(primaryIdentifier)-atc")
+                    TextField("Principio attivo (opzionale)", text: activePrinciple)
+                        .accessibilityIdentifier("\(primaryIdentifier)-active-principle")
+                    TextField("Posologia", text: dosage)
+                        .accessibilityIdentifier("\(primaryIdentifier)-dosage")
+                    TextField("Motivazione (opzionale)", text: motivation)
+                        .accessibilityIdentifier("\(primaryIdentifier)-motivation")
+                    if !diagnosisOptions.isEmpty {
+                        Picker("Diagnosi collegata", selection: diagnosisCode) {
+                            Text("Nessuna").tag("")
+                            ForEach(diagnosisOptions, id: \.code) { diagnosis in
+                                Text(diagnosis.displayText).tag(diagnosis.code)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityIdentifier("\(primaryIdentifier)-diagnosis")
                     }
                 }
-                .pickerStyle(.menu)
-                .accessibilityIdentifier("\(primaryIdentifier)-diagnosis")
-            }
-            Picker("Stato", selection: status) {
-                ForEach(PairedTherapyStatus.allCases) { status in
-                    Text(status.title).tag(status)
+            } trailing: {
+                ChartGroup("Periodo e stato") {
+                    Picker("Stato", selection: status) {
+                        ForEach(PairedTherapyStatus.allCases) { status in
+                            Text(status.title).tag(status)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("\(primaryIdentifier)-status")
+                    DatePicker("Inizio", selection: startDate, displayedComponents: .date)
+                        .accessibilityIdentifier("\(primaryIdentifier)-start-date")
+                    Toggle("Fine terapia", isOn: hasEndDate)
+                        .accessibilityIdentifier("\(primaryIdentifier)-has-end-date")
+                    if hasEndDate.wrappedValue {
+                        DatePicker("Fine", selection: endDate, displayedComponents: .date)
+                            .accessibilityIdentifier("\(primaryIdentifier)-end-date")
+                    }
                 }
-            }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("\(primaryIdentifier)-status")
-            DatePicker("Inizio", selection: startDate, displayedComponents: .date)
-                .accessibilityIdentifier("\(primaryIdentifier)-start-date")
-            Toggle("Fine terapia", isOn: hasEndDate)
-                .accessibilityIdentifier("\(primaryIdentifier)-has-end-date")
-            if hasEndDate.wrappedValue {
-                DatePicker("Fine", selection: endDate, displayedComponents: .date)
-                    .accessibilityIdentifier("\(primaryIdentifier)-end-date")
             }
             HStack(spacing: 8) {
                 if let onCancel {

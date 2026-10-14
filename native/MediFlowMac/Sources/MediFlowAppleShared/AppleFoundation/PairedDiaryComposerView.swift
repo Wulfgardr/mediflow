@@ -52,6 +52,14 @@ struct PairedDiaryComposerView: View {
         // The workspace retains finalized recording review; hidden capture stops.
     }
 
+    private var isListening: Bool {
+        #if os(macOS)
+        return recording.state == .recording || recording.state == .finalizing || recording.state == .starting
+        #else
+        return false
+        #endif
+    }
+
     private var hasPendingNewEntry: Bool {
         !model.newEntryTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || model.newEntryType != .note
@@ -104,7 +112,7 @@ struct PairedDiaryComposerView: View {
                 Button {
                     Task { await model.updateEditingEntry() }
                 } label: {
-                    Label("Salva modifiche", systemImage: "checkmark.circle")
+                    Label("Registra modifiche", systemImage: "checkmark")
                         .modifier(PairedDiaryControlLabel())
                 }
                 .disabled(!model.canUpdateEditingEntry)
@@ -187,8 +195,9 @@ struct PairedDiaryComposerView: View {
 
     private var newEntryForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Nuova voce", systemImage: "square.and.pencil")
-                .font(.headline)
+            Label("Bozza non registrata", systemImage: "circle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PlatformColors.freshInk)
                 .accessibilityAddTraits(.isHeader)
             TextField("Titolo (opzionale)", text: $model.newEntryTitle)
                 .disabled(model.isWorking)
@@ -249,11 +258,16 @@ struct PairedDiaryComposerView: View {
             Button {
                 Task { await model.createEntryForSelectedPatient() }
             } label: {
-                Label("Salva voce", systemImage: "checkmark.circle")
+                Label("Registra", systemImage: "checkmark")
                     .modifier(PairedDiaryControlLabel())
             }
-            .disabled(!model.canCreateEntry)
+            .buttonStyle(.borderedProminent)
+            .tint(PlatformColors.ink)
+            .disabled(!model.canCreateEntry || isListening)
             .accessibilityIdentifier("homebase-create-entry-button")
+            if isListening {
+                Text("Ferma l’ascolto prima di registrare").font(.caption)
+            }
             Text("Disponibile solo online: se il Mac non risponde, la voce non viene accodata.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)

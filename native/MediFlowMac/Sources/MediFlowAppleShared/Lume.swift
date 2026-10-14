@@ -36,6 +36,27 @@ public struct LumeRegisterPalette: Equatable, Sendable {
     public var inkMuted: Color { Color(lumeHex: inkMutedHex) }
     public var minerale: Color { Color(lumeHex: mineraleHex) }
 
+    public var isDark: Bool { inkPrimaryHex != "#14161a" }
+    private var isGuardia: Bool { self == LumePalette.guardia }
+    public var pencilHex: String { isGuardia ? inkMutedHex : isDark ? "#9aa3b0" : "#5f6878" }
+    public var ruleHex: String { isGuardia ? inkMutedHex : isDark ? "#2a2e35" : "#dfe2e7" }
+    public var strongRuleHex: String { isGuardia ? inkMutedHex : isDark ? "#3b414b" : "#c9ced6" }
+    public var draftRuleHex: String { isGuardia ? inkMutedHex : isDark ? "#2f3a5c" : "#d9e0f3" }
+    public var writingHex: String { isGuardia ? focalHex : isDark ? "#1d2333" : "#f3f6fd" }
+    public var selectionHex: String { isGuardia ? focalHex : isDark ? "#232a3d" : "#eef2fb" }
+    public var hoverHex: String { isGuardia ? focalHex : isDark ? "#20242a" : "#f5f6f8" }
+    public var thresholdHex: String { isGuardia ? focalHex : inkPrimaryHex }
+    public var thresholdInkHex: String { isGuardia ? inkPrimaryHex : isDark ? "#14161a" : "#ffffff" }
+    public var pencil: Color { Color(lumeHex: pencilHex) }
+    public var rule: Color { Color(lumeHex: ruleHex) }
+    public var strongRule: Color { Color(lumeHex: strongRuleHex) }
+    public var draftRule: Color { Color(lumeHex: draftRuleHex) }
+    public var writing: Color { Color(lumeHex: writingHex) }
+    public var selection: Color { Color(lumeHex: selectionHex) }
+    public var hover: Color { Color(lumeHex: hoverHex) }
+    public var threshold: Color { Color(lumeHex: thresholdHex) }
+    public var thresholdInk: Color { Color(lumeHex: thresholdInkHex) }
+
     public func surface(for zone: LumeZone) -> Color {
         switch zone {
         case .canvas: canvas
@@ -48,23 +69,23 @@ public struct LumeRegisterPalette: Equatable, Sendable {
 
 public enum LumePalette {
     public static let giorno = LumeRegisterPalette(
-        canvasHex: "#eef0f2",
-        fieldHex: "#f4f6f8",
-        focalHex: "#fbfcfe",
-        chromeHex: "#e6e8eb",
-        inkPrimaryHex: "#1a1c1e",
-        inkMutedHex: "#5c6772",
-        mineraleHex: "#33506b"
+        canvasHex: "#e8eaee",
+        fieldHex: "#ffffff",
+        focalHex: "#ffffff",
+        chromeHex: "#e8eaee",
+        inkPrimaryHex: "#14161a",
+        inkMutedHex: "#555e6b",
+        mineraleHex: "#2346b0"
     )
 
     public static let grafite = LumeRegisterPalette(
-        canvasHex: "#121417",
-        fieldHex: "#191c21",
-        focalHex: "#22252b",
-        chromeHex: "#0e1013",
+        canvasHex: "#101216",
+        fieldHex: "#1a1d22",
+        focalHex: "#1a1d22",
+        chromeHex: "#101216",
         inkPrimaryHex: "#e9ecef",
-        inkMutedHex: "#8f9aa6",
-        mineraleHex: "#8fb0cc"
+        inkMutedHex: "#a3acb8",
+        mineraleHex: "#9db4ff"
     )
 
     public static let guardia = LumeRegisterPalette(
@@ -82,22 +103,20 @@ public enum LumePalette {
     public static let successHex = "#4b6354"
     public static let plumHex = "#555161"
 
-    public static var warning: Color { Color(lumeHex: warningHex) }
-    public static var critical: Color { Color(lumeHex: criticalHex) }
-    public static var success: Color { Color(lumeHex: successHex) }
+    public static var warning: Color { PlatformColors.signal(.attention) }
+    public static var critical: Color { PlatformColors.signal(.critical) }
+    public static var success: Color { PlatformColors.signal(.positive) }
     public static var plum: Color { Color(lumeHex: plumHex) }
 
-    /// Resolves a clinical tone to its canonical DTCG value. Neutral and
-    /// informational tones follow the active register; clinical signals stay
-    /// register-independent. Plum remains outside this mapping until a
-    /// structured state explicitly adopts it.
+    /// Active registers render the exact dossier signal. Guardia remains a
+    /// compatibility register with its historical derivation.
     public static func hex(for tone: LumeTone, using palette: LumeRegisterPalette) -> String {
         switch tone {
         case .neutral: return palette.inkMutedHex
         case .info: return palette.mineraleHex
-        case .positive: return successHex
-        case .attention: return warningHex
-        case .critical: return criticalHex
+        case .positive: return palette == guardia ? successHex : palette.isDark ? "#8fbf9f" : "#3f5a49"
+        case .attention: return palette == guardia ? warningHex : palette.isDark ? "#d9a75f" : "#8a5a1c"
+        case .critical: return palette == guardia ? criticalHex : palette.isDark ? "#f08a7d" : criticalHex
         }
     }
 
@@ -105,6 +124,7 @@ public enum LumePalette {
     /// can fail closed on the derived signal, not only on its DTCG seed.
     static func resolvedHex(for tone: LumeTone, using palette: LumeRegisterPalette) -> String {
         let seed = hex(for: tone, using: palette)
+        guard palette == guardia else { return seed }
         switch tone {
         case .neutral, .info:
             return seed
@@ -117,8 +137,7 @@ public enum LumePalette {
         Color(lumeHex: resolvedHex(for: tone, using: palette))
     }
 
-    /// Mirrors the web status derivation: preserve the canonical signal seed,
-    /// then mix it with register ink so status text remains readable at night.
+    /// Retains the historical signal derivation for Guardia alone.
     private static func mix(_ seed: String, with ink: String, seedWeight: Double) -> String {
         guard
             let seedRGB = UInt64(seed.dropFirst(), radix: 16),
@@ -142,33 +161,30 @@ public enum LumePalette {
     }
 
     /// Code-first mirror used by the fail-closed JSON parity test.
-    public static let tokenHexValues: [String: String] = [
-        "register.giorno.surface.canvas": giorno.canvasHex,
-        "register.giorno.surface.field": giorno.fieldHex,
-        "register.giorno.surface.focal": giorno.focalHex,
-        "register.giorno.surface.chrome": giorno.chromeHex,
-        "register.giorno.ink.primary": giorno.inkPrimaryHex,
-        "register.giorno.ink.muted": giorno.inkMutedHex,
-        "register.giorno.accent.minerale": giorno.mineraleHex,
-        "register.grafite.surface.canvas": grafite.canvasHex,
-        "register.grafite.surface.field": grafite.fieldHex,
-        "register.grafite.surface.focal": grafite.focalHex,
-        "register.grafite.surface.chrome": grafite.chromeHex,
-        "register.grafite.ink.primary": grafite.inkPrimaryHex,
-        "register.grafite.ink.muted": grafite.inkMutedHex,
-        "register.grafite.accent.minerale": grafite.mineraleHex,
-        "register.guardia.surface.canvas": guardia.canvasHex,
-        "register.guardia.surface.field": guardia.fieldHex,
-        "register.guardia.surface.focal": guardia.focalHex,
-        "register.guardia.surface.chrome": guardia.chromeHex,
-        "register.guardia.ink.primary": guardia.inkPrimaryHex,
-        "register.guardia.ink.muted": guardia.inkMutedHex,
-        "register.guardia.accent.minerale": guardia.mineraleHex,
-        "signal.warning": warningHex,
-        "signal.critical": criticalHex,
-        "signal.success": successHex,
-        "signal.plum": plumHex
-    ]
+    public static let tokenHexValues: [String: String] = {
+        var tokens = ["signal.warning": warningHex, "signal.critical": criticalHex,
+                      "signal.success": successHex, "signal.plum": plumHex]
+        for (name, palette) in [("giorno", giorno), ("grafite", grafite), ("guardia", guardia)] {
+            let values = [
+                "surface.canvas": palette.canvasHex, "surface.field": palette.fieldHex,
+                "surface.focal": palette.focalHex, "surface.chrome": palette.chromeHex,
+                "surface.draft": palette.writingHex, "surface.selected": palette.selectionHex,
+                "surface.hover": palette.hoverHex, "surface.threshold": palette.thresholdHex,
+                "ink.primary": palette.inkPrimaryHex, "ink.muted": palette.inkMutedHex,
+                "ink.fresh": palette.mineraleHex, "ink.pencil": palette.pencilHex,
+                "ink.secondary": palette.inkMutedHex, "ink.threshold": palette.thresholdInkHex,
+                "accent.minerale": palette.mineraleHex,
+                "rule.default": palette.ruleHex, "rule.strong": palette.strongRuleHex,
+                "rule.draft": palette.draftRuleHex,
+                "signal.warning": hex(for: .attention, using: palette),
+                "signal.critical": hex(for: .critical, using: palette),
+                "signal.success": hex(for: .positive, using: palette),
+            ]
+            for (role, value) in values { tokens["register.\(name).\(role)"] = value }
+        }
+        return tokens
+    }()
+
 }
 
 private extension Color {
@@ -206,108 +222,57 @@ public extension View {
     }
 }
 
+private struct InkPlaneKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private extension EnvironmentValues {
+    var isInsideInkPlane: Bool {
+        get { self[InkPlaneKey.self] }
+        set { self[InkPlaneKey.self] = newValue }
+    }
+}
+
 public struct LumeSurface: ViewModifier {
     public let zone: LumeZone
     public let cornerRadius: CGFloat
-
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
-    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @Environment(\.appleReduceMotionOverride) private var reduceMotionOverride
 
-    public init(zone: LumeZone, cornerRadius: CGFloat = 14) {
+    public init(zone: LumeZone, cornerRadius: CGFloat = 0) {
         self.zone = zone
         self.cornerRadius = cornerRadius
     }
 
-    #if os(macOS)
-    /// Content speaks Lume; chrome stays the system's.
-    ///
-    /// This used to map every zone onto a system colour, on the reasoning that
-    /// the system carries one step per zone per appearance. Measured against a
-    /// real `NSWindow` on macOS 27, it does not: `windowBackgroundColor`,
-    /// `textBackgroundColor` and `controlBackgroundColor` all resolve to the
-    /// same value — 255 in light, 30 at night — so three of the four zones were
-    /// one colour and a nested block was indistinguishable from the section
-    /// holding it.
-    ///
-    /// The other half of that reasoning was that Lume's dark ramp is too timid,
-    /// about seven points of luminance per step. Per step it is: 1.033 against
-    /// the system's 1.131. But the system has that step once, and Lume spends
-    /// 1.241 of total range across three of them. A chart that nests pane inside
-    /// section inside block needs three steps, and one larger step cannot be
-    /// spent three times.
-    ///
-    /// So the content zones take the register's own surfaces, the same values
-    /// iPhone and iPad already draw and the same hexes the web tokens declare.
-    /// `.chrome` stays `windowBackgroundColor`: the sidebar and toolbar are
-    /// where translucency, vibrancy and the scroll edge are platform behaviour
-    /// rather than colour, and a fixed hex there would suppress exactly the
-    /// thing that makes the window read as a Mac window.
-    private func macOSSurface(_ palette: LumeRegisterPalette) -> Color {
-        switch zone {
-        case .canvas, .field, .focal: palette.surface(for: zone)
-        case .chrome: Color(nsColor: .windowBackgroundColor)
-        }
-    }
-    #endif
-
     public func body(content: Content) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        let reduceMotion = AppleAppearanceStore.shouldReduceMotion(
-            systemReduceMotion: systemReduceMotion,
-            override: reduceMotionOverride
-        )
-
-        content
-            .background {
-                #if os(macOS)
-                // The hairline is what makes a section read as a bounded object in
-                // dark, where a fill alone barely separates from its background.
-                // Kept from the system-colour arrangement this replaced, along
-                // with the focal shadow: both earn their place at these steps.
-                ZStack {
-                    shape.fill(macOSSurface(palette))
-                    shape.strokeBorder(
-                        Color(nsColor: .separatorColor).opacity(zone == .chrome ? 0 : 0.5),
-                        lineWidth: 0.5
-                    )
-                }
-                .shadow(
-                    color: .black.opacity(zone == .focal ? 0.16 : 0),
-                    radius: zone == .focal ? 6 : 0,
-                    y: zone == .focal ? 2 : 0
-                )
-                #else
-                ZStack {
-                    shape.fill(palette.surface(for: zone))
-                    shape
-                        .fill(palette.focal)
-                        .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-                        .opacity(zone == .focal ? 1 : 0)
-                }
-                #endif
-            }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: zone)
+        content.background(palette.surface(for: zone), in: RoundedRectangle(cornerRadius: cornerRadius))
     }
 }
 
 private struct LumeCardStyleModifier: ViewModifier {
     let zone: LumeZone
     let cornerRadius: CGFloat
-
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.isInsideInkPlane) private var isInsidePlane
 
     func body(content: Content) -> some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-
         content
             .padding(16)
-            .modifier(LumeSurface(zone: zone, cornerRadius: cornerRadius))
-            .overlay(shape.stroke(palette.inkMuted.opacity(0.28), lineWidth: 0.5))
+            .background {
+                if !isInsidePlane {
+                    RoundedRectangle(cornerRadius: cornerRadius).fill(palette.surface(for: zone))
+                }
+            }
+            .overlay(alignment: .top) {
+                if isInsidePlane {
+                    Rectangle().fill(contrast == .increased ? palette.strongRule : palette.rule).frame(height: 1)
+                }
+            }
+            .environment(\.isInsideInkPlane, true)
     }
 }
 
@@ -316,11 +281,8 @@ public struct LumeCard<Content: View>: View {
     private let cornerRadius: CGFloat
     private let content: Content
 
-    public init(
-        zone: LumeZone = .field,
-        cornerRadius: CGFloat = 14,
-        @ViewBuilder content: () -> Content
-    ) {
+    public init(zone: LumeZone = .field, cornerRadius: CGFloat = LumeGeometry.planeRadius,
+                @ViewBuilder content: () -> Content) {
         self.zone = zone
         self.cornerRadius = cornerRadius
         self.content = content()
@@ -331,20 +293,32 @@ public struct LumeCard<Content: View>: View {
     }
 }
 
+public enum LumeGeometry {
+    #if os(macOS)
+    public static let controlRadius: CGFloat = 8
+    public static let planeRadius: CGFloat = 12
+    public static let rowHeight: CGFloat = 40
+    #else
+    public static let controlRadius: CGFloat = 12
+    public static let planeRadius: CGFloat = 18
+    public static let rowHeight: CGFloat = 44
+    #endif
+}
+
 public extension View {
-    func lumeSurface(zone: LumeZone, cornerRadius: CGFloat = 14) -> some View {
+    func lumeSurface(zone: LumeZone, cornerRadius: CGFloat = 0) -> some View {
         modifier(LumeSurface(zone: zone, cornerRadius: cornerRadius))
     }
 
-    /// Compatibility surface for existing clinical cards. It is Lume field.
-    func clinicalCardStyle(cornerRadius: CGFloat = 14) -> some View {
+    func clinicalCardStyle(cornerRadius: CGFloat = LumeGeometry.planeRadius) -> some View {
         modifier(LumeCardStyleModifier(zone: .field, cornerRadius: cornerRadius))
     }
 
-    /// SF Mono semantics for doses, values, codes, dates, times and identifiers.
-    func registro() -> some View {
-        monospaced().monospacedDigit()
-    }
+    /// Controls, values, dates and doses use the system face with tabular figures.
+    func registro() -> some View { monospacedDigit() }
+
+    /// Only identifiers and classification codes use the bundled monospaced face.
+    func codice() -> some View { font(LumeTypography.code) }
 }
 
 public struct LumeFiloContinuity {
@@ -465,13 +439,16 @@ public struct RigaLista<Content: View>: View {
         self.content = content()
     }
 
+    @Environment(\.colorScheme) private var colorScheme
+
     public var body: some View {
+        let palette = LumePalette.palette(for: colorScheme, isGuardia: false)
         content
-            .monospacedDigit()
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .inkRegister()
+            .frame(maxWidth: .infinity, minHeight: LumeGeometry.rowHeight, alignment: .leading)
             .padding(.horizontal, 12)
-            .lumeSurface(zone: isSelected ? .focal : .field, cornerRadius: 10)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(isSelected ? palette.selection : Color.clear)
+            .contentShape(Rectangle())
     }
 }
 
@@ -486,6 +463,7 @@ struct LumeRigaListaModifier: ViewModifier {
 
 private struct LumeInchiostroModifier: ViewModifier {
     let bozza: Bool
+    @Environment(\.colorSchemeContrast) private var contrast
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.lumeGuardia) private var isGuardia
@@ -500,7 +478,7 @@ private struct LumeInchiostroModifier: ViewModifier {
         )
 
         content
-            .foregroundStyle(bozza ? palette.inkMuted : palette.inkPrimary)
+            .foregroundStyle(bozza ? (contrast == .increased ? palette.inkMuted : palette.pencil) : palette.inkPrimary)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: bozza)
     }
 }

@@ -63,7 +63,7 @@ non certifica che tutti i testi correnti lo rispettino già.
 
 ## Una lingua condivisa
 
-Lume è la lingua visiva attiva. Web e implementazioni Apple condividono
+Punto d'inchiostro è l'evoluzione attiva di Lume (ADR 0144). Web e implementazioni Apple condividono
 il significato dei controlli, pur adattandone la forma alla piattaforma:
 
 - terminologia clinica e significato dei controlli;
@@ -83,8 +83,11 @@ densità di contenuti.
 
 ## Gerarchia e tipografia
 
-La tipografia di Lume distingue due registri funzionali, così che orientamento
-e dettaglio possano convivere:
+Il [dossier Punto d'inchiostro](./docs/design/punto-inchiostro/README.md) definisce
+misure, componenti e adattamenti. Newsreader locale accompagna titoli, nomi
+in testata e prosa clinica; il carattere di sistema serve controlli, tabelle,
+date e valori; IBM Plex Mono resta riservato ai codici. Voce e registro
+mantengono due funzioni:
 
 - **Voce** identifica la domanda, il paziente, il compito o l'azione corrente.
 - **Registro** raccoglie dati densi, provenienza, stato e storia.
@@ -92,6 +95,17 @@ e dettaglio possano convivere:
 I titoli stabiliscono il contesto; le etichette restano vicine al valore
 o al controllo che descrivono. Nomi clinici lunghi e dati con più codifiche
 devono andare a capo senza tagli e senza nascondere l'azione principale.
+
+Il piano di lavoro è uno, in luce sulla penombra. Le righe di registro sono
+separate da filetti, senza card individuali. Il punto distingue solo una
+scrittura: vuoto con «Proposta», fresco con «Bozza non registrata», asciutto
+con «Registrata» dopo una rilettura dello stato salvato. I segnali clinici
+conservano forma e parola proprie. Il componente non certifica un salvataggio:
+il chiamante deve possedere la prova dello stato che espone.
+
+I gesti ripetuti non animano spostamenti o scale; la riduzione del movimento
+elimina ogni transizione non necessaria. Palette Giorno e Grafite, alias di
+compatibilità e controlli di contrasto vivono in `docs/design/lume/tokens/lume.tokens.json`.
 
 <a id="color-borders-and-materials"></a>
 

@@ -106,7 +106,7 @@ struct PairedHomeBaseCredentialsView: View {
             if let error = model.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(LumePalette.critical)
                     .accessibilityIdentifier("homebase-error-message")
             }
         }
@@ -204,8 +204,8 @@ struct PairedPatientsWorklistView: View {
         VStack(alignment: .leading, spacing: 0) {
             macOSWorklistHeader
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
             if let presentation = model.conflictPresentation {
                 conflictBanner(presentation)
                     .padding(.horizontal, 12)
@@ -230,7 +230,7 @@ struct PairedPatientsWorklistView: View {
             if verticalSizeClass != .compact {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Pazienti")
-                        .font(.title2.weight(.semibold))
+                        .inkVoice(26)
                         .accessibilityHeading(.h1)
                     Spacer(minLength: 8)
                     mobileResultCount
@@ -270,11 +270,11 @@ struct PairedPatientsWorklistView: View {
     /* @Codex */
     private var macOSWorklistHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("Pazienti")
-                .font(.title2.weight(.semibold))
-                .accessibilityHeading(.h1)
+            Text("Elenco")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHeading(.h2)
                 .accessibilityIdentifier("patient-worklist-title")
-            Spacer(minLength: 8)
             // A count describes the loaded, filtered rows, never the host total.
             // An unread empty array must not announce an empty patient archive.
             if !model.patients.isEmpty || model.connectionState == .pairedOnline {
@@ -289,6 +289,10 @@ struct PairedPatientsWorklistView: View {
                     .help("Risultati nell'elenco caricato, dopo ricerca e filtro di stato.")
                     .accessibilityIdentifier("patient-worklist-count")
             }
+            Spacer(minLength: 4)
+            patientSortMenu
+                .labelsHidden()
+                .controlSize(.small)
         }
     }
 
@@ -341,7 +345,7 @@ struct PairedPatientsWorklistView: View {
                                 HStack(spacing: 6) {
                                     Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
                                         .font(.caption)
-                                        .registro()
+                                        .codice()
                                         .foregroundStyle(.secondary)
                                     if let deletedAt = patient.deletedAt {
                                         Text("Eliminato il \(PairedPatientsWorkspaceSupport.birthDateFormatter.string(from: deletedAt))")
@@ -579,11 +583,11 @@ struct PairedPatientsWorklistView: View {
             }
             Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
                 .font(.caption)
-                .registro()
+                .codice()
         }
         .lineLimit(1)
         // @Codex
-        .lumeInchiostro(bozza: true)
+        .foregroundStyle(.secondary)
     }
 
     #if os(iOS)
@@ -598,7 +602,7 @@ struct PairedPatientsWorklistView: View {
                 .lineLimit(2)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
-                .lumeInchiostro(bozza: true)
+                .foregroundStyle(.secondary)
                 .accessibilityLabel(summary.additionalCount > 0
                     ? "\(summary.displayText). \(summary.additionalAccessibilityLabel)"
                     : summary.displayText)
@@ -653,7 +657,7 @@ struct PairedPatientsWorklistView: View {
             }
             .font(.caption)
             // @Codex
-            .lumeInchiostro(bozza: true)
+            .foregroundStyle(.secondary)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
                 summary.additionalCount > 0
@@ -670,7 +674,7 @@ struct PairedPatientsWorklistView: View {
         #if os(macOS)
         Text(code)
             .font(.caption.weight(.semibold))
-            .registro()
+            .codice()
             .foregroundStyle(.primary)
             .fixedSize()
         #else
@@ -692,7 +696,7 @@ struct PairedPatientsWorklistView: View {
                     .font(.caption2)
                     .registro()
                     // @Codex
-                    .lumeInchiostro(bozza: false)
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
             }
@@ -733,20 +737,8 @@ struct PairedPatientsWorklistView: View {
             patientViewModePicker
                 .controlSize(.regular)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            // The scope gets a whole row; sort and reset share the second only
-            // while both fit, so neither compresses the segmented control.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    patientSortMenu
-                    Spacer(minLength: 8)
-                    resetFiltersButton
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    patientSortMenu
-                    resetFiltersButton
-                }
-            }
-            .controlSize(.small)
+            resetFiltersButton
+                .controlSize(.small)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -826,7 +818,7 @@ struct PairedPatientsWorklistView: View {
             // stay individually queryable instead of collapsing into one element.
             Label(presentation.title, systemImage: "exclamationmark.triangle.fill")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(LumePalette.warning)
                 .accessibilityIdentifier("version-conflict-banner")
             Text(presentation.detail)
                 .font(.caption)
@@ -846,8 +838,8 @@ struct PairedPatientsWorklistView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.orange.opacity(0.4)))
+        .background(LumePalette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(LumePalette.warning.opacity(0.4)))
     }
 
     // Plain tinted capsule (no glass): glass inside the glass card would nest.
@@ -930,7 +922,6 @@ private extension View {
     func worklistTranslucentBackground() -> some View {
         if #available(macOS 14.0, *) {
             scrollContentBackground(.hidden)
-                .background(PlatformColors.groupedBackground)
         } else {
             self
         }
@@ -955,7 +946,7 @@ private struct WorklistRowHover: ViewModifier {
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }
             // A hover tint that snaps is noise; one that eases reads as response.
-            .animation(.easeOut(duration: 0.12), value: isHovering)
+
     }
 }
 #endif

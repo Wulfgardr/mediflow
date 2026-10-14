@@ -95,7 +95,7 @@ test('focus, live status, table semantics and existing Lume token vocabulary (no
     assert.match(panel, /aria-live="polite"/u); assert.match(panel, /previewTitle\.current\?\.focus\(\)/u);
     assert.match(panel, /resultTitle\.current\?\.focus\(\)/u); assert.match(panel, /scope="col"/u);
     const css = read('components/patient-bulk-import-panel.module.css');
-    assert.match(css, /min-height: 44px/u); assert.match(css, /border-radius: 12px/u);
+    assert.match(css, /min-height: 44px/u); assert.match(css, /border-radius: var\(--lume-radius-control\)/u);
     assert.match(css, /:focus-visible/u); assert.match(css, /max-width: 640px/u);
     assert.match(css, /prefers-reduced-motion/u); assert.match(css, /forced-colors/u);
     const globals = read('app/globals.css');

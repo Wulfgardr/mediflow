@@ -95,22 +95,18 @@ struct PairedPatientFlagChip: View {
 
     var body: some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
-        let toneColor = LumePalette.tint(for: tone, using: palette)
-        // A near-opaque chip on a selected row, so the tone colour it carries
-        // stays a tone colour instead of washing into the selection tint. The
-        // chip's job is to say "ADI" legibly; it cannot do that in pale ink on
-        // pale glass over blue.
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(toneColor)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                isOnProminentBackground ? Color.white.opacity(0.94) : palette.field,
-                in: Capsule()
-            )
-            .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
+        let toneColor = tone == .info ? palette.inkMuted : LumePalette.tint(for: tone, using: palette)
+        HStack(spacing: 4) {
+            if tone == .attention { Image(systemName: "exclamationmark.triangle") }
+            if tone == .critical { Image(systemName: "xmark") }
+            if tone == .positive { Image(systemName: "checkmark") }
+            Text(text)
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(isOnProminentBackground ? Color.primary : toneColor)
+        .accessibilityElement(children: .combine)
     }
+
 }
 
 /// A clinical code — ICD, LOINC, ATC — set as a token rather than as words.
@@ -142,36 +138,9 @@ struct ClinicalCodePill: View {
 
     var body: some View {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
-        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
-        // Contrast first, and the same identity in both states.
-        //
-        // On a selected row the system resolves `.primary` to the selected
-        // content colour — white — while the pill kept painting its near-white
-        // field fill underneath. White on near-white: selecting a patient made
-        // their ICD code vanish into an empty rounded box. A translucent scrim
-        // was the first fix and it was not good enough either — a pale chip with
-        // pale text on a saturated blue is legible in a screenshot and not at a
-        // glance across a desk.
-        //
-        // So the pill stays a light chip with a dark code whether the row is
-        // selected or not: it keeps looking like the same object, and dark ink on
-        // a near-opaque chip is the highest contrast available in both states.
-        // Both colours are stated explicitly, because that is what stops the
-        // selection style from repainting the text out from under us.
-        let isProminent = isOnProminentBackground
         Text(code)
-            .font(.caption2.weight(.semibold))
-            .registro()
-            .foregroundStyle(palette.inkPrimary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(shape.fill(isProminent ? Color.white.opacity(0.94) : palette.field))
-            .overlay(
-                shape.strokeBorder(
-                    palette.inkMuted.opacity(isProminent ? 0.15 : 0.25),
-                    lineWidth: 0.5
-                )
-            )
+            .codice()
+            .foregroundStyle(isOnProminentBackground ? Color.primary : palette.inkMuted)
             .fixedSize()
     }
 }
@@ -274,43 +243,24 @@ struct PairedPatientCounterStrip: View {
     let identifier: String
 
     var body: some View {
-        Group {
-            if dynamicTypeSize >= .accessibility1 {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(values, id: \.0) { label, value in
-                        HStack(spacing: 6) {
-                            Text("\(value)")
-                                .font(.caption.weight(.semibold))
-                                .registro()
-                            Text(label)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(minWidth: 58, alignment: .leading)
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 8)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-            } else {
-                HStack(spacing: 8) {
-                    ForEach(values, id: \.0) { label, value in
-                        VStack(spacing: 2) {
-                            Text("\(value)")
-                                .font(.caption.weight(.semibold))
-                                .registro()
-                            Text(label)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .frame(minWidth: 58)
-                        .padding(.vertical, 6)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                    }
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 20) { counters }
+            VStack(alignment: .leading, spacing: 8) { counters }
+        }
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
+        .accessibilityIdentifier(identifier)
+    }
+
+    @ViewBuilder
+    private var counters: some View {
+        ForEach(values, id: \.0) { label, value in
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(value)").inkRegister(weight: .semibold).monospacedDigit()
+                Text(label).chartMetadata()
             }
         }
-        .accessibilityIdentifier(identifier)
     }
 }
 
