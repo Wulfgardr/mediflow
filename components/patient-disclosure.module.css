@@ -74,4 +74,4 @@
 
 .documents, .archive { font: 14px/1.5 var(--lume-font-sans); }
 .synthesis { max-width: 64ch; font: 17px/1.5 var(--lume-font-voice); color: var(--lume-ink-pencil); }
-.summaries > h3 { font: 400 22px/1.2 var(--lume-font-voice); }
+.summaries > h3 { font: 600 14px/1.5 var(--lume-font-sans); }

@@ -10,7 +10,7 @@
     overflow-wrap: anywhere;
 }
 .section { display: grid; gap: 16px; min-width: 0; padding-block: 16px; border-top: 1px solid var(--lume-rule); }
-.section h2 { font: 400 22px/1.4 var(--lume-font-voice); }
+.section h2 { font: 600 14px/1.5 var(--lume-font-sans); }
 .panel p { line-height: 1.55; margin: 0; }
 .muted { color: var(--lume-ink-muted); font-size: 0.875rem; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

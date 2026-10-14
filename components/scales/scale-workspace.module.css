@@ -80,5 +80,5 @@
 }
 
 .catalogLink { border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; padding: 16px 0; }
-.question { font: 400 22px/1.4 var(--lume-font-voice); }
+.question { font: 600 14px/1.5 var(--lume-font-sans); }
 .catalogDescription { font-size: 13px; }

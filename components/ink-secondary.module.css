@@ -4,14 +4,14 @@
     font: 14px/1.5 var(--lume-font-sans);
     font-variant-numeric: tabular-nums;
 }
-.surface :is(h1, h2, h3) {
+.surface h1 {
     font-family: var(--lume-font-voice);
     font-weight: 400;
     letter-spacing: -0.01em;
     line-height: 1.2;
 }
 .surface h1 { font-size: 26px; }
-.surface :is(h2, h3) { font-size: 22px; }
+.surface.surface :is(h2, h3) { font: 600 14px/1.5 var(--lume-font-sans); letter-spacing: 0; }
 .surface :is(h4, h5, label, button, input, select, textarea, summary) {
     font-family: var(--lume-font-sans);
 }
@@ -94,7 +94,7 @@
     padding: 28px 0;
     box-shadow: none;
 }
-.form :global(.mf-section) {
+:global(html[data-ui-style='redesign']) .form.form :global(.mf-section) {
     border: 0;
     border-bottom: 1px solid var(--lume-rule);
     border-radius: 0;
@@ -123,8 +123,8 @@
 
 .surface :global(.lume-code) { font-family: var(--font-registro), ui-monospace; }
 
-.surface:global(.patient-detail-section),
-.surface:global(.lume-panel) { border-radius: 0; box-shadow: none; }
+:global(html[data-ui-style='redesign']) .surface.surface:global(.patient-detail-section),
+:global(html[data-ui-style='redesign']) .surface.surface:global(.lume-panel) { border-radius: 0; box-shadow: none; }
 .surface :global(.apple-chip) { border: 0; border-radius: 0; background: transparent; font-size: 13px; }
 .surface .group :global(.truncate) { white-space: normal; overflow-wrap: anywhere; }
 .surface .record :is(h4, span):global(.truncate) { white-space: normal; overflow-wrap: anywhere; }
