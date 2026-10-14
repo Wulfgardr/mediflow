@@ -136,6 +136,13 @@ cleanup() {
 
 trap cleanup SIGINT TERM HUP EXIT
 
+start_optional_ollama() {
+    if ! pgrep -x "ollama" > /dev/null && command -v ollama &> /dev/null; then
+        nohup ollama serve > /dev/null 2>&1 < /dev/null &
+        echo "   Avvio Ollama in background. MediFlow può aprirsi mentre il servizio AI si prepara."
+    fi
+}
+
 if [ "$PORT_STATUS" = "occupied" ]; then
     if ! READY_RESULT="$(node "$HELPER" wait-and-open "$MEDIFLOW_URL" "$CURRENT_APP_SOURCE_FINGERPRINT" 5000 250 2>&1)"; then
         echo "   ❌ Porta ${MEDIFLOW_PORT} occupata, ma l'istanza non corrisponde a questo checkout."
@@ -143,6 +150,7 @@ if [ "$PORT_STATUS" = "occupied" ]; then
         echo "      Riuso negato senza arrestare alcun processo (${READY_RESULT})."
         exit 1
     fi
+    start_optional_ollama
     echo "   ✅ MediFlow ${CURRENT_APP_SOURCE_FINGERPRINT} è già attivo su ${MEDIFLOW_URL}."
     echo "      PID: ${PORT_LISTENER_PID:-sconosciuto}"
     echo "      Verifica endpoint: ${READY_RESULT}"
@@ -152,10 +160,7 @@ if [ "$PORT_STATUS" = "occupied" ]; then
 fi
 
 # The optional local AI service must not delay the medical record or its port checks.
-if ! pgrep -x "ollama" > /dev/null && command -v ollama &> /dev/null; then
-    nohup ollama serve > /dev/null 2>&1 < /dev/null &
-    echo "   Avvio Ollama in background. MediFlow può aprirsi mentre il servizio AI si prepara."
-fi
+start_optional_ollama
 
 reset_next_cache_if_revision_changed
 
