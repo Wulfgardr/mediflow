@@ -281,7 +281,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS} htmlFor="patient-firstName">Nome <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-firstName">Nome <span className="text-[color:var(--lume-signal-critical)]">*</span></label>
                         <input
                             id="patient-firstName"
                             aria-invalid={!!errors.firstName}
@@ -294,7 +294,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS} htmlFor="patient-lastName">Cognome <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-lastName">Cognome <span className="text-[color:var(--lume-signal-critical)]">*</span></label>
                         <input
                             id="patient-lastName"
                             aria-invalid={!!errors.lastName}
@@ -307,7 +307,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                     </div>
 
                     <div className="space-y-1">
-                        <label className={FORM_LABEL_CLASS} htmlFor="patient-taxCode">Codice fiscale <span className="text-red-500">*</span></label>
+                        <label className={FORM_LABEL_CLASS} htmlFor="patient-taxCode">Codice fiscale <span className="text-[color:var(--lume-signal-critical)]">*</span></label>
                         <input
                             id="patient-taxCode"
                             aria-invalid={!!errors.taxCode}
@@ -391,7 +391,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             {/* Diagnosi & Patologie */}
             <div className={`${FORM_SECTION_CLASS} diagnosis-section-card`}>
                 <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(163, 58, 47, 0.1)' }}>
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--lume-signal-critical) 10%, transparent)' }}>
                         <Activity className="w-5 h-5" style={{ color: 'var(--lume-signal-critical)' }} />
                     </div>
                     <div>
