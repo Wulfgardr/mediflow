@@ -141,7 +141,7 @@
 
 .scopeChip:hover { color: var(--lume-ink); }
 
-.scopeChip:active { transform: scale(0.97); }
+.scopeChip:active { transform: none; }
 
 .scopeChipActive {
   background: var(--lume-surface-focal);
@@ -719,7 +719,7 @@
 .directoryToolbar .patientSearchField { flex: 1; min-width: 140px; min-height: 40px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-focal); padding: 0 12px; }
 .directoryToolbar .patientSearchField input { width: 100%; font-size: 14px; background: transparent; }
 .directoryToolbar .inboxScope { display: flex; gap: 0; padding: 3px; border-radius: 10px; background: var(--lume-surface-canvas); margin: 0; }
-.directoryToolbar .scopeChip { min-height: 34px; padding: 6px 12px; border: 0; border-radius: 8px; font: 14px/1.4 var(--lume-font-sans); }
+.directoryToolbar .scopeChip { min-height: 40px; padding: 6px 12px; border: 0; border-radius: 8px; font: 14px/1.4 var(--lume-font-sans); }
 .directoryToolbar .scopeChipActive { background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 600; }
 :global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: grid; grid-template-columns: minmax(0, 1fr) 304px; gap: 28px; align-items: stretch; }
 :global(html[data-runtime-twin-design='proposal']) .worklistPanel { padding: 0; border: 0; border-radius: 0; background: transparent; min-width: 0; }

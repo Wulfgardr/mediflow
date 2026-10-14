@@ -105,7 +105,7 @@ il chiamante deve possedere la prova dello stato che espone.
 
 I gesti ripetuti non animano spostamenti o scale; la riduzione del movimento
 elimina ogni transizione non necessaria. Palette Giorno e Grafite, alias di
-compatibilità e controlli di contrasto vivono in `design/lume.tokens.json`.
+compatibilità e controlli di contrasto vivono in `docs/design/lume/tokens/lume.tokens.json`.
 
 <a id="color-borders-and-materials"></a>
 
