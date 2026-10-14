@@ -1,6 +1,7 @@
 'use client';
 
 import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -80,8 +81,7 @@ function reviewStateBadgeClasses(state: SmartImportReviewState): string {
 function reviewStateCardClasses(state: SmartImportReviewState, isSelected: boolean): string {
     if (state === 'new') {
         return isSelected
-            ? 'border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] bg-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]'
-            : 'border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)]';
+            ? styles.selected : '';
     }
 
     return semanticSignalSurfaceClass(smartImportReviewStateSignal(state));
@@ -514,8 +514,8 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
     }
 
     return (
-        <div className={ink.surface + " patient-detail-section lume-panel overflow-hidden rounded-[28px] border p-0"}>
-            <div className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] p-5">
+        <div className={`${styles.register} ${styles.review}`}>
+            <div className={styles.toolbar}>
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]">
@@ -539,7 +539,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                     <button
                         onClick={generateSuggestions}
                         disabled={isGenerating || isApplying || !smartImportEnabled}
-                        className={ink.primary + " inline-flex h-9 w-full items-center justify-center gap-2 rounded-full bg-[color:var(--lume-ink)] px-5 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:opacity-50"}
+                        className={`${styles.control} ${styles.primary}`}
                     >
                         {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                         {analysis ? (smartImportEnabled ? 'Aggiorna' : 'Disabilitata') : (smartImportEnabled ? 'Analizza fonti' : 'Disabilitata')}
@@ -577,7 +577,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                 )}
 
                 {!analysis && !isGenerating && (
-                    <div className="rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-relaxed text-[color:var(--lume-ink)]">
+                    <div className={styles.empty}>
                         Analisi automatica di note, diario e documenti per suggerire diagnosi ICD-11 e terapie farmacologiche da importare in scheda.
                     </div>
                 )}
@@ -613,7 +613,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
 
                         <div
                             className="grid gap-5"
-                            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 24rem), 1fr))' }}
+                            style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}
                         >
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
@@ -635,7 +635,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                         return (
                                             <div
                                                 key={diagnosis.id}
-                                                className={`${ink.proposalRow} overflow-hidden rounded-[var(--lume-radius-card)] border p-3.5 text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] duration-[var(--lume-dur-firma)] ${reviewStateCardClasses(diagnosis.review.state, isSelected)}`}
+                                                className={`${styles.proposalRow} ${reviewStateCardClasses(diagnosis.review.state, isSelected)}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="pt-0.5">
@@ -756,7 +756,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                         return (
                                             <div
                                                 key={therapy.id}
-                                                className={`${ink.proposalRow} overflow-hidden rounded-[var(--lume-radius-card)] border p-3.5 text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] duration-[var(--lume-dur-firma)] ${reviewStateCardClasses(therapy.review.state, isSelected)}`}
+                                                className={`${styles.proposalRow} ${reviewStateCardClasses(therapy.review.state, isSelected)}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="pt-0.5">
@@ -908,7 +908,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                             <button
                                 onClick={applySelection}
                                 disabled={isApplying || selectedCount === 0 || !smartImportEnabled}
-                                className={ink.primary + " inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[color:var(--lume-ink)] px-8 text-xs font-bold text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)] transition-[background-color,opacity,transform] hover:bg-[color:var(--lume-accent)] active:scale-95 disabled:opacity-50"}
+                                className={`${styles.control} ${styles.primary}`}
                             >
                                 {isApplying ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                                 {smartImportEnabled ? 'Applica selezionati' : 'Disabilitata'}
