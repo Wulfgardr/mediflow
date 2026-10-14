@@ -43,11 +43,18 @@ per l’azienda, le sue API, gli adapter distinti e le attribuzioni.
 
 ## Forma e interazioni
 
-Il prodotto resta il soggetto di un sito semplice, con una componente giocosa
-che non ostacoli la lettura. Tipografia leggibile, pannelli morbidi e piccoli
-movimenti accompagnano l’esplorazione. La palette Lume usa carta, grafite e
-blu minerale; contrasto scuro e verde acceso distinguono Fabric. Non si
-aggiungono accenti arancio decorativi.
+La direzione è [Punto d’inchiostro](design/punto-inchiostro/README.md).
+Newsreader dà voce al titolo, chiuso dal punto; i controlli e i dati usano il
+carattere di sistema. La penombra esterna sostiene un piano di lavoro chiaro,
+con righe sottili al posto di pannelli ripetuti. Il tema Grafite conserva la
+stessa gerarchia. Colori e contrasti seguono i token condivisi del prodotto.
+
+La prima schermata conserva «La cura ha una storia», due righe di testo e due
+comandi, affiancati da una grande schermata reale con dati sintetici dichiarati.
+Tre colonne spiegano matita (proposta da rivedere), inchiostro fresco (bozza)
+e inchiostro asciutto (registrato); sono una regola di lettura e non attestano
+capacità o stati che il runtime non conferma. I movimenti accompagnano soltanto
+cambi di contesto e rispettano la preferenza di riduzione.
 
 Le schermate reali devono provenire esclusivamente da un runtime con fixture
 sintetiche. Le ricostruzioni interattive vanno dichiarate illustrative e non
