@@ -65,7 +65,7 @@
 }
 @media (max-width: 700px) {
   .workspace { display: flex; flex-direction: column; padding: 0; }
-  .workarea { flex: 1; order: 0; border-radius: 0; box-shadow: none; }
+  .workarea { flex: 1; order: 0; border-radius: 0; box-shadow: none; isolation: isolate; }
   .rail { order: 1; padding: 0 8px env(safe-area-inset-bottom); height: auto; min-height: 60px; flex: none; border-top: 1px solid var(--twin-border); }
   .brand, .railBottom, .iconButton, .navigation .secondaryDestination { display: none; }
   .navigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
