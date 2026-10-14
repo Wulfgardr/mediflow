@@ -1,5 +1,7 @@
 /* @Codex */
 import { types } from 'node:util';
+import { WHO_CLOUD_REFERENCE } from './icd11-who-cloud-contract.ts';
+import { isWhoCanonicalMmsUri } from './icd11-who-local-contract.ts';
 import { ICD11_WHO_BINDING } from './icd11-who-service.ts';
 
 const RESULT_KEYS = ['destinationEntities', 'error', 'errorMessage', 'resultChopped',
@@ -91,11 +93,12 @@ function matchingProperties(value: unknown): boolean {
     return true;
 }
 
-function entity(value: unknown): Readonly<{ code: string; description: string }> | null {
+function entity(value: unknown): Readonly<{ code: string; description: string; canonicalUri: unknown }> | null {
     const item = dataRecord(value, ENTITY_KEYS, ['theCode', 'title']);
     if (!item || typeof item.theCode !== 'string' || typeof item.title !== 'string'
         || !/^[A-Z0-9][A-Z0-9.&/-]{0,31}$/.test(item.theCode)
-        || !item.title || item.title !== item.title.trim().replace(/\s+/g, ' ')
+        || item.theCode === 'N/A'
+        || !item.title || item.title.length > 4096 || item.title !== item.title.trim().replace(/\s+/g, ' ')
         || unsafeDisplayText.test(item.title)
         || NULLABLE_ENTITY_STRINGS.some((key) => !optionalNullableString(item, key))
         || ENTITY_BOOLEANS.some((key) => !optionalBoolean(item, key))
@@ -104,10 +107,11 @@ function entity(value: unknown): Readonly<{ code: string; description: string }>
     if (present(item, 'matchingPVs') && !matchingProperties(item.matchingPVs)) return null;
     if (present(item, 'descendants') && item.descendants !== null
         && !arrayValues(item.descendants, 0)) return null;
-    return Object.freeze({ code: item.theCode, description: item.title });
+    return Object.freeze({ code: item.theCode, description: item.title, canonicalUri: item.id });
 }
 
-export function parseIcd11WhoOfficialSearchBody(body: string) {
+// Shared field validation only; each deployment must admit the returned identity separately.
+export function parseIcd11WhoOfficialSearchFields(body: string) {
     let parsed: unknown;
     try { parsed = JSON.parse(body); } catch { return null; }
     const result = dataRecord(parsed, RESULT_KEYS, RESULT_REQUIRED);
@@ -122,14 +126,26 @@ export function parseIcd11WhoOfficialSearchBody(body: string) {
     const rawEntries = arrayValues(result.destinationEntities, ICD11_WHO_BINDING.resultLimit);
     if (!rawEntries) return null;
     const seen = new Set<string>();
-    const entries: Array<Readonly<{ code: string; description: string }>> = [];
+    const entries: Array<Readonly<{ code: string; description: string; canonicalUri: unknown }>> = [];
     for (const rawEntry of rawEntries) {
         const parsedEntity = entity(rawEntry);
         if (!parsedEntity || seen.has(parsedEntity.code)) return null;
         seen.add(parsedEntity.code); entries.push(parsedEntity);
     }
+    return Object.freeze({ entries: Object.freeze(entries) });
+}
+
+export function parseIcd11WhoOfficialSearchBody(body: string) {
+    const fields = parseIcd11WhoOfficialSearchFields(body);
+    if (!fields) return null;
+    const entries: Array<Readonly<{ code: string; description: string; canonicalUri: string }>> = [];
+    for (const entry of fields.entries) {
+        if (!isWhoCanonicalMmsUri(entry.canonicalUri, entry.code)) return null;
+        entries.push(Object.freeze({ ...entry, canonicalUri: entry.canonicalUri }));
+    }
     return Object.freeze({
-        schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v1' as const,
+        schemaVersion: 'mediflow.reference-data.icd11-who-transport-result.v2' as const,
+        bindingId: WHO_CLOUD_REFERENCE.bindingId,
         releaseId: ICD11_WHO_BINDING.releaseId, language: ICD11_WHO_BINDING.language,
         entries: Object.freeze(entries),
     });

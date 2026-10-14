@@ -51,7 +51,7 @@ test('process owner is default OFF, requires one host-port bind and never accept
         network: 'offline',
         egress: 'disabled',
         credential: 'absent',
-        operation: 'mediflow.reference_data.icd11.search.v1',
+        operation: 'mediflow.reference_data.icd11.search.v3',
         releaseId: '2026-01',
         language: 'en',
     }));

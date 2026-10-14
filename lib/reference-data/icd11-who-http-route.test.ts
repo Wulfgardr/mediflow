@@ -1,5 +1,6 @@
 /* @Codex */
 import assert from 'node:assert/strict';
+import { WHO_CLOUD_REFERENCE } from './icd11-who-cloud-contract.ts';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
@@ -8,11 +9,11 @@ import { Icd11WhoServiceError } from './icd11-who-service.ts';
 
 const SEARCH_RESULT = Object.freeze({
     entries: Object.freeze([
-        Object.freeze({ code: 'BA00', description: 'Essential hypertension', system: 'ICD-11' as const }),
+        Object.freeze({ code: 'BA00', description: 'Essential hypertension', canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/900000001', system: 'ICD-11' as const }),
     ]),
     receipt: Object.freeze({
-        schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1' as const,
-        operation: 'mediflow.reference_data.icd11.search.v1' as const,
+        ...WHO_CLOUD_REFERENCE, schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v3' as const,
+        operation: 'mediflow.reference_data.icd11.search.v3' as const,
         releaseId: '2026-01' as const,
         language: 'en' as const,
         source: 'live' as const,
@@ -92,7 +93,7 @@ test('accepts exactly one bounded q parameter and passes a normalized query', as
     assert.equal(response.status, 200);
     assert.deepEqual(current.searches, ['synthetic hypertension']);
     assert.deepEqual(await payload(response), {
-        schemaVersion: 'mediflow.reference-data.icd11-search-response.v1',
+        schemaVersion: 'mediflow.reference-data.icd11-search-response.v3',
         entries: SEARCH_RESULT.entries,
         receipt: SEARCH_RESULT.receipt,
     });
