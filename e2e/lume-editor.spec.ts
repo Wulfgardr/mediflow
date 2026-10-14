@@ -110,20 +110,20 @@ async function assertEditorComposition(page: Page, viewCase: ViewCase): Promise<
   expect(adjacency.rightGap).toBeLessThanOrEqual(1);
 
   const draftState = page.getByTestId('lume-entry-draft-state');
-  await expect(draftState).toHaveText('Vuoto');
-  const draftInk = await draftState.evaluate((element) => getComputedStyle(element).color);
-  const mutedInk = await page.evaluate(() => {
+  await expect(draftState).toHaveText('Bozza vuota');
+  const draftInk = await draftState.locator('[data-ink]').evaluate((element) => getComputedStyle(element).color);
+  const freshInk = await page.evaluate(() => {
     const probe = document.createElement('span');
-    probe.style.color = 'var(--lume-ink-muted)';
+    probe.style.color = 'var(--lume-ink-fresh)';
     document.body.appendChild(probe);
     const color = getComputedStyle(probe).color;
     probe.remove();
     return color;
   });
-  expect(draftInk).toBe(mutedInk);
+  expect(draftInk).toBe(freshInk);
 
   await field.fill('Voce sintetica in bozza, senza dati clinici reali.');
-  await expect(draftState).toHaveText('Da registrare');
+  await expect(draftState).toHaveText('Bozza non registrata');
   await field.focus();
   await expect(field).toBeFocused();
   await expect(canvas).not.toHaveCSS('box-shadow', 'none');

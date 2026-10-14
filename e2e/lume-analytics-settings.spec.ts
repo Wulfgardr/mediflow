@@ -63,7 +63,10 @@ async function expectRegisterFont(locator: Locator, minimum: number): Promise<vo
       .map((element) => {
         const style = getComputedStyle(element);
         return {
-          available: document.fonts.check(`${style.fontWeight} ${style.fontSize} "IBM Plex Mono"`),
+          available: document.fonts.check(`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`),
+          expectedFamily: element.classList.contains('lume-code')
+            ? style.getPropertyValue('--font-registro').trim().split(',')[0].replace(/["']/g, '')
+            : 'system-ui',
           family: style.fontFamily,
           numericVariant: style.fontVariantNumeric,
         };
@@ -71,9 +74,10 @@ async function expectRegisterFont(locator: Locator, minimum: number): Promise<vo
   });
   expect(specimens.length).toBeGreaterThanOrEqual(minimum);
   for (const specimen of specimens) {
-    expect(specimen.family).toContain('IBM Plex Mono');
+    expect(specimen.expectedFamily).toBeTruthy();
+    expect(specimen.family).toContain(specimen.expectedFamily);
     expect(specimen.available).toBe(true);
-    expect(specimen.numericVariant).toMatch(/tabular-nums|normal/);
+    expect(specimen.numericVariant).toBe('tabular-nums');
   }
 }
 

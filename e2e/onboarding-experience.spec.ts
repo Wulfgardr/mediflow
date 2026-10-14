@@ -91,7 +91,7 @@ async function geometry(page: Page, selector: string) {
         expect(box!.height).toBeGreaterThanOrEqual(44);
         expect(box!.x).toBeGreaterThanOrEqual(-1);
         expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
-        expect(await control.evaluate(element => getComputedStyle(element).borderTopLeftRadius)).toBe('12px');
+        expect(await control.evaluate(element => getComputedStyle(element).borderTopLeftRadius)).toBe('10px');
     }
     // No entry animation even while the reduced-motion preference is active.
     const moving = await surface.evaluate(element => [element, ...element.querySelectorAll('*')]
@@ -275,7 +275,7 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         await focusVisible(page, confirm);
         await confirm.press('Enter');
         await expect(panel).toHaveCount(0);
-        await expect(page.getByRole('heading', { name: /Pazienti in carico/u, level: 1 })).toBeVisible();
+        await expect(page.getByRole('heading', { name: /^Pazienti$/u, level: 1 })).toBeVisible();
         await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true })).toBeVisible();
         expect((await readProfile(page)).active?.profile).toBe('interactive');
         await check(info);

@@ -96,7 +96,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Conferma profilo di lavoro' }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Interactive');
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /Pazienti in carico/, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Pazienti$/u, level: 1 })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' })).toBeVisible();
     await page.goto('/settings/profilo');

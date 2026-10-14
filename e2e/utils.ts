@@ -109,6 +109,19 @@ async function hasStableUnlockedShell(page: Page): Promise<boolean> {
     isVisible(page.getByTestId('work-profile-onboarding'), 750),
   ]);
 
+  if (navigationVisible && !lockControlVisible) {
+    const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
+    const mobileMenu = navigation.locator('details').filter({ has: page.getByText('Altro', { exact: true }) });
+    const toggle = mobileMenu.locator('summary');
+    if (await isVisible(toggle, 250)) {
+      const wasOpen = await mobileMenu.getAttribute('open') !== null;
+      if (!wasOpen) await toggle.click();
+      const lock = mobileMenu.getByRole('button', { name: 'Blocca', exact: true });
+      const authenticatedMenu = await isVisible(lock, 250) && await lock.isEnabled();
+      if (!wasOpen) await toggle.press('Escape');
+      return authenticatedMenu;
+    }
+  }
   return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
