@@ -5,7 +5,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, BookOpen, CalendarDays, ChevronDown, ClipboardList, FolderOpen, LockKeyhole, PanelLeftClose, PanelLeftOpen, Plus, Settings2, Users, X } from 'lucide-react';
+import { Activity, BookOpen, CalendarDays, ChevronDown, ClipboardList, FolderOpen, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
@@ -85,9 +85,17 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     <WorkspaceAreaContext.Provider value={setArea}>
     <div className={styles.workspace} data-twin-workspace data-active={proposal} data-composition={composition} data-rail-open={railOpen}>
       <aside className={styles.rail} aria-label="MediFlow">
-        <Link href="/?area=incarico" className={styles.brand}><span className={styles.brandMark}><Plus size={17} aria-hidden /></span><strong>MediFlow</strong></Link>
+        <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
         <nav aria-label="Navigazione principale" className={styles.navigation}>
-          {destinations.map(({ href, label, icon: Icon }) => <Link key={href} href={href} title={label} aria-label={label} aria-current={(href.includes('?area=') ? (pathname === '/' && href.endsWith(`=${area}`)) || (href.endsWith('=incarico') && pathname.startsWith('/patients/')) : pathname.startsWith(href)) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={(href.includes('?area=') ? (pathname === '/' && href.endsWith(`=${area}`)) || (href.endsWith('=incarico') && pathname.startsWith('/patients/')) : pathname.startsWith(href)) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          <details className={styles.mobileMore} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
+            <summary><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
+            <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
+              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
+              <Link href="/settings"><Settings2 size={18} aria-hidden /><span>Impostazioni</span></Link>
+              <button type="button" onClick={lock}><LockKeyhole size={18} aria-hidden /><span>Blocca</span></button>
+            </div>
+          </details>
         </nav>
         <div className={styles.railBottom}>
           <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={pathname.startsWith('/settings') || (pathname === '/' && area === 'governance') ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
