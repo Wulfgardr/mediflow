@@ -26,6 +26,10 @@ const destinations = [
 
 /* @Codex: the mounted cockpit publishes its displayed area, including a
    profile-derived default. This is presentation state, never a URL command. */
+type DirectoryReturn = { patientId: string; query: string; scope: 'ambulatorio' | 'network' | 'tutti'; list: 'attivi' | 'archivio'; restore: boolean };
+const DirectoryReturnContext = createContext<{ current: DirectoryReturn | null } | null>(null);
+export const useDirectoryReturn = () => useContext(DirectoryReturnContext);
+
 const WorkspaceAreaContext = createContext<((area: string | null) => void) | null>(null);
 export function useRuntimeWorkspaceArea(area: string | null) {
   const publish = useContext(WorkspaceAreaContext);
@@ -43,6 +47,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
   const [opened, setOpened] = useState<string[]>([]);
   const [area, setArea] = useState<string | null>(null);
+  const directoryReturn = useRef<DirectoryReturn | null>(null);
   const [railOpen, setRailOpen] = useState(true);
   /* @Codex: one confirmation boundary for the new route shortcuts. Replay the
      actual link once, so its close-tab action and Next navigation stay atomic.
@@ -83,6 +88,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceAreaContext.Provider value={setArea}>
+    <DirectoryReturnContext.Provider value={directoryReturn}>
     <div className={styles.workspace} data-twin-workspace data-active={proposal} data-composition={composition} data-rail-open={railOpen}>
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
@@ -120,6 +126,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <div className={styles.page}>{children}</div>
       </div>
     </div>
+    </DirectoryReturnContext.Provider>
     </WorkspaceAreaContext.Provider>
   );
 }

@@ -20,8 +20,7 @@ async function openSyntheticWorklist(page: Page, width: number, height: number, 
       if (!response.ok) throw new Error(`Fixture: HTTP ${response.status}`);
     }
   }, marker);
-  await page.getByRole('navigation', { name: 'Navigazione principale' })
-    .getByRole('link', { name: 'Pazienti', exact: true }).click();
+  await page.goto('/?area=incarico');
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
   await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' }).fill(marker);
   await expect(page.getByText('3 risultati', { exact: true })).toBeVisible();
@@ -65,6 +64,9 @@ for (const theme of ['light', 'dark']) {
       await expect(page).toHaveURL(/\/patients\/[^/]+\/modules$/);
       await expect(page.getByTestId('lume-scheda-header').getByRole('heading', { name, exact: true })).toBeVisible();
       await page.screenshot({ path: test.info().outputPath('scheda.png'), animations: 'disabled' });
+      await page.getByRole('navigation', { name: 'Navigazione principale' }).getByRole('link', { name: 'Pazienti', exact: true }).click();
+      await expect(search).toHaveValue(marker);
+      await expect(page.getByRole('option').filter({ has: page.locator('strong', { hasText: name }) })).toBeFocused();
     });
   }
 }

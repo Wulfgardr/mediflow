@@ -29,6 +29,7 @@ import { parseDiagnosisLabels } from '@/lib/patient-workspace';
 import { nextVirtualRowIndex, type VirtualListNavigationKey } from '@/lib/kree8-keyboard-navigation';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
+import { useDirectoryReturn } from '@/components/runtime-twin-workspace';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 
 
@@ -59,9 +60,14 @@ function IncaricoArea({
 }) {
   const router = useRouter();
   const { proposal } = useRuntimeTwinDesign();
-  const [scope, setScope] = useState<InboxScope>('ambulatorio');
-  const [list, setList] = useState<InboxList>('attivi');
-  const [query, setQuery] = useState('');
+  const directoryReturn = useDirectoryReturn();
+  const [scope, setScope] = useState<InboxScope>(directoryReturn?.current?.scope ?? 'ambulatorio');
+  const [list, setList] = useState<InboxList>(directoryReturn?.current?.list ?? 'attivi');
+  const [query, setQuery] = useState(directoryReturn?.current?.query ?? '');
+  const rememberRow = (patientId: string) => {
+    if (directoryReturn) directoryReturn.current = { patientId, query, scope, list, restore: true };
+  };
+  const openRecord = (patient: Kree8Patient) => { rememberRow(patient.id); router.push(patient.modulesHref); };
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const [actionsMenuPosition, setActionsMenuPosition] = useState<{ left: number; top: number } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -226,6 +232,15 @@ function IncaricoArea({
     rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(2));
   }, [onSelectPatient, patientRowVirtualizer, visible]);
 
+  // The unlocked workspace owns this view context; locking clears it with the frame.
+  useEffect(() => {
+    const saved = directoryReturn?.current;
+    if (!saved?.restore || patientStatus !== 'ready') return;
+    const index = visible.findIndex(patient => patient.id === saved.patientId);
+    saved.restore = false;
+    if (index >= 0) focusRowAtIndex(index);
+  }, [directoryReturn, patientStatus, visible, focusRowAtIndex]);
+
   const currentRowIndex = useCallback((target: EventTarget | null) => {
     const focusedRow = target instanceof HTMLElement
       ? target.closest<HTMLElement>('[data-patient-index]')
@@ -262,7 +277,7 @@ function IncaricoArea({
     event.preventDefault();
     onSelectPatient(patient.id);
     if (isReview) onOpenArea('scheda');
-    else router.push(patient.modulesHref);
+    else openRecord(patient);
   };
 
   /* @Codex: scorciatoie contestuali, disattivate nei campi editabili. */
@@ -293,7 +308,10 @@ function IncaricoArea({
   }, [currentRowIndex, navigateRows, router, visible]);
 
   return (
-    <div className={styles.areaShell} data-patient-directory={proposal ? 'proposal' : undefined}>
+    <div className={styles.areaShell} onClickCapture={event => {
+      const anchor = event.target instanceof Element ? event.target.closest('a') : null;
+      if (selected && anchor?.getAttribute('href')?.startsWith(`/patients/${selected.id}/`)) rememberRow(selected.id);
+    }} data-patient-directory={proposal ? 'proposal' : undefined}>
       <header className={patientStyles.directoryToolbar}>
         <h1 className="lume-voice">Pazienti<span aria-hidden="true">.</span></h1>
         <label className={patientStyles.patientSearchField}>
@@ -382,8 +400,8 @@ function IncaricoArea({
                             patientStyles.patientRow,
                             isSelected && patientStyles.patientRowSelected,
                           )}
-                          onClick={() => { onSelectPatient(p.id); if (proposal && window.matchMedia('(max-width: 850px)').matches) router.push(p.modulesHref); }}
-                          onDoubleClick={() => { if (!isReview) router.push(p.modulesHref); }}
+                          onClick={() => { onSelectPatient(p.id); if (proposal && window.matchMedia('(max-width: 850px)').matches) openRecord(p); }}
+                          onDoubleClick={() => { if (!isReview) openRecord(p); }}
                           role="option"
                           aria-selected={isSelected}
                           tabIndex={isSelected ? 0 : -1}
