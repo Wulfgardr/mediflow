@@ -295,6 +295,8 @@ test('first use: manual entry creates the first synthetic patient without saving
     expect(initial.status()).toBe(200);
     expect(await initial.json()).toEqual([]);
     // Ordinary form/locators from the frozen patient-bulk-import spec, not a mocked patient API.
+    await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+        .getByRole('link', { name: 'Pazienti', exact: true }).click();
     await page.getByRole('link', { name: /^Nuova scheda(?: da documento)?$/u }).click();
     await expect(page).toHaveURL(/\/patients\/new$/u);
     await page.locator('input[name="firstName"]').fill('Prima');

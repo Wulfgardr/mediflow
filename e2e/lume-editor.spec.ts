@@ -244,7 +244,7 @@ test('alias di review conserva i layout dei moduli propri', async ({ page }) => 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.goto('/mockups/kree8');
 
-  await page.getByRole('button', { name: 'Documenti paziente', exact: true }).click();
+  await page.getByRole('button', { name: 'Apri documenti', exact: true }).click();
   await expect(page.getByRole('heading', { name: /Referto cardiologico/ })).toBeVisible();
   await expect(page.locator('[class*="docGrid"]')).toHaveCSS('display', 'grid');
   await expect(page.locator('[class*="docPaper"]')).toHaveCSS('display', 'flex');

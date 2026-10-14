@@ -2,8 +2,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
-const GIORNO_CANVAS_RGB = 'rgb(238, 240, 242)'; // #eef0f2
-const GRAFITE_CANVAS_RGB = 'rgb(18, 20, 23)'; // #121417
+const GIORNO_CANVAS_RGB = 'rgb(232, 234, 238)'; // #e8eaee
+const GRAFITE_CANVAS_RGB = 'rgb(16, 18, 22)'; // #101216
 
 // Custom properties compute to raw var() text, so resolve an alias by consuming
 // it on a throwaway probe element.
@@ -41,8 +41,8 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   // The redesign identity (ADR 0078) still coexists; F2a does not replace it.
   await expect(html).toHaveAttribute('data-ui-style', 'redesign');
   // Both register-scoped mirrors are present regardless of the active theme.
-  expect(await readNamespacedVar(page, '--lume-giorno-surface-canvas')).toBe('#eef0f2');
-  expect(await readNamespacedVar(page, '--lume-grafite-surface-canvas')).toBe('#121417');
+  expect(await readNamespacedVar(page, '--lume-giorno-surface-canvas')).toBe('#e8eaee');
+  expect(await readNamespacedVar(page, '--lume-grafite-surface-canvas')).toBe('#101216');
   // The active alias selects giorno under light and grafite under .dark.
   await setThemeClass(page, 'light');
   expect(await resolveActiveVar(page, '--lume-surface-canvas')).toBe(GIORNO_CANVAS_RGB);
@@ -107,6 +107,9 @@ test('lume context tokens, focal light primitive and SVG filo retain their contr
     const probe = document.createElement('div');
     probe.classList.add('lume-focal');
     probe.style.transition = 'none';
+    // Distinct synthetic colors isolate the primitive from equal live surfaces.
+    probe.style.setProperty('--lume-surface-field', '#000000');
+    probe.style.setProperty('--lume-surface-focal', '#ffffff');
     document.body.appendChild(probe);
     const read = (sample: typeof incarico) => {
       probe.style.setProperty('--lume-surface-l', sample.light);

@@ -605,6 +605,7 @@ for (const transition of ['patient', 'session', 'unmount'] as const) {
       const otherRow = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true }).getByRole('option');
       await expect(otherRow).toHaveCount(1);
       await otherRow.click();
+      await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`/patients/${other.patientId}/modules`));
       const openRecords = page.getByRole('navigation', { name: 'Cartelle aperte', exact: true });
       await openRecords.locator(`a[href="/patients/${original.patientId}/modules"]`).click();
