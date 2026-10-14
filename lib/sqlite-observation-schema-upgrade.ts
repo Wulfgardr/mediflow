@@ -23,14 +23,23 @@ export function upgradeObservationTimestampDefault(
     const defaultClause = /\bupdated_at INTEGER DEFAULT \(unixepoch\(\)\)/g;
     if ([...ddl.matchAll(defaultClause)].length !== 1) deny();
     const legacyDdl = ddl.replace(defaultClause, 'updated_at INTEGER');
+    // Released archives may have acquired this FK through ALTER TABLE, which
+    // omitted ON DELETE SET NULL. Admit only that exact earlier declaration.
+    const referenceClause = /\bservice_prescription_item_id TEXT REFERENCES service_prescription_items\(id\) ON DELETE SET NULL/g;
+    if ([...legacyDdl.matchAll(referenceClause)].length !== 1) deny();
+    const legacyDeclarations = [legacyDdl, legacyDdl.replace(referenceClause,
+        'service_prescription_item_id TEXT REFERENCES service_prescription_items(id)')];
     const indices = canonicalConnection.prepare("SELECT sql FROM sqlite_schema WHERE type='index' AND tbl_name=? AND sql IS NOT NULL ORDER BY name")
         .all(TABLE) as { sql: string }[];
-    const expected = new Database(':memory:');
-    try {
-        expected.exec(legacyDdl);
-        for (const { sql } of indices) expected.exec(sql);
-        if (JSON.stringify(observed) !== JSON.stringify(schemaSnapshot(expected)[TABLE])) deny();
-    } finally { expected.close(); }
+    const supported = legacyDeclarations.some(declaration => {
+        const expected = new Database(':memory:');
+        try {
+            expected.exec(declaration);
+            for (const { sql } of indices) expected.exec(sql);
+            return JSON.stringify(observed) === JSON.stringify(schemaSnapshot(expected)[TABLE]);
+        } finally { expected.close(); }
+    });
+    if (!supported) deny();
 
     // DROP must never cascade into a dependent table, even for an empty child.
     for (const { name } of connection.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all() as { name: string }[]) {
