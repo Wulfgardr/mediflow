@@ -32,7 +32,7 @@ function contents(db: Database.Database) {
     return Object.fromEntries(names.filter(({ name }) => !['archive_generation', 'archive_session_generations'].includes(name))
         .map(({ name }) => [name, db.prepare(`SELECT * FROM ${quote(name)}`).all()]));
 }
-async function fixture() {
+async function fixture(paddingBytes = 0) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-recovery-'));
     const sourceDir = path.join(root, 'source'); const targetDir = path.join(root, 'target');
     fs.mkdirSync(sourceDir); fs.mkdirSync(targetDir);
@@ -70,6 +70,10 @@ async function fixture() {
     db.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('network.pairing.state', pairing);
     // Extra tables are intentionally not registered anywhere: a physical backup must preserve them too.
     db.exec("CREATE TABLE synthetic_extension (value TEXT); INSERT INTO synthetic_extension VALUES ('unknown table preserved')");
+    if (paddingBytes) {
+        db.exec('CREATE TABLE synthetic_padding (value BLOB)');
+        db.prepare('INSERT INTO synthetic_padding VALUES (zeroblob(?))').run(paddingBytes);
+    }
     db.pragma('wal_autocheckpoint = 0');
     db.prepare("INSERT INTO settings(key,value) VALUES ('synthetic-wal-only','must survive')").run();
     const snapshot = createRecoverySnapshot(db, actor);
@@ -80,6 +84,25 @@ async function fixture() {
             recoveryKey: recovery.recoveryKey, destination, ...changes }),
         cleanup: () => { if (db.open) db.close(); fs.rmSync(root, { recursive: true, force: true }); } };
 }
+
+test('an archive above the former 256 MiB limit encrypts and restores through the full boundary', async () => {
+    const padding = 257 * 1024 * 1024;
+    const f = await fixture(padding);
+    try {
+        assert.ok(f.snapshot.length > 256 * 1024 * 1024);
+        f.db.close();
+        await f.restore();
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.equal(restored.prepare('SELECT length(value) FROM synthetic_padding').pluck().get(), padding);
+            assert.equal(restored.prepare('SELECT hex(substr(value, 1, 16)) FROM synthetic_padding').pluck().get(), '00'.repeat(16));
+            const encrypted = restored.prepare('SELECT notes FROM patients').pluck().get() as string;
+            const [, iv, ciphertext] = encrypted.split(':');
+            assert.equal(await decryptData(ciphertext, iv, f.key), 'nota clinica sintetica recuperabile');
+            assert.equal(restored.pragma('integrity_check', { simple: true }), 'ok');
+        } finally { restored.close(); }
+    } finally { f.cleanup(); }
+});
 
 test('complete encrypted snapshot recovers keys, all tables and replay history into an empty archive', async () => {
     const f = await fixture();
