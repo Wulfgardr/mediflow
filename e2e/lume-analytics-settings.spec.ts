@@ -152,7 +152,9 @@ async function verifyAnalytics(page: Page, viewCase: ViewCase): Promise<void> {
   await expect(page.locator('#indicatori > dl')).toHaveCount(1);
 
   const downstream = page.locator('#diagnosi');
-  await downstream.evaluate((element) => element.scrollIntoView({ behavior: 'auto', block: 'center' }));
+  // Align the destination at the top: the compact overview can keep Domanda
+  // visible when Diagnosi is only centered, so its current-section state is valid.
+  await downstream.evaluate((element) => element.scrollIntoView({ behavior: 'auto', block: 'start' }));
   await expect(currentSection).toHaveCount(1);
   await expect(currentSection).not.toHaveAttribute('href', '#domanda');
   await focus.evaluate((element) => element.scrollIntoView({ behavior: 'auto', block: 'center' }));

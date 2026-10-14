@@ -285,12 +285,18 @@ async function assertReflowStack(diary: Locator): Promise<void> {
     const box = element.getBoundingClientRect();
     const date = element.querySelector<HTMLElement>('[data-lume-entry-part="date"]')!.getBoundingClientRect();
     const provenance = element.querySelector<HTMLElement>('[data-lume-entry-part="provenance"]')!.getBoundingClientRect();
-    return { top: box.top, bottom: box.bottom, dateBottom: date.bottom, provenanceTop: provenance.top };
+    return {
+      top: box.top, bottom: box.bottom,
+      dateRight: date.right, dateBottom: date.bottom,
+      provenanceLeft: provenance.left, provenanceTop: provenance.top,
+    };
   }));
   for (let index = 1; index < geometry.length; index += 1) {
     expect(geometry[index].top).toBeGreaterThanOrEqual(geometry[index - 1].bottom - 1);
   }
-  expect(geometry.every((entry) => entry.dateBottom <= entry.provenanceTop)).toBe(true);
+  // Date and provenance may share a row or stack; their text must stay separate.
+  expect(geometry.every((entry) => entry.dateRight <= entry.provenanceLeft
+    || entry.dateBottom <= entry.provenanceTop)).toBe(true);
 }
 
 test.describe.serial('Diario globale Lume', () => {
