@@ -1,35 +1,71 @@
 {
-  "$description": "Lume design tokens (WUL-55, L1a delivered; L1b web runtime mirror delivered). DTCG-style source for the three light registers giorno/grafite/guardia plus register-independent clinical signals. app/lume-tokens.css mirrors this source; app/layout.tsx exposes the fixed data-lume=true migration marker, while active aliases map giorno to :root and grafite to .dark. Guardia is declared but not active. Text/background contrast is measured by scripts/check-lume-tokens.mjs.",
+  "$description": "Punto d’inchiostro active tokens (WUL-765), with legacy Lume aliases and declared-only Guardia compatibility. DTCG-style color source; per-register clinical signals follow Giorno and Grafite, while global signals retain legacy seeds. app/lume-tokens.css mirrors this source; app/layout.tsx exposes the fixed data-lume=true migration marker, while active aliases map giorno to :root and grafite to .dark. Guardia is declared but not active. Text/background contrast is measured by scripts/check-lume-tokens.mjs.",
   "$type": "color",
   "register": {
     "giorno": {
       "surface": {
-        "canvas": { "$value": "#eef0f2" },
-        "field": { "$value": "#f4f6f8" },
-        "focal": { "$value": "#fbfcfe" },
-        "chrome": { "$value": "#e6e8eb" }
+        "canvas": { "$value": "#e8eaee" },
+        "field": { "$value": "#ffffff" },
+        "focal": { "$value": "#ffffff" },
+        "chrome": { "$value": "#e8eaee" },
+        "draft": { "$value": "#f3f6fd" },
+        "selected": { "$value": "#eef2fb" },
+        "hover": { "$value": "#f5f6f8" },
+        "threshold": { "$value": "#14161a" }
       },
       "ink": {
-        "primary": { "$value": "#1a1c1e" },
-        "muted": { "$value": "#5c6772" }
+        "primary": { "$value": "#14161a" },
+        "muted": { "$value": "#555e6b" },
+        "fresh": { "$value": "#2346b0" },
+        "pencil": { "$value": "#5f6878" },
+        "secondary": { "$value": "#555e6b" },
+        "threshold": { "$value": "#ffffff" }
       },
       "accent": {
-        "minerale": { "$value": "#33506b" }
+        "minerale": { "$value": "#2346b0" }
+      },
+      "rule": {
+        "default": { "$value": "#dfe2e7" },
+        "strong": { "$value": "#c9ced6" },
+        "draft": { "$value": "#d9e0f3" }
+      },
+      "signal": {
+        "warning": { "$value": "#8a5a1c" },
+        "critical": { "$value": "#a33a2f" },
+        "success": { "$value": "#3f5a49" }
       }
     },
     "grafite": {
       "surface": {
-        "canvas": { "$value": "#121417" },
-        "field": { "$value": "#191c21" },
-        "focal": { "$value": "#22252b" },
-        "chrome": { "$value": "#0e1013" }
+        "canvas": { "$value": "#101216" },
+        "field": { "$value": "#1a1d22" },
+        "focal": { "$value": "#1a1d22" },
+        "chrome": { "$value": "#101216" },
+        "draft": { "$value": "#1d2333" },
+        "selected": { "$value": "#232a3d" },
+        "hover": { "$value": "#20242a" },
+        "threshold": { "$value": "#e9ecef" }
       },
       "ink": {
         "primary": { "$value": "#e9ecef" },
-        "muted": { "$value": "#8f9aa6" }
+        "muted": { "$value": "#a3acb8" },
+        "fresh": { "$value": "#9db4ff" },
+        "pencil": { "$value": "#9aa3b0" },
+        "secondary": { "$value": "#a3acb8" },
+        "threshold": { "$value": "#14161a" }
       },
       "accent": {
-        "minerale": { "$value": "#8fb0cc" }
+        "minerale": { "$value": "#9db4ff" }
+      },
+      "rule": {
+        "default": { "$value": "#2a2e35" },
+        "strong": { "$value": "#3b414b" },
+        "draft": { "$value": "#2f3a5c" }
+      },
+      "signal": {
+        "warning": { "$value": "#d9a75f" },
+        "critical": { "$value": "#f08a7d" },
+        "success": { "$value": "#8fbf9f" }
       }
     },
     "guardia": {
@@ -37,14 +73,32 @@
         "canvas": { "$value": "#0c0e12" },
         "field": { "$value": "#14171d" },
         "focal": { "$value": "#1a1e26" },
-        "chrome": { "$value": "#090b0e" }
+        "chrome": { "$value": "#090b0e" },
+        "draft": { "$value": "#1a1e26" },
+        "selected": { "$value": "#1a1e26" },
+        "hover": { "$value": "#1a1e26" },
+        "threshold": { "$value": "#1a1e26" }
       },
       "ink": {
         "primary": { "$value": "#e3e8ee" },
-        "muted": { "$value": "#8792a3" }
+        "muted": { "$value": "#8792a3" },
+        "fresh": { "$value": "#7fa0bc" },
+        "pencil": { "$value": "#8792a3" },
+        "secondary": { "$value": "#8792a3" },
+        "threshold": { "$value": "#e3e8ee" }
       },
       "accent": {
         "minerale": { "$value": "#7fa0bc" }
+      },
+      "rule": {
+        "default": { "$value": "#8792a3" },
+        "strong": { "$value": "#8792a3" },
+        "draft": { "$value": "#8792a3" }
+      },
+      "signal": {
+        "warning": { "$value": "#9a6a2f" },
+        "critical": { "$value": "#a33a2f" },
+        "success": { "$value": "#4b6354" }
       }
     }
   },

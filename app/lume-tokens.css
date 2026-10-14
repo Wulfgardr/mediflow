@@ -1,41 +1,69 @@
-/* Lume runtime token mirror (WUL-55, F2a). Hand-kept mirror of
-   docs/design/lume/tokens/lume.tokens.json, which stays the single source of
-   truth; scripts/check-lume-tokens.mjs fails closed on any drift. The namespaced
-   --lume-<register>-* properties declare giorno/grafite/guardia plus the
-   register-independent signals; the active aliases resolve to giorno under light
-   and grafite under html.dark. guardia is declared only, never a user control. */
-
+/* Runtime mirror of docs/design/lume/tokens/lume.tokens.json. Checked by scripts/check-lume-tokens.mjs. Guardia remains declared, not selectable. */
 :root {
-  /* register: giorno */
-  --lume-giorno-surface-canvas: #eef0f2;
-  --lume-giorno-surface-field: #f4f6f8;
-  --lume-giorno-surface-focal: #fbfcfe;
-  --lume-giorno-surface-chrome: #e6e8eb;
-  --lume-giorno-ink-primary: #1a1c1e;
-  --lume-giorno-ink-muted: #5c6772;
-  --lume-giorno-accent-minerale: #33506b;
-  /* register: grafite */
-  --lume-grafite-surface-canvas: #121417;
-  --lume-grafite-surface-field: #191c21;
-  --lume-grafite-surface-focal: #22252b;
-  --lume-grafite-surface-chrome: #0e1013;
+  --lume-giorno-surface-canvas: #e8eaee;
+  --lume-giorno-surface-field: #ffffff;
+  --lume-giorno-surface-focal: #ffffff;
+  --lume-giorno-surface-chrome: #e8eaee;
+  --lume-giorno-surface-draft: #f3f6fd;
+  --lume-giorno-surface-selected: #eef2fb;
+  --lume-giorno-surface-hover: #f5f6f8;
+  --lume-giorno-surface-threshold: #14161a;
+  --lume-giorno-ink-primary: #14161a;
+  --lume-giorno-ink-muted: #555e6b;
+  --lume-giorno-ink-fresh: #2346b0;
+  --lume-giorno-ink-pencil: #5f6878;
+  --lume-giorno-ink-secondary: #555e6b;
+  --lume-giorno-ink-threshold: #ffffff;
+  --lume-giorno-rule-default: #dfe2e7;
+  --lume-giorno-rule-strong: #c9ced6;
+  --lume-giorno-rule-draft: #d9e0f3;
+  --lume-giorno-signal-warning: #8a5a1c;
+  --lume-giorno-signal-critical: #a33a2f;
+  --lume-giorno-signal-success: #3f5a49;
+  --lume-giorno-accent-minerale: #2346b0;
+  --lume-grafite-surface-canvas: #101216;
+  --lume-grafite-surface-field: #1a1d22;
+  --lume-grafite-surface-focal: #1a1d22;
+  --lume-grafite-surface-chrome: #101216;
+  --lume-grafite-surface-draft: #1d2333;
+  --lume-grafite-surface-selected: #232a3d;
+  --lume-grafite-surface-hover: #20242a;
+  --lume-grafite-surface-threshold: #e9ecef;
   --lume-grafite-ink-primary: #e9ecef;
-  --lume-grafite-ink-muted: #8f9aa6;
-  --lume-grafite-accent-minerale: #8fb0cc;
-  /* register: guardia (declared only; not user-selectable) */
+  --lume-grafite-ink-muted: #a3acb8;
+  --lume-grafite-ink-fresh: #9db4ff;
+  --lume-grafite-ink-pencil: #9aa3b0;
+  --lume-grafite-ink-secondary: #a3acb8;
+  --lume-grafite-ink-threshold: #14161a;
+  --lume-grafite-rule-default: #2a2e35;
+  --lume-grafite-rule-strong: #3b414b;
+  --lume-grafite-rule-draft: #2f3a5c;
+  --lume-grafite-signal-warning: #d9a75f;
+  --lume-grafite-signal-critical: #f08a7d;
+  --lume-grafite-signal-success: #8fbf9f;
+  --lume-grafite-accent-minerale: #9db4ff;
   --lume-guardia-surface-canvas: #0c0e12;
   --lume-guardia-surface-field: #14171d;
   --lume-guardia-surface-focal: #1a1e26;
   --lume-guardia-surface-chrome: #090b0e;
+  --lume-guardia-surface-draft: #1a1e26;
+  --lume-guardia-surface-selected: #1a1e26;
+  --lume-guardia-surface-hover: #1a1e26;
+  --lume-guardia-surface-threshold: #1a1e26;
   --lume-guardia-ink-primary: #e3e8ee;
   --lume-guardia-ink-muted: #8792a3;
+  --lume-guardia-ink-fresh: #7fa0bc;
+  --lume-guardia-ink-pencil: #8792a3;
+  --lume-guardia-ink-secondary: #8792a3;
+  --lume-guardia-ink-threshold: #e3e8ee;
+  --lume-guardia-rule-default: #8792a3;
+  --lume-guardia-rule-strong: #8792a3;
+  --lume-guardia-rule-draft: #8792a3;
+  --lume-guardia-signal-warning: #9a6a2f;
+  --lume-guardia-signal-critical: #a33a2f;
+  --lume-guardia-signal-success: #4b6354;
   --lume-guardia-accent-minerale: #7fa0bc;
-  /* register-independent clinical signals */
-  --lume-signal-warning: #9a6a2f;
-  --lume-signal-critical: #a33a2f;
-  --lume-signal-success: #4b6354;
   --lume-signal-plum: #555161;
-  /* active aliases: giorno is the light default */
   --lume-surface-canvas: var(--lume-giorno-surface-canvas);
   --lume-surface-field: var(--lume-giorno-surface-field);
   --lume-surface-focal: var(--lume-giorno-surface-focal);
@@ -43,10 +71,22 @@
   --lume-ink: var(--lume-giorno-ink-primary);
   --lume-ink-muted: var(--lume-giorno-ink-muted);
   --lume-accent: var(--lume-giorno-accent-minerale);
+  --lume-ink-fresh: var(--lume-giorno-ink-fresh);
+  --lume-ink-pencil: var(--lume-giorno-ink-pencil);
+  --lume-ink-secondary: var(--lume-giorno-ink-secondary);
+  --lume-ink-threshold: var(--lume-giorno-ink-threshold);
+  --lume-surface-draft: var(--lume-giorno-surface-draft);
+  --lume-surface-selected: var(--lume-giorno-surface-selected);
+  --lume-surface-hover: var(--lume-giorno-surface-hover);
+  --lume-surface-threshold: var(--lume-giorno-surface-threshold);
+  --lume-rule: var(--lume-giorno-rule-default);
+  --lume-rule-strong: var(--lume-giorno-rule-strong);
+  --lume-rule-draft: var(--lume-giorno-rule-draft);
+  --lume-signal-warning: var(--lume-giorno-signal-warning);
+  --lume-signal-critical: var(--lume-giorno-signal-critical);
+  --lume-signal-success: var(--lume-giorno-signal-success);
 }
 
-/* active aliases: grafite is the dark default (html.dark is set by the layout
-   bootstrap; it coexists with mediflow-theme and data-ui-style=redesign). */
 .dark {
   --lume-surface-canvas: var(--lume-grafite-surface-canvas);
   --lume-surface-field: var(--lume-grafite-surface-field);
@@ -55,4 +95,18 @@
   --lume-ink: var(--lume-grafite-ink-primary);
   --lume-ink-muted: var(--lume-grafite-ink-muted);
   --lume-accent: var(--lume-grafite-accent-minerale);
+  --lume-ink-fresh: var(--lume-grafite-ink-fresh);
+  --lume-ink-pencil: var(--lume-grafite-ink-pencil);
+  --lume-ink-secondary: var(--lume-grafite-ink-secondary);
+  --lume-ink-threshold: var(--lume-grafite-ink-threshold);
+  --lume-surface-draft: var(--lume-grafite-surface-draft);
+  --lume-surface-selected: var(--lume-grafite-surface-selected);
+  --lume-surface-hover: var(--lume-grafite-surface-hover);
+  --lume-surface-threshold: var(--lume-grafite-surface-threshold);
+  --lume-rule: var(--lume-grafite-rule-default);
+  --lume-rule-strong: var(--lume-grafite-rule-strong);
+  --lume-rule-draft: var(--lume-grafite-rule-draft);
+  --lume-signal-warning: var(--lume-grafite-signal-warning);
+  --lume-signal-critical: var(--lume-grafite-signal-critical);
+  --lume-signal-success: var(--lume-grafite-signal-success);
 }

@@ -283,6 +283,9 @@ export function formatPaletteReport(result) {
 
 export const REGISTERS = ['giorno', 'grafite', 'guardia'];
 export const SURFACES = ['canvas', 'field', 'focal', 'chrome'];
+const INK_ROLES = ['primary', 'muted', 'fresh', 'pencil', 'secondary'];
+const EXTRA_SURFACES = ['draft', 'selected', 'hover', 'threshold'];
+const RULE_ROLES = ['default', 'strong', 'draft'];
 export const SIGNALS = ['warning', 'critical', 'success', 'plum'];
 // Normal-size text must clear WCAG AA 4.5:1. accent.minerale is documented as
 // interactive text (links, minerale admin queue), so it uses the text threshold
@@ -354,7 +357,7 @@ export function resolveColor(tokens, dottedPath) {
 export function buildContract() {
   const checks = [];
   for (const register of REGISTERS) {
-    for (const ink of ['primary', 'muted']) {
+    for (const ink of INK_ROLES) {
       for (const surface of SURFACES) {
         checks.push({
           register,
@@ -374,11 +377,18 @@ export function buildContract() {
         minRatio: TEXT_MIN_RATIO,
       });
     }
+    for (const signal of register === 'guardia' ? [] : ['warning', 'critical', 'success']) {
+      for (const surface of ['canvas', 'focal']) checks.push({
+        register, label: `signal.${signal} on surface.${surface}`,
+        text: `register.${register}.signal.${signal}`,
+        background: `register.${register}.surface.${surface}`, minRatio: TEXT_MIN_RATIO,
+      });
+    }
     for (const signal of SIGNALS) {
       checks.push({
         register,
         label: `signal.${signal} text on 10% signal tint`,
-        signal: `signal.${signal}`,
+        signal: signal === 'plum' ? `signal.${signal}` : `register.${register}.signal.${signal}`,
         ink: `register.${register}.ink.primary`,
         surface: `register.${register}.surface.field`,
         minRatio: TEXT_MIN_RATIO,
@@ -441,25 +451,31 @@ export const ACTIVE_ALIASES = [
   { alias: '--lume-ink', suffix: 'ink-primary' },
   { alias: '--lume-ink-muted', suffix: 'ink-muted' },
   { alias: '--lume-accent', suffix: 'accent-minerale' },
+  ...['fresh', 'pencil', 'secondary', 'threshold'].map((role) => ({ alias: `--lume-ink-${role}`, suffix: `ink-${role}` })),
+  ...EXTRA_SURFACES.map((role) => ({ alias: `--lume-surface-${role}`, suffix: `surface-${role}` })),
+  ...RULE_ROLES.map((role) => ({ alias: role === 'default' ? '--lume-rule' : `--lume-rule-${role}`, suffix: `rule-${role}` })),
+  ...['warning', 'critical', 'success'].map((role) => ({ alias: `--lume-signal-${role}`, suffix: `signal-${role}` })),
 ];
 
 export function expectedMirror(tokens) {
   const map = new Map();
   for (const register of REGISTERS) {
-    for (const surface of SURFACES) {
+    for (const surface of [...SURFACES, ...EXTRA_SURFACES]) {
       map.set(`--lume-${register}-surface-${surface}`, resolveColor(tokens, `register.${register}.surface.${surface}`));
     }
     map.set(`--lume-${register}-ink-primary`, resolveColor(tokens, `register.${register}.ink.primary`));
-    map.set(`--lume-${register}-ink-muted`, resolveColor(tokens, `register.${register}.ink.muted`));
+    for (const role of ['muted', 'fresh', 'pencil', 'secondary', 'threshold']) map.set(`--lume-${register}-ink-${role}`, resolveColor(tokens, `register.${register}.ink.${role}`));
+    for (const role of RULE_ROLES) map.set(`--lume-${register}-rule-${role}`, resolveColor(tokens, `register.${register}.rule.${role}`));
+    for (const role of ['warning', 'critical', 'success']) map.set(`--lume-${register}-signal-${role}`, resolveColor(tokens, `register.${register}.signal.${role}`));
     map.set(`--lume-${register}-accent-minerale`, resolveColor(tokens, `register.${register}.accent.minerale`));
   }
-  for (const signal of SIGNALS) {
+  for (const signal of ['plum']) {
     map.set(`--lume-signal-${signal}`, resolveColor(tokens, `signal.${signal}`));
   }
   return map;
 }
 
-const NAMESPACED_TOKEN = /^--lume-(?:giorno|grafite|guardia)-|^--lume-signal-/;
+const NAMESPACED_TOKEN = /^--lume-(?:giorno|grafite|guardia)-|^--lume-signal-plum$/;
 
 export function parseCssBlocks(css) {
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
