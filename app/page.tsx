@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 
 import { AREA_ID_VALUES, Kree8ClinicalCockpit, type AreaId } from '@/components/kree8/kree8-clinical-cockpit';
 import { useSecurity } from '@/components/security-provider';
+import { AppStartupScreen } from '@/components/app-startup-screen';
 /* @Codex */
 import { WorkProfileOnboarding } from '@/components/work-profile-onboarding';
 import { useWorkProfile } from '@/lib/hooks/use-work-profile';
@@ -39,7 +40,7 @@ function HomeCockpit() {
 
 export default function Home() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<AppStartupScreen title="Apro la tua area di lavoro" message="Carico la schermata iniziale…" />}>
       <HomeCockpit />
     </Suspense>
   );
