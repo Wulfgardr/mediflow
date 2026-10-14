@@ -241,7 +241,7 @@ export default function BackupSchedulerUI() {
                 <div>
                     <p className="section-kicker">Continuità operativa</p>
                     <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
-                        <Clock3 className="w-5 h-5 text-indigo-500" />
+                        <Clock3 className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
                         Backup automatico notturno
                     </h3>
                     <p className="mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
@@ -249,7 +249,7 @@ export default function BackupSchedulerUI() {
                     </p>
                 </div>
                 {status && (
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300' : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300'}`}>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${status.installed ? 'graphite-chip-tone-success' : 'graphite-chip-tone-muted'}`}>
                         {status.installed === null ? 'Stato non confermato' : status.installed ? 'Installato' : 'Non installato'}
                     </span>
                 )}
@@ -257,7 +257,7 @@ export default function BackupSchedulerUI() {
 
             {status?.observationMessage && <p role="alert" className="text-sm text-[color:var(--lume-signal-warning)]">{status.observationMessage}</p>}
             {!isLoading && schedulingUnsupported && (
-                <div className="rounded-[18px] border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">
+                <div className="mf-alert mf-alert-warning px-3 py-2 text-sm">
                     Lo scheduling automatico non e disponibile su questa piattaforma. Puoi comunque eseguire il backup manuale con «Esegui adesso» e usare la pulizia retention.
                 </div>
             )}
@@ -269,7 +269,7 @@ export default function BackupSchedulerUI() {
                         checked={enabled}
                         disabled={schedulingUnsupported}
                         onChange={(event) => setEnabled(event.target.checked)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                        className="rounded border-[color:var(--lume-rule-strong)] accent-[color:var(--lume-ink-fresh)] focus:ring-[color:var(--lume-ink-fresh)] disabled:opacity-50"
                     />
                     Attiva backup notturno
                 </label>
@@ -388,12 +388,12 @@ export default function BackupSchedulerUI() {
             )}
 
             {message && (
-                <div role={message.type === 'error' ? 'alert' : 'status'} className={`rounded-[18px] border px-4 py-3 flex items-center gap-2 text-sm ${
+                <div role={message.type === 'error' ? 'alert' : 'status'} className={`mf-alert px-4 py-3 flex items-center gap-2 text-sm ${
                     message.type === 'success'
-                        ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-500/20 dark:bg-green-900/10 dark:text-green-300'
+                        ? 'mf-alert-success'
                         : message.type === 'error'
-                            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-300'
-                            : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/20 dark:bg-blue-900/10 dark:text-blue-300'
+                            ? 'mf-alert-critical'
+                            : 'mf-alert-info'
                 }`}>
                     {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                     <span>{message.text}</span>

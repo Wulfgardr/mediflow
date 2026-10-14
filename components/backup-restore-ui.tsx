@@ -163,13 +163,13 @@ export default function BackupRestoreUI() {
             <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Export locale</p>
                 <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
-                    <Download className="w-5 h-5 text-blue-500" />
+                    <Download className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
                     Esportazione portabile
                 </h3>
                 <p className="mb-4 mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     Scarica un file <code>.mediflow</code> con le collezioni esportabili. Non è il backup completo di recupero: non contiene gli account e gli involucri delle chiavi. Il ripristino valida formato, versione e integrità prima di sovrascrivere i dati.
                     <br />
-                    <span className="font-bold text-amber-600 dark:text-amber-500">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
+                    <span className="font-bold text-[color:var(--lume-signal-warning)]">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
                 </p>
                 <button
                     onClick={handleExport}
@@ -201,10 +201,10 @@ export default function BackupRestoreUI() {
             <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Ripristino controllato</p>
                 <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
-                    <Upload className="w-5 h-5 text-amber-500" />
+                    <Upload className="w-5 h-5 text-[color:var(--lume-signal-warning)]" />
                     Restore
                 </h3>
-                <div className="mt-2 mb-4 rounded-[20px] p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 flex gap-3 text-sm text-amber-800 dark:text-amber-200">
+                <div className="mf-alert mf-alert-warning mt-2 mb-4 p-4 flex gap-3 text-sm">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <p>
                         Caricare un backup <strong>cancellerà TUTTI i dati attuali</strong> e li sostituirà con il contenuto del backup.
@@ -228,9 +228,9 @@ export default function BackupRestoreUI() {
                     // WUL-297: superficie di conferma esplicita per il restore.
                     <div
                         data-testid="restore-confirmation-panel"
-                        className="mt-4 space-y-3 rounded-[20px] border border-red-200/70 bg-red-50/70 p-4 dark:border-red-500/25 dark:bg-red-900/15"
+                        className="mf-alert mf-alert-critical mt-4 space-y-3 p-4"
                     >
-                        <div className="flex items-start gap-2 text-sm font-semibold text-red-700 dark:text-red-200">
+                        <div className="flex items-start gap-2 text-sm font-semibold">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
                                 ATTENZIONE: <strong>TUTTI i dati attuali verranno cancellati</strong> e sostituiti con
@@ -238,11 +238,11 @@ export default function BackupRestoreUI() {
                                 i dispositivi abbinati dovranno essere abbinati e sincronizzati di nuovo.
                             </p>
                         </div>
-                        <p className="text-xs text-red-800/80 dark:text-red-200/80">
+                        <p className="text-xs">
                             File selezionato: <code>{pendingRestoreFile.name}</code>{' '}
                             ({Math.max(1, Math.round(pendingRestoreFile.size / 1024)).toLocaleString()} KB)
                         </p>
-                        <label className="block text-xs font-medium text-red-800 dark:text-red-200">
+                        <label className="block text-xs font-medium">
                             Scrivi <strong>{RESTORE_CONFIRM_KEYWORD}</strong> per procedere
                             <input
                                 type="text"
@@ -252,7 +252,7 @@ export default function BackupRestoreUI() {
                                 autoComplete="off"
                                 spellCheck={false}
                                 data-testid="restore-confirmation-input"
-                                className="mt-1 w-full rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100 dark:placeholder:text-red-100/60"
+                                className="mf-input mt-1 w-full px-3 py-2 text-sm"
                             />
                         </label>
                         <div className="flex flex-wrap items-center gap-2">
@@ -261,7 +261,7 @@ export default function BackupRestoreUI() {
                                 onClick={confirmRestore}
                                 disabled={!restoreConfirmed || isLoading}
                                 data-testid="restore-confirmation-submit"
-                                className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-500/40"
+                                className="ui-btn-primary mf-tone-critical inline-flex items-center gap-2 px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isLoading ? <RefreshCw className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                                 Ripristina adesso
@@ -270,7 +270,7 @@ export default function BackupRestoreUI() {
                                 type="button"
                                 onClick={cancelRestore}
                                 disabled={isLoading}
-                                className="inline-flex items-center rounded-full border border-red-200 bg-white/80 px-4 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/30 dark:bg-transparent dark:text-red-200"
+                                className="mf-btn-secondary inline-flex items-center px-4 py-2 text-xs font-semibold disabled:opacity-50"
                             >
                                 Annulla
                             </button>
@@ -280,9 +280,9 @@ export default function BackupRestoreUI() {
             </div>
 
             {status && (
-                <div className={`xl:col-span-2 p-4 rounded-[22px] flex items-center gap-3 border ${status.type === 'success' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/10 dark:text-green-300 dark:border-green-500/20' :
-                        status.type === 'error' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/10 dark:text-red-300 dark:border-red-500/20' :
-                            'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/10 dark:text-blue-300 dark:border-blue-500/20'
+                <div className={`mf-alert xl:col-span-2 p-4 flex items-center gap-3 ${status.type === 'success' ? 'mf-alert-success' :
+                        status.type === 'error' ? 'mf-alert-critical' :
+                            'mf-alert-info'
                     }`}>
                     {status.type === 'success' && <CheckCircle className="w-5 h-5" />}
                     {status.type === 'error' && <AlertTriangle className="w-5 h-5" />}
@@ -292,7 +292,7 @@ export default function BackupRestoreUI() {
                         {status.nextStep && <p className="text-sm">{status.nextStep}</p>}
                         {status.preflight && (
                             <div className="space-y-3 text-sm">
-                                <div className="rounded-lg border border-current/15 bg-white/50 px-3 py-2">
+                                <div className="border-t border-[color:var(--lume-rule)] py-2">
                                     <p className="font-semibold">Preflight restore</p>
                                     <p>
                                         Data dir: <code>{status.preflight.target.dataDir ?? 'n/d'}</code>
@@ -303,7 +303,7 @@ export default function BackupRestoreUI() {
                                 </div>
                                 <div className="space-y-2">
                                     {status.preflight.checks.map((check) => (
-                                        <div key={check.id} className="rounded-lg border border-current/15 bg-white/50 px-3 py-2">
+                                        <div key={check.id} className="border-t border-[color:var(--lume-rule)] py-2">
                                             <p className="font-semibold">
                                                 {check.status === 'pass' ? 'PASS' : 'FAIL'} · <code>{check.id}</code>
                                             </p>
