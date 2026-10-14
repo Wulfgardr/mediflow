@@ -21,8 +21,37 @@ struct PairedPatientDocumentsSection: View {
     @Binding var expandedInsightId: String?
 
     @State private var isShowingUpload = false
+    var usesInlinePreview = false
 
     var body: some View {
+        Group {
+            if usesInlinePreview, let attachment = attachmentDetailCandidate {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 20) {
+                        archiveColumn.frame(width: 240, alignment: .topLeading)
+                        Divider()
+                        original(attachment).frame(width: 399)
+                    }.frame(width: 680, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 20) {
+                        archiveColumn
+                        Divider()
+                        original(attachment)
+                    }
+                }
+            } else { archiveColumn }
+        }
+    }
+
+    private func original(_ attachment: HomeBaseAttachmentSummary) -> some View {
+        PairedAttachmentDetailView(model: model, summary: attachment, onClose: {
+            attachmentDetailCandidate = nil
+            model.dismissAttachmentDetail()
+        }, isEmbedded: true)
+        .frame(height: 560)
+        .accessibilityIdentifier("documents-original-preview")
+    }
+
+    private var archiveColumn: some View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             documentsSection
 
@@ -60,8 +89,7 @@ struct PairedPatientDocumentsSection: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("documents-fse-disclosure")
         }
-        .padding(ClinicalChartMetrics.cardPadding)
-        .lumeSurface(zone: .field)
+
     }
 
     // MARK: - S6 (Wave 5): documenti, archivio intelligente, follow-up, FSE
@@ -115,7 +143,7 @@ struct PairedPatientDocumentsSection: View {
             if let pickerError = attachmentPickerError {
                 Text(pickerError)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(LumePalette.critical)
             }
         }
         .fileImporter(isPresented: $isPickingAttachmentFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
@@ -264,7 +292,7 @@ struct PairedPatientDocumentsSection: View {
                     if let queueLabel = HomeBaseDocumentOcrQueuePresentation.describe(state: attachment.ocrQueueState, reason: attachment.ocrQueueReason) {
                         Text(queueLabel)
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(LumePalette.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -373,7 +401,7 @@ struct PairedPatientDocumentsSection: View {
                     if !insight.appliedDiagnoses.isEmpty {
                         Text("Diagnosi aggiunte alla scheda: \(insight.appliedDiagnoses.joined(separator: ", "))")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.green)
+                            .foregroundStyle(LumePalette.success)
                     }
                     if !insight.summary.isEmpty {
                         Text(insight.summary)
@@ -413,8 +441,8 @@ struct PairedPatientDocumentsSection: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(10)
-        .lumeSurface(zone: .field, cornerRadius: 12)
+        .padding(.vertical, 12)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -456,8 +484,8 @@ struct PairedPatientDocumentsSection: View {
                 .accessibilityIdentifier("followup-create-checkup-button-\(suggestion.id)")
             }
         }
-        .padding(10)
-        .lumeSurface(zone: .field, cornerRadius: 10)
+        .padding(.vertical, 12)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -543,12 +571,12 @@ struct PairedPatientDocumentsSection: View {
                 ForEach(Array(result.errors.enumerated()), id: \.offset) { _, issue in
                     Text("Errore: \(issue.message)")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(LumePalette.critical)
                 }
                 ForEach(Array(result.warnings.enumerated()), id: \.offset) { _, issue in
                     Text("Avviso: \(issue.message)")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(LumePalette.warning)
                 }
             }
         }

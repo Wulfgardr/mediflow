@@ -99,7 +99,8 @@ struct PairedScalesSection: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(.rect(cornerRadius: ClinicalChartMetrics.rowRadius))
+        .contentShape(Rectangle())
+        .modifier(LumeRigaListaModifier(isSelected: false))
         .accessibilityLabel("\(scale.title), \(scale.questions.count) domande")
     }
 
@@ -151,10 +152,7 @@ struct PairedScalesSection: View {
         return Text(text)
             .font(.caption2.weight(.semibold))
             .foregroundStyle(toneColor)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(palette.field, in: Capsule())
-            .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
+            .monospacedDigit()
     }
 
     static func area(for scaleId: String) -> String {

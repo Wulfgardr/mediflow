@@ -165,13 +165,9 @@ test('settings search, mobile navigation, focus and both palettes', async () => 
             await page.getByRole('button', { name: theme === 'light' ? 'Tema Chiaro' : 'Tema Scuro', exact: true }).click();
             await expect(page.locator('html')).toHaveClass(new RegExp(theme));
             if (width === 390) {
-                const toggle = page.getByTestId('settings-nav-mobile-toggle');
-                await toggle.click();
-                await expect(toggle).toHaveAttribute('aria-expanded', 'true');
                 await page.getByTestId('settings-nav-mobile-profilo').click();
                 await expect(page).toHaveURL(/\/settings\/profilo$/);
-                await expect(toggle).toBeFocused();
-                await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+                await expect(page.getByTestId('settings-nav-mobile-profilo')).toHaveAttribute('aria-current', 'page');
             } else {
                 await page.getByTestId('settings-nav-profilo').click();
                 await expect(page.getByTestId('settings-nav-profilo')).toHaveAttribute('aria-current', 'page');

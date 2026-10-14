@@ -19,10 +19,10 @@ import {
 
 /* @Codex: font Lume bundled locally so the layout remains usable offline. */
 const voce = localFont({
-  src: './fonts/Inter-Variable-Latin.woff2',
+  src: './fonts/Newsreader-Variable.ttf',
   variable: '--font-voce',
   display: 'swap',
-  weight: '100 900',
+  weight: '200 800',
   style: 'normal',
 });
 

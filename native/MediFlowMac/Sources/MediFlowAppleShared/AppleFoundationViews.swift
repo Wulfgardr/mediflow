@@ -102,7 +102,7 @@ public struct AppleFoundationWindowContent: View {
         AppleFoundationOverviewView(snapshot: snapshot)
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(PlatformColors.groupedBackground)
+            .background(PlatformColors.chartCardSurface)
     }
 }
 
@@ -147,7 +147,7 @@ public struct AppleFoundationOverviewView: View {
             ForEach(snapshot.safetyNotes, id: \.self) { note in
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "checkmark.shield")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(LumePalette.success)
                         .font(.body)
                     Text(note)
                         .font(.subheadline)
@@ -155,8 +155,9 @@ public struct AppleFoundationOverviewView: View {
                 }
             }
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 
     private var lanes: some View {
@@ -229,8 +230,9 @@ public struct AppleCapabilityLaneCard: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 
     private func platformHeader(_ title: String) -> some View {
@@ -284,6 +286,7 @@ public struct AppleFoundationMobileRootView: View {
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
+    @State private var selectedOtherSection: ClinicalWorkspaceSection?
     // @Codex: URL intents and project paths belong to this window, never to defaults.
     @State private var projectNavigationPath: [ClinicalWorkspaceSection] = []
     @StateObject private var navigationRouter = ClinicalNavigationRouter()
@@ -311,7 +314,7 @@ public struct AppleFoundationMobileRootView: View {
                     .navigationTitle("MediFlow")
                 } detail: {
                     detailView(for: section)
-                        .navigationTitle(section.title)
+                        .inkWorkspaceTitle(section.title)
                 }
                 #else
                 // @Codex #142: the project sidebar overlays iPad detail instead of
@@ -329,17 +332,20 @@ public struct AppleFoundationMobileRootView: View {
                     // as iPhone while the project sidebar keeps its own selection.
                     NavigationStack {
                         detailView(for: section)
-                            .navigationTitle(section.title)
+                            .inkWorkspaceTitle(section.title)
                     }
                 }
                 .navigationSplitViewStyle(.prominentDetail)
                 #endif
             } else {
-                TabView(selection: Binding(get: { section }, set: selectSection)) {
-                    ForEach(ClinicalWorkspaceSection.clinicalSections + ClinicalWorkspaceSection.settingsSections) { item in
+                TabView(selection: Binding(
+                    get: { [.patients, .agenda, .diary].contains(section) ? section : .settings },
+                    set: { item in selectSection(item == .settings ? selectedOtherSection ?? .settings : item) }
+                )) {
+                    ForEach([ClinicalWorkspaceSection.patients, .agenda, .diary]) { item in
                         NavigationStack {
                             detailView(for: item)
-                                .navigationTitle(item.title)
+                                .inkWorkspaceTitle(item.title)
                                 .toolbar {
                                     if item == .patients {
                                         ToolbarItem(placement: .automatic) {
@@ -358,21 +364,23 @@ public struct AppleFoundationMobileRootView: View {
                             Label(item.title, systemImage: item.symbolName)
                         }
                     }
+                    NavigationStack {
+                        compactOtherContent
+                    }
+                    .tag(ClinicalWorkspaceSection.settings)
+                    .tabItem { Label("Altro", systemImage: "ellipsis") }
                 }
                 #if os(iOS)
                 .background(
                     TabBarAccessibilityIdentifierBridge(
                         identifiersByTitle: Dictionary(
                             uniqueKeysWithValues:
-                                (
-                                    ClinicalWorkspaceSection.clinicalSections
-                                        + ClinicalWorkspaceSection.settingsSections
-                                ).map {
+                                [ClinicalWorkspaceSection.patients, .agenda, .diary].map {
                                     (
                                         $0.title,
                                         "clinical-workspace-section-\($0.rawValue)-button"
                                     )
-                                }
+                                } + [("Altro", "clinical-workspace-section-other-button")]
                         ),
                         selection: section.rawValue
                     )
@@ -399,6 +407,36 @@ public struct AppleFoundationMobileRootView: View {
         .environment(\.dynamicTypeSize, dynamicTypeSizeOverride ?? inheritedDynamicTypeSize)
         .respectsAppleMotionPreference()
         .privacyShield(appearance: appearance)
+        .tint(PlatformColors.freshInk)
+        .foregroundStyle(PlatformColors.ink)
+        .inkRegister()
+    }
+
+    @ViewBuilder
+    private var compactOtherContent: some View {
+        let selected = selectedOtherSection ?? (![ClinicalWorkspaceSection.patients, .agenda, .diary, .settings].contains(section) ? section : nil)
+        if let selected {
+            detailView(for: selected)
+                .inkWorkspaceTitle(selected.title)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Altro") {
+                            selectedOtherSection = nil
+                            selectSection(.settings)
+                        }
+                    }
+                }
+        } else {
+            List([ClinicalWorkspaceSection.analytics, .scales, .settings] + ClinicalWorkspaceSection.projectSections) { item in
+                Button {
+                    selectedOtherSection = item
+                    selectSection(item)
+                } label: { Label(item.title, systemImage: item.symbolName) }
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
+            }
+            .inkWorkspaceTitle("Altro")
+        }
     }
 
     private func sidebarButton(_ item: ClinicalWorkspaceSection) -> some View {
@@ -431,7 +469,7 @@ public struct AppleFoundationMobileRootView: View {
                 .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
             }
             .navigationDestination(for: ClinicalWorkspaceSection.self) { item in
-                detailView(for: item).navigationTitle(item.title)
+                detailView(for: item).inkWorkspaceTitle(item.title)
             }
             .navigationTitle("Progetto")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Chiudi") { showsProjectSurfaces = false } } }
@@ -500,7 +538,7 @@ public struct AppleFoundationMobileRootView: View {
         case .overview:
             AppleFoundationOverviewView(snapshot: snapshot)
                 .padding(20)
-                .background(PlatformColors.groupedBackground)
+                .background(PlatformColors.chartCardSurface)
                 .accessibilityIdentifier("apple-foundation-overview-view")
         case .repertori:
             // Catalogue browsing is a macOS surface for now; mobile reaches the
@@ -516,7 +554,7 @@ public struct AppleFoundationMobileRootView: View {
                 HomeBaseRuntimeStatusView()
                     .padding(20)
             }
-            .background(PlatformColors.groupedBackground)
+            .background(PlatformColors.chartCardSurface)
             .accessibilityIdentifier("apple-foundation-runtime-view")
         case .milestones:
             ScrollView {
@@ -527,7 +565,7 @@ public struct AppleFoundationMobileRootView: View {
                 }
                 .padding(20)
             }
-            .background(PlatformColors.groupedBackground)
+            .background(PlatformColors.chartCardSurface)
             .accessibilityIdentifier("apple-foundation-milestones-view")
         }
     }
@@ -557,7 +595,8 @@ public struct AppleMilestoneCard: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(16)
-        .lumeSurface(zone: .field)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { Rectangle().fill(PlatformColors.separator).frame(height: 1) }
     }
 }

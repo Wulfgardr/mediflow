@@ -32,26 +32,16 @@ const FUNCTION_COLOR = /\b(?:rgba?|hsla?)\((?:[^()]*)\)/gi;
 export const PALETTE_ALLOWLIST = [
   {"path":"app/mockups/scheda/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":10,"fingerprint":"0b532d8493c010f98eba790c6cca032e0c871be43eccd5bb743d13b514892219"},
   {"path":"app/patients/[id]/edit/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":2,"fingerprint":"c465f2f78534069d2c5091795196bb3c49d4428b0c2aaa3a488617f7bc16d9a4"},
-  {"path":"app/patients/new/page.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":4,"fingerprint":"0aa269a73f2eb260a9c4dbd49759a327de47595518ab671274424fe5aeb2af8d"},
-  {"path":"app/settings/ambulatories/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":3,"fingerprint":"680fb818b76e100c8f0a8f4d4d871e2f7bea91c77ff62fe8298f619428b68523"},
   {"path":"app/settings/sviluppo/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"ec8b1f7e92f6ad06696229de18e38a2fe2e006b9e87fef48103be7be871cadb9"},
   {"path":"app/settings/zona-pericolo/page.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":44,"fingerprint":"bcc5bf6a3df4adf7a3968ad603f885d668b36b4a4895359f59ecadf34653b717"},
-  {"path":"components/auth-health-screen.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":13,"fingerprint":"30b1e64ad5485c409510ea340a19258b1040b25b2657b5c4cdc6c61f2728e6bb"},
-  {"path":"components/backup-restore-ui.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":60,"fingerprint":"56c8bfb936705a2f73ef54c16955c9b07aa567dee8b71297dc1b2de54a3532c0"},
-  {"path":"components/backup-scheduler-ui.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":40,"fingerprint":"4e6eb625255af73bdc88558b4be2ae464fbe9e2fef9931d433d60ef05064eadb"},
   {"path":"components/data-seeder.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":107,"fingerprint":"f153fe70c92078aff36baa3e468f168b168b4dd36301f9894dc0bc5a48ed849a"},
   {"path":"components/diagnostic-hub.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":23,"fingerprint":"11b4372ca0e69c7268354c3ac6ab66690586fbc55f21b9915a4cae7d0a3f6cbe"},
   {"path":"components/exemption-selector.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":3,"fingerprint":"9e174fff7276abf47e4f81a8679d8aef07472a4ded852fb5773aa5698eb64c52"},
   {"path":"components/followup-suggestions.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"a9ea794b338ca05d36f1aeb6c13712161214b7f3a9cedf5b258350d65177799c"},
   {"path":"components/kree8/kree8-workspace-shell.module.css","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":15,"fingerprint":"fa250e7b6f53574872e76a36673a80ee388f84d80626e55d761b82975aeb5dc7"},
-  {"path":"components/observation-manager.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":2,"fingerprint":"316c0591b2c775a3511f7e3dfd261710a3cfa928cfe22a488d81aba90bc9ef38"},
   {"path":"components/patient-clinical-signals.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":7,"fingerprint":"16ced9b1b6a637581983755058a65c6dd29d74703fb442d488e1b88f01bbb2c7"},
-  {"path":"components/patient-document-import-review.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":4,"fingerprint":"dde9d41cdd6acf1b150e71385a5734c7892bf07682c496287eb136aaf3feb179"},
-  {"path":"components/patient-form.tsx","reason":"Debito storico su superficie clinica: migrazione Lume da completare.","occurrences":6,"fingerprint":"d951c75dec7e4f2efc7a68b2c81e7b9a472660d00422e24dbc9c7012f696d22e"},
-  {"path":"components/settings/ai-model-parliament-panel.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":142,"fingerprint":"418913b2d5d845cf4298742a705d626c3b756b37ad6a31fc55051abb995ba1ab"},
   {"path":"components/settings/ai-model-selector.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"df13a493dbddcbcc063e8c184254da292afd6f96485dc9ecfd49b7dd53ad05a1"},
   {"path":"components/settings/ai-rollout-guard-notice.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":48,"fingerprint":"58c1e661ac3bbd8f5518264be0f1978dca441b0101dfef5e5e407ca839f4c47c"},
-  {"path":"components/settings/ai-rollout-readiness-panel.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":130,"fingerprint":"deedfed83948cacf2aa1d715429c5dbc8770de313d9a51cc6ff9c219b6e0c804"},
   {"path":"components/settings/exemption-db-manager.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"e9ba390ec566b27739b479c18cc1459793aff8db9dc62644d6ed09d7662cdacd"},
   {"path":"components/settings/network-operating-mode-panel.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":232,"fingerprint":"e7ad7ca7e5b04731b2e1024468b383c4d345082b21c3a8e01dc7c538e408d0d6"},
   {"path":"components/settings/settings-search.tsx","reason":"Debito storico su superficie non clinica: migrazione Lume da completare.","occurrences":1,"fingerprint":"30b66e71736711489accadafb52c1196a07501b44cbe3da7eac0cb30824ac0b6"},
@@ -283,6 +273,9 @@ export function formatPaletteReport(result) {
 
 export const REGISTERS = ['giorno', 'grafite', 'guardia'];
 export const SURFACES = ['canvas', 'field', 'focal', 'chrome'];
+const INK_ROLES = ['primary', 'muted', 'fresh', 'pencil', 'secondary'];
+const EXTRA_SURFACES = ['draft', 'selected', 'hover', 'threshold'];
+const RULE_ROLES = ['default', 'strong', 'draft'];
 export const SIGNALS = ['warning', 'critical', 'success', 'plum'];
 // Normal-size text must clear WCAG AA 4.5:1. accent.minerale is documented as
 // interactive text (links, minerale admin queue), so it uses the text threshold
@@ -354,7 +347,7 @@ export function resolveColor(tokens, dottedPath) {
 export function buildContract() {
   const checks = [];
   for (const register of REGISTERS) {
-    for (const ink of ['primary', 'muted']) {
+    for (const ink of INK_ROLES) {
       for (const surface of SURFACES) {
         checks.push({
           register,
@@ -374,11 +367,18 @@ export function buildContract() {
         minRatio: TEXT_MIN_RATIO,
       });
     }
+    for (const signal of register === 'guardia' ? [] : ['warning', 'critical', 'success']) {
+      for (const surface of ['canvas', 'focal']) checks.push({
+        register, label: `signal.${signal} on surface.${surface}`,
+        text: `register.${register}.signal.${signal}`,
+        background: `register.${register}.surface.${surface}`, minRatio: TEXT_MIN_RATIO,
+      });
+    }
     for (const signal of SIGNALS) {
       checks.push({
         register,
         label: `signal.${signal} text on 10% signal tint`,
-        signal: `signal.${signal}`,
+        signal: signal === 'plum' ? `signal.${signal}` : `register.${register}.signal.${signal}`,
         ink: `register.${register}.ink.primary`,
         surface: `register.${register}.surface.field`,
         minRatio: TEXT_MIN_RATIO,
@@ -441,25 +441,31 @@ export const ACTIVE_ALIASES = [
   { alias: '--lume-ink', suffix: 'ink-primary' },
   { alias: '--lume-ink-muted', suffix: 'ink-muted' },
   { alias: '--lume-accent', suffix: 'accent-minerale' },
+  ...['fresh', 'pencil', 'secondary', 'threshold'].map((role) => ({ alias: `--lume-ink-${role}`, suffix: `ink-${role}` })),
+  ...EXTRA_SURFACES.map((role) => ({ alias: `--lume-surface-${role}`, suffix: `surface-${role}` })),
+  ...RULE_ROLES.map((role) => ({ alias: role === 'default' ? '--lume-rule' : `--lume-rule-${role}`, suffix: `rule-${role}` })),
+  ...['warning', 'critical', 'success'].map((role) => ({ alias: `--lume-signal-${role}`, suffix: `signal-${role}` })),
 ];
 
 export function expectedMirror(tokens) {
   const map = new Map();
   for (const register of REGISTERS) {
-    for (const surface of SURFACES) {
+    for (const surface of [...SURFACES, ...EXTRA_SURFACES]) {
       map.set(`--lume-${register}-surface-${surface}`, resolveColor(tokens, `register.${register}.surface.${surface}`));
     }
     map.set(`--lume-${register}-ink-primary`, resolveColor(tokens, `register.${register}.ink.primary`));
-    map.set(`--lume-${register}-ink-muted`, resolveColor(tokens, `register.${register}.ink.muted`));
+    for (const role of ['muted', 'fresh', 'pencil', 'secondary', 'threshold']) map.set(`--lume-${register}-ink-${role}`, resolveColor(tokens, `register.${register}.ink.${role}`));
+    for (const role of RULE_ROLES) map.set(`--lume-${register}-rule-${role}`, resolveColor(tokens, `register.${register}.rule.${role}`));
+    for (const role of ['warning', 'critical', 'success']) map.set(`--lume-${register}-signal-${role}`, resolveColor(tokens, `register.${register}.signal.${role}`));
     map.set(`--lume-${register}-accent-minerale`, resolveColor(tokens, `register.${register}.accent.minerale`));
   }
-  for (const signal of SIGNALS) {
+  for (const signal of ['plum']) {
     map.set(`--lume-signal-${signal}`, resolveColor(tokens, `signal.${signal}`));
   }
   return map;
 }
 
-const NAMESPACED_TOKEN = /^--lume-(?:giorno|grafite|guardia)-|^--lume-signal-/;
+const NAMESPACED_TOKEN = /^--lume-(?:giorno|grafite|guardia)-|^--lume-signal-plum$/;
 
 export function parseCssBlocks(css) {
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');

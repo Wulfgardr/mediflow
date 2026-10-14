@@ -1,0 +1,669 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MediFlow direzioni estetiche</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+</head><body>
+<style>
+/* Layout: una barra di confronto fissa in alto, sotto un unico palco che ospita la stessa schermata in tre lingue diverse. */
+:root{
+  --sh-bg:#f1f2f4; --sh-panel:#ffffff; --sh-ink:#17191c; --sh-muted:#5b6470; --sh-line:#d6dae0; --sh-accent:#2f5373; --sh-on:#ffffff;
+  --sh-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --sh-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--sh-bg:#111316;--sh-panel:#1a1d21;--sh-ink:#e8ebee;--sh-muted:#98a2ad;--sh-line:#30353c;--sh-accent:#9bbbd8;--sh-on:#10151a;color-scheme:dark}}
+:root[data-theme="dark"]{--sh-bg:#111316;--sh-panel:#1a1d21;--sh-ink:#e8ebee;--sh-muted:#98a2ad;--sh-line:#30353c;--sh-accent:#9bbbd8;--sh-on:#10151a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--sh-bg);color:var(--sh-ink);font:14px/1.45 var(--sh-font);margin:0}
+button{font:inherit;color:inherit}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--sh-panel);border-bottom:1px solid var(--sh-line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.bar h1{font-size:14px;font-weight:650;margin:0;letter-spacing:-.01em}
+.bar .syn{font:11px var(--sh-mono);color:var(--sh-muted);border:1px solid var(--sh-line);border-radius:4px;padding:2px 6px}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--sh-line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:0 12px;min-height:36px;cursor:pointer;border-right:1px solid var(--sh-line);color:var(--sh-muted)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--sh-accent);color:var(--sh-on);font-weight:600}
+.seg button:focus-visible,.chk:focus-within{outline:2px solid var(--sh-accent);outline-offset:2px}
+.chk{display:flex;gap:6px;align-items:center;color:var(--sh-muted);font-size:13px}
+.wrap{padding-block:16px 48px;padding-inline:16px;max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.note{color:var(--sh-muted);max-width:78ch;margin:0}
+.note b{color:var(--sh-ink)}
+.frame{container:frame/inline-size;margin:0 auto;width:100%;border:1px solid var(--sh-line);border-radius:10px;overflow:hidden;background:#fff}
+.frame.m{width:390px;max-width:100%}
+.frame>.d{min-height:820px}
+.oggi{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.oggi img{width:100%;border:1px solid var(--sh-line);border-radius:10px;display:block}
+.oggi ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:10px}
+.oggi h2,.cmp h2{font-size:16px;margin:0 0 10px}
+.cmp{background:var(--sh-panel);border:1px solid var(--sh-line);border-radius:10px;padding:18px}
+.cmp .tw{overflow-x:auto}
+.cmp table{border-collapse:collapse;width:100%;min-width:760px}
+.cmp th,.cmp td{text-align:left;vertical-align:top;padding:9px 10px;border-top:1px solid var(--sh-line)}
+.cmp thead th{border-top:0;font-size:12px;color:var(--sh-muted);font-weight:600}
+.cmp tbody th{width:130px;color:var(--sh-muted);font-weight:500}
+.cmp p{max-width:80ch}
+.cmp a{color:var(--sh-accent)}
+@media (max-width:820px){.oggi{grid-template-columns:1fr}}
+
+/* ───────── elementi comuni ai tre prototipi ───────── */
+.d{position:relative;color:var(--ink);background:var(--bg);font-family:var(--f);-webkit-font-smoothing:antialiased}
+.d button{cursor:pointer}
+.d :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.d .num{font-variant-numeric:tabular-nums}
+.d textarea{font:inherit;color:inherit;width:100%;resize:vertical;background:transparent}
+.d .sr{position:absolute;left:-9999px}
+.sem-warn{color:#8a5a1c}.sem-crit{color:#a33a2f}.sem-ok{color:#3f5a49}
+@media (prefers-reduced-motion:reduce){.d *,.d *::before,.d *::after{animation:none!important;transition:none!important}}
+
+/* ═════════ A · STRUMENTO ═════════ banco calibrato: rail, piani bianchi, filetti, mono per i dati */
+.dA{--bg:#f3f5f7;--pl:#ffffff;--ink:#15181c;--mut:#566170;--line:#dde2e8;--line2:#c6ced7;--acc:#2c5475;--accbg:#e8eff6;--focus:#2c5475;--f:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;--m:"IBM Plex Mono",ui-monospace,monospace;--h:36px;font-size:13px;line-height:1.4;display:grid;grid-template-columns:184px minmax(0,1fr)}
+@media (pointer:coarse){.dA{--h:44px}}
+.dA .rail{background:#e9edf1;border-right:1px solid var(--line);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+.dA .rail .brand{font-weight:600;padding:6px 10px 14px;letter-spacing:-.01em}
+.dA .rail button{border:0;background:transparent;text-align:left;height:var(--h);padding:0 10px;border-radius:6px;color:var(--mut)}
+.dA .rail button[aria-current]{background:var(--pl);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line)}
+.dA .rail .sp{flex:1}
+.dA .main{min-width:0;display:flex;flex-direction:column}
+.dA .top{background:var(--pl);border-bottom:1px solid var(--line);padding:10px 18px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.dA .top h2{font-size:19px;font-weight:600;margin:0;letter-spacing:-.015em}
+.dA .facts{color:var(--mut);font-family:var(--m);font-size:12px}
+.dA .alg{border:1px solid #a33a2f;color:#a33a2f;border-radius:3px;padding:1px 6px;font-size:12px;font-weight:500}
+.dA .grow{flex:1}
+.dA .btn{height:var(--h);padding:0 12px;border-radius:6px;border:1px solid var(--line2);background:var(--pl);font-weight:500}
+.dA .btn.p{background:var(--acc);border-color:var(--acc);color:#fff}
+.dA .btn[disabled]{opacity:.55;cursor:default}
+.dA .body{padding:14px 18px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:14px;align-items:start}
+.dA .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.dA .fr{background:var(--pl);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.dA .fr>header{display:flex;justify-content:space-between;align-items:baseline;padding:8px 12px;border-bottom:1px solid var(--line);background:#f8f9fb}
+.dA .fr h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0;font-weight:600}
+.dA .fr header span{font-family:var(--m);font-size:11px;color:var(--mut)}
+.dA table{border-collapse:collapse;width:100%}
+.dA td,.dA th{padding:7px 12px;border-top:1px solid var(--line);text-align:left;vertical-align:baseline}
+.dA tr:first-child td{border-top:0}
+.dA .c{font-family:var(--m);font-size:12px;color:var(--mut);white-space:nowrap}
+.dA .v{font-family:var(--m);font-weight:500;white-space:nowrap}
+.dA .r{text-align:right}
+.dA .dia{display:grid;grid-template-columns:86px minmax(0,1fr);gap:0 12px;padding:10px 12px;border-top:1px solid var(--line)}
+.dA .dia:first-of-type{border-top:0}
+.dA .dia .when{font-family:var(--m);font-size:12px;color:var(--mut)}
+.dA .dia .ty{font-weight:600}
+.dA .dia p{margin:2px 0 0;max-width:68ch}
+.dA .dia .by{font-family:var(--m);font-size:11px;color:var(--mut);margin-top:4px}
+.dA .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 18px;background:var(--pl);border-bottom:1px solid var(--line)}
+.dA .inp{height:var(--h);border:1px solid var(--line2);border-radius:6px;padding:0 10px;background:var(--pl);font:inherit;color:inherit;min-width:0}
+.dA .sgm{display:flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.dA .sgm button{border:0;background:var(--pl);height:calc(var(--h) - 2px);padding:0 10px;color:var(--mut)}
+.dA .sgm button[aria-pressed="true"]{background:var(--accbg);color:var(--acc);font-weight:600}
+.dA .lst{display:grid;grid-template-columns:minmax(0,1fr) 320px;min-height:0;flex:1}
+.dA .lst .tb{overflow-x:auto;background:var(--pl)}
+.dA .lst thead th{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:600;border-top:0;border-bottom:1px solid var(--line2);background:#f8f9fb;height:30px;padding-block:0}
+.dA .lst tbody td{height:var(--h);padding-block:0;border-top:1px solid var(--line)}
+.dA .lst tbody tr{cursor:pointer}
+.dA .lst tbody tr:hover{background:#f6f8fa}
+.dA .lst tbody tr.sel{background:var(--accbg);box-shadow:inset 2px 0 0 var(--acc)}
+.dA .rowb{border:0;background:transparent;padding:0;font-weight:500;text-align:left;height:var(--h);width:100%}
+.dA .insp{border-left:1px solid var(--line);background:#f8f9fb;padding:14px;display:flex;flex-direction:column;gap:12px}
+.dA .insp h4{margin:0;font-size:15px}
+.dA .insp dl{margin:0;display:grid;grid-template-columns:92px 1fr;gap:4px 8px}
+.dA .insp dt{color:var(--mut)} .dA .insp dd{margin:0}
+.dA .st{font-size:12px;font-weight:500;white-space:nowrap}
+.dA .ed{padding:12px;display:flex;flex-direction:column;gap:10px}
+.dA .ed .meta{display:flex;flex-wrap:wrap;gap:8px}
+.dA .ed textarea{border:1px solid var(--line2);border-radius:6px;padding:10px;min-height:250px;line-height:1.55;background:var(--pl)}
+.dA .wr{list-style:none;margin:0;padding:0}
+.dA .wr li{display:grid;grid-template-columns:76px 1fr;gap:8px;padding:9px 12px;border-top:1px solid var(--line)}
+.dA .wr li:first-child{border-top:0}
+.dA .wr .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:600;padding-top:1px}
+.dA .foot{position:sticky;bottom:0;margin-top:auto;background:var(--pl);border-top:1px solid var(--line2);padding:10px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.dA .foot.cf{background:#15181c;color:#fff;border-color:#15181c}
+.dA .foot.cf .btn{background:transparent;color:#fff;border-color:#69727d}
+.dA .foot.cf .btn.p{background:#fff;color:#15181c;border-color:#fff}
+.dA .foot .msg{flex:1;min-width:220px}
+.dA .foot .msg small{display:block;font-family:var(--m);font-size:11px;opacity:.75}
+.dA.site{display:block;background:var(--pl)}
+.dA .snav{display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center;padding:14px 28px;border-bottom:1px solid var(--line);color:var(--mut)}
+.dA .snav b{color:var(--ink);margin-right:8px}
+.dA .hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:36px;padding:56px 28px 40px;align-items:center}
+.dA .hero h2{font-size:46px;line-height:1.04;letter-spacing:-.03em;font-weight:600;margin:0 0 18px}
+.dA .hero p{font-size:16px;color:#333b45;max-width:46ch;margin:0 0 10px}
+.dA .cta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.dA .cta .btn{height:44px;padding:0 16px}
+.dA .spec{border-top:1px solid var(--line2);margin:0 28px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.dA .spec div{padding:16px 16px 28px 0;border-right:1px solid var(--line);padding-left:16px}
+.dA .spec div:first-child{padding-left:0}.dA .spec div:last-child{border-right:0}
+.dA .spec dt{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:600}
+.dA .spec dd{margin:6px 0 0;font-size:15px}
+.dA .fig{border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:var(--bg);box-shadow:0 18px 40px -24px rgba(21,24,28,.35)}
+@container frame (max-width:900px){
+  .dA{grid-template-columns:1fr}
+  .dA .rail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px 8px}
+  .dA .rail .brand{padding:10px 10px} .dA .rail .sp{display:none}
+  .dA .rail button{white-space:nowrap;height:44px}
+  .dA .body,.dA .lst,.dA .hero{grid-template-columns:1fr}
+  .dA .insp{border-left:0;border-top:1px solid var(--line)}
+  .dA .hide{display:none}
+  .dA .hero{padding:32px 16px}.dA .hero h2{font-size:34px}
+  .dA .spec{grid-template-columns:1fr 1fr;margin:0 16px}.dA .snav{padding:12px 16px}
+  .dA .btn,.dA .inp{height:44px}.dA .lst tbody td,.dA .rowb{height:44px}
+}
+
+/* ═════════ B · REGISTRO ═════════ pagina clinica: serif per la voce, filetti, data in margine, niente scatole */
+.dB{--bg:#fbfbfa;--ink:#121212;--mut:#585858;--line:#d8d8d4;--focus:#121212;--f:"Hanken Grotesk",-apple-system,"Segoe UI",sans-serif;--s:"Newsreader",Georgia,"Times New Roman",serif;--m:"IBM Plex Mono",ui-monospace,monospace;font-size:14px;line-height:1.45}
+.dB .mast{display:flex;flex-wrap:wrap;gap:4px 22px;align-items:center;padding:0 40px;border-bottom:2px solid var(--ink);min-height:52px}
+.dB .mast b{font-family:var(--s);font-size:19px;font-weight:500;margin-right:14px}
+.dB .mast button{border:0;background:transparent;min-height:44px;padding:0 2px;color:var(--mut);border-bottom:2px solid transparent;margin-bottom:-2px}
+.dB .mast button[aria-current]{color:var(--ink);font-weight:600}
+.dB .mast .grow{flex:1}
+.dB .pg{max-width:1180px;margin:0 auto;padding:34px 40px 60px}
+.dB .who{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--ink)}
+.dB .who h2{font-family:var(--s);font-weight:400;font-size:44px;line-height:1;letter-spacing:-.015em;margin:0 0 8px}
+.dB .who .facts{color:var(--mut)} .dB .who .facts .mono{font-family:var(--m);font-size:12.5px}
+.dB .alg{color:#a33a2f;font-weight:600}
+.dB .btn{min-height:44px;padding:0 18px;border:1px solid var(--ink);background:transparent;border-radius:2px;font-weight:500}
+.dB .btn.p{background:var(--ink);color:#fff}
+.dB .btn[disabled]{opacity:.5;cursor:default}
+.dB .acts{display:flex;gap:8px;flex-wrap:wrap}
+.dB .two{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,4fr);gap:56px;margin-top:26px;align-items:start}
+.dB h3{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;margin:0;padding-bottom:8px;border-bottom:1px solid var(--ink);display:flex;justify-content:space-between}
+.dB h3 span{color:var(--mut);font-weight:400;letter-spacing:0;text-transform:none}
+.dB .ent{display:grid;grid-template-columns:84px minmax(0,1fr);gap:0 22px;padding:18px 0;border-bottom:1px solid var(--line)}
+.dB .ent .day{font-family:var(--s);font-size:38px;line-height:.95}
+.dB .ent .mo{color:var(--mut);font-size:12px;margin-top:4px}
+.dB .ent .ty{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.dB .ent .ty span{color:var(--mut);font-weight:400;letter-spacing:0;text-transform:none;margin-left:8px}
+.dB .ent p{font-family:var(--s);font-size:18px;line-height:1.5;margin:6px 0 0;max-width:62ch}
+.dB .side{display:flex;flex-direction:column;gap:26px}
+.dB .rl{list-style:none;margin:0;padding:0}
+.dB .rl li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.dB .rl .n{font-family:var(--s);font-size:17px}
+.dB .rl small{display:block;color:var(--mut);font-size:12.5px;font-family:var(--f)}
+.dB .rl .v{font-family:var(--m);font-size:13px;white-space:nowrap;text-align:right}
+.dB .rl .v small{font-family:var(--m);font-size:11px}
+.dB .tools{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:flex-end;justify-content:space-between;padding-bottom:16px;border-bottom:1px solid var(--ink)}
+.dB .tools h2{font-family:var(--s);font-weight:400;font-size:44px;line-height:1;margin:0}
+.dB .srch{min-height:44px;border:0;border-bottom:1px solid var(--ink);background:transparent;font:inherit;color:inherit;width:300px;max-width:100%;padding:0 2px}
+.dB .ix{list-style:none;margin:0 0 26px;padding:0}
+.dB .ix li{border-bottom:1px solid var(--line)}
+.dB .ix button{display:grid;grid-template-columns:34px minmax(0,3fr) minmax(0,4fr) 110px 150px;gap:16px;align-items:baseline;width:100%;min-height:48px;padding:8px 0;border:0;background:transparent;text-align:left}
+.dB .ix button:hover .n{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+.dB .ix .o{font-family:var(--m);font-size:11.5px;color:var(--mut)}
+.dB .ix .n{font-family:var(--s);font-size:20px}
+.dB .ix .n small{font-family:var(--f);font-size:12.5px;color:var(--mut);margin-left:8px}
+.dB .ix .dt{font-family:var(--m);font-size:12.5px;color:var(--mut)}
+.dB .ix .st{font-size:13px}
+.dB .gh{margin-top:26px}
+.dB .sheet{display:grid;grid-template-columns:84px minmax(0,1fr);gap:0 22px;padding:22px 0;border-bottom:1px solid var(--line)}
+.dB .sheet textarea{border:0;font-family:var(--s);font-size:19px;line-height:1.55;min-height:230px;padding:0;max-width:62ch}
+.dB .sheet .lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;margin-bottom:8px}
+.dB .sheet .lab span{color:var(--mut);font-weight:400;letter-spacing:0;text-transform:none;margin-left:8px}
+.dB .band{position:sticky;bottom:0;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;padding:16px 40px;border-top:1px solid var(--ink);background:var(--bg)}
+.dB .band .msg{flex:1;min-width:240px}
+.dB .band .msg b{font-family:var(--s);font-size:19px;font-weight:500;display:block}
+.dB .band.cf{background:var(--ink);color:#fff}
+.dB .band.cf .btn{border-color:#8a8a8a;color:#fff}
+.dB .band.cf .btn.p{background:#fff;color:var(--ink);border-color:#fff}
+.dB .shero{padding:70px 40px 30px;max-width:1180px;margin:0 auto}
+.dB .shero h2{font-family:var(--s);font-weight:400;font-size:108px;line-height:.92;letter-spacing:-.03em;margin:0 0 34px;max-width:9ch}
+.dB .shero .lead{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:56px;border-top:1px solid var(--ink);padding-top:22px}
+.dB .shero .lead p{font-family:var(--s);font-size:22px;line-height:1.4;margin:0 0 14px}
+.dB .shero .lead .sm{font-family:var(--f);font-size:14.5px;color:var(--mut)}
+.dB figure{margin:0}
+.dB figcaption{font-size:12.5px;color:var(--mut);padding-top:8px}
+.dB .fig{border:1px solid var(--ink);padding:18px 20px;background:#fff}
+.dB .pts{max-width:1180px;margin:0 auto;padding:10px 40px 60px;list-style:none}
+.dB .pts li{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:56px;padding:16px 0;border-top:1px solid var(--line)}
+.dB .pts b{font-family:var(--s);font-weight:400;font-size:26px}
+.dB .pts span{max-width:52ch;padding-top:6px}
+@container frame (max-width:900px){
+  .dB .mast,.dB .band{padding-inline:16px}.dB .pg,.dB .shero,.dB .pts{padding-inline:16px}
+  .dB .mast{overflow-x:auto;flex-wrap:nowrap} .dB .mast button{white-space:nowrap}
+  .dB .two,.dB .shero .lead,.dB .pts li{grid-template-columns:1fr;gap:22px}
+  .dB .who h2,.dB .tools h2{font-size:34px}
+  .dB .ent,.dB .sheet{grid-template-columns:54px minmax(0,1fr);gap:0 14px}.dB .ent .day{font-size:28px}
+  .dB .ix button{grid-template-columns:28px minmax(0,1fr) auto;gap:10px}.dB .ix .hide{display:none}
+  .dB .shero{padding-top:36px}.dB .shero h2{font-size:58px}
+}
+
+/* ═════════ C · LUCE E INCHIOSTRO ═════════ un piano illuminato sul contesto in penombra, dock, fogli, inchiostro che asciuga */
+.dC{--bg:#e6e9ed;--pl:#ffffff;--ink:#14171b;--mut:#56606b;--line:#e3e6ea;--acc:#2f66a3;--wet:#2f66a3;--focus:#2f66a3;--f:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;--m:ui-monospace,"SF Mono",Menlo,"IBM Plex Mono",monospace;font-size:15px;line-height:1.42;padding:18px 18px 96px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;align-items:start}
+.dC.one{grid-template-columns:minmax(0,1fr)}
+.dC.wr{height:780px;overflow:hidden}
+.dC .pen{display:flex;flex-direction:column;gap:2px;padding-top:6px}
+.dC .pen h3{font-size:12px;font-weight:600;color:var(--mut);margin:0 0 6px 12px}
+.dC .pen button{border:0;background:transparent;text-align:left;min-height:44px;border-radius:12px;padding:4px 12px;color:var(--mut)}
+.dC .pen button small{display:block;font-size:12px}
+.dC .pen button[aria-current]{background:rgba(255,255,255,.75);color:var(--ink);font-weight:600}
+.dC .plane{background:var(--pl);border-radius:22px;box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 22px 50px -28px rgba(20,23,27,.45),0 2px 6px rgba(20,23,27,.06);padding:26px 28px;min-width:0;max-width:1040px;width:100%;margin:0 auto}
+.dC .hd{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-start;justify-content:space-between}
+.dC .hd h2{font-size:30px;font-weight:650;letter-spacing:-.022em;margin:0 0 4px;line-height:1.1}
+.dC .facts{color:var(--mut)} .dC .facts .mono{font-family:var(--m);font-size:13px}
+.dC .alg{display:inline-flex;align-items:center;gap:6px;color:#a33a2f;font-weight:600;background:#fbeeec;border-radius:999px;padding:4px 10px;font-size:13px}
+.dC .pills{display:inline-flex;background:#eef0f3;border-radius:12px;padding:3px;gap:2px;flex-wrap:wrap}
+.dC .pills button{border:0;background:transparent;min-height:38px;padding:0 14px;border-radius:9px;color:var(--mut);transition:background .16s}
+.dC .pills button[aria-pressed="true"]{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(20,23,27,.14)}
+.dC .rowc{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:20px 0 6px}
+.dC .sec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 34px;margin-top:8px}
+.dC h3.t{font-size:13px;font-weight:600;color:var(--mut);margin:18px 0 4px}
+.dC .li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.dC .li b{font-weight:600} .dC .li small{display:block;color:var(--mut);font-size:13px}
+.dC .li .v{font-family:var(--m);font-size:14px;text-align:right;white-space:nowrap}
+.dC .li .v small{font-family:var(--m);font-size:12px}
+.dC .en{padding:14px 0;border-bottom:1px solid var(--line)}
+.dC .en .h{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.dC .en .h b{font-weight:600}.dC .en .h span{color:var(--mut);font-size:13px}
+.dC .en p{margin:4px 0 0;max-width:70ch;font-size:16px;line-height:1.5}
+.dC .en .aud{font-family:var(--m);font-size:12px;color:var(--mut);margin-top:6px}
+.dC .en.fresh p{animation:dry 1.4s ease-out both}
+@keyframes dry{from{color:var(--wet)}to{color:var(--ink)}}
+.dC .dock{position:sticky;bottom:16px;grid-column:1/-1;justify-self:center;display:flex;gap:6px;align-items:center;padding:6px;border-radius:20px;background:rgba(250,251,252,.72);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);box-shadow:0 0 0 1px rgba(20,23,27,.08),0 14px 30px -14px rgba(20,23,27,.4);z-index:5;max-width:100%;flex-wrap:wrap;justify-content:center}
+@media (prefers-reduced-transparency:reduce){.dC .dock{background:#fafbfc;-webkit-backdrop-filter:none;backdrop-filter:none}}
+.dC .dock button,.dC .btn{border:0;min-height:44px;padding:0 16px;border-radius:14px;background:transparent;font-weight:500;color:var(--ink);transition:transform .08s,background .16s}
+.dC .dock button:active,.dC .btn:active{transform:scale(.97)}
+.dC .dock .p,.dC .btn.p{background:var(--acc);color:#fff}
+.dC .btn.g{background:#eef0f3}
+.dC .btn[disabled]{opacity:.55;cursor:default}
+.dC .dock .toast{padding:0 14px;color:var(--ink);font-weight:500}
+.dC .grp{background:#f5f6f8;border-radius:16px;padding:2px 14px;margin-top:6px}
+.dC .grp button{display:grid;grid-template-columns:minmax(0,1fr) auto 14px;gap:12px;align-items:center;width:100%;min-height:56px;border:0;background:transparent;text-align:left;border-bottom:1px solid #e3e6ea;padding:6px 0}
+.dC .grp button:last-child{border-bottom:0}
+.dC .grp b{font-weight:600}.dC .grp small{display:block;color:var(--mut);font-size:13px}
+.dC .grp .tr{text-align:right;font-size:13px;color:var(--mut)}
+.dC .grp .ch{color:#9aa3ad}
+.dC .search{width:100%;min-height:44px;border:0;border-radius:14px;background:#eef0f3;padding:0 14px;font:inherit;color:inherit}
+.dC .veil{position:absolute;inset:0;background:rgba(20,23,27,.28);z-index:8}
+.dC .sh{position:absolute;left:50%;transform:translateX(-50%);bottom:0;width:min(720px,100%);background:#fff;border-radius:26px 26px 0 0;z-index:9;padding:22px 24px 20px;box-shadow:0 -20px 60px -20px rgba(20,23,27,.5);animation:rise .24s cubic-bezier(.2,.9,.3,1.05) both;display:flex;flex-direction:column;gap:12px;max-height:94%;overflow:auto}
+@keyframes rise{from{transform:translate(-50%,40px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.dC .sh .idn{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline}
+.dC .sh .idn b{font-size:20px;font-weight:650;letter-spacing:-.01em}
+.dC .sh textarea{border:0;background:#f5f6f8;border-radius:16px;padding:14px;min-height:200px;font-size:16px;line-height:1.5;color:var(--wet)}
+.dC .chips{display:flex;flex-direction:column;gap:6px}
+.dC .chip{display:flex;gap:10px;background:#f5f6f8;border-radius:12px;padding:10px 12px;align-items:baseline}
+.dC .chip i{font-style:normal;font-size:12px;font-weight:600;color:var(--mut);min-width:64px}
+.dC .sf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+.dC .sf .msg{flex:1;min-width:220px}
+.dC .sf .msg b{display:block}
+.dC .sf.cf{background:#14171b;color:#fff;border-radius:18px;padding:12px 14px}
+.dC .sf.cf .btn{color:#fff}.dC .sf.cf .btn.p{background:#fff;color:#14171b}
+.dC .draft{font-size:13px;color:var(--wet);font-weight:500}
+.dC.site{display:block;padding:14px 18px 60px}
+.dC .gnav{position:sticky;top:10px;margin:0 auto 10px;width:fit-content;max-width:100%}
+.dC .cen{text-align:center;padding:54px 0 28px;max-width:760px;margin:0 auto}
+.dC .cen h2{font-size:64px;font-weight:700;letter-spacing:-.035em;line-height:1.02;margin:0 0 18px}
+.dC .cen p{font-size:19px;color:#353c45;margin:0 auto 8px;max-width:52ch}
+.dC .cen .cta{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.dC .tri{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-width:1040px;margin:22px auto 0}
+.dC .tri div{background:rgba(255,255,255,.6);border-radius:18px;padding:18px}
+.dC .tri b{display:block;font-size:17px;margin-bottom:4px}
+.dC .tri span{color:var(--mut)}
+@container frame (max-width:900px){
+  .dC{grid-template-columns:1fr;padding:10px 10px 96px}
+  .dC .pen{display:none}
+  .dC .plane{padding:18px 16px;border-radius:18px}
+  .dC .sec,.dC .tri{grid-template-columns:1fr}
+  .dC .hd h2{font-size:25px}.dC .cen h2{font-size:40px}.dC .cen{padding-top:28px}
+  .dC .sh{padding:18px 16px}
+}
+
+/* ═════════ D · PUNTO D'INCHIOSTRO ═════════ struttura di A, voce serif di B, luce e inchiostro di C. Cifra: un punto, tre inchiostri. */
+.dD{--bg:#e8eaee;--pl:#ffffff;--ink:#14161a;--fresh:#2346b0;--pencil:#687080;--mut:#555e6b;--line:#dfe2e7;--line2:#c9ced6;--focus:#2346b0;--f:-apple-system,BlinkMacSystemFont,"Segoe UI Variable","Segoe UI",Roboto,"Noto Sans",sans-serif;--s:"Newsreader",Georgia,"Times New Roman",serif;--m:"IBM Plex Mono",ui-monospace,Menlo,monospace;--h:36px;font-size:13.5px;line-height:1.4;display:grid;grid-template-columns:172px minmax(0,1fr)}
+@media (pointer:coarse){.dD{--h:44px}}
+.dD .dot{display:inline-block;width:.44em;height:.44em;border-radius:50%;background:var(--fresh);margin:0 .14em 0 .1em;flex:none}
+.dD .dot.dry{background:var(--ink)}
+.dD h2 .dot,.dD .wm .dot,.dD .nm .dot{width:.24em;height:.24em;margin-left:.06em}
+.dD .by .dot,.dD .state .dot,.dD .msg .dot,.dD .row .dot,.dD .leg .dot,.dD .inks .dot{margin-right:.5em}
+.dD .dot.pen{background:transparent;box-shadow:inset 0 0 0 1.5px var(--pencil)}
+.dD .dot.set{animation:settle .52s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes settle{0%{transform:translateY(-.7em) scale(1.35);background:var(--fresh)}60%{transform:translateY(0) scale(.9);background:var(--fresh)}100%{transform:none;background:var(--ink)}}
+.dD .fresh{color:var(--fresh)}
+.dD .pencil{color:var(--pencil);text-decoration:underline dashed;text-decoration-thickness:1px;text-underline-offset:4px}
+.dD .dries{animation:dryD 1.5s ease-out both}
+@keyframes dryD{from{color:var(--fresh)}to{color:var(--ink)}}
+.dD .wm{font-family:var(--s);font-size:22px;font-weight:500;letter-spacing:-.01em}
+.dD .rail{padding:14px 8px;display:flex;flex-direction:column;gap:2px}
+.dD .rail .wm{padding:2px 10px 16px}
+.dD .rail button{border:0;background:transparent;text-align:left;height:var(--h);padding:0 10px;border-radius:9px;color:var(--mut)}
+.dD .rail button[aria-current]{background:rgba(255,255,255,.8);color:var(--ink);font-weight:600}
+.dD .rail .sp{flex:1}
+.dD .main{min-width:0;padding:12px 12px 0 0;display:flex}
+.dD .plane{background:var(--pl);border-radius:16px 16px 0 0;box-shadow:0 0 0 1px rgba(20,22,26,.05),0 18px 44px -26px rgba(20,22,26,.45);flex:1;min-width:0;display:flex;flex-direction:column}
+.dD .hd{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:16px 22px 14px;border-bottom:1px solid var(--line)}
+.dD .hd h2{font-family:var(--s);font-weight:400;font-size:32px;line-height:1;letter-spacing:-.012em;margin:0}
+.dD .facts{color:var(--mut);font-family:var(--m);font-size:12px}
+.dD .alg{color:#a33a2f;border:1px solid #a33a2f;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600}
+.dD .grow{flex:1}
+.dD .btn{height:var(--h);padding:0 14px;border-radius:10px;border:1px solid var(--line2);background:var(--pl);font-weight:500;transition:transform .08s}
+.dD .btn:active{transform:scale(.97)}
+.dD .btn.p{background:var(--fresh);border-color:var(--fresh);color:#fff}
+.dD .btn[disabled]{opacity:.55;cursor:default}
+.dD .body{padding:6px 22px 18px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:30px;align-items:start}
+.dD h3{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);font-weight:600;margin:14px 0 0;padding-bottom:6px;border-bottom:1px solid var(--line2);display:flex;justify-content:space-between;gap:10px}
+.dD h3 span{font-family:var(--m);letter-spacing:0;text-transform:none;font-weight:400}
+.dD table{border-collapse:collapse;width:100%}
+.dD td,.dD th{padding:7px 0;padding-right:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:baseline}
+.dD td:last-child,.dD th:last-child{padding-right:0}
+.dD .c{font-family:var(--m);font-size:12px;color:var(--mut);white-space:nowrap}
+.dD .v{font-family:var(--m);font-weight:500;white-space:nowrap}
+.dD .r{text-align:right}
+.dD .en{display:grid;grid-template-columns:70px minmax(0,1fr);gap:0 14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.dD .en .when{font-family:var(--m);font-size:12px;color:var(--mut);padding-top:2px}
+.dD .en .ty{font-weight:600}
+.dD .en p{font-family:var(--s);font-size:17px;line-height:1.45;margin:3px 0 0;max-width:64ch}
+.dD .en .by{font-family:var(--m);font-size:11px;color:var(--mut);margin-top:5px;display:flex;align-items:center}
+.dD .en.dim p{color:var(--mut)}
+.dD .en.live{background:#f6f8fd;margin:8px -12px 0;padding:12px;border-radius:12px;border-bottom:0;box-shadow:0 0 0 1px #d9e0f3}
+.dD .en.live textarea{border:0;font-family:var(--s);font-size:17px;line-height:1.45;min-height:150px;padding:0;color:var(--fresh)}
+.dD .state{display:flex;align-items:center;font-weight:600;font-size:12.5px}
+.dD .it{list-style:none;margin:8px 0 0;padding:0;border-top:1px solid #d9e0f3}
+.dD .it li{display:grid;grid-template-columns:14px 62px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #d9e0f3;min-height:38px}
+.dD .it .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:600}
+.dD .it .mini{display:flex;gap:6px}
+.dD .it .btn{height:32px;padding:0 10px;border-radius:8px;font-size:12.5px}
+@media (pointer:coarse){.dD .it .btn{height:44px}}
+.dD .foot{position:sticky;bottom:0;margin-top:auto;background:var(--pl);border-top:1px solid var(--line2);padding:10px 22px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.dD .foot.cf{background:var(--ink);color:#fff;border-color:var(--ink)}
+.dD .foot.cf .btn{background:transparent;color:#fff;border-color:#6d7480}
+.dD .foot.cf .btn.p{background:#fff;color:var(--ink);border-color:#fff}
+.dD .foot .msg{flex:1;min-width:220px}
+.dD .foot .msg b{font-family:var(--s);font-size:17px;font-weight:500;display:flex;align-items:center}
+.dD .foot .msg small{display:block;font-size:12.5px;opacity:.8}
+.dD .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:14px 22px;border-bottom:1px solid var(--line)}
+.dD .filters h2{font-family:var(--s);font-weight:400;font-size:28px;margin:0 8px 0 0;line-height:1}
+.dD .inp{height:var(--h);border:1px solid var(--line2);border-radius:10px;padding:0 12px;background:var(--pl);font:inherit;color:inherit;min-width:0}
+.dD .sgm{display:flex;background:#eef0f3;border-radius:10px;padding:2px}
+.dD .sgm button{border:0;background:transparent;height:calc(var(--h) - 4px);padding:0 10px;border-radius:8px;color:var(--mut)}
+.dD .sgm button[aria-pressed="true"]{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(20,22,26,.14)}
+.dD .lst{display:grid;grid-template-columns:minmax(0,1fr) 300px;flex:1}
+.dD .lst .tb{overflow-x:auto;padding:0 22px}
+.dD .lst thead th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:600;height:30px;padding-block:0;border-bottom:1px solid var(--line2)}
+.dD .lst tbody td{height:var(--h);padding-block:0}
+.dD .lst tbody tr{cursor:pointer}
+.dD .lst tbody tr:hover{background:#f6f7f9}
+.dD .lst tbody tr.sel{background:#eef2fb}
+.dD .rowb{border:0;background:transparent;padding:0;text-align:left;height:var(--h);width:100%;font-family:var(--s);font-size:17px;display:flex;align-items:center}
+.dD .rowb .dot{margin-right:.45em}
+.dD .rowb .nod{width:.44em;margin-right:.69em;flex:none}
+.dD .insp{border-left:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:12px;background:#fafbfc}
+.dD .insp h4{font-family:var(--s);font-weight:400;font-size:22px;margin:0}
+.dD .insp dl{margin:0;display:grid;grid-template-columns:96px 1fr;gap:5px 8px}
+.dD .insp dt{color:var(--mut)}.dD .insp dd{margin:0}
+.dD .leg{padding:10px 22px;color:var(--mut);font-size:12.5px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;border-top:1px solid var(--line)}
+.dD .leg span{display:inline-flex;align-items:center}
+.dD.site{display:block;background:var(--pl)}
+.dD .snav{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;padding:14px 32px;color:var(--mut)}
+.dD .snav .wm{color:var(--ink);margin-right:10px}
+.dD .hero{padding:44px 32px 26px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:44px;align-items:center}
+.dD .hero>div>h2{font-family:var(--s);font-weight:400;font-size:76px;line-height:.96;letter-spacing:-.028em;margin:0 0 22px}
+.dD .hero>div:first-child>p{font-size:17px;line-height:1.5;color:#333a44;max-width:44ch;margin:0 0 10px}
+.dD .cta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.dD .cta .btn{height:46px;padding:0 18px}
+.dD .figw{background:var(--bg);border-radius:20px;padding:18px 0 0 18px;overflow:hidden}
+.dD .figw .plane{border-radius:14px 0 0 0}
+.dD .inks{max-width:1180px;margin:0 auto;padding:8px 32px 44px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.dD .inks div{padding:18px 22px 0 0;border-top:1px solid var(--ink)}
+.dD .inks b{font-family:var(--s);font-weight:400;font-size:26px;display:flex;align-items:center}
+.dD .inks span{display:block;color:var(--mut);margin-top:4px;max-width:34ch}
+.dD.fam{display:block;padding:20px}
+.dD .famg{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.dD .pf{display:flex;flex-direction:column;gap:6px;min-width:0}
+.dD .pf>span{font-size:12px;color:var(--mut);font-weight:600}
+.dD .win{background:#fff;overflow:hidden;box-shadow:0 0 0 1px rgba(20,22,26,.1),0 16px 34px -22px rgba(20,22,26,.5)}
+.dD .win .tbar{display:flex;align-items:center;gap:8px;padding:0 12px;height:38px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--mut)}
+.dD .win .cnt{padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.dD .win .nm{font-family:var(--s);font-size:24px;line-height:1}
+.dD .win .ln{font-family:var(--s);font-size:15.5px;line-height:1.4;margin:0}
+.dD .win .row{display:flex;align-items:center;gap:4px;font-size:12.5px}
+.dD .mac{border-radius:12px}.dD .mac .tbar{background:rgba(246,247,249,.9)}
+.dD .mac .tl{display:flex;gap:6px}.dD .mac .tl i{width:11px;height:11px;border-radius:50%;background:#c9ced6}
+.dD .mac .btn{border-radius:8px}
+.dD .wnd{border-radius:7px;font-family:"Segoe UI Variable","Segoe UI",var(--f)}.dD .wnd .tbar{justify-content:space-between}
+.dD .wnd .btn{border-radius:4px}
+.dD .gtk{border-radius:10px;font-family:Cantarell,"Noto Sans",var(--f)}.dD .gtk .tbar{justify-content:center;font-weight:600;color:var(--ink);background:#f3f4f6}
+.dD .gtk .btn{border-radius:6px}
+.dD .ios{border-radius:30px;max-width:290px}.dD .ios .tbar{justify-content:center;border:0;font-weight:600;color:var(--ink)}
+.dD .ios .btn{border-radius:14px;height:46px;width:100%}
+.dD .cli{background:#14161a;color:#e6e9ee;border-radius:8px;font-family:var(--m);font-size:12.5px;line-height:1.7;padding:14px 16px;white-space:pre-wrap;overflow-x:auto}
+.dD .cli .fr{color:#9db4ff}.dD .cli .pn{color:#a3abb8}
+.dD .same{margin:18px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.dD .same div{border-top:1px solid var(--ink);padding-top:10px}
+.dD .same b{font-family:var(--s);font-weight:400;font-size:21px;display:block;margin-bottom:4px}
+.dD .same span{color:var(--mut)}
+@container frame (max-width:900px){
+  .dD{grid-template-columns:1fr}
+  .dD .rail{flex-direction:row;overflow-x:auto;padding:6px 8px;align-items:center}
+  .dD .rail .wm{padding:0 10px}.dD .rail .sp{display:none}.dD .rail button{white-space:nowrap;height:44px}
+  .dD .main{padding:0}.dD .plane{border-radius:16px 16px 0 0}
+  .dD .body,.dD .lst,.dD .hero,.dD .inks{grid-template-columns:1fr}
+  .dD .body{padding-inline:16px;gap:8px}.dD .hd,.dD .filters,.dD .foot{padding-inline:16px}.dD .lst .tb{padding:0 16px}
+  .dD .insp{border-left:0;border-top:1px solid var(--line)}
+  .dD .hide{display:none}
+  .dD .hero{padding:26px 16px}.dD .hero>div>h2{font-size:48px}
+  .dD .body.wr>div:first-child{order:2}.dD .snav{padding:12px 16px}.dD .inks{padding-inline:16px}
+  .dD .btn,.dD .inp,.dD .rowb{height:44px}.dD .lst tbody td{height:44px}
+  .dD .en{grid-template-columns:1fr}.dD .it li{grid-template-columns:14px 56px minmax(0,1fr)}.dD .it .mini{grid-column:2/-1}
+  .dD.fam{padding:14px}
+}
+</style>
+
+<div class="bar">
+  <h1>MediFlow · direzioni estetiche</h1><span class="syn">dati sintetici</span>
+  <div class="seg" id="segD" role="group" aria-label="Direzione"></div>
+  <div class="seg" id="segS" role="group" aria-label="Schermata"></div>
+  <div class="seg" id="segV" role="group" aria-label="Larghezza"></div>
+  <label class="chk" for="err"><input type="checkbox" id="err"> Simula un errore al salvataggio</label>
+</div>
+<div class="wrap">
+  <p class="note" id="note"></p>
+  <div id="stage"></div>
+</div>
+
+<script>
+const P={name:'Moretti Elena',age:67,born:'14/03/1959',cf:'MRTLNE59C54F205X',allergy:'Allergia: penicilline (orticaria)',
+ prob:[['I10','Ipertensione essenziale','dal 2014'],['E11.9','Diabete mellito tipo 2','dal 2019'],['I48.0','Fibrillazione atriale parossistica','da giugno 2026']],
+ ther:[['Ramipril','5 mg','1 compressa al mattino','C09AA05'],['Metformina','1000 mg','1 compressa a colazione e a cena','A10BA02'],['Apixaban','5 mg','1 compressa ogni 12 ore','B01AF02']],
+ meas:[['Pressione arteriosa','148/86','mmHg','06/10','+10 sistolica dal 17/07','warn'],['HbA1c','7,4','%','22/09','−0,3 dal 20/05',''],['eGFR','58','mL/min','22/09','stabile dal 20/05',''],['Peso','72','kg','06/10','−1 dal 17/07','']],
+ due:[['Holter ECG 24 h','da prenotare','warn'],['HbA1c di controllo','entro il 22/12/2026','']],
+ diary:[
+  {d:'06',m:'ott 2026',h:'11:20',t:'Visita',w:'Ambulatorio',x:'Riferisce cardiopalmo serale occasionale, mai sincope. PA 148/86 mmHg, FC 78 aritmica. Prosegue apixaban. Richiesto Holter ECG 24 h. Ramipril da rivalutare al prossimo controllo.'},
+  {d:'22',m:'set 2026',h:'08:45',t:'Esami',w:'Laboratorio',x:'HbA1c 7,4 %, creatinina 1,1 mg/dL, eGFR 58 mL/min. Metformina invariata.'},
+  {d:'03',m:'set 2026',h:'17:05',t:'Telefonata',w:'Ambulatorio',x:'Chiede chiarimenti sull\'orario dell\'apixaban. Ribadita l\'assunzione ogni 12 ore, anche nei giorni di esami.'},
+  {d:'17',m:'lug 2026',h:'10:10',t:'Visita',w:'Ambulatorio',x:'Primo controllo dopo la dimissione dalla cardiologia. PA 138/82 mmHg. Nessun sanguinamento. Consegnato il piano dei controlli.'}]};
+const NEW={d:'09',m:'ott 2026',h:'19:00',t:'Visita',w:'Ambulatorio',x:'S: cardiopalmo ridotto dopo la visita del 6 ottobre, nessun episodio sincopale.\nO: PA 142/84 mmHg, FC 72 ritmica. Holter: brevi episodi di fibrillazione atriale, nessuna pausa.\nA: pressione non ancora a target.\nP: ramipril da 5 a 10 mg al mattino. Controllo della pressione fra 4 settimane.'};
+const ITEMS=[['Diario','Visita in ambulatorio, 9 ottobre 2026 alle 19:00'],['Misura','Pressione arteriosa 142/84 mmHg'],['Terapia','Ramipril da 5 mg a 10 mg, 1 compressa al mattino']];
+const L=[['Moretti Elena',67,'Fibrillazione atriale parossistica','06/10','Holter ECG da prenotare','warn'],['Bianchi Aldo',74,'Scompenso cardiaco','08/10','Controllo peso scaduto il 05/10','crit'],['Conti Sara',43,'Asma bronchiale','02/10','Referto da rivedere','warn'],['De Luca Piero',58,'Diabete mellito tipo 2','30/09','HbA1c entro il 15/11',''],['Ferri Marta',81,'Demenza vascolare','29/09','Rinnovo piano terapeutico','warn'],['Galli Ugo',66,'BPCO','25/09','Spirometria entro dicembre',''],['Leone Ada',52,'Ipotiroidismo','24/09','TSH entro il 24/12',''],['Marino Tito',70,'Cardiopatia ischemica','22/09','Nessun controllo aperto',''],['Neri Irma',77,'Osteoporosi','18/09','Densitometria nel 2027',''],['Orsini Dino',61,'Ipertensione essenziale','16/09','Nessun controllo aperto',''],['Pace Lia',39,'Emicrania','11/09','Nessun controllo aperto',''],['Riva Enzo',84,'Insufficienza renale cronica','09/09','eGFR entro il 09/11',''],['Sala Nora',55,'Artrite reumatoide','04/09','Emocromo entro il 04/11',''],['Testa Ivo',48,'Dislipidemia','01/09','Nessun controllo aperto','']];
+const SITE={h:'La cura ha una storia.',l:'Per seguire una persona non basta conservare i suoi dati: occorre ritrovarli nel loro contesto. MediFlow è un gestionale aperto e gratuito per il lavoro ambulatoriale.',s:'Funziona sul tuo computer, anche senza AI.',v:'0.9.0 · versione sorgente per Mac',
+ pts:[['Lavora in locale','MediFlow funziona in locale e si apre nel browser dello stesso computer.'],['L\'AI è facoltativa','Le funzioni intelligenti sono spente all\'inizio e si scelgono una per una.'],['Ogni proposta si rivede','Modelli e agenti preparano proposte. La conferma resta al medico.']],
+ nav:['Il gestionale','Intelligence Fabric','Come funziona','GitHub']};
+const NAV=['Pazienti','Agenda','Diario','Repertori','Analisi','Scale'];
+const SEM={warn:'sem-warn',crit:'sem-crit','':''};
+const MARK={warn:'▲ ',crit:'◆ ','':''};
+const S={dir:'D',scr:'scheda',vw:'d',w:'draft',dens:'ess',sel:0,prop:'pencil'};
+const e=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const nl=s=>e(s).replace(/\n/g,'<br>');
+const stl=(t,k)=>`<span class="${SEM[k]}">${MARK[k]}${e(t)}</span>`;
+
+/* stato della scrittura: bozza → conferma → salvataggio → registrata | errore */
+function wmsg(){return{
+ draft:['Bozza non registrata','Tre elementi pronti per la scheda di '+P.name+'.'],
+ confirm:['Registrare nella scheda di '+P.name+', '+P.age+' anni?','1 voce di diario, 1 misura, 1 modifica di terapia. La scrittura è unica: o tutto o niente.'],
+ saving:['Registrazione in corso','Attendi la conferma prima di chiudere.'],
+ saved:['Registrata il 9 ottobre 2026 alle 19:02','3 elementi scritti e tracciati a nome di Dr. demo.'],
+ error:['Non registrata. Nulla è stato scritto.','La scheda è stata modificata da un\'altra postazione alle 19:01. La bozza è intatta: rileggi la scheda e riprova.']}[S.w]}
+function wbtns(){return{
+ draft:`<button class="btn p" data-w="confirm">Registra 3 elementi</button>`,
+ confirm:`<button class="btn" data-w="draft">Torna alla bozza</button><button class="btn p" data-w="save">Conferma e registra</button>`,
+ saving:`<button class="btn p" disabled>Registrazione…</button>`,
+ saved:`<button class="btn" data-go="scheda">Torna alla scheda</button>`,
+ error:`<button class="btn" data-go="scheda">Rileggi la scheda</button><button class="btn p" data-w="save">Riprova</button>`}[S.w]}
+const wicon=()=>({saved:'<span class="sem-ok">✓ </span>',error:'<span class="sem-crit">✕ </span>'}[S.w]||'');
+const diary=()=>S.w==='saved'?[NEW,...P.diary]:P.diary;
+
+/* ───── A ───── */
+const A={
+ shell(inner,cur='Pazienti'){return `<div class="d dA"><nav class="rail" aria-label="Aree"><div class="brand">MediFlow</div>${NAV.map(n=>`<button ${n===cur?'aria-current="page"':''} ${n==='Pazienti'?'data-go="elenco"':''}>${n}</button>`).join('')}<div class="sp"></div><button>Impostazioni</button><button>Blocca</button></nav><div class="main">${inner}</div></div>`},
+ top(extra=''){return `<div class="top"><h2>${P.name}</h2><span class="facts">F · ${P.age} anni · ${P.born} · ${P.cf}</span><span class="alg">${P.allergy}</span><span class="grow"></span>${extra}</div>`},
+ quadro(){return `<section class="fr"><header><h3>Problemi</h3><span>${P.prob.length}</span></header><table>${P.prob.map(p=>`<tr><td class="c">${p[0]}</td><td>${p[1]}</td><td class="c r">${p[2]}</td></tr>`).join('')}</table></section>
+ <section class="fr"><header><h3>Terapie attive</h3><span>${P.ther.length}</span></header><table>${P.ther.map(t=>`<tr><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td>${t[2]}</td><td class="c r hide">ATC ${t[3]}</td></tr>`).join('')}</table></section>
+ <section class="fr"><header><h3>Misure recenti</h3><span>ultime 4</span></header><table>${P.meas.map(m=>`<tr><td>${m[0]}</td><td class="v r num">${m[1]} <span class="c">${m[2]}</span></td><td class="c">${m[3]}</td><td class="c hide">${stl(m[4],m[5])}</td></tr>`).join('')}</table></section>
+ <section class="fr"><header><h3>Controlli aperti</h3><span>${P.due.length}</span></header><table>${P.due.map(d=>`<tr><td>${d[0]}</td><td class="r">${stl(d[1],d[2])}</td></tr>`).join('')}</table></section>`},
+ scheda(){return this.shell(this.top(`<button class="btn">Azioni</button><button class="btn p" data-go="scrittura">Nuova voce</button>`)+`<div class="body"><div class="col">${this.quadro()}</div><div class="col"><section class="fr"><header><h3>Diario</h3><span>${diary().length} voci</span></header>${diary().map(d=>`<article class="dia"><div class="when">${d.d} ${d.m.slice(0,3)}<br>${d.h}</div><div><span class="ty">${d.t}</span> <span class="c">· ${d.w}</span><p>${nl(d.x)}</p><div class="by">Registrata da Dr. demo</div></div></article>`).join('')}</section></div></div>`)},
+ elenco(){const s=L[S.sel];return this.shell(`<div class="filters"><input class="inp" id="a-q" placeholder="Cerca per nome, codice fiscale o diagnosi" aria-label="Cerca" style="flex:1 1 260px"><div class="sgm"><button aria-pressed="true">In carico · ${L.length}</button><button aria-pressed="false">Da rivedere · 4</button><button aria-pressed="false">Archivio</button></div><button class="btn p">Nuova scheda</button></div>
+ <div class="lst"><div class="tb"><table><thead><tr><th>Paziente</th><th class="hide">Età</th><th class="hide">Problema principale</th><th class="hide">Ultimo contatto</th><th>Da fare</th></tr></thead><tbody>${L.map((r,i)=>`<tr class="${i===S.sel?'sel':''}" data-sel="${i}"><td><button class="rowb" data-row data-open="${i}">${r[0]}</button></td><td class="c num hide">${r[1]}</td><td class="hide">${r[2]}</td><td class="c num hide">${r[3]}</td><td class="st">${stl(r[4],r[5])}</td></tr>`).join('')}</tbody></table></div>
+ <aside class="insp" aria-label="Anteprima"><h4>${s[0]}</h4><dl><dt>Età</dt><dd>${s[1]} anni</dd><dt>Problema</dt><dd>${s[2]}</dd><dt>Ultimo contatto</dt><dd class="c">${s[3]}/2026</dd><dt>Da fare</dt><dd>${stl(s[4],s[5])}</dd></dl><button class="btn p" data-go="scheda">Apri la scheda</button><span class="c">↑ ↓ per scorrere · Invio per aprire</span></aside></div>`)},
+ scrittura(){const m=wmsg();return this.shell(this.top()+`<div class="body"><div class="col"><section class="fr"><header><h3>Nuova voce</h3><span>${S.w==='saved'?'registrata':'bozza'}</span></header><div class="ed"><div class="meta"><select class="inp" id="a-t" aria-label="Tipo"><option>Visita</option><option>Telefonata</option><option>Esami</option></select><select class="inp" id="a-l" aria-label="Luogo"><option>Ambulatorio</option><option>Domicilio</option></select><input class="inp" id="a-d" aria-label="Data e ora" value="09/10/2026 19:00"></div><textarea id="a-x" aria-label="Resoconto clinico" ${S.w==='draft'||S.w==='error'?'':'readonly'}>${e(NEW.x)}</textarea></div></section>
+ <section class="fr"><header><h3>Che cosa verrà registrato</h3><span>${ITEMS.length} elementi</span></header><ul class="wr">${ITEMS.map(i=>`<li><span class="k">${i[0]}</span><span>${i[1]}</span></li>`).join('')}</ul></section></div><div class="col">${this.quadro()}</div></div>
+ <div class="foot ${S.w==='confirm'?'cf':''}" role="status"><div class="msg"><b>${wicon()}${m[0]}</b><small>${m[1]}</small></div>${wbtns()}</div>`)},
+ mini(){return `<div class="fig"><div class="top"><h2 style="font-size:16px">${P.name}</h2><span class="facts">F · ${P.age} anni</span></div><div style="padding:12px;display:flex;flex-direction:column;gap:10px"><section class="fr"><header><h3>Terapie attive</h3><span>3</span></header><table>${P.ther.map(t=>`<tr><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td class="hide">${t[2]}</td></tr>`).join('')}</table></section><section class="fr"><header><h3>Diario</h3><span>4 voci</span></header><article class="dia"><div class="when">06 ott<br>11:20</div><div><span class="ty">Visita</span><p>${e(P.diary[0].x)}</p></div></article></section></div></div>`},
+ sito(){return `<div class="d dA site"><nav class="snav"><b>MediFlow</b>${SITE.nav.map(n=>`<span>${n}</span>`).join('')}</nav><div class="hero"><div><h2>${SITE.h}</h2><p>${SITE.l}</p><p>${SITE.s}</p><div class="cta"><button class="btn p">Scopri il gestionale</button><button class="btn">Codice su GitHub</button></div></div>${this.mini()}</div>
+ <dl class="spec"><div><dt>Dove lavora</dt><dd>In locale, nel browser dello stesso computer</dd></div><div><dt>AI</dt><dd>Facoltativa, spenta all'inizio</dd></div><div><dt>Scritture cliniche</dt><dd>Sempre confermate dal medico</dd></div><div><dt>Versione</dt><dd class="c" style="font-size:13px">${SITE.v}</dd></div></dl></div>`}
+};
+
+/* ───── B ───── */
+const B={
+ mast(){return `<nav class="mast" aria-label="Aree"><b>MediFlow</b>${NAV.map((n,i)=>`<button ${i===0?'aria-current="page" data-go="elenco"':''}>${n}</button>`).join('')}<span class="grow"></span><button>Impostazioni</button><button>Blocca</button></nav>`},
+ who(btn){return `<div class="who"><div><h2>${P.name}</h2><div class="facts">F, ${P.age} anni, nata il ${P.born} · <span class="mono">${P.cf}</span> · <span class="alg">${P.allergy}</span></div></div><div class="acts">${btn}</div></div>`},
+ side(){return `<aside class="side"><div><h3>Problemi</h3><ul class="rl">${P.prob.map(p=>`<li><span class="n">${p[1]}<small>${p[2]}</small></span><span class="v">${p[0]}</span></li>`).join('')}</ul></div>
+ <div><h3>Terapie attive</h3><ul class="rl">${P.ther.map(t=>`<li><span class="n">${t[0]}<small>${t[2]}</small></span><span class="v">${t[1]}</span></li>`).join('')}</ul></div>
+ <div><h3>Misure recenti</h3><ul class="rl">${P.meas.map(m=>`<li><span class="n">${m[0]}<small>${stl(m[4],m[5])}</small></span><span class="v num">${m[1]} ${m[2]}<small>${m[3]}</small></span></li>`).join('')}</ul></div>
+ <div><h3>Controlli aperti</h3><ul class="rl">${P.due.map(d=>`<li><span class="n">${d[0]}</span><span class="v">${stl(d[1],d[2])}</span></li>`).join('')}</ul></div></aside>`},
+ ent(d){return `<article class="ent"><div><div class="day num">${d.d}</div><div class="mo">${d.m}<br>${d.h}</div></div><div><div class="ty">${d.t}<span>${d.w} · Dr. demo</span></div><p>${nl(d.x)}</p></div></article>`},
+ scheda(){return `<div class="d dB">${this.mast()}<div class="pg">${this.who(`<button class="btn">Azioni</button><button class="btn p" data-go="scrittura">Nuova voce</button>`)}<div class="two"><section><h3>Diario <span>${diary().length} voci</span></h3>${diary().map(d=>this.ent(d)).join('')}</section>${this.side()}</div></div></div>`},
+ row(r,i,n){return `<li><button data-row data-open="${i}"><span class="o num">${String(n).padStart(2,'0')}</span><span class="n">${r[0]}<small>${r[1]} anni</small></span><span class="hide">${r[2]}</span><span class="dt num hide">${r[3]}</span><span class="st">${stl(r[4],r[5])}</span></button></li>`},
+ elenco(){const att=L.map((r,i)=>[r,i]).filter(x=>x[0][5]);const rest=L.map((r,i)=>[r,i]).filter(x=>!x[0][5]);return `<div class="d dB">${this.mast()}<div class="pg"><div class="tools"><h2>Pazienti in carico</h2><div class="acts" style="align-items:flex-end"><input class="srch" id="b-q" placeholder="Cerca per nome, codice fiscale o diagnosi" aria-label="Cerca"><button class="btn p">Nuova scheda</button></div></div>
+ <h3 class="gh">Da rivedere <span>${att.length}</span></h3><ul class="ix">${att.map((x,n)=>this.row(x[0],x[1],n+1)).join('')}</ul><h3>Tutti gli altri <span>${rest.length}</span></h3><ul class="ix">${rest.map((x,n)=>this.row(x[0],x[1],n+att.length+1)).join('')}</ul></div></div>`},
+ scrittura(){const m=wmsg();return `<div class="d dB">${this.mast()}<div class="pg">${this.who('')}<div class="two"><section><h3>Nuova voce <span>${S.w==='saved'?'registrata':'bozza'}</span></h3><div class="sheet"><div><div class="day num" style="font-family:var(--s);font-size:38px;line-height:.95">09</div><div class="mo" style="color:var(--mut);font-size:12px;margin-top:4px">ott 2026<br>19:00</div></div><div><div class="lab">Visita<span>Ambulatorio · Dr. demo</span></div><textarea id="b-x" aria-label="Resoconto clinico" ${S.w==='draft'||S.w==='error'?'':'readonly'}>${e(NEW.x)}</textarea></div></div>
+ <h3 style="margin-top:22px">Insieme alla voce <span>${ITEMS.length} elementi</span></h3><ul class="rl">${ITEMS.map(i=>`<li><span class="n">${i[1]}</span><span class="v">${i[0]}</span></li>`).join('')}</ul></section>${this.side()}</div></div>
+ <div class="band ${S.w==='confirm'?'cf':''}" role="status"><div class="msg"><b>${wicon()}${m[0]}</b>${m[1]}</div>${wbtns()}</div></div>`},
+ sito(){return `<div class="d dB"><nav class="mast"><b>MediFlow</b>${SITE.nav.map(n=>`<button>${n}</button>`).join('')}</nav><div class="shero"><h2>${SITE.h}</h2><div class="lead"><div><p>${SITE.l}</p><p class="sm">${SITE.s} ${SITE.v}.</p><div class="acts" style="margin-top:20px"><button class="btn p">Scopri il gestionale</button><button class="btn">Codice su GitHub</button></div></div>
+ <figure><div class="fig"><div style="font-family:var(--s);font-size:26px;border-bottom:1px solid var(--ink);padding-bottom:8px">${P.name}</div>${this.ent(P.diary[0])}<ul class="rl">${P.ther.map(t=>`<li><span class="n">${t[0]}<small>${t[2]}</small></span><span class="v">${t[1]}</span></li>`).join('')}</ul></div><figcaption>Una scheda di MediFlow con una paziente inventata. Esempio dimostrativo, non indicazione terapeutica.</figcaption></figure></div></div>
+ <ul class="pts">${SITE.pts.map(p=>`<li><b>${p[0]}</b><span>${p[1]}</span></li>`).join('')}</ul></div>`}
+};
+
+/* ───── C ───── */
+const C={
+ pen(){return `<nav class="pen" aria-label="Pazienti recenti"><h3>Pazienti</h3>${L.slice(0,9).map((r,i)=>`<button ${i===0?'aria-current="page"':''} data-open="${i}">${r[0]}<small>${r[2]}</small></button>`).join('')}<button data-go="elenco">Tutti i pazienti</button></nav>`},
+ dock(mid){return `<div class="dock" role="toolbar" aria-label="Comandi"><button data-go="elenco">Pazienti</button><button>Cerca ⌘K</button>${mid}<button>Blocca</button></div>`},
+ plane(fresh){const full=S.dens==='full';return `<main class="plane"><div class="hd"><div><h2>${P.name}</h2><div class="facts">F · ${P.age} anni · nata il ${P.born} · <span class="mono">${P.cf}</span></div></div><span class="alg">▲ ${P.allergy}</span></div>
+ <div class="rowc"><div class="pills" role="group" aria-label="Sezione"><button aria-pressed="true">Riepilogo</button><button aria-pressed="false">Diario</button><button aria-pressed="false">Terapie</button><button aria-pressed="false">Documenti</button></div><div class="pills" role="group" aria-label="Dettaglio"><button aria-pressed="${!full}" data-dens="ess">Essenziale</button><button aria-pressed="${full}" data-dens="full">Completo</button></div></div>
+ <div class="sec"><div><h3 class="t">Terapie attive</h3>${P.ther.map(t=>`<div class="li"><span><b>${t[0]}</b><small>${t[2]}${full?' · ATC '+t[3]:''}</small></span><span class="v">${t[1]}</span></div>`).join('')}
+ <h3 class="t">Controlli aperti</h3>${P.due.map(d=>`<div class="li"><span><b>${d[0]}</b></span><span class="v">${stl(d[1],d[2])}</span></div>`).join('')}</div>
+ <div><h3 class="t">Misure recenti</h3>${P.meas.map(m=>`<div class="li"><span><b>${m[0]}</b><small>${stl(m[4],m[5])}</small></span><span class="v num">${m[1]} ${m[2]}<small>${m[3]}</small></span></div>`).join('')}
+ ${full?`<h3 class="t">Problemi</h3>${P.prob.map(p=>`<div class="li"><span><b>${p[1]}</b><small>${p[2]}</small></span><span class="v">${p[0]}</span></div>`).join('')}`:''}</div></div>
+ <h3 class="t">Diario</h3>${diary().slice(0,full?9:3).map((d,i)=>`<article class="en ${fresh&&i===0?'fresh':''}"><div class="h"><b>${d.t}</b><span>${d.d} ${d.m} · ${d.w}</span></div><p>${nl(d.x)}</p>${full?`<div class="aud">Registrata alle ${d.h} da Dr. demo</div>`:''}</article>`).join('')}</main>`},
+ scheda(){return `<div class="d dC">${this.pen()}${this.plane(false)}${this.dock(`<button class="p" data-go="scrittura">Nuova voce</button>`)}</div>`},
+ grp(t,rows){return `<h3 class="t">${t}</h3><div class="grp">${rows.map(x=>`<button data-row data-open="${x[1]}"><span><b>${x[0][0]}</b><small>${x[0][1]} anni · ${x[0][2]}</small></span><span class="tr">${stl(x[0][4],x[0][5])}<br>${x[0][3]}</span><span class="ch" aria-hidden="true">›</span></button>`).join('')}</div>`},
+ elenco(){const a=L.map((r,i)=>[r,i]);return `<div class="d dC one"><main class="plane"><div class="hd"><h2>Pazienti in carico</h2><button class="btn p">Nuova scheda</button></div><div style="margin:14px 0 4px"><input class="search" id="c-q" placeholder="Cerca per nome, codice fiscale o diagnosi" aria-label="Cerca"></div>${this.grp('Da rivedere',a.filter(x=>x[0][5]))}${this.grp('Tutti gli altri',a.filter(x=>!x[0][5]))}</main>${this.dock(`<button class="p">Nuova scheda</button>`)}</div>`},
+ scrittura(){const m=wmsg();if(S.w==='saved')return `<div class="d dC">${this.pen()}${this.plane(true)}${this.dock(`<span class="toast" role="status"><span class="sem-ok">✓ </span>${m[0]}</span><button class="p" data-go="scheda">Fatto</button>`)}</div>`;
+ return `<div class="d dC wr">${this.pen()}<div inert aria-hidden="true" style="min-width:0">${this.plane(false)}</div><div class="veil"></div>
+ <section class="sh" role="dialog" aria-label="Nuova voce"><div class="idn"><b>${P.name}, ${P.age} anni</b><span class="draft">● ${S.w==='error'?'Bozza intatta':'Bozza non registrata'}</span></div><div class="facts">Visita · Ambulatorio · 9 ottobre 2026, 19:00 · <span class="alg" style="padding:2px 8px">▲ penicilline</span></div>
+ <textarea id="c-x" aria-label="Resoconto clinico" ${S.w==='draft'||S.w==='error'?'':'readonly'}>${e(NEW.x)}</textarea><div class="chips">${ITEMS.map(i=>`<div class="chip"><i>${i[0]}</i><span>${i[1]}</span></div>`).join('')}</div>
+ <div class="sf ${S.w==='confirm'?'cf':''}" role="status"><div class="msg"><b>${wicon()}${m[0]}</b>${m[1]}</div>${S.w==='draft'?`<button class="btn g" data-go="scheda">Chiudi</button>`:''}${wbtns()}</div></section></div>`},
+ sito(){return `<div class="d dC site"><div class="dock gnav"><button><b>MediFlow</b></button>${SITE.nav.map(n=>`<button>${n}</button>`).join('')}</div><div class="cen"><h2>${SITE.h}</h2><p>${SITE.l}</p><p>${SITE.s}</p><div class="cta"><button class="btn p">Scopri il gestionale</button><button class="btn g">Codice su GitHub</button></div></div>
+ <div inert>${this.plane(false)}</div><div class="tri">${SITE.pts.map(p=>`<div><b>${p[0]}</b><span>${p[1]}</span></div>`).join('')}</div><p style="text-align:center;color:var(--mut);font-family:var(--m);font-size:13px;margin-top:22px">${SITE.v}</p></div>`}
+};
+
+/* ───── D · Punto d'inchiostro ───── */
+const D={
+ wm:(cls='')=>`<span class="wm">MediFlow<i class="dot ${cls}" aria-hidden="true"></i></span>`,
+ shell(inner){return `<div class="d dD"><nav class="rail" aria-label="Aree">${this.wm('dry')}${NAV.map((n,i)=>`<button ${i===0?'aria-current="page" data-go="elenco"':''}>${n}</button>`).join('')}<div class="sp"></div><button>Impostazioni</button><button>Blocca</button></nav><div class="main"><div class="plane">${inner}</div></div></div>`},
+ hd(extra=''){return `<div class="hd"><h2>${P.name}</h2><span class="facts">F · ${P.age} anni · ${P.born} · ${P.cf}</span><span class="alg">▲ ${P.allergy}</span><span class="grow"></span>${extra}</div>`},
+ quadro(){const sv=S.w==='saved',dr=sv?'dries':'';
+  const ther=P.ther.map((t,i)=>i===0&&sv?[t[0],'10 mg',t[2],t[3],1]:t);
+  const meas=sv?[['Pressione arteriosa','142/84','mmHg','09/10','−6 sistolica dal 06/10','',1],...P.meas.slice(1)]:P.meas;
+  return `<h3>Problemi <span>${P.prob.length}</span></h3><table>${P.prob.map(p=>`<tr><td class="c">${p[0]}</td><td>${p[1]}</td><td class="c r">${p[2]}</td></tr>`).join('')}</table>
+  <h3>Terapie attive <span>${ther.length}</span></h3><table>${ther.map(t=>`<tr class="${t[4]?dr:''}"><td><b>${t[0]}</b> <span class="v">${t[1]}</span></td><td>${t[2]}</td><td class="c r hide">ATC ${t[3]}</td></tr>`).join('')}</table>
+  <h3>Misure recenti <span>ultime 4</span></h3><table>${meas.map(m=>`<tr class="${m[6]?dr:''}"><td>${m[0]}</td><td class="v r num">${m[1]} <span class="c">${m[2]}</span></td><td class="c">${m[3]}</td><td class="c hide">${stl(m[4],m[5])}</td></tr>`).join('')}</table>
+  <h3>Controlli aperti <span>${P.due.length}</span></h3><table>${P.due.map(d=>`<tr><td>${d[0]}</td><td class="r">${stl(d[1],d[2])}</td></tr>`).join('')}</table>`},
+ en(d,cls=''){return `<article class="en ${cls}"><div class="when">${d.d} ${d.m.slice(0,3)}<br>${d.h}</div><div><span class="ty">${d.t}</span> <span class="c">· ${d.w}</span><p>${nl(d.x)}</p><div class="by"><i class="dot dry" aria-hidden="true"></i>Registrata da Dr. demo</div></div></article>`},
+ scheda(){return this.shell(this.hd(`<button class="btn">Azioni</button><button class="btn p" data-go="scrittura">Nuova voce</button>`)+`<div class="body"><div>${this.quadro()}</div><div><h3>Diario <span>${diary().length} voci</span></h3>${diary().map(d=>this.en(d)).join('')}</div></div>`)},
+ elenco(){const s=L[S.sel];const mk=i=>i===0&&S.w!=='saved'?'<i class="dot" title="Bozza non registrata"></i><span class="sr">Bozza non registrata. </span>':i===2?'<i class="dot pen" title="Proposta da rivedere"></i><span class="sr">Proposta da rivedere. </span>':'<i class="nod"></i>';
+  return this.shell(`<div class="filters"><h2>Pazienti</h2><input class="inp" id="d-q" placeholder="Cerca per nome, codice fiscale o diagnosi" aria-label="Cerca" style="flex:1 1 240px"><div class="sgm"><button aria-pressed="true">In carico · ${L.length}</button><button aria-pressed="false">Da rivedere · 4</button><button aria-pressed="false">Archivio</button></div><button class="btn p">Nuova scheda</button></div>
+  <div class="lst"><div class="tb"><table><thead><tr><th>Paziente</th><th class="hide">Età</th><th class="hide">Problema principale</th><th class="hide">Ultimo contatto</th><th>Da fare</th></tr></thead><tbody>${L.map((r,i)=>`<tr class="${i===S.sel?'sel':''}" data-sel="${i}"><td><button class="rowb" data-row data-open="${i}">${mk(i)}${r[0]}</button></td><td class="c num hide">${r[1]}</td><td class="hide">${r[2]}</td><td class="c num hide">${r[3]}</td><td>${stl(r[4],r[5])}</td></tr>`).join('')}</tbody></table></div>
+  <aside class="insp" aria-label="Anteprima"><h4>${s[0]}</h4><dl><dt>Età</dt><dd>${s[1]} anni</dd><dt>Problema</dt><dd>${s[2]}</dd><dt>Ultimo contatto</dt><dd class="c">${s[3]}/2026</dd><dt>Da fare</dt><dd>${stl(s[4],s[5])}</dd></dl><button class="btn p" data-go="scheda">Apri la scheda</button><span class="c">↑ ↓ per scorrere · Invio per aprire</span></aside></div>
+  <div class="leg"><span><i class="dot pen"></i>Matita: proposta da rivedere</span><span><i class="dot"></i>Inchiostro fresco: bozza tua, non registrata</span><span><i class="dot dry"></i>Inchiostro asciutto: in cartella</span></div>`)},
+ scrittura(){const m=wmsg(),sv=S.w==='saved',ed=S.w==='draft'||S.w==='error';
+  const n=ITEMS.length+(S.prop==='acc'?1:0);
+  const prop=S.prop==='rej'?'':S.prop==='acc'?`<li><i class="dot"></i><span class="k">Misura</span><span class="fresh">Frequenza cardiaca media 74 bpm</span><span class="c">dal referto Holter</span></li>`:`<li><i class="dot pen"></i><span class="k">Proposta</span><span class="pencil">Frequenza cardiaca media 74 bpm, dal referto Holter dell'8 ottobre</span><span class="mini">${ed?`<button class="btn" data-prop="rej">Scarta</button><button class="btn" data-prop="acc">Accetta</button>`:''}</span></li>`;
+  const live=sv?this.en(NEW,'').replace('<p>','<p class="dries">').replace('class="dot dry"','class="dot set"').replace('Registrata da','Registrata alle 19:02 da'):
+  `<article class="en live"><div class="when">09 ott<br>19:00</div><div><div class="state fresh"><i class="dot"></i>${S.w==='error'?'Bozza intatta':'Bozza non registrata'}</div><div style="margin-top:4px"><span class="ty">Visita</span> <span class="c">· Ambulatorio</span></div>
+  <textarea id="d-x" aria-label="Resoconto clinico" ${ed?'':'readonly'}>${e(NEW.x)}</textarea><ul class="it">${ITEMS.map(i=>`<li><i class="dot"></i><span class="k">${i[0]}</span><span class="fresh">${i[1]}</span><span></span></li>`).join('')}${prop}</ul></div></article>`;
+  const txt={draft:[m[0],n+' elementi pronti per la scheda di '+P.name+'.'+(S.prop==='pencil'?' Una proposta a matita resta fuori finché non la accetti.':'')],confirm:[m[0],'1 voce di diario, '+(n-2)+(n-2>1?' misure':' misura')+', 1 modifica di terapia. La scrittura è unica: o tutto o niente.'],saved:[m[0],n+' elementi scritti e tracciati a nome di Dr. demo.']}[S.w]||m;
+  const dot=sv?'<i class="dot set"></i>':S.w==='error'?'':'<i class="dot"></i>';
+  return this.shell(this.hd()+`<div class="body wr"><div>${this.quadro()}</div><div><h3>Diario <span>${P.diary.length+1} voci</span></h3>${live}${P.diary.map(d=>this.en(d,sv?'':'dim')).join('')}</div></div>
+  <div class="foot ${S.w==='confirm'?'cf':''}" role="status"><div class="msg"><b>${S.w==='error'?wicon():dot}${txt[0]}</b><small>${txt[1]}</small></div>${wbtns().replace('Registra 3 elementi','Registra '+n+' elementi')}</div>`)},
+ sito(){return `<div class="d dD site"><nav class="snav">${this.wm('dry')}${SITE.nav.map(n=>`<span>${n}</span>`).join('')}</nav><div class="hero"><div><h2>La cura ha una storia<i class="dot set" aria-hidden="true"></i></h2><p>${SITE.l}</p><p>${SITE.s}</p><div class="cta"><button class="btn p">Scopri il gestionale</button><button class="btn">Codice su GitHub</button></div></div>
+  <div class="figw" inert><div class="plane">${this.hd()}<div class="body" style="grid-template-columns:1fr"><div><h3>Diario <span>4 voci</span></h3><article class="en"><div class="when">09 ott<br>19:00</div><div><div class="state fresh"><i class="dot"></i>Bozza non registrata</div><p class="fresh">Cardiopalmo ridotto dopo la visita del 6 ottobre. PA 142/84 mmHg.</p><p class="pencil" style="font-size:15px">Proposta: frequenza cardiaca media 74 bpm, dal referto Holter</p></div></article>${this.en(P.diary[0])}</div></div></div></div></div>
+  <div class="inks"><div><b><i class="dot pen"></i>Matita</b><span>Lo propone un modello o un agente. Non è in cartella finché non lo accetti.</span></div><div><b class="fresh"><i class="dot"></i>Inchiostro fresco</b><span>Lo stai scrivendo tu. Resta una bozza finché non confermi.</span></div><div><b><i class="dot dry"></i>Inchiostro asciutto</b><span>È registrato in cartella, con data, ora e autore.</span></div></div>
+  <p style="padding:0 32px 36px;max-width:1180px;margin:0 auto;color:var(--mut);font-family:var(--m);font-size:12.5px">${SITE.v} · Funziona in locale · L'AI è facoltativa</p></div>`},
+ card(btnTxt='Registra 3 elementi'){return `<div class="cnt"><div class="nm">${P.name}</div><div class="row fresh"><i class="dot"></i><b>Bozza non registrata</b></div><p class="ln fresh">Cardiopalmo ridotto. PA 142/84 mmHg. Ramipril da 5 a 10 mg.</p><p class="ln pencil" style="font-size:14px">Proposta: FC media 74 bpm, dal referto Holter</p><button class="btn p">${btnTxt}</button></div>`},
+ famiglia(){return `<div class="d dD fam"><div class="famg">
+  <div class="pf"><span>macOS</span><div class="win mac"><div class="tbar"><span class="tl"><i></i><i></i><i></i></span>${this.wm('dry').replace('class="wm"','class="wm" style="font-size:16px"')}</div>${this.card()}</div></div>
+  <div class="pf"><span>Windows</span><div class="win wnd"><div class="tbar">${this.wm('dry').replace('class="wm"','class="wm" style="font-size:16px"')}<span>─ &nbsp;☐ &nbsp;✕</span></div>${this.card()}</div></div>
+  <div class="pf"><span>Linux</span><div class="win gtk"><div class="tbar">${P.name}</div>${this.card()}</div></div>
+  <div class="pf"><span>iPhone</span><div class="win ios"><div class="tbar">Nuova voce</div>${this.card('Registra')}</div></div>
+  <div class="pf"><span>Mini, a riga di comando</span><div class="cli">MediFlow. › paziente Moretti Elena
+<span class="pn">○ matita    FC media 74 bpm (referto Holter 08/10)</span>
+<span class="fr">● fresco    Visita 09/10 19:00 · 3 elementi</span>
+● asciutto  Visita 06/10 11:20
+
+Registrare 3 elementi nella scheda di Moretti Elena? [s/N]</div></div>
+  <div class="pf"><span>Sito</span><div class="win" style="border-radius:12px"><div class="cnt"><div class="nm" style="font-size:34px;letter-spacing:-.02em">La cura ha una storia<i class="dot dry"></i></div><div class="row"><i class="dot pen"></i>Matita &nbsp;<i class="dot"></i><span class="fresh">Fresco</span> &nbsp;<i class="dot dry"></i>Asciutto</div></div></div></div></div>
+  <div class="same"><div><b>Che cosa non cambia mai</b><span>Il punto. I tre inchiostri e i loro nomi. Il serif per nomi dei pazienti e prosa clinica. Il mono per dosi, codici e date. Le parole dei comandi.</span></div><div><b>Che cosa segue la piattaforma</b><span>Il carattere dei controlli, che è quello di sistema. Finestre, barre, raggi, posizione del comando principale. La scrittura avviene sempre nel diario, in cima: su telefono sale sopra il quadro.</span></div><div><b>Dove sta il gioco</b><span>Nel punto che cade e si posa quando registri, e chiude il titolo del sito. Con la riduzione del movimento cambia solo colore.</span></div></div></div>`}
+};
+
+/* ───── cornice di confronto ───── */
+const DIRS=[['oggi','Oggi'],['D','Punto d\'inchiostro'],['A','A · Strumento'],['B','B · Registro'],['C','C · Luce e inchiostro'],['cmp','Confronto']];
+const SCRS=[['scheda','Scheda paziente'],['elenco','Elenco'],['scrittura','Scrittura con conferma'],['sito','Home del sito']];
+const NOTES={
+ D:'<b>Punto d\'inchiostro.</b> La sintesi dopo la tua scelta: struttura densa di A, voce serif di B, luce e inchiostro di C. La cifra è un punto e tre inchiostri: matita per ciò che propone un modello, inchiostro fresco per ciò che stai scrivendo, inchiostro asciutto per ciò che è in cartella. Prova Scrittura con conferma, poi Famiglia.',
+ A:'<b>Strumento.</b> Un banco calibrato: aree a sinistra, piani bianchi separati da filetti, tabelle vere al posto delle card, mono per dosi, codici e date. Tutto il quadro del paziente sta in una schermata. Da tastiera il passaggio è immediato, senza animazioni.',
+ B:'<b>Registro.</b> La cartella come pagina: nome e prosa clinica in serif, data grande in margine, filetti al posto delle scatole, nessun colore fuori dagli stati clinici. La conferma è una soglia scura che chiude la pagina.',
+ C:'<b>Luce e inchiostro.</b> Un solo piano illuminato sul contesto in penombra, comandi in un dock, scrittura in un foglio che sale sopra la scheda. La bozza è in inchiostro blu e diventa nera quando è registrata. Il dettaglio si allarga con Essenziale e Completo.'};
+const OGGI={
+ scheda:['oggi-scheda-riepilogo.jpg',['A 1440 px la scheda usa una colonna centrale: metà dello schermo resta vuota e per vedere terapie, misure e diario bisogna cambiare sezione o scorrere.','Diagnosi, titoli di sezione e valori hanno quasi lo stesso peso. Il dato che conta (129 mmHg, in aumento) non si distingue dal resto.','Due righe di navigazione più la riga delle schede aperte occupano la parte alta prima di qualunque dato clinico.']],
+ elenco:['oggi-elenco.jpg',['A 1440×900 si vedono tre pazienti e mezzo: ogni riga è una card, e titolo, filtri e ricerca occupano oltre metà dello schermo.','Lo stato del paziente è un punto grigio senza etichetta.','Pulsanti neri a pillola, card arrotondate e grigio-azzurro: corretto, ma potrebbe essere qualunque gestionale.']],
+ scrittura:['oggi-scrittura.jpg',['Chi scrive non vede terapie, misure e allergie: il nome del paziente è piccolo, in alto a destra.','Menu e campo data del browser stanno accanto a controlli disegnati.','A 900 px di altezza il comando che registra è sotto la piega.']],
+ sito:['oggi-sito-home.jpg',['Titolo molto grande e pannelli arrotondati: la pagina è curata nei testi, ma la forma non dice che si tratta di uno strumento clinico.','Il prodotto compare in piccolo, a lato.','Sito e applicazione condividono la palette, non un gesto riconoscibile.']]};
+function seg(id,items,key){document.getElementById(id).innerHTML=items.map(i=>`<button aria-pressed="${S[key]===i[0]}" data-set="${key}:${i[0]}">${i[1]}</button>`).join('')}
+function cmp(){return `<section class="cmp"><h2>Le tre direzioni a confronto</h2><div class="tw"><table><thead><tr><th></th><th>A · Strumento</th><th>B · Registro</th><th>C · Luce e inchiostro</th></tr></thead><tbody>
+<tr><th>Struttura</th><td>Aree a sinistra, elenco con anteprima, scheda a due colonne tutta visibile</td><td>Pagina unica con testata, diario come colonna principale e quadro a lato</td><td>Un piano in luce, contesto in penombra, dock e fogli</td></tr>
+<tr><th>Tipografia</th><td>IBM Plex Sans e Mono, 13 px, numeri tabulari</td><td>Newsreader per nome e prosa, Hanken Grotesk per etichette, mono per i dati</td><td>Carattere di sistema della piattaforma, 15 px</td></tr>
+<tr><th>Colore</th><td>Neutri freddi, blu minerale solo per selezione e azione</td><td>Bianco e nero, colore solo per gli stati clinici</td><td>Grigio luminoso, blu per azione e bozza</td></tr>
+<tr><th>Densità</th><td>Alta: 14 pazienti visibili in questa finestra a 1440×900 (oggi 3), righe da 36 px, 44 px al tocco</td><td>Media: 8 pazienti visibili, righe da 48 px, prosa a 18 px</td><td>Progressiva: 8 pazienti visibili, righe da 56 px, due livelli di dettaglio</td></tr>
+<tr><th>Movimento</th><td>Nessuno nei gesti ripetuti</td><td>Nessuno, solo il cambio di stato della soglia</td><td>Foglio che sale in 240 ms, inchiostro che asciuga, fermo con riduzione del movimento</td></tr>
+<tr><th>Conferma</th><td>Barra in basso che diventa scura, elenco di ciò che verrà scritto</td><td>Soglia scura a tutta larghezza in fondo alla pagina</td><td>Piede del foglio che diventa scuro, poi la voce compare nel diario</td></tr>
+<tr><th>Reference</th><td>Sales CRM di Marcel Kargul (elenco, filtri, dettaglio), Frame e Table di coss, griglie di ReUI, Emil Kowalski</td><td>New Form e Seline su Refero Styles, direzioni editoriali del 1 settembre (ordinale dominante, indice continuo, soglia orizzontale scura)</td><td>Fluid Functionalism (tre velocità, uscita più rapida), Apple su Refero Styles, Breccia, scelta luce e inchiostro del 14 luglio</td></tr>
+<tr><th>Rischio</th><td>Può sembrare uno strumento per sviluppatori</td><td>Meno pazienti per schermata, serif da provare su schermi a bassa densità</td><td>La più costosa sul web, densità minore, effetto che invecchia</td></tr>
+<tr><th>Distanza da Lume</th><td>Breve: stessi registri, nuova struttura</td><td>Media: nuova voce tipografica, via l'accento</td><td>Lunga sul web, breve sulle app Apple</td></tr></tbody></table></div>
+<p><b>Scelta del 9 ottobre.</b> Ibrido di A e B con luce e inchiostro di C. La sintesi è la direzione Punto d'inchiostro, che aggiunge la cifra comune a tutte le piattaforme.</p></section>`}
+function render(){
+ if(S.dir!=='D'&&S.scr==='famiglia')S.scr='scheda';seg('segD',DIRS,'dir');seg('segS',S.dir==='D'?[...SCRS,['famiglia','Famiglia']]:SCRS,'scr');seg('segV',[['d','Desktop'],['m','390 px']],'vw');
+ const st=document.getElementById('stage'),nt=document.getElementById('note');
+ document.getElementById('segS').hidden=S.dir==='cmp';document.getElementById('segV').hidden=S.dir==='cmp'||S.dir==='oggi';
+ if(S.dir==='cmp'){nt.textContent='';st.innerHTML=cmp();return}
+ if(S.dir==='oggi'){const o=OGGI[S.scr];nt.innerHTML='<b>Stato attuale.</b> Schermate reali: applicazione web su main con 60 pazienti inventati, sito pubblico come appare oggi.';st.innerHTML=`<div class="oggi"><img src="${o[0]}" alt="Schermata attuale: ${S.scr}"><div><h2>Che cosa è debole</h2><ul>${o[1].map(x=>`<li>${x}</li>`).join('')}</ul></div></div>`;return}
+ nt.innerHTML=NOTES[S.dir];
+ const R={A,B,C,D}[S.dir];
+ st.innerHTML=`<div class="frame ${S.vw==='m'?'m':''}">${R[S.scr]()}</div>`;
+}
+function go(scr){if(scr!=='scrittura'||S.scr!=='scrittura'){if(scr==='scrittura'){S.w='draft';S.prop='pencil'}}S.scr=scr;render();window.scrollTo({top:0})}
+document.addEventListener('click',ev=>{
+ const t=ev.target.closest('[data-set],[data-go],[data-w],[data-open],[data-sel],[data-dens],[data-prop]');if(!t)return;
+ if(t.dataset.prop){S.prop=t.dataset.prop;render();return}
+ if(t.dataset.set){const[k,v]=t.dataset.set.split(':');S[k]=v;if(k==='scr'&&v==='scrittura')S.w='draft';if(k==='dir')S.w=S.w==='saved'?'saved':'draft';render();return}
+ if(t.dataset.dens){S.dens=t.dataset.dens;render();return}
+ if(t.dataset.go){go(t.dataset.go);return}
+ if(t.dataset.open!==undefined){S.sel=+t.dataset.open;go('scheda');return}
+ if(t.dataset.sel!==undefined){S.sel=+t.dataset.sel;render();return}
+ if(t.dataset.w){const w=t.dataset.w;if(w==='save'){S.w='saving';render();setTimeout(()=>{S.w=document.getElementById('err').checked?'error':'saved';render()},700)}else{S.w=w;render()}
+  const f=document.querySelector('#stage [data-w],#stage .btn.p');if(f)f.focus({preventScroll:true})}
+});
+document.addEventListener('keydown',ev=>{
+ if(S.scr!=='elenco'||!['ArrowDown','ArrowUp','j','k'].includes(ev.key))return;
+ if(ev.target.matches('input,textarea,select'))return;
+ const rows=[...document.querySelectorAll('#stage [data-row]')];if(!rows.length)return;
+ let i=rows.indexOf(document.activeElement);i=(ev.key==='ArrowDown'||ev.key==='j')?Math.min(rows.length-1,i+1):Math.max(0,i-1);
+ ev.preventDefault();
+ if(S.dir==='A'||S.dir==='D'){S.sel=+rows[i].dataset.open;render();document.querySelectorAll('#stage [data-row]')[i].focus()}else rows[i].focus();
+});
+render();
+</script>
+</body></html>

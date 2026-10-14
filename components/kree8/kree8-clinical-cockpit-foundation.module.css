@@ -3,7 +3,7 @@
 .areaShell {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 28px;
 }
 /* ───────────── area headers ───────────── */
 
@@ -53,19 +53,14 @@
 
 /* ───────────── panels & grids ───────────── */
 
-.panel {
-  background: var(--surface);
-  border-radius: var(--radius-card);
-  padding: 16px;
-  box-shadow: var(--shadow-panel);
-}
-
-.panelInset {
-  background: var(--surface-soft);
-  border-radius: var(--radius-card);
-  padding: 16px;
-  box-shadow: inset 0 1px 0 var(--surface-highlight),
-    inset 0 0 0 1px color-mix(in srgb, var(--lume-ink) 3%, transparent);
+.panel, .panelInset {
+  min-width: 0;
+  border: 0;
+  border-top: 1px solid var(--lume-rule);
+  border-radius: 0;
+  padding: 20px 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .panelHeader {
@@ -146,28 +141,16 @@
   .threeCol { grid-template-columns: 1fr; }
 }
 
-/* A card raised above the panel that holds it, which it was not.
- *
- * This drew `--surface` while its container `.panelInset` drew
- * `--surface-soft`, and the shell aliases both to `--lume-surface-field`: two
- * tokens meant to be two levels, resolving to one value. So the card was the
- * exact colour of the panel underneath it and contributed nothing but a second
- * rounded outline, inset 16px from the first. Nested a few deep that is what
- * reads as layers of glass piling up at the edge — five concentric corners
- * between this card and the page, three of them drawing a border.
- *
- * `--surface-focal` is the step that already existed for exactly this: the
- * surface that comes forward. The radius follows the concentric rule the
- * native side documents, outer minus the inset between them, so the inner
- * corner sits inside the outer one instead of tracing it. */
 .compositeCard {
-  background: var(--surface-focal);
-  border-radius: max(calc(var(--radius-card) - 16px), 6px);
-  padding: 12px 14px;
-  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--lume-rule);
+  border-radius: 0;
+  padding: 12px 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 /* ───────────── pills (status / chips) ───────────── */
@@ -853,3 +836,7 @@
 :global(html[data-runtime-twin-design='proposal']) .panelSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
 :global(html[data-runtime-twin-design='proposal']) .statLabel { font-size: var(--twin-type-caption); text-transform: none; letter-spacing: 0; }
 :global(html[data-runtime-twin-design='proposal']) .panelHeader { flex-wrap: wrap; }
+
+.pill.pill { border: 0; border-radius: 0; padding: 0; background: transparent; font-size: 13px; letter-spacing: 0; }
+.pillWarning::before, .pillCritical::before { content: '▲'; flex-shrink: 0; font-size: 11px; }
+.pillPlum { color: var(--lume-ink-pencil); text-decoration: underline dashed; text-underline-offset: 4px; }

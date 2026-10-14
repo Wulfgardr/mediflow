@@ -25,31 +25,9 @@ import {
   scanPaletteSource,
 } from './check-lume-tokens.mjs';
 
-// Minimal well-formed tokens covering every path the contract references.
+// Reuse the public token fixture so new roles cannot silently escape mutation tests.
 function validTokens() {
-  const register = (surface, ink, accent) => ({
-    surface: {
-      canvas: { $value: surface[0] },
-      field: { $value: surface[1] },
-      focal: { $value: surface[2] },
-      chrome: { $value: surface[3] },
-    },
-    ink: { primary: { $value: ink[0] }, muted: { $value: ink[1] } },
-    accent: { minerale: { $value: accent } },
-  });
-  return {
-    register: {
-      giorno: register(['#eef0f2', '#f5f5f4', '#fbfaf7', '#e6e8eb'], ['#1a1c1e', '#5c6772'], '#33506b'),
-      grafite: register(['#121417', '#191c21', '#22252b', '#0e1013'], ['#e9ecef', '#8f9aa6'], '#8fb0cc'),
-      guardia: register(['#0c0e12', '#14171d', '#1a1e26', '#090b0e'], ['#e3e8ee', '#8792a3'], '#7fa0bc'),
-    },
-    signal: {
-      warning: { $value: '#9a6a2f' },
-      critical: { $value: '#a33a2f' },
-      success: { $value: '#4b6354' },
-      plum: { $value: '#555161' },
-    },
-  };
+  return structuredClone(loadTokens());
 }
 
 test('WCAG primitives match known reference values', () => {
@@ -64,17 +42,17 @@ test('WCAG primitives match known reference values', () => {
 test('committed token source passes the whole contract', () => {
   const result = evaluateContract(loadTokens());
   assert.equal(result.pass, true);
-  assert.equal(result.checks.length, 42); // 3 registers x (2 ink x 4 surface + 2 accent + 4 signal recipes)
+  assert.equal(result.checks.length, 90); // Includes new inks and direct signals on both active registers.
   assert.ok(result.checks.every((c) => c.ratio >= c.minRatio));
   // The adjusted binding pair: giorno muted on chrome clears 4.5 with margin.
   const bind = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'ink.muted on surface.chrome',
   );
-  assert.equal(bind.ratio.toFixed(3), '4.702');
+  assert.equal(bind.ratio.toFixed(3), '5.449');
   const warningTint = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'signal.warning text on 10% signal tint',
   );
-  assert.equal(warningTint.ratio.toFixed(3), '6.579');
+  assert.equal(warningTint.ratio.toFixed(3), '8.437');
   assert.ok(
     result.checks
       .filter((c) => c.signal)
@@ -94,6 +72,9 @@ test('missing required token fails closed', () => {
   delete broken.signal.warning;
   assert.throws(() => evaluateContract(broken), /missing token: signal\.warning/);
   assert.throws(() => resolveColor(broken, 'signal.warning'), /missing token/);
+  const missingInk = validTokens();
+  delete missingInk.register.giorno.ink.pencil;
+  assert.throws(() => evaluateContract(missingInk), /missing token: register\.giorno\.ink\.pencil/);
 });
 
 test('malformed color value fails closed', () => {
@@ -128,20 +109,20 @@ test('parseCssBlocks strips comments and reads namespaced + alias declarations',
 
 test('committed CSS mirror matches the committed token source', () => {
   const summary = verifyCssMirror(loadTokens(), loadCssMirror());
-  // 3 registers x (4 surface + 2 ink + 1 accent) + 4 signals.
+  // All register-scoped roles plus the register-independent legacy plum signal.
   assert.equal(summary.tokens, expectedMirror(loadTokens()).size);
-  assert.equal(summary.tokens, 25);
+  assert.equal(summary.tokens, 64);
   assert.equal(summary.aliases, ACTIVE_ALIASES.length);
 });
 
 test('a drifted mirror value fails closed', () => {
-  const css = loadCssMirror().replace('--lume-giorno-surface-canvas: #eef0f2;', '--lume-giorno-surface-canvas: #ffffff;');
+  const css = loadCssMirror().replace('--lume-giorno-surface-canvas: #e8eaee;', '--lume-giorno-surface-canvas: #ffffff;');
   assert.throws(() => verifyCssMirror(loadTokens(), css), /mirror drift: --lume-giorno-surface-canvas/);
-  assert.throws(() => verifyCssMirror(loadTokens(), `${css}\n:root { --lume-giorno-surface-canvas: #eef0f2 }`), /duplicate token/);
+  assert.throws(() => verifyCssMirror(loadTokens(), `${css}\n:root { --lume-giorno-surface-canvas: #e8eaee }`), /duplicate token/);
 });
 
 test('a mirror missing a namespaced token fails closed', () => {
-  const css = loadCssMirror().replace('--lume-grafite-ink-muted: #8f9aa6;', '');
+  const css = loadCssMirror().replace('--lume-grafite-ink-muted: #a3acb8;', '');
   assert.throws(() => verifyCssMirror(loadTokens(), css), /mirror missing token: --lume-grafite-ink-muted/);
 });
 
@@ -306,7 +287,7 @@ test('palette guard catches neutral and fixed Tailwind color utilities', () => {
 test('palette guard accepts a declared Lume token, transparent, currentColor and non-color utilities', () => {
   const result = scanPaletteSource({
     relativePath: 'components/example.tsx',
-    source: 'const example = <div className="bg-transparent text-current whitespace-nowrap" style={{ color: "#eef0f2", background: "transparent", outlineColor: "currentColor", borderColor: "inherit", outline: "hsl(0 0% 100%)" }} />;',
+    source: 'const example = <div className="bg-transparent text-current whitespace-nowrap" style={{ color: "#e8eaee", background: "transparent", outlineColor: "currentColor", borderColor: "inherit", outline: "hsl(0 0% 100%)" }} />;',
     tokens: validTokens(),
     allowlist: [],
   });

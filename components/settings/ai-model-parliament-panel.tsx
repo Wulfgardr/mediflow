@@ -1,10 +1,9 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, Scale } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import styles from './settings-lume.module.css';
+import styles from './ai-utilities.module.css';
 
 type ParliamentLaneState =
     | 'competitive'
@@ -113,15 +112,13 @@ export default function AiModelParliamentPanel() {
     const readiness = parliament?.readiness || 'hold';
 
     return (
-        <div className="mf-section space-y-4">
-            <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                    <div className="rounded-2xl bg-amber-100/90 p-2.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
-                        <Scale className="h-5 w-5" />
-                    </div>
+        <div className={styles.panel}>
+            <div className={styles.heading}>
+                <div className={styles.headingBody}>
+                    <Scale className={styles.icon} aria-hidden="true" />
                     <div>
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Confronto modelli AI</h3>
-                        <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                        <h3 className={styles.title}>Confronto modelli AI</h3>
+                        <p className={styles.prose}>
                             Report in sola lettura su modello base, alternative, modelli protetti e candidati da rimuovere.
                         </p>
                     </div>
@@ -130,87 +127,87 @@ export default function AiModelParliamentPanel() {
                 <button
                     type="button"
                     onClick={() => void loadReport()}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/72 px-3 py-2 text-[11px] font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
+                    className={styles.button}
                 >
-                    <RefreshCw className="h-3.5 w-3.5" />
+                    <RefreshCw className={styles.icon} />
                     Aggiorna
                 </button>
             </div>
 
             {state.status === 'missing' ? (
-                <div className="rounded-[20px] border border-dashed border-slate-200/80 bg-white/60 p-4 text-xs leading-6 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                <div className={styles.row}>
                     <p>{state.message}</p>
-                    <p className="mt-2 font-mono text-[11px] text-slate-700 dark:text-slate-200">
+                    <p className={styles.code}>
                         npm run benchmark:model-parliament -- --out &lt;latest.json&gt; --markdown-out &lt;latest.md&gt;
                     </p>
                 </div>
             ) : null}
 
             {state.status === 'error' ? (
-                <div className="rounded-[20px] border border-red-200/70 bg-red-50/80 p-4 text-xs leading-6 text-red-700 dark:border-red-500/20 dark:bg-red-900/10 dark:text-red-200">
-                    <div className="flex items-center gap-2 font-semibold">
-                        <AlertTriangle className="h-4 w-4" />
+                <div role="alert" className={cn(styles.notice, styles.critical)}>
+                    <div className={styles.title}>
+                        <AlertTriangle className={styles.icon} />
                         Report non disponibile
                     </div>
-                    <p className="mt-2">{state.message}</p>
+                    <p>{state.message}</p>
                 </div>
             ) : null}
 
             {state.status === 'ready' && parliament ? (
-                <div className="space-y-4">
+                <div className={styles.sections}>
                     <div className={cn(
-                        `rounded-[20px] border p-4 ${styles.quietShadow}`,
+                        styles.notice,
                         readiness === 'prune_ready'
-                            ? 'border-emerald-200/70 bg-emerald-50/75 dark:border-emerald-500/20 dark:bg-emerald-900/10'
-                            : 'border-amber-200/70 bg-amber-50/75 dark:border-amber-500/20 dark:bg-amber-900/10'
+                            ? styles.positive
+                            : styles.warning
                     )}>
-                        <div className="flex items-start gap-2">
+                        <div className={styles.headingBody}>
                             {readiness === 'prune_ready' ? (
-                                <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600 dark:text-emerald-200" />
+                                <CheckCircle2 className={styles.icon} />
                             ) : (
-                                <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600 dark:text-amber-200" />
+                                <AlertTriangle className={styles.icon} />
                             )}
                             <div>
-                                <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                                <p className={styles.title}>
                                     Stato confronto: {readiness === 'prune_ready' ? 'pronto per revisione' : 'in attesa'}
                                 </p>
-                                <p className="mt-1 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                <p className={styles.prose}>
                                     {parliament.rationale || 'Nessuna razionale disponibile.'}
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <MetricCard label="Baseline" value={parliament.baselineModel || 'n/d'} />
-                        <MetricCard label="Challenger" value={(parliament.challengerModels || []).length > 0 ? (parliament.challengerModels || []).join(', ') : 'nessuno'} />
-                        <MetricCard label="Protetti" value={String((parliament.protectedModels || []).length)} />
-                        <MetricCard label="Candidati da rimuovere" value={String((parliament.recommendedPruneModels || []).length)} />
+                    <div className={styles.rows}>
+                        <MetricRow label="Baseline" value={parliament.baselineModel || 'n/d'} />
+                        <MetricRow label="Challenger" value={(parliament.challengerModels || []).length > 0 ? (parliament.challengerModels || []).join(', ') : 'nessuno'} />
+                        <MetricRow label="Protetti" value={String((parliament.protectedModels || []).length)} />
+                        <MetricRow label="Candidati da rimuovere" value={String((parliament.recommendedPruneModels || []).length)} />
                     </div>
 
                     {scorecard?.summary ? (
-                        <div className="space-y-3">
+                        <div className={styles.section}>
                             <div>
-                                <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Qualità, costo e copertura</h4>
+                                <h4 className={styles.title}>Qualità, costo e copertura</h4>
                             </div>
 
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                <MetricCard
+                            <div className={styles.rows}>
+                                <MetricRow
                                     label="Miglior qualità"
                                     value={scorecard.summary.bestQualityLabel || scorecard.summary.bestQualityModel || 'n/d'}
                                     meta={typeof scorecard.summary.bestQualityScore === 'number' ? `score ${scorecard.summary.bestQualityScore.toFixed(3)}` : null}
                                 />
-                                <MetricCard
+                                <MetricRow
                                     label="Miglior valore"
                                     value={scorecard.summary.bestValueLabel || scorecard.summary.bestValueModel || 'n/d'}
                                     meta={typeof scorecard.summary.bestValueScore === 'number' ? `score ${scorecard.summary.bestValueScore.toFixed(3)}` : null}
                                 />
-                                <MetricCard
+                                <MetricRow
                                     label="Challenger economico"
                                     value={scorecard.summary.bestValueChallengerLabel || scorecard.summary.bestValueChallengerModel || 'n/d'}
                                     meta={typeof scorecard.summary.fastestAvgLatencyMs === 'number' ? `fastest ${scorecard.summary.fastestAvgLatencyMs.toFixed(1)} ms` : null}
                                 />
-                                <MetricCard
+                                <MetricRow
                                     label="Aree AI"
                                     value={`${scorecard.summary.competitiveLaneCount || 0} competitive`}
                                     meta={`${scorecard.summary.advisoryLaneCount || 0} consultive`}
@@ -219,61 +216,62 @@ export default function AiModelParliamentPanel() {
                         </div>
                     ) : null}
 
-                    <ListCard
+                    <ModelList
                         title="Modelli protetti"
                         emptyLabel="Nessun modello protetto."
                         values={parliament.protectedModels || []}
                     />
-                    <ListCard
+                    <ModelList
                         title="Candidati da rimuovere"
                         emptyLabel="Nessun candidato da rimuovere."
                         values={parliament.recommendedPruneModels || []}
                     />
 
                     {scorecard?.lanes && scorecard.lanes.length > 0 ? (
-                        <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 dark:border-white/10 dark:bg-white/5">
-                            <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Copertura per area AI</h4>
-                            <div className="mt-3 space-y-3">
+                        <div className={styles.section}>
+                            <h4 className={styles.title}>Copertura per area AI</h4>
+                            <div className={styles.sections}>
                                 {scorecard.lanes.map((lane) => (
                                     <div
                                         key={lane.lane}
-                                        className="rounded-[16px] border border-slate-200/70 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-white/5"
+                                        className={styles.row}
                                     >
-                                        <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div className={styles.compact}>
                                             <div>
-                                                <p className="text-xs font-semibold text-slate-900 dark:text-white">
+                                                <p className={styles.title}>
                                                     {laneLabel(lane.lane)}
                                                 </p>
-                                                <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                                                <p className={styles.muted}>
                                                     {lane.capability}
                                                 </p>
                                             </div>
                                             <span className={cn(
-                                                'rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]',
+                                                styles.status,
                                                 laneStateClassName(lane.state),
                                             )}>
                                                 {laneStateLabel(lane.state)}
                                             </span>
                                         </div>
 
-                                        <div className="mt-3 grid gap-2 md:grid-cols-3">
-                                            <InlineMetric label="Focus" value={lane.focusCandidateLabel || lane.focusCandidateModel || 'n/d'} />
-                                            <InlineMetric label="Eseguibili" value={`${lane.runnableCandidates}/${lane.totalCandidates}`} />
-                                            <InlineMetric label="Valutati" value={`${lane.benchmarkedCandidates}/${lane.totalCandidates}`} />
+                                        <div className={styles.rows}>
+                                            <InlineRow label="Focus" value={lane.focusCandidateLabel || lane.focusCandidateModel || 'n/d'} />
+                                            <InlineRow label="Eseguibili" value={`${lane.runnableCandidates}/${lane.totalCandidates}`} />
+                                            <InlineRow label="Valutati" value={`${lane.benchmarkedCandidates}/${lane.totalCandidates}`} />
                                         </div>
 
                                         {lane.focusNote ? (
-                                            <p className="mt-3 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                                            <p className={styles.muted}>
                                                 {lane.focusNote}
                                             </p>
                                         ) : null}
 
                                         {lane.blockers.length > 0 ? (
-                                            <div className="mt-3 flex flex-wrap gap-2">
+                                            <div className={cn(styles.list, styles.warning)}>
+                                                <p className={styles.status}>Motivi di blocco</p>
                                                 {lane.blockers.map((blocker) => (
                                                     <span
                                                         key={`${lane.lane}-${blocker}`}
-                                                        className="rounded-full border border-slate-200/70 bg-white/80 px-2.5 py-1 text-[10px] font-medium text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                                                        className={styles.model}
                                                     >
                                                         {blocker}
                                                     </span>
@@ -286,8 +284,8 @@ export default function AiModelParliamentPanel() {
                         </div>
                     ) : null}
 
-                    <div className="rounded-[18px] border border-slate-200/70 bg-white/72 p-3 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                        <p>Aggiornato: <span className="font-mono text-slate-700 dark:text-slate-200">{state.payload?.updatedAt || 'n/d'}</span></p>
+                    <div className={styles.row}>
+                        <p>Aggiornato: <span className={styles.value}>{state.payload?.updatedAt || 'n/d'}</span></p>
                     </div>
                 </div>
             ) : null}
@@ -295,43 +293,43 @@ export default function AiModelParliamentPanel() {
     );
 }
 
-function MetricCard({ label, value, meta }: { label: string; value: string; meta?: string | null }) {
+function MetricRow({ label, value, meta }: { label: string; value: string; meta?: string | null }) {
     return (
-        <div className="rounded-[18px] border border-slate-200/70 bg-white/72 px-3 py-3 dark:border-white/10 dark:bg-white/5">
-            <span className="block text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{label}</span>
-            <span className="mt-2 block text-xs font-semibold text-slate-900 dark:text-white">{value}</span>
+        <div className={styles.metricRow}>
+            <span className={styles.label}>{label}</span>
+            <span className={styles.value}>{value}</span>
             {meta ? (
-                <span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">{meta}</span>
+                <span className={styles.meta}>{meta}</span>
             ) : null}
         </div>
     );
 }
 
-function ListCard({ title, values, emptyLabel }: { title: string; values: string[]; emptyLabel: string }) {
+function ModelList({ title, values, emptyLabel }: { title: string; values: string[]; emptyLabel: string }) {
     return (
-        <div className="rounded-[20px] border border-slate-200/70 bg-white/72 p-4 dark:border-white/10 dark:bg-white/5">
-            <h4 className="text-xs font-semibold text-slate-900 dark:text-white">{title}</h4>
-            <div className="mt-3 flex flex-wrap gap-2">
+        <div className={styles.row}>
+            <h4 className={styles.title}>{title}</h4>
+            <div className={styles.list}>
                 {values.length > 0 ? values.map((value) => (
                     <span
                         key={value}
-                        className="rounded-full border border-slate-200/70 bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                        className={styles.model}
                     >
                         {value}
                     </span>
                 )) : (
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{emptyLabel}</span>
+                    <span className={styles.muted}>{emptyLabel}</span>
                 )}
             </div>
         </div>
     );
 }
 
-function InlineMetric({ label, value }: { label: string; value: string }) {
+function InlineRow({ label, value }: { label: string; value: string }) {
     return (
-        <div className="rounded-[12px] border border-slate-200/70 bg-white/80 px-2.5 py-2 dark:border-white/10 dark:bg-white/5">
-            <span className="block text-[10px] uppercase tracking-[0.14em] text-slate-400 dark:text-slate-500">{label}</span>
-            <span className="mt-1 block text-[11px] font-medium text-slate-700 dark:text-slate-200">{value}</span>
+        <div className={styles.metricRow}>
+            <span className={styles.label}>{label}</span>
+            <span className={styles.value}>{value}</span>
         </div>
     );
 }
@@ -367,14 +365,14 @@ function laneStateLabel(state: ParliamentLaneState) {
 function laneStateClassName(state: ParliamentLaneState) {
     switch (state) {
         case 'competitive':
-            return 'border-emerald-200/70 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200';
+            return styles.positive;
         case 'benchmark_only':
-            return 'border-sky-200/70 bg-sky-50 text-sky-700 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200';
+            return styles.muted;
         case 'integration_pending':
-            return 'border-violet-200/70 bg-violet-50 text-violet-700 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200';
+            return styles.muted;
         case 'blocked':
-            return 'border-red-200/70 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200';
+            return styles.critical;
         default:
-            return 'border-amber-200/70 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200';
+            return styles.warning;
     }
 }

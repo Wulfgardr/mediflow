@@ -4,10 +4,10 @@
 .surface { display: grid; gap: 16px; }
 .surface > *, .selector > * { min-width: 0; }
 .card { min-width: 0; padding: 16px; border-radius: 12px; }
-/* @Codex: these guided steps retain a visible panel in the official design. */
+/* Settings share a continuous reading plane. */
 :global(html[data-runtime-twin-design='proposal']) .surface .card {
-    padding: 20px; border: 1px solid var(--lume-border-color);
-    border-radius: var(--lume-control-radius); background: var(--lume-surface-field);
+    padding: 20px 0; border: 0; border-top: 1px solid var(--lume-rule);
+    border-radius: 0; background: transparent;
 }
 .stack { display: grid; gap: 8px; min-width: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -36,3 +36,10 @@
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px; }
 .roles > div { min-width: 0; display: grid; align-content: start; gap: 8px; }
 .presetAction { font-size: 13px; line-height: 1.5; }
+
+.selector { padding: 16px 0; border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; background: transparent; }
+.presets { grid-template-columns: minmax(0,1fr); gap: 0; }
+.surface .preset { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: center; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; padding: 12px 0; background: transparent; }
+.surface .preset[aria-pressed='true'] { outline: 0; background: var(--lume-surface-selected); }
+.accountDetails { border-top: 1px solid var(--lume-rule); padding-top: 12px; }
+@media(max-width:700px) { .surface .preset { grid-template-columns: minmax(0,1fr); gap: 4px; } }

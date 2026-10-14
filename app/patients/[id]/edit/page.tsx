@@ -1,5 +1,7 @@
 'use client';
 
+import ink from '@/components/ink-secondary.module.css';
+
 import { ApiConflictError, db } from '@/lib/db';
 import { useRouter, useParams } from 'next/navigation';
 import { Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
@@ -205,7 +207,7 @@ export default function EditPatientPage() {
             patientLabel={`${patient.lastName} ${patient.firstName}`}
             navItems={workspaceNavItems}
         >
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8">
+            <div className={ink.surface + " mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8"}>
                 {patient.isArchived && (
                     <div className="mf-alert mf-alert-warning !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
                         <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--lume-signal-warning)]">

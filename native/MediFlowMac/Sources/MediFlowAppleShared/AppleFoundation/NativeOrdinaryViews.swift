@@ -19,12 +19,13 @@ struct NativeDocumentSynthesisView: View {
     @State private var attachmentId = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            Text("Documento da sintetizzare").chartGroupHeading()
             Picker("Documento da sintetizzare", selection: $attachmentId) {
                 Text("Scegli un documento").tag("")
                 ForEach(workspaceModel.attachments.filter { $0.patientId == workspaceModel.selectedPatientID }, id: \.id) { attachment in
                     Text(attachment.name).tag(attachment.id)
                 }
-            }.accessibilityIdentifier("clinical-workspace-document-synthesis-document")
+            }.labelsHidden().accessibilityIdentifier("clinical-workspace-document-synthesis-document")
             NativeOrdinaryExperience(workspaceModel: workspaceModel, function: .documentSynthesis,
                 attachmentId: attachmentId.isEmpty ? nil : attachmentId).id(attachmentId)
             Text("Il documento deve essere estraibile localmente dall’host. File non supportati o cifrati senza una lettura autorizzata non vengono inviati.")
@@ -46,7 +47,7 @@ private struct NativeOrdinaryExperience: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(function.title) con OpenAI").font(.headline)
-            Text(model.message).font(.callout).accessibilityFocused($statusFocused)
+            Text(model.message).font(.callout).fixedSize(horizontal: false, vertical: true).accessibilityFocused($statusFocused)
                 .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-status")
             if model.isWorking { ProgressView(model.phase == .generating ? "Elaborazione e chiusura…" : "Verifica in corso…") }
             if model.phase == .needsConsent, let disclosure = model.disclosure {
@@ -120,7 +121,7 @@ private struct NativeOrdinaryProposalView: View {
     let result: NativeOrdinaryJSON
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Proposta da rivedere").font(.headline)
+            Label("Proposta da rivedere", systemImage: "circle").font(.subheadline.weight(.semibold))
             switch function {
             case .patientInsight:
                 let proposal = result["preview"]["proposal"]
@@ -156,10 +157,10 @@ private struct NativeOrdinaryProposalView: View {
                     }
                 }
             }
-        }.textSelection(.enabled)
+        }.foregroundStyle(PlatformColors.pencil).textSelection(.enabled)
     }
     @ViewBuilder private func paragraph(_ value: NativeOrdinaryJSON) -> some View {
-        if let text = value.string, !text.isEmpty { Text(text) }
+        if let text = value.string, !text.isEmpty { Text(text).chartProse() }
     }
     @ViewBuilder private func lines(_ title: String, _ value: NativeOrdinaryJSON) -> some View {
         if !value.array.isEmpty {

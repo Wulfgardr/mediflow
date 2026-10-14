@@ -1,6 +1,7 @@
-/* @Codex */
+
 'use client';
 
+import styles from './clinical-register.module.css';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Eye, FileText, Loader2, RefreshCw, Trash2, Upload } from 'lucide-react';
@@ -208,7 +209,8 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     };
 
     return (
-        <div className={disclosure.documents} data-testid="patient-documents">
+        <div className={`${styles.register} ${styles.documentLayout}`} data-testid="patient-documents">
+            <div className={styles.documentRail}>
             <section aria-label="Caricamento documenti" data-document-area="upload">
                 {currentAttachments?.length === 0 && !listLoading ? (
                     <p className={disclosure.empty}>Nessun documento caricato. Aggiungi un file per consultarlo e, separatamente, richiedere una sintesi.</p>
@@ -216,16 +218,14 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                 <div
                     {...getRootProps({ role: 'button', 'aria-label': 'Carica documenti', 'aria-describedby': uploadHintId,
                         'aria-disabled': isProcessing, 'aria-busy': isProcessing })}
-                    className={cn(disclosure.upload, isDragActive
-                        ? 'lume-focal border-[color:color-mix(in_srgb,var(--lume-ink)_24%,transparent)] bg-[color:var(--lume-surface-focal)]'
-                        : 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]')}
+                    className={cn(styles.upload, isDragActive && styles.selected)}
                 >
                     <input {...getInputProps({ 'aria-hidden': true, tabIndex: -1 })} />
                     <div className={disclosure.uploadIcon} aria-hidden="true">
                         {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Upload className="h-6 w-6" />}
                     </div>
                     <p className="text-sm font-medium">Carica documenti</p>
-                    <p id={uploadHintId} className={disclosure.hint}>Scegli o trascina fino a 10 file, 25 MB ciascuno. Il caricamento salva gli allegati, senza avviare estrazione o sintesi.</p>
+                    <p id={uploadHintId} className={styles.uploadHint}>Scegli o trascina fino a 10 file, 25 MB ciascuno. Il caricamento salva gli allegati, senza avviare estrazione o sintesi.</p>
                 </div>
                 {isProcessing && (
                     <div className="mt-3 flex flex-wrap items-center gap-3" role="status">
@@ -258,20 +258,19 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                     <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Riprova elenco</button>
                 </div> : null}
                 {!listError && attachments === undefined ? <p role="status">Caricamento documenti…</p> : null}
-                {currentAttachments?.map((file) => (
-                    <article key={file.id} className={disclosure.documentRow} data-document-id={file.id}>
-                        <div className={disclosure.documentHead}>
-                            <FileText className="h-5 w-5 shrink-0" aria-hidden="true" />
-                            <div className="min-w-0 flex-1">
-                                <h4 className={disclosure.documentTitle}><PrivacyBlur>{file.name}</PrivacyBlur></h4>
+                <table className={styles.table}><thead><tr><th>Documento</th><th>Azioni</th></tr></thead>
+                {currentAttachments?.map(file => <tbody key={file.id} data-document-id={file.id}>
+                    <tr className={viewingId === file.id ? styles.selected : undefined}><td>
+                                <h4 className={styles.documentName}><PrivacyBlur>{file.name}</PrivacyBlur></h4>
                                 <p className={disclosure.hint}>Caricato il {new Date(file.createdAt).toLocaleDateString('it-IT')} · {Math.max(1, Math.ceil(file.size / 1024))} KB</p>
                                 <p className={disclosure.hint} data-testid="document-source-status">
                                     {extractingId === file.id ? 'Estrazione in corso' : localExtraction?.attachmentId === file.id
                                         ? localExtraction.status === 'available' ? 'Testo disponibile · da rivedere' : 'Revisione manuale necessaria'
                                         : 'Allegato salvato · testo non verificato in questa sessione'}
                                 </p>
-                            </div>
-                            <div className={disclosure.documentActions}>
+
+                    </td><td>
+                            <div className={styles.documentActions}>
                                 <button type="button" onClick={() => setViewingId(file.id)} disabled={!file.data || deletingId === file.id}
                                     className={disclosure.documentAction} data-lume-action="quiet" title={file.data ? 'Visualizza' : 'Contenuto file non disponibile'} aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
@@ -281,13 +280,15 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                                     <RefreshCw className={cn('h-4 w-4', extractingId === file.id && 'animate-spin')} aria-hidden="true" />Estrai testo
                                 </button>
                                 <button type="button" className={disclosure.documentAction} data-lume-action="quiet" disabled={deletingId === file.id}
-                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { setSelectedId(file.id); summaryHeading.current?.focus(); }}>Sintesi</button>
+                                    aria-label={`Prepara sintesi di ${file.name}`} onClick={() => { setSelectedId(file.id); setViewingId(file.id); summaryHeading.current?.focus(); }}>Sintesi</button>
                                 <button type="button" onClick={() => handleDelete(file)} disabled={deletingId !== null}
                                     className={`${disclosure.documentAction} ${disclosure.removeAction}`} data-lume-action="quiet" aria-label={`Elimina ${file.name}`}>
                                     <Trash2 className="h-4 w-4" aria-hidden="true" />{deletingId === file.id ? 'Eliminazione…' : 'Elimina'}
                                 </button>
                             </div>
-                        </div>
+
+                    </td></tr>
+                    {(deleteErrorId === file.id || extractingId === file.id || localExtraction?.attachmentId === file.id) && <tr><td colSpan={2}>
                         {deleteErrorId === file.id && <div className="mt-3" role="alert">
                             <p>Eliminazione non confermata. Rileggi l’elenco prima di riprovare.</p>
                             <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={refreshAttachments} disabled={listLoading}>Rileggi elenco</button>
@@ -307,8 +308,10 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             <p>{localExtraction.status === 'interrupted' ? 'Attesa interrotta. Puoi riprovare con “Estrai testo”.' : 'Testo locale non disponibile. Apri il documento per la revisione manuale o riprova con “Estrai testo”.'}</p>
                             {localExtraction.status === 'review_required' && <details className={disclosure.disclosure}><summary>Dettagli estrazione</summary><p>review_required · esito non confermato</p><p>Un errore di rete o di sessione non dimostra unsupported_local_extraction.</p></details>}
                         </div>}
-                    </article>
-                ))}
+
+                    </td></tr>}
+                </tbody>)}
+                </table>
             </section>
 
             {Boolean(currentAttachments?.length) || children ? (
@@ -319,7 +322,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                         <label className="mt-3 grid min-w-0 gap-2">
                             Documento da sintetizzare
                             <select className="min-h-11 min-w-0 max-w-full rounded-xl border bg-[color:var(--lume-surface-field)] px-3 py-2"
-                                value={selectedAttachment?.id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
+                                value={selectedAttachment?.id ?? ''} onChange={(event) => { setSelectedId(event.target.value); setViewingId(event.target.value || null); }}>
                                 <option value="">Scegli un documento</option>
                                 {currentAttachments?.map((file, index) => <option key={file.id} value={file.id}>{isPrivacyMode ? `Documento ${index + 1}` : file.name}</option>)}
                             </select>
@@ -342,7 +345,12 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                     {children}
                 </section>
             ) : null}
-            {viewingFile?.data && <DocumentViewer file={viewingFile.data} fileName={viewingFile.name} onClose={() => setViewingId(null)} />}
+            </div>
+            <aside className={styles.documentOriginal} aria-label="Originale del documento">
+                <h3>Originale</h3>
+                {viewingFile?.data ? <DocumentViewer key={viewingFile.id} inline file={viewingFile.data} fileName={viewingFile.name} onClose={() => setViewingId(null)} />
+                    : <p className={styles.empty}>Apri un documento dall’elenco per consultare l’originale accanto alle proposte.</p>}
+            </aside>
         </div>
     );
 }

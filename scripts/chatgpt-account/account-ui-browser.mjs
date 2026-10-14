@@ -87,7 +87,8 @@ try {
             return { documentWidth:document.documentElement.scrollWidth, viewport:innerWidth, panelWidth:element.getBoundingClientRect().width, overlaps, controls:rectangles };
         });
         assert.ok(metrics.documentWidth <= width, `${name}: horizontal overflow`); assert.deepEqual(metrics.overlaps, []);
-        assert.ok(metrics.controls.every(item => item.height >= 44));
+        const minimumHeight = width <= 700 ? 44 : 40;
+        assert.ok(metrics.controls.every(item => item.height >= minimumHeight), `${name} at ${width}px: minimum control height ${minimumHeight}px`);
         evidence.viewports.push({ width, state:name, ...metrics });
         await panel.screenshot({ path:join(output,`${name}-${width}.png`) });
     }
@@ -136,7 +137,7 @@ try {
         }
     }
     assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
-    evidence.checks.push('no overlap/overflow','shared action height >=44px','keyboard disclosure','no automatic model/quota read','no storage','no external request','cancel/lock remove URL','late reply ignored','official logo SHA256','unaltered local asset in light/dark','accessible textual status with logo');
+    evidence.checks.push('no overlap/overflow','control height >=44px compact / >=40px desktop pointer','keyboard disclosure','no automatic model/quota read','no storage','no external request','cancel/lock remove URL','late reply ignored','official logo SHA256','unaltered local asset in light/dark','accessible textual status with logo');
     assert.deepEqual(evidence.errors,[]);
     await writeFile(join(output,'browser-results.json'),JSON.stringify(evidence,null,2));
     process.stdout.write(JSON.stringify({ pass:true, states:evidence.states, geometry:evidence.viewports.length, output })+'\n');

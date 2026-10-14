@@ -103,6 +103,7 @@ function revealFocusedRailControl(event: FocusEvent<HTMLElement>): void {
 function AreaContent({
   area,
   filter,
+  setFilter,
   agendaBridge,
   patientState,
   agendaState,
@@ -119,6 +120,7 @@ function AreaContent({
 }: {
   area: AreaId;
   filter: StatusFilter;
+  setFilter: (filter: StatusFilter) => void;
   agendaBridge: ClinicalAgendaBridgeClientState;
   patientState: Kree8PatientClientState;
   agendaState: Kree8AgendaClientState;
@@ -138,6 +140,7 @@ function AreaContent({
       return (
         <TurnoArea
           filter={filter}
+          setFilter={setFilter}
           agendaBridge={agendaBridge}
           patientState={patientState}
           agendaState={agendaState}
@@ -638,6 +641,7 @@ export function Kree8ClinicalCockpit({
             ) : null}
             <div className={styles.focusContent}>
               <AreaContent
+                setFilter={setFilter}
                 area={area}
                 filter={filter}
                 agendaBridge={agendaBridge}

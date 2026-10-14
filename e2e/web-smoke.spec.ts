@@ -115,14 +115,14 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(lockScreen.getByLabel('PIN operatore')).toBeVisible();
 
   await bootstrapUnlockedSession(page, pin);
+  await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
+    .getByRole('link', { name: 'Pazienti', exact: true }).click();
 
-  // WUL-274/Kree8: the patients list moved into the cockpit "incarico" area
-  // (components/kree8/areas/incarico-area.tsx). The cockpit toolbar exposes a
-  // "Cerca nella lista pazienti" trigger (components/kree8/cockpit-shared.tsx)
-  // that focuses the incarico search field (aria-label "Cerca nella lista pazienti").
-  await page.getByRole('button', { name: 'Cerca nella lista pazienti' }).click();
+  // Search is now a persistent field in the patient list, without a toolbar trigger.
   const patientsSearch = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
   await expect(patientsSearch).toBeVisible({ timeout: 20_000 });
+  await patientsSearch.focus();
+  await expect(patientsSearch).toBeFocused();
 
   // Scope chips ("Attivi" / "Archivio") replaced the old view-mode toggles.
   await page.getByRole('button', { name: 'Archivio' }).click();
@@ -199,7 +199,7 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(returnToPatients).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/[?&]area=incarico/);
-  await expect(page.getByRole('heading', { name: 'Pazienti in carico', level: 1, exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pazienti', level: 1, exact: true })).toBeVisible();
   await expect(patientsSearch).toBeVisible();
 });
 

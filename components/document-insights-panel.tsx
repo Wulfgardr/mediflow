@@ -1,5 +1,6 @@
 'use client';
 
+import styles from './clinical-register.module.css';
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { ApiConflictError, db, DocumentInsight, Patient } from '@/lib/db';
@@ -40,14 +41,12 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
         });
     };
 
-    /* @Codex */
     const qualityTone = (level?: string) => {
         if (level === 'green') return 'border-[color:color-mix(in_srgb,var(--lume-signal-success)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-success)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-success)_60%,var(--lume-ink))]';
         if (level === 'red') return 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]';
         return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
     };
 
-    /* @Codex */
     const persistArchive = async (nextInsights: DocumentInsight[], action: string | 'all') => {
         if (typeof patient.version !== 'number') {
             showToast({
@@ -87,7 +86,6 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
         }
     };
 
-    /* @Codex */
     const handleRemoveInsight = async (insightId: string, fileName: string) => {
         const { confirmed } = await confirm({
             title: 'Rimuovere la sintesi archiviata?',
@@ -101,7 +99,6 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
         await persistArchive(nextInsights, insightId);
     };
 
-    /* @Codex */
     const handleClearArchive = async () => {
         const { confirmed } = await confirm({
             title: 'Svuotare le sintesi archiviate?',
@@ -132,7 +129,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
             </div>
 
             {insights.map((insight) => (
-                <article key={insight.id} className={disclosure.archiveRow} data-expanded={expandedId === insight.id}>
+                <article key={insight.id} className={styles.documentRow} data-expanded={expandedId === insight.id}>
                     <div className={disclosure.archiveHead}>
                         <button
                             type="button"
@@ -142,7 +139,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                             aria-controls={`document-insight-${insight.id}`}
                         >
                             <span className={disclosure.archiveLabel}>
-                                <span className={disclosure.documentTitle}>{insight.fileName}</span>
+                                <span className={styles.documentName}>{insight.fileName}</span>
                                 <span className={disclosure.hint}>Archiviata il {formatDate(insight.date)}</span>
                                 <span className={disclosure.archiveMetadata}>
                                     {insight.quality?.level && (
@@ -174,7 +171,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
 
                     <div id={`document-insight-${insight.id}`} hidden={expandedId !== insight.id}>
                         {expandedId === insight.id && (
-                            <div className={disclosure.archiveContent}>
+                            <div className={styles.proposalRow}>
                                 {Array.isArray(insight.extractedData?.diagnoses) && insight.extractedData.diagnoses.length > 0 && (
                                     <div className="flex flex-wrap gap-2">
                                         {insight.extractedData.diagnoses.map((diagnosis) => (

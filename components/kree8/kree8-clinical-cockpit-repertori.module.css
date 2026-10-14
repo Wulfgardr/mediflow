@@ -1,81 +1,10 @@
-/* ───────────── AIFA freshness panel (white + semantic rail) ───────────── */
-
-.freshness {
-  position: relative;
-  border-radius: 18px;
-  padding: 16px 18px;
-  color: var(--ink);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--surface);
-  overflow: hidden;
-  box-shadow:
-    inset 0 1px 0 var(--surface-highlight),
-    0 0 0 1px var(--line-strong);
-}
-
-.freshnessLabel { display: flex; flex-direction: column; gap: 2px; }
-
-.freshnessTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.freshnessTitle::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ink-faint);
-}
-
-.freshnessSub { font-size: 12px; color: var(--ink-muted); }
-
-.freshnessNum {
-  margin-left: auto;
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.freshnessOk .freshnessTitle::before { background: var(--lume-signal-success); }
-
-.freshnessStale .freshnessTitle::before { background: var(--lume-signal-warning); }
-
-.freshnessBroken .freshnessTitle::before { background: var(--lume-signal-critical); }
-
-/* ───────────── catalogs list ───────────── */
-
-.catalogRow {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1.4fr) 1fr 110px 96px;
-  gap: 12px;
-  align-items: center;
-  padding: 9px 4px;
-  border-bottom: 1px solid var(--line);
-  transition: background var(--lume-dur-fuoco) var(--lume-ease);
-}
-
-.catalogRow:last-child { border-bottom: 0; }
-
-.catalogRow:hover { background: var(--surface-soft); border-radius: 10px; }
-
-.catalogIcon {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  background: var(--surface-soft);
-  color: var(--ink-muted);
-}
-
-.catalogName { font-size: 13px; color: var(--ink); font-weight: 500; }
-
-.catalogSub { font-size: 11px; color: var(--ink-subtle); }
+.catalogRow, .catalogHeader { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto; align-items: center; gap: 16px; }
+.catalogHeader { min-height: 36px; margin-top: 16px; border-bottom: 1px solid var(--lume-rule-strong); color: var(--lume-ink-muted); font-size: 12px; }
+.catalogRow { min-height: 44px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule); }
+.catalogRow[data-selected='true'] { background: var(--lume-surface-selected); }
+.catalogName { font-size: 14px; font-weight: 500; }
+.catalogSub { font-size: 13px; color: var(--lume-ink-muted); }
+.detail { display: grid; gap: 12px; padding-top: 20px; border-top: 1px solid var(--lume-rule); }
+.detail p { margin: 0; max-width: 70ch; color: var(--lume-ink-muted); }
+.detail a { justify-self: start; }
+@media(max-width:700px) { .catalogHeader { display: none; } .catalogRow { grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; padding: 12px 0; } .catalogName, .catalogSub { grid-column: 1; } .catalogRow > button { grid-column: 2; grid-row: 1 / 4; } }

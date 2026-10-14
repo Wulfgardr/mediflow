@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import ink from '@/components/ink-secondary.module.css';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import {
   Inbox,
@@ -11,7 +12,6 @@ import { db, type ClinicalEntry } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 /* @Codex */
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
-import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, Kree8DiaryClientState, Kree8DiaryEntry } from '../cockpit-shared';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
@@ -89,7 +89,8 @@ function DiarioArea({
 }) {
   const { proposal } = useRuntimeTwinDesign();
   const isLoading = diaryState.status === 'loading' || diaryState.status === 'idle';
-  const visibleEntries = diaryState.entries;
+  const [query, setQuery] = useState('');
+  const [entryType, setEntryType] = useState('Tutte');
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const rawEntries = useLiveQuery<ClinicalEntry[], ClinicalEntry[]>(
     async () => db.entries.query({ orderBy: 'date', orderDir: 'desc', limit: 50 }).toArray(),
@@ -98,17 +99,26 @@ function DiarioArea({
     ['entries'],
   ) ?? [];
   const rawEntryById = new Map(rawEntries.map((entry) => [entry.id, entry]));
+  const entryTypes = ['Tutte', ...new Set(diaryState.entries.map(entry => entry.typeLabel))];
+  const visibleEntries = diaryState.entries.filter(entry =>
+    (entryType === 'Tutte' || entry.typeLabel === entryType)
+    && `${entry.patientName} ${entry.title} ${entry.preview}`.toLocaleLowerCase('it-IT').includes(query.trim().toLocaleLowerCase('it-IT')),
+  );
+  const monthLabel = (entry: Kree8DiaryEntry) => {
+    const date = rawEntryById.get(entry.id)?.date;
+    return date ? new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(date)) : 'Voci recenti';
+  };
   const resolvedActiveId = visibleEntries.some((entry) => entry.id === activeEntryId)
     ? activeEntryId
     : visibleEntries[0]?.id;
 
   return (
-    <div className={styles.areaShell} data-testid="lume-diario">
+    <div className={`${styles.areaShell} ${ink.surface}`} data-testid="lume-diario">
       <header className={styles.areaHeader}>
         <div>
           <p className={styles.areaCaption}>Diario clinico</p>
           <h1 className={styles.areaTitle}>
-            Ultime voci del lavoro clinico <em>· cronologia locale, tutti i pazienti</em>
+            Diario<span aria-hidden="true">.</span>
           </h1>
           <p className={styles.areaSubtitle}>
             Cronologia delle ultime 50 voci cliniche di tutti i pazienti.
@@ -128,10 +138,14 @@ function DiarioArea({
         </div>}
       </header>
 
+      <div className={diaryStyles.tools}>
+        <input type="search" aria-label="Cerca nel diario" placeholder="Cerca paziente o contenuto" value={query} onChange={event => setQuery(event.target.value)} />
+        <div className={diaryStyles.types} aria-label="Tipo di voce">{entryTypes.map(type => <button key={type} type="button" aria-pressed={entryType === type} onClick={() => setEntryType(type)}>{type}</button>)}</div>
+      </div>
       <section className={diaryStyles.timelineSection} aria-labelledby="diario-timeline-title">
         <header className={diaryStyles.sectionHeader}>
           <div>
-            <h2 id="diario-timeline-title" className={diaryStyles.sectionTitle}>Timeline recente</h2>
+            <h2 id="diario-timeline-title" className={diaryStyles.sectionTitle}>Voci recenti</h2>
             {!proposal && <p className={diaryStyles.sectionSubtitle}>Un solo Filo connette le voci che appartengono alla sequenza temporale.</p>}
           </div>
           <span className={proposal ? diaryStyles.count : `${diaryStyles.count} lume-registro`}>
@@ -152,12 +166,6 @@ function DiarioArea({
               aria-busy="false"
               data-testid="lume-diario-feed"
             >
-              <LumeFilo
-                variant="spina"
-                nodeCount={visibleEntries.length}
-                anchorSelector="[data-lume-diary-node]"
-                className={diaryStyles.filo}
-              />
               {visibleEntries.map((entry, index) => {
                 const presentation = entryPresentation(entry, rawEntryById.get(entry.id));
                 const isActive = entry.id === resolvedActiveId;
@@ -165,8 +173,9 @@ function DiarioArea({
                 const descriptionId = `diario-entry-${index}-description`;
 
                 return (
+                  <Fragment key={entry.id}>
+                  {(index === 0 || monthLabel(visibleEntries[index - 1]) !== monthLabel(entry)) && <h3 className={diaryStyles.month}>{monthLabel(entry)}</h3>}
                   <article
-                    key={entry.id}
                     className={diaryStyles.entry}
                     data-active={isActive ? 'true' : 'false'}
                     data-lume-entry-state={presentation.state}
@@ -180,10 +189,6 @@ function DiarioArea({
                     onClick={() => setActiveEntryId(entry.id)}
                     onFocus={() => setActiveEntryId(entry.id)}
                   >
-                    <LumeFiloNodo
-                      className={diaryStyles.node}
-                      data-lume-diary-node
-                    />
                     <div className={diaryStyles.entryTop}>
                       <div className={diaryStyles.titleGroup}>
                         <span className={diaryStyles.stateLabel}>{presentation.stateLabel}</span>
@@ -205,7 +210,7 @@ function DiarioArea({
                     <div className={diaryStyles.entryFooter}>
                       <span className={diaryStyles.patientIdentity}>
                         <strong>{entry.patientName}</strong>
-                        <span className="lume-registro">{entry.patientCode}</span>
+                        <span className="lume-code">{entry.patientCode}</span>
                       </span>
                       {entry.attachmentCount > 0 ? (
                         <span className={diaryStyles.attachmentCount}>
@@ -232,6 +237,7 @@ function DiarioArea({
                       </span>
                     </div>
                   </article>
+                  </Fragment>
                 );
               })}
             </div>

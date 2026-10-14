@@ -1,5 +1,7 @@
 'use client';
 
+import ink from './ink-secondary.module.css';
+import styles from './clinical-register.module.css';
 import { X, FileText } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import DocumentPreviewCanvas from './document-viewer-canvas';
@@ -10,9 +12,9 @@ interface DocumentViewerProps {
     file: Blob | string;
     fileName: string;
     onClose: () => void;
+    inline?: boolean;
 }
 
-/* @Codex */
 function DocumentText({ text }: { text: string }) {
     const [page, setPage] = useState(1);
     const window = textWindow(text, page);
@@ -32,7 +34,6 @@ type Source = { file: Blob | string; fileName: string; attempt: number };
 type PreviewState = { source: Source; preview: DocumentPreview; signal: AbortSignal }
     | { source: Source; error: PreviewFailure };
 
-/* @Codex */
 function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file' | 'fileName'>) {
     const [attempt, setAttempt] = useState(0);
     const source = useMemo(() => ({ file, fileName, attempt }), [file, fileName, attempt]);
@@ -75,15 +76,15 @@ function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file
         : <DocumentPreviewCanvas source={current.preview} signal={current.signal} />;
 }
 
-export default function DocumentViewer({ file, fileName, onClose }: DocumentViewerProps) {
-    /* @Codex */
+export default function DocumentViewer({ file, fileName, onClose, inline = false }: DocumentViewerProps) {
+
     const [closed, setClosed] = useState(false);
     const titleId = useId();
     const shell = useRef<HTMLDivElement>(null);
     const closeButton = useRef<HTMLButtonElement>(null);
     const close = () => { setClosed(true); onClose(); };
     useEffect(() => {
-        if (closed) return;
+        if (closed || inline) return;
         const root = shell.current;
         if (!root) return;
         const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -106,31 +107,22 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
             document.removeEventListener('keydown', keydown);
             if (previous?.isConnected) previous.focus();
         };
-    }, [closed]);
+    }, [closed, inline]);
     if (closed) return null;
 
-    return (
-        // @Codex WUL-229: full-screen document viewer reuses specular chrome + vitreous canvas
-        <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-[var(--lume-dur-riga)]" style={{ zIndex: 100 }}>
-            <button type="button" aria-label="Chiudi sfondo" className="absolute inset-0 cursor-default" onClick={close} />
-            <div ref={shell} role="dialog" aria-modal="true" aria-labelledby={titleId} data-testid="document-viewer"
-                className="mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]">
-                <div className="flex items-center justify-between gap-3 p-4 graphite-divider">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="p-2 rounded-xl flex items-center justify-center"
-                            style={{ background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' }}>
-                            <FileText className="w-5 h-5" />
-                        </div>
-                        <h3 id={titleId} className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--lume-ink)' }}>{fileName}</h3>
-                    </div>
-                    <button ref={closeButton} type="button" onClick={close} className="mf-btn-secondary !p-2 !rounded-full" aria-label="Chiudi" title="Chiudi">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="min-h-0 flex-1 relative" style={{ background: 'var(--lume-surface-field)' }}>
-                    <DocumentPreviewBody file={file} fileName={fileName} />
-                </div>
-            </div>
+    const viewer = <div ref={shell} role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby={titleId} data-testid="document-viewer"
+        className={inline ? styles.inlineViewer : `${ink.surface} ${ink.viewer} mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden`}>
+        <header className={inline ? undefined : 'flex items-center justify-between gap-3 p-4 graphite-divider'}>
+            <div className="flex min-w-0 items-center gap-3"><FileText size={18} aria-hidden /><h3 id={titleId}>{fileName}</h3></div>
+            <button ref={closeButton} type="button" onClick={close} className={styles.control} aria-label="Chiudi" title="Chiudi"><X size={18} aria-hidden /></button>
+        </header>
+        <div className={inline ? `${styles.inlineCanvas} relative` : 'min-h-0 flex-1 relative'} style={{ background: 'var(--lume-surface-field)' }}>
+            <DocumentPreviewBody file={file} fileName={fileName} />
         </div>
-    );
+    </div>;
+    if (inline) return viewer;
+    return <div className="mf-modal-backdrop p-4 md:p-8" style={{ zIndex: 100 }}>
+        <button type="button" aria-label="Chiudi sfondo" className="absolute inset-0 cursor-default" onClick={close} />
+        {viewer}
+    </div>;
 }

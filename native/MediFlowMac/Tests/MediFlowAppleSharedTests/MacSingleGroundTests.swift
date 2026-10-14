@@ -32,33 +32,15 @@ final class MacSingleGroundTests: XCTestCase {
         }
     }
 
-    /// The chart nests a pane inside a section inside a block, so it needs three
-    /// steps, and this asserts it has them.
-    ///
-    /// It did not. Every zone used to resolve to a system colour, and on macOS 27
-    /// `field`, `focal` and `chrome` are all the same value: four zones, two
-    /// levels. The measured trade is that a single system step is larger than a
-    /// single Lume step — 1.131 against 1.033 at night — but the system only has
-    /// that step once, while Lume spends 1.241 of total range over three. One
-    /// larger step cannot be spent three times.
-    func testTheFourContentZonesAreFourDistinctSurfaces() throws {
-        // Rendered through `lumeSurface(zone:)` itself, not by comparing the
-        // palette's hexes with each other. The palette was never the problem:
-        // it always held four distinct values, and the macOS branch of the
-        // modifier ignored them. Asserting on the modifier is what makes this
-        // test able to fail.
+    /// Punto d’inchiostro uses one opaque plane and one recessive ground.
+    func testContentZonesShareThePlaneAndChromeSharesTheGround() throws {
         for scheme in [ColorScheme.light, .dark] {
             let rendered = try LumeZone.allCases.map { zone in
-                try centerPixel(
-                    Color.clear.frame(width: 48, height: 24).lumeSurface(zone: zone),
-                    colorScheme: scheme
-                ).rgb
+                try centerPixel(Color.clear.frame(width: 48, height: 24).lumeSurface(zone: zone), colorScheme: scheme).rgb
             }
-            let distinct = Set(rendered.map { "\($0)" })
-            XCTAssertEqual(
-                distinct.count, LumeZone.allCases.count,
-                "Nel registro \(scheme) le zone Lume collassano: \(rendered)"
-            )
+            XCTAssertEqual(rendered[0], rendered[3], "Canvas and chrome use penombra")
+            XCTAssertEqual(rendered[1], rendered[2], "Field and focal use piano")
+            XCTAssertNotEqual(rendered[0], rendered[1], "Piano must remain distinct from penombra")
         }
     }
 

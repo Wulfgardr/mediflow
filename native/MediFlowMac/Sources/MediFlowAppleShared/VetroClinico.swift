@@ -10,96 +10,30 @@ public typealias VetroTone = LumeTone
 public typealias VetroPalette = LumePalette
 
 enum PlatformColors {
-    /// The recessive ground that grouped content sits on.
-    ///
-    /// On macOS this is Lume's own canvas, so the ground and the sections it
-    /// carries come from one ramp instead of two.
-    ///
-    /// It was `windowBackgroundColor`, which measured against a real `NSWindow`
-    /// on macOS 27 is the *same* value as `textBackgroundColor` and
-    /// `controlBackgroundColor` — 255 in light, 30 at night. The arrangement the
-    /// chart is built on, a recessive ground with lighter surfaces on it, had no
-    /// recessive ground: every section was painted the exact colour it was meant
-    /// to be an island on. `underPageBackgroundColor` fixed that against system
-    /// cards, but once the sections became Lume `field` (#f5f5f4) its 246 sat one
-    /// point away from them and the two collided again in light.
-    ///
-    /// Lume canvas is 238,240,242 against field's 245,245,244, and the ramp is
-    /// then a single one shared with iPhone, iPad and the web tokens.
-    /// `MacSingleGroundTests` pins the separation in both registers.
-    ///
-    /// Declared as a dynamic `NSColor` rather than a flat hex so it still follows
-    /// the appearance. The guardia register is not reachable from here — it is an
-    /// environment flag, and this accessor has no environment — which is a real
-    /// limit of expressing a register as a static colour, recorded rather than
-    /// hidden.
-    static var groupedBackground: Color {
+    private static func adaptive(_ resolve: @escaping (LumeRegisterPalette) -> Color) -> Color {
         #if os(macOS)
-        return Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            return NSColor(isDark ? LumePalette.grafite.canvas : LumePalette.giorno.canvas)
+        Color(nsColor: NSColor(name: nil) { appearance in
+            NSColor(resolve(appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? LumePalette.grafite : LumePalette.giorno))
         })
         #else
-        // Lume canvas here too, for the same reason and on harder evidence.
-        //
-        // This was `systemGroupedBackground`, which in dark is **pure black**.
-        // Sampled from an iPad Pro 13 in dark: the detail pane came out
-        // `rgb(0, 0, 0)` while the ground under the list was `rgb(25, 28, 33)`,
-        // two different grounds in one window, and neither is a Lume value —
-        // the darkest Lume declares is chrome at `(14, 16, 19)`. Worse, that
-        // `(25, 28, 33)` is Lume `field`, the *card* step, so the card and the
-        // ground it sits on were the exact same colour and the card had no edge
-        // at all.
-        return Color(uiColor: UIColor { traits in
-            UIColor(traits.userInterfaceStyle == .dark ? LumePalette.grafite.canvas : LumePalette.giorno.canvas)
+        Color(uiColor: UIColor { traits in
+            UIColor(resolve(traits.userInterfaceStyle == .dark ? LumePalette.grafite : LumePalette.giorno))
         })
         #endif
     }
 
-    static var cardBackground: Color {
-        #if os(macOS)
-        return Color(nsColor: .controlBackgroundColor)
-        #else
-        return Color(uiColor: .secondarySystemBackground)
-        #endif
-    }
+    static var groupedBackground: Color { adaptive { $0.canvas } }
+    static var cardBackground: Color { adaptive { $0.field } }
+    static var chartCardSurface: Color { adaptive { $0.field } }
+    static var separator: Color { adaptive { $0.rule } }
+    static var strongSeparator: Color { adaptive { $0.strongRule } }
+    static var ink: Color { adaptive { $0.inkPrimary } }
+    static var secondaryInk: Color { adaptive { $0.inkMuted } }
+    static var freshInk: Color { adaptive { $0.minerale } }
+    static var pencil: Color { adaptive { $0.pencil } }
+    static var writing: Color { adaptive { $0.writing } }
+    static func signal(_ tone: LumeTone) -> Color { adaptive { LumePalette.tint(for: tone, using: $0) } }
 
-    /// The surface a section card sits on, one step above the ground.
-    ///
-    /// Deliberately not `cardBackground`, which resolves to
-    /// `secondarySystemBackground` — a light *grey* in light mode. A card that is
-    /// grey on a grey ground has no edge, and the two greys are what made the
-    /// chart read as cream once a slightly warm Lume surface was mixed in.
-    ///
-    /// The two platforms reach that step differently, and the difference is
-    /// worth stating. On iOS these are the grouped-content pair the system
-    /// maintains, so Increase Contrast and the accessibility settings come with
-    /// them. On macOS the system pair collapsed to one value, so the step comes
-    /// from Lume instead — which costs that automatic adaptation and is the
-    /// price of having a second level at all.
-    static var chartCardSurface: Color {
-        #if os(macOS)
-        // Lume `field`, the same step `LumeSurface` fills a section with, so a
-        // card drawn through this accessor and one drawn through the modifier
-        // are the same surface rather than two near neighbours.
-        return Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            return NSColor(isDark ? LumePalette.grafite.field : LumePalette.giorno.field)
-        })
-        #else
-        return Color(uiColor: UIColor { traits in
-            UIColor(traits.userInterfaceStyle == .dark ? LumePalette.grafite.field : LumePalette.giorno.field)
-        })
-        #endif
-    }
-
-    static var separator: Color {
-        #if os(macOS)
-        return Color(nsColor: .separatorColor)
-        #else
-        return Color(uiColor: .separator)
-        #endif
-    }
 }
 
 public extension View {
@@ -148,8 +82,7 @@ public struct StatusBadge: View {
             .foregroundStyle(toneColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(palette.field, in: Capsule())
-            .overlay(Capsule().strokeBorder(toneColor.opacity(0.4), lineWidth: 0.5))
+            .accessibilityValue(text)
             .accessibilityLabel(text)
     }
 }
@@ -235,14 +168,14 @@ private struct InfoRowValueTypeface: ViewModifier {
     let value: String
 
     func body(content: Content) -> some View {
-        isCodeLike ? AnyView(content.registro()) : AnyView(content)
+        isCodeLike ? AnyView(content.codice()) : AnyView(content.monospacedDigit())
     }
 
     /// Code-like when the value carries no lowercase letters (`DEMODEL0002X`,
     /// `AMB-DEMO`, `048 · C01`) or is essentially numeric.
     private var isCodeLike: Bool {
         let letters = value.filter(\.isLetter)
-        if letters.isEmpty { return true }
+        if letters.isEmpty { return false }
         return !letters.contains(where: \.isLowercase)
     }
 }

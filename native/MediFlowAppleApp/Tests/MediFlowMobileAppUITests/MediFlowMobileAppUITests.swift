@@ -172,6 +172,8 @@ final class MediFlowMobileAppUITests: XCTestCase {
             let button = app.tabBars.buttons[overflow]
             if button.exists && button.isHittable {
                 button.tap()
+                let backToOther = app.navigationBars.buttons["Altro"]
+                if backToOther.exists && backToOther.isHittable { backToOther.tap() }
                 let row = app.buttons[label]
                 if row.waitForExistence(timeout: 5) {
                     row.tap()
@@ -794,7 +796,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             "clinical-workspace-section-patients-button",
             "clinical-workspace-section-agenda-button",
             "clinical-workspace-section-diary-button",
-            "clinical-workspace-section-analytics-button",
+            "clinical-workspace-section-other-button",
         ]
         let identifierQuery = tabBar.descendants(matching: .any).matching(
             NSPredicate(format: "identifier IN %@", compactTabIdentifiers)

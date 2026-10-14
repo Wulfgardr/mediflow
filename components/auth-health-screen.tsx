@@ -73,31 +73,31 @@ export function AuthHealthScreen({
 
     return (
         <div className="fixed inset-0 z-[100] flex h-screen w-screen items-center justify-center bg-[color:var(--lume-surface-canvas)] p-6">
-            <div className="lume-focal w-full max-w-2xl space-y-6 rounded-[var(--lume-radius-panel)] border p-8" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-focal)', boxShadow: '0 12px 30px color-mix(in srgb, var(--lume-ink) 20%, transparent)' }}>
+            <div className="lume-focal w-full max-w-2xl space-y-6 rounded-[var(--lume-radius-panel)] border p-8" style={{ borderColor: 'var(--lume-rule)', background: 'var(--lume-surface-focal)', boxShadow: '0 18px 44px -26px color-mix(in srgb, var(--lume-ink) 45%, transparent)' }}>
                 <div className="flex items-start gap-4">
-                    <div className="p-3 rounded-2xl bg-orange-100 text-orange-600">
+                    <div className="p-3 text-[color:var(--lume-signal-warning)]">
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
                         <h1 className="text-2xl font-bold" style={{ color: 'var(--lume-ink)' }}>Problema Database</h1>
                         <p className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{friendlyMessage}</p>
                         {health.error?.code && (
-                            <p className="lume-registro text-xs text-orange-700">Codice: {health.error.code}</p>
+                            <p className="lume-registro text-xs text-[color:var(--lume-signal-warning)]">Codice: {health.error.code}</p>
                         )}
                     </div>
                 </div>
 
                 {/* @Codex */}
                 {nextAction && (
-                    <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 text-sm text-orange-900 dark:border-orange-500/20 dark:bg-orange-900/10 dark:text-orange-200">
-                        <div className="font-semibold text-orange-800 mb-1">Prossima azione</div>
+                    <div className="mf-alert mf-alert-warning p-4 text-sm">
+                        <div className="font-semibold mb-1">Prossima azione</div>
                         <p>{nextAction}</p>
                     </div>
                 )}
 
                 {/* @Codex */}
                 {remediationCommand && (
-                    <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="border-t border-[color:var(--lume-rule)] py-4">
                         <div className="mb-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>Comando consigliato (esegui manualmente nel terminale)</div>
                         <code className="lume-registro block break-all whitespace-pre-wrap select-all text-xs" style={{ color: 'var(--lume-ink)' }}>
                             {remediationCommand}
@@ -109,16 +109,16 @@ export function AuthHealthScreen({
                 )}
 
                 {details.length > 0 && (
-                    <div className="rounded-[var(--lume-radius-card)] border bg-[color:var(--lume-surface-field)] p-4" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)' }}>
+                    <div className="border-t border-[color:var(--lume-rule)] py-4">
                         <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                            <Database className="w-4 h-4 text-orange-500" />
+                            <Database className="w-4 h-4 text-[color:var(--lume-signal-warning)]" />
                             Dettagli locale
                         </div>
                         <div className="grid grid-cols-1 gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                             {details.map(([label, value]) => (
                                 <div key={label} className="flex items-center justify-between gap-4">
                                     <span>{label}</span>
-                                    <span className="lume-registro break-all" style={{ color: 'var(--lume-ink)' }}>{value}</span>
+                                    <span className="break-all" style={{ color: 'var(--lume-ink)' }}>{value}</span>
                                 </div>
                             ))}
                         </div>

@@ -33,6 +33,7 @@ test('complete backup is encrypted in the browser and verification never claims 
     const manual = page.getByRole('link', { name: 'Apri la cartella manualmente', exact: true });
     await expect(navigation.or(manual).first()).toBeVisible();
     if (await manual.isVisible()) await manual.click();
+    await navigation.locator('summary').filter({ hasText: /^Altro$/u }).click();
     await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
     await page.getByRole('link', { name: 'Backup', exact: true }).click();
     const panel = page.getByRole('region', { name: 'Backup completo di recupero', exact: true });

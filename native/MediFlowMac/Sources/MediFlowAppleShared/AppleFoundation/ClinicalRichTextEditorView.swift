@@ -32,7 +32,7 @@ struct ClinicalRichTextEditorView: View {
             HStack(alignment: .firstTextBaseline) {
                 Label("Contenuto preservato", systemImage: "lock.doc")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(LumePalette.warning)
                 Spacer(minLength: 8)
                 Button(role: .destructive) {
                     document.removeBlock(id: block.id)
@@ -258,6 +258,11 @@ struct VisitDraftComposerView: View {
             }
 #endif
             TextEditor(text: $model.newEntryVisitTranscript)
+                #if os(macOS)
+                .inkRegister()
+                #else
+                .inkVoice(17, relativeTo: .body)
+                #endif
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 70)
                 // A TextEditor is not a TextField, so the style applied at the
@@ -268,7 +273,7 @@ struct VisitDraftComposerView: View {
             HStack {
                 Text("\(model.newEntryVisitTranscript.count)/\(PairedPatientsWorkspaceModel.maxVisitDraftTranscriptChars)")
                     .font(.caption2)
-                    .foregroundStyle(isTranscriptWithinLimits ? Color.secondary : Color.red)
+                    .foregroundStyle(isTranscriptWithinLimits ? Color.secondary : LumePalette.critical)
                 Spacer(minLength: 8)
                 Button {
                     Task { await model.computeVisitDraftForNewEntry() }
@@ -292,15 +297,13 @@ struct VisitDraftComposerView: View {
             && model.newEntryVisitTranscript.utf8.count <= VisitRecordingLimits.standard.maxTranscriptUTF8Bytes
     }
 
-    private var isUnsignedDraft: Bool {
-        model.newEntryVisitDraftResponse != nil && !model.newEntryVisitDraftReviewed
-    }
+
 
     private func draftReview(_ draft: HomeBaseVisitDraftResponse) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Bozza da rivedere")
+            Label("Proposta da rivedere", systemImage: "circle")
                 .font(.caption.weight(.semibold))
-                .lumeInchiostro(bozza: isUnsignedDraft)
+                .foregroundStyle(PlatformColors.pencil)
                 .accessibilityIdentifier("visit-draft-review-heading")
 
             sectionPreview("S", draft.sections.subjective)
@@ -314,14 +317,14 @@ struct VisitDraftComposerView: View {
                 ForEach(Array(draft.medications.enumerated()), id: \.offset) { _, medication in
                     Text(medicationLine(medication))
                         .font(.caption2)
-                        .lumeInchiostro(bozza: isUnsignedDraft)
+                        .foregroundStyle(PlatformColors.pencil)
                 }
             }
 
             if draft.safety.reviewRequired {
                 Text("Revisione clinica obbligatoria prima dell'uso. La bozza non esegue scritture (\(draft.safety.forbiddenAutoWriteCount) candidate bloccate automaticamente).")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(LumePalette.warning)
             }
 
             Toggle("Ho rivisto la bozza ed e clinicamente corretta", isOn: $model.newEntryVisitDraftReviewed)
@@ -368,7 +371,7 @@ struct VisitDraftComposerView: View {
                     Text(line).font(.caption2)
                 }
             }
-            .lumeInchiostro(bozza: isUnsignedDraft)
+            .foregroundStyle(PlatformColors.pencil)
         }
     }
 }

@@ -48,12 +48,13 @@ struct MacPatientInspectorContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Contesto paziente")
-                .font(.title3.weight(.semibold))
+                .font(.headline)
                 .accessibilityHeading(.h1)
                 .accessibilityIdentifier("clinical-workspace-patient-inspector")
 
+            Text(snapshot.displayName).inkVoice(22)
+                .accessibilityIdentifier("clinical-workspace-inspector-patient-name")
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                row("Paziente", snapshot.displayName, identifier: "clinical-workspace-inspector-patient-name")
                 row("Codice", snapshot.taxCode)
                 row("Anno", snapshot.birthYear)
                 row("Cartella", snapshot.recordState)
@@ -61,9 +62,9 @@ struct MacPatientInspectorContent: View {
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: MacClinicalContentSurfaceStyle.backgroundColor), in: surfaceShape)
+            .background(PlatformColors.chartCardSurface, in: surfaceShape)
             .overlay {
-                surfaceShape.stroke(Color(nsColor: MacClinicalContentSurfaceStyle.separatorColor), lineWidth: 0.5)
+                surfaceShape.stroke(PlatformColors.separator, lineWidth: 0.5)
             }
         }
         .padding(14)
@@ -71,7 +72,7 @@ struct MacPatientInspectorContent: View {
     }
 
     private var surfaceShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
+        RoundedRectangle(cornerRadius: 0, style: .continuous)
     }
 
     private func row(_ label: String, _ value: String, identifier: String? = nil) -> some View {

@@ -258,7 +258,7 @@
   margin-top: 8px;
   padding: 10px 14px;
   border: 1px solid var(--lume-ink-muted);
-  border-radius: 12px;
+  border-radius: var(--lume-radius-control);
   background: var(--lume-surface-field);
   color: var(--lume-ink);
   font-size: 13px;
@@ -666,18 +666,17 @@
 }
 
 .shell :global(.graphite-mini-btn) {
-  border-radius: 12px !important;
+  border-radius: var(--lume-radius-control) !important;
   border-color: var(--k8-control-border) !important;
   background: var(--k8-control-bg) !important;
   color: var(--k8-muted) !important;
 }
 
-/* @Codex */
 .shell :global(input:not([type="checkbox"]):not([type="radio"]):not([type="range"])),
 .shell :global(select),
 .shell :global(textarea) {
   border: 1px solid var(--k8-control-border) !important;
-  border-radius: 12px !important;
+  border-radius: var(--lume-radius-control) !important;
   background: var(--k8-control-bg) !important;
   color: var(--k8-ink) !important;
   box-shadow: none !important;
