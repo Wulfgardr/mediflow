@@ -15,7 +15,7 @@ Status: Accepted. Aggiorna ADR 0078 per colore, tipografia, forma e movimento.
 La direzione scelta il 9 ottobre viene anticipata sulle superfici esistenti
 su richiesta del 14 ottobre. La specifica è nel
 [dossier](../design/punto-inchiostro/README.md), il contratto in
-[DESIGN.md](../../DESIGN.md). I token canonici sono `design/lume.tokens.json`;
+[DESIGN.md](../../DESIGN.md). I token canonici sono `docs/design/lume/tokens/lume.tokens.json`;
 CSS e implementazione Apple mantengono gli alias Lume per i consumatori.
 
 Newsreader locale rende titoli, nomi in testata e prosa; sistema rende

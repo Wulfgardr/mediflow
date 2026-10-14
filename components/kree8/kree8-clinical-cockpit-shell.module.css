@@ -836,3 +836,6 @@
 :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 20px 28px 28px; }
 :global(html[data-runtime-twin-design='proposal']) .toolbar { padding: 6px 28px; min-height: 40px; }
 @media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 16px; } }
+
+:global(html[data-runtime-twin-design='proposal']) .toolbar :is(button, input, a) { min-height: 40px; }
+@media (pointer: coarse) { :global(html[data-runtime-twin-design='proposal']) .toolbar :is(button, input, a) { min-height: 44px; } }

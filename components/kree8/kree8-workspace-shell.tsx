@@ -386,7 +386,7 @@ export function Kree8WorkspaceShell({
               </span>
               <div className={styles.heroText}>
                 {!proposal ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-                <h1 className={styles.title}>
+                <h1 className={`${styles.title} lume-voice`}>
                   <span className={styles.titleMain}>{title}</span>
                 </h1>
                 {patientLabel ? (
