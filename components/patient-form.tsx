@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import ink from './ink-secondary.module.css';
 import { useRef, useState } from 'react';
 import { useForm, useFieldArray, Control, Controller, FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch, type DefaultValues } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -83,7 +84,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                     {...register(`diagnoses.${index}.code`)}
                                     readOnly={!!watch(`diagnoses.${index}.canonicalUri`)}
                                     placeholder="Es. 8A80.0"
-                                    className="mf-input mf-input-sm font-mono font-bold"
+                                    className="mf-input mf-input-sm lume-code font-bold"
                                     aria-invalid={!!errors.diagnoses?.[index]?.code}
                                 />
                             </div>
@@ -263,7 +264,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
     const estimatedAge = estimatedYear ? calculateAge(estimatedYear) : null;
 
     return (
-        <form onSubmit={handleSubmit(submitOnce)} className="space-y-10">
+        <form onSubmit={handleSubmit(submitOnce)} className={`${ink.surface} ${ink.form} space-y-10`}>
             {/* @Codex: freeze a pending/partial plan instead of accepting ignored edits. */}
             <fieldset disabled={disabled || submitting} className="min-w-0 space-y-10">
 
@@ -315,7 +316,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             aria-invalid={!!errors.taxCode}
                             aria-describedby={errors.taxCode ? "patient-taxCode-error" : undefined}
                             {...register('taxCode')}
-                            className={`${FORM_INPUT_CLASS} uppercase font-mono font-bold tracking-wider`}
+                            className={`${FORM_INPUT_CLASS} uppercase lume-code font-bold tracking-wider`}
                             placeholder="RSSMRA80A01H501U"
                             maxLength={16}
                         />

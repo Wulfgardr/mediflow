@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
                             {stats.topDiagnoses.map((diagnosis) => (
                                 <tr key={diagnosis.key}>
                                     <td>{diagnosis.description}</td>
-                                    <td className="lume-registro" data-lume-register-value="true">{diagnosis.system} {diagnosis.code}</td>
+                                    <td className="lume-code" data-lume-register-value="true">{diagnosis.system} {diagnosis.code}</td>
                                     <td className="lume-registro" data-lume-register-value="true">{diagnosis.count}</td>
                                 </tr>
                             ))}

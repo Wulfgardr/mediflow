@@ -9,8 +9,8 @@
     width: 100%;
     overflow-wrap: anywhere;
 }
-.section { display: grid; gap: 16px; min-width: 0; padding-block: 16px; border-top: 1px solid var(--lume-border-color); }
-.section h2 { font-size: 1.25rem; font-weight: 650; line-height: 1.4; }
+.section { display: grid; gap: 16px; min-width: 0; padding-block: 16px; border-top: 1px solid var(--lume-rule); }
+.section h2 { font: 400 22px/1.4 var(--lume-font-voice); }
 .panel p { line-height: 1.55; margin: 0; }
 .muted { color: var(--lume-ink-muted); font-size: 0.875rem; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
@@ -24,19 +24,19 @@
     justify-content: center;
     gap: 8px;
     padding: 10px 16px;
-    border: 1px solid var(--lume-border-color);
-    border-radius: 12px;
+    border: 1px solid var(--lume-rule);
+    border-radius: var(--lume-radius-control);
     line-height: 1.4;
     text-align: center;
     text-decoration: none;
     cursor: pointer;
     max-width: 100%;
 }
-.primary { background: var(--lume-ink); color: var(--lume-surface-focal); }
+.primary { background: var(--lume-ink-fresh); color: var(--lume-surface-focal); }
 .secondary { background: var(--lume-surface-field); color: var(--lume-ink); }
 .panel button:disabled, .panel input:disabled { opacity: 0.55; cursor: not-allowed; }
 .panel :is(button, a, input, summary):focus-visible, .panel h2:focus {
-    outline: 2px solid var(--lume-ink);
+    outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 4px;
 }
 .fileLabel { display: grid; gap: 8px; max-width: 100%; min-width: 0; }
@@ -44,8 +44,8 @@
 .fileLabel input::file-selector-button {
     min-height: 44px;
     padding: 8px 12px;
-    border: 1px solid var(--lume-border-color);
-    border-radius: 12px;
+    border: 1px solid var(--lume-rule);
+    border-radius: var(--lume-radius-control);
     background: var(--lume-surface-field);
     color: var(--lume-ink);
     font: inherit;
@@ -58,25 +58,29 @@
 .disclosure dt { color: var(--lume-ink-muted); font-size: 0.875rem; }
 .disclosure dd { margin: 0 0 8px; white-space: pre-wrap; }
 .consent { display: flex; align-items: flex-start; gap: 12px; padding-block: 12px; cursor: pointer; line-height: 1.5; }
-.consent input { margin-top: 3px; width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--lume-ink); }
+.consent input { margin-top: 3px; width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--lume-ink-fresh); }
 .notice { border-inline-start: 3px solid var(--lume-ink-muted); padding: 12px 16px; background: var(--lume-surface-field); }
 .table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.9375rem; }
 .table caption { text-align: start; padding-block: 8px 12px; color: var(--lume-ink-muted); }
-.table th, .table td { padding: 12px 8px; vertical-align: top; text-align: start; border-bottom: 1px solid var(--lume-border-color); overflow-wrap: anywhere; }
+.table th, .table td { padding: 12px 8px; vertical-align: top; text-align: start; border-bottom: 1px solid var(--lume-rule); overflow-wrap: anywhere; }
 .table th:first-child, .table td:first-child { width: 64px; }
 .table td p { font-size: 0.875rem; margin-top: 8px; }
 .table small { display: block; line-height: 1.5; }
 .table code { font-size: 0.8125rem; white-space: normal; }
-.panel progress { width: 100%; height: 16px; accent-color: var(--lume-ink); }
+.panel progress { width: 100%; height: 16px; accent-color: var(--lume-ink-fresh); }
 @media (max-width: 640px) {
     .panel { gap: 16px; }
     .actions { align-items: stretch; flex-direction: column; }
     .table, .table tbody { display: block; }
     .table caption { display: block; }
     .table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-    .table tr { display: grid; gap: 12px; padding-block: 16px; border-bottom: 1px solid var(--lume-border-color); }
+    .table tr { display: grid; gap: 12px; padding-block: 16px; border-bottom: 1px solid var(--lume-rule); }
     .table td, .table th:first-child, .table td:first-child { display: block; width: auto; padding: 0; border: 0; }
     .table td::before { content: attr(data-label); display: block; font-weight: 600; color: var(--lume-ink-muted); margin-bottom: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .panel *, .panel *::before, .panel *::after { transition: none; animation: none; } }
 @media (forced-colors: active) { .primary, .secondary, .notice { border: 1px solid ButtonText; } }
+
+.panel { font: 14px/1.5 var(--lume-font-sans); }
+.preview tbody td { color: var(--lume-ink-pencil); }
+.preview td:nth-child(2) { text-decoration: underline dashed; text-underline-offset: 4px; }

@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import ink from './ink-secondary.module.css';
 import { useEffect, useMemo, useState } from 'react';
 /* @Codex */
 import {
@@ -125,7 +126,7 @@ export default function PatientDocumentImportReview({
     const tone = qualityTone(localDraft.quality?.level);
 
     return (
-        <div className={`lume-panel rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
+        <div className={`${ink.surface} lume-panel rounded-[32px] border p-6 md:p-8 ${tone.panel}`}>
             <div className="flex flex-col gap-5 border-b border-black/5 pb-6 dark:border-white/5 md:flex-row md:items-start md:justify-between">
                 <div className="flex items-start gap-4">
                     <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone.icon}`}>
@@ -142,7 +143,7 @@ export default function PatientDocumentImportReview({
                             I dati estratti restano in bozza: puoi confermare, correggere o escludere
                             ogni gruppo prima di applicarlo alla scheda.
                         </p>
-                        <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                        <div className="flex flex-wrap gap-2 text-xs font-semibold">
                             <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-3 py-1 text-[color:var(--lume-ink-muted)]">
                                 {localDraft.sourceLabel}
                             </span>
@@ -200,7 +201,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <FileText className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Anagrafica e contatti
                             </h3>
                         </div>
@@ -211,7 +212,7 @@ export default function PatientDocumentImportReview({
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <p className="text-sm font-bold text-[color:var(--lume-ink)]">{field.label}</p>
-                                            <p className="text-[11px] text-[color:var(--lume-ink-muted)]">{field.sourceLabel}</p>
+                                            <p className="text-xs text-[color:var(--lume-ink-muted)]">{field.sourceLabel}</p>
                                         </div>
                                         <input
                                             type="checkbox"
@@ -255,7 +256,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <Stethoscope className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Diagnosi candidate
                             </h3>
                         </div>
@@ -266,22 +267,22 @@ export default function PatientDocumentImportReview({
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                     {diagnosis.system}
                                                 </span>
                                                 {diagnosis.confidence && (
-                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                         {confidenceLabel(diagnosis.confidence)}
                                                     </span>
                                                 )}
                                             </div>
                                             {diagnosis.evidence && (
-                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
+                                                <p className="text-xs text-[color:var(--lume-ink-muted)]">
                                                     Evidenza: {diagnosis.evidence}
                                                 </p>
                                             )}
                                             {diagnosis.blockedReason && (
-                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
+                                                <p className="text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                     {diagnosis.blockedReason}
                                                 </p>
                                             )}
@@ -304,7 +305,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, code: event.target.value } : item),
                                             }))}
-                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm font-mono text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm lume-code text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={diagnosis.description}
@@ -325,7 +326,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <ClipboardCheck className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Prestazioni prescritte
                             </h3>
                         </div>
@@ -341,17 +342,17 @@ export default function PatientDocumentImportReview({
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="text-sm font-bold text-[color:var(--lume-ink)]">{item.serviceName}</p>
-                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                     {item.category ?? 'other'}
                                                 </span>
                                                 {item.confidence && (
-                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                         {confidenceLabel(item.confidence)}
                                                     </span>
                                                 )}
                                             </div>
                                             {item.evidence && (
-                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
+                                                <p className="text-xs text-[color:var(--lume-ink-muted)]">
                                                     Evidenza: {item.evidence}
                                                 </p>
                                             )}
@@ -417,7 +418,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <Pill className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Terapie candidate
                             </h3>
                         </div>
@@ -436,26 +437,26 @@ export default function PatientDocumentImportReview({
                                                 <p className="text-sm font-bold text-[color:var(--lume-ink)]">
                                                     {medication.drugName || 'Terapia proposta'}
                                                 </p>
-                                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
+                                                <span className={`rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
                                                     {therapyStateLabel(medication.therapyState)}
                                                 </span>
-                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                     {therapyMatchLabel(medication.matchType)}
                                                 </span>
                                                 {medication.confidence && (
-                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                                    <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                                         {confidenceLabel(medication.confidence)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-[11px] text-[color:var(--lume-ink-muted)]">{medication.sourceLabel}</p>
+                                            <p className="text-xs text-[color:var(--lume-ink-muted)]">{medication.sourceLabel}</p>
                                             {medication.evidence && (
-                                                <p className="text-[11px] text-[color:var(--lume-ink-muted)]">
+                                                <p className="text-xs text-[color:var(--lume-ink-muted)]">
                                                     Evidenza: {medication.evidence}
                                                 </p>
                                             )}
                                             {medication.blockedReason && (
-                                                <p className="text-[11px] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
+                                                <p className="text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
                                                     {medication.blockedReason}
                                                 </p>
                                             )}
@@ -511,7 +512,7 @@ export default function PatientDocumentImportReview({
                                     </div>
 
                                     {(medication.aic || medication.atc) && (
-                                        <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                             {medication.aic && (
                                                 <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-2 py-1">
                                                     AIC {medication.aic}

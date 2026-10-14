@@ -4,12 +4,12 @@
     width: 100%;
     min-width: 0;
     padding: clamp(1rem, 3vw, 1.75rem);
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border: 1px solid var(--lume-rule);
     border-radius: var(--lume-radius-panel);
     background: var(--lume-surface-focal);
     color: var(--lume-ink);
     font-family: var(--lume-font-sans);
-    font-size: 1rem;
+    font-size: 14px;
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
@@ -53,8 +53,7 @@
 }
 
 .heading h2 {
-    font-size: 1.5rem;
-    font-weight: 650;
+    font: 400 26px/1.2 var(--lume-font-voice);
     line-height: 1.25;
     letter-spacing: -0.02em;
     text-wrap: balance;
@@ -90,11 +89,11 @@
     min-width: 0;
     min-height: 2.75rem;
     padding: 0.65rem 0.75rem;
-    border: 1px solid color-mix(in srgb, var(--lume-ink) 20%, transparent);
+    border: 1px solid var(--lume-rule-strong);
     border-radius: var(--lume-radius-control);
     background: var(--lume-surface-field);
     color: var(--lume-ink);
-    font-size: 1rem;
+    font-size: 14px;
     line-height: 1.5;
 }
 
@@ -143,12 +142,12 @@
 }
 
 .option:hover {
-    border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
+    border-color: var(--lume-rule-strong);
 }
 
 .selected {
-    border-color: color-mix(in srgb, var(--lume-accent) 55%, transparent);
-    background: color-mix(in srgb, var(--lume-accent) 8%, var(--lume-surface-field));
+    border-color: color-mix(in srgb, var(--lume-ink-fresh) 55%, transparent);
+    background: var(--lume-surface-selected);
 }
 
 .option input[type='radio'] {
@@ -156,7 +155,7 @@
     width: 1.125rem;
     height: 1.125rem;
     margin: 0.2rem 0 0;
-    accent-color: var(--lume-accent);
+    accent-color: var(--lume-ink-fresh);
 }
 
 .optionCopy {
@@ -213,13 +212,13 @@
 }
 
 .primaryAction {
-    border-color: var(--lume-accent);
-    background: var(--lume-accent);
+    border-color: var(--lume-ink-fresh);
+    background: var(--lume-ink-fresh);
     color: var(--lume-surface-focal);
 }
 
 .primaryAction:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--lume-accent) 90%, var(--lume-ink));
+    background: color-mix(in srgb, var(--lume-ink-fresh) 90%, var(--lume-ink));
 }
 
 .secondaryAction {
@@ -263,7 +262,7 @@
 .disclosure,
 .rollback,
 .draftActions {
-    border-top: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+    border-top: 1px solid var(--lume-rule);
     padding-top: 0.75rem;
 }
 
@@ -292,7 +291,7 @@
 
 .experience :where(button, a, summary, input):focus-visible,
 .option:has(input:focus-visible) {
-    outline: 2px solid var(--lume-accent);
+    outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 3px;
 }
 

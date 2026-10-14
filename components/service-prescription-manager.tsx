@@ -1,5 +1,6 @@
 'use client';
 
+import ink from './ink-secondary.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import {
     CalendarCheck,
@@ -426,7 +427,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     );
 
     return (
-        <section id={embedded ? undefined : 'prestazioni'} className={embedded ? '' : 'patient-detail-section border p-5 md:p-6'}>
+        <section id={embedded ? undefined : 'prestazioni'} className={`${ink.surface} ${embedded ? '' : 'patient-detail-section border p-5 md:p-6'}`}>
             {embedded ? (
                 <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{headerActions}</div>
             ) : (
@@ -448,7 +449,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             {isFormOpen && (
                 <form
                     onSubmit={handleSubmit}
-                    className="mb-5 rounded-[8px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4"
+                    className={ink.draft + " mb-5 p-4"}
                 >
                     <div className="grid gap-3 md:grid-cols-2">
                         <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
@@ -687,7 +688,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         return (
                             <article
                                 key={item.id}
-                                className="rounded-[8px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4"
+                                className={ink.record}
                             >
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                     <div className="min-w-0">
@@ -775,7 +776,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                                                 <div className="min-w-0 flex-1">
                                                                     <span className="font-medium text-[color:var(--lume-ink)]">{child.serviceName}</span>
                                                                     {child.serviceCode && (
-                                                                        <span className="lume-registro ml-2 text-xs text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="lume-code ml-2 text-xs text-[color:var(--lume-ink-muted)]">
                                                                             {child.serviceCode}
                                                                             {child.codeSystem ? ` · ${child.codeSystem}` : ''}
                                                                         </span>

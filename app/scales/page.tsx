@@ -216,7 +216,7 @@ export default function ScalesLibraryPage() {
                                     <strong className="block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                         {patient.lastName} {patient.firstName}
                                     </strong>
-                                    <span className="lume-registro mt-1 block truncate text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
+                                    <span className="lume-code mt-1 block truncate text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
                                 </span>
                                 <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
                                     Avvia

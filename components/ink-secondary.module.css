@@ -1,0 +1,134 @@
+.surface {
+    min-width: 0;
+    color: var(--lume-ink);
+    font: 14px/1.5 var(--lume-font-sans);
+    font-variant-numeric: tabular-nums;
+}
+.surface :is(h1, h2, h3) {
+    font-family: var(--lume-font-voice);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+.surface h1 { font-size: 26px; }
+.surface :is(h2, h3) { font-size: 22px; }
+.surface :is(h4, h5, label, button, input, select, textarea, summary) {
+    font-family: var(--lume-font-sans);
+}
+.surface :is(h4, h5) { font-size: 14px; font-weight: 600; }
+.surface :global(.lume-registro) { font-family: var(--lume-font-sans); }
+.surface :is(button, input:not([type='checkbox']):not([type='radio']), select, summary) {
+    min-height: 44px;
+    font-size: 14px;
+}
+.surface :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+    border-color: var(--lume-rule-strong);
+    border-radius: var(--lume-radius-control);
+    background: var(--lume-surface-focal);
+}
+.surface :is(button, a, input, select, textarea, summary):focus-visible {
+    outline: 2px solid var(--lume-ink-fresh);
+    outline-offset: 2px;
+}
+.surface :is(button, a):global(.rounded-full) { border-radius: var(--lume-radius-control); }
+.surface :is(span, p):global(.rounded-full) {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding-inline: 0;
+    font-size: 13px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.surface :global(.ui-btn-primary) {
+    background: var(--lume-ink-fresh);
+    color: var(--lume-surface-focal);
+    border-radius: var(--lume-radius-control);
+    box-shadow: none;
+}
+.surface .record,
+.surface .group {
+    border: 0;
+    border-bottom: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 16px 0;
+    margin-top: 0;
+}
+.surface .group { padding: 0; }
+.surface .group > :is(header, button) {
+    background: transparent;
+    border-color: var(--lume-rule);
+    padding-inline: 0;
+}
+.surface .draft {
+    border: 1px solid var(--lume-rule);
+    border-radius: 12px;
+    background: var(--lume-surface-draft);
+    box-shadow: none;
+    animation: none;
+}
+.surface .draft :is(input, textarea) { color: var(--lume-ink-fresh); }
+.surface .proposalRow {
+    border: 0;
+    border-bottom: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    padding: 16px 0;
+    box-shadow: none;
+}
+.surface .pencil,
+.surface .pencil :is(p, li, h4) {
+    color: var(--lume-ink-pencil);
+    text-decoration: underline dashed;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+}
+.surface .pencil { max-width: 64ch; }
+.surface .section {
+    border: 0;
+    border-top: 1px solid var(--lume-rule-strong);
+    border-radius: 0;
+    background: transparent;
+    padding: 28px 0;
+    box-shadow: none;
+}
+.form :global(.mf-section) {
+    border: 0;
+    border-bottom: 1px solid var(--lume-rule);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 16px 0;
+}
+.form :global(.patient-code-pill) {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding-inline: 0;
+}
+.form textarea { font: 17px/1.5 var(--lume-font-voice); }
+.surface .primary {
+    background: var(--lume-ink-fresh);
+    color: var(--lume-surface-focal);
+    border-color: var(--lume-ink-fresh);
+    box-shadow: none;
+}
+.viewer pre { font: 17px/1.5 var(--lume-font-voice); }
+.viewer { background: var(--lume-surface-focal); }
+@media (prefers-contrast: more) {
+    .surface { --lume-rule: var(--lume-rule-strong); --lume-ink-pencil: var(--lume-ink-muted); }
+}
+
+.surface :global(.lume-code) { font-family: var(--font-registro), ui-monospace; }
+
+.surface:global(.patient-detail-section),
+.surface:global(.lume-panel) { border-radius: 0; box-shadow: none; }
+.surface :global(.apple-chip) { border: 0; border-radius: 0; background: transparent; font-size: 13px; }
+.surface .group :global(.truncate) { white-space: normal; overflow-wrap: anywhere; }
+.surface .record :is(h4, span):global(.truncate) { white-space: normal; overflow-wrap: anywhere; }
+
+.stack { display: grid; gap: 28px; }
+
+.surface .record h3 { font: 600 14px/1.5 var(--lume-font-sans); }

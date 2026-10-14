@@ -1,5 +1,6 @@
 'use client';
 
+import ink from './ink-secondary.module.css';
 import { X, FileText } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import DocumentPreviewCanvas from './document-viewer-canvas';
@@ -114,16 +115,16 @@ export default function DocumentViewer({ file, fileName, onClose }: DocumentView
         <div className="mf-modal-backdrop p-4 md:p-8 animate-in fade-in duration-[var(--lume-dur-riga)]" style={{ zIndex: 100 }}>
             <button type="button" aria-label="Chiudi sfondo" className="absolute inset-0 cursor-default" onClick={close} />
             <div ref={shell} role="dialog" aria-modal="true" aria-labelledby={titleId} data-testid="document-viewer"
-                className="mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]">
+                className={`${ink.surface} ${ink.viewer} mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden`}>
                 <div className="flex items-center justify-between gap-3 p-4 graphite-divider">
                     <div className="flex min-w-0 items-center gap-3">
                         <div className="p-2 rounded-xl flex items-center justify-center"
-                            style={{ background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' }}>
+                            style={{ background: 'transparent', color: 'var(--lume-ink-muted)' }}>
                             <FileText className="w-5 h-5" />
                         </div>
                         <h3 id={titleId} className="font-semibold text-sm md:text-base truncate" style={{ color: 'var(--lume-ink)' }}>{fileName}</h3>
                     </div>
-                    <button ref={closeButton} type="button" onClick={close} className="mf-btn-secondary !p-2 !rounded-full" aria-label="Chiudi" title="Chiudi">
+                    <button ref={closeButton} type="button" onClick={close} className="mf-btn-secondary !p-2 !rounded-[var(--lume-radius-control)]" aria-label="Chiudi" title="Chiudi">
                         <X className="w-5 h-5" />
                     </button>
                 </div>

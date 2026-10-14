@@ -1,3 +1,4 @@
+import ink from '@/components/ink-secondary.module.css';
 import { useState } from 'react';
 import Link from 'next/link';
 import {
@@ -216,7 +217,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
   );
 
   return (
-    <div className={styles.areaShell}>
+    <div className={`${styles.areaShell} ${ink.surface}`}>
       <header className={styles.areaHeader}>
         <div>
           <p className={styles.areaCaption}>Repertori clinici</p>

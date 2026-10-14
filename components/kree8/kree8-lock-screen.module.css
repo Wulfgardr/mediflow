@@ -13,9 +13,9 @@
   --chrome: var(--lume-surface-chrome);
   --ink: var(--lume-ink);
   --ink-muted: var(--lume-ink-muted);
-  --accent: var(--lume-accent);
+  --accent: var(--lume-ink-fresh);
   --accent-ink: var(--lume-surface-focal);
-  --line: color-mix(in srgb, var(--lume-ink) 20%, var(--lume-surface-focal));
+  --line: var(--lume-rule-strong);
   --critical: var(--lume-signal-critical);
   --critical-bg: color-mix(in srgb, var(--lume-signal-critical) 14%, var(--lume-surface-focal));
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -30,8 +30,7 @@
   overflow-y: auto;
   background: var(--canvas);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
-    "Inter", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--lume-font-sans);
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
 }
@@ -43,7 +42,7 @@
      of clipping (paired with overflow-y:auto on .lockShell). */
   margin: auto;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: var(--lume-radius-panel);
   padding: 24px;
   background: var(--surface-focal);
 }
@@ -55,28 +54,18 @@
   margin-bottom: 24px;
 }
 
-.brandMark {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-}
-
 .brandWord {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
   color: var(--ink);
+  font: 500 28px/1.1 var(--lume-font-voice);
+  letter-spacing: -0.01em;
 }
-
-.brandWord b {
-  font-weight: 700;
+.brandDot {
+  display: inline-block;
+  width: .24em;
+  height: .24em;
+  margin-left: .06em;
+  border-radius: 50%;
+  background: var(--ink);
 }
 
 .headerBlock {
@@ -89,8 +78,7 @@
 .title {
   margin: 0;
   color: var(--ink);
-  font-size: 26px;
-  font-weight: 650;
+  font: 400 26px/1.1 var(--lume-font-voice);
   line-height: 1.1;
   letter-spacing: 0;
 }
@@ -145,8 +133,8 @@
   max-width: 100%;
   padding: 7px 10px;
   border: 1px solid var(--critical);
-  border-radius: 12px;
-  background: var(--critical-bg);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink);
   font-size: 12px;
   font-weight: 600;
