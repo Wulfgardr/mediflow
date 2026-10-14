@@ -2,7 +2,9 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -10,12 +12,40 @@ import {
     classifyRevisionPayload,
     hashWorktreeStatus,
     inspectPort,
+    knownMainUpdates,
     probeRunningInstance,
     readProductIdentity,
     waitForInstanceAndOpen,
 } from './launcher-helpers.mjs';
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+
+test('known updates stop an older main, but do not block an updated or development checkout', (t) => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-git-'));
+    t.after(() => rmSync(cwd, { recursive: true, force: true }));
+    const git = (...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Synthetic');
+    git('config', 'user.email', 'synthetic@example.invalid');
+    git('commit', '--allow-empty', '-m', 'first');
+    const earlier = git('rev-parse', 'HEAD');
+    assert.equal(knownMainUpdates(cwd), 0, 'a source archive without an upstream can still start');
+    git('commit', '--allow-empty', '-m', 'update');
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    git('remote', 'add', 'origin', cwd);
+    git('config', 'branch.main.remote', 'origin');
+    git('config', 'branch.main.merge', 'refs/heads/main');
+    git('reset', '--hard', earlier);
+    assert.equal(knownMainUpdates(cwd), 1);
+    const denied = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/launcher-helpers.mjs'), 'check-source-current'], { cwd, encoding: 'utf8' });
+    assert.equal(denied.status, 1);
+    assert.match(denied.stderr, /git pull --ff-only/);
+    git('switch', '-c', 'codex/synthetic-development');
+    assert.equal(knownMainUpdates(cwd), 0);
+    git('switch', 'main');
+    git('merge', '--ff-only', 'origin/main');
+    assert.equal(knownMainUpdates(cwd), 0);
+});
 
 test('product identity reports the exact checkout, version, and source fingerprint', () => {
     const identity = readProductIdentity(repoRoot);

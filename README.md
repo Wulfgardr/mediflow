@@ -272,6 +272,11 @@ Apri `http://localhost:3000`. Il launcher controlla checkout e porta, così da
 non aprire per errore un’altra istanza. Gli altri sistemi operativi e i client
 nativi non fanno parte della distribuzione dichiarata per la 0.8.6.
 
+Su macOS, una checkout `main` che non contiene aggiornamenti già noti a Git
+si ferma prima di aprire l’archivio: aggiorna con `git pull --ff-only` e rilancia.
+Il controllo è locale e non scarica aggiornamenti. Ollama, se installato,
+si avvia in background senza ritardare l’apertura della cartella.
+
 Questi comandi non attivano provider AI, servizio WHO o altri connettori
 opzionali. Il clone segue il ramo predefinito pubblico: non seleziona il tag
 della release né la base di una revisione editoriale.

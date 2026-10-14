@@ -134,6 +134,13 @@ function readGitValue(args, cwd, fallback = 'unknown') {
     return result.stdout.trim() || fallback;
 }
 
+/** A local main checkout must contain the updates already known by Git. No fetch or implicit update. */
+export function knownMainUpdates(cwd = process.cwd()) {
+    if (readGitValue(['branch', '--show-current'], cwd) !== 'main') return 0;
+    const count = Number(readGitValue(['rev-list', '--count', 'HEAD..@{upstream}'], cwd, '0'));
+    return Number.isSafeInteger(count) && count > 0 ? count : 0;
+}
+
 /* @Codex: keep this algorithm identical to lib/app-revision.ts. */
 export function readProductIdentity(cwd = process.cwd()) {
     const resolvedCwd = path.resolve(cwd);
@@ -248,6 +255,13 @@ function printIdentitySummary(identity) {
 export async function runCli(argv = process.argv.slice(2)) {
     const [cmd, ...args] = argv;
     switch (cmd) {
+        case 'check-source-current': {
+            const updates = knownMainUpdates();
+            if (!updates) return 0;
+            console.error(`Questa copia di MediFlow non contiene ${updates} aggiornamenti già disponibili.`);
+            console.error('Aggiorna la checkout con git pull --ff-only e rilancia. Nessun archivio è stato aperto.');
+            return 1;
+        }
         case 'port-listener':
             process.stdout.write(portListenerPid(Number(args[0])));
             return 0;
@@ -292,7 +306,7 @@ export async function runCli(argv = process.argv.slice(2)) {
             return result.ok ? 0 : 1;
         }
         default:
-            console.error('usage: launcher-helpers.mjs <inspect-port <port>|port-listener <port>|open <url>|check-node|check-runtime|worktree-hash|identity-summary|identity-field <field>|verify-instance <url> <source-fingerprint>|wait-and-open <url> <source-fingerprint> [timeout-ms] [interval-ms]>');
+            console.error('usage: launcher-helpers.mjs <check-source-current|inspect-port <port>|port-listener <port>|open <url>|check-node|check-runtime|worktree-hash|identity-summary|identity-field <field>|verify-instance <url> <source-fingerprint>|wait-and-open <url> <source-fingerprint> [timeout-ms] [interval-ms]>');
             return 2;
     }
 }
