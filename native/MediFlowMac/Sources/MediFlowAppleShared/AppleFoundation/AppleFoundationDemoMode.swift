@@ -1,5 +1,7 @@
 #if DEBUG
 import Foundation
+import CoreGraphics
+import CoreText
 
 /// Fully offline demo dataset, for working on the interface without a host.
 ///
@@ -129,6 +131,39 @@ enum AppleFoundationDemoMode {
             createdAt: base.addingTimeInterval(-31_536_000),
             updatedAt: patient.updatedAt
         )
+    }
+
+    static func document(patientId: String) -> HomeBaseAttachmentDetail {
+        let data = NSMutableData()
+        var page = CGRect(x: 0, y: 0, width: 420, height: 594)
+        if let consumer = CGDataConsumer(data: data), let context = CGContext(consumer: consumer, mediaBox: &page, nil) {
+            context.beginPDFPage(nil)
+            for (index, line) in ["DOCUMENTO SINTETICO", "Esempio inventato per la verifica dell’interfaccia", "Rilevazione dimostrativa: glicemia 95 mg/dL", "Nessun dato di una persona reale"].enumerated() {
+                let text = NSAttributedString(string: line, attributes: [
+                    NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName("Helvetica" as CFString, index == 0 ? 18 : 11, nil)
+                ])
+                context.textPosition = CGPoint(x: 32, y: 530 - index * 42)
+                CTLineDraw(CTLineCreateWithAttributedString(text), context)
+            }
+            context.endPDFPage()
+            context.closePDF()
+        }
+        return HomeBaseAttachmentDetail(
+            id: "demo-document", patientId: patientId, name: "Documento sintetico.pdf",
+            type: "application/pdf", size: data.length, path: "demo-document.pdf",
+            summarySnapshot: "Documento inventato per la demo. Nessuna estrazione o proposta generata.",
+            parseEvidenceArtifactSnapshot: nil, ocrQueueState: nil, ocrQueueReason: nil,
+            ocrQueueUpdatedAt: nil, ocrReplayArtifactSnapshot: nil, createdAt: base,
+            data: "data:application/pdf;base64," + (data as Data).base64EncodedString()
+        )
+    }
+
+    static func documentSummary(patientId: String) -> HomeBaseAttachmentSummary {
+        let document = document(patientId: patientId)
+        return HomeBaseAttachmentSummary(id: document.id, patientId: patientId, name: document.name,
+            type: document.type, size: document.size, path: document.path, summarySnapshot: document.summarySnapshot,
+            parseEvidenceArtifactSnapshot: nil, ocrQueueState: nil, ocrQueueReason: nil,
+            ocrQueueUpdatedAt: nil, ocrReplayArtifactSnapshot: nil, createdAt: document.createdAt)
     }
 
     private static let addresses = [

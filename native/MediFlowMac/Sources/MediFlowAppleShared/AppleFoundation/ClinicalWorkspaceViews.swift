@@ -311,6 +311,26 @@ final class AgendaWorkspaceModel: ObservableObject {
     func load() async {
         invalidateReadContext()
         let generation = requestGeneration
+        #if DEBUG
+        if AppleFoundationDemoMode.isDemoDataset {
+            let patients = AppleFoundationDemoMode.patients().filter { $0.isArchived != true }
+            let offsets = [-2, 0, 1, 3, 7, 14]
+            let checkups = zip(patients, offsets).enumerated().map { index, item in
+                AgendaCheckup(id: "demo-agenda-\(index)", patientId: item.0.id,
+                    date: now().addingTimeInterval(Double(item.1) * 86400), status: "pending")
+            }
+            rows = checkups.map { checkup in
+                let patient = patients.first { $0.id == checkup.patientId }!
+                return AgendaWorkspaceRow(checkup: checkup, patientName: "\(patient.lastName) \(patient.firstName)",
+                    presentation: AgendaPresentation.classifyCheckupPill(date: checkup.date, status: checkup.status, now: now()))
+            }
+            todayCount = AgendaPresentation.countTodayCheckups(checkups, now: now())
+            plannedCount = AgendaPresentation.countPlannedCheckups(checkups, now: now())
+            activePatientCount = patients.count
+            state = .loaded
+            return
+        }
+        #endif
         guard let connection = connectionProvider()?.readRequest else {
             state = .unavailable("Collega l'home-base prima di caricare l'agenda.")
             return
@@ -495,6 +515,16 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
     func load() async {
         invalidateReadContext()
         let generation = requestGeneration
+        #if DEBUG
+        if AppleFoundationDemoMode.isDemoDataset {
+            let patients = AppleFoundationDemoMode.patients().filter { $0.isArchived != true }.map {
+                PopulationPatient(id: $0.id, birthDate: $0.birthDate, isAdi: $0.isAdi, diagnoses: DiagnosesCodec.decode($0.diagnoses))
+            }
+            statistics = PopulationAnalytics.statistics(for: patients, ageRange: (minimumAge, maximumAge), now: now())
+            state = .loaded
+            return
+        }
+        #endif
         guard let connection = connectionProvider()?.readRequest else {
             state = .unavailable("Collega l'home-base prima di caricare gli analytics.")
             return
@@ -701,51 +731,70 @@ struct AgendaWorkspaceView: View {
 
     private var content: some View {
         List {
-            // Counts are stated only once a read has happened. Before that they
-            // are all zero, and three zeros presented as figures are a claim
-            // about the archive rather than an admission that it was not read.
-            if model.state == .loaded {
-                Section {
-                    HStack {
-                        agendaStatistic("Visite oggi", value: model.todayCount)
-                        agendaStatistic("Pianificate", value: model.plannedCount)
-                        agendaStatistic("Pazienti attivi", value: model.activePatientCount)
-                    }
-                }
-            }
-            Section {
-                switch sectionContent {
-                case .progress:
-                    ProgressView()
-                case .message(let message):
-                    Text(message)
-                        // @Codex
-                        .lumeInchiostro(bozza: false)
-                case .rows:
-                    ForEach(model.rows) { row in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(row.patientName).chartRowTitle()
-                                Text(row.checkup.date, format: .dateTime.day().month().hour().minute())
-                                    .chartMetadata()
+            switch sectionContent {
+            case .progress:
+                ProgressView()
+            case .message(let message):
+                Text(message).foregroundStyle(.secondary)
+            case .rows:
+                ForEach([AgendaPill.coral, .yellow, .blue, .green, .muted], id: \.rawValue) { group in
+                    let rows = model.rows.filter { $0.presentation.pill == group }
+                    if !rows.isEmpty {
+                        Section {
+                            ForEach(rows) { row in
+                                HStack(alignment: .firstTextBaseline, spacing: 16) {
+                                    Text(row.patientName).chartRowTitle()
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 8)
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text(row.checkup.date, format: .dateTime.day().month().hour().minute())
+                                            .inkRegister().monospacedDigit()
+                                        Text(row.presentation.label).chartMetadata()
+                                            .foregroundStyle(pillColor(row.presentation.pill))
+                                    }
+                                }.padding(.vertical, 8)
                             }
-                            Spacer()
-                            Text(row.presentation.label).font(.caption.weight(.semibold)).padding(.horizontal, 8).padding(.vertical, 4)
-                                .foregroundStyle(pillColor(row.presentation.pill)).background(pillColor(row.presentation.pill).opacity(0.14), in: Capsule())
+                        } header: {
+                            HStack {
+                                Text(agendaGroupTitle(group))
+                                Spacer()
+                                Text("\(rows.count)").monospacedDigit()
+                            }
                         }
                     }
                 }
-            } header: {
-                Text("Prossime visite")
-                    // @Codex
-                    .lumeInchiostro(bozza: false)
+            }
+            if model.state == .loaded {
+                Text("Visite oggi: \(model.todayCount) · Pianificate: \(model.plannedCount) · Pazienti attivi: \(model.activePatientCount)")
+                    .chartMetadata()
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .clinicalRegisterList()
+        #if DEBUG
+        .safeAreaInset(edge: .bottom) {
+            if AppleFoundationDemoMode.isDemoDataset {
+                Text("Dati sintetici di esempio · Nessuna lettura dall’host")
+                    .chartMetadata().padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PlatformColors.chartCardSurface)
+            }
+        }
+        #endif
         .navigationTitle("Agenda")
         .toolbar {
             Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
                 .disabled(!canRefresh)
                 .accessibilityIdentifier("clinical-workspace-agenda-refresh-button")
+        }
+    }
+
+    private func agendaGroupTitle(_ pill: AgendaPill) -> String {
+        switch pill {
+        case .coral: "Scaduti"
+        case .yellow: "Oggi"
+        case .blue: "Prossimi"
+        case .green: "Completati"
+        case .muted: "Annullati"
         }
     }
 
@@ -758,13 +807,8 @@ struct AgendaWorkspaceView: View {
         )
     }
 
-    private func agendaStatistic(_ title: String, value: Int) -> some View {
-        VStack(alignment: .leading, spacing: 3) { Text("\(value)").font(.title3.weight(.semibold)); Text(title).chartMetadata() }
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private func pillColor(_ pill: AgendaPill) -> Color {
-        switch pill { case .coral: .red; case .yellow: .orange; case .blue: .blue; case .green: .green; case .muted: .secondary }
+        switch pill { case .coral: PlatformColors.signal(.critical); case .yellow: PlatformColors.signal(.attention); case .blue: PlatformColors.freshInk; case .green: PlatformColors.signal(.positive); case .muted: .secondary }
     }
 }
 
@@ -870,6 +914,7 @@ struct GlobalDiaryWorkspaceView: View {
                 }
             }
         }
+        .clinicalRegisterList()
         .navigationTitle("Diario")
         .toolbar {
             Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
@@ -928,10 +973,11 @@ struct PopulationAnalyticsWorkspaceView: View {
 
     private var content: some View {
         List {
-            Section("Età") {
-                Stepper("Da \(model.minimumAge) anni", value: $model.minimumAge, in: 0...120)
-                Stepper("A \(model.maximumAge) anni", value: $model.maximumAge, in: 0...120)
-                Button("Applica intervallo") { Task { await model.load() } }
+            Section("Fascia di età") {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 24) { ageControls }
+                    VStack(alignment: .leading, spacing: 12) { ageControls }
+                }.padding(.vertical, 8)
             }
             if model.state == .loaded, let statistics = model.statistics {
                 // Two counts and two percentages, not four percentages.
@@ -945,7 +991,7 @@ struct PopulationAnalyticsWorkspaceView: View {
                 // the two that do not share a base are stated as counts, and the
                 // base of the two that do is written under them.
                 Section {
-                    HStack {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), alignment: .leading)], alignment: .leading, spacing: 16) {
                         count("Pazienti in fascia", statistics.totalInRange)
                         metric("ADI", statistics.adiCount, statistics.totalInRange)
                         metric("Con diagnosi", statistics.withDiagnoses, statistics.totalInRange)
@@ -975,6 +1021,16 @@ struct PopulationAnalyticsWorkspaceView: View {
                 }
             }
         }
+        .clinicalRegisterList()
+        #if DEBUG
+        .safeAreaInset(edge: .bottom) {
+            if AppleFoundationDemoMode.isDemoDataset {
+                Text("Dati sintetici di esempio · Nessuna lettura dall’host")
+                    .chartMetadata().padding(12).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(PlatformColors.chartCardSurface)
+            }
+        }
+        #endif
         .navigationTitle("Analytics")
         .toolbar {
             Button("Aggiorna", systemImage: "arrow.clockwise", action: refresh)
@@ -992,6 +1048,13 @@ struct PopulationAnalyticsWorkspaceView: View {
         )
     }
 
+    @ViewBuilder
+    private var ageControls: some View {
+        Stepper("Da \(model.minimumAge) anni", value: $model.minimumAge, in: 0...120)
+        Stepper("A \(model.maximumAge) anni", value: $model.maximumAge, in: 0...120)
+        Button("Applica intervallo") { Task { await model.load() } }
+    }
+
     private func metric(_ label: String, _ value: Int, _ total: Int) -> some View { tile(label, "\(PopulationAnalytics.percent(value, total: total))%") }
 
     /// A plain number, for the quantities whose base is not the base of the
@@ -1000,7 +1063,7 @@ struct PopulationAnalyticsWorkspaceView: View {
 
     private func tile(_ label: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing / 2) {
-            Text(value).font(.title3.weight(.semibold))
+            Text(value).font(.system(size: 28, weight: .semibold)).monospacedDigit()
             Text(label).chartMetadata()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1050,11 +1113,23 @@ struct ClinicalScalesWorkspaceView: View {
             ForEach(model.groups, id: \.area) { group in
                 Section(group.area) {
                     ForEach(group.scales) { scale in
-                        Button { pendingScale = scale; showsPatientPicker = true } label: { VStack(alignment: .leading, spacing: 3) { Text(scale.title); Text(scale.scaleDescription).font(.caption).foregroundStyle(.secondary) } }
+                        Button { pendingScale = scale; showsPatientPicker = true } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(scale.title).chartRowTitle().foregroundStyle(.primary)
+                                    Text(scale.scaleDescription).chartMetadata()
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 8)
+                                Text("\(scale.questions.count) domande").chartMetadata()
+                                    .fixedSize(horizontal: true, vertical: false)
+                            }.padding(.vertical, 10).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
                     }
                 }
             }
         }
+        .clinicalRegisterList()
         .navigationTitle("Scale")
     }
 

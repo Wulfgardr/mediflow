@@ -11,26 +11,11 @@ struct PairedPatientTherapiesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Five controls beside the title do not fit a phone. Left to compress
-            // they did not truncate, they hyphenated: "Ter-apie", "Aggior-na",
-            // "Es-porta". Same ladder the diary header uses, with one more rung,
-            // because this header can carry two share actions the diary cannot.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    therapiesHeaderTitle
-                    Spacer(minLength: 8)
-                    therapiesHeaderControls
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    therapiesHeaderTitle
-                    therapiesHeaderControls
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    therapiesHeaderTitle
-                    Spacer(minLength: 8)
-                    therapiesOverflowMenu
-                    therapiesStatusFilter
-                }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                therapiesHeaderTitle
+                Spacer(minLength: 8)
+                therapiesOverflowMenu
+                therapiesStatusFilter
             }
 
             if model.therapies.isEmpty {
@@ -90,34 +75,36 @@ struct PairedPatientTherapiesSection: View {
 
             Divider()
 
-            therapyForm(
-                title: "Nuova terapia online",
-                drugName: $model.newTherapyDrugName,
-                aic: $model.newTherapyAIC,
-                atc: $model.newTherapyATC,
-                activePrinciple: $model.newTherapyActivePrinciple,
-                dosage: $model.newTherapyDosage,
-                motivation: $model.newTherapyMotivation,
-                status: $model.newTherapyStatus,
-                startDate: $model.newTherapyStartDate,
-                hasEndDate: $model.newTherapyHasEndDate,
-                endDate: $model.newTherapyEndDate,
-                diagnosisCode: $model.newTherapyDiagnosisCode,
-                diagnosisOptions: model.currentPatientDiagnoses,
-                drugCatalogResults: model.newTherapyDrugCatalogResults,
-                isSearchingDrugCatalog: model.isSearchingNewTherapyDrugCatalog,
-                drugCatalogStatusMessage: model.drugCatalogStatusMessage,
-                primaryLabel: "Salva terapia",
-                primaryIdentifier: "homebase-create-therapy-button",
-                canSubmit: model.canCreateTherapy,
-                onDrugQueryChanged: { model.scheduleNewTherapyDrugCatalogSearch() },
-                onSelectDrug: { model.selectNewTherapyDrugCatalogResult($0) },
-                onCancel: nil,
-                onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
-            )
-            Text("Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            ClinicalCreationDisclosure(title: "Nuova terapia", identifier: "therapy-create-disclosure") {
+                therapyForm(
+                    title: "Nuova terapia online",
+                    drugName: $model.newTherapyDrugName,
+                    aic: $model.newTherapyAIC,
+                    atc: $model.newTherapyATC,
+                    activePrinciple: $model.newTherapyActivePrinciple,
+                    dosage: $model.newTherapyDosage,
+                    motivation: $model.newTherapyMotivation,
+                    status: $model.newTherapyStatus,
+                    startDate: $model.newTherapyStartDate,
+                    hasEndDate: $model.newTherapyHasEndDate,
+                    endDate: $model.newTherapyEndDate,
+                    diagnosisCode: $model.newTherapyDiagnosisCode,
+                    diagnosisOptions: model.currentPatientDiagnoses,
+                    drugCatalogResults: model.newTherapyDrugCatalogResults,
+                    isSearchingDrugCatalog: model.isSearchingNewTherapyDrugCatalog,
+                    drugCatalogStatusMessage: model.drugCatalogStatusMessage,
+                    primaryLabel: "Salva terapia",
+                    primaryIdentifier: "homebase-create-therapy-button",
+                    canSubmit: model.canCreateTherapy,
+                    onDrugQueryChanged: { model.scheduleNewTherapyDrugCatalogSearch() },
+                    onSelectDrug: { model.selectNewTherapyDrugCatalogResult($0) },
+                    onCancel: nil,
+                    onSubmit: { Task { await model.createTherapyForSelectedPatient() } }
+                )
+                Text("Solo campi non-AI. Nessuna prescrizione SISS nativa o coda offline.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -128,14 +115,6 @@ struct PairedPatientTherapiesSection: View {
             ClinicalSectionTitle("Terapie", systemImage: "pills", accent: .terapie)
             Text("Ultime \(PairedPatientsWorkspaceSupport.clinicalPreviewCap) terapie")
                 .chartMetadata()
-        }
-        .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private var therapiesHeaderControls: some View {
-        HStack(spacing: 8) {
-            therapyActions
-            therapiesStatusFilter
         }
         .fixedSize(horizontal: true, vertical: false)
     }

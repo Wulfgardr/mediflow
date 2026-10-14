@@ -189,6 +189,7 @@ struct RepertoriWorkspaceView: View {
             if store.catalogue == .terminology { whoControls.padding(.horizontal, 20).padding(.bottom, 10) }
             Divider()
             results.frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(PlatformColors.chartCardSurface)
         }
         .searchable(text: $store.query, placement: .toolbar, prompt: store.catalogue.prompt)
         .onSubmit(of: .search) { store.submitSearch() }
@@ -282,7 +283,7 @@ struct RepertoriWorkspaceView: View {
                             Text(entry.description).fixedSize(horizontal: false, vertical: true)
                             Text(entry.canonicalUri).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         }.padding(.vertical, 3)
-                    }.accessibilityIdentifier("repertori-who-results")
+                    }.clinicalRegisterList().accessibilityIdentifier("repertori-who-results")
                 }
             }
         } else if let response = store.whoCheck {
@@ -384,6 +385,7 @@ struct RepertoriWorkspaceView: View {
                 .padding(.vertical, 3)
                 .accessibilityElement(children: .combine)
             }
+            .clinicalRegisterList()
             .accessibilityIdentifier("repertori-drugs-list")
 
         case .exemptions:
@@ -403,6 +405,7 @@ struct RepertoriWorkspaceView: View {
                 .padding(.vertical, 3)
                 .accessibilityElement(children: .combine)
             }
+            .clinicalRegisterList()
             .accessibilityIdentifier("repertori-exemptions-list")
 
         case .terminology:

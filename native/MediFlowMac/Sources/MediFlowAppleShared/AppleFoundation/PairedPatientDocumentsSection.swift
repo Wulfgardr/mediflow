@@ -21,8 +21,37 @@ struct PairedPatientDocumentsSection: View {
     @Binding var expandedInsightId: String?
 
     @State private var isShowingUpload = false
+    var usesInlinePreview = false
 
     var body: some View {
+        Group {
+            if usesInlinePreview, let attachment = attachmentDetailCandidate {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 20) {
+                        archiveColumn.frame(minWidth: 280, maxWidth: 360, alignment: .topLeading)
+                        Divider()
+                        original(attachment).frame(minWidth: 320)
+                    }.frame(minWidth: 680)
+                    VStack(alignment: .leading, spacing: 20) {
+                        archiveColumn
+                        Divider()
+                        original(attachment)
+                    }
+                }
+            } else { archiveColumn }
+        }
+    }
+
+    private func original(_ attachment: HomeBaseAttachmentSummary) -> some View {
+        PairedAttachmentDetailView(model: model, summary: attachment, onClose: {
+            attachmentDetailCandidate = nil
+            model.dismissAttachmentDetail()
+        }, isEmbedded: true)
+        .frame(height: 560)
+        .accessibilityIdentifier("documents-original-preview")
+    }
+
+    private var archiveColumn: some View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             documentsSection
 
@@ -60,8 +89,7 @@ struct PairedPatientDocumentsSection: View {
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("documents-fse-disclosure")
         }
-        .padding(ClinicalChartMetrics.cardPadding)
-        .lumeSurface(zone: .field)
+
     }
 
     // MARK: - S6 (Wave 5): documenti, archivio intelligente, follow-up, FSE
@@ -413,8 +441,8 @@ struct PairedPatientDocumentsSection: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(10)
-        .lumeSurface(zone: .field, cornerRadius: 12)
+        .padding(.vertical, 12)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */
@@ -456,8 +484,8 @@ struct PairedPatientDocumentsSection: View {
                 .accessibilityIdentifier("followup-create-checkup-button-\(suggestion.id)")
             }
         }
-        .padding(10)
-        .lumeSurface(zone: .field, cornerRadius: 10)
+        .padding(.vertical, 12)
+        .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
     /* @Codex */

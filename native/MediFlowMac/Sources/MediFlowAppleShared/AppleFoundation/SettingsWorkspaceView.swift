@@ -385,6 +385,10 @@ struct SettingsWorkspaceView: View {
     @State private var showsClearConfirmation = false
     @State private var showsConnectionSetup = false // @Codex
     @State private var confirmsClearingPairing = false // @Codex
+    @State private var selectedArea: SettingsArea = .connection
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
 
     init(
         capabilities: ClinicalWorkspaceCapabilitiesStore,
@@ -411,27 +415,47 @@ struct SettingsWorkspaceView: View {
     }
 
     var body: some View {
-        List {
-            /* @Codex */
-            Section("Collegamento") {
-                Button {
-                    showsConnectionSetup = true
-                } label: {
-                    Label("Collegamento MediFlow", systemImage: "link")
+        Group {
+            if usesSidebar {
+                HStack(spacing: 0) {
+                    List(selection: Binding<SettingsArea?>(
+                        get: { selectedArea },
+                        set: { if let area = $0 { selectedArea = area } }
+                    )) {
+                        ForEach(SettingsArea.allCases) { area in
+                            Label(area.title, systemImage: area.symbol).tag(area)
+                        }
+                    }
+                    .listStyle(.sidebar)
+                    .frame(width: 176)
+                    .accessibilityIdentifier("settings-area-navigation")
+                    Divider()
+                    settingsDetail
                 }
-                .accessibilityHint("Apre la configurazione del collegamento al computer MediFlow.")
-                .accessibilityIdentifier("settings-mediflow-connection-button")
+            } else {
+                VStack(spacing: 0) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 20) {
+                            ForEach(SettingsArea.allCases) { area in
+                                Button { selectedArea = area } label: {
+                                    Text(area.title)
+                                        .font(.body.weight(selectedArea == area ? .semibold : .regular))
+                                        .foregroundStyle(selectedArea == area ? Color.primary : Color.secondary)
+                                        .frame(minHeight: 44)
+                                        .overlay(alignment: .bottom) {
+                                            if selectedArea == area { Rectangle().fill(PlatformColors.freshInk).frame(height: 2) }
+                                        }
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(selectedArea == area ? .isSelected : [])
+                            }
+                        }.padding(.horizontal, 20)
+                    }
+                    .accessibilityIdentifier("settings-area-navigation")
+                    Divider()
+                    settingsDetail
+                }
             }
-            Section("Accesso") { accessContent }
-            Section("Profilo") { profileContent }
-            Section("Ambulatori") { ambulatoryContent }
-            Section("Funzioni AI") { aiFunctionsContent }
-            #if os(macOS)
-            // @Codex: ADR0135 uses only native pairing/session and an explicit host grant.
-            Section("Preferenze AI dell’host") { NativeAIConfigurationView(workspaceModel: workspaceModel) }
-            #endif
-            Section("Aspetto") { appearanceContent }
-            Section("Privacy") { privacyContent }
         }
         .navigationTitle("Impostazioni")
         .task(id: workspaceModel.operatorIdentity) {
@@ -466,6 +490,78 @@ struct SettingsWorkspaceView: View {
             }
         } message: {
             Text(pendingClear.map { "I dati di test di \($0.name) verranno rimossi." } ?? "I dati di test verranno rimossi.")
+        }
+    }
+
+    private var usesSidebar: Bool {
+        #if os(macOS)
+        !dynamicTypeSize.isAccessibilitySize
+        #else
+        horizontalSizeClass == .regular && !dynamicTypeSize.isAccessibilitySize
+        #endif
+    }
+
+    private var settingsDetail: some View {
+        List {
+            Section(selectedArea.title) {
+                switch selectedArea {
+                case .connection:
+                    Button { showsConnectionSetup = true } label: {
+                        Label("Collegamento MediFlow", systemImage: "link")
+                    }
+                    .accessibilityHint("Apre la configurazione del collegamento al computer MediFlow.")
+                    .accessibilityIdentifier("settings-mediflow-connection-button")
+                case .access: accessContent
+                case .profile: profileContent
+                case .ambulatories: ambulatoryContent
+                case .ai: aiFunctionsContent
+                #if os(macOS)
+                case .aiPreferences: NativeAIConfigurationView(workspaceModel: workspaceModel)
+                #endif
+                case .appearance: appearanceContent
+                case .privacy: privacyContent
+                }
+            }
+        }
+        .clinicalRegisterList()
+        .id(selectedArea)
+        .accessibilityIdentifier("settings-area-\(selectedArea.rawValue)")
+    }
+
+    private enum SettingsArea: String, CaseIterable, Identifiable {
+        case connection, access, profile, ambulatories, ai
+        #if os(macOS)
+        case aiPreferences
+        #endif
+        case appearance, privacy
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .connection: "Collegamento"
+            case .access: "Accesso"
+            case .profile: "Profilo"
+            case .ambulatories: "Ambulatori"
+            case .ai: "Funzioni AI"
+            #if os(macOS)
+            case .aiPreferences: "Preferenze AI"
+            #endif
+            case .appearance: "Aspetto"
+            case .privacy: "Privacy"
+            }
+        }
+        var symbol: String {
+            switch self {
+            case .connection: "link"
+            case .access: "key"
+            case .profile: "person"
+            case .ambulatories: "building.2"
+            case .ai: "sparkles"
+            #if os(macOS)
+            case .aiPreferences: "slider.horizontal.3"
+            #endif
+            case .appearance: "circle.lefthalf.filled"
+            case .privacy: "hand.raised"
+            }
         }
     }
 
