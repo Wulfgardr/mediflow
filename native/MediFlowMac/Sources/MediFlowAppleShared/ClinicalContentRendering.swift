@@ -29,7 +29,26 @@ public enum ClinicalContentRendering {
               !rendered.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return AttributedString(content)
         }
-        return AttributedString(rendered)
+        // Imported HTML carries its own default font; replace only presentation
+        // attributes so narrative follows the same local face as plain prose.
+        _ = LumeTypography.voice(17)
+        let styled = NSMutableAttributedString(attributedString: rendered)
+        styled.enumerateAttribute(.font, in: NSRange(location: 0, length: styled.length)) { value, range, _ in
+            #if canImport(AppKit)
+            let original = value as? NSFont
+            let base = NSFont(name: "Newsreader16pt-Regular", size: 17) ?? NSFont.systemFont(ofSize: 17)
+            let traits = original?.fontDescriptor.symbolicTraits ?? []
+            let font = NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits), size: 17) ?? base
+            styled.addAttributes([.font: font, .foregroundColor: NSColor.labelColor], range: range)
+            #elseif canImport(UIKit)
+            let original = value as? UIFont
+            let base = UIFontMetrics(forTextStyle: .body).scaledFont(for: UIFont(name: "Newsreader16pt-Regular", size: 17) ?? UIFont.systemFont(ofSize: 17))
+            let traits = original?.fontDescriptor.symbolicTraits ?? []
+            let font = UIFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits) ?? base.fontDescriptor, size: base.pointSize)
+            styled.addAttributes([.font: font, .foregroundColor: UIColor.label], range: range)
+            #endif
+        }
+        return AttributedString(styled)
         #else
         return AttributedString(content)
         #endif

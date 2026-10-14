@@ -57,15 +57,18 @@ enum ClinicalInlineAttributedText {
         _ run: ClinicalRichTextTextRun, kind: ClinicalRichTextEditorBlock.EditableKind
     ) -> [NSAttributedString.Key: Any] {
         #if os(macOS)
-        let size: CGFloat = kind == .heading2 ? 18 : kind == .heading3 ? 16 : NSFont.systemFontSize
-        let base = NSFont.systemFont(ofSize: size)
+        let size: CGFloat = kind == .heading2 ? 26 : kind == .heading3 ? 22 : 17
+        _ = LumeTypography.voice(size)
+        let base = NSFont(name: "Newsreader16pt-Regular", size: size) ?? NSFont.systemFont(ofSize: size)
         var traits = base.fontDescriptor.symbolicTraits
         if run.isBold { traits.insert(.bold) }
         if run.isItalic { traits.insert(.italic) }
         let font = NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits), size: size) ?? base
         let color = NSColor.labelColor
         #else
-        let base = UIFont.preferredFont(forTextStyle: kind == .heading2 ? .title3 : kind == .heading3 ? .headline : .body)
+        let size: CGFloat = kind == .heading2 ? 26 : kind == .heading3 ? 22 : 17
+        _ = LumeTypography.voice(size)
+        let base = UIFontMetrics(forTextStyle: .body).scaledFont(for: UIFont(name: "Newsreader16pt-Regular", size: size) ?? UIFont.systemFont(ofSize: size))
         var traits = base.fontDescriptor.symbolicTraits
         if run.isBold { traits.insert(.traitBold) }
         if run.isItalic { traits.insert(.traitItalic) }

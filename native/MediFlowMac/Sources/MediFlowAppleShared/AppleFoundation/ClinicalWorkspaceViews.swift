@@ -1067,7 +1067,7 @@ struct ClinicalScalesWorkspaceView: View {
                         Text("\(patient.firstName) \(patient.lastName)")
                         Text(PairedPatientsWorkspaceSupport.compactTaxCode(patient.taxCode))
                             .font(.caption)
-                            .registro()
+                            .codice()
                             .foregroundStyle(.secondary)
                     }
                 }

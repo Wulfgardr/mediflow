@@ -558,7 +558,7 @@ struct PairedPatientClinicalSections: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(item.code)
                                 .font(.caption.monospaced().weight(.semibold))
-                                .registro()
+                                .codice()
                             Text(item.display)
                                 .font(.caption)
                                 .lineLimit(2)

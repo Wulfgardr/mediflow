@@ -303,6 +303,7 @@ struct PairedPatientDiarySection: View {
                         .padding(.vertical, 10)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .modifier(LumeRigaListaModifier(isSelected: false))
+                        .overlay(alignment: .bottom) { Divider() }
                         // The leading inset goes *outside* the row surface, so the
                         // Filo runs in a clear channel beside the entries. Inside
                         // it, the row background painted across the thread and
@@ -313,12 +314,7 @@ struct PairedPatientDiarySection: View {
                         .accessibilityIdentifier("entry-row-\(entry.id)")
                     }
                 }
-                .background(alignment: .leading) {
-                    Filo(axis: .vertical, isConnected: true, tone: .minerale)
-                        .frame(width: 2)
-                        .padding(.vertical, 22)
-                        .accessibilityHidden(true)
-                }
+
             }
         }
     }

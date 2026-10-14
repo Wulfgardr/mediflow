@@ -19,7 +19,7 @@ struct PairedPatientDeleteSheet: View {
                     if let validationMessage {
                         Text(validationMessage)
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(LumePalette.critical)
                             .accessibilityIdentifier("patient-delete-validation-message")
                     }
                 }

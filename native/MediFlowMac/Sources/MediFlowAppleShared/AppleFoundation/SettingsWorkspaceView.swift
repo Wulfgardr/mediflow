@@ -566,6 +566,11 @@ struct SettingsWorkspaceView: View {
 
     @ViewBuilder
     private var aiFunctionsContent: some View {
+        #if os(macOS)
+        if #unavailable(macOS 26) {
+            settingsMessage("L’ascolto non è disponibile su questo computer. Puoi scrivere la voce a mano.")
+        }
+        #endif
         Text("Stato dei servizi AI in sola lettura.")
             .font(.subheadline)
             .foregroundStyle(.secondary)

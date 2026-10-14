@@ -70,7 +70,7 @@ struct PairedPatientDetailSection: View {
             // behind an overflow rather than in front of the record.
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text("\(detail.lastName) \(detail.firstName)")
-                    .chartCardTitle()
+                    .inkVoice(28)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("\(detail.lastName) \(detail.firstName)")
@@ -343,7 +343,7 @@ struct PairedPatientDetailSection: View {
     private var macPatientFacts: some View {
         let contacts: [(label: String, value: String, isCode: Bool)] = [
             ("Indirizzo", cleanedPatientWorkspaceValue(detail.address), false),
-            ("Telefono", cleanedPatientWorkspaceValue(detail.phone), true),
+            ("Telefono", cleanedPatientWorkspaceValue(detail.phone), false),
         ].compactMap { label, value, isCode in value.map { (label, $0, isCode) } }
         let care: [(label: String, value: String, isCode: Bool)] = [
             ("Caregiver", cleanedPatientWorkspaceValue(detail.caregiver), false),
@@ -356,7 +356,7 @@ struct PairedPatientDetailSection: View {
             ChartGroup("Identità") {
                 macPatientFact("Codice fiscale", detail.taxCode, isCode: true)
                 if let birth = detail.birthDate {
-                    macPatientFact("Data di nascita", birthDateText(birth), isCode: true) // @Codex
+                    macPatientFact("Data di nascita", birthDateText(birth), isCode: false) // @Codex
                 }
             }
             if !contacts.isEmpty {
@@ -415,7 +415,7 @@ struct PairedPatientDetailSection: View {
                 .foregroundStyle(.secondary)
             Group {
                 if isCode {
-                    Text(value).registro()
+                    Text(value).codice()
                 } else {
                     Text(value)
                 }
@@ -828,7 +828,7 @@ struct PairedPatientDetailSection: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(exemption.code)
                                 .font(.caption.monospaced().weight(.semibold))
-                                .registro()
+                                .codice()
                             Text(exemption.description)
                                 .font(.caption)
                                 .lineLimit(2)

@@ -42,13 +42,13 @@ final class LumeToneMappingTests: XCTestCase {
         }
     }
 
-    func testRenderedSignalsUseSixtyFortySRGBAndMeetFieldContrast() throws {
+    func testRenderedSignalsUseExactInkTokensAndMeetFieldContrast() throws {
         for register in registers {
             for tone in signalTones {
                 let seed = LumePalette.hex(for: tone, using: register.palette)
-                let expected = mixedHex(seed: seed, ink: register.palette.inkPrimaryHex)
+                let expected = register.name == "guardia" ? mixedHex(seed: seed, ink: register.palette.inkPrimaryHex) : seed
                 let actual = LumePalette.resolvedHex(for: tone, using: register.palette)
-                XCTAssertEqual(actual, expected, "\(register.name).\(tone) must use the 60/40 sRGB mix")
+                XCTAssertEqual(actual, expected, "\(register.name).\(tone) must render the register signal")
                 XCTAssertGreaterThanOrEqual(contrastRatio(actual, register.palette.fieldHex), 4.5,
                                             "\(register.name).\(tone) must remain readable on field")
                 #if os(macOS)
@@ -84,9 +84,9 @@ final class LumeToneMappingTests: XCTestCase {
         switch tone {
         case .neutral: return "register.\(registerName).ink.muted"
         case .info: return "register.\(registerName).accent.minerale"
-        case .positive: return "signal.success"
-        case .attention: return "signal.warning"
-        case .critical: return "signal.critical"
+        case .positive: return "register.\(registerName).signal.success"
+        case .attention: return "register.\(registerName).signal.warning"
+        case .critical: return "register.\(registerName).signal.critical"
         }
     }
 

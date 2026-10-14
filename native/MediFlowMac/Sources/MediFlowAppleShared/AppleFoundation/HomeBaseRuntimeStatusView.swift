@@ -86,7 +86,7 @@ public struct HomeBaseRuntimeStatusView: View {
             if let errorMessage = supervisor.errorMessage {
                 Text(errorMessage)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(LumePalette.critical)
                     .accessibilityIdentifier("homebase-runtime-supervisor-error")
             }
             #endif
