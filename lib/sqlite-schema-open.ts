@@ -6,7 +6,7 @@ import { checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema, initializeSql
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
 import { initSqlitePragmas } from './sqlite-pragmas';
-import { upgradeObservationTimestampDefault } from './sqlite-observation-schema-upgrade';
+import { upgradeObservationTimestampDefault, upgradeReviewPatientReferenceDefault } from './sqlite-observation-schema-upgrade';
 import { readSqliteArchiveGeneration } from './archive-generation';
 
 // 1: the first versioned schema (C09). 2: ADR 0143 credentials. 3: archive generation (ADR 0144).
@@ -125,6 +125,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
                 const violationsBefore = foreignKeyViolations(connection);
                 initializeSqliteSchema(connection);
                 upgradeObservationTimestampDefault(connection, canonical);
+                upgradeReviewPatientReferenceDefault(connection, canonical);
                 assertCanonical(connection, canonical);
                 assertIntegrity(connection);
                 if (foreignKeyViolations(connection) !== violationsBefore) deny('migration changed foreign key violations');
