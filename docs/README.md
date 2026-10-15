@@ -22,7 +22,7 @@ La candidatura ricostruita il 12 settembre 2026 non era ancora una release.
 In quel piano Windows, Linux, Mini, iPhone e iPad erano rinviati alla 1.0, con
 ATHENA opzionale: era l’indicazione di quella fase, non una nuova scadenza
 o una qualifica delle piattaforme.
-**Oggi la 0.8.6 è pubblicata come codice sorgente**, per runtime locale/headless
+**La 0.8.6 è stata pubblicata come codice sorgente**, per runtime locale/headless
 sul Mac e browser localhost. Il percorso nativo è separato; gli archivi ZIP e
 TAR.GZ non attestano installer firmati o notarizzati né app complete su altri
 sistemi. Le prove storiche Windows/Linux e il raccordo Mini WUL-696 non sono
@@ -37,7 +37,20 @@ in WUL-685–688. Il coordinamento della consegna sorgente e del passaggio alla
 23 settembre, come riletto il 26 settembre 2026: questo non adotta le
 procedure organizzative né qualifica servizi solo configurati.
 
-<!-- @Codex -->
+## Consegna sorgente 0.9.0
+
+MediFlow 0.9.0 è una release sorgente per runtime locale Web e Headless. Le
+[note di rilascio](../CHANGELOG.md#090---2026-10-15) e lo
+[stato corrente](./STATE_OF_THE_SYSTEM.md#supporto-capacità-e-protezione-correnti)
+distinguono profili sorgente, prove delegate accettate C15/C20 e quarantene
+fino al 23 ottobre 2026 alle 00:00 UTC. La [pagina della release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
+riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna;
+app native e ammissione clinica restano separate. GitHub fornisce ZIP/TAR.GZ
+sorgenti; l'avvio qualificato richiede un checkout Git pulito del tag `v0.9.0`
+con Node 24, sui profili macOS ARM, Windows 11 ARM con Node x64 emulato e
+Omarchy/Arch ARM su Parallels. Gli archivi privi di `.git` non sono un profilo
+di avvio qualificato.
+
 ## Pianificazione corrente
 
 La [roadmap prodotto](./ROADMAP.md#roadmap-vigente--21-settembre-2026) riporta

@@ -49,7 +49,7 @@ test('known updates stop an older main, but do not block an updated or developme
 
 test('product identity reports the exact checkout, version, and source fingerprint', () => {
     const identity = readProductIdentity(repoRoot);
-    assert.equal(identity.version, '0.8.6');
+    assert.equal(identity.version, '0.9.0');
     assert.equal(identity.checkoutPath, repoRoot);
     assert.equal(identity.sourceFingerprint, `${identity.branch}@${identity.revision}:${identity.worktreeHash}`);
 });
