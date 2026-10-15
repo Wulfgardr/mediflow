@@ -180,6 +180,16 @@ seguire symlink, verifica di identità e proprietario sul descrittore e
 `fchmod` sullo stesso descrittore. File non propri, symlink e altri tipi di file
 sono rifiutati senza cambiarne i permessi. I sidecar assenti sono ammessi.
 
+La verifica iniziale usa `lstat` senza aprire descrittori. Quando occorre
+correggere i permessi, apertura, verifica e `fchmod` avvengono in un processo
+Node locale separato, senza shell, con timeout di cinque secondi e identità
+attesa dei file. Errore, timeout o identità discordante bloccano l'apertura.
+I file già a `0600` non richiedono il processo aggiuntivo. Non si aprono e
+chiudono descrittori ausiliari nel processo che possiede connessioni SQLite:
+su POSIX quella chiusura rilascia i lock del processo sull'inode e può consentire
+a un'altra connessione di eliminare il WAL ancora in uso. La regressione
+multiprocesso verifica persistenza, identità del WAL e visibilità dei trigger.
+
 La build resta in memoria e non normalizza archivi persistenti. Non cambia la
 scelta della cartella dati: una cartella esplicitamente configurata conserva
 i permessi decisi dall'operatore. Il controllo owner-only del servizio degli

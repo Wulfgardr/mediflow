@@ -26,6 +26,42 @@ function seed(file: string, missingColumn = false) {
 function originals(directory: string) { return fs.readdirSync(directory).filter(name => name.includes('.schema-original-')); }
 function columns(db: Database.Database) { return (db.pragma('table_info(patients)') as { name: string }[]).map(row => row.name); }
 
+test('permission admission preserves live WAL locks, cross-process writes and audit fault triggers', { skip: process.platform === 'win32' }, () => {
+    const w = workspace();
+    let writer: Database.Database | undefined;
+    let opened: Database.Database | undefined;
+    try {
+        writer = openVersionedSqliteDatabase(w.file);
+        writer.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('wal-before-admission', 'committed');
+        for (const suffix of ['', '-wal', '-shm']) fs.chmodSync(`${w.file}${suffix}`, 0o644);
+        opened = openVersionedSqliteDatabase(w.file);
+        const wal = fs.statSync(`${w.file}-wal`);
+        const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+            import Database from 'better-sqlite3';
+            const db = new Database(process.env.SYNTHETIC_SCHEMA_FILE, { fileMustExist: true });
+            try {
+                db.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('wal-from-child', 'committed');
+                db.exec("CREATE TRIGGER synthetic_settings_fault BEFORE INSERT ON settings WHEN NEW.key='audit-required' BEGIN SELECT RAISE(IGNORE); END");
+            } finally { db.close(); }
+        `], { cwd: process.cwd(), env: { ...process.env, SYNTHETIC_SCHEMA_FILE: w.file }, encoding: 'utf8', timeout: 10_000 });
+        assert.equal(child.status, 0, child.stderr || child.stdout);
+        assert.equal(fs.existsSync(`${w.file}-wal`), true, 'another process must not unlink the live WAL');
+        assert.equal(fs.statSync(`${w.file}-wal`).ino, wal.ino, 'all connections must retain the same WAL');
+        assert.equal(writer.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-from-child'), 'committed');
+        assert.equal(opened.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-before-admission'), 'committed');
+        assert.equal(writer.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('audit-required', 'refused').changes, 0);
+        opened.close(); opened = undefined;
+        writer.close(); writer = undefined;
+        const readback = new Database(w.file, { readonly: true, fileMustExist: true });
+        try {
+            assert.equal(readback.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-before-admission'), 'committed');
+            assert.equal(readback.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-from-child'), 'committed');
+            assert.equal(readback.prepare('SELECT value FROM settings WHERE key=?').get('audit-required'), undefined);
+            assert.equal(readback.pragma('integrity_check', { simple: true }), 'ok');
+        } finally { readback.close(); }
+    } finally { opened?.close(); writer?.close(); w.cleanup(); }
+});
+
 test('opening an older owner-owned archive makes the database and live WAL sidecars private without losing data', { skip: process.platform === 'win32' }, () => {
     const w = workspace();
     let writer: Database.Database | undefined;
@@ -60,19 +96,43 @@ test('opening refuses symlinked archive files before SQLite and leaves their tar
 });
 
 test('opening does not chmod archive files owned by another user', { skip: process.platform === 'win32' }, () => {
-    const w = workspace(), stat = fs.fstatSync;
+    const w = workspace(), stat = fs.lstatSync;
     try {
         openVersionedSqliteDatabase(w.file).close();
         fs.chmodSync(w.file, 0o644);
-        fs.fstatSync = ((...args: Parameters<typeof stat>) => {
+        Reflect.set(fs, 'lstatSync', ((...args: Parameters<typeof stat>) => {
             const info = stat(...args);
+            assert.ok(info);
             return Object.assign(info, { uid: Number(info.uid) + 1 });
-        }) as typeof stat;
+        }) as typeof stat);
         let opens = 0;
         assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
         assert.equal(opens, 0);
         assert.equal(fs.statSync(w.file).mode & 0o777, 0o644);
-    } finally { fs.fstatSync = stat; w.cleanup(); }
+    } finally { Reflect.set(fs, 'lstatSync', stat); w.cleanup(); }
+});
+
+test('permission admission refuses a file replaced with a symlink while it is fixed', { skip: process.platform === 'win32' }, () => {
+    const w = workspace(), stat = fs.lstatSync;
+    try {
+        openVersionedSqliteDatabase(w.file).close();
+        fs.chmodSync(w.file, 0o644);
+        const target = path.join(w.directory, 'untouched');
+        fs.writeFileSync(target, 'synthetic target', { mode: 0o644 });
+        let inspections = 0;
+        Reflect.set(fs, 'lstatSync', ((...args: Parameters<typeof stat>) => {
+            const info = stat(...args);
+            if (String(args[0]) === w.file && ++inspections === 1) {
+                fs.renameSync(w.file, `${w.file}.original`);
+                fs.symlinkSync(target, w.file);
+            }
+            return info;
+        }) as typeof stat);
+        let opens = 0;
+        assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /archive file (changed during permission admission|is not a regular owner-owned file)/u);
+        assert.equal(opens, 0);
+        assert.equal(fs.readFileSync(target, 'utf8'), 'synthetic target');
+    } finally { Reflect.set(fs, 'lstatSync', stat); w.cleanup(); }
 });
 
 test('fresh and reserved archives consume admission atomically; repeated open does not migrate', () => {

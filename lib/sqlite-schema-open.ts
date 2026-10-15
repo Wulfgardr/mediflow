@@ -28,6 +28,9 @@ export class SqliteSchemaRecoveryRequiredError extends Error {
 
 function deny(reason: string): never { throw new SqliteSchemaRecoveryRequiredError(reason); }
 
+// POSIX close() releases every lock this process holds on the inode, SQLite's included,
+// so permissions are fixed by path (chmod opens nothing) and verified with lstat around it.
+// The data directory is already owner-only, so no other user can swap the file in between.
 function ensurePrivateArchiveFiles(databasePath: string): void {
     if (process.platform === 'win32') return;
     for (const file of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
@@ -38,13 +41,11 @@ function ensurePrivateArchiveFiles(databasePath: string): void {
             throw error;
         }
         if (!before.isFile() || before.uid !== process.getuid?.()) deny('archive file is not a regular owner-owned file');
-        const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
-        try {
-            const current = fs.fstatSync(fd);
-            if (!current.isFile() || current.uid !== process.getuid?.() || current.dev !== before.dev || current.ino !== before.ino)
-                deny('archive file identity or owner changed');
-            if ((current.mode & 0o7777) !== 0o600) fs.fchmodSync(fd, 0o600);
-        } finally { fs.closeSync(fd); }
+        if ((before.mode & 0o7777) === 0o600) continue;
+        fs.chmodSync(file, 0o600);
+        const after = fs.lstatSync(file);
+        if (!after.isFile() || after.dev !== before.dev || after.ino !== before.ino || (after.mode & 0o7777) !== 0o600)
+            deny('archive file changed during permission admission');
     }
 }
 

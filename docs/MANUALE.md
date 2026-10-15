@@ -165,6 +165,8 @@ memoria: per archivi grandi serve memoria libera sufficiente sul computer.
 All'apertura su macOS e Linux, MediFlow limita al proprietario l'accesso a
 `medical.db` e ai file di lavoro SQLite `-wal` e `-shm`. Non modifica file
 di altri utenti o collegamenti simbolici, che impediscono l'apertura.
+Se non riesce a verificare o correggere questi permessi, l'apertura si ferma:
+conserva l'archivio e i file di lavoro, senza eliminarli per forzare l'avvio.
 Se hai scelto una cartella dati personalizzata, assicurati che sia accessibile
 solo al tuo utente prima di allegare originali al repertorio protesico.
 
