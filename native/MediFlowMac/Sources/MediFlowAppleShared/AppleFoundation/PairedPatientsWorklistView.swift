@@ -586,8 +586,7 @@ struct PairedPatientsWorklistView: View {
                 .codice()
         }
         .lineLimit(1)
-        // @Codex
-        .foregroundStyle(.secondary)
+        .foregroundStyle(PlatformColors.secondaryInk)
     }
 
     #if os(iOS)
