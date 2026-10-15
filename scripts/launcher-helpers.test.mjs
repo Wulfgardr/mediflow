@@ -55,7 +55,7 @@ test('product identity reports the exact checkout, version, and source fingerpri
 });
 
 test('worktree hash matches the server algorithm and ignores edge whitespace', () => {
-    const status = ' M scripts/start-mediflow.sh\n?? scripts/launcher-helpers.test.mjs\n';
+    const status = ' M MediFlow.sh\n?? scripts/launcher-helpers.test.mjs\n';
     const expected = crypto.createHash('sha1').update(status.trim()).digest('hex').slice(0, 12);
     assert.equal(hashWorktreeStatus(status), expected);
     assert.equal(hashWorktreeStatus('  \n'), 'clean');
@@ -206,27 +206,123 @@ test('a verified instance stays valid when the local browser cannot be opened', 
     assert.equal(result.browserOpened, false);
 });
 
-test('all web launchers use shared identity, fail-closed port inspection, and readiness opening', () => {
-    for (const relativePath of ['Start_MediFlow.command', 'Start-MediFlow.ps1', 'scripts/start-mediflow.sh']) {
-        const source = readFileSync(path.join(repoRoot, relativePath), 'utf8');
-        assert.match(source, /identity-summary/u);
-        assert.match(source, /inspect-port/u);
-        assert.ok((source.match(/wait-and-open/gu) || []).length >= 2, `${relativePath} must gate both reuse and startup`);
-        assert.doesNotMatch(source, /AI\/OCR|AI e OCR/u);
-    }
 
-    const macSource = readFileSync(path.join(repoRoot, 'Start_MediFlow.command'), 'utf8');
-    assert.match(macSource, /identity-field sourceFingerprint/u);
-    assert.match(macSource, /trap cleanup SIGINT TERM HUP EXIT/u);
-    assert.doesNotMatch(macSource, /git rev-parse|shasum -a 1/u);
-    assert.doesNotMatch(macSource, /kill "\$PORT_LISTENER_PID"/u);
+import http from 'node:http';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { atomicJson, buildDecision, claimLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
+import { createChoiceServer } from './mediflow-launcher-page.mjs';
 
-    const linuxSource = readFileSync(path.join(repoRoot, 'scripts/start-mediflow.sh'), 'utf8');
-    assert.doesNotMatch(linuxSource, /exec npm run dev/u);
-    assert.match(linuxSource, /npm_exit_code=\$\?/u);
-    assert.match(linuxSource, /exit "\$npm_exit_code"/u);
+const cleanIdentity = { checkoutPath: repoRoot, revision: 'abc123456789', worktreeHash: 'clean', sourceFingerprint: 'main@abc123456789:clean' };
 
-    const windowsSource = readFileSync(path.join(repoRoot, 'Start-MediFlow.ps1'), 'utf8');
-    assert.match(windowsSource, /\$npmExitCode = \$LASTEXITCODE/u);
-    assert.match(windowsSource, /exit \$npmExitCode/u);
+test('remembered choice respects explicit choice, choose flag, availability and dirty sources', () => {
+    const input = { remembered: 'web', nativeAvailable: false, dirty: false };
+    assert.equal(selectChoice(input), 'web');
+    assert.equal(selectChoice({ ...input, forceChoice: true }), null);
+    assert.equal(selectChoice({ ...input, explicit: 'agenti', forceChoice: true }), 'agenti');
+    assert.equal(selectChoice({ ...input, dirty: true }), null);
+    assert.equal(selectChoice({ ...input, remembered: 'mac', nativeAvailable: true, dirty: true }), null);
+    assert.equal(selectChoice({ ...input, remembered: 'mac' }), null);
+    assert.equal(selectChoice({ ...input, remembered: 'sviluppo', dirty: true }), null);
+    assert.throws(() => selectChoice({ ...input, explicit: 'mac' }));
+    assert.throws(() => parseArguments(['--scelta', 'untrusted']));
+    assert.equal(parseArguments(['--scelta', 'web', '--senza-browser']).choice, 'web');
+});
+
+test('production reuses only the verified build for the current clean source', () => {
+    const verified = { identity: { revision: 'abc1234567890123456789', sourceFingerprint: cleanIdentity.sourceFingerprint } };
+    assert.equal(buildDecision(cleanIdentity, null), 'build');
+    assert.equal(buildDecision(cleanIdentity, verified), 'reuse');
+    assert.equal(buildDecision(cleanIdentity, { identity: { ...verified.identity, revision: 'other' } }), 'build');
+    assert.equal(buildDecision(cleanIdentity, { identity: { ...verified.identity, sourceFingerprint: 'another-branch' } }), 'build');
+    assert.equal(buildDecision({ ...cleanIdentity, worktreeHash: 'dirty' }, verified), 'development-only');
+    assert.throws(() => buildDecision({ ...cleanIdentity, revision: 'unknown' }, null));
+});
+
+test('text fallback offers the same available actions and never silently enables development', async () => {
+    assert.equal(needsTextMenu('linux', {}), true);
+    assert.equal(needsTextMenu('linux', { WAYLAND_DISPLAY: 'wayland-0' }), false);
+    assert.equal(needsTextMenu('darwin', {}, 1), true);
+    const output = [], answers = ['invalid', '3'];
+    assert.equal(await textualChoice({ nativeAvailable: false, dirty: true,
+        question: async () => answers.shift(), write: line => output.push(line) }), 'sviluppo');
+    assert.ok(output.some(line => line.includes('per sviluppo')));
+    assert.equal(await textualChoice({ nativeAvailable: false, dirty: false, question: async () => '', write: () => {} }), 'web');
+});
+
+test('preferences are atomically replaced with a readable choice', (t) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-preferences-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const file = path.join(root, 'preferences.json');
+    atomicJson(file, { schemaVersion: 1, choice: 'web' });
+    atomicJson(file, { schemaVersion: 1, choice: 'agenti' });
+    assert.equal(JSON.parse(readFileSync(file, 'utf8')).choice, 'agenti');
+});
+
+test('launcher ownership refuses a live owner and recovers only a dead receipt', t => {
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-owner-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    const lock = path.join(root, 'lock');
+    claimLauncher(lock, cleanIdentity);
+    assert.throws(() => claimLauncher(lock, cleanIdentity), /già in corso/u);
+    assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'), 'utf8')).pid, process.pid);
+    atomicJson(path.join(lock, 'instance.json'), { pid: 2147483647, checkoutPath: repoRoot });
+    claimLauncher(lock, cleanIdentity);
+    assert.equal(JSON.parse(readFileSync(path.join(lock, 'instance.json'), 'utf8')).pid, process.pid);
+});
+
+async function fakeRuntime(t, fingerprint = cleanIdentity.sourceFingerprint) {
+    const server = http.createServer((_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ revision: cleanIdentity.revision, sourceFingerprint: fingerprint, fingerprint }));
+    });
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
+    return `http://127.0.0.1:${server.address().port}`;
+}
+
+test('choice page serves locally, rejects cross-origin actions and redirects only after verified readiness', async (t) => {
+    const target = await fakeRuntime(t);
+    const state = { ready: false, busy: false, message: 'Scegli', url: null };
+    const chosen = [];
+    const page = await createChoiceServer({ root: repoRoot, state: () => state,
+        choose: (...args) => chosen.push(args), install: () => {}, stop: async () => {} });
+    t.after(page.close);
+    const response = await fetch(page.url);
+    assert.equal(response.status, 200);
+    assert.match(await response.text(), /Apri MediFlow/u);
+    assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/u);
+    const post = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json', Origin: new URL(page.url).origin }, body: JSON.stringify(body) });
+    assert.equal((await fetch(new URL('choose', page.url), { ...post({ choice: 'web' }), headers: { 'Content-Type': 'application/json', Origin: 'https://foreign.invalid' } })).status, 403);
+    assert.equal((await fetch(new URL('/state', page.url))).status, 404);
+    assert.equal((await fetch(new URL('go', page.url), { redirect: 'manual' })).status, 409);
+    assert.equal((await fetch(new URL('choose', page.url), post({ choice: 'web', remember: true }))).status, 202);
+    assert.deepEqual(chosen, [['web', true]]);
+    const ready = await waitForInstanceAndOpen(target, cleanIdentity.sourceFingerprint, { open: () => 0 });
+    assert.equal(ready.ok, true);
+    Object.assign(state, { ready: true, url: target });
+    const redirect = await fetch(new URL('go', page.url), { redirect: 'manual' });
+    assert.equal(redirect.status, 303);
+    assert.equal(redirect.headers.get('location'), target);
+});
+
+test('same-folder receipt reuses an exact running instance and refuses changed sources', async (t) => {
+    const target = await fakeRuntime(t);
+    const page = await createChoiceServer({ root: repoRoot, state: () => ({ ready: true, url: target }),
+        choose: () => {}, install: () => {}, stop: async () => {} });
+    t.after(page.close);
+    const receipt = { pid: process.pid, checkoutPath: repoRoot, choiceUrl: page.url };
+    assert.equal((await findExistingInstance(receipt, cleanIdentity)).url, target);
+    assert.equal(await findExistingInstance({ ...receipt, checkoutPath: '/another/folder' }, cleanIdentity), null);
+    await assert.rejects(findExistingInstance(receipt, { ...cleanIdentity, sourceFingerprint: 'changed' }), /non corrisponde/u);
+    await assert.rejects(requireFreePort(Number(new URL(target).port)), /non è disponibile/u);
+    assert.equal((await probeRunningInstance(target, cleanIdentity.sourceFingerprint)).ok, true);
+});
+
+test('shutdown asks an owned runtime to stop and waits for its exit', async () => {
+    const child = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => process.exit(0)); process.on('message', m => { if(m.type === 'mediflow-launcher-stop') process.exit(0); }); process.send('ready');"],
+        { stdio: ['ignore', 'ignore', 'ignore', 'ipc'], detached: process.platform !== 'win32' });
+    await once(child, 'message');
+    await stopOwnedChild(child, 3000);
+    assert.equal(child.exitCode, 0);
 });

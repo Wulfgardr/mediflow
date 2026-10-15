@@ -223,11 +223,11 @@ test('fixed PowerShell ACL adapter passes literal path as data and never elevate
 });
 test('thin launchers and application specs keep path spaces, delegation and no policy bypass', () => {
     const win = appLaunchSpec('win32', 'C:\\Synthetic Project\\MediFlow');
-    assert.equal(win.executable, 'powershell.exe');
-    assert.deepEqual(win.args, ['-NoLogo', '-NoProfile', '-File', 'C:\\Synthetic Project\\MediFlow\\Start-MediFlow.ps1']);
+    assert.equal(win.executable, process.execPath);
+    assert.deepEqual(win.args, ['C:\\Synthetic Project\\MediFlow\\scripts\\mediflow.mjs']);
     const linux = appLaunchSpec('linux', '/synthetic project/MediFlow');
-    assert.deepEqual(linux.args, ['/synthetic project/MediFlow/scripts/start-mediflow.sh']);
-    assert.equal(appLaunchSpec('darwin', '/synthetic project/MediFlow').args[0], '/synthetic project/MediFlow/Start_MediFlow.command');
+    assert.deepEqual(linux.args, ['/synthetic project/MediFlow/scripts/mediflow.mjs']);
+    assert.equal(appLaunchSpec('darwin', '/synthetic project/MediFlow').args[0], '/synthetic project/MediFlow/scripts/mediflow.mjs');
     assert.match(ownedLauncher('win32', "C:\\Synthetic O'Brien").content, /O''Brien/u);
     const unicodeLauncher = ownedLauncher('win32', 'C:\\Synthetic Équipe');
     assert.equal(unicodeLauncher.content.codePointAt(0), 0xfeff, 'UTF-8 BOM for Windows PowerShell 5.1');

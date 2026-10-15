@@ -6,23 +6,25 @@ Riferimenti correlati:
 - [docs/local-api-tls.md](./local-api-tls.md)
 - [docs/native-testing.md](./native-testing.md)
 
-## Avvio con doppio click (consigliato)
+## Avvio con doppio clic
 
-1) Il client nativo e la web app hanno avvii distinti. Se la web app locale non è già attiva, avviala con:
+Apri `MediFlow.command` nella radice e scegli **App per Mac**. Il lanciatore
+apre il bundle locale già costruito e ne controlla l'identità rispetto ai
+sorgenti. Se il bundle manca, la voce spiega che serve Xcode completo;
+**Apri MediFlow** resta il percorso web.
+
+La preparazione del bundle è un'operazione di sviluppo distinta:
 
 ```bash
-./Start_MediFlow.command
-```
-
-`Start_MediFlow.command` avvia la superficie web e i servizi locali opzionali, non il client Apple.
-
-2) Per aprire il client nativo, esegui separatamente:
-
-```
 ./scripts/Launch_MediFlowMac.command
 ```
 
-Lo script prepara TLS e pin, avvia il proxy locale e compila il client nativo; al termine apre l'app macOS.
+Questo motore interno prepara TLS e pin, avvia il proxy locale e compila
+il client. Non è l'ingresso utente. Il lanciatore unico non costruisce
+implicitamente l'app nativa e non cerca altre app installate in cartelle
+diverse. Usa `MEDIFLOW_MAC_DERIVED_DATA` e `MEDIFLOW_MAC_CONFIG` per un bundle
+costruito in una destinazione esplicita.
+
 
 Nell'app, il pannello `Runtime` consente di avviare e arrestare esplicitamente backend web production standalone e proxy TLS inclusi nel bundle. Ollama e MLX rimangono invece servizi opzionali gestiti separatamente: il pannello ne mostra soltanto lo stato diagnostico in lettura, senza assumerne la supervisione. Anche ICD-11 WHO segue un percorso distinto, verificato dalla diagnostica web attraverso readiness autenticata, senza probe nativo o query clinica implicita. Per backend e proxy, l'arresto concede una breve finestra ordinata prima dell'escalation locale, così che PID non più validi non blocchino il ciclo successivo.
 

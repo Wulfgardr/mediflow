@@ -1,9 +1,5 @@
 #!/usr/bin/env node
 /* @Codex */
-// Cross-platform launcher helpers shared by Start_MediFlow.command (macOS),
-// Start-MediFlow.ps1 (Windows) and scripts/start-mediflow.sh (Linux).
-// Centralizes the fragile platform logic (port detection, browser open,
-// Node version check, worktree hash) so each launcher stays thin.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';

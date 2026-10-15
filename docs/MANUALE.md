@@ -18,16 +18,29 @@ Per orientarti prima dell'avvio o approfondire una scelta:
 
 ### Avvio rapido
 
-1. Apri la cartella `mediflow` che hai scaricato.
-2. Fai doppio click su `Start_MediFlow.command`.
-3. Si apre il Terminale: **non chiuderlo** mentre usi l'app.
-4. Dopo l'avvio, apri:
-    `http://localhost:3000`
+1. Installa Node 24 e apri la cartella Git di MediFlow.
+2. Fai doppio clic su `MediFlow.command` (Mac), `MediFlow.cmd` (Windows) o
+   `MediFlow.sh` (Linux, da rendere eseguibile se necessario).
+3. Lascia aperto il terminale e scegli **Apri MediFlow** nel browser.
+4. Se mancano le dipendenze, conferma **Installa dipendenze**: `npm ci`
+   richiede il registro npm. La prima build della revisione può richiedere
+   diversi minuti; l'avanzamento è nel terminale.
+5. Il browser apre MediFlow soltanto dopo il controllo della revisione.
 
-> Se scegli i modelli AI locali, il loro download può allungare la prima
-> esecuzione; non sono necessari per usare il gestionale.
-> `Start_MediFlow.command` avvia la web app locale, mentre l'eventuale client
-> macOS ha un launcher separato.
+**Ricorda la mia scelta** salva la preferenza nella cartella dati.
+**Cambia** nella pagina di attesa torna alle scelte. Per riaprirle dal
+terminale usa `node scripts/mediflow.mjs --scegli`. **Arresta MediFlow** o
+Ctrl+C chiudono i processi di questo avvio. Un'altra istanza resta intatta.
+
+Senza display o browser si usa il menu numerato del terminale. Per un avvio
+senza domande: `node scripts/mediflow.mjs --scelta web --senza-browser`.
+Su Linux il comando facoltativo
+`node scripts/mediflow.mjs install-desktop-entry` aggiunge MediFlow al menu.
+
+Una cartella con modifiche non committate offre **Apri per sviluppo**; non
+costruisce la produzione. **Accesso per agenti** avvia il collegamento locale
+per un client autorizzato e riserva il terminale al protocollo: non concede
+accesso clinico da solo. I servizi AI restano facoltativi.
 
 ---
 
@@ -131,13 +144,14 @@ codifica, il resolver OMS ICD-11 può proporre un codice strutturato: il servizi
 
 ## 🍎 6. App nativa (sperimentale)
 
-Il client nativo Mac è un percorso sperimentale separato: la release 0.8.6
+Il client nativo Mac è un percorso sperimentale separato: la release 0.9.0
 è distribuita come sorgente e il seguito nativo non è necessario per usare
 il runtime locale attraverso il browser.
 
 * **Vantaggi**: avvio rapido, integrazione macOS e schermata di blocco con PIN.
-* **Come si usa**: avvia lo script `Launch_MediFlowMac.command` nella cartella
-  principale, separatamente da `Start_MediFlow.command`.
+* **Come si usa**: scegli **App per Mac** in Avvio. La voce è disponibile
+  solo su Mac con il bundle già costruito per questa revisione. Per costruirlo
+  serve Xcode completo, seguendo [la guida nativa](native-launch.md).
 * **Nota**: la vecchia shell macOS resta una fotografia alpha, mentre il
   lavoro attivo prosegue sul backend/API `home-base`. In caso di problemi
   usa l'interfaccia web, che resta la superficie operativa primaria.

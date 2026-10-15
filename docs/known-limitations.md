@@ -20,6 +20,24 @@ stessa SHA, firma, tag, GitHub Release, distribuzione o installazione su un host
 esterno. Per questi esiti occorrono i controlli e le ricevute di chiusura
 pertinenti. Lo storico delle versioni è nel [CHANGELOG](../CHANGELOG.md).
 
+## Avvio unificato, aggiornamento 15 ottobre 2026
+
+Gli ingressi del sorgente corrente richiedono Node 24 installato; non sono
+installer. Linux può richiedere il permesso eseguibile e un file manager che
+avvii gli script nel terminale; il comando `install-desktop-entry` aggiunge
+un ingresso nel menu. La voce App per Mac richiede un bundle locale costruito
+con Xcode per la stessa revisione. Non compila implicitamente l'app nativa.
+
+Le modifiche non committate impediscono la build di produzione e richiedono
+la scelta esplicita per sviluppo. Il riuso di un processo richiede la ricevuta
+del lanciatore per quella cartella e il fingerprint corretto; un server
+avviato manualmente o da un altro ingresso non viene adottato.
+
+L'accesso per agenti richiede un client sul protocollo standard input/output;
+la scelta nel browser non crea una sessione clinica autorizzata. La nuova
+pagina Avvio non aggiunge una prova di VoiceOver o di doppio clic nei tre
+sistemi. La CI del lanciatore Node non sostituisce quelle verifiche manuali.
+
 ## VoiceOver su iPhone e iPad
 
 Gli audit di accessibilità XCTest e i test UI della baseline storica
