@@ -164,7 +164,7 @@ jobs:
           done
           curl -fsS "$E2E_BASE_URL/api/auth/check" > /dev/null
           # Keep the main suite quarantine report; these six cases have no exemptions.
-          npm run test:e2e -- e2e/official-ui.spec.ts --reporter=list,html --output=test-results/official-ui
+          npm run test:e2e -- e2e/official-ui.spec.ts --retries=0 --reporter=list,html --output=test-results/official-ui
 
       - name: Synthetic component browser contracts
         run: npm run test:inventory-browser
