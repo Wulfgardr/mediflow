@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.35.0
+  version: 1.36.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1805,6 +1805,12 @@ paths:
                   error:
                     type: string
                     const: Prescription ID already exists
+        '412':
+          description: La revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProstheticsCatalogSelectionConflict'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -1857,6 +1863,12 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/PrescriptionVersionConflict'
+        '412':
+          description: La revisione del repertorio o gli originali della selezione non sono più validi; nessuna scrittura.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProstheticsCatalogSelectionConflict'
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -7669,6 +7681,109 @@ components:
             - string
             - 'null'
           format: date-time
+    ProstheticsCatalogSelectionConflict:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [CATALOG_REVISION_CONFLICT, ENTRY_NOT_FOUND, SOURCE_NOT_FOUND, DOCUMENT_NOT_FOUND, DOCUMENT_CHANGED, INVALID_DOCUMENT, ARCHIVE_PERMISSIONS]
+    ProstheticsCatalogSelection:
+      type: object
+      additionalProperties: false
+      required: [entryId, revision]
+      properties:
+        entryId:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        revision:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+    ProstheticsSourceSnapshot:
+      type: object
+      additionalProperties: false
+      required: [id, name, authority, scope, version, date, sha256, notes]
+      properties:
+        id:
+          type: string
+          maxLength: 1024
+        name:
+          type: string
+          maxLength: 200
+        authority:
+          type: string
+          maxLength: 200
+        scope:
+          type: string
+          maxLength: 200
+        version:
+          type: string
+          maxLength: 200
+        date:
+          type: [string, 'null']
+          format: date
+        sha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        notes:
+          type: string
+          maxLength: 2000
+    ProstheticsOriginalReference:
+      type: object
+      additionalProperties: false
+      required: [id, sourceId, name, sha256, size, page]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          maxLength: 1024
+        name:
+          type: string
+          maxLength: 300
+        sha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        size:
+          type: integer
+          minimum: 1
+          maximum: 26214400
+        page:
+          type: [string, 'null']
+          maxLength: 100
+    ProstheticsCatalogSnapshot:
+      type: object
+      additionalProperties: false
+      description: Provenienza in chiaro verificata dal server al salvataggio; non cambia con gli import successivi.
+      required: [entryId, code, codeSystem, description, source, documents, revision]
+      properties:
+        entryId:
+          type: string
+          maxLength: 2048
+        code:
+          type: string
+          maxLength: 200
+        codeSystem:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        source:
+          $ref: '#/components/schemas/ProstheticsSourceSnapshot'
+        documents:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/ProstheticsOriginalReference'
+        revision:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
     ProstheticPrescriptionDetail:
       type: object
       additionalProperties: false
@@ -7681,6 +7796,10 @@ components:
         - description
         - version
       properties:
+        catalogSnapshot:
+          anyOf:
+            - $ref: '#/components/schemas/ProstheticsCatalogSnapshot'
+            - type: 'null'
         id:
           type: string
         patientId:
@@ -7757,6 +7876,8 @@ components:
         - prescribedAt
         - description
       properties:
+        catalogSelection:
+          $ref: '#/components/schemas/ProstheticsCatalogSelection'
         id:
           type: string
           minLength: 1
@@ -7821,6 +7942,10 @@ components:
       required:
         - version
       properties:
+        catalogSelection:
+          anyOf:
+            - $ref: '#/components/schemas/ProstheticsCatalogSelection'
+            - type: 'null'
         version:
           type: integer
           minimum: 1

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { isProstheticsSnapshot } from '../lib/reference-data/prosthetics-snapshot.ts';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
 /* @Codex */
@@ -43,6 +44,8 @@ const BACKUP_TABLES = {
   exemptionImportReceipts: 'exemption_import_receipts',
   prostheticsCatalogEntries: 'prosthetics_catalog_entries',
   prostheticsCatalogReceipts: 'prosthetics_catalog_receipts',
+  prostheticsCatalogSources: 'prosthetics_catalog_sources',
+  prostheticsCatalogDocuments: 'prosthetics_catalog_documents',
   messages: 'messages',
   observations: 'observations',
   patients: 'patients',
@@ -154,11 +157,17 @@ export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
 export async function serializeBackupArtifact(payload, createdAt = new Date()) {
   /* @Codex Same receipt validation and ordering as the web export. */
   assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []);
-  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? []);
+  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? []);
+  for (const prescription of payload.prostheticPrescriptions ?? []) {
+    if (prescription.catalogSnapshot !== undefined && prescription.catalogSnapshot !== null && !isProstheticsSnapshot(prescription.catalogSnapshot))
+      throw new Error('PROSTHETICS_SNAPSHOT_BACKUP_INVALID');
+  }
   const canonicalPayload = {
     ...canonicalizeHeadlessSoapActiveRoleAttestations(payload),
     prostheticsCatalogEntries: payload.prostheticsCatalogEntries ?? [],
     prostheticsCatalogReceipts: payload.prostheticsCatalogReceipts ?? [],
+    prostheticsCatalogSources: payload.prostheticsCatalogSources ?? [],
+    prostheticsCatalogDocuments: payload.prostheticsCatalogDocuments ?? [],
     exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => a.id - b.id),
   };
   if (Object.hasOwn(payload, 'auditEvents')) {
@@ -470,6 +479,9 @@ function buildDataset(db, backupCollections) {
     dataset.sissHandoffs = filterRowsByReference(dataset.sissHandoffs, 'patientId', patientIds);
     dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
 
+    for (const row of dataset.prostheticPrescriptions) {
+      if (typeof row.catalogSnapshot === 'string') row.catalogSnapshot = JSON.parse(row.catalogSnapshot);
+    }
     return dataset;
   })();
 }

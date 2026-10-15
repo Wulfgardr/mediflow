@@ -78,7 +78,7 @@ test('preview writes nothing; atomic merge and unchanged counts preserve absent 
         importFile(service, bytes); assert.equal(service.status().count, 2);
         assert.deepEqual(service.preview(csv([row('DEMO-002')]), name, 'synthetic').changes, { inserted: 0, updated: 0, unchanged: 1 });
         importFile(service, csv([row('DEMO-002')])); assert.equal(service.status().count, 2);
-        const backup = backupRows(db); assertProstheticsCatalogBackup(backup.entries, backup.receipts);
+        const backup = backupRows(db); assertProstheticsCatalogBackup(backup.entries, backup.receipts, db.prepare('SELECT * FROM prosthetics_catalog_sources').all());
     } finally { db.close(); }
 });
 
@@ -140,7 +140,7 @@ test('backup rejects missing/altered provenance, invalid dates, duplicate identi
             (v: typeof data) => { v.entries[0].code = 'changed'; },
             (v: typeof data) => { v.entries.push(v.entries[0]); },
             (v: typeof data) => { const r = v.receipts[0] as { receiptJson: string }; const j = JSON.parse(r.receiptJson); j.manifest.metadata.source = 'Changed invented source'; r.receiptJson = JSON.stringify(j); },
-        ]) { const value = structuredClone(data); mutate(value); assert.throws(() => assertProstheticsCatalogBackup(value.entries, value.receipts), /BACKUP_INVALID/u); }
+        ]) { const value = structuredClone(data); mutate(value); assert.throws(() => assertProstheticsCatalogBackup(value.entries, value.receipts, db.prepare('SELECT * FROM prosthetics_catalog_sources').all()), /BACKUP_INVALID/u); }
     } finally { db.close(); }
 });
 
@@ -154,4 +154,93 @@ test('search is bounded and literal; selection retains namespace and only explic
         assert.deepEqual(Object.keys(selected).sort(), ['code', 'codeSystem', 'description', 'source', 'version']);
         assert.equal(Object.hasOwn(selected, 'isoCode'), false); assert.equal(Object.hasOwn(selected, 'operationKey'), false);
     } finally { db.close(); }
+});
+
+test('fonti distinte convivono con lo stesso codice e la ricerca filtra per fonte', () => {
+    const { db, service } = fixture();
+    try {
+        importFile(service);
+        const other = row(); other[4] = 'Altra fonte inventata';
+        importFile(service, csv([other]));
+        assert.equal(service.status().count, 2); assert.equal(service.status().sourceCount, 2);
+        const entries = service.search('DEMO-001').entries;
+        assert.notEqual(entries[0].id, entries[1].id);
+        assert.equal(service.search('DEMO', entries[0].sourceId).entries.length, 1);
+        assert.equal(service.search('DEMO', 'inesistente').entries.length, 0);
+    } finally { db.close(); }
+});
+
+test('CSV con punto e virgola e colonne riordinate: anteprima e proof vincolano mappatura e metadati', () => {
+    const { db, service } = fixture();
+    try {
+        const bytes = Buffer.from('Descrizione;Codice;Codifica;Versione;Fonte;Ambito;Da;A\nAusilio inventato;DEMO;Sistema inventato;v1;ATS inventata;Locale;;\n');
+        const options = { mapping: { delimiter: ';' as const, columns: { codice_sistema: 2, codice: 1, descrizione: 0, versione: 3, fonte: 4, ambito: 5, data_inizio: 6, data_fine: 7 } },
+            sourceDetails: { authority: 'Ente inventato', date: '2026-10-15', notes: 'Solo test' } };
+        const p = service.preview(bytes, name, 'synthetic', options);
+        assert.equal(p.valid, true); assert.equal(p.sample[0].description, 'Ausilio inventato'); assert.equal(service.status().count, 0);
+        const changed = structuredClone(options); changed.sourceDetails.notes = 'Modificate';
+        assert.throws(() => service.commit({ bytes, sourceName: name, proof: p.proof!, acceptSubset: true, options: changed }, 'synthetic', current), /Anteprima/u);
+        const invalid = structuredClone(options); invalid.mapping.columns.codice = 0;
+        assert.equal(service.preview(bytes, name, 'synthetic', invalid).valid, false);
+        service.commit({ bytes, sourceName: name, proof: p.proof!, acceptSubset: true, options }, 'synthetic', current);
+        const source = service.sources().sources[0]; assert.equal(source.authority, 'Ente inventato'); assert.equal(source.date, '2026-10-15');
+        const backup = backupRows(db);
+        const receipts = JSON.parse(JSON.stringify(backup.receipts, (_k, value) => value));
+        assertProstheticsCatalogBackup(backup.entries, receipts, [{ id: source.id, name: source.name, authority: source.authority, scope: source.scope, version: source.version, date: source.date, notes: source.notes, sha256: source.sha256 }]);
+    } finally { db.close(); }
+});
+
+test('migrazione v1 conserva voci e ricevute e deriva fonti senza collisioni', () => {
+    const db = new Database(':memory:');
+    try {
+        db.exec(PROSTHETICS_CATALOG_SQL);
+        db.prepare(`INSERT INTO prosthetics_catalog_entries VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+            JSON.stringify(['Codifica', 'A', 'Locale']), 'Codifica', 'A', 'Ausilio inventato', 'v1', 'ATS inventata', 'Locale', null, null, 'a'.repeat(64), 'b'.repeat(64), '2026-10-15T00:00:00.000Z');
+        db.transaction(() => ensureProstheticsCatalogSchema(db)).immediate();
+        const service = createProstheticsCatalog(db), entry = service.search('').entries[0];
+        assert.equal(service.status().sourceCount, 1); assert.equal(entry.code, 'A'); assert.equal(entry.sourceSha256, 'a'.repeat(64));
+        assert.equal(service.sources().sources[0].name, 'ATS inventata');
+        const before = service.status(); ensureProstheticsCatalogSchema(db); assert.deepEqual(service.status(), before);
+    } finally { db.close(); }
+});
+
+test('originali immutabili: hash, limiti, CAS, rollback, documento alterato e mancante', () => {
+    const { db, service } = fixture();
+    try {
+        importFile(service); const sourceId = service.sources().sources[0].id;
+        const bytes = Buffer.from('%PDF-1.4\nOriginale sintetico');
+        const input = { sourceId, revision: service.status().revision, name: '../nome con spazi.pdf', base64: bytes.toString('base64'), page: '12' };
+        const doc = service.addDocument(input, current);
+        assert.equal(doc.size, bytes.length); assert.ok(!doc.name.includes('/')); assert.deepEqual(service.document(doc.id, doc.sha256).bytes, bytes);
+        assert.throws(() => service.addDocument(input, current), /cambiato/u);
+        const selection = { entryId: service.search('').entries[0].id, revision: service.status().revision };
+        assert.equal(service.snapshot(selection).documents[0].page, '12');
+        const sources = db.prepare('SELECT * FROM prosthetics_catalog_sources').all();
+        const data = backupRows(db), docs = db.prepare('SELECT id,source_id AS sourceId,name,sha256,size,page,base64 FROM prosthetics_catalog_documents').all();
+        assertProstheticsCatalogBackup(data.entries, data.receipts, sources, docs);
+        const changed = structuredClone(docs) as { base64: string }[]; changed[0].base64 = Buffer.from('sostituito').toString('base64');
+        assert.throws(() => assertProstheticsCatalogBackup(data.entries, data.receipts, sources, changed), /BACKUP_INVALID/u);
+        const before = service.status();
+        assert.throws(() => service.addDocument({ ...input, revision: before.revision }, () => { if (db.inTransaction) throw new Error('Revocata'); }), /Revocata/u);
+        assert.deepEqual(service.status(), before);
+        db.prepare('UPDATE prosthetics_catalog_documents SET base64=? WHERE id=?').run(Buffer.from('sostituito').toString('base64'), doc.id);
+        assert.throws(() => service.document(doc.id), /integrità/u); assert.throws(() => service.snapshot(selection), /integrità/u);
+        db.prepare('DELETE FROM prosthetics_catalog_documents WHERE id=?').run(doc.id); assert.throws(() => service.document(doc.id), /non disponibile/u);
+        assert.throws(() => service.addDocument({ ...input, revision: service.status().revision, base64: 'YQ' }, current), /non valido/u);
+    } finally { db.close(); }
+});
+
+test('originali rifiutati se database o sidecar non sono riservati al proprietario', { skip: process.platform === 'win32' }, () => {
+    const dir = fs.mkdtempSync(path.join(process.env.MEDIFLOW_DATA_DIR!, 'originali-permessi-'));
+    const file = path.join(dir, 'medical.db'), db = new Database(file);
+    try {
+        ensureProstheticsCatalogSchema(db); const service = createProstheticsCatalog(db); importFile(service);
+        const input = { sourceId: service.sources().sources[0].id, revision: service.status().revision, name: 'inventato.pdf', base64: Buffer.from('inventato').toString('base64'), page: null };
+        fs.chmodSync(file, 0o644);
+        assert.throws(() => service.addDocument(input, current), /proprietario/u);
+        assert.equal(service.sources().sources[0].documents.length, 0);
+        fs.chmodSync(file, 0o600); const doc = service.addDocument(input, current);
+        fs.chmodSync(file, 0o644); assert.throws(() => service.document(doc.id), /proprietario/u);
+        fs.chmodSync(file, 0o600); assert.equal(service.document(doc.id).bytes.toString(), 'inventato');
+    } finally { db.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });

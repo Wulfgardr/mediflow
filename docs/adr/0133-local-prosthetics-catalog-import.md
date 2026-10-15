@@ -91,3 +91,40 @@ never-regress, claims e diff-check superati. La prova Chromium usa il componente
 e le route reali su SQLite sintetico, con trasporto intercettato e senza listener.
 Prova flusso, copia della sola descrizione, target 44 px e raggio 12 px; non
 attesta il layout completo Next/Tailwind, il form prescrizione o la distribuzione.
+
+## Emendamento 2026-10: fonti personali e originali
+
+L'identità include ora la fonte. Ogni fonte ha id stabile, nome, ente/ambito,
+versione, data facoltativa, hash dell'ultimo file importato e note. La migrazione
+deriva una fonte per combinazione fonte/versione/ambito esistente e ricodifica
+le identità senza modificare ricevute storiche o prescrizioni.
+
+Il CSV UTF-8 accetta separatore virgola o punto e virgola e mappatura esplicita
+per indice delle otto colonne. Il proof lega anche mappatura e metadati fonte.
+Nessuna estrazione AI e nessuna dipendenza Excel aggiunta: esportare XLSX in CSV.
+
+Gli originali sono bytes base64 in una tabella SQLite separata dai pazienti,
+nel database sotto la data dir. Metadati, hash, dimensione e bytes sono atomici;
+i documenti sono immutabili e aggiuntivi, massimo 25 MiB ciascuno e 100 MiB
+complessivi. Nessun percorso o URL viene accettato. Il nome segue attachment-path.
+Download autenticato, no-store, attachment e nosniff, hash e dimensione verificati
+prima della risposta. Catalogo, documenti e snapshot di provenienza restano in
+chiaro; le protezioni del database locale non equivalgono a cifratura.
+
+Il writer salva uno snapshot additivo di voce, fonte e riferimenti agli originali
+solo su scelta esplicita dell'operatore, verificata nella transazione clinica
+contro la revisione attesa. Una scelta obsoleta è un conflitto senza scritture.
+Sul writer una precondizione del catalogo fallita risponde 412; i conflitti 409
+di versione o identificativo restano invariati per i client esistenti.
+La descrizione clinica continua a seguire il percorso cifrato esistente. Lo
+snapshot di provenienza è in chiaro e non cambia aggiornando il repertorio.
+Il DTO network rimane additivo. Nessun import scrive prescrizioni.
+
+Backup web e schedulato includono fonti, originali e snapshot. Le generazioni
+precedenti restano verificabili col checksum originale e sono migrate soltanto
+nel restore atomico. Nessuna promessa di validità normativa o completezza.
+
+Il payload standalone del backup schedulato include anche i validatori puri di
+mappatura/snapshot e attachment-path, con pin delle sorgenti e tracing Next
+espliciti. La chiusura runtime non aggiunge dipendenze ed è provata in un
+processo isolato senza accesso al database.

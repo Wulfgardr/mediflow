@@ -1,3 +1,4 @@
+import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
 // API Client Facade for SQLite Backend
 // Replaces Dexie DB with Fetch calls
 
@@ -1222,6 +1223,8 @@ export type ProstheticPrescriptionCategory = 'standard' | 'oxygen' | 'repair' | 
 
 /* @Codex */
 export interface ProstheticPrescription {
+    catalogSelection?: ProstheticsCatalogSelection;
+    catalogSnapshot?: ProstheticsSnapshot | null;
     id: string;
     patientId: string;
     prescribedAt: Date;

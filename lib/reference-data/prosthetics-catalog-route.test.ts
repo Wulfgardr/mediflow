@@ -30,7 +30,7 @@ const bytes = Buffer.from(PROSTHETICS_TEMPLATE.replace('Dimostrazione,,', 'Dimos
 const body = { sourceName: 'inventato-route.csv', base64: bytes.toString('base64') };
 const request = (value: unknown, extra: RequestInit = {}) => new Request('http://localhost/api/prosthetics/catalog/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value), ...extra });
 function nonCatalog() {
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('prosthetics_catalog_entries', 'prosthetics_catalog_receipts') ORDER BY name").all() as { name: string }[];
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('prosthetics_catalog_entries', 'prosthetics_catalog_receipts', 'prosthetics_catalog_sources', 'prosthetics_catalog_documents') ORDER BY name").all() as { name: string }[];
     return tables.map(({ name }) => ({ name, rows: db.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all() }));
 }
 function snapshot() { return { entries: db.prepare('SELECT * FROM prosthetics_catalog_entries ORDER BY id').all(), receipts: db.prepare('SELECT * FROM prosthetics_catalog_receipts ORDER BY id').all() }; }
@@ -39,7 +39,7 @@ after(() => { auth.requireSession = original; for (const session of sessions) re
 
 test('unauthenticated requests deny every route before consuming the upload', async () => {
     const before = nonCatalog();
-    for (const action of ['preview', 'commit', 'status', 'search', 'template'] as const) {
+    for (const action of ['preview', 'commit', 'status', 'search', 'template', 'sources', 'documents'] as const) {
         const req = request(body); req.headers.set('Authorization', 'Bearer synthetic-not-a-web-session');
         const response = await route(action, req);
         assert.equal(response.status, 401); assert.equal(req.bodyUsed, false);
@@ -116,7 +116,7 @@ test('canonical web backup, scheduled CLI and restore preserve repertory bytes, 
 
 test('legacy backup without both repertory collections verifies original checksum then clears both', async () => {
     active(); const exported = await (await backupRoute.GET()).json();
-    for (const name of ['prostheticsCatalogEntries', 'prostheticsCatalogReceipts']) { delete exported.payload[name]; delete exported.manifest.recordCounts[name]; }
+    for (const name of ['prostheticsCatalogEntries', 'prostheticsCatalogReceipts', 'prostheticsCatalogSources', 'prostheticsCatalogDocuments']) { delete exported.payload[name]; delete exported.manifest.recordCounts[name]; }
     exported.manifest.collections = exported.manifest.collections.filter((name: string) => !name.startsWith('prostheticsCatalog'));
     await assert.rejects(parseBackupArtifact(exported), /checksum/u);
     rehash(exported); const parsed = await parseBackupArtifact(exported);
@@ -134,4 +134,69 @@ test('restore rejects partial collections and unsupported provenance before any 
     await assert.rejects(parseBackupArtifact(changed), /Prosthetics/u);
     assert.throws(() => restoreBackupArtifact(changed, () => true), /BACKUP_INVALID/u);
     assert.deepEqual(snapshot(), before);
+});
+
+test('originali autenticati: nome sicuro, integrità, negazione senza sessione e roundtrip completo', async () => {
+    active();
+    const sourceId = service.sources().sources[0].id;
+    const original = Buffer.from('%PDF-1.4\nOriginale di repertorio inventato');
+    const input = { sourceId, revision: service.status().revision, name: 'listino inventato.pdf', base64: original.toString('base64'), page: '3' };
+    const add = await route('documents', request(input)); assert.equal(add.status, 200);
+    const doc = await add.json();
+    const url = `http://localhost/api/prosthetics/catalog/documents?id=${doc.id}&sha256=${doc.sha256}`;
+    const opened = await route('documents', new Request(url)); assert.equal(opened.status, 200);
+    assert.deepEqual(Buffer.from(await opened.arrayBuffer()), original);
+    assert.equal(opened.headers.get('X-Content-Type-Options'), 'nosniff'); assert.match(opened.headers.get('Content-Disposition')!, /^attachment;/u);
+    auth.requireSession = async () => null;
+    assert.equal((await route('documents', new Request(url))).status, 401);
+    assert.equal((await route('documents', request(input))).status, 401);
+    active();
+    const artifact = await parseBackupArtifact(await (await backupRoute.GET()).json());
+    const snapshotBefore = service.sources();
+    assert.equal(artifact.payload.prostheticsCatalogDocuments!.length, 1);
+    const output = execFileSync(process.execPath, ['scripts/run-scheduled-backup.mjs'], {
+        cwd: process.cwd(), encoding: 'utf8', timeout: 10_000,
+        env: { ...process.env, MEDIFLOW_BACKUP_FORCE: '1', MEDIFLOW_BACKUP_DEST_DIR: path.join(directory, 'originals-backup') },
+    });
+    const scheduled = await parseBackupArtifact(JSON.parse(fs.readFileSync(JSON.parse(output).artifactPath, 'utf8')));
+    assert.deepEqual(scheduled.payload.prostheticsCatalogDocuments, artifact.payload.prostheticsCatalogDocuments);
+    assert.deepEqual(scheduled.payload.prostheticsCatalogSources, artifact.payload.prostheticsCatalogSources);
+    const emptyArtifact = await parseBackupArtifact(JSON.parse(await serializeBackupArtifact(createEmptyDataset())));
+    restoreBackupArtifact(emptyArtifact, () => true);
+    assert.throws(() => service.document(doc.id), /non disponibile/u);
+    restoreBackupArtifact(scheduled, () => true);
+    assert.deepEqual(service.document(doc.id, doc.sha256).bytes, original); assert.deepEqual(service.sources(), snapshotBefore);
+    active();
+    db.prepare('UPDATE prosthetics_catalog_documents SET base64=? WHERE id=?').run(Buffer.from('sostituito').toString('base64'), doc.id);
+    assert.equal((await route('documents', new Request(url))).status, 409);
+    db.prepare('DELETE FROM prosthetics_catalog_documents WHERE id=?').run(doc.id);
+    assert.equal((await route('documents', new Request(url))).status, 404);
+});
+
+test('backup storico con sole voci e ricevute migra le fonti nel restore atomico', async () => {
+    active(); const exported = await (await backupRoute.GET()).json();
+    for (const name of ['prostheticsCatalogSources', 'prostheticsCatalogDocuments']) { delete exported.payload[name]; delete exported.manifest.recordCounts[name]; }
+    exported.manifest.collections = exported.manifest.collections.filter((name: string) => !['prostheticsCatalogSources', 'prostheticsCatalogDocuments'].includes(name));
+    for (const entry of exported.payload.prostheticsCatalogEntries) { entry.id = JSON.stringify([entry.codeSystem, entry.code, entry.scope]); delete entry.sourceId; }
+    rehash(exported);
+    const old = await parseBackupArtifact(exported);
+    restoreBackupArtifact(old, () => true);
+    assert.equal(service.status().sourceCount, 1); assert.equal(service.search('').entries[0].code, 'DEMO-001');
+    active(); assert.equal((await backupRoute.GET()).status, 200);
+});
+
+test('mappatura HTTP mantiene hash dei bytes e metadati nel backup e respinge opzioni cambiate', async () => {
+    active();
+    const content = Buffer.from('Descrizione;Codice;Codifica;Versione;Fonte;Ambito;Da;A\nInventato;MAPPATO;Codifica inventata;v1;Fonte mappata;Locale;;\n');
+    const options = { mapping: { delimiter: ';', columns: { codice_sistema: 2, codice: 1, descrizione: 0, versione: 3, fonte: 4, ambito: 5, data_inizio: 6, data_fine: 7 } },
+        sourceDetails: { authority: 'Ente inventato', date: '2026-10-15', notes: 'Solo fixture' } };
+    const mappedBody = { sourceName: 'inventato-mappato.csv', base64: content.toString('base64'), options };
+    const preview = await route('preview', request(mappedBody)); assert.equal(preview.status, 200);
+    const p = await preview.json(); assert.equal(p.valid, true); assert.equal(p.manifest.sha256, createHash('sha256').update(content).digest('hex'));
+    const changed = structuredClone(options); changed.sourceDetails.notes = 'Cambiate';
+    assert.equal((await route('commit', request({ ...mappedBody, options: changed, proof: p.proof, acceptSubset: true }))).status, 409);
+    assert.equal((await route('commit', request({ ...mappedBody, proof: p.proof, acceptSubset: true }))).status, 200);
+    const exported = await parseBackupArtifact(await (await backupRoute.GET()).json());
+    const mappedSource = exported.payload.prostheticsCatalogSources!.find(source => source.name === 'Fonte mappata');
+    assert.equal(mappedSource?.notes, 'Solo fixture'); assert.equal(mappedSource?.date, '2026-10-15');
 });

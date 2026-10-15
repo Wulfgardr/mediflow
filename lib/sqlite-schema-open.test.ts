@@ -224,3 +224,31 @@ test('process interruption before schema stamp rolls back and the next start saf
         w.cleanup();
     }
 });
+
+test('migrazione da versione 3 conserva originali verificati, ricevute e fonte derivata protesica', async () => {
+    const w = workspace();
+    try {
+        const db = seed(w.file);
+        const { createProstheticsCatalog } = await import('./reference-data/prosthetics-catalog-service.ts');
+        const { PROSTHETICS_TEMPLATE } = await import('./reference-data/prosthetics-catalog-contract.ts');
+        const catalog = createProstheticsCatalog(db), bytes = Buffer.from(PROSTHETICS_TEMPLATE);
+        const p = catalog.preview(bytes, 'inventato.csv', 'synthetic');
+        catalog.commit({ bytes, sourceName: 'inventato.csv', proof: p.proof!, acceptSubset: true }, 'synthetic', () => {});
+        const receipt = db.prepare('SELECT * FROM prosthetics_catalog_receipts').get();
+        const entry = catalog.search('').entries[0];
+        db.prepare('UPDATE prosthetics_catalog_entries SET id=? WHERE id=?').run(JSON.stringify([entry.codeSystem, entry.code, entry.scope]), entry.id);
+        db.exec('ALTER TABLE prosthetics_catalog_entries DROP COLUMN source_id; DROP TABLE prosthetics_catalog_sources; DROP TABLE prosthetics_catalog_documents; ALTER TABLE prosthetic_prescriptions DROP COLUMN catalog_snapshot; PRAGMA user_version=3;');
+        db.close();
+        const opened = openVersionedSqliteDatabase(w.file);
+        assert.equal(opened.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+        const migrated = createProstheticsCatalog(opened);
+        assert.equal(migrated.status().sourceCount, 1); assert.equal(migrated.search('').entries[0].code, entry.code);
+        assert.deepEqual(opened.prepare('SELECT * FROM prosthetics_catalog_receipts').get(), receipt);
+        assert.equal(originals(w.directory).length, 1);
+        const old = new Database(path.join(w.directory, originals(w.directory)[0]), { readonly: true });
+        assert.equal(old.pragma('user_version', { simple: true }), 3);
+        assert.equal(old.prepare("SELECT count(*) n FROM sqlite_master WHERE name='prosthetics_catalog_sources'").pluck().get(), 0);
+        old.close(); opened.close();
+        openVersionedSqliteDatabase(w.file).close(); assert.equal(originals(w.directory).length, 1);
+    } finally { w.cleanup(); }
+});

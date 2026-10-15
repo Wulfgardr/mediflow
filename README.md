@@ -393,3 +393,10 @@ Il codice è pubblicato sotto [licenza MIT](./LICENSE), perché sia possibile
 esaminarlo e contribuire al suo sviluppo. Dataset, terminologie, modelli e
 fonti esterne conservano le rispettive condizioni d’uso: la licenza di
 MediFlow non le sostituisce. [Crediti e attribuzioni](./CREDITS.md).
+
+
+Il repertorio protesica supporta fonti personali distinte, originali locali e
+snapshot di provenienza nelle nuove prescrizioni scelte dal catalogo. Importa
+CSV UTF-8 con virgola o punto e virgola e mappatura colonne; per XLSX occorre
+prima esportare in CSV. Catalogo, originali e snapshot di provenienza sono in
+chiaro nel database locale. Vedi [manuale](docs/MANUALE.md#fonti-personali-della-protesica).
