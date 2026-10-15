@@ -81,3 +81,74 @@ Poi un'acquisizione reale dalla fonte fissa in un database di prova isolato,
 con hash completo e ricerca dopo riavvio. Il risultato non viene trasferito
 alle altre piattaforme: macOS, Windows e Linux richiedono la propria prova
 del percorso condiviso. Nessuna pubblicazione prima di review e CI.
+
+## Emendamento 2026-10
+
+Decisione di Leonardo del 15 ottobre 2026: controllo remoto e applicazione con
+un clic, senza sostituzioni automatiche. Sostituisce il precedente divieto di
+controlli periodici, limitatamente ai metadati del catalogo pubblico AIFA.
+
+Il gate AI per il testo clinico resta chiuso e non viene riutilizzato per i
+repertori. `network.mode` governa la LAN e non autorizza Internet. Non esiste
+un consenso generale per il download dei repertori: `aifaNetworkAccess` è
+quindi un opt-in dedicato, disattivato quando assente o diverso da `enabled`.
+È modificabile dalle impostazioni autenticate; `MEDIFLOW_NETWORK_DISABLED`
+lo blocca quando presente con valore diverso da `0`. Una disabilitazione è
+ricontrollata prima della richiesta e durante download e sostituzione.
+
+All'apertura di Repertori o delle impostazioni Repertori, un endpoint locale
+autenticato verifica soltanto l'URL fisso con HEAD. Timeout: 8 secondi;
+redirect rifiutati, nessun fallback GET. La visita non scarica il CSV. Nessun
+cookie, credenziale, ricerca o dato clinico viene inviato ad AIFA. Il controllo
+non è un job in background: occorre aprire una delle due aree. Verifica,
+download e importazione manuale condividono un'esclusione per processo.
+
+`aifaCatalogRemoteState`, separato dal manifest, conserva ETag, Last-Modified,
+Content-Length, checkedAt ed esito della verifica. La prenotazione del tentativo
+avviene con transazione IMMEDIATE: anche errori e riavvii conservano il limite
+di una richiesta ogni 24 ore per archivio. Un'operazione già in corso non
+consuma il tentativo. Un processo terminato durante HEAD può lasciare la
+verifica non disponibile fino alla scadenza delle 24 ore. I metadati mancanti
+o non confrontabili non sono dichiarati «nessuna variazione».
+
+Il manifest v1 accetta tre campi HTTP opzionali, compatibili con i manifest
+preesistenti senza migrazione SQL. Il confronto privilegia ETag, poi
+Last-Modified; Content-Length da solo non identifica una versione. Un catalogo
+senza tali metadati può essere aggiornato esplicitamente per acquisirli. La
+data di scarico locale è distinta dalla data pubblicata da AIFA.
+
+«Aggiorna ora» riusa il POST esistente. Se disponibili, i validatori del file
+locale alimentano If-None-Match e If-Modified-Since. Un 304 legato a tali
+validatori conserva il catalogo, verifica lo snapshot e registra l'esito.
+Il progresso è una lettura locale dei byte ricevuti e del Content-Length,
+non una stima del completamento della validazione. Il limite di 100 MiB e
+la scadenza di 180 secondi restano validi; una dimensione finale diversa da
+Content-Length rifiuta il file.
+
+Per importazione remota e manuale sono richieste le colonne AIC,
+denominazione, ATC e principi attivi. I valori non presenti nella singola riga
+restano null. La fixture sintetica segue le 15 colonne della fonte osservata.
+FORNITURA e STATO_AMMINISTRATIVO non sono conservati nello schema attuale;
+il feed non contiene fascia e prezzo, che rimangono null. Non si promettono
+copertura di rimborsabilità, disponibilità o appropriatezza.
+
+Un catalogo con meno del 90% degli AIC unici correnti viene rifiutato nella
+transazione, prima della cancellazione. Una conferma esplicita può superare
+solo questo controllo. La conferma è legata a SHA-256 del file e snapshot
+locale: un file differente o una modifica concorrente richiedono una nuova
+conferma. Per il download viene riacquisito il CSV; non si conserva una copia
+temporanea fuori dal database. Non vengono superati i controlli di struttura,
+colonne, dimensione, sessione o audit.
+
+L'evento `reference_data.aifa.updated` segue ADR 0015. Per le sostituzioni
+riuscite conserva attore, superficie, modalità remota/manuale, manifest prima
+e dopo ed eventuale riduzione confermata nella stessa transazione IMMEDIATE.
+Un audit mancante o ignorato annulla catalogo e manifest. I rifiuti delle route
+sono tracciati separatamente senza testi clinici o eccezioni di rete grezze.
+La pulizia e il caricamento legacy non sono nuovi percorsi di acquisizione
+AIFA e restano fuori da questa estensione dell'audit.
+
+Le prove sono sintetiche: HEAD 200/304, scadenza, redirect, metadati assenti,
+egress negato, debounce persistente, CSV reale nelle intestazioni, troncamento,
+riduzione e rollback audit. Non attestano un aggiornamento live del catalogo
+AIFA o l'installazione su una postazione clinica.
