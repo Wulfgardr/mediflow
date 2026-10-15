@@ -488,7 +488,7 @@ export default function ObservationManager({
                 <table className={styles.table}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Riferimento</th></tr></thead><tbody>
                     {day.items.map(item => { const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); return <tr key={item.id}>
                         <td>{italianLoincLabel(item.code, item.display)}</td>
-                        <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{item.value} {item.unitCode}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▲ Basso'}</small>}</td>
+                        <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{item.value} {item.unitCode}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
                         <td className={styles.muted}>{formatReferenceRange(item.refLow, item.refHigh, item.refText) || '—'}</td>
                     </tr>; })}
                 </tbody></table>
@@ -503,7 +503,7 @@ export default function ObservationManager({
                             <td><button type="button" onClick={() => toggleGroup(group.code)} aria-expanded={openGroups.has(group.code)} aria-controls={`param-region-${group.code}`} className={styles.rowButton}>
                                 {italianLoincLabel(group.code, group.display)} <ChevronDown size={14} aria-hidden className="inline" />
                             </button></td>
-                            <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{group.unitCode}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▲ Basso'}</small>}</td>
+                            <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{group.unitCode}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
                             <td className={styles.muted}><time>{new Date(latest.observedAt).toLocaleDateString('it-IT')}</time></td>
                             <td className={styles.secondaryColumn}>{delta === null ? '—' : <span className="inline-flex items-center gap-1">{delta > 0 ? <TrendingUp size={14} aria-label="in aumento" /> : delta < 0 ? <TrendingDown size={14} aria-label="in calo" /> : <Minus size={14} aria-label="stabile" />}{delta > 0 ? '+' : ''}{delta.toLocaleString('it-IT')}</span>}</td>
                         </tr>;
@@ -524,7 +524,7 @@ export default function ObservationManager({
                                 <table className={styles.table}><thead><tr><th>Data</th><th>Valore</th><th aria-label="Azioni" /></tr></thead><tbody>{visibleItems.map(item => {
                                     const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); const range = formatReferenceRange(item.refLow, item.refHigh, item.refText);
                                     return <tr key={item.id}><td className={styles.muted}><time title={new Date(item.observedAt).toLocaleString('it-IT')}>{new Date(item.observedAt).toLocaleDateString('it-IT')}</time></td>
-                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▲ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
+                                        <td><strong className={flag ? styles.critical : undefined}>{item.value}</strong>{flag && <span className={styles.critical}> {flag === 'alto' ? '▲ Alto' : '▼ Basso'}</span>}{range && <small>rif {range}</small>}{item.notes && <small>{item.notes}</small>}</td>
                                         <td><button type="button" onClick={() => deleteObservation(item.id)} className={styles.control} title="Elimina misura" aria-label={`Elimina misura ${label} del ${new Date(item.observedAt).toLocaleDateString('it-IT')}`}><Trash2 size={16} aria-hidden /></button></td>
                                     </tr>;
                                 })}</tbody></table>
