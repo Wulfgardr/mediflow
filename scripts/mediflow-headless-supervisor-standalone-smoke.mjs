@@ -11,7 +11,8 @@ import Database from 'better-sqlite3';
 import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 import { appLayout, checkHeadlessRuntime } from './stage-headless-runtime.mjs';
 import { OPERATION_DESCRIPTORS, publicCatalog } from '../packages/mcp/src/contracts.ts';
-const ROOT = fileURLToPath(new URL('..', import.meta.url)), BASE_URL = 'http://127.0.0.1:3000';
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+let BASE_URL;
 const ORDINARY_URL = 'http://127.0.0.1:3001';
 // @Codex: the same real authenticated smoke, now against an extracted app.
 const args = process.argv.slice(2);
@@ -80,7 +81,7 @@ async function prebindShutdown(dataDir, foreignCwd, kind) {
   let stderr = ''; child.stderr.setEncoding('utf8'); child.stderr.on('data', chunk => { stderr += chunk; });
   const rpc = rpcClient(child);
   try {
-    await waitForReady(() => stderr, child);
+    BASE_URL = await waitForHeadlessReady(() => stderr, child);
     assert.ok(rememberDescendants(child.pid) >= 2, 'Expected real Web and MCP children');
     await rpc.send('server/discover');
     const denied = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
@@ -207,6 +208,68 @@ async function waitForReady(readStderr, child) {
   }
   throw new Error('Production Supervisor did not become ready');
 }
+async function waitForHeadlessReady(readStderr, child) {
+  for (let attempt = 0; attempt < 1_500; attempt += 1) {
+    const match = readStderr().match(/^MEDIFLOW_HEADLESS_WEB_READY (.+)$/mu);
+    if (match) {
+      const { url } = JSON.parse(match[1]);
+      assert.match(url, /^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/u);
+      const address = new URL(url);
+      assert.ok(Number(address.port) <= 65535);
+      return url;
+    }
+    if (hasExited(child)) throw new Error('Production Supervisor exited before Web address readiness');
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  throw new Error('Production Supervisor did not publish its ready Web address');
+}
+async function concurrentSupervisors(foreignCwd) {
+  const instances = [];
+  try {
+    for (let index = 0; index < 2; index += 1) {
+      const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-concurrent-supervisor-')));
+      const instance = { dataDir, child: null, stderr: '', rpc: null };
+      instances.push(instance);
+      prepareSyntheticDatabase(dataDir);
+      instance.child = launch(dataDir, foreignCwd);
+      instance.child.stderr.setEncoding('utf8');
+      instance.child.stderr.on('data', chunk => { instance.stderr += chunk; });
+      instance.rpc = rpcClient(instance.child);
+    }
+    const urls = await Promise.all(instances.map(instance =>
+      waitForHeadlessReady(() => instance.stderr, instance.child)));
+    assert.notEqual(urls[0], urls[1], 'Each live Supervisor must own a different backend port');
+    const generations = [];
+    for (const [index, instance] of instances.entries()) {
+      assert.ok(rememberDescendants(instance.child.pid) >= 2);
+      const login = await loginWithWebAuthControl(urls[index], { username: USERNAME, password: '1234' });
+      assert.equal(login.response.status, 200, 'Login must use the announced backend');
+      assert.ok(login.cookieHeader);
+      generations.push(login.json.archiveGeneration);
+      const other = await fetch(new URL('/api/ambulatories', urls[1 - index]),
+        { headers: { Cookie: login.cookieHeader } });
+      assert.equal(other.status, 401, 'A session from the other synthetic archive must be denied');
+    }
+    assert.notEqual(generations[0], generations[1], 'Synthetic archives must be separate');
+    for (let round = 0; round < 2; round += 1) {
+      for (const instance of instances) {
+        assert.equal(hasExited(instance.child), false);
+        const discovery = await instance.rpc.send('server/discover');
+        assert.deepEqual(discovery.result.supportedVersions, ['2026-07-28']);
+        const listed = await instance.rpc.send('tools/list');
+        assert.ok(listed.result.tools.some(item => item.name === 'mediflow.system.headless_status.v1'));
+        const denied = await instance.rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
+        assert.equal(denied.result.content[0].text, 'MediFlow operation denied: host_unbound.');
+        assert.doesNotMatch(instance.stderr, /EADDRINUSE/u);
+        instance.rpc.assertHealthy();
+      }
+    }
+  } finally {
+    await Promise.all(instances.map(instance => terminateChild(instance.child)));
+    await assertReaped();
+    for (const instance of instances) fs.rmSync(instance.dataDir, { recursive: true, force: true });
+  }
+}
 async function activateSyntheticSelection() {
   const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: '1234' });
   assert.equal(login.response.status, 200);
@@ -323,6 +386,7 @@ async function main() {
   fs.writeFileSync(path.join(foreignCwd, 'node'), `#!/bin/sh\n: > '${marker}'\nexit 99\n`, { mode: 0o755 });
   let child = null, ordinary = null, stderr = '', before = null; try {
     if (APP) { await checkHeadlessRuntime(APP); before = snapshotApp(); }
+    await concurrentSupervisors(foreignCwd);
     prepareSyntheticDatabase(dataDir);
     ordinary = spawn(process.execPath, [path.join(layout?.web ?? path.join(ROOT, '.next/standalone'), 'server.js')], {
       cwd: ROOT, env: { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3001',
@@ -343,7 +407,7 @@ async function main() {
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     const rpc = rpcClient(child);
-    await waitForReady(() => stderr, child);
+    BASE_URL = await waitForHeadlessReady(() => stderr, child);
     if (APP) assert.ok(rememberDescendants(child.pid) >= 2, 'Expected real Web and MCP children');
     const discovery = await rpc.send('server/discover');
     assert.deepEqual(discovery.result.supportedVersions, ['2026-07-28']);
@@ -508,7 +572,7 @@ async function main() {
       await checkHeadlessRuntime(APP);
       assert.deepEqual(snapshotApp(), before, 'The extracted app changed during smoke');
     }
-    process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
+    process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: two concurrent isolated authenticated backends, post-readiness discovery/tools/list, five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
   } catch (error) {
     if (stderr) process.stderr.write(stderr);
     throw error;

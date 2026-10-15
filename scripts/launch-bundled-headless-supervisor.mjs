@@ -126,11 +126,11 @@ export function verifyHeadlessBundle() {
   };
   checkDirectories(RUNTIME);
   for (const name of ['scripts/mediflow-headless-supervisor.mjs', 'scripts/intelligent-host-mcp-stdio.mjs',
-    'scripts/register-strip-types-loader.mjs', 'scripts/headless-source-loader.mjs',
+    'scripts/register-strip-types-loader.mjs', 'scripts/headless-source-loader.mjs', 'scripts/headless-web-server.mjs',
     'scripts/node-runtime-contract.mjs', 'lib/security/portable-supervisor-production.ts', '.nvmrc', 'package.json']) {
     if (!entries.has(`${PREFIX}${name}`)) fail();
   }
-  for (const name of ['server.js', 'mediflow-build-identity.json', 'mediflow-runtime-contract.json', '.next/BUILD_ID', 'package.json']) {
+  for (const name of ['server.js', 'mediflow-build-identity.json', 'mediflow-runtime-contract.json', '.next/BUILD_ID', '.next/required-server-files.json', 'package.json']) {
     if (!entries.has(`Resources/WebRuntime/${name}`)) fail();
   }
   if ([...entries.keys()].some(name => /(?:^|\/)packages\/mini\//u.test(name))) fail();

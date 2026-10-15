@@ -247,7 +247,12 @@ for (const { ending, revokedRequest } of scenarios) {
           assert.equal(args.at(-2), path.join(root, 'packages/mini/src/cli.ts'));
           assert.deepEqual(options.env, { MEDIFLOW_AIP_OPERATION_RPC: 'late_bound_authenticated_inherited_child_ipc_v1' });
         }
-        const child = spawn(command, [...args], { ...options, stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
+        if (!mini) {
+          assert.deepEqual(args, [path.join(root, 'scripts/headless-web-server.mjs'), webTargetPath]);
+          assert.equal(options.env?.PORT, '0');
+        }
+        const child = spawn(command, mini ? [...args] : [webTargetPath],
+          { ...options, stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
         children.push(child);
         exits.push(new Promise((resolve) => {
           child.once('exit', () => resolve());

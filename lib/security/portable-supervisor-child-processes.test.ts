@@ -1,6 +1,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
-import type { ChildProcess, SpawnOptions } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { once } from 'node:events';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -80,11 +81,11 @@ test('spawns one marker-only MCP child with a file URL loader and one direct loo
   assert.doesNotMatch(JSON.stringify(mcp?.options.env), /bootstrap|cookie|pin|password|secret|token/iu);
 
   assert.equal(web?.command, paths.nodePath);
-  assert.deepEqual(web?.args, [paths.webTargetPath]);
+  assert.deepEqual(web?.args, [path.join(repoRoot, 'scripts/headless-web-server.mjs'), paths.webTargetPath]);
   assert.equal(web?.options.cwd, webDirectory);
   assert.deepEqual(web?.options.stdio, ['ignore', 2, 2, 'ipc']);
   assert.deepEqual(web?.options.env, {
-    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir,
+    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '0', MEDIFLOW_DATA_DIR: dataDir,
     MEDIFLOW_APP_REVISION: identity.revision.slice(0, 12), MEDIFLOW_APP_BRANCH: identity.branch,
     MEDIFLOW_APP_WORKTREE_HASH: identity.worktreeHash,
     MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint, MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
@@ -158,4 +159,26 @@ test('rejects symlinked executable, runtime, Web and data targets before spawnin
     }), /(?:unavailable|path_invalid)/u);
   }
   assert.equal(spawns, 0);
+});
+
+const bootstrap = path.join(repoRoot, 'scripts/headless-web-server.mjs');
+
+test('Web bootstrap fails closed without inherited parent IPC', () => {
+  const result = spawnSync(process.execPath, [bootstrap, paths.webTargetPath],
+    { env: { NODE_ENV: 'production' }, encoding: 'utf8', timeout: 5_000 });
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /headless Web failed closed/u);
+});
+
+test('Web bootstrap failure before readiness closes IPC and exits without opening a backend', async () => {
+  const child = spawn(process.execPath, [bootstrap, paths.webTargetPath],
+    { env: { NODE_ENV: 'production' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+  let output = '';
+  child.stderr?.on('data', chunk => { output += chunk; });
+  const [code] = await once(child, 'exit');
+  assert.equal(code, 1);
+  assert.equal(child.connected, false);
+  assert.match(output, /headless Web failed closed/u);
+  assert.doesNotMatch(output, /MEDIFLOW_HEADLESS_WEB_READY/u);
 });
