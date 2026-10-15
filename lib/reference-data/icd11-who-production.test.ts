@@ -315,6 +315,8 @@ test('catalog search uses exact codes, full text literal tokens, and bounded res
         store.activate(replacement.previewId, 1, noop, 'synthetic');
         assert.equal(store.search('amber').entries.length, 25);
         assert.equal(store.search('amber').partial, true);
+        assert.deepEqual(store.search('amb').entries.map(row => row.code), categories.slice(0, 25).map((_, index) => `AB${String(index).padStart(2, '0')}`));
+        assert.equal(store.search('amb').partial, true);
     } finally { store.close(); }
 });
 
