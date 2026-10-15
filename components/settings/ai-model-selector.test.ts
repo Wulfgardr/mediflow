@@ -12,7 +12,7 @@ test('salvataggio riuscito rilegge il passo 4 senza attivare; errore di salvatag
             createRoot(document.getElementById('root')).render(<ToastProvider><Page /></ToastProvider>);`,
             resolveDir: process.cwd(), loader: 'tsx' },
         bundle: true, write: false, outfile: 'models-mount.js', format: 'iife', platform: 'browser',
-        define: { 'process.env.NODE_ENV': '"test"' }, tsconfig: path.resolve('tsconfig.json'),
+        define: { 'process.env.NODE_ENV': '"test"' }, banner: { js: 'var process = { env: { NODE_ENV: "test" } };' }, tsconfig: path.resolve('tsconfig.json'),
         plugins: [{
             name: 'synthetic-settings-boundary',
             setup(bundle) {
