@@ -601,7 +601,7 @@ struct PairedPatientsWorklistView: View {
                 .lineLimit(2)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(PlatformColors.secondaryInk)
                 .accessibilityLabel(summary.additionalCount > 0
                     ? "\(summary.displayText). \(summary.additionalAccessibilityLabel)"
                     : summary.displayText)
@@ -656,7 +656,7 @@ struct PairedPatientsWorklistView: View {
             }
             .font(.caption)
             // @Codex
-            .foregroundStyle(.secondary)
+            .foregroundStyle(PlatformColors.secondaryInk)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
                 summary.additionalCount > 0
