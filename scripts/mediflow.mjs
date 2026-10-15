@@ -50,11 +50,11 @@ export function needsTextMenu(platform = process.platform, env = process.env, br
 }
 
 export async function textualChoice({ nativeAvailable, dirty, question, write = log }) {
-  const entries = [['web', 'Apri MediFlow'],
+  const entries = [['web', 'Nel browser'],
     ...(nativeAvailable ? [['mac', 'App per Mac']] : []),
-    ['agenti', 'Accesso per agenti: collegamento locale per un client autorizzato'],
+    ['agenti', 'Per un agente: collegamento locale per un client autorizzato'],
     ...(dirty ? [['sviluppo', 'Apri per sviluppo: modifiche non committate']] : []),
-    ['stop', 'Arresta MediFlow']];
+    ['stop', 'Arresta']];
   entries.forEach(([, label], index) => write(`${index + 1}. ${label}`));
   while (true) {
     const answer = (await question('Scelta [1]: ')).trim() || '1';
@@ -257,7 +257,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const start = async (choice, remember) => {
     const attempt = ++generation;
-    update({ busy: true, ready: false, url: null, message: 'Controllo delle dipendenze.' });
+    update({ busy: true, ready: false, url: null, step: 'dipendenze', message: 'Controllo delle dipendenze.' });
     await stopOwnedChild(child);
     if (closing) return;
     if (!fs.existsSync(path.join(ROOT, 'node_modules/next/package.json')) || !fs.existsSync(path.join(ROOT, 'node_modules/better-sqlite3/package.json'))) {
@@ -268,7 +268,7 @@ export async function main(args = process.argv.slice(2)) {
       installApproval = null;
       update({ needsInstall: false });
       if (!approved || closing) throw new Error('Dipendenze non installate.');
-      update({ message: 'Installazione delle dipendenze. Attendi il completamento.' });
+      update({ step: 'dipendenze', message: 'Installazione delle dipendenze.' });
       await runNpm('ci');
     }
     const nativeStatus = checkNode(true);
@@ -278,7 +278,7 @@ export async function main(args = process.argv.slice(2)) {
     if (current.worktreeHash !== 'clean' && choice !== 'sviluppo') throw new Error('Questa cartella contiene modifiche non committate. Scegli Apri per sviluppo oppure usa una copia Git pulita.');
     if (choice === 'mac') {
       const bundleIdentity = readJson(path.join(path.dirname(native), '../Resources/WebRuntime/mediflow-build-identity.json'));
-      if (bundleIdentity?.sourceFingerprint !== current.sourceFingerprint) throw new Error('L’app per Mac non corrisponde a questa revisione. Ricostruiscila con la guida nativa oppure scegli Apri MediFlow.');
+      if (bundleIdentity?.sourceFingerprint !== current.sourceFingerprint) throw new Error('L’app per Mac non corrisponde a questa revisione. Ricostruiscila con la guida nativa oppure scegli Nel browser.');
     } else if (choice !== 'sviluppo') {
       let verified;
       try { verified = verifySourceRuntime(ROOT); } catch { /* Missing or obsolete build requires preparation. */ }
@@ -287,7 +287,7 @@ export async function main(args = process.argv.slice(2)) {
       if (decision === 'build') {
         if (failedBuild === current.sourceFingerprint) throw new Error('La build di questa revisione è già fallita. Controlla i log, correggi la causa e riapri il lanciatore.');
         failedBuild = current.sourceFingerprint;
-        update({ message: 'Preparazione di MediFlow per questa revisione. In genere richiede da 2 a 10 minuti; i tempi dipendono dal computer. Avanzamento nel terminale.' });
+        update({ step: 'versione', since: Date.now(), message: 'Preparazione di questa versione. Succede una volta sola e richiede qualche minuto.' });
         await runNpm('run build');
         verified = verifySourceRuntime(ROOT);
         if (buildDecision(readProductIdentity(ROOT), verified) !== 'reuse') throw new Error('La build non corrisponde ai sorgenti. Avvio sospeso.');
@@ -296,7 +296,7 @@ export async function main(args = process.argv.slice(2)) {
     }
     if (closing) return;
     startOptionalOllama();
-    update({ message: choice === 'agenti' ? 'Avvio dell’accesso per agenti. Collega un client al protocollo del terminale.' : 'Avvio di MediFlow.' });
+    update({ step: 'avvio', message: choice === 'agenti' ? 'Avvio dell’accesso per agenti. Collega un client al protocollo del terminale.' : 'Avvio di MediFlow.' });
     let target = null;
     if (choice === 'mac') {
       const owned = run(native, [], false, { ...process.env, MEDIFLOW_NODE_BINARY: process.execPath,
@@ -345,11 +345,11 @@ export async function main(args = process.argv.slice(2)) {
     }
     if (closing) return;
     child.once('exit', () => {
-      if (!closing && attempt === generation) update({ ready: false, busy: false, url: null, message: 'MediFlow si è arrestato. Controlla i log prima di riaprire.' });
+      if (!closing && attempt === generation) update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
     });
     if (remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
     else if (!remember) atomicJson(preferencesFile, { schemaVersion: 1, choice: null });
-    update({ busy: false, ready: true, url: target, message: choice === 'mac' ? 'App per Mac avviata. Lascia aperto il terminale.' : `Pronto: ${target}` });
+    update({ busy: false, ready: true, url: target, step: 'pronto', message: choice === 'mac' ? 'App per Mac avviata. Lascia aperto il terminale.' : `Pronto: ${target}` });
     if (options.noBrowser) log(`Per cambiare scelta o arrestare: ${chooser.url}`);
   };
   const choose = (choice, remember = false) => {
@@ -357,7 +357,7 @@ export async function main(args = process.argv.slice(2)) {
     if (!CHOICES.includes(choice) || state.busy || closing) throw new Error('Attendi il completamento dell’avvio prima di cambiare scelta.');
     void start(choice, remember).catch(async error => {
       await stopOwnedChild(child);
-      update({ busy: false, ready: false, url: null, needsInstall: false, message: error.message });
+      update({ busy: false, ready: false, url: null, needsInstall: false, step: 'errore', message: error.message });
       if (options.choice && options.noBrowser) { process.exitCode = 1; await shutdown(); }
       else if (useTerminal && !closing) {
         try { await chooseTerminal(); } catch (error) { log(error.message); process.exitCode = 1; await shutdown(); }
@@ -373,7 +373,8 @@ export async function main(args = process.argv.slice(2)) {
   };
   try {
     chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state }), choose,
-      install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty });
+      install: () => installApproval?.(true), stop: shutdown, nativeAvailable: !!native, development: dirty,
+      version: identity.version, folder: path.basename(ROOT) });
     if (closing) { await chooser.close(); return; }
     atomicJson(path.join(lockDirectory, 'instance.json'), { pid: process.pid, checkoutPath: identity.checkoutPath, choiceUrl: chooser.url });
     log(`MediFlow ${identity.version}\nCartella: ${ROOT}\nAvvio: ${chooser.url}\nCtrl+C per arrestare.`);

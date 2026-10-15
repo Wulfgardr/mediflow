@@ -290,7 +290,7 @@ test('choice page serves locally, rejects cross-origin actions and redirects onl
     t.after(page.close);
     const response = await fetch(page.url);
     assert.equal(response.status, 200);
-    assert.match(await response.text(), /Apri MediFlow/u);
+    assert.match(await response.text(), /Nel browser/u);
     assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/u);
     const post = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json', Origin: new URL(page.url).origin }, body: JSON.stringify(body) });
     assert.equal((await fetch(new URL('choose', page.url), { ...post({ choice: 'web' }), headers: { 'Content-Type': 'application/json', Origin: 'https://foreign.invalid' } })).status, 403);

@@ -270,10 +270,11 @@ gestore. `better-sqlite3` deve corrispondere all’ABI del Node attivo.
 | Windows | `MediFlow.cmd` |
 | Linux | `MediFlow.sh` (eseguibile; l'apertura dipende dal file manager) |
 
-Si apre **Avvio**: scegli **Apri MediFlow**, **Accesso per agenti** oppure,
-su macOS, **App per Mac** se il bundle è già costruito. Il terminale conserva
-i log: lascialo aperto; **Ctrl+C** o **Arresta MediFlow** arrestano i processi
-di questo avvio. L'accesso per agenti mantiene i controlli e le autorizzazioni
+Il browser chiede come vuoi usare MediFlow: **Nel browser**, **Per un agente**
+oppure, su macOS, **App per Mac** se l'app è già costruita. La scelta si può
+ricordare. La prima volta per ogni versione MediFlow prepara la build di
+produzione e ne mostra l'avanzamento. Il terminale conserva i log: lascialo
+aperto; **Ctrl+C** o **Arresta** chiudono i processi di questo avvio. L'accesso per agenti mantiene i controlli e le autorizzazioni
 esistenti e riserva lo standard output al protocollo del client.
 
 Il lanciatore propone `npm ci` se mancano le dipendenze, chiedendo conferma

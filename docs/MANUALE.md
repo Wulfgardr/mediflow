@@ -21,10 +21,11 @@ Per orientarti prima dell'avvio o approfondire una scelta:
 1. Installa Node 24 e apri la cartella Git di MediFlow.
 2. Fai doppio clic su `MediFlow.command` (Mac), `MediFlow.cmd` (Windows) o
    `MediFlow.sh` (Linux, da rendere eseguibile se necessario).
-3. Lascia aperto il terminale e scegli **Apri MediFlow** nel browser.
-4. Se mancano le dipendenze, conferma **Installa dipendenze**: `npm ci`
-   richiede il registro npm. La prima build della revisione può richiedere
-   diversi minuti; l'avanzamento è nel terminale.
+3. Lascia aperto il terminale e, nella pagina che si apre, scegli
+   **Nel browser**.
+4. Se mancano le dipendenze, conferma **Installa le dipendenze**: `npm ci`
+   richiede il registro npm. La prima volta per ogni versione MediFlow
+   prepara la build di produzione: la pagina mostra le fasi e il tempo.
 5. Il browser apre MediFlow soltanto dopo il controllo della revisione.
 
 **Ricorda la mia scelta** salva la preferenza nella cartella dati.

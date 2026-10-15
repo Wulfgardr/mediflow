@@ -683,7 +683,7 @@ release sorgente 0.8.6.
 
 ### Avvio rapido
 
-- Avvio: `MediFlow.command`, `MediFlow.cmd` o `MediFlow.sh`, poi **Apri MediFlow**
+- Avvio: `MediFlow.command`, `MediFlow.cmd` o `MediFlow.sh`, poi **Nel browser**
 - Client Mac: **App per Mac** in Avvio, con bundle già costruito
 
 ---
