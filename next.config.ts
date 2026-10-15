@@ -76,6 +76,7 @@ const nextConfig: NextConfig = {
       "./CREDITS.md",
       "./app/fonts/*-OFL.txt",
       "./licenses/sharp-libvips/*.txt",
+      "./licenses/who-icd11/*.md",
       // Raw scheduler closure; checked against the canonical runtime roster in tests.
       "./scripts/run-scheduled-backup.mjs",
       "./scripts/scheduled-backup-date-fields.mjs",

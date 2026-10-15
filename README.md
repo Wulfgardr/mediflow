@@ -398,4 +398,5 @@ MediFlow non le sostituisce. [Crediti e attribuzioni](./CREDITS.md).
 Il [catalogo ICD-11 incorporato](docs/icd-who-setup.md) cerca categorie per codice
 o titolo inglese in SQLite. Dati WHO CC BY-ND 3.0 IGO, separati dalla licenza MIT:
 nessun sinonimo o postcoordinazione dell’API, nessuna scrittura clinica automatica.
-Gli asset ufficiali restano da acquisire e verificare; i test usano dati sintetici.
+Il bundle include l’archivio WHO ufficiale non modificato e il manifest verificato:
+35.664 categorie con codice. Il primo uso lo importa nel DB di repertorio dedicato.

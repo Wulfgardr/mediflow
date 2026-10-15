@@ -616,8 +616,8 @@ Il bundle contiene l'archivio originale e un manifest con URL fisso, release,
 lingua, licenza, hash SHA-256, byte e conteggi. Al primo uso del servizio nel
 processo vengono verificati manifest, archivio e proiezione SQLite; una verifica
 fallita non rende disponibile il catalogo corrotto. Gli asset sono inclusi anche
-nella distribuzione standalone. In questa tranche NON è distribuito il dataset
-WHO: soltanto fixture sintetiche, mai caricate automaticamente in produzione.
+nella distribuzione standalone. L’acquisizione autorizzata del 15 ottobre 2026
+include ora l’archivio WHO ufficiale non modificato e il manifest verificato.
 
 Il parser accetta solo tab-separated UTF-8 con intestazioni SimpleTabulation
 riconosciute, anche dentro ZIP. XLSX, versioni diverse, strutture ignote,
@@ -643,8 +643,8 @@ Il download non riceve mai termini clinici, pazienti, documenti o credenziali.
 I dati WHO restano CC BY-ND 3.0 IGO, separati dalla licenza MIT del software;
 l'archivio originale viene conservato senza modifiche e accompagnato
  dall'attribuzione World Health Organization. SHA-256 prova integrità rispetto
-al manifest, non una firma WHO. La prima distribuzione reale richiede ancora
-l'acquisizione autorizzata e la verifica dello schema effettivo. La copertura è
+al manifest, non una firma WHO. Lo schema effettivo e i conteggi del bundle
+2026-01 sono verificati anche sul file ufficiale. La copertura è
 solo delle categorie tabellari inglesi: niente sinonimi, traduzione italiana,
 postcoordinazione o validazione clinica. Il controllo codice verifica soltanto
 la presenza nel catalogo, non la correttezza di una diagnosi.
@@ -656,3 +656,32 @@ cifrato già esistente. I client paired devono supportare il nuovo contratto
 prima di essere dichiarati compatibili. Le route v1 paired conservano il runtime
 sidecar con il contratto precedente: nessun impatto OpenAPI v1. Nessuna modifica
 a scritture cliniche o autorizzazioni è implicata da questa decisione.
+
+
+### Emendamento 2026-10: layout ufficiale e inclusione del dataset
+
+L'archivio originale di 4.214.980 byte è incluso con SHA-256
+`f1356588f40953a83e3af2b662deab47c5e269f944d1ea4ed0cfeb2007c7cd39`.
+Il parser richiede un solo `SimpleTabulation-ICD-11-MMS-<lingua>.txt` nello
+ZIP, ammette solo inglese e dichiara nel manifest gli altri file ignorati,
+compresi readme e XLSX gemello. Restano limiti ZIP, CRC e rifiuto di ambiguità,
+corruzione, duplicati e release diverse. Non viene introdotta lettura XLSX.
+
+Il layout ufficiale ha record CRLF, BOM UTF-8, campi quotati con virgolette
+raddoppiate e note multilinea. CodingNote contiene anche LF non quotati:
+questi vengono ammessi solo nella colonna delle note del layout ufficiale.
+Version è metadato d'intestazione e manca nei record dati. La data estratta è
+`2026-01-17T05:30:00.000Z`; i record logici sono 37.052, di cui 35.664 categorie,
+1.360 blocchi e 28 capitoli. Non si contano le continuazioni come record.
+
+La proiezione elimina il solo prefisso di profondità dai titoli e associa
+la release 2026-01 agli URI senza anno, secondo il contratto MMS canonico
+esistente. Il risultato del parser espone anche `originalUri`; l'archivio
+originale resta nel DB di repertorio e nel bundle. Nessuna formula BrowserLink
+viene interpretata. I titoli ufficiali con confronti numerici `<` o `>` sono
+ammessi nei soli contratti incorporati, conservando il rifiuto di markup e
+controlli invisibili. I contratti sidecar e cloud rimangono invariati.
+
+L'attribuzione e i collegamenti alle condizioni WHO e CC BY-ND 3.0 IGO sono
+in `CREDITS.md`, `licenses/who-icd11/NOTICE.md` e nel README degli asset,
+anche nella build standalone. Il software non rivendica approvazione WHO.

@@ -176,7 +176,7 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
     const store = createWhoCatalogStore(path.join(dataDir, 'icd11-catalog.sqlite'));
     try {
         const revision = store.status().revision;
-        const preview = store.stage(readFileSync('lib/reference-data/fixtures/icd11-simple-tabulation.synthetic.tsv'), revision, () => undefined, 'synthetic-e2e');
+        const preview = store.stage(readFileSync('lib/reference-data/fixtures/icd11-official-layout.synthetic.zip'), revision, () => undefined, 'synthetic-e2e');
         store.activate(preview.previewId, revision, () => undefined, 'synthetic-e2e');
     } finally { store.close(); }
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');

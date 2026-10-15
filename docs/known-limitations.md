@@ -239,15 +239,14 @@ La `0.8.5` non consegna:
 
 ## Catalogo ICD-11 incorporato (2026-10)
 
-La ricerca tabellare MMS 2026-01 funziona senza Docker, rete o credenziali dopo
-un'acquisizione verificata. Questa tranche NON include il catalogo WHO reale e
-non lo ha scaricato: prove soltanto sintetiche. Stato Assente fino a disponibilità
-del bundle autorizzato o aggiornamento esplicito confermato dalla UI.
+La ricerca tabellare MMS 2026-01 usa il bundle WHO ufficiale incluso, verificato
+e importato al primo uso senza Docker, rete o credenziali: 35.664 categorie
+con codice. Un bundle assente, alterato o disabilitato non viene attivato.
 
 Copertura: solo categorie con codice e titoli inglesi SimpleTabulation, senza
 sinonimi, traduzione italiana o postcoordinazione dell'API. Il parser supporta
 tab-separated UTF-8 in ZIP, rifiuta XLSX e intestazioni non riconosciute. Lo schema
-dell'archivio reale resta da verificare dopo autorizzazione. Le combinazioni
+dell'archivio reale è verificato, comprese le note multilinea. Le combinazioni
 postcoordinate non vengono verificate dal catalogo tabellare. Dati WHO CC BY-ND
 3.0 IGO, non MIT; nessuna garanzia clinica deriva dalla presenza di un codice.
 
