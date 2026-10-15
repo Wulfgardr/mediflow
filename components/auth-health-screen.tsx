@@ -79,7 +79,7 @@ export function AuthHealthScreen({
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-bold" style={{ color: 'var(--lume-ink)' }}>Problema Database</h1>
+                        <h1 className="text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>Problema Database</h1>
                         <p className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{friendlyMessage}</p>
                         {health.error?.code && (
                             <p className="lume-registro text-xs text-[color:var(--lume-signal-warning)]">Codice: {health.error.code}</p>
@@ -99,10 +99,10 @@ export function AuthHealthScreen({
                 {remediationCommand && (
                     <div className="border-t border-[color:var(--lume-rule)] py-4">
                         <div className="mb-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>Comando consigliato (esegui manualmente nel terminale)</div>
-                        <code className="lume-registro block break-all whitespace-pre-wrap select-all text-xs" style={{ color: 'var(--lume-ink)' }}>
+                        <code className="type-code block break-all whitespace-pre-wrap select-all text-xs" style={{ color: 'var(--lume-ink)' }}>
                             {remediationCommand}
                         </code>
-                        <p className="mt-2 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>
+                        <p className="mt-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                             Esegui il comando con lo stesso runtime Node usato per avviare MediFlow. Non eseguito automaticamente per sicurezza.
                         </p>
                     </div>
@@ -147,7 +147,7 @@ export function AuthHealthScreen({
 
                 <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                     Se hai usato strumenti di pulizia, verifica che la cartella dati e il file{' '}
-                    <code className="lume-registro text-[11px]" style={{ color: 'var(--lume-ink)' }}>medical.db</code> non siano
+                    <code className="type-code text-xs" style={{ color: 'var(--lume-ink)' }}>medical.db</code> non siano
                     stati rimossi o spostati. In caso di dubbi, ripristina un backup locale.
                 </p>
             </div>

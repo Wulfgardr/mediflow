@@ -224,7 +224,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                                             <div className="flex items-center justify-between gap-3">
                                                 <p className="lume-registro text-xs font-semibold text-[color:var(--lume-ink)]">{result.code}</p>
                                                 {result.type && (
-                                                    <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-[color:var(--lume-ink-muted)] dark:bg-white/10">
+                                                    <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs text-[color:var(--lume-ink-muted)] dark:bg-white/10">
                                                         {result.type}
                                                     </span>
                                                 )}

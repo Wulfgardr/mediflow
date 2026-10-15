@@ -57,11 +57,11 @@ export default function SettingsCompliancePage() {
                         </div>
 
                         <div className="rounded-[22px] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_4%,var(--lume-surface-field))] p-4">
-                            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
+                            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
                                 <BookOpenCheck className="h-4 w-4" aria-hidden="true" />
                                 Evidenze consultabili nel repository
                             </div>
-                            <ul className="mt-3 space-y-1 font-mono text-xs text-[color:var(--lume-ink)]">
+                            <ul className="mt-3 space-y-1 text-xs text-[color:var(--lume-ink)]">
                                 {record.evidence.map((evidence) => <li key={evidence}>{evidence}</li>)}
                             </ul>
                         </div>
@@ -79,7 +79,7 @@ export default function SettingsCompliancePage() {
 
                         {record.externalReferences.length > 0 ? (
                             <div className="border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4">
-                                <p className="text-xs font-bold uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-[color:var(--lume-ink-muted)]">
                                     Fonti ufficiali esterne
                                 </p>
                                 <ul className="mt-2 space-y-2 text-sm">

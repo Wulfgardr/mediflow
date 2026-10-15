@@ -216,7 +216,7 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="section-kicker">SISS</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
                             <ClipboardCheck className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Diario portali regionali
                         </h2>

@@ -160,10 +160,10 @@ export function ClinicalRiverTimeline({
                                 tabIndex={0}
                             >
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                                    <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                         {item.typeLabel ?? presentation.label}
                                     </span>
-                                    <span className="lume-registro inline-flex items-center gap-1 text-[12px] text-[color:var(--lume-ink-muted)]">
+                                    <span className="lume-registro inline-flex items-center gap-1 text-xs text-[color:var(--lume-ink-muted)]">
                                         <FileText className="h-3.5 w-3.5" />
                                         {formatDate(item.date)}
                                     </span>
@@ -181,7 +181,7 @@ export function ClinicalRiverTimeline({
             </div>
 
             {hiddenCount > 0 ? (
-                <p className="pl-[44px] text-[12px] text-[color:var(--lume-ink-muted)]">
+                <p className="pl-[44px] text-xs text-[color:var(--lume-ink-muted)]">
                     Mostrati gli ultimi {items.length} eventi di {totalAvailable}. La cronologia completa è nel diario e nei documenti del paziente.
                 </p>
             ) : null}

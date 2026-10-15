@@ -16,26 +16,26 @@
 }
 
 .areaTitle {
-  font-size: 26px;
-  font-weight: 600;
   color: var(--ink);
   margin: 0;
+  font: var(--type-page-title);
 }
 
 .areaTitle em {
+  font: var(--type-meta);
   font-style: normal;
   color: var(--ink-subtle);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .areaSubtitle {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   margin-top: 4px;
 }
 
 .areaCaption {
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -69,9 +69,9 @@
   gap: 12px;
 }
 
-.panelTitle { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.panelTitle { margin: 0; font-size: 0.9375rem; font-weight: 600; color: var(--ink); }
 
-.panelSubtitle { margin: 4px 0 8px; font-size: 12px; color: var(--ink-muted); }
+.panelSubtitle { margin: 4px 0 8px; font-size: 0.75rem; color: var(--ink-muted); }
 
 .panelActions { margin-left: auto; display: inline-flex; gap: 8px; align-items: center; }
 
@@ -96,7 +96,7 @@
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -104,13 +104,13 @@
 }
 
 .statValue {
-  font-size: 22px;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--ink);
 }
 
 .statTrend {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   display: inline-flex;
   align-items: center;
@@ -161,8 +161,8 @@
   gap: 5px;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
   border: 1px solid transparent;
@@ -206,10 +206,10 @@
 }
 
 .diagnosisCode {
+  composes: type-code from global;
   flex: none;
-  font-family: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+  font: var(--type-code);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
 }
 
 .diagnosisLabel {
@@ -244,7 +244,7 @@
 .segItem {
   padding: 6px 14px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-muted);
   cursor: pointer;
   border: 0;
@@ -269,7 +269,7 @@
 .emptyState {
   margin: 0;
   padding: 14px 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-muted);
 }
 
@@ -287,7 +287,7 @@
 .row:hover { background: var(--surface-soft); border-radius: 12px; }
 
 .rowTime {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--ink-subtle);
   width: 64px;
   font-variant-numeric: tabular-nums;
@@ -295,9 +295,9 @@
 
 .rowMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
-.rowTitle { font-size: 14px; color: var(--ink); font-weight: 500; }
+.rowTitle { font-size: 0.875rem; color: var(--ink); font-weight: 600; }
 
-.rowSub { font-size: 12px; color: var(--ink-muted); }
+.rowSub { font-size: 0.75rem; color: var(--ink-muted); }
 
 .rowEnd { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
 
@@ -322,7 +322,7 @@
   align-items: center;
   gap: 8px;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -331,7 +331,7 @@
 .agendaBridgeCopy {
   margin: 8px 0 0;
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
@@ -355,7 +355,7 @@
 
 .agendaCandidateTime {
   color: var(--ink-subtle);
-  font-size: 11px;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.25;
 }
@@ -377,14 +377,14 @@
 
 .agendaCandidateTitle {
   color: var(--ink);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .agendaCandidateMeta,
 .agendaCandidateReason {
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: 0.75rem;
 }
 
 .agendaCandidateEnd {
@@ -440,7 +440,7 @@
 .stepperVal {
   min-width: 36px;
   text-align: center;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -489,9 +489,9 @@
 
 .toggleRowMain { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 
-.toggleRowTitle { font-size: 13px; color: var(--ink); font-weight: 500; }
+.toggleRowTitle { font-size: 0.8125rem; color: var(--ink); font-weight: 600; }
 
-.toggleRowSub { font-size: 12px; color: var(--ink-muted); }
+.toggleRowSub { font-size: 0.75rem; color: var(--ink-muted); }
 
 .primaryBtn {
   display: inline-flex;
@@ -501,8 +501,8 @@
   border-radius: 14px;
   background: var(--solid-action-bg);
   color: var(--solid-action-fg);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 0.8125rem;
+  font-weight: 600;
   border: 0;
   cursor: pointer;
   box-shadow: none;
@@ -524,8 +524,8 @@
   border-radius: 14px;
   background: var(--surface);
   color: var(--ink-strong);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 0.8125rem;
+  font-weight: 600;
   border: 0;
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
@@ -545,8 +545,8 @@
   border-radius: 10px;
   background: var(--surface);
   color: var(--ink-strong);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 0.75rem;
+  font-weight: 600;
   border: 0;
   cursor: pointer;
   box-shadow: 0 0 0 1px var(--line-strong);
@@ -563,9 +563,9 @@
   min-height: var(--lume-control-height);
   padding: 10px 14px;
   border-radius: var(--lume-control-radius);
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
-  line-height: 22px;
+  line-height: 1.5;
   gap: 8px;
 }
 
@@ -577,8 +577,8 @@
   min-height: var(--lume-control-height);
   border-radius: var(--lume-control-radius);
   padding: 10px 14px;
-  font-size: 14px;
-  line-height: 22px;
+  font-size: 0.875rem;
+  line-height: 1.5;
   font-weight: 600;
 }
 
@@ -618,11 +618,11 @@
 
 .evidenceItem:last-child { border-bottom: 0; }
 
-.evidenceDate { font-size: 12px; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
+.evidenceDate { font-size: 0.75rem; color: var(--ink-subtle); font-variant-numeric: tabular-nums; }
 
-.evidenceTitle { font-size: 14px; color: var(--ink); font-weight: 500; }
+.evidenceTitle { font-size: 0.875rem; color: var(--ink); font-weight: 600; }
 
-.evidenceSnippet { font-size: 12px; color: var(--ink-muted); margin-top: 2px; line-height: 1.5; }
+.evidenceSnippet { font-size: 0.75rem; color: var(--ink-muted); margin-top: 2px; line-height: 1.5; }
 
 .plannedItem {
   display: grid;
@@ -646,9 +646,9 @@
   justify-content: center;
 }
 
-.plannedTitle { font-size: 13px; color: var(--ink); font-weight: 500; }
+.plannedTitle { font-size: 0.8125rem; color: var(--ink); font-weight: 600; }
 
-.plannedSub { font-size: 11px; color: var(--ink-muted); }
+.plannedSub { font-size: 0.75rem; color: var(--ink-muted); }
 
 /* ───────────── settings groups ───────────── */
 
@@ -722,9 +722,9 @@
   justify-content: center;
 }
 
-.modeTitle { font-size: 13px; color: var(--ink); font-weight: 500; }
+.modeTitle { font-size: 0.8125rem; color: var(--ink); font-weight: 600; }
 
-.modeSub { font-size: 11px; color: var(--ink-muted); }
+.modeSub { font-size: 0.75rem; color: var(--ink-muted); }
 
 /* @Codex */
 
@@ -803,7 +803,8 @@
 
   .areaCaption { margin-bottom: 2px; }
 
-  .areaTitle { font-size: 20px; }
+  .areaTitle {
+    font: var(--type-page-title); }
 
   .areaTitle em,
   .areaSubtitle {
@@ -821,7 +822,7 @@
 
 /* @Codex WUL-676: clear directory heading, one working plane. */
 :global(html[data-runtime-twin-design='proposal']) .areaCaption { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .areaTitle { font-size: 30px; font-weight: 550; letter-spacing: -0.035em; }
+:global(html[data-runtime-twin-design='proposal']) .areaTitle { letter-spacing: -0.035em; font: var(--type-page-title); }
 :global(html[data-runtime-twin-design='proposal']) .areaTitle em { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .areaHeader { padding: 14px 0 24px; }
 /* @Codex: page, section, subsection and supporting copy retain distinct roles. */
@@ -837,6 +838,6 @@
 :global(html[data-runtime-twin-design='proposal']) .statLabel { font-size: var(--twin-type-caption); text-transform: none; letter-spacing: 0; }
 :global(html[data-runtime-twin-design='proposal']) .panelHeader { flex-wrap: wrap; }
 
-.pill.pill { border: 0; border-radius: 0; padding: 0; background: transparent; font-size: 13px; letter-spacing: 0; }
-.pillWarning::before, .pillCritical::before { content: '▲'; flex-shrink: 0; font-size: 11px; }
+.pill.pill { border: 0; border-radius: 0; padding: 0; background: transparent; font-size: 0.8125rem; letter-spacing: 0; }
+.pillWarning::before, .pillCritical::before { content: '▲'; flex-shrink: 0; font-size: 0.75rem; }
 .pillPlum { color: var(--lume-ink-pencil); text-decoration: underline dashed; text-underline-offset: 4px; }

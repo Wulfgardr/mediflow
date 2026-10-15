@@ -17,7 +17,7 @@ export function DocumentReferenceChip({ references }: DocumentReferenceChipProps
                 {references.map((reference) => (
                     <span
                         key={reference}
-                        className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-[color:var(--lume-surface-field)] px-3 py-1 text-[11px] font-medium text-[color:var(--lume-ink-muted)]"
+                        className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-[color:var(--lume-surface-field)] px-3 py-1 text-xs font-medium text-[color:var(--lume-ink-muted)]"
                     >
                         <FileText className="h-3 w-3 shrink-0" />
                         {reference}

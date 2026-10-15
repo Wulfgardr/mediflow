@@ -83,7 +83,7 @@ function SkeletonLines({ rows }: { rows: number }) {
 
 function MicroLabel({ children }: { children: ReactNode }) {
     return (
-        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+        <span className="text-xs font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
             {children}
         </span>
     );
@@ -152,15 +152,15 @@ export function PatientSynopticSheet({
                         <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
                             <span className={`${styles.synopticCode} lume-registro shrink-0`} data-testid="lume-register-value">{leadDiagnosis.code}</span>
                             <span aria-hidden="true">·</span>
-                            <span className="text-[15px] font-semibold leading-6 text-[color:var(--lume-ink)]">{leadDiagnosis.description}</span>
-                            <span className="text-[11px] uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{leadDiagnosis.system}</span>
+                            <span className="text-lg font-semibold leading-6 text-[color:var(--lume-ink)]">{leadDiagnosis.description}</span>
+                            <span className="text-xs uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{leadDiagnosis.system}</span>
                         </div>
                     ) : (
                         <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessuna diagnosi codificata in scheda.</p>
                     )}
                 </div>
                 {otherProblemsCount > 0 ? (
-                    <span className="shrink-0 whitespace-nowrap text-[11px] text-[color:var(--lume-ink-muted)]">+{otherProblemsCount} problemi</span>
+                    <span className="shrink-0 whitespace-nowrap text-xs text-[color:var(--lume-ink-muted)]">+{otherProblemsCount} problemi</span>
                 ) : null}
             </div>
 
@@ -170,8 +170,8 @@ export function PatientSynopticSheet({
                     {signals.map((signal) => {
                         const body = (
                             <>
-                                <span className="block text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">{signal.label}</span>
-                                <span className={`lume-registro mt-0.5 block text-[18px] font-semibold leading-none ${SIGNAL_TONE[signal.tone ?? 'neutral']}`} data-testid="lume-register-value">
+                                <span className="block text-xs font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">{signal.label}</span>
+                                <span className={`lume-registro mt-0.5 block text-lg font-semibold leading-none ${SIGNAL_TONE[signal.tone ?? 'neutral']}`} data-testid="lume-register-value">
                                     {signal.value}
                                 </span>
                             </>
@@ -208,7 +208,7 @@ export function PatientSynopticSheet({
                         <ul className="mt-1 divide-y divide-[color:color-mix(in_srgb,var(--lume-ink)_6%,transparent)]">
                             {visibleTherapies.map((therapy) => (
                                 <li key={therapy.id} className={styles.synopticTherapy}>
-                                    <span className="text-[13px] font-medium leading-5 text-[color:var(--lume-ink)]">{therapy.drugName}</span>
+                                    <span className="text-sm font-medium leading-5 text-[color:var(--lume-ink)]">{therapy.drugName}</span>
                                     {therapy.dosage ? (
                                         <span className={styles.synopticDetailMeta}>{therapy.dosage}</span>
                                     ) : null}
@@ -216,7 +216,7 @@ export function PatientSynopticSheet({
                             ))}
                             {extraTherapies > 0 ? (
                                 <li className="py-1">
-                                    <a href="#terapie" className="text-[12px] font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]">
+                                    <a href="#terapie" className="text-xs font-medium text-[color:var(--lume-ink-muted)] transition-colors hover:text-[color:var(--lume-ink)]">
                                         +{extraTherapies} altre terapie
                                     </a>
                                 </li>
@@ -237,12 +237,12 @@ export function PatientSynopticSheet({
                             <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">Nessun parametro registrato.</p>
                         ) : (
                             <div className={styles.synopticMeasure}>
-                                <span className="text-[13px] text-[color:var(--lume-ink)]">{latestMeasure.display}</span>
-                                <span className={`lume-registro text-[15px] font-semibold ${latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : 'text-[color:var(--lume-ink)]'}`} data-testid="lume-register-value">
+                                <span className="text-sm text-[color:var(--lume-ink)]">{latestMeasure.display}</span>
+                                <span className={`lume-registro text-lg font-semibold ${latestMeasure.outOfRange ? 'text-[color:var(--lume-signal-critical)]' : 'text-[color:var(--lume-ink)]'}`} data-testid="lume-register-value">
                                     {latestMeasure.valueLabel}
                                 </span>
                                 {latestMeasure.delta ? (
-                                    <span className="inline-flex items-center gap-0.5 text-[12px] text-[color:var(--lume-ink-muted)]">
+                                    <span className="inline-flex items-center gap-0.5 text-xs text-[color:var(--lume-ink-muted)]">
                                         {latestMeasure.delta.direction === 'up' ? (
                                             <TrendingUp className="h-3.5 w-3.5" aria-label="in aumento" />
                                         ) : latestMeasure.delta.direction === 'down' ? (
@@ -267,7 +267,7 @@ export function PatientSynopticSheet({
                         </a>
                         {nextCheckupLabel ? (
                             <div className={styles.synopticMeasure}>
-                                <span className={`lume-registro text-[13px] font-semibold ${styles.synopticWarning}`} data-testid="lume-register-value">{nextCheckupLabel}</span>
+                                <span className={`lume-registro text-sm font-semibold ${styles.synopticWarning}`} data-testid="lume-register-value">{nextCheckupLabel}</span>
                                 {nextCheckupTitle ? <span className={styles.synopticDetailMeta}>{nextCheckupTitle}</span> : null}
                             </div>
                         ) : (

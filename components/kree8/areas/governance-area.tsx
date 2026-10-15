@@ -42,7 +42,7 @@ function GovernanceArea() {
           <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
             Controlli della postazione <em>· accessi, AI e backup</em>
-          </h1>
+          <span aria-hidden="true">.</span></h1>
           <p className={styles.areaSubtitle}>
             Account, funzioni AI, rete, backup, repertori e controlli locali
             restano raggiungibili da qui.
@@ -137,7 +137,7 @@ function GovernanceArea() {
               <div key={m.name} className={styles.compositeCard}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Activity size={13} color="var(--ink-muted)" />
-                  <span style={{ fontSize: 12.5, color: 'var(--ink)' }}>{m.name}</span>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--ink)' }}>{m.name}</span>
                   <span style={{ marginLeft: 'auto' }}>
                     <PillBadge variant={m.variant}>{m.tag}</PillBadge>
                   </span>

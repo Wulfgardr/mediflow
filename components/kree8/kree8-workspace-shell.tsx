@@ -340,7 +340,7 @@ export function Kree8WorkspaceShell({
         >
           {folderMode ? <>
             <div className={twin.identity}>
-              <h1 ref={patientTitleRef} tabIndex={-1}><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <h1 ref={patientTitleRef} tabIndex={-1} className="type-person"><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
             </div>
             <div className={twin.actions}>
@@ -369,7 +369,7 @@ export function Kree8WorkspaceShell({
           {isClinical ? (
             <div className={styles.clinicalIdentity}>
               <p className={styles.clinicalLabel}>{eyebrow}</p>
-              <h1 ref={patientTitleRef} tabIndex={-1} className={styles.clinicalName}><PrivacyBlur>{title}</PrivacyBlur></h1>
+              <h1 ref={patientTitleRef} tabIndex={-1} className={`${styles.clinicalName} type-person`}><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
                 {patientAtoms.map((atom, index) => (
                   <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
@@ -386,8 +386,8 @@ export function Kree8WorkspaceShell({
               </span>
               <div className={styles.heroText}>
                 {!proposal ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-                <h1 className={`${styles.title} lume-voice`}>
-                  <span className={styles.titleMain}>{title}</span>
+                <h1 className={`${styles.title} type-page-title`}>
+                  <span className={styles.titleMain}>{title}</span><span aria-hidden="true">.</span>
                 </h1>
                 {patientLabel ? (
                   <p className={styles.patientLabel} data-testid="lume-workspace-patient-label">

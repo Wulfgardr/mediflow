@@ -129,7 +129,7 @@ export default function PatientDocumentImportReview({
                     <div className="space-y-2">
                         <div>
 
-                            <h2 className="text-2xl font-black tracking-tight text-[color:var(--lume-ink)]">
+                            <h2 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
                                 Scegli cosa portare nella scheda
                             </h2>
                         </div>
@@ -157,7 +157,7 @@ export default function PatientDocumentImportReview({
                 <button
                     type="button"
                     onClick={onDismiss}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
                 >
                     <X className="h-4 w-4" />
                     Scarta documento
@@ -174,7 +174,7 @@ export default function PatientDocumentImportReview({
                         )}
                     </div>
                     <div className="space-y-1">
-                        <p className="text-sm font-bold text-[color:var(--lume-ink)]">
+                        <p className="text-sm font-semibold text-[color:var(--lume-ink)]">
                             Qualità documento: {localDraft.quality.reason}
                         </p>
                         {localDraft.sourceExcerpt && (
@@ -195,7 +195,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <FileText className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Anagrafica e contatti
                             </h3>
                         </div>
@@ -205,7 +205,7 @@ export default function PatientDocumentImportReview({
                                 <fieldset key={field.key} className={styles.reviewRow}>
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
-                                            <p className="text-sm font-bold text-[color:var(--lume-ink)]">{field.label}</p>
+                                            <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{field.label}</p>
                                             <p className="text-xs text-[color:var(--lume-ink-muted)]">{field.sourceLabel}</p>
                                         </div>
                                         <input
@@ -250,7 +250,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <Stethoscope className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Diagnosi candidate
                             </h3>
                         </div>
@@ -299,7 +299,7 @@ export default function PatientDocumentImportReview({
                                                 ...current,
                                                 diagnoses: current.diagnoses.map((item) => item.id === diagnosis.id ? { ...item, code: event.target.value } : item),
                                             }))}
-                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 text-sm lume-code text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
+                                            className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-4 py-3 lume-code text-[color:var(--lume-ink)] outline-none transition-colors focus:border-[color:var(--lume-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--lume-accent)_24%,transparent)]"
                                         />
                                         <input
                                             value={diagnosis.description}
@@ -320,7 +320,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <ClipboardCheck className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Prestazioni prescritte
                             </h3>
                         </div>
@@ -335,7 +335,7 @@ export default function PatientDocumentImportReview({
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-bold text-[color:var(--lume-ink)]">{item.serviceName}</p>
+                                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{item.serviceName}</p>
                                                 <span className={styles.muted}>
                                                     {item.category ?? 'other'}
                                                 </span>
@@ -412,7 +412,7 @@ export default function PatientDocumentImportReview({
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
                             <Pill className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                            <h3 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                            <h3 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                 Terapie candidate
                             </h3>
                         </div>
@@ -428,10 +428,10 @@ export default function PatientDocumentImportReview({
                                     <div className="mb-3 flex items-start justify-between gap-3">
                                         <div className="space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-bold text-[color:var(--lume-ink)]">
+                                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]">
                                                     {medication.drugName || 'Terapia proposta'}
                                                 </p>
-                                                <span className={`rounded-full border px-2 py-0.5 text-xs font-bold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
+                                                <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${therapyStateBadgeClasses(medication.therapyState)}`}>
                                                     {therapyStateLabel(medication.therapyState)}
                                                 </span>
                                                 <span className={styles.muted}>
@@ -506,7 +506,7 @@ export default function PatientDocumentImportReview({
                                     </div>
 
                                     {(medication.aic || medication.atc) && (
-                                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                             {medication.aic && (
                                                 <span className={styles.muted}>
                                                     AIC {medication.aic}

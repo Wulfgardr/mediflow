@@ -135,7 +135,7 @@ export default function MockSchedaPage() {
                     {/* Narrativa clinica: aperta di default, in cima alla colonna larga. */}
                     <section id="insight" className="patient-detail-section border p-5 md:p-6 scroll-mt-28">
                         <p className="section-kicker">Sintesi AI</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
                             <Activity className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                             Quadro sintetico assistito
                         </h2>
@@ -150,7 +150,7 @@ export default function MockSchedaPage() {
                         <div className="mb-5 flex items-center justify-between gap-3">
                             <div>
                                 <p className="section-kicker">Timeline</p>
-                                <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">Timeline clinica</h2>
+                                <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Timeline clinica</h2>
                             </div>
                             <span className="apple-chip">23 eventi in totale</span>
                         </div>
@@ -161,7 +161,7 @@ export default function MockSchedaPage() {
                         <div className="mb-5 flex items-center justify-between gap-3">
                             <div>
                                 <p className="section-kicker">Diario</p>
-                                <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                                <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
                                     <FileText className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                                     Diario clinico
                                 </h2>

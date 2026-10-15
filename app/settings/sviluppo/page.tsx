@@ -38,7 +38,7 @@ export default function SettingsDevelopmentPage() {
                     <div className="mb-3">
                         <p className="section-kicker">Sviluppo</p>
                         <h4 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Dati dimostrativi</h4>
-                        <p className="mt-1 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>Genera pazienti e documenti sintetici per verificare la postazione.</p>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Genera pazienti e documenti sintetici per verificare la postazione.</p>
                     </div>
                     <div className="flex items-center justify-end">
                         <DataSeeder />
@@ -49,7 +49,7 @@ export default function SettingsDevelopmentPage() {
                     <div className="mb-3">
                         <p className="section-kicker">Desktop</p>
                         <h4 className="mt-1 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>App nativa macOS</h4>
-                        <p className="mt-1 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>Avvia la shell nativa quando disponibile sul sistema.</p>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>Avvia la shell nativa quando disponibile sul sistema.</p>
                     </div>
                     <div className="flex items-center justify-between gap-4">
                         <button

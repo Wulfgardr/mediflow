@@ -38,6 +38,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
+      - run: npm run check:type-scale
       - run: npm run check:lume-tokens
       - run: npm run test:lume-tokens
       - run: npm run check:motion-budget

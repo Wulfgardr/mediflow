@@ -1,12 +1,12 @@
 .panel {
     min-width: 0;
     color: var(--lume-ink);
-    font: 14px/1.5 var(--lume-font-sans);
+    font: 0.875rem/1.5 var(--lume-font-sans);
     overflow-wrap: anywhere;
     container-type: inline-size;
 }
 .panel h3 {
-    font: 400 22px/1.2 var(--lume-font-voice);
+    font: var(--type-strong);
 }
 .panel h4, .title {
     color: var(--lume-ink);
@@ -61,7 +61,7 @@
     border-bottom: 1px solid var(--lume-rule);
 }
 .label, .muted, .meta { color: var(--lume-ink-muted); }
-.meta { grid-column: 2; font-size: 13px; }
+.meta { grid-column: 2; font-size: 0.8125rem; }
 .value { font-weight: 600; font-variant-numeric: tabular-nums; }
 .model { padding-block: 8px; border-bottom: 1px solid var(--lume-rule); }
 .status { display: flex; align-items: center; gap: 8px; font-weight: 600; }
@@ -72,7 +72,7 @@
     margin-top: 8px;
     max-width: 64ch;
     color: var(--lume-ink-muted);
-    font: 400 17px/1.5 var(--lume-font-voice);
+    font: var(--type-body);
 }
 .spaced { margin-top: 12px; }
 .disclosure {
@@ -81,7 +81,7 @@
     cursor: pointer;
     font-weight: 600;
 }
-.code { font: 12px/1.5 var(--font-registro), monospace; overflow-wrap: anywhere; }
+.code { composes: type-code from global; font: var(--type-code); overflow-wrap: anywhere; }
 .report { white-space: pre-wrap; font: inherit; margin-top: 12px; }
 @container (max-width: 500px) {
     .metricRow { grid-template-columns: minmax(0, 1fr); gap: 4px; }

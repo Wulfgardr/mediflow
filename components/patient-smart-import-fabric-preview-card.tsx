@@ -81,7 +81,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                                     <dt>Provenienza</dt>
                                     <dd>{preview.provenance.preprocessing.join(' → ')}</dd>
                                     <dt>Review</dt>
-                                    <dd className="break-all font-mono text-sm">{preview.reviewRef}</dd>
+                                    <dd className="break-all type-code">{preview.reviewRef}</dd>
                                 </dl>
                                 </details>
                             </>

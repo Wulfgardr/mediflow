@@ -29,7 +29,7 @@ function Badge({
     }[tone];
 
     return (
-        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold', toneClass)}>
+        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold', toneClass)}>
             {children}
         </span>
     );
@@ -218,19 +218,19 @@ export default function NetworkOperatingModePanel() {
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Motore locale</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Motore locale</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.aiLocalRuntimeLabel ?? 'Ollama locale del nodo'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Fallback</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Fallback</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.aiFallbackLabel ?? 'AI non disponibile'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Attivazione</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Attivazione</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.aiRolloutGateLabel ?? 'Benchmark prima del rollout'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Superfici</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Superfici</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.aiSurfaceLabels.join(' / ') ?? 'Patient Insight / Smart Import / Document Synthesis'}</p>
                     </div>
                 </div>
@@ -255,15 +255,15 @@ export default function NetworkOperatingModePanel() {
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Authority</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Authority</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.replicaAuthorityLabel ?? 'Dispositivo locale'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Conflitti</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Conflitti</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.replicaConflictModelLabel ?? 'Preflight restore + version check'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Ultimo riallineamento</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Ultimo riallineamento</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.lastSyncLabel ?? 'Non ancora disponibile'}</p>
                     </div>
                 </div>
@@ -283,17 +283,17 @@ export default function NetworkOperatingModePanel() {
                 </div>
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Operatore</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Operatore</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityOperatorLabel ?? 'Operatore non ancora legato al nodo'}</p>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{viewModel?.identityLoginModeLabel ?? 'PIN-only se esiste un solo account locale'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Scope effettivo</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Scope effettivo</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityScopeLabel ?? 'Nessun ambulatorio effettivo'}</p>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Origine: {viewModel?.identityScopeSourceLabel ?? 'Nessuna risoluzione'}</p>
                     </div>
                     <div className="rounded-[16px] border border-white/70 bg-white/72 p-3 dark:border-white/10 dark:bg-white/5">
-                        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Audit</p>
+                        <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">Audit</p>
                         <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{viewModel?.identityAuditLabel ?? 'Solo token di trasporto'}</p>
                     </div>
                 </div>

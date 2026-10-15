@@ -29,7 +29,7 @@ export function FabricVenueSection({
                     <strong>Nessun dirottamento automatico.</strong>{' '}
                     Se una sede non è disponibile, la richiesta viene rifiutata e non passa a un&apos;altra sede.
                 </p>
-                <code className="lume-registro">{snapshot.fallback}</code>
+                <code className="type-code">{snapshot.fallback}</code>
             </div>
 
             <dl className={styles.fabricVenueList}>

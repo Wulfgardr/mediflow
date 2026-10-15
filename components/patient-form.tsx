@@ -68,7 +68,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                     const sys = watch(`diagnoses.${index}.system`) || 'ICD-11';
                                     const isV11 = sys === 'ICD-11';
                                     return (
-                                        <div className={`diagnosis-system-pill patient-code-pill ${isV11 ? 'patient-code-pill-primary' : 'patient-code-pill-plum'} w-full justify-center text-xs font-bold`}>
+                                        <div className={`diagnosis-system-pill patient-code-pill ${isV11 ? 'patient-code-pill-primary' : 'patient-code-pill-plum'} w-full justify-center text-xs font-semibold`}>
                                             {sys}
                                         </div>
                                     );
@@ -83,7 +83,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                     {...register(`diagnoses.${index}.code`)}
                                     readOnly={!!watch(`diagnoses.${index}.canonicalUri`)}
                                     placeholder="Es. 8A80.0"
-                                    className="mf-input mf-input-sm lume-code font-bold"
+                                    className="mf-input mf-input-sm lume-code"
                                     aria-invalid={!!errors.diagnoses?.[index]?.code}
                                 />
                             </div>
@@ -313,7 +313,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             aria-invalid={!!errors.taxCode}
                             aria-describedby={errors.taxCode ? "patient-taxCode-error" : undefined}
                             {...register('taxCode')}
-                            className={`${FORM_INPUT_CLASS} uppercase lume-code font-bold tracking-wider`}
+                            className={`${FORM_INPUT_CLASS} uppercase lume-code font-semibold tracking-wider`}
                             placeholder="RSSMRA80A01H501U"
                             maxLength={16}
                         />
@@ -435,7 +435,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             />
                         )}
                     />
-                    <div className="mt-3 mf-alert mf-alert-warning text-[11px]" role="note">
+                    <div className="mt-3 mf-alert mf-alert-warning text-xs" role="note">
                         <span className="inline-flex items-start gap-2">
                             <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                             I codici selezionati verranno salvati in modo cifrato nella scheda del paziente.
@@ -465,7 +465,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                             />
                             <label htmlFor="adi" className="font-semibold cursor-pointer select-none" style={{ color: 'var(--lume-ink)' }}>
                                 Paziente in ADI
-                                <span className="block text-[11px] font-normal" style={{ color: 'var(--lume-ink-muted)' }}>Assistenza Domiciliare Integrata</span>
+                                <span className="block text-xs font-normal" style={{ color: 'var(--lume-ink-muted)' }}>Assistenza Domiciliare Integrata</span>
                             </label>
                         </div>
 
@@ -522,7 +522,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
                 <p className={styles.previewName}><PrivacyBlur>{[watch('lastName'), watch('firstName')].filter(Boolean).join(' ') || 'Nome da completare'}</PrivacyBlur></p>
                 <p className={styles.muted}>{disabled ? 'Compilazione sospesa: verifica l’esito prima di continuare.' : isEditMode ? 'Dati del modulo aperto. Le modifiche richiedono il salvataggio.' : 'Controlla i dati prima di salvare.'}</p>
                 <dl>
-                    <dt>Codice fiscale</dt><dd className="lume-code"><PrivacyBlur>{watchedTaxCode || 'Da completare'}</PrivacyBlur></dd>
+                    <dt>Codice fiscale</dt><dd className={watchedTaxCode ? 'type-code' : 'type-meta'}><PrivacyBlur>{watchedTaxCode || 'Da completare'}</PrivacyBlur></dd>
                     <dt>Data di nascita</dt><dd className="lume-registro"><PrivacyBlur>{watchedBirthDate ? new Date(watchedBirthDate).toLocaleDateString('it-IT') : 'Non indicata'}</PrivacyBlur></dd>
                     <dt>Telefono</dt><dd><PrivacyBlur>{watch('phone') || 'Non indicato'}</PrivacyBlur></dd>
                     <dt>Indirizzo</dt><dd><PrivacyBlur>{watch('address') || 'Non indicato'}</PrivacyBlur></dd>

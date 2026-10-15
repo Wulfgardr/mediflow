@@ -10,29 +10,19 @@ const config: Config = {
         "./components/**/*.{js,ts,jsx,tsx,mdx}",
     ],
     theme: {
-        extend: {
-            colors: {
-                background: "var(--background)",
-                foreground: "var(--foreground)",
-                /* Lume espone superfici opache, inchiostro e segnali clinici. */
-                ink: "var(--lume-ink)",
-                muted: "var(--lume-ink-muted)",
-                primary: "var(--lume-accent)",
-                accent: "var(--lume-accent)",
-                plum: "var(--lume-signal-plum)",
-                warning: "var(--lume-signal-warning)",
-                critical: "var(--lume-signal-critical)",
-                success: "var(--lume-signal-success)",
-            },
-            fontSize: {
-                /* @Codex WUL-UIUX (STREAM E): scala fissa che copre i px scritti a
-                   mano nel codice (text-[8px] .. text-[28px]). Usare text-2xs ecc.
-                   al posto dei valori arbitrari. */
-                "3xs": ["8px", { lineHeight: "1.4" }],
-                "2xs": ["10px", { lineHeight: "1.4" }],
-                "xs+": ["11px", { lineHeight: "1.45" }],
-                micro: ["9px", { lineHeight: "1.35" }],
-            },
+        fontSize: {
+            xs: ['0.75rem', { lineHeight: '1.5' }],
+            sm: ['0.8125rem', { lineHeight: '1.5' }],
+            base: ['0.875rem', { lineHeight: '1.5' }],
+            lg: ['0.9375rem', { lineHeight: '1.5' }],
+            xl: ['1.625rem', { lineHeight: '1.2' }],
+            '2xl': ['1.625rem', { lineHeight: '1.2' }],
+            '3xl': ['1.625rem', { lineHeight: '1.2' }],
+            '4xl': ['1.625rem', { lineHeight: '1.2' }],
+        },
+        fontWeight: {
+            thin: '400', extralight: '400', light: '400', normal: '400', medium: '400',
+            semibold: '600', bold: '600', extrabold: '600', black: '600',
         },
     },
     plugins: [

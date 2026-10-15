@@ -85,7 +85,7 @@ export default function SettingsDangerZonePage() {
                             autoComplete="off"
                             spellCheck={false}
                             data-testid="danger-zone-confirm-input"
-                            className="mt-1 w-full max-w-xs rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100 dark:placeholder:text-red-100/60"
+                            className="mt-1 w-full max-w-xs rounded-[12px] border border-red-200 bg-white/90 px-3 py-2 font-sans text-base text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-red-300 dark:border-red-500/30 dark:bg-red-950/30 dark:text-red-100 dark:placeholder:text-red-100/60"
                         />
                     </label>
 
@@ -93,7 +93,7 @@ export default function SettingsDangerZonePage() {
                         onClick={resetOnboarding}
                         disabled={!confirmed || isResetting}
                         data-testid="danger-zone-reset-button"
-                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-600 shadow-sm transition-[border-color,background-color,color] hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-red-600 dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600 dark:disabled:hover:bg-red-950/10 dark:disabled:hover:text-red-200"
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-semibold text-red-600 shadow-sm transition-[border-color,background-color,color] hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white disabled:hover:text-red-600 dark:border-red-500/30 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-600 dark:disabled:hover:bg-red-950/10 dark:disabled:hover:text-red-200"
                     >
                         {isResetting ? 'Reset in corso...' : 'Ripeti configurazione iniziale'}
                     </button>

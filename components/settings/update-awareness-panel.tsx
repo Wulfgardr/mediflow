@@ -84,7 +84,7 @@ export default function UpdateAwarenessPanel() {
                         <p>
                             Canale {status.channel}
                         </p>
-                        {isDismissed ? <p className="text-[11px] font-medium">Avviso rimandato per questa versione.</p> : null}
+                        {isDismissed ? <p className="text-xs font-medium">Avviso rimandato per questa versione.</p> : null}
                         {status.notes[0] ? <p><b style={{ color: 'var(--lume-ink)' }}>{status.changelogTitle || 'Changelog'}:</b> {status.notes[0]}</p> : null}
                     </>
                 ) : (

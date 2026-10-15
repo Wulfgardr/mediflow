@@ -38,7 +38,7 @@ function LiveDocumentReviewArea({
       <header className={styles.header}>
         <div>
           <p className={styles.caption}>Revisione documentale</p>
-          <h1 className={styles.title}>Evidenza, decisione e prossimo passo</h1>
+          <h1 className={styles.title}>Evidenza, decisione e prossimo passo<span aria-hidden="true">.</span></h1>
           <p className={styles.subtitle}>
             {patient
               ? `Un solo flusso di revisione per ${patient.name}, con provenienza e responsabilità leggibili.`

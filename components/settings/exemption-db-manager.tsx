@@ -68,7 +68,7 @@ export default function ExemptionDbManager() {
                 <Database aria-hidden="true" className="h-6 w-6 text-emerald-600" />
                 <div>
                     <p className="section-kicker">Repertorio amministrativo</p>
-                    <h2 className="text-lg font-bold">Codifiche Esenzioni</h2>
+                    <h2 className="text-lg font-semibold">Codifiche Esenzioni</h2>
                     <p className="text-sm">{status ? `${status.count.toLocaleString()} codici nel repertorio` : 'Conteggio non disponibile'}</p>
                 </div>
             </div>

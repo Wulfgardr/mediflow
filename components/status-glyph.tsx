@@ -82,7 +82,7 @@ export function StatusGlyph({ kind, label, className, tone = 'semantic' }: Statu
     return (
         <span
             className={cn(
-                'status-glyph inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-tight',
+                'status-glyph inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold tracking-tight',
                 tone === 'neutral'
                     ? 'border-[color:color-mix(in_srgb,var(--lume-ink)_18%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'
                     : glyph.className,
