@@ -66,7 +66,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // The admitted source payload stays immutable across requests and restarts.
   // Next retains its in-memory cache and immutable build seeds; no disk ISR/image cache.
-  experimental: { isrFlushToDisk: false },
+  experimental: { isrFlushToDisk: false, proxyClientMaxBodySize: Math.ceil(25 * 1024 * 1024 / 3) * 4 + 16384 },
   /* @Codex */
   outputFileTracingIncludes: {
     "/*": [

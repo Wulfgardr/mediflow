@@ -198,12 +198,21 @@ bozza. Il codice mantiene la propria codifica e non compila automaticamente
 il campo ISO. Salva solo dopo la revisione clinica. Una revisione cambiata
 richiede una nuova scelta. Modificare manualmente la descrizione nella bozza
 annulla la selezione dal catalogo. La prescrizione conserva uno snapshot della
-voce, della fonte e dei riferimenti agli originali presenti al salvataggio;
-gli import successivi non lo modificano. Le prescrizioni precedenti restano
+voce, dei metadati del suo import e dei riferimenti agli originali allegati a
+quell’import al momento del salvataggio; gli import successivi non lo modificano. Le prescrizioni precedenti restano
 leggibili e non ricevono provenienze ricostruite automaticamente.
 
 Originali, catalogo e snapshot di provenienza sono in chiaro nel database
 locale; la descrizione clinica segue la cifratura dei campi esistenti. Il backup
-web e quello schedulato includono gli originali; il ripristino è atomico.
+web e quello schedulato includono gli originali conservati come BLOB SQLite;
+il ripristino è atomico. Se un originale referenziato manca o non corrisponde
+a fonte, import, hash o dimensione dichiarati, il backup e il ripristino sono
+rifiutati prima di modificare l’archivio di destinazione.
 Un originale mancante o alterato non viene restituito come verificato. Gli
 aggiornamenti degli originali richiedono una nuova allegazione esplicita.
+
+I codici assenti da un nuovo import conservano i metadati e gli originali del
+proprio import. I nuovi allegati appartengono all'import corrente della fonte.
+Ridurre il limite configurato per gli upload non impedisce di scaricare gli
+originali già conservati. Il client Apple attuale ignora lo snapshot di
+provenienza e non offre la gestione delle fonti.

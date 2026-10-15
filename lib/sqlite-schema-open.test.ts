@@ -241,6 +241,7 @@ test('migrazione da versione 3 conserva originali verificati, ricevute e fonte d
         db.close();
         const opened = openVersionedSqliteDatabase(w.file);
         assert.equal(opened.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+        assert.equal((opened.prepare('PRAGMA table_info(prosthetics_catalog_documents)').all() as { name: string; type: string }[]).find(column => column.name === 'bytes')?.type, 'BLOB');
         const migrated = createProstheticsCatalog(opened);
         assert.equal(migrated.status().sourceCount, 1); assert.equal(migrated.search('').entries[0].code, entry.code);
         assert.deepEqual(opened.prepare('SELECT * FROM prosthetics_catalog_receipts').get(), receipt);

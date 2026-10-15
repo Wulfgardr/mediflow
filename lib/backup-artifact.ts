@@ -1,4 +1,3 @@
-import { isProstheticsSnapshot } from './reference-data/prosthetics-snapshot';
 import { types } from 'node:util';
 import { assertBackupAuditSnapshots, backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
 /* @Codex */
@@ -774,15 +773,11 @@ async function assertCollectionReferences(
         }
     }
 
-    for (const prescription of payload.prostheticPrescriptions ?? []) {
-        if (prescription.catalogSnapshot !== undefined && prescription.catalogSnapshot !== null && !isProstheticsSnapshot(prescription.catalogSnapshot))
-            throw new BackupArtifactError('invalid-manifest', 'Prosthetics prescription snapshot is invalid.');
-    }
     /* @Codex Reject unsupported or inconsistent exemption receipts before restore/export. */
     try { assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Exemption import receipts are invalid or unsupported.'); }
     /* @Codex */
-    try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? []); }
+    try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);

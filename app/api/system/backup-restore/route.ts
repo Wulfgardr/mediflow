@@ -1,3 +1,4 @@
+import { serializeProstheticsDocument } from '@/lib/reference-data/prosthetics-catalog-backup';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
@@ -155,7 +156,7 @@ function buildBackupDataset(): BackupDataset {
             prostheticsCatalogEntries: tx.select().from(prostheticsCatalogEntries).all(),
             prostheticsCatalogReceipts: tx.select().from(prostheticsCatalogReceipts).all(),
             prostheticsCatalogSources: tx.select().from(prostheticsCatalogSources).all(),
-            prostheticsCatalogDocuments: tx.select().from(prostheticsCatalogDocuments).all(),
+            prostheticsCatalogDocuments: tx.select().from(prostheticsCatalogDocuments).all().map(serializeProstheticsDocument),
             messages: sortBackupRows(filterRowsByReference(messagesRows, 'conversationId', conversationIds)),
             observations: sortBackupRows(filterRowsByReference(observationsRows, 'patientId', patientIds)),
             patients: sortBackupRows(enrichedPatients),

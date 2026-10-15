@@ -1,4 +1,3 @@
-import { isProstheticsSnapshot } from './reference-data/prosthetics-snapshot';
 /* @Codex */
 import { eq } from 'drizzle-orm';
 /* @Codex */
@@ -217,7 +216,11 @@ function insertRows<T extends Record<string, unknown>>(
     rows: T[],
 ): void {
     if (rows.length === 0) return;
-    for (const group of chunk(rows, 250)) {
+    const insertableRows: Record<string, unknown>[] = table === prostheticsCatalogDocuments ? rows.map(row => {
+        const { base64, ...metadata } = row;
+        return { ...metadata, bytes: Buffer.from(base64 as string, 'base64') };
+    }) : rows;
+    for (const group of chunk(insertableRows, 250)) {
         /* @Codex Repertory dates are declared source text, not clinical timestamp columns. */
         runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
     }
@@ -372,11 +375,8 @@ export function restoreBackupArtifact(
     beforeMutation: BackupRestoreMutationFence,
 ): BackupRestoreResult {
     assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
-    assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? [], artifact.payload.prostheticsCatalogSources ?? [], artifact.payload.prostheticsCatalogDocuments ?? []);
-    for (const prescription of artifact.payload.prostheticPrescriptions ?? []) {
-        if (prescription.catalogSnapshot !== undefined && prescription.catalogSnapshot !== null && !isProstheticsSnapshot(prescription.catalogSnapshot))
-            throw new Error('PROSTHETICS_SNAPSHOT_BACKUP_INVALID');
-    }
+    assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? [], artifact.payload.prostheticsCatalogSources ?? [], artifact.payload.prostheticsCatalogDocuments ?? [], artifact.payload.prostheticPrescriptions ?? []);
+
     const coverage = backupAuditCoverage(artifact.payload);
     let audit: BackupRestoreResult['audit'] = { coverage, inserted: 0, reused: 0 };
     revokeAttachmentExtractionLocatorGeneration();

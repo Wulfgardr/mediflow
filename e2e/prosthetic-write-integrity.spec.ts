@@ -1,6 +1,7 @@
 /* @Codex: synthetic ordinary Web workflow, real HTTP and SQLite readback. */
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
+import { createHash } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
@@ -89,4 +90,31 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     expect(JSON.stringify(deleted.events)).not.toContain('Motivazione sintetica');
     expect(JSON.stringify(deleted.events)).not.toContain('ENC:');
     await testInfo.attach('readback.json', { contentType: 'application/json', body: JSON.stringify({ id, events: deleted.events, hardDeleted: true }) });
+});
+
+
+test('HTTP attraverso il proxy conserva originali protesici da 8 e 25 MiB', async ({ page, baseURL }) => {
+    test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
+    const dir = process.env.MEDIFLOW_DATA_DIR, url = new URL(baseURL!);
+    if (!dir || !isAbsolute(dir) || url.hostname !== '127.0.0.1' || !url.port || url.port === '3000') throw new Error('Dedicated synthetic data and loopback port required');
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const body = { sourceName: 'trasporto-inventato.csv', base64: Buffer.from('codice_sistema,codice,descrizione,versione,fonte,ambito,data_inizio,data_fine\nSistema inventato,TRASPORTO,Ausilio inventato,v1,Fonte trasporto sintetica,Dimostrazione,,\n').toString('base64') };
+    const preview = await page.request.post('/api/prosthetics/catalog/preview', { data: body }); expect(preview.status()).toBe(200);
+    const p = await preview.json(); expect(p.proof).toBeTruthy();
+    const commit = await page.request.post('/api/prosthetics/catalog/commit', { data: { ...body, proof: p.proof, acceptSubset: true } }); expect(commit.status()).toBe(200);
+    const sourcesResponse = await page.request.get('/api/prosthetics/catalog/sources'); expect(sourcesResponse.status()).toBe(200);
+    const sources = await sourcesResponse.json();
+    const sourceId = sources.sources.find((source: { name: string }) => source.name === 'Fonte trasporto sintetica').id;
+    for (const mib of [8, 25]) {
+        const bytes = Buffer.alloc(mib * 1024 * 1024, mib);
+        const status = await page.request.get('/api/prosthetics/catalog/status'); expect(status.status()).toBe(200);
+        const upload = await page.request.post('/api/prosthetics/catalog/documents', { data: { sourceId, revision: (await status.json()).revision, name: `originale-${mib}.bin`, base64: bytes.toString('base64'), page: null } });
+        expect(upload.status(), await upload.text()).toBe(200);
+        const doc = await upload.json(); expect(doc.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
+        const download = await page.request.get(`/api/prosthetics/catalog/documents?id=${doc.id}&sha256=${doc.sha256}`); expect(download.status()).toBe(200);
+        expect(await download.body()).toEqual(bytes);
+        const db = new Database(join(dir, 'medical.db'), { readonly: true, fileMustExist: true });
+        try { expect(db.prepare('SELECT typeof(bytes) AS type,length(bytes) AS size FROM prosthetics_catalog_documents WHERE id=?').get(doc.id)).toEqual({ type: 'blob', size: bytes.length }); }
+        finally { db.close(); }
+    }
 });

@@ -9,18 +9,18 @@ import { fileURLToPath } from 'node:url';
 // Reviewed source identity, independent of the checkout used to run this gate.
 // Changes to this closure require review and a deliberate update of these pins.
 export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
-  ['scripts/run-scheduled-backup.mjs', 'a8ebb56baf9dd2657a966cb89a79d31accbe6dee0d486d66edc2d6dc751058cc'],
+  ['scripts/run-scheduled-backup.mjs', 'b55314187b52fa3555a695f7da5eab679712fdfb94ccda96e3ada3a89b8421b0'],
   ['scripts/scheduled-backup-date-fields.mjs', '91779e9df7f34bd71bce6329ca1577070cfb3a12fbc55365272982d8fb4fb1a0'],
   ['lib/sqlite-maintenance-admission.mjs', '03e5e03ca8f32aa28fd7bab6f9236e81bbc12d7d2bf6e59589852624fc909d81'],
   ['lib/sqlite-durability.mjs', '75dc15f8a383bf040d6a0b494a2889d136be248772f5ddca7cd29651d5a4a103'],
   ['lib/backup-audit.ts', 'd58f0e13136e8be04823839f4a61394bb85404da9603803f9a0b27c396243c56'],
   ['lib/exemption-import-receipt.ts', '894cc749fa4f512f65d10e3ff66f0a445b129cd23c56627bfe0c549a932c1e3a'],
   ['lib/exemption-import-contract.ts', '12b97b4a54bca6a3d56103f442035b81d5269ec276789ee2febc0560e533b0e0'],
-  ['lib/reference-data/prosthetics-catalog-backup.ts', '7a707a8c4127d551ceff7c43aa94297bea8b6532c05064d2b3d8a35af426edf6'],
+  ['lib/reference-data/prosthetics-catalog-backup.ts', '5e267385e6a62d0eb3bb2151234f46c2dbf054d18a88bca20f45d965d494808b'],
   ['lib/reference-data/prosthetics-import-options.ts', '65140db5ea1d443573f9c7badbdd20ec0b2d0daa25bff5f364bf8f2b06418c50'],
-  ['lib/reference-data/prosthetics-snapshot.ts', 'ef365b866df4ad673ce2bebce51ea3d610dc59329066bdab3e708e056ee285fd'],
+  ['lib/reference-data/prosthetics-snapshot.ts', 'a32dbdc57e1991eccd9a28324718fb280cde9364e015e7694e7d1522bb638b94'],
   ['lib/attachment-path.ts', 'd9f3b7edb6ae32a4a66f85f691c071f63d1381a8d7221fdeed9776923d90b968'],
-  ['lib/reference-data/prosthetics-catalog-contract.ts', 'ca2b96ed363b4163b41c1dbc3bfa61a92126b46d1c4483f2ab0c1d36361cafc3'],
+  ['lib/reference-data/prosthetics-catalog-contract.ts', '2ad9638759dd09ee76aea62bf4d53986d13ad818e38aeefb97b2b415f875318d'],
 ].map(([file, sha256]) => Object.freeze({ path: file, sha256 })));
 
 // Import closure from lock-pinned better-sqlite3 12.6.2, bindings 1.5.0 and

@@ -167,7 +167,7 @@ test('originali autenticati: nome sicuro, integrità, negazione senza sessione e
     restoreBackupArtifact(scheduled, () => true);
     assert.deepEqual(service.document(doc.id, doc.sha256).bytes, original); assert.deepEqual(service.sources(), snapshotBefore);
     active();
-    db.prepare('UPDATE prosthetics_catalog_documents SET base64=? WHERE id=?').run(Buffer.from('sostituito').toString('base64'), doc.id);
+    db.prepare('UPDATE prosthetics_catalog_documents SET bytes=? WHERE id=?').run(Buffer.from('sostituito'), doc.id);
     assert.equal((await route('documents', new Request(url))).status, 409);
     db.prepare('DELETE FROM prosthetics_catalog_documents WHERE id=?').run(doc.id);
     assert.equal((await route('documents', new Request(url))).status, 404);
@@ -199,4 +199,53 @@ test('mappatura HTTP mantiene hash dei bytes e metadati nel backup e respinge op
     const exported = await parseBackupArtifact(await (await backupRoute.GET()).json());
     const mappedSource = exported.payload.prostheticsCatalogSources!.find(source => source.name === 'Fonte mappata');
     assert.equal(mappedSource?.notes, 'Solo fixture'); assert.equal(mappedSource?.date, '2026-10-15');
+});
+
+
+test('regressione: export, parsing e restore negano snapshot con originali mancanti o discordanti prima della mutazione', async () => {
+    active();
+    const sourceId = service.sources().sources[0].id;
+    const doc = service.addDocument({ sourceId, revision: service.status().revision, name: 'riferimento.pdf', base64: Buffer.from('originale per snapshot').toString('base64'), page: null }, () => {});
+    const entry = service.search('', sourceId).entries[0];
+    const selected = service.snapshot({ entryId: entry.id, revision: service.status().revision });
+    const exported = await (await backupRoute.GET()).json();
+    exported.payload.patients = [{ id: 'synthetic-patient' }]; exported.manifest.recordCounts.patients = 1;
+    exported.payload.prostheticPrescriptions = [{ id: 'synthetic-prescription', patientId: 'synthetic-patient', catalogSnapshot: selected }];
+    exported.manifest.recordCounts.prostheticPrescriptions = 1; rehash(exported);
+    const before = snapshot();
+    for (const field of ['missing','sourceId','sha256','size'] as const) {
+        const broken = structuredClone(exported);
+        const ref = broken.payload.prostheticPrescriptions[0].catalogSnapshot.documents.find((item: { id: string }) => item.id === doc.id);
+        if (field === 'missing') broken.payload.prostheticsCatalogDocuments = broken.payload.prostheticsCatalogDocuments.filter((item: { id: string }) => item.id !== doc.id);
+        else if (field === 'sourceId') { ref.sourceId = 'altra-fonte'; broken.payload.prostheticPrescriptions[0].catalogSnapshot.source.id = 'altra-fonte'; }
+        else ref[field] = field === 'size' ? ref.size + 1 : 'f'.repeat(64);
+        broken.manifest.recordCounts.prostheticsCatalogDocuments = broken.payload.prostheticsCatalogDocuments.length; rehash(broken);
+        await assert.rejects(serializeBackupArtifact(broken.payload), /Prosthetics/u);
+        await assert.rejects(parseBackupArtifact(broken), /Prosthetics/u);
+        let fenceCalled = false;
+        assert.throws(() => restoreBackupArtifact(broken, () => { fenceCalled = true; return true; }), /PROSTHETICS/u);
+        assert.equal(fenceCalled, false); assert.deepEqual(snapshot(), before);
+    }
+});
+
+
+test('regressione trasporto: la clonazione del proxy Next conserva originali da 8 e 25 MiB', async () => {
+    const { Readable } = await import('node:stream');
+    const { getCloneableBody } = await import('next/dist/server/body-streams.js');
+    const nextConfig = requireCurrent('../../next.config.ts').default as import('next').NextConfig;
+    active();
+    if (!service.status().count) { const p = service.preview(bytes, body.sourceName, 'synthetic'); service.commit({ bytes, sourceName: body.sourceName, proof: p.proof!, acceptSubset: true }, 'synthetic', () => {}); }
+    for (const size of [8, 25]) {
+        const bytes = Buffer.alloc(size * 1024 * 1024, size);
+        const encoded = Buffer.from(JSON.stringify({ sourceId: service.sources().sources[0].id, revision: service.status().revision, name: `originale-${size}.bin`, base64: bytes.toString('base64'), page: null }));
+        const incoming = Readable.from((function* () { for (let i = 0; i < encoded.length; i += 65536) yield encoded.subarray(i, i + 65536); })());
+        const cloned = getCloneableBody(incoming as import('node:http').IncomingMessage, nextConfig.experimental?.proxyClientMaxBodySize as number | undefined);
+        const chunks: Buffer[] = [];
+        for await (const chunk of cloned.cloneBodyStream()) chunks.push(Buffer.from(chunk));
+        assert.equal(Buffer.concat(chunks).length, encoded.length);
+        await cloned.finalize();
+        const req = new Request('http://localhost/api/prosthetics/catalog/documents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: Buffer.concat(chunks) });
+        const response = await route('documents', req); assert.equal(response.status, 200, await response.clone().text());
+        const doc = await response.json(); assert.deepEqual(service.document(doc.id).bytes, bytes);
+    }
 });

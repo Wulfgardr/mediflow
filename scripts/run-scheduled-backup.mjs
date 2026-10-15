@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-import { isProstheticsSnapshot } from '../lib/reference-data/prosthetics-snapshot.ts';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
 /* @Codex */
-import { assertProstheticsCatalogBackup } from '../lib/reference-data/prosthetics-catalog-backup.ts';
+import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '../lib/reference-data/prosthetics-catalog-backup.ts';
 
 import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
@@ -157,11 +156,8 @@ export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
 export async function serializeBackupArtifact(payload, createdAt = new Date()) {
   /* @Codex Same receipt validation and ordering as the web export. */
   assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []);
-  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? []);
-  for (const prescription of payload.prostheticPrescriptions ?? []) {
-    if (prescription.catalogSnapshot !== undefined && prescription.catalogSnapshot !== null && !isProstheticsSnapshot(prescription.catalogSnapshot))
-      throw new Error('PROSTHETICS_SNAPSHOT_BACKUP_INVALID');
-  }
+  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []);
+
   const canonicalPayload = {
     ...canonicalizeHeadlessSoapActiveRoleAttestations(payload),
     prostheticsCatalogEntries: payload.prostheticsCatalogEntries ?? [],
@@ -448,7 +444,7 @@ function buildDataset(db, backupCollections) {
         collection,
         hasTable(db, BACKUP_TABLES[collection])
           ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) =>
-            collection === 'auditEvents' ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
+            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : collection === 'auditEvents' ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
           : [],
       ]),
     );
