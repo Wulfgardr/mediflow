@@ -191,7 +191,14 @@ la richiesta potrebbe essere già stata completata.
 Una riduzione sotto il 90% delle confezioni locali richiede una conferma
 aggiuntiva. Il catalogo viene conservato finché non confermi; per aggiornamenti
 via Internet il file viene scaricato nuovamente e deve essere identico a quello
-controllato. Gli altri errori di validazione non possono essere forzati.
+controllato e il catalogo locale deve essere rimasto invariato. La verifica
+vale anche se il secondo file non presenta più una riduzione sotto soglia.
+Se file o catalogo sono cambiati, rileggi lo stato e ripeti l'operazione.
+Gli altri errori di validazione non possono essere forzati.
+
+Durante una verifica o importazione, altri caricamenti e lo svuotamento del
+catalogo vengono rifiutati come operazione già in corso. Attendi il termine
+e ripeti l'azione.
 
 Il CSV deve contenere AIC, denominazione, ATC e principi attivi. La copertura
 è descrittiva e parziale: FORNITURA e STATO_AMMINISTRATIVO non sono conservati;

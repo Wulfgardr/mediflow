@@ -1,3 +1,4 @@
+import { assertEmptyAifaRequestBody } from '@/lib/aifa-catalog-request';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -16,37 +17,6 @@ export const runtime = 'nodejs';
 export async function GET() {
     if (!await requireSession()) return unauthorizedResponse();
     return Response.json({ progress: getAifaDownloadProgress() }, { headers: { 'Cache-Control': 'no-store' } });
-}
-
-// Inspect without buffering: cap empty chunks and time, and never await stream cancellation.
-async function assertEmptyBody(request: Request, signal: AbortSignal): Promise<void> {
-    signal.throwIfAborted();
-    if (!request.body) return;
-    const reader = request.body.getReader();
-    const invalid = () => new AifaUpdateError('La richiesta AIFA non accetta parametri o contenuti', 400);
-    let rejectRead!: (reason: unknown) => void;
-    const stopped = new Promise<never>((_resolve, reject) => { rejectRead = reject; });
-    const cancel = () => rejectRead(signal.reason);
-    signal.addEventListener('abort', cancel, { once: true });
-    const deadline = Date.now() + 1_000;
-    const timer = setTimeout(() => rejectRead(invalid()), 1_000);
-    try {
-        for (let reads = 0; reads < 32; reads++) {
-            signal.throwIfAborted();
-            if (Date.now() >= deadline) throw invalid();
-            const chunk = await Promise.race([reader.read(), stopped]);
-            signal.throwIfAborted();
-            if (Date.now() >= deadline) throw invalid();
-            if (chunk.done) return;
-            if (chunk.value.byteLength !== 0) throw invalid();
-        }
-        throw invalid();
-    } finally {
-        clearTimeout(timer);
-        signal.removeEventListener('abort', cancel);
-        void reader.cancel().catch(() => undefined);
-        reader.releaseLock();
-    }
 }
 
 export async function POST(request: Request) {
@@ -77,7 +47,7 @@ export async function POST(request: Request) {
             if (!use || !commitResourceUse(use)) throw new AifaUpdateError('Sessione non più valida', 401);
         };
         assertSession();
-        await assertEmptyBody(request, controller.signal);
+        await assertEmptyAifaRequestBody(request, controller.signal);
         assertSession();
         assertAifaNetworkAllowed();
         const confirmedReduction = request.headers.get('x-mediflow-aifa-confirm-reduction') ?? undefined;

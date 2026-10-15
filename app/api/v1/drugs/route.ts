@@ -1,5 +1,6 @@
 // Codex: created 2026-02-06
 import { NextResponse } from 'next/server';
+import { AifaUpdateError } from '@/lib/aifa-catalog-lock';
 import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { clearAifaCatalog, replaceUnverifiedDrugCatalog } from '@/lib/aifa-catalog-server';
 import { drugs } from '@/lib/schema';
@@ -77,6 +78,9 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, count: items.length });
     } catch (error) {
+        if (error instanceof AifaUpdateError && error.status === 409) {
+            return NextResponse.json({ error: 'Operazione AIFA già in corso' }, { status: 409 });
+        }
         console.error('API POST /api/v1/drugs error:', error);
         return NextResponse.json({ error: 'Failed to import drugs' }, { status: 500 });
     }
@@ -90,6 +94,9 @@ export async function DELETE(request: Request) {
         clearAifaCatalog();
         return NextResponse.json({ success: true });
     } catch (error) {
+        if (error instanceof AifaUpdateError && error.status === 409) {
+            return NextResponse.json({ error: 'Operazione AIFA già in corso' }, { status: 409 });
+        }
         console.error('API DELETE /api/v1/drugs error:', error);
         return NextResponse.json({ error: 'Failed to clear drugs' }, { status: 500 });
     }

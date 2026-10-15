@@ -99,3 +99,18 @@ test('remote comparison never calls a legacy or metadata-free catalog unchanged'
     assert.equal(compareAifaSource({ ...remote, outcome: 'unavailable' }, manifest, 3).outcome, 'unavailable');
     assert.deepEqual(parseStoredAifaCatalogManifest(JSON.stringify(manifest)), manifest);
 });
+
+test('remote ETag comparison uses weak equivalence and preserves opaque tag case', async () => {
+    const { compareAifaSource } = await import('./aifa-catalog-source');
+    const { AIFA_DOWNLOAD_URL } = await import('./aifa-catalog');
+    const manifest = buildAifaCatalogManifest({ sourceUrl: AIFA_DOWNLOAD_URL, version: 'synthetic-weak', downloadedAt: '2026-10-15',
+        etag: '"same"' }, { sha256: 'a'.repeat(64), fileName: 'synthetic.csv', rowCount: 3 });
+    const remote = { checkedAt: '2026-10-15T10:00:00Z', outcome: 'unchanged' as const };
+    for (const local of ['"same"', 'W/"same"']) {
+        for (const etag of ['"same"', 'W/"same"']) {
+            assert.equal(compareAifaSource({ ...remote, etag }, { ...manifest, etag: local }, 3).outcome, 'unchanged');
+        }
+        assert.equal(compareAifaSource({ ...remote, etag: 'W/"Same"' }, { ...manifest, etag: local }, 3).outcome, 'available');
+        assert.equal(compareAifaSource({ ...remote, etag: 'W/"different"' }, { ...manifest, etag: local }, 3).outcome, 'available');
+    }
+});
