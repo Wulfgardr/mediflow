@@ -18,6 +18,7 @@ struct ClinicalCreationDisclosure<Content: View>: View {
                 .frame(minHeight: 44, alignment: .leading)
                 #endif
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier(identifier)
     }
 }
