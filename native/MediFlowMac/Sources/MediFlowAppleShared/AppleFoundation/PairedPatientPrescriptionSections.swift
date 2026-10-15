@@ -202,6 +202,7 @@ struct PairedPatientPrescriptionSections: View {
                         TextField("Sistema codice", text: $model.newServiceCodeSystem)
                             .accessibilityIdentifier("new-service-code-system")
                         TextField("Codice", text: $model.newServiceCode)
+                            .codice()
                             .accessibilityIdentifier("new-service-code")
                     }
                     Picker("Stato", selection: $model.newServiceStatus) {
@@ -359,6 +360,7 @@ struct PairedPatientPrescriptionSections: View {
                         .accessibilityIdentifier("new-prosthetic-description")
                     HStack(spacing: 8) {
                         TextField("Codice ISO", text: $model.newProstheticISOCode)
+                            .codice()
                             .accessibilityIdentifier("new-prosthetic-iso-code")
                         Picker("Categoria", selection: $model.newProstheticCategory) {
                             ForEach(PairedProstheticPrescriptionCategory.allCases) { category in
