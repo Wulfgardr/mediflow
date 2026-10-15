@@ -808,7 +808,7 @@ struct AgendaWorkspaceView: View {
     }
 
     private func pillColor(_ pill: AgendaPill) -> Color {
-        switch pill { case .coral: PlatformColors.signal(.critical); case .yellow: PlatformColors.signal(.attention); case .blue: PlatformColors.freshInk; case .green: PlatformColors.signal(.positive); case .muted: .secondary }
+        switch pill { case .coral: PlatformColors.signal(.critical); case .yellow: PlatformColors.signal(.attention); case .blue: PlatformColors.secondaryInk; case .green: PlatformColors.signal(.positive); case .muted: PlatformColors.secondaryInk }
     }
 }
 

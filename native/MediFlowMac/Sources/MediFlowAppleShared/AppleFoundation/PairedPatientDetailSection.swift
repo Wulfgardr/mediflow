@@ -820,7 +820,7 @@ struct PairedPatientDetailSection: View {
                     // read. Same weight for both made the tile a uniform grey
                     // block where nothing led.
                     .font(.caption)
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(PlatformColors.secondaryInk)
                     #else
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -844,19 +844,10 @@ struct PairedPatientDetailSection: View {
         .frame(maxWidth: .infinity)
         #if os(macOS)
         .padding(.vertical, 10)
-        // Concentric with the card that contains it: the card rounds at
-        // ClinicalChartMetrics.cardRadius and insets its content by
-        // cardPadding, so a tile flush with that inset rounds at the difference.
-        // Given the same radius as its parent, a nested box reads as pasted on
-        // rather than sitting inside.
-        .background(
-            Color.secondary.opacity(0.07),
-            in: RoundedRectangle(cornerRadius: ClinicalChartMetrics.innerRadius, style: .continuous)
-        )
         #else
         .padding(.vertical, 6)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
         #endif
+        .overlay(alignment: .bottom) { PlatformColors.separator.frame(height: 1) }
     }
 
     // Quadro clinical-signals strip (parity with the web "segnali clinici"): counts

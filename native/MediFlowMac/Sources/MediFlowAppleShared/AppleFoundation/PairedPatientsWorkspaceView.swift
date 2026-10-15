@@ -1152,7 +1152,7 @@ struct PairedPatientsWorkspaceView: View {
         // gives the label back to the content; `.tint` still drives the chevron,
         // which is the part that really is a control.
         .foregroundStyle(.primary)
-        .tint(.accentColor)
+        .tint(PlatformColors.freshInk)
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -1567,7 +1567,7 @@ private struct MacPatientSectionNavigation: View {
                         .padding(.vertical, 8)
                         .overlay(alignment: .bottom) {
                             Rectangle()
-                                .fill(selection == section ? Color.accentColor : Color.clear)
+                                .fill(selection == section ? PlatformColors.freshInk : Color.clear)
                                 .frame(height: 2)
                         }
                         .contentShape(Rectangle())
