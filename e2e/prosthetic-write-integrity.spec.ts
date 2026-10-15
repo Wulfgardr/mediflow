@@ -51,7 +51,9 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     // @Codex: a rejected audit must keep the draft and permit a deliberate retry.
     const faultDb = new Database(join(dir, 'medical.db'), { fileMustExist: true });
     try {
+        expect(faultDb.prepare('SELECT id FROM patients WHERE id=?').get(patientId)).toEqual({ id: patientId });
         faultDb.exec("CREATE TRIGGER synthetic_prosthetic_ui_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='prosthetic.prescription.created' BEGIN SELECT RAISE(IGNORE); END");
+        expect(faultDb.prepare("SELECT name FROM sqlite_schema WHERE type='trigger' AND name='synthetic_prosthetic_ui_audit'").get()).toEqual({ name: 'synthetic_prosthetic_ui_audit' });
         const failed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/prosthetic-prescriptions' && r.request().method() === 'POST');
         await pane.getByRole('button', { name: 'Salva voce', exact: true }).click();
         expect((await failed).status()).toBe(500);
@@ -134,9 +136,18 @@ test('HTTP attraverso il proxy conserva originali protesici da 8 e 25 MiB', asyn
         expect(restored.status(), await restored.text()).toBe(200);
         expect((await restored.json()).success).toBe(true);
         for (const original of originals) {
-            const row = db.prepare('SELECT bytes FROM prosthetics_catalog_documents WHERE id=?').get(original.id) as { bytes: Buffer };
-            expect(row.bytes.length).toBe(original.size);
-            expect(createHash('sha256').update(row.bytes).digest('hex')).toBe(original.sha256);
+            const row = db.prepare('SELECT bytes FROM prosthetics_catalog_documents WHERE id=?').get(original.id) as { bytes: Buffer } | undefined;
+            expect(row, `Originale ripristinato assente nella connessione SQLite: ${original.id}`).toBeDefined();
+            expect(row!.bytes.length).toBe(original.size);
+            expect(createHash('sha256').update(row!.bytes).digest('hex')).toBe(original.sha256);
         }
     } finally { db.close(); }
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    for (const original of originals) {
+        const download = await page.request.get(`/api/prosthetics/catalog/documents?id=${original.id}&sha256=${original.sha256}`);
+        expect(download.status()).toBe(200);
+        const bytes = await download.body();
+        expect(bytes.length).toBe(original.size);
+        expect(createHash('sha256').update(bytes).digest('hex')).toBe(original.sha256);
+    }
 });

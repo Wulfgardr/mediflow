@@ -251,6 +251,9 @@ Su macOS e Linux il bootstrap normalizza a `0600` soltanto i file SQLite
 regolari dell'utente corrente. Non corregge file non propri, symlink o i permessi
 di una cartella dati personalizzata; l'apertura di file non sicuri resta
 bloccata. Non è una verifica degli ACL Windows né una cifratura del database.
+La correzione avviene per percorso, senza aprire i file, cosi' non rilascia i
+lock delle connessioni SQLite attive; un file sostituito durante la correzione
+viene rifiutato.
 
 - Import diretto XLSX non disponibile: esportare in CSV UTF-8, con virgola o punto e virgola e mappatura esplicita.
 - Nessuna estrazione AI, attestazione normativa o aggiornamento clinico automatico.
