@@ -335,9 +335,11 @@ struct PairedPatientTherapiesSection: View {
             ClinicalFormColumns {
                 ChartGroup("Farmaco e posologia") {
                     TextField("Codice AIC (opzionale)", text: aic)
+                        .codice()
                         .autocorrectionDisabled()
                         .accessibilityIdentifier("\(primaryIdentifier)-aic")
                     TextField("Codice ATC (opzionale)", text: atc)
+                        .codice()
                         .autocorrectionDisabled()
                         .accessibilityIdentifier("\(primaryIdentifier)-atc")
                     TextField("Principio attivo (opzionale)", text: activePrinciple)

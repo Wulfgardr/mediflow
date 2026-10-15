@@ -32,6 +32,8 @@ enum PlatformColors {
     static var freshInk: Color { adaptive { $0.minerale } }
     static var pencil: Color { adaptive { $0.pencil } }
     static var writing: Color { adaptive { $0.writing } }
+    static var selection: Color { adaptive { $0.selection } }
+    static var hover: Color { adaptive { $0.hover } }
     static func signal(_ tone: LumeTone) -> Color { adaptive { LumePalette.tint(for: tone, using: $0) } }
 
 }

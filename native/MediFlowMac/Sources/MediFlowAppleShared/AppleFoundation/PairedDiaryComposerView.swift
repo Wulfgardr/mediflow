@@ -8,6 +8,9 @@ struct PairedDiaryComposerView: View {
     @EnvironmentObject private var recording: VisitRecordingLumeCoordinator
     #endif
     @Binding var confirmsReplacingEntryTemplate: Bool
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.lumeGuardia) private var isGuardia
+    @Environment(\.colorSchemeContrast) private var contrast
     @State private var isCreatingEntry = false
     @State private var hasOpenedVisitDraft = false
     @FocusState private var focusedTitle: TitleField?
@@ -262,7 +265,7 @@ struct PairedDiaryComposerView: View {
                     .modifier(PairedDiaryControlLabel())
             }
             .buttonStyle(.borderedProminent)
-            .tint(PlatformColors.ink)
+            .tint(PlatformColors.freshInk)
             .disabled(!model.canCreateEntry || isListening)
             .accessibilityIdentifier("homebase-create-entry-button")
             if isListening {
@@ -272,6 +275,17 @@ struct PairedDiaryComposerView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(
+            LumePalette.palette(for: colorScheme, isGuardia: isGuardia).writing,
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .overlay {
+            let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(contrast == .increased ? palette.strongRule : palette.draftRule, lineWidth: 1)
+                .allowsHitTesting(false)
         }
         .onAppear { focusedTitle = .newEntry }
     }
