@@ -5,6 +5,33 @@ This file collects MediFlow's relevant changes.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-10-15
+
+MediFlow 0.9.0 è una release sorgente per runtime locale Web e Headless.
+La [pagina della release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
+riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna.
+Le prove storiche conservano la revisione su cui sono state eseguite;
+le decisioni di accettazione sono in [WUL-735](https://linear.app/wulfgardr/issue/WUL-735).
+
+- Consolidamento delle scritture cliniche con validazione, conflitti e audit;
+  protezione locale con passphrase v3 e recupero completo distinto dall'export clinico.
+- Avvio Web e Headless con Node 24, controllo dell'identità del runtime e archivi
+  sintetici separati; interfaccia, documenti e percorsi ordinari rivisti.
+- Profili sorgente: macOS ARM, Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM
+  su Parallels. Le prove delegate sostitutive C15/C20 sono state accettate per
+  questa consegna: non attestano una prova personale né ammissione clinica.
+- Le quarantene `native-filechooser-timeout` e `chromium-no-store-response-abort`
+  sono accettate fino al 23 ottobre 2026 alle 00:00 UTC. I test continuano a
+  eseguire; le cause non sono dichiarate risolte e gli altri errori restano bloccanti.
+
+GitHub fornisce ZIP e TAR.GZ dei sorgenti. L’avvio qualificato richiede un
+checkout Git pulito del tag `v0.9.0` con Node 24; gli archivi privi di `.git`
+non costituiscono un profilo di avvio qualificato.
+App e installer nativi restano fuori da questa release e mantengono i propri
+metadati. AI facoltativa, provider esterni spenti per impostazione predefinita
+e revisione umana restano invariati. La pubblicazione non autorizza l'uso di
+archivi clinici reali: l'ammissione dell'installazione resta una decisione separata.
+
 ## [0.8.6] - 2026-09-07
 
 The feature-complete decision at `c320694c3` remains historical. Independent

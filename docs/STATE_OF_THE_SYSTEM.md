@@ -18,17 +18,24 @@ read_when:
 
 ## Supporto, capacità e protezione correnti
 
-Matrice generale aggiornata l'11 ottobre 2026; le fonti collegate mantengono i contratti del proprio confine.
+Matrice generale aggiornata il 15 ottobre 2026; le fonti collegate mantengono i contratti del proprio confine.
 
-La release pubblicata resta [v0.8.6, sorgente Mac/localhost](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6).
-La **0.9.0 è una candidatura in consolidamento**, non ancora una release né
-un'installazione clinica ammessa. Stato e criteri finiti sono nel
-[programma Linear](https://linear.app/wulfgardr/issue/WUL-717); commit, review e
-controlli restano nelle PR e nella CI.
+**MediFlow 0.9.0 è una release sorgente per runtime locale Web e Headless**. Le prove
+delegate sostitutive C15/C20 sono state accettate per questa consegna;
+non costituiscono una prova personale né ammissione clinica. Le
+[note di rilascio](../CHANGELOG.md#090---2026-10-15) riportano i limiti e le
+quarantene accettate fino al 23 ottobre 2026 alle 00:00 UTC. La
+[pagina della release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
+riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna.
+Stato e criteri sono nel [programma Linear](https://linear.app/wulfgardr/issue/WUL-717);
+commit, review e controlli restano nelle PR e nella CI.
+GitHub fornisce ZIP/TAR.GZ sorgenti; l'avvio qualificato richiede un checkout
+Git pulito del tag `v0.9.0` con Node 24. Gli archivi privi di `.git` non sono
+un profilo di avvio qualificato.
 
 | Ambito | Contenuto e confine dei sorgenti correnti | Stato di consegna e fonte |
 | --- | --- | --- |
-| Profili 0.9.0 | Sorgente, browser localhost e headless con Node 24: macOS, Windows 11 ARM con Node x64 emulato, Omarchy/Arch ARM su Parallels. | Profili scelti, qualifica finale aperta in [C20](https://linear.app/wulfgardr/issue/WUL-735). I runner CI non sostituiscono le macchine dichiarate. |
+| Profili 0.9.0 | Sorgente, browser localhost e headless con Node 24: macOS ARM, Windows 11 ARM con Node x64 emulato, Omarchy/Arch ARM su Parallels. | Le prove tecniche sui profili conservano revisione e ambiente; i runner CI non sostituiscono le macchine dichiarate. L'accettazione delle prove delegate sostitutive in [C20](https://linear.app/wulfgardr/issue/WUL-735) è una decisione distinta e non attesta una prova personale. |
 | App e installer nativi | Percorso separato; un archivio ZIP/TAR.GZ non è un installer firmato. | Previsti nella 0.9.6; gli account v3 non sono ammessi nei client nativi non qualificati. |
 | Cartella ordinaria | Ricerca, revisione e scritture nominate, con conflitti, validazione e audit. AI facoltativa, provider esterni spenti per impostazione predefinita. | [Roster clinico](./clinical-write-roster.md); flussi integrati e usabilità finale in C20, non dedotti dalla compilazione. |
 | Protezione locale | Cifratura applicativa dei soli campi dichiarati; passphrase v3 e kit separato. Identificativi, metadati e alcune copie restano in chiaro. | [Matrice dati a riposo](./data-at-rest-matrix.md) e [policy](../SECURITY.md#chiavi-passphrase-e-recupero); volume cifrato e recupero completo restano verifiche distinte. |
@@ -37,7 +44,7 @@ controlli restano nelle PR e nella CI.
 | Artefatti di runtime | La build da checkout Git pulito prepara un payload fisico comune a Web e Headless. I due avvii verificano membri, byte, identità e Node/ABI/piattaforma prima dell'app; cache Next su disco disabilitata. | [C18](https://linear.app/wulfgardr/issue/WUL-733) conserva qualifica, provenienza e notices. Il registro esterno non è una firma contro la sostituzione degli input fidati, né un controllo continuo durante l'esecuzione. Il launcher nativo resta distinto. |
 | Client e agenti | Operazioni nominate, selezione e permessi; niente SQL generico, percorsi del database o conferme umane delegate all'agente. | [C16](https://linear.app/wulfgardr/issue/WUL-731) distingue trasporto locale, client provato e host/modello esterno non osservato. Non è una promessa che i dati consegnati all'host restino locali. |
 
-**Uso clinico quotidiano: non valutato per la candidata 0.9.0.** Leonardo e il
+**Uso clinico quotidiano: ammissione separata dalla consegna sorgente 0.9.0.** Leonardo e il
 referente competente decidono l'ammissione dell'installazione e dei flussi
 concreti; una consegna sorgente o una prova sintetica non prende tale decisione.
 La [guida alle responsabilità](./privacy-and-ai-governance.md) prepara funzioni,
