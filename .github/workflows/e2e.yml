@@ -143,6 +143,29 @@ jobs:
           E2E_DOCUMENTS_SYNTHETIC_ONLY: "1"
         run: npm run test:e2e
 
+      - name: Official UI production acceptance
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3252
+          MEDIFLOW_TEST_OFFICIAL_UI: "1"
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report/official-ui
+        run: |
+          export MEDIFLOW_DATA_DIR="$(mktemp -d /tmp/mf-official.XXXXXX)"
+          export MEDIFLOW_E2E_DATA_DIR="$MEDIFLOW_DATA_DIR"
+          export MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 E2E_DISABLE_LEGACY_COPY=1
+          printf 'Synthetic official UI acceptance fixture\n' > "$MEDIFLOW_DATA_DIR/SYNTHETIC-PROTOTYPE"
+          node scripts/prepare-e2e-db.mjs
+          (cd "$E2E_ISOLATED_STANDALONE_DIR" && NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3252 node server.js) > "$RUNNER_TEMP/official-ui.log" 2>&1 &
+          OFFICIAL_UI_PID=$!
+          trap 'kill "$OFFICIAL_UI_PID"; wait "$OFFICIAL_UI_PID" || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS "$E2E_BASE_URL/api/auth/check" > /dev/null; then break; fi
+            kill -0 "$OFFICIAL_UI_PID" || { cat "$RUNNER_TEMP/official-ui.log"; exit 1; }
+            sleep 1
+          done
+          curl -fsS "$E2E_BASE_URL/api/auth/check" > /dev/null
+          # Keep the main suite quarantine report; these six cases have no exemptions.
+          npm run test:e2e -- e2e/official-ui.spec.ts --retries=0 --reporter=list,html --output=test-results/official-ui
+
       - name: Synthetic component browser contracts
         run: npm run test:inventory-browser
 
