@@ -26,6 +26,55 @@ function seed(file: string, missingColumn = false) {
 function originals(directory: string) { return fs.readdirSync(directory).filter(name => name.includes('.schema-original-')); }
 function columns(db: Database.Database) { return (db.pragma('table_info(patients)') as { name: string }[]).map(row => row.name); }
 
+test('opening an older owner-owned archive makes the database and live WAL sidecars private without losing data', { skip: process.platform === 'win32' }, () => {
+    const w = workspace();
+    let writer: Database.Database | undefined;
+    let opened: Database.Database | undefined;
+    try {
+        writer = openVersionedSqliteDatabase(w.file);
+        writer.prepare('INSERT INTO settings(key, value) VALUES (?, ?)').run('permission-fixture', 'preserved in WAL');
+        const files = [w.file, `${w.file}-wal`, `${w.file}-shm`];
+        for (const file of files) fs.chmodSync(file, 0o644);
+        opened = openVersionedSqliteDatabase(w.file);
+        for (const file of files) assert.equal(fs.statSync(file).mode & 0o777, 0o600, path.basename(file));
+        assert.equal(opened.prepare('SELECT value FROM settings WHERE key=?').pluck().get('permission-fixture'), 'preserved in WAL');
+    } finally { opened?.close(); writer?.close(); w.cleanup(); }
+});
+
+test('opening refuses symlinked archive files before SQLite and leaves their targets untouched', { skip: process.platform === 'win32' }, () => {
+    for (const suffix of ['', '-wal', '-shm']) {
+        const w = workspace();
+        try {
+            openVersionedSqliteDatabase(w.file).close();
+            const target = path.join(w.directory, 'untouched');
+            fs.writeFileSync(target, 'synthetic target', { mode: 0o644 });
+            if (!suffix) fs.unlinkSync(w.file);
+            fs.symlinkSync(target, `${w.file}${suffix}`);
+            let opens = 0;
+            assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
+            assert.equal(opens, 0);
+            assert.equal(fs.statSync(target).mode & 0o777, 0o644);
+            assert.equal(fs.readFileSync(target, 'utf8'), 'synthetic target');
+        } finally { w.cleanup(); }
+    }
+});
+
+test('opening does not chmod archive files owned by another user', { skip: process.platform === 'win32' }, () => {
+    const w = workspace(), stat = fs.fstatSync;
+    try {
+        openVersionedSqliteDatabase(w.file).close();
+        fs.chmodSync(w.file, 0o644);
+        fs.fstatSync = ((...args: Parameters<typeof stat>) => {
+            const info = stat(...args);
+            return Object.assign(info, { uid: Number(info.uid) + 1 });
+        }) as typeof stat;
+        let opens = 0;
+        assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
+        assert.equal(opens, 0);
+        assert.equal(fs.statSync(w.file).mode & 0o777, 0o644);
+    } finally { fs.fstatSync = stat; w.cleanup(); }
+});
+
 test('fresh and reserved archives consume admission atomically; repeated open does not migrate', () => {
     for (const reserved of [false, true]) {
         const w = workspace();

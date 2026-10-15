@@ -118,3 +118,28 @@ artifact precedente. Questa estensione non qualifica il recupero completo C15.
 2. Esportare snapshot raw delle collezioni supportate nel file `.mediflow`.
 3. Aggiungere restore server-side con preflight e scrittura diretta in SQLite.
 4. Coprire il contract con test mirati sul manifest e sulla validazione.
+
+## Emendamento 2026-10: trasporto del backup completo
+
+Le sole route `/api/system/backup-restore` e
+`/api/system/backup-restore/verify` sono escluse dal matcher del proxy Next.
+Entrambe richiedono autonomamente sessione web amministrativa, origine esatta,
+Fetch Metadata same-origin e Content-Type JSON prima di leggere il body.
+Il ripristino richiede inoltre la generazione corrente dell'archivio e conserva
+preflight, checksum, fence, audit e transazione esistenti. Le altre API restano
+sotto il controllo centrale del proxy, compresi gli upload degli originali.
+
+Next clona i body delle richieste coperte dal proxy e tronca lo stream che
+raggiunge la route al limite di buffering. Il limite per un singolo originale
+da 25 MiB non copre un backup con più originali o allegati paziente. Anche la
+precedente soglia di 10 MiB poteva troncare questi backup. Non si aumenta il
+buffer globale: il backup non ha un tetto complessivo derivabile dai 100 MiB
+del solo repertorio protesico. L'eccezione evita una copia aggiuntiva e il
+troncamento, mantenendo i controlli nelle due route.
+
+Export, parsing, verifica e ripristino restano operazioni in memoria sull'intero
+JSON. Non sono upload in streaming né garantiscono archivi di dimensione
+arbitraria: la memoria disponibile sul computer resta un limite operativo.
+Le regressioni coprono il matcher e lo stream sostitutivo del Next installato;
+gli E2E HTTP esportano, verificano e ripristinano backup oltre 35 MiB con
+originali protesici e allegati paziente su archivi sintetici isolati.

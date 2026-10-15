@@ -80,12 +80,13 @@ const commandOperationValues = [
 ];
 
 const webBackupDatasetScript = [
+    "const {serializeProstheticsDocument} = await import('./lib/reference-data/prosthetics-catalog-backup.ts');",
     "const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/system/backup-restore/route.ts','utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);",
     "const functions = source.statements.filter(node => ts.isFunctionDeclaration(node) && ['sortBackupRows','filterRowsByReference','buildBackupDataset'].includes(node.name?.text)).map(node => node.getText(source)).join('\\n');",
     "const schemaImport = source.statements.find(node => ts.isImportDeclaration(node) && node.moduleSpecifier.text === '@/lib/schema' && ts.isNamedImports(node.importClause?.namedBindings));",
     "const names = schemaImport.importClause.namedBindings.elements.map(node => node.name.text);",
     "const code = ts.transpileModule(functions, {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;",
-    "const buildWebBackupDataset = new Function('dbServer','tables','sql','snapshotBackupAudit','enrichBackupPatientsWithAmbulatoryLinks', 'const {' + names.join(',') + '} = tables; const backupSchema = tables; ' + code + '; return buildBackupDataset;')(dbServer,tables,sql,snapshotBackupAudit,enrichBackupPatientsWithAmbulatoryLinks);",
+    "const buildWebBackupDataset = new Function('dbServer','tables','sql','snapshotBackupAudit','enrichBackupPatientsWithAmbulatoryLinks','serializeProstheticsDocument', 'const {' + names.join(',') + '} = tables; const backupSchema = tables; ' + code + '; return buildBackupDataset;')(dbServer,tables,sql,snapshotBackupAudit,enrichBackupPatientsWithAmbulatoryLinks,serializeProstheticsDocument);",
 ].join('\n');
 
 const webBackupExportScript = [

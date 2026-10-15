@@ -232,6 +232,12 @@ uno sviluppo separato. Il principio locale va letto insieme ai percorsi
 espliciti di pairing, cache, esportazione e backup, non come promessa che
 ogni dato sia confinato per sempre a un solo dispositivo.
 
+All'apertura su macOS e Linux, i file del database appartenenti all'utente
+sono resi accessibili solo a quell'utente. Verifica e ripristino web ricevono
+il backup completo, inclusi originali e allegati paziente, senza il limite
+del proxy previsto per un singolo upload. Il JSON viene elaborato in memoria:
+la dimensione gestibile dipende dalle risorse del computer.
+
 ```mermaid
 flowchart LR
     web[Browser locale] --> host[Host MediFlow: servizi e API]

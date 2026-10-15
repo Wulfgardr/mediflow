@@ -44,5 +44,7 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-    matcher: ['/api/:path*'],
+    // Backup routes enforce admin and exact-origin JSON before reading their body; restore also checks archive generation.
+    // Bypass Next body cloning here: a complete backup can exceed the single-upload limit.
+    matcher: ['/api/((?!system/backup-restore(?:/verify)?/?$).*)'],
 };

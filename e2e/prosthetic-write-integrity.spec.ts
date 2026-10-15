@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('Web creates, records testing, and removes a prosthetic prescription with one audit per action', async ({ page, baseURL }, testInfo) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
@@ -94,6 +95,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
 
 
 test('HTTP attraverso il proxy conserva originali protesici da 8 e 25 MiB', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
     const dir = process.env.MEDIFLOW_DATA_DIR, url = new URL(baseURL!);
     if (!dir || !isAbsolute(dir) || url.hostname !== '127.0.0.1' || !url.port || url.port === '3000') throw new Error('Dedicated synthetic data and loopback port required');
@@ -105,16 +107,36 @@ test('HTTP attraverso il proxy conserva originali protesici da 8 e 25 MiB', asyn
     const sourcesResponse = await page.request.get('/api/prosthetics/catalog/sources'); expect(sourcesResponse.status()).toBe(200);
     const sources = await sourcesResponse.json();
     const sourceId = sources.sources.find((source: { name: string }) => source.name === 'Fonte trasporto sintetica').id;
+    const originals: Array<{ id: string; sha256: string; size: number }> = [];
     for (const mib of [8, 25]) {
         const bytes = Buffer.alloc(mib * 1024 * 1024, mib);
         const status = await page.request.get('/api/prosthetics/catalog/status'); expect(status.status()).toBe(200);
         const upload = await page.request.post('/api/prosthetics/catalog/documents', { data: { sourceId, revision: (await status.json()).revision, name: `originale-${mib}.bin`, base64: bytes.toString('base64'), page: null } });
         expect(upload.status(), await upload.text()).toBe(200);
         const doc = await upload.json(); expect(doc.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
+        originals.push({ id: doc.id, sha256: doc.sha256, size: bytes.length });
         const download = await page.request.get(`/api/prosthetics/catalog/documents?id=${doc.id}&sha256=${doc.sha256}`); expect(download.status()).toBe(200);
         expect(await download.body()).toEqual(bytes);
         const db = new Database(join(dir, 'medical.db'), { readonly: true, fileMustExist: true });
         try { expect(db.prepare('SELECT typeof(bytes) AS type,length(bytes) AS size FROM prosthetics_catalog_documents WHERE id=?').get(doc.id)).toEqual({ type: 'blob', size: bytes.length }); }
         finally { db.close(); }
     }
+    const headers = await trustedArchiveWebRequestHeaders(page);
+    const exported = await page.request.get('/api/system/backup-restore'); expect(exported.status()).toBe(200);
+    const artifact = await exported.body(); expect(artifact.length).toBeGreaterThan(35 * 1024 * 1024);
+    const verified = await page.request.post('/api/system/backup-restore/verify', { headers: { ...headers, 'Content-Type': 'application/json' }, data: artifact });
+    expect(verified.status(), await verified.text()).toBe(200);
+    expect((await verified.json()).success).toBe(true);
+    const db = new Database(join(dir, 'medical.db'), { fileMustExist: true });
+    try {
+        for (const original of originals) db.prepare('DELETE FROM prosthetics_catalog_documents WHERE id=?').run(original.id);
+        const restored = await page.request.post('/api/system/backup-restore', { headers: { ...headers, 'Content-Type': 'application/json' }, data: artifact });
+        expect(restored.status(), await restored.text()).toBe(200);
+        expect((await restored.json()).success).toBe(true);
+        for (const original of originals) {
+            const row = db.prepare('SELECT bytes FROM prosthetics_catalog_documents WHERE id=?').get(original.id) as { bytes: Buffer };
+            expect(row.bytes.length).toBe(original.size);
+            expect(createHash('sha256').update(row.bytes).digest('hex')).toBe(original.sha256);
+        }
+    } finally { db.close(); }
 });

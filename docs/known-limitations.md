@@ -240,6 +240,18 @@ La `0.8.5` non consegna:
 
 ## Fonti personali protesica
 
+Verifica e ripristino web del backup completo non usano la clonazione del proxy
+Next limitata al singolo upload. Il caso riguarda anche gli allegati paziente,
+non solo i 100 MiB ammessi per gli originali protesici. Export e lettura JSON
+richiedono comunque memoria proporzionale al backup; non è garantita una
+dimensione arbitraria. I test HTTP dedicati richiedono un server sintetico
+isolato e un ambiente che consenta un listener loopback.
+
+Su macOS e Linux il bootstrap normalizza a `0600` soltanto i file SQLite
+regolari dell'utente corrente. Non corregge file non propri, symlink o i permessi
+di una cartella dati personalizzata; l'apertura di file non sicuri resta
+bloccata. Non è una verifica degli ACL Windows né una cifratura del database.
+
 - Import diretto XLSX non disponibile: esportare in CSV UTF-8, con virgola o punto e virgola e mappatura esplicita.
 - Nessuna estrazione AI, attestazione normativa o aggiornamento clinico automatico.
 - Fonti derivate da nome/versione/ambito; una versione differente crea una fonte distinta. La migrazione non recupera collisioni già avvenute nelle versioni precedenti.
