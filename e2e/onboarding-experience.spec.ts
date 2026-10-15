@@ -147,8 +147,8 @@ async function setup(page: Page, info?: TestInfo) {
     await expect(root.getByLabel('Avanzamento setup', { exact: true })).toHaveText('Passo 1 di 2');
     const next = root.getByRole('button', { name: 'Avanti', exact: true });
     await expect(next).toBeDisabled();
-    const name = root.getByLabel('Nome e Cognome', { exact: true });
-    const ambulatory = root.getByLabel('Nome Ambulatorio', { exact: true });
+    const name = root.getByLabel('Nome e cognome', { exact: true });
+    const ambulatory = root.getByLabel('Nome dell’ambulatorio', { exact: true });
     await name.fill('Dr. Primo Avvio Sintetico');
     await expect(next).toBeDisabled();
     await name.focus();
@@ -160,7 +160,7 @@ async function setup(page: Page, info?: TestInfo) {
     await expect(next).toBeEnabled();
     if (info) await capture(page, info, 'identity', setupSelector);
     await next.press('Enter');
-    await expect(root.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
+    await expect(root.getByRole('heading', { name: 'Proteggi l’accesso', exact: true })).toBeVisible();
     await expect(root.getByLabel('Avanzamento setup', { exact: true })).toHaveText('Passo 2 di 2');
     await expect(root.locator('#setup-pin-help')).toContainText('da 4 a 64 caratteri');
     const pin = root.getByLabel('PIN di conferma', { exact: true });
