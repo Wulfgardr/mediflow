@@ -1,7 +1,7 @@
 /* @Codex WUL-678: scale-only presentation, shared 44px targets and 12px controls. */
 .workspace {
     --scale-control-radius: var(--lume-radius-control);
-    font: 14px/1.5 var(--lume-font-sans);
+    font: 0.875rem/1.5 var(--lume-font-sans);
     width: 100%;
     max-width: 56rem;
     min-width: 0;
@@ -11,7 +11,7 @@
 }
 .engine { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .progress { margin: 0; color: var(--lume-ink-muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
-.question { margin: 0 0 24px; font-size: clamp(1.25rem, 2.5vw, 1.5rem); font-weight: 600; line-height: 1.5; }
+.question { margin: 0 0 24px; font-size: 0.9375rem; font-weight: 600; line-height: 1.5; }
 /* @Codex: semantic grouping adds no second frame or intrinsic minimum width. */
 .questionGroup { min-width: 0; width: 100%; margin: 0; padding: 0; border: 0; }
 .legend { max-width: 100%; padding: 0; }
@@ -66,7 +66,7 @@
 .catalogLink svg { flex-shrink: 0; }
 .catalogLink > span { flex: 1; min-width: 0; }
 .catalogTitle { display: block; font-weight: 600; }
-.catalogDescription { display: block; margin-top: 6px; color: var(--lume-ink-muted); font-size: .9375rem; line-height: 1.6; }
+.catalogDescription { display: block; margin-top: 6px; color: var(--lume-ink-muted); font-size: 0.9375rem; line-height: 1.6; }
 .quickStart { display: grid; gap: 12px; }
 .quickStart h4 { margin: 0; }
 .back { margin-bottom: 16px; }
@@ -76,30 +76,30 @@
 .screen :global(header a[title="Torna alle scale"]),
 .screen :global(header a[title="Torna alla scheda paziente"]) {
     min-height: 44px; border-radius: 12px; padding: 10px 12px;
-    color: var(--lume-ink); background: transparent; font-size: .9375rem;
+    color: var(--lume-ink); background: transparent; font-size: 0.9375rem;
 }
 
 .catalogLink { border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; padding: 16px 0; }
-.question { font: 600 14px/1.5 var(--lume-font-sans); }
-.catalogDescription { font-size: 13px; }
+.question { font: 600 0.875rem/1.5 var(--lume-font-sans); }
+.catalogDescription { font-size: 0.8125rem; }
 
 .formColumns { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,.8fr); gap: 40px; align-items: start; }
 .formColumns > div { min-width: 0; }
-.formColumns .progress { padding-bottom: 16px; border-bottom: 1px solid var(--lume-rule); margin-bottom: 20px; font-size: 13px; }
+.formColumns .progress { padding-bottom: 16px; border-bottom: 1px solid var(--lume-rule); margin-bottom: 20px; font-size: 0.8125rem; }
 .answers { gap: 0; }
 .choice { border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; padding: 14px 0; min-height: 44px; }
-.draftSummary { min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); font-size: 13px; }
-.draftSummary h3 { margin: 0; font: 600 14px/1.5 var(--lume-font-sans); }
+.draftSummary { min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); font-size: 0.8125rem; }
+.draftSummary h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .draftSummary > p { margin: 12px 0; }
 .draftState { color: var(--lume-ink-fresh); }
-.draftSummary .score { color: var(--lume-ink-fresh); font: 400 36px/1.1 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
+.draftSummary .score { color: var(--lume-ink-fresh); font: var(--type-threshold); font-variant-numeric: tabular-nums; }
 .draftSummary dl { margin: 20px 0; }
 .draftSummary dl > div { padding: 10px 0; border-top: 1px solid var(--lume-rule); }
 .draftSummary dt { color: var(--lume-ink-muted); }
 .draftSummary dd { margin: 4px 0 0; color: var(--lume-ink-fresh); }
 .source { color: var(--lume-ink-muted); }
 .actions { position: sticky; bottom: 0; z-index: 2; background: var(--lume-surface-focal); padding: 16px 0; }
-.thresholdContext { display: grid; gap: 3px; margin-right: auto; font-size: 13px; }
+.thresholdContext { display: grid; gap: 3px; margin-right: auto; font-size: 0.8125rem; }
 .thresholdContext > span { color: var(--lume-ink-muted); }
 @media(max-width:700px) { .formColumns { grid-template-columns: minmax(0,1fr); gap: 28px; } .draftSummary { border-left: 0; border-top: 1px solid var(--lume-rule); padding: 20px 0 0; } .thresholdContext { flex-basis: 100%; } }
 

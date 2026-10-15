@@ -16,7 +16,7 @@
     gap: 8px;
     min-height: 36px;
     color: var(--lume-ink-muted);
-    font-size: 12px;
+    font-size: 0.75rem;
     text-decoration: none;
 }
 .back:hover { color: var(--lume-ink); }
@@ -28,8 +28,8 @@
     gap: 6px 20px;
     margin-top: 8px;
 }
-.titleRow h1 { margin: 0; font: 400 26px/1.1 var(--lume-font-voice); letter-spacing: 0; }
-.titleRow p { margin: 0; color: var(--lume-ink-muted); font-size: 14px; overflow-wrap: anywhere; }
+.titleRow h1 { margin: 0; letter-spacing: 0; font: var(--type-page-title); }
+.titleRow p { margin: 0; color: var(--lume-ink-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
 
 .sheet {
     min-width: 0;
@@ -44,7 +44,7 @@
     gap: 14px;
     padding-bottom: 22px;
 }
-.metadataField { display: flex; min-width: 0; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 550; }
+.metadataField { display: flex; min-width: 0; flex-direction: column; gap: 6px; font-size: 0.75rem; font-weight: 600; }
 .metadataField > span { color: var(--lume-ink-muted); }
 .metadataField select,
 .metadataField input {
@@ -58,8 +58,8 @@
     background: var(--lume-surface-field);
     color: var(--lume-ink);
     font: inherit;
-    font-size: 14px;
-    font-weight: 450;
+    font-size: 0.875rem;
+    font-weight: 400;
     color-scheme: inherit;
 }
 .metadataField input:focus-visible,
@@ -73,8 +73,8 @@
 
 .writing { min-width: 0; }
 .editorHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
-.editorHeading h2 { margin: 0; font-size: 14px; font-weight: 600; }
-.editorHeading p { margin: 0; color: var(--lume-ink-muted); font-size: 12px; }
+.editorHeading h2 { margin: 0; font-size: 0.875rem; font-weight: 600; }
+.editorHeading p { margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; }
 .editor { border-radius: 8px; }
 .editor [data-lume-editor-surface="toolbar"] { gap: 2px; padding: 6px; }
 .editor [data-lume-editor-surface="toolbar"] button { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 5px; }
@@ -86,10 +86,10 @@
     max-height: 440px;
     overflow-y: auto;
     scrollbar-gutter: stable;
-    font: 400 17px/1.5 var(--lume-font-voice);
+    font: var(--type-prose);
     color: var(--lume-ink-fresh);
 }
-.editor [data-lume-editor-surface="canvas"] > p { font-size: 11px; }
+.editor [data-lume-editor-surface="canvas"] > p { font-size: 0.75rem; }
 
 .attachments { margin-top: 12px; }
 .addFile {
@@ -102,12 +102,12 @@
     border-radius: 10px;
     color: var(--lume-ink-muted);
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 550;
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 .addFile:hover,
 .dropActive { border-color: color-mix(in srgb, var(--lume-accent) 30%, transparent); background: color-mix(in srgb, var(--lume-accent) 6%, transparent); color: var(--lume-accent); }
-.fileCount { font-weight: 450; }
+.fileCount { font-weight: 400; }
 .fileList { display: grid; max-height: 180px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 .fileRow { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 8px 4px; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent); }
 .fileIcon { display: flex; flex: none; align-items: center; justify-content: center; width: 24px; color: var(--lume-ink-muted); }
@@ -122,41 +122,41 @@
     padding: 10px 2px;
     cursor: pointer;
     list-style: none;
-    font-size: 13px;
-    font-weight: 550;
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 .sessionSummary::-webkit-details-marker { display: none; }
-.optional { margin-left: auto; color: var(--lume-ink-muted); font-size: 12px; font-weight: 400; }
+.optional { margin-left: auto; color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 400; }
 .disclosureIcon { flex: none; width: 15px; height: 15px; color: var(--lume-ink-muted); }
 .session[open] > .sessionSummary .disclosureIcon { transform: rotate(180deg); }
 .context { border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 11%, transparent); }
 .context[open] > .sessionSummary .disclosureIcon { transform: rotate(180deg); }
 .contextBody { display: grid; gap: 20px; padding: 8px 0 20px; }
-.contextBody h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
-.contextBody p { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+.contextBody h3 { margin: 0 0 8px; font-size: 0.8125rem; font-weight: 600; }
+.contextBody p { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8125rem; line-height: 1.6; }
 .contextList { max-height: 260px; margin: 0; padding: 0; overflow-y: auto; overscroll-behavior: contain; list-style: none; }
-.contextList li { padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent); font-size: 13px; }
+.contextList li { padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent); font-size: 0.8125rem; }
 .contextSource { padding: 7px 0; }
-.contextSource summary { cursor: pointer; font-size: 13px; overflow-wrap: anywhere; }
+.contextSource summary { cursor: pointer; font-size: 0.8125rem; overflow-wrap: anywhere; }
 .contextSource summary:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
 .sessionBody { padding: 6px 0 20px; }
 .sessionLayout { display: grid; gap: 16px; min-width: 0; }
 .sessionOverview { display: grid; gap: 10px; min-width: 0; }
 .capabilityNote { display: flex; align-items: flex-start; gap: 9px; }
 .capabilityIcon { display: flex; align-items: center; flex: none; width: 16px; height: 20px; color: var(--lume-ink-muted); }
-.capabilityNote p { font-size: 12px; }
-.sessionMetrics { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 12px; }
+.capabilityNote p { font-size: 0.75rem; }
+.sessionMetrics { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 0.75rem; }
 .sessionStatus,
 .sessionCounter { display: inline-flex; align-items: center; gap: 6px; color: var(--lume-ink-muted); }
 .sessionStatus svg { flex: none; width: 14px; height: 14px; }
 .sessionControls { display: flex; flex-wrap: wrap; gap: 8px; }
-.sessionControls button { height: 36px; border-radius: 10px; font-size: 12px; }
+.sessionControls button { height: 36px; border-radius: 10px; font-size: 0.75rem; }
 .sessionBody textarea { border-radius: 8px; }
 .sessionBody input[type="checkbox"] { flex: none; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; }
-.actions > p { max-width: 36ch; margin: 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.5; }
-.saveButton { margin-left: auto; min-height: 42px; padding: 10px 16px; border-radius: 7px; font-size: 14px; }
+.actions > p { max-width: 36ch; margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.5; }
+.saveButton { margin-left: auto; min-height: 42px; padding: 10px 16px; border-radius: 7px; font-size: 0.875rem; }
 
 @media (max-width: 680px) {
     .page { padding: 16px 12px 32px; }
@@ -165,7 +165,7 @@
     .metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-bottom: 20px; }
     .metadataField:last-child { grid-column: 1 / -1; }
     .metadataField input,
-    .metadataField select { font-size: 16px; }
+    .metadataField select { font-size: 0.9375rem; }
     .editor [data-lume-editor-surface="canvas"] { padding: 14px 12px 10px; }
     .editor [data-lume-editor-surface="field"] { min-height: 220px; max-height: 360px; }
     .sessionSummary { flex-wrap: wrap; gap: 4px 8px; }
@@ -180,7 +180,7 @@
 }
 
 .actions { position: sticky; z-index: 10; bottom: 0; margin: 20px -24px -24px; padding: 16px 24px; border-top: 1px solid var(--lume-rule-strong); background: var(--lume-surface-focal); border-radius: 0 0 12px 12px; }
-.saveSummary { font-size: 14px; }
-.saveSummary p { margin-top: 4px; font-size: 13px; color: var(--lume-ink-muted); }
+.saveSummary { font-size: 0.875rem; }
+.saveSummary p { margin-top: 4px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
 .saveButton { border-radius: 10px; }
 @media (max-width: 680px) { .actions { margin-inline: -16px; margin-bottom: -16px; padding: 16px; } .saveButton { min-height: 44px; } }

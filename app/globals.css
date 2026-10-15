@@ -1,5 +1,5 @@
 @import "tailwindcss" source(none);
-@plugin "@tailwindcss/typography";
+@config "../tailwind.config.ts";
 @source "../app";
 @source "../components";
 
@@ -56,6 +56,7 @@
 
 @theme {
   --font-sans: var(--lume-font-sans);
+  --font-serif: var(--lume-font-voice);
   --font-mono: var(--font-registro), "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
 }
 
@@ -68,6 +69,19 @@
   --lume-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
   --lume-font-voice: var(--font-voce), Georgia, serif;
 
+  --type-page-title: 400 1.625rem/1.2 var(--lume-font-voice);
+  --type-person: 400 1.75rem/1.1 var(--lume-font-voice);
+  --type-person-compact: 400 1.625rem/1.1 var(--lume-font-voice);
+  --type-person-preview: 400 1.375rem/1.2 var(--lume-font-voice);
+  --type-prose: 400 1.0625rem/1.5 var(--lume-font-voice);
+  --type-brand: 500 1.3125rem/1.2 var(--lume-font-voice);
+  --type-body: 400 0.875rem/1.5 var(--lume-font-sans);
+  --type-strong: 600 0.875rem/1.5 var(--lume-font-sans);
+  --type-threshold: 600 0.9375rem/1.5 var(--lume-font-sans);
+  --type-meta: 400 0.8125rem/1.5 var(--lume-font-sans);
+  --type-section: 600 0.75rem/1.5 var(--lume-font-sans);
+  --type-code: 400 0.75rem/1.5 var(--font-registro), monospace;
+
 }
 
 body {
@@ -76,6 +90,9 @@ body {
   color: var(--foreground);
   /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
   font-family: var(--lume-font-sans);
+  font-size: 0.875rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
   min-height: 100vh;
   letter-spacing: 0;
   background-color: var(--lume-surface-canvas);
@@ -86,12 +103,44 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.lume-code, code, kbd {
-  font-family: var(--font-registro), "SF Mono", "Cascadia Code", monospace;
+.lume-code.lume-code, .type-code.type-code, code {
+  font: var(--type-code);
   font-variant-numeric: tabular-nums;
 }
 
-.lume-voice { font-family: var(--lume-font-voice); font-weight: 400; }
+.type-page-title, .lume-voice { font: var(--type-page-title); }
+.type-person { font: var(--type-person); }
+.type-person-preview { font: var(--type-person-preview); }
+.type-prose { font: var(--type-prose); max-width: 64ch; }
+.type-brand { font: var(--type-brand); }
+.type-body { font: var(--type-body); }
+.type-strong { font: var(--type-strong); }
+.type-threshold { font: var(--type-threshold); }
+.type-meta { font: var(--type-meta); }
+.type-section { font: var(--type-section); text-transform: uppercase; letter-spacing: 0.05em; }
+.clinical-rich-text, .clinical-rich-editor { font: var(--type-prose); }
+.clinical-rich-text :is(strong, b, a, h1, h2, h3, h4, h5, h6),
+.clinical-rich-editor :is(strong, b, a, h1, h2, h3, h4, h5, h6) { font: var(--type-strong); }
+.clinical-rich-text :is(table, button, summary),
+.clinical-rich-editor :is(table, button, summary) { font: var(--type-body); }
+.prose { font: var(--type-prose); }
+.prose :where(h1, h2, h3, h4, h5, h6, strong, b, a, blockquote) { font: var(--type-strong); }
+.prose :where(table, th, td, button, summary) { font: var(--type-body); }
+.prose :where(figcaption) { font: var(--type-meta); }
+.prose :where(code, pre) { font: var(--type-code); }
+.prose :where(sup, sub) { font-size: inherit; }
+.type-body, .type-strong, .type-threshold, .type-meta, .type-section { font-variant-numeric: tabular-nums; }
+@media (max-width: 699px) { .type-person { font: var(--type-person-compact); } }
+
+@layer base {
+  h1, h2, h3, h4, h5, h6 { font: var(--type-strong); }
+  button, input, select, textarea, summary, table, kbd { font-family: var(--lume-font-sans); }
+  button, input, select, textarea, summary { font-size: 0.875rem; }
+  strong, b { font-weight: 600; }
+  small, kbd { font: var(--type-meta); }
+  pre { font: var(--type-body); }
+  time, input, select, table, output { font-variant-numeric: tabular-nums; }
+}
 .lume-ink-state { display: inline-flex; align-items: baseline; gap: 0.5em; }
 .lume-ink-state[data-ink='pencil'] { color: var(--lume-ink-pencil); }
 .lume-ink-state[data-ink='fresh'] { color: var(--lume-ink-fresh); }
@@ -99,11 +148,11 @@ body {
 .lume-point { display: inline-block; flex: none; width: 0.44em; height: 0.44em; border: 1.5px solid currentColor; border-radius: 50%; background: currentColor; }
 [data-ink='pencil'] > .lume-point { background: transparent; }
 [data-ink='pencil'] > .lume-ink-copy { text-decoration: underline dashed; text-underline-offset: 4px; }
-.lume-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 12px/1.5 var(--lume-font-sans); letter-spacing: 0.05em; text-transform: uppercase; }
+.lume-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 0.75rem/1.5 var(--lume-font-sans); letter-spacing: 0.05em; text-transform: uppercase; }
 .lume-section-heading > span { font-weight: 400; color: var(--lume-ink-muted); }
-.lume-rule-table { width: 100%; border-collapse: collapse; font: 14px/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
+.lume-rule-table { width: 100%; border-collapse: collapse; font: 0.875rem/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
 .lume-rule-table :is(th, td) { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--lume-rule); }
-.lume-rule-table th { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-color: var(--lume-rule-strong); }
+.lume-rule-table th { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-color: var(--lume-rule-strong); }
 .lume-rule-table tbody tr:hover { background: var(--lume-surface-hover); }
 
 body { caret-color: var(--lume-ink-fresh); }
@@ -292,8 +341,8 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   background: color-mix(in srgb, var(--lume-ink) 8%, var(--lume-surface-field));
   color: var(--lume-ink);
   padding: 0.25rem 0.55rem;
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 :root.dark[data-ui-style='redesign'] .patient-liquid-commandbar {
@@ -461,7 +510,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   }
 
   .apple-chip {
-    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-tight;
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-tight;
     background-color: var(--lume-surface-field);
     border-color: color-mix(in srgb, var(--lume-ink) 10%, transparent);
     color: var(--lume-ink-muted);
@@ -506,12 +555,12 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   }
 
   .section-kicker {
-    @apply text-[10px] font-semibold uppercase tracking-[0.05em];
+    @apply text-xs font-semibold uppercase tracking-[0.05em];
     color: var(--lume-ink-muted);
   }
 
   .ui-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 text-sm font-semibold;
+    @apply inline-flex items-center justify-center gap-2 text-base font-semibold;
     border-radius: var(--lume-radius-control);
     background: var(--lume-accent);
     color: var(--lume-surface-focal);
@@ -536,8 +585,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   /* @Codex */
   .clinical-rich-text,
   .clinical-rich-editor {
-    font-family: var(--lume-font-voice);
-    font-size: 17px;
+    font: var(--type-prose);
     color: var(--lume-ink);
     line-height: 1.5;
   }
@@ -565,24 +613,24 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   .clinical-rich-text h3,
   .clinical-rich-editor h3 {
     margin-top: 1rem;
-    font-weight: 600;
+    font: var(--type-strong);
     letter-spacing: -0.01em;
     color: var(--lume-ink);
   }
 
   .clinical-rich-text h1,
   .clinical-rich-editor h1 {
-    font-size: 1.25rem;
+    font-size: 0.9375rem;
   }
 
   .clinical-rich-text h2,
   .clinical-rich-editor h2 {
-    font-size: 1.125rem;
+    font-size: 0.9375rem;
   }
 
   .clinical-rich-text h3,
   .clinical-rich-editor h3 {
-    font-size: 1rem;
+    font-size: 0.9375rem;
   }
 
   .clinical-rich-text ul,
@@ -672,7 +720,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   background-color: var(--lume-surface-field);
   color: var(--lume-ink-muted);
   padding: 0.18rem 0.55rem;
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
@@ -733,7 +781,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--lume-ink);
   background-color: var(--lume-surface-field);
   border: 1px solid var(--lume-border-color);
@@ -753,7 +801,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   padding: 0.3rem 0.6rem;
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 600;
   transition:
     background-color var(--lume-dur-riga) var(--lume-ease),
@@ -818,7 +866,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   display: flex;
   align-items: center;
   gap: 0.42rem;
-  font-size: 12.5px;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -827,7 +875,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
 }
 
 .siss-action-btn-caption {
-  font-size: 10.8px;
+  font-size: 0.75rem;
   line-height: 1.35;
   color: var(--lume-ink-muted);
 }
@@ -846,7 +894,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   border-radius: 12px;
   border: 1px solid;
   padding: 0.6rem 0.75rem;
-  font-size: 12.5px;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 
@@ -915,19 +963,19 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
 }
 
 .siss-blocked-item-label {
-  font-size: 12.5px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--lume-ink);
 }
 
 .siss-blocked-item-caption {
-  font-size: 11.5px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--lume-ink-muted);
 }
 
 .siss-blocked-item-reason {
-  font-size: 11.5px;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
 }
@@ -939,7 +987,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   border-radius: 999px;
   border: 1px solid;
   padding: 0.05rem 0.5rem;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.3;
@@ -1055,7 +1103,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   padding: 0.7rem 0.95rem;
-  font-size: 0.92rem;
+  font-size: 0.9375rem;
   line-height: 1.4;
   outline: none;
   box-shadow: none;
@@ -1096,7 +1144,7 @@ textarea.input-field {
 
 .mf-input-sm {
   padding: 0.45rem 0.7rem;
-  font-size: 0.84rem;
+  font-size: 0.8125rem;
   border-radius: var(--lume-radius-control);
 }
 
@@ -1131,7 +1179,7 @@ textarea.input-field {
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   padding: 0.7rem 0.95rem;
-  font-size: 0.92rem;
+  font-size: 0.9375rem;
   line-height: 1.4;
   outline: none;
   box-shadow: none;
@@ -1176,7 +1224,7 @@ textarea.input-field {
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   padding: 0.55rem 1rem;
-  font-size: 0.86rem;
+  font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0;
   box-shadow: none;
@@ -1302,7 +1350,7 @@ textarea.input-field {
   gap: 0.65rem;
   padding: 0.6rem 0.7rem;
   border-radius: var(--lume-radius-control);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   color: var(--lume-ink);
   cursor: pointer;
   transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease);
@@ -1340,7 +1388,7 @@ textarea.input-field {
   color: var(--lume-ink);
   display: grid;
   gap: 0.4rem;
-  font-size: 0.86rem;
+  font-size: 0.875rem;
   line-height: 1.5;
 }
 
@@ -1376,8 +1424,8 @@ textarea.input-field {
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--lume-ink-muted);
   background-color: var(--lume-surface-field);
   border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent);
@@ -1414,7 +1462,7 @@ textarea.input-field {
   background-color: transparent;
   color: var(--lume-ink-muted);
   padding: 0.55rem 0.95rem;
-  font-size: 0.86rem;
+  font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: 0;
   transition: background-color var(--lume-dur-riga) var(--lume-ease), color var(--lume-dur-riga) var(--lume-ease), border-color var(--lume-dur-riga) var(--lume-ease);
@@ -1501,7 +1549,7 @@ textarea.input-field {
 /* Eyebrow / kicker used in vitreous panels */
 .mf-eyebrow {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   /* @Codex WUL-UIUX: 800 faceva pesare l'etichetta piu del valore che introduce. */
   font-weight: 600;
   text-transform: uppercase;
@@ -1512,7 +1560,7 @@ textarea.input-field {
 /* Small label/helper text inside forms */
 .mf-field-label {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0;
   color: var(--lume-ink-muted);
@@ -1520,13 +1568,13 @@ textarea.input-field {
 }
 
 .mf-field-helper {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--lume-ink-muted);
   margin-top: 0.3rem;
 }
 
 .mf-field-error {
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   color: var(--lume-signal-critical);
   margin-top: 0.3rem;
 }
@@ -1605,7 +1653,7 @@ textarea.input-field {
 
 :root[data-ui-style='redesign'] .patient-liquid-name {
   max-width: 12ch;
-  font-weight: 760;
+  font-weight: 600;
   letter-spacing: 0;
 }
 

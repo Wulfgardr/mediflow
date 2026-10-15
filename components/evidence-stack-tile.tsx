@@ -38,7 +38,7 @@ export function EvidenceStackTile({ insight }: EvidenceStackTileProps) {
                     </div>
                     <div>
                         <p className="text-sm font-semibold text-[color:var(--lume-ink)]">{insight.fileName}</p>
-                        <div className="mt-1 flex items-center gap-1.5 text-[12px] text-[color:var(--lume-ink-muted)]">
+                        <div className="mt-1 flex items-center gap-1.5 text-xs text-[color:var(--lume-ink-muted)]">
                             <CalendarDays className="h-3.5 w-3.5" />
                             {formatDate(insight.date)}
                         </div>
@@ -55,11 +55,11 @@ export function EvidenceStackTile({ insight }: EvidenceStackTileProps) {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[11px] font-semibold text-[color:var(--lume-ink-muted)]">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                     <Microscope className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
                     {diagnosisCount} diagnosi
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[11px] font-semibold text-[color:var(--lume-ink-muted)]">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                     <ShieldCheck className="h-3.5 w-3.5 text-[color:var(--lume-accent)]" />
                     {medicationCount} terapie
                 </span>

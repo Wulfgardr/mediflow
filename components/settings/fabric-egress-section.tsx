@@ -42,7 +42,7 @@ export function FabricEgressSection({ snapshot }: { snapshot: FabricStatusSnapsh
                         <div key={summary.id} className={styles.fabricEgressRow}>
                             <dt>
                                 <strong>{copy.title}</strong>
-                                <code className="lume-registro">{summary.id}</code>
+                                <code className="type-code">{summary.id}</code>
                             </dt>
                             <dd>
                                 <p>{copy.description}</p>

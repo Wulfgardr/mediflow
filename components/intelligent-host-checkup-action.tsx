@@ -187,7 +187,7 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
             <button type="button" className={actionClass} onClick={copy}><Clipboard size={14} aria-hidden="true" /> Copia codice</button>
           </div> : null}
           <label htmlFor={proposalId} className="mf-field-label">Codice della proposta ricevuta dall’assistente</label>
-          <input id={proposalId} className="mf-input mf-input-sm w-full font-mono" value={proposalRef}
+          <input id={proposalId} className="mf-input mf-input-sm w-full type-code" value={proposalRef}
             onChange={(event) => { setProposalRef(event.target.value); setProposal(null); }} />
           <button type="button" className={actionClass} disabled={busy || !proposalRef.trim()} onClick={read}>Rileggi proposta</button>
           {proposal ? <div className="space-y-2 border-t pt-3" data-testid="checkup-host-proposal">

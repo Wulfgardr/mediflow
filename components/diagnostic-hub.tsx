@@ -117,7 +117,7 @@ export default function DiagnosticHub() {
             <div className="flex items-center justify-between">
                 <div>
                     <p className="section-kicker">Servizi locali</p>
-                    <h2 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
                         <Activity className="w-5 h-5 text-indigo-500" />
                         Diagnostica di Sistema
                     </h2>
@@ -152,8 +152,8 @@ export default function DiagnosticHub() {
                                                 check.icon}
                                 </div>
                                 <div>
-                                    <p className="text-sm font-bold" style={{ color: 'var(--lume-ink)' }}>{check.name}</p>
-                                    <p className="text-[10px]" style={{ color: 'var(--lume-ink-muted)' }}>{check.description}</p>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{check.name}</p>
+                                    <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{check.description}</p>
                                 </div>
                             </div>
 

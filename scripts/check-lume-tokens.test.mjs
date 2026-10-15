@@ -424,3 +424,39 @@ test('palette guard fails a regression beyond the declared allowlist entry', () 
   assert.equal(result.violations.length, 2);
   assert.equal(result.allowlistIssues.length, 0);
 });
+
+// The type guard complements color tokens with source-level escape detection.
+const { scanTypeSource, scanTypeScale, checkTailwindScale, TYPE_ALLOWLIST } = await import('./check-type-scale.mjs');
+
+test('type scale: committed web sources use the bounded roles', () => {
+  assert.deepEqual(scanTypeScale(), []);
+});
+
+test('type scale rejects legacy Tailwind sizes and weights even when utilities are unchanged', async () => {
+  const { default: config } = await import('../tailwind.config.ts');
+  const theme = structuredClone((config.default ?? config).theme);
+  theme.fontSize.sm[0] = '0.875rem';
+  theme.fontWeight.medium = '500';
+  assert.deepEqual(checkTailwindScale({ theme }), ['text-sm: atteso 0.8125rem', 'font-medium: atteso 400']);
+});
+
+test('type scale rejects responsive utilities, CSS drift and inline styles', () => {
+  for (const utility of ['font-bold', 'hover:font-extrabold', 'md:text-xl', 'text-[11px]', 'text-[1.1rem]', 'font-[550]', 'font-mono']) {
+    assert.ok(scanTypeSource('components/example.tsx', `<span className="${utility}">Test</span>`).length, utility);
+  }
+  for (const declaration of ['font-size: 11px', 'font-size: .9rem', 'font-weight: 500', 'font: 600 14px system-ui', 'font-family: Georgia', '--type-body: 400 16px system-ui']) {
+    assert.ok(scanTypeSource('components/example.module.css', `.example { ${declaration}; }`).length, declaration);
+  }
+  for (const style of ['fontSize: 11', "fontSize: '16px'", 'fontWeight: 550', "fontFamily: 'Georgia'"]) {
+    assert.ok(scanTypeSource('components/example.tsx', `<span style={{ ${style} }}>Test</span>`).length, style);
+  }
+});
+
+test('type scale permits semantic colors, roles, rem controls and scoped hiding only', () => {
+  assert.deepEqual(scanTypeSource('components/example.tsx', '<span className="type-person text-[color:var(--lume-ink)] font-semibold">Test</span>'), []);
+  assert.deepEqual(scanTypeSource('components/example.module.css', '.example { font: var(--type-person); } .meta { font-size: 0.8125rem; font-weight: 600; }'), []);
+  const allowed = TYPE_ALLOWLIST[0];
+  assert.deepEqual(scanTypeSource(allowed.path, `${allowed.selector} { font-size: 0; }`), []);
+  assert.equal(scanTypeSource(allowed.path, '.other { font-size: 0; }').length, 1);
+  assert.equal(scanTypeSource('components/other.css', `${allowed.selector} { font-size: 0; }`).length, 1);
+});

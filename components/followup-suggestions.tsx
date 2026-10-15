@@ -71,7 +71,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
 
     return (
         <div className="mt-3 space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
-            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                 Trovati nei documenti, da valutare
             </p>
             {visible.map((suggestion) => (
@@ -87,7 +87,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
                                     <PrivacyBlur intensity="sm">{suggestion.excerpt}</PrivacyBlur>
                                 </p>
                             ) : null}
-                            <p className="mt-1.5 text-[11px] text-[color:var(--lume-ink-muted)]">
+                            <p className="mt-1.5 text-xs text-[color:var(--lume-ink-muted)]">
                                 Trovato in {suggestion.citation.fileName}
                                 {suggestion.citation.documentDate ? ` · ${new Date(suggestion.citation.documentDate).toLocaleDateString('it-IT')}` : ''}
                             </p>
@@ -106,7 +106,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
 
                     {openId === suggestion.id ? (
                         <div className="mt-3 space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
-                            <label className="block text-[11px] font-medium text-[color:var(--lume-ink-muted)]">
+                            <label className="block text-xs font-medium text-[color:var(--lume-ink-muted)]">
                                 Titolo
                                 <input
                                     className="input-field mt-1 w-full"
@@ -114,7 +114,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
                                     onChange={(e) => setTitle(e.target.value)}
                                 />
                             </label>
-                            <label className="block text-[11px] font-medium text-[color:var(--lume-ink-muted)]">
+                            <label className="block text-xs font-medium text-[color:var(--lume-ink-muted)]">
                                 Data
                                 <input
                                     type="date"
@@ -123,7 +123,7 @@ export default function FollowupSuggestions({ patientId, suggestions, existingTi
                                     onChange={(e) => setDate(e.target.value)}
                                 />
                             </label>
-                            <label className="block text-[11px] font-medium text-[color:var(--lume-ink-muted)]">
+                            <label className="block text-xs font-medium text-[color:var(--lume-ink-muted)]">
                                 Note
                                 <textarea
                                     className="input-field mt-1 w-full"

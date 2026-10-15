@@ -63,7 +63,7 @@ export default function ProstheticsCatalogManager() {
         catch { if (!signal.aborted) setMessage('Import registrato; rilettura non riuscita. Premi Rileggi stato.'); }
     }
     return <section aria-label="Import repertorio protesica" className="mf-section lume-focal min-w-0 space-y-5 p-6 md:p-7" style={{ borderRadius: 12 }}>
-        <div><p className="section-kicker">Repertorio locale</p><h2 className="text-lg font-bold">Protesica e ausili</h2>
+        <div><p className="section-kicker">Repertorio locale</p><h2 className="text-lg font-semibold">Protesica e ausili</h2>
             <p className="text-sm">{status ? `${status.count.toLocaleString('it-IT')} ${status.count === 1 ? 'voce' : 'voci'} nel repertorio protesica` : 'Conteggio non disponibile'}</p></div>
         <p className="text-sm leading-6">Carica il repertorio della tua fonte, controlla l’anteprima e conferma l’importazione.</p>
         <details className="text-sm leading-6"><summary className="cursor-pointer font-semibold" style={{ minHeight: 44, alignContent: 'center' }}>Formato CSV richiesto</summary>

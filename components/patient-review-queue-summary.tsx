@@ -101,7 +101,7 @@ export default function PatientReviewQueueSummaryPanel({ summary, embedded = fal
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p className="section-kicker">Coda di revisione</p>
-                    <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                    <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
                         <ListChecks className="h-5 w-5 text-[color:var(--lume-ink-muted)]" />
                         Cosa rivedere adesso
                     </h2>

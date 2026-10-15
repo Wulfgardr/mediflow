@@ -1,25 +1,25 @@
 .surface {
     min-width: 0;
     color: var(--lume-ink);
-    font: 14px/1.5 var(--lume-font-sans);
+    font: 0.875rem/1.5 var(--lume-font-sans);
     font-variant-numeric: tabular-nums;
 }
 .surface h1 {
-    font-family: var(--lume-font-voice);
-    font-weight: 400;
     letter-spacing: -0.01em;
     line-height: 1.2;
+    font: var(--type-page-title);
 }
-.surface h1 { font-size: 26px; }
-.surface.surface :is(h2, h3) { font: 600 14px/1.5 var(--lume-font-sans); letter-spacing: 0; }
+.surface h1 {
+    font: var(--type-page-title); }
+.surface.surface :is(h2, h3) { font: 600 0.875rem/1.5 var(--lume-font-sans); letter-spacing: 0; }
 .surface :is(h4, h5, label, button, input, select, textarea, summary) {
     font-family: var(--lume-font-sans);
 }
-.surface :is(h4, h5) { font-size: 14px; font-weight: 600; }
+.surface :is(h4, h5) { font-size: 0.875rem; font-weight: 600; }
 .surface :global(.lume-registro) { font-family: var(--lume-font-sans); }
 .surface :is(button, input:not([type='checkbox']):not([type='radio']), select, summary) {
     min-height: 44px;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 .surface :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
     border-color: var(--lume-rule-strong);
@@ -36,7 +36,7 @@
     border-radius: 0;
     background: transparent;
     padding-inline: 0;
-    font-size: 13px;
+    font-size: 0.8125rem;
     letter-spacing: 0;
     text-transform: none;
 }
@@ -108,27 +108,27 @@
     background: transparent;
     padding-inline: 0;
 }
-.form textarea { font: 17px/1.5 var(--lume-font-voice); }
+.form textarea { font: var(--type-prose); }
 .surface .primary {
     background: var(--lume-ink-fresh);
     color: var(--lume-surface-focal);
     border-color: var(--lume-ink-fresh);
     box-shadow: none;
 }
-.viewer pre { font: 17px/1.5 var(--lume-font-voice); }
+.viewer pre { font: var(--type-prose); }
 .viewer { background: var(--lume-surface-focal); }
 @media (prefers-contrast: more) {
     .surface { --lume-rule: var(--lume-rule-strong); --lume-ink-pencil: var(--lume-ink-muted); }
 }
 
-.surface :global(.lume-code) { font-family: var(--font-registro), ui-monospace; }
+.surface.surface :global(.lume-code), .surface.surface :global(.type-code) { font: var(--type-code); }
 
 :global(html[data-ui-style='redesign']) .surface.surface:global(.patient-detail-section),
 :global(html[data-ui-style='redesign']) .surface.surface:global(.lume-panel) { border-radius: 0; box-shadow: none; }
-.surface :global(.apple-chip) { border: 0; border-radius: 0; background: transparent; font-size: 13px; }
+.surface :global(.apple-chip) { border: 0; border-radius: 0; background: transparent; font-size: 0.8125rem; }
 .surface .group :global(.truncate) { white-space: normal; overflow-wrap: anywhere; }
 .surface .record :is(h4, span):global(.truncate) { white-space: normal; overflow-wrap: anywhere; }
 
 .stack { display: grid; gap: 28px; }
 
-.surface .record h3 { font: 600 14px/1.5 var(--lume-font-sans); }
+.surface .record h3 { font: 600 0.875rem/1.5 var(--lume-font-sans); }

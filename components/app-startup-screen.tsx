@@ -19,11 +19,10 @@ export function AppStartupScreen({
         <div className={styles.lockShell}>
             <section className={styles.lockCard} aria-labelledby="mediflow-startup-title">
                 <div className={styles.brandRow}>
-                    <span className={styles.brandMark} aria-hidden="true">MF</span>
-                    <span className={styles.brandWord}>MEDI<b>FLOW</b></span>
+                    <span className={`${styles.brandWord} type-brand`}>MediFlow<span className={styles.brandDot} aria-hidden="true" /></span>
                 </div>
                 <div className={styles.headerBlock}>
-                    <h1 id="mediflow-startup-title" className={styles.title}>{title}</h1>
+                    <h1 id="mediflow-startup-title" className={`${styles.title} type-page-title`}>{title}<span aria-hidden="true">.</span></h1>
                 </div>
                 <p role="status" className="flex items-start gap-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                     <Loader2 className="mt-1 h-4 w-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />

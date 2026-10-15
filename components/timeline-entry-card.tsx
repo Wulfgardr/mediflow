@@ -94,8 +94,8 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
                             <Paperclip className="w-3 h-3" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold truncate">{file.name}</p>
-                            <p className="text-[10px]" style={{ color: 'var(--lume-ink-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
+                            <p className="text-xs font-semibold truncate">{file.name}</p>
+                            <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{file.summarySnapshot ? 'Analisi IA disponibile' : 'Allegato'}</p>
                         </div>
                     </button>
                 ))}
@@ -157,7 +157,7 @@ export function TimelineEntryCard({
                             <Icon className="w-4 h-4" />
                         </div>}
                         <div className={proposal ? twin.identity : undefined}>
-                            <span className="block text-xs font-bold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
+                            <span className="block text-xs font-semibold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
                                 {TYPE_LABELS[entry.type] || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type)}
                                 {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - <PrivacyBlur>{entry.patientName}</PrivacyBlur></span>}
                             </span>
@@ -211,10 +211,10 @@ export function TimelineEntryCard({
                     <div className="mf-alert mf-alert-critical mb-3 !flex items-start gap-2 text-xs">
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                         <div>
-                            <span className="font-bold">ELIMINATO: </span>
+                            <span className="font-semibold">ELIMINATO: </span>
                             {/* Window check to prevent hydration mismatch if SSR (though this is Client Component) */}
                             {typeof window !== 'undefined' && <span className="italic">{entry.deletionReason}</span>}
-                            <div className="text-[10px] opacity-70 mt-0.5">
+                            <div className="text-xs opacity-70 mt-0.5">
                                 {entry.deletedAt && <span className="lume-registro">{format(new Date(entry.deletedAt), 'dd/MM/yyyy HH:mm', { locale: it })}</span>}
                             </div>
                         </div>
@@ -245,12 +245,12 @@ export function TimelineEntryCard({
                 {entry.metadata?.score !== undefined && (
                     <div className="mf-alert mf-alert-info mt-3 !flex items-center justify-between">
                         <div>
-                            <p className="text-xs font-bold uppercase">{entry.metadata.title as string}</p>
+                            <p className="text-xs font-semibold uppercase">{entry.metadata.title as string}</p>
                             <div className="text-sm font-medium">
                                 <PrivacyBlur>{entry.metadata.interpretation as string}</PrivacyBlur>
                             </div>
                         </div>
-                        <div className="text-2xl font-bold">
+                        <div className="text-lg font-semibold">
                             {entry.metadata.score as number}
                         </div>
                     </div>

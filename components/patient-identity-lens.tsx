@@ -103,14 +103,14 @@ export function PatientIdentityLens({
             <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 space-y-4">
                     <div className="space-y-2">
-                        <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
+                        <p className="text-xs font-medium uppercase tracking-[0.12em] text-[color:var(--lume-ink-muted)]">
                             Identity Lens
                         </p>
-                        <h1 className="text-3xl font-semibold tracking-tight text-[color:var(--lume-ink)] md:text-4xl">
+                        <h1 className="type-person text-[color:var(--lume-ink)]">
                             <PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur>
                         </h1>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[color:var(--lume-ink-muted)]">
-                            <span className="lume-registro text-[12px] tracking-tight">
+                            <span className="lume-registro text-xs tracking-tight">
                                 <PrivacyBlur intensity="sm">{patient.taxCode}</PrivacyBlur>
                             </span>
                             <span>{ageLabel}</span>
@@ -135,7 +135,7 @@ export function PatientIdentityLens({
 
                     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                         <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Quadro clinico
                             </p>
                             {diagnoses.length > 0 ? (
@@ -148,11 +148,11 @@ export function PatientIdentityLens({
                                     {diagnoses.map((diagnosis) => (
                                         <li
                                             key={`${diagnosis.system}-${diagnosis.code}`}
-                                            className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-[12px] font-medium text-[color:var(--lume-ink)]"
+                                            className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] px-3 py-1 text-xs font-medium text-[color:var(--lume-ink)]"
                                         >
                                             <span className="lume-registro shrink-0 font-semibold text-[color:var(--lume-ink)]">{diagnosis.code}</span>
                                             <span className="min-w-0 truncate" title={diagnosis.description}>{diagnosis.description}</span>
-                                            <span className="shrink-0 text-[10px] uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
+                                            <span className="shrink-0 text-xs uppercase tracking-[0.04em] text-[color:var(--lume-ink-muted)]">
                                                 {diagnosisSystemLabel(diagnosis.system)}
                                             </span>
                                         </li>
@@ -166,7 +166,7 @@ export function PatientIdentityLens({
                         </div>
 
                         <div className="identity-lens-pane rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-4">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                            <p className="text-xs font-medium uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                 Contesto rapido
                             </p>
                             <div className="mt-3 space-y-2 text-sm text-[color:var(--lume-ink)]">

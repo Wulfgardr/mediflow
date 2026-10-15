@@ -153,7 +153,7 @@ export function SettingsSearchOverlay({
                         style={{ color: 'var(--lume-ink)' }}
                     />
                     <kbd
-                        className="lume-registro rounded-md border px-1.5 py-0.5 text-[10px]"
+                        className="lume-registro rounded-md border px-1.5 py-0.5 text-xs"
                         style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', color: 'var(--lume-ink-muted)' }}
                     >
                         esc
@@ -188,7 +188,7 @@ export function SettingsSearchOverlay({
                                     <span className="block truncate text-sm font-semibold" style={{ color: match.item.tone === 'danger' ? 'var(--lume-signal-critical)' : 'var(--lume-ink)' }}>
                                         {match.item.label}
                                     </span>
-                                    <span className="mt-0.5 block truncate text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                                         {match.groupLabel} · {match.matchedLabel}
                                     </span>
                                 </span>

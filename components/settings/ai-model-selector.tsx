@@ -167,7 +167,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                 </div>
                 <div className="min-w-0">
                     <h4 className="text-sm font-semibold" style={c.titleStyle}>{label}</h4>
-                    <p className="mt-1 text-[13px] leading-5" style={c.descriptionStyle}>{description}</p>
+                    <p className="mt-1 text-sm leading-5" style={c.descriptionStyle}>{description}</p>
                 </div>
             </div>
 
@@ -226,7 +226,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                                 </div>
                                                 <div className="min-w-0">
                                                     <span className="lume-registro block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
-                                                    <span className="mt-0.5 block text-[13px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
+                                                    <span className="mt-0.5 block text-sm leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
                                                 </div>
                                             </button>
 
@@ -246,7 +246,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                                         }}
                                                         aria-label={`Scarica ${model.name}`}
                                                         disabled={isPulling}
-                                                        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[13px] font-semibold transition-colors disabled:opacity-60"
+                                                        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-semibold transition-colors disabled:opacity-60"
                                                         style={c.downloadBadgeStyle}
                                                     >
                                                         {isPulling && pullingModel === model.name ? (
@@ -310,7 +310,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                             style={{ width: `${pullProgress}%`, ...c.progressStyle }}
                         />
                     </div>
-                    <p className="mt-2 truncate text-[13px]" style={{ color: 'var(--lume-ink-muted)' }}>{pullStatus}</p>
+                    <p className="mt-2 truncate text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{pullStatus}</p>
                 </div>
             )}
         </div>

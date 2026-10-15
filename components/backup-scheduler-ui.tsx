@@ -241,7 +241,7 @@ export default function BackupSchedulerUI() {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="section-kicker">Continuità operativa</p>
-                    <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
+                    <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
                         <Clock3 className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
                         Backup automatico notturno
                     </h3>

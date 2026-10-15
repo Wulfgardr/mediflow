@@ -80,7 +80,7 @@ export default function RootLayout({
   const runtimeTwin = process.env.MEDIFLOW_RUNTIME_TWIN === '1';
 
   return (
-    <html lang="it" data-ui-style="redesign" data-lume="true" data-runtime-twin={runtimeTwin ? 'true' : undefined} data-runtime-twin-design="proposal" data-twin-composition="stream" suppressHydrationWarning>
+    <html lang="it" className={`${voce.variable} ${registro.variable}`} data-ui-style="redesign" data-lume="true" data-runtime-twin={runtimeTwin ? 'true' : undefined} data-runtime-twin-design="proposal" data-twin-composition="stream" suppressHydrationWarning>
       {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
         <meta name="mediflow-app-fingerprint" content={appFingerprint} />
@@ -89,7 +89,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body
-        className={`${voce.variable} ${registro.variable} min-h-screen overflow-x-hidden antialiased`}
+        className="min-h-screen overflow-x-hidden antialiased"
         suppressHydrationWarning
       >
         <RuntimeTwinDesignProvider comparisonEnabled={runtimeTwin}>

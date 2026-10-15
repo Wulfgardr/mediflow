@@ -163,7 +163,7 @@ function ReviewActionButtons({
             <button
                 type="button"
                 onClick={onToggleEditor}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]"
             >
                 <Edit3 className="h-3 w-3" />
                 {isEditing ? 'Chiudi modifica' : 'Modifica'}
@@ -171,7 +171,7 @@ function ReviewActionButtons({
             <button
                 type="button"
                 onClick={onDiscard}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)] transition-[border-color,background-color,color] hover:border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] hover:text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]"
             >
                 <Trash2 className="h-3 w-3" />
                 Scarta
@@ -184,7 +184,7 @@ function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImpo
     return (
         <div className="space-y-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Resolver ICD locale</p>
+                <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Resolver ICD locale</p>
                 {diagnosis.resolver.queries.length > 0 && (
                     <span className="max-w-full break-words rounded-full bg-[color:var(--lume-surface-focal)] px-2 py-0.5 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                         {diagnosis.resolver.queries.join(' · ')}
@@ -199,10 +199,10 @@ function DiagnosisResolverPreview({ diagnosis }: { diagnosis: DiagnosisSmartImpo
                             className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-2.5"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="lume-code text-xs font-bold text-[color:var(--lume-ink)]">
+                                <span className="lume-code text-[color:var(--lume-ink)]">
                                     {candidate.code}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold uppercase tracking-tight ${candidate.selected ? 'bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)]' : 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase tracking-tight ${candidate.selected ? 'bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)]' : 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'}`}>
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
                             </div>
@@ -222,7 +222,7 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
     return (
         <div className="space-y-2 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
             <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Resolver AIFA locale</p>
+                <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Resolver AIFA locale</p>
                 {therapy.resolver.searchTerms.length > 0 && (
                     <span className="max-w-full break-words rounded-full bg-[color:var(--lume-surface-focal)] px-2 py-0.5 text-xs font-medium text-[color:var(--lume-ink-muted)]">
                         {therapy.resolver.searchTerms.join(' · ')}
@@ -237,13 +237,13 @@ function TherapyResolverPreview({ therapy }: { therapy: TherapySmartImportSugges
                             className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-2.5"
                         >
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="lume-code text-xs font-bold text-[color:var(--lume-ink)]">
+                                <span className="lume-code text-[color:var(--lume-ink)]">
                                     AIC {candidate.aic}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold uppercase tracking-tight ${candidate.selected ? 'bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)]' : 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase tracking-tight ${candidate.selected ? 'bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)]' : 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]'}`}>
                                     {candidate.selected ? 'scelto' : `score ${formatResolverScore(candidate.score)}`}
                                 </span>
-                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)]' : 'bg-[color:var(--lume-surface-canvas)] text-[color:var(--lume-ink-muted)]'}`}>
+                                <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase tracking-tight ${candidate.dosageAligned ? 'bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)]' : 'bg-[color:var(--lume-surface-canvas)] text-[color:var(--lume-ink-muted)]'}`}>
                                     {candidate.dosageAligned ? 'dosaggio coerente' : 'dosaggio divergente'}
                                 </span>
                             </div>
@@ -495,8 +495,8 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                         <AlertTriangle className="w-8 h-8" />
                     </div>
                     <div>
-                        <p className="text-xs font-bold uppercase tracking-normal text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">Funzione AI disattivata</p>
-                        <h3 className="mt-2 text-xl font-bold text-[color:var(--lume-ink)]">Smart Import disabilitato</h3>
+                        <p className="text-xs font-semibold uppercase tracking-normal text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">Funzione AI disattivata</p>
+                        <h3 className="mt-2 text-lg font-semibold text-[color:var(--lume-ink)]">Smart Import disabilitato</h3>
                         <p className="mt-2 max-w-sm text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
                             La funzione è stata fermata localmente per prudenza. La scheda resta consultabile, ma non avvia analisi né applicazioni finché l&apos;interruttore non viene riattivato in Impostazioni.
                         </p>
@@ -522,9 +522,9 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                             <Brain className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-base font-bold text-[color:var(--lume-ink)]">Smart Import</h3>
+                            <h3 className="text-base font-semibold text-[color:var(--lume-ink)]">Smart Import</h3>
                             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="inline-flex items-center rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-bold uppercase tracking-tight text-[color:var(--lume-ink-muted)]">
+                                <span className="inline-flex items-center rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-tight text-[color:var(--lume-ink-muted)]">
                                     {sourceCount} fonti
                                 </span>
                                 {analysis && (
@@ -590,7 +590,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                 <RefreshCw className="h-5 w-5 animate-spin text-[color:var(--lume-ink)]" />
                             </div>
                         </div>
-                        <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Elaborazione fonti cliniche in corso...</p>
+                        <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Elaborazione fonti cliniche in corso...</p>
                     </div>
                 )}
 
@@ -598,16 +598,16 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-4 lg:grid-cols-3">
                             <div className="flex flex-col">
-                                <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Selezionati</span>
-                                <span className="text-sm font-bold text-[color:var(--lume-ink)]">{selectedCount} pronti</span>
+                                <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Selezionati</span>
+                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{selectedCount} pronti</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Reviewabili</span>
-                                <span className="text-sm font-bold text-[color:var(--lume-ink)]">{reviewableCount} da confermare</span>
+                                <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Reviewabili</span>
+                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{reviewableCount} da confermare</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Bloccati</span>
-                                <span className="text-sm font-bold text-[color:var(--lume-ink)]">{blockedCount} da correggere o scartare</span>
+                                <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Bloccati</span>
+                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{blockedCount} da correggere o scartare</span>
                             </div>
                         </div>
 
@@ -618,7 +618,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
                                     <Stethoscope className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
-                                    <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Diagnosi Candidate</h4>
+                                    <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Diagnosi Candidate</h4>
                                 </div>
 
                                 <div className="space-y-3">
@@ -654,21 +654,21 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                             <div className="min-w-0 space-y-1.5">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     {diagnosis.canApply ? (
-                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-[color:var(--lume-ink)]">
+                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-semibold text-[color:var(--lume-ink)]">
                                                                             {displayLabel}
                                                                         </label>
                                                                     ) : (
-                                                                        <p className="break-words text-sm font-bold text-[color:var(--lume-ink)]">{displayLabel}</p>
+                                                                        <p className="break-words text-sm font-semibold text-[color:var(--lume-ink)]">{displayLabel}</p>
                                                                     )}
-                                                                    <span className={`rounded-full border px-1.5 py-0.5 text-xs font-bold uppercase tracking-normal ${reviewStateBadgeClasses(diagnosis.review.state)}`}>
+                                                                    <span className={`rounded-full border px-1.5 py-0.5 text-xs font-semibold uppercase tracking-normal ${reviewStateBadgeClasses(diagnosis.review.state)}`}>
                                                                         {reviewStateLabel(diagnosis.review.state)}
                                                                     </span>
-                                                                    <span className="rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                    <span className="rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                         {confidenceLabel(diagnosis.confidence)}
                                                                     </span>
                                                                 </div>
                                                                 {diagnosis.match && (
-                                                                    <p className="break-words lume-registro text-xs font-bold text-[color:var(--lume-ink)]">
+                                                                    <p className="break-words lume-registro text-xs font-semibold text-[color:var(--lume-ink)]">
                                                                         ICD-11 {diagnosis.match.code} · {diagnosis.match.description}
                                                                     </p>
                                                                 )}
@@ -696,7 +696,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                         </div>
 
                                                         <div className="space-y-1.5">
-                                                            <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                            <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                 Provenienza · {formatEvidenceMeta(diagnosis.evidence)}
                                                             </p>
                                                             <div className={ink.pencil + " p-2 text-sm"}>
@@ -709,7 +709,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                         {isEditing && (
                                                             <div className="grid gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
                                                                 <label className="space-y-1">
-                                                                    <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                    <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                         Descrizione da importare
                                                                     </span>
                                                                     <input
@@ -737,7 +737,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2 px-1">
                                     <Pill className="h-3.5 w-3.5 text-[color:var(--lume-ink-muted)]" />
-                                    <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Terapie Candidate</h4>
+                                    <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Terapie Candidate</h4>
                                 </div>
 
                                 <div className="space-y-3">
@@ -775,27 +775,27 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                             <div className="min-w-0 space-y-1.5">
                                                                 <div className="flex flex-wrap items-center gap-2">
                                                                     {therapy.canApply ? (
-                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-bold text-[color:var(--lume-ink)]">
+                                                                        <label htmlFor={checkboxId} className="cursor-pointer break-words text-sm font-semibold text-[color:var(--lume-ink)]">
                                                                             {displayName}
                                                                         </label>
                                                                     ) : (
-                                                                        <p className="break-words text-sm font-bold text-[color:var(--lume-ink)]">{displayName}</p>
+                                                                        <p className="break-words text-sm font-semibold text-[color:var(--lume-ink)]">{displayName}</p>
                                                                     )}
-                                                                    <span className={`rounded-full border px-1.5 py-0.5 text-xs font-bold uppercase tracking-normal ${reviewStateBadgeClasses(therapy.review.state)}`}>
+                                                                    <span className={`rounded-full border px-1.5 py-0.5 text-xs font-semibold uppercase tracking-normal ${reviewStateBadgeClasses(therapy.review.state)}`}>
                                                                         {reviewStateLabel(therapy.review.state)}
                                                                     </span>
-                                                                    <span className={`rounded-full border px-1.5 py-0.5 text-xs font-bold uppercase tracking-normal ${therapyStateBadgeClasses(therapy.therapyState)}`}>
+                                                                    <span className={`rounded-full border px-1.5 py-0.5 text-xs font-semibold uppercase tracking-normal ${therapyStateBadgeClasses(therapy.therapyState)}`}>
                                                                         {therapyStateLabel(therapy.therapyState)}
                                                                     </span>
-                                                                    <span className="rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                    <span className="rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                         {matchTypeLabel(therapy.matchType)}
                                                                     </span>
                                                                 </div>
-                                                                <p className="break-words text-xs font-bold text-[color:var(--lume-ink)]">
+                                                                <p className="break-words text-xs font-semibold text-[color:var(--lume-ink)]">
                                                                     {[displayPrinciple, displayDosage].filter(Boolean).join(' · ')}
                                                                 </p>
                                                                 {therapy.match?.aic && (
-                                                                    <p className="break-words lume-registro text-xs font-bold text-[color:var(--lume-ink-muted)]">
+                                                                    <p className="break-words lume-registro text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                                                                         AIC {therapy.match.aic}{therapy.match.atc ? ` · ATC ${therapy.match.atc}` : ''}
                                                                     </p>
                                                                 )}
@@ -823,7 +823,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                         </div>
 
                                                         <div className="space-y-1.5">
-                                                            <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                            <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                 Provenienza · {formatEvidenceMeta(therapy.evidence)}
                                                             </p>
                                                             <div className={ink.pencil + " p-2 text-sm"}>
@@ -837,7 +837,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                             <div className="grid gap-3 rounded-[20px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-3">
                                                                 <div className="grid gap-3 md:grid-cols-2">
                                                                     <label className="space-y-1">
-                                                                        <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                             Nome farmaco
                                                                         </span>
                                                                         <input
@@ -850,7 +850,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
-                                                                        <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                             Principio attivo
                                                                         </span>
                                                                         <input
@@ -863,7 +863,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
-                                                                        <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                             Posologia
                                                                         </span>
                                                                         <input
@@ -876,7 +876,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                                                                         />
                                                                     </label>
                                                                     <label className="space-y-1">
-                                                                        <span className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">
                                                                             Motivazione
                                                                         </span>
                                                                         <input

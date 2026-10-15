@@ -56,8 +56,8 @@
 
 .brandWord {
   color: var(--ink);
-  font: 500 28px/1.1 var(--lume-font-voice);
   letter-spacing: -0.01em;
+  font: var(--type-brand);
 }
 .brandDot {
   display: inline-block;
@@ -78,9 +78,9 @@
 .title {
   margin: 0;
   color: var(--ink);
-  font: 400 26px/1.1 var(--lume-font-voice);
   line-height: 1.1;
   letter-spacing: 0;
+  font: var(--type-page-title);
 }
 
 .form {
@@ -102,7 +102,7 @@
   color: var(--ink);
   padding: 12px 14px;
   text-align: center;
-  font-size: 18px;
+  font-size: 0.9375rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.4em;
   outline: none;
@@ -111,7 +111,7 @@
 
 .pinInput::placeholder {
   color: var(--ink-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   letter-spacing: 0.02em;
 }
 
@@ -136,7 +136,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--ink);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.35;
   text-align: center;
@@ -158,8 +158,8 @@
   background: var(--accent);
   color: var(--accent-ink);
   padding: 12px 18px;
-  font-size: 14px;
-  font-weight: 650;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
   transition: background-color 160ms var(--motion-ease);
 }
@@ -199,7 +199,7 @@
   }
 
   .title {
-    font-size: 24px;
+    font: var(--type-page-title);
   }
 }
 

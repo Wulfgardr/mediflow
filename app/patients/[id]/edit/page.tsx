@@ -214,7 +214,7 @@ export default function EditPatientPage() {
                             <Archive className="w-6 h-6 shrink-0" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>Paziente archiviato</h3>
+                            <h3 className="text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>Paziente archiviato</h3>
                             <p className="mt-1 text-sm font-medium leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
                                 Questa scheda è attualmente in sola lettura per l&apos;agenda corrente. Riattiva per tornare alle operazioni standard.
                             </p>
@@ -257,7 +257,7 @@ export default function EditPatientPage() {
                         </div>
                         <div>
                             <p className="mf-eyebrow !text-[color:var(--lume-signal-critical)]">Azioni sensibili</p>
-                            <h3 className="text-xl font-black tracking-tight" style={{ color: 'var(--lume-ink)' }}>Stato scheda ed export</h3>
+                            <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>Stato scheda ed export</h3>
                         </div>
                     </div>
 

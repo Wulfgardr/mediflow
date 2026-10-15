@@ -162,14 +162,14 @@ export default function BackupRestoreUI() {
             <div className="xl:col-span-2"><RecoveryBackupUI /></div>
             <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Export locale</p>
-                <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
+                <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
                     <Download className="w-5 h-5 text-[color:var(--lume-ink-secondary)]" />
                     Esportazione portabile
                 </h3>
                 <p className="mb-4 mt-2 text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
                     Scarica un file <code>.mediflow</code> con le collezioni esportabili. Non è il backup completo di recupero: non contiene gli account e gli involucri delle chiavi. Il ripristino valida formato, versione e integrità prima di sovrascrivere i dati.
                     <br />
-                    <span className="font-bold text-[color:var(--lume-signal-warning)]">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
+                    <span className="font-semibold text-[color:var(--lume-signal-warning)]">Nota:</span> il restore copre le collezioni esportabili via API locale; i dati non validi vengono rifiutati prima della scrittura.
                 </p>
                 <button
                     onClick={handleExport}
@@ -200,7 +200,7 @@ export default function BackupRestoreUI() {
 
             <div className="mf-section lume-focal p-6 md:p-7">
                 <p className="section-kicker">Ripristino controllato</p>
-                <h3 className="flex items-center gap-2 text-lg font-bold" style={{ color: 'var(--lume-ink)' }}>
+                <h3 className="flex items-center gap-2 text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
                     <Upload className="w-5 h-5 text-[color:var(--lume-signal-warning)]" />
                     Restore
                 </h3>
@@ -261,7 +261,7 @@ export default function BackupRestoreUI() {
                                 onClick={confirmRestore}
                                 disabled={!restoreConfirmed || isLoading}
                                 data-testid="restore-confirmation-submit"
-                                className="ui-btn-primary mf-tone-critical inline-flex items-center gap-2 px-4 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-50"
+                                className="ui-btn-primary mf-tone-critical inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isLoading ? <RefreshCw className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                                 Ripristina adesso
@@ -287,7 +287,7 @@ export default function BackupRestoreUI() {
                     {status.type === 'success' && <CheckCircle className="w-5 h-5" />}
                     {status.type === 'error' && <AlertTriangle className="w-5 h-5" />}
                     <div className="space-y-3" data-testid="backup-outcome">
-                        {status.title && <p className="font-bold">{status.title}</p>}
+                        {status.title && <p className="font-semibold">{status.title}</p>}
                         <p className="font-medium">{status.message}</p>
                         {status.nextStep && <p className="text-sm">{status.nextStep}</p>}
                         {status.preflight && (

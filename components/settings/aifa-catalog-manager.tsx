@@ -89,8 +89,8 @@ export default function AifaCatalogManager() {
             <div className="space-y-4">
                 <div className="flex items-center justify-between rounded-[var(--lume-radius-control)] border p-4" style={AIFA_STAT_STYLE}>
                     <div>
-                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--lume-ink-muted)' }}>Confezioni indicizzate</p>
-                        <p className="text-2xl font-bold" style={{ color: 'var(--lume-ink)' }}>
+                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--lume-ink-muted)' }}>Confezioni indicizzate</p>
+                        <p className="text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>
                             {drugCatalog !== null ? drugCatalog.count.toLocaleString('it-IT') : '-'}
                         </p>
                     </div>
