@@ -38,10 +38,10 @@ async function unlocked(page: Page): Promise<void> {
 async function setup(page: Page): Promise<void> {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Chi sei?', exact: true })).toBeVisible();
-    await page.getByLabel('Nome e Cognome', { exact: true }).fill('Dr. Importazione Sintetica');
-    await page.getByLabel('Nome Ambulatorio', { exact: true }).fill('Ambulatorio CSV Sintetico');
+    await page.getByLabel('Nome e cognome', { exact: true }).fill('Dr. Importazione Sintetica');
+    await page.getByLabel('Nome dell’ambulatorio', { exact: true }).fill('Ambulatorio CSV Sintetico');
     await page.getByRole('button', { name: 'Avanti', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Proteggi l’accesso', exact: true })).toBeVisible();
     await page.getByLabel('Passphrase di accesso', { exact: true }).fill(PASSPHRASE);
     await page.getByLabel('Conferma passphrase', { exact: true }).fill(PASSPHRASE);
     await page.locator('#setup-pin').fill(PIN);
