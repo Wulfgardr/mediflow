@@ -48,7 +48,8 @@ test.beforeAll(async ({ browser, baseURL }) => {
   expect(+url.port).toBeGreaterThanOrEqual(3200);
   expect(+url.port).toBeLessThan(3300);
   expect(['3290', '3291', '3292']).not.toContain(url.port);
-  context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 960 } });
+  context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 960 },
+    recordVideo: { dir: test.info().outputPath('videos') } });
   page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => {
@@ -107,15 +108,31 @@ test('ordinary PIN and manual onboarding preserve default B without comparison c
   await expect(nav().getByRole('link', { name: 'Agenda', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
-test('one click opens the correct record and all thirteen progressive sections remain reachable', async () => {
+test('patient preview opens the correct record and all thirteen progressive sections remain reachable', async () => {
   test.setTimeout(90_000);
   await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
-  await page.getByTestId('lume-patient-row').filter({ hasText: patients[0].firstName }).click();
+  const row1 = page.getByTestId('lume-patient-row').filter({ hasText: patients[0].firstName });
+  await row1.click();
+  await expect(row1).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/[?&]area=incarico/);
+  const preview1 = page.getByRole('complementary', { name: `Lente paziente: ${name(0)}`, exact: true });
+  await expect(preview1).toBeVisible();
+  const open1 = preview1.getByRole('link', { name: 'Apri scheda paziente', exact: true });
+  await expect(open1).toHaveAttribute('href', modules(0));
+  await open1.click();
   await expect(page).toHaveURL(new RegExp(`${modules()}$`));
   await expect(page.locator('#diario')).toBeVisible();
   await expect(page.getByRole('heading', { name: name(), exact: true })).toBeVisible();
   await nav().getByRole('link', { name: 'Pazienti', exact: true }).click();
-  await page.getByTestId('lume-patient-row').filter({ hasText: patients[1].firstName }).click();
+  const row2 = page.getByTestId('lume-patient-row').filter({ hasText: patients[1].firstName });
+  await row2.click();
+  await expect(row2).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/[?&]area=incarico/);
+  const preview2 = page.getByRole('complementary', { name: `Lente paziente: ${name(1)}`, exact: true });
+  await expect(preview2).toBeVisible();
+  const open2 = preview2.getByRole('link', { name: 'Apri scheda paziente', exact: true });
+  await expect(open2).toHaveAttribute('href', modules(1));
+  await open2.click();
   await expect(page).toHaveURL(new RegExp(`${modules(1)}$`));
   const tabs = page.getByRole('navigation', { name: 'Cartelle aperte' });
   await expect(tabs.getByRole('link', { name: name(1), exact: true })).toHaveAttribute('aria-current', 'page');
