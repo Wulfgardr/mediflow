@@ -158,6 +158,16 @@ e conserva il file in un luogo sicuro, per esempio un disco esterno.
 In caso di guasto, il ripristino richiede di reinstallare MediFlow e recuperare
 backup e PIN.
 
+Verifica e ripristino accettano il backup completo anche quando supera la
+dimensione di un singolo allegato. Il file viene elaborato interamente in
+memoria: per archivi grandi serve memoria libera sufficiente sul computer.
+
+All'apertura su macOS e Linux, MediFlow limita al proprietario l'accesso a
+`medical.db` e ai file di lavoro SQLite `-wal` e `-shm`. Non modifica file
+di altri utenti o collegamenti simbolici, che impediscono l'apertura.
+Se hai scelto una cartella dati personalizzata, assicurati che sia accessibile
+solo al tuo utente prima di allegare originali al repertorio protesico.
+
 **È a norma GDPR?**
 Cifratura e gestione locale dei dati sono misure tecniche, non una garanzia
 complessiva di conformità. La conformità legale dipende anche dalle misure

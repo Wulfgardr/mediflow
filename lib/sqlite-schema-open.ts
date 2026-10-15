@@ -28,6 +28,26 @@ export class SqliteSchemaRecoveryRequiredError extends Error {
 
 function deny(reason: string): never { throw new SqliteSchemaRecoveryRequiredError(reason); }
 
+function ensurePrivateArchiveFiles(databasePath: string): void {
+    if (process.platform === 'win32') return;
+    for (const file of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+        let before: fs.Stats;
+        try { before = fs.lstatSync(file); }
+        catch (error) {
+            if (file !== databasePath && (error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+            throw error;
+        }
+        if (!before.isFile() || before.uid !== process.getuid?.()) deny('archive file is not a regular owner-owned file');
+        const fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+        try {
+            const current = fs.fstatSync(fd);
+            if (!current.isFile() || current.uid !== process.getuid?.() || current.dev !== before.dev || current.ino !== before.ino)
+                deny('archive file identity or owner changed');
+            if ((current.mode & 0o7777) !== 0o600) fs.fchmodSync(fd, 0o600);
+        } finally { fs.closeSync(fd); }
+    }
+}
+
 function assertIntegrity(connection: Database.Database): void {
     const integrity = connection.pragma('integrity_check') as { integrity_check: string }[];
     if (integrity.length !== 1 || integrity[0].integrity_check !== 'ok') deny('integrity check failed');
@@ -85,6 +105,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
         if (before.size === 0) deny('empty file has no first-install reservation');
     }
 
+    ensurePrivateArchiveFiles(databasePath);
     const connection = openConnection(databasePath);
     let snapshot: string | undefined;
     try {
@@ -137,6 +158,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
         }).immediate();
         readSqliteArchiveGeneration(connection);
         initSqlitePragmas(connection);
+        ensurePrivateArchiveFiles(databasePath);
         return connection;
     } catch (error) {
         // After a rollback the archive is still the original: keeping one more
