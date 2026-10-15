@@ -1,0 +1,2104 @@
+{
+  "schemaVersion": "mediflow.c20_c02_comparison.v1",
+  "scope": "Bounded comparison for WUL-735 criterion 6; not completion of all historical C02 dimensions, release acceptance or clinical admission.",
+  "patientRuns": [
+    {
+      "id": "baseline-1",
+      "receiptSHA256": "3c87650a9c3cf6553e433c050a292250cb232322e003dfee62db72fd4076e413",
+      "measuredAt": "2026-10-06T05:39:55.939Z",
+      "source": {
+        "head": "47e24f6cf5eea42b34f320d6d675e07fc96bd2a5",
+        "diffSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnessSHA256": "4d843f72f4703b143b93af483fe44c622d8d811444ec463d8b630c4285b29ab5",
+        "seedSHA256": "c833193bdb8c2a9390e353e47c2973a9600406a04b0299b6ed8d1e9ae2b03f4c",
+        "lockSHA256": "7b589bc317aa501fc5d121d121061af8a305e8e2cc661b3b162b9a7c6f0aa2d3"
+      },
+      "artifact": {
+        "serverSHA256": "611857d7f89b4e66dd8663f9c96e8c4c8cdcae0affa198e8dd2e8be4c2d8d4fc",
+        "applicationSHA256": "6fc18248b3ab97d3a82ceb2143957768bf8ddfec938fcb11925066e36f8c3ed3"
+      },
+      "environment": {
+        "node": "v24.21.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "os": "27.2.0",
+        "cpu": "Apple M4 Max",
+        "logicalCores": 14,
+        "memoryBytes": 38654705664,
+        "timezone": "Europe/Rome",
+        "browser": "145.0.7632.6",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        }
+      },
+      "protocol": {
+        "patients": 20,
+        "samples": 5,
+        "firstVisit": "fresh page, already started/authenticated server; not OS-cold",
+        "warm": "same browser context and server, full document navigation",
+        "startupSamples": 1,
+        "statistics": "raw samples and median/range only; no P95 or wall-clock CI threshold",
+        "formReady": "loaded and enabled firstName plus decrypted address/notes and two related checkups",
+        "saveToFresh": "click through real PUT body EOF, app GET of advanced version, all post-save clinical reads complete, then newly opened editable form; includes test-driver observation overhead",
+        "ai": "no provider configured; no feature kill switch changed; requests observed, not intercepted"
+      },
+      "seed": {
+        "schemaVersion": "mediflow.performance_seed.v2",
+        "seed": "mediflow-performance-2026-07-17",
+        "patients": 20,
+        "entries": 160,
+        "observations": 120,
+        "documents": 40,
+        "checkups": 40,
+        "fixtureRevision": 2,
+        "provenance": "deterministic synthetic records; not a real-patient distribution",
+        "cardinalities": {
+          "users": 1,
+          "ambulatories": 1,
+          "patients": 20,
+          "memberships": 20,
+          "entries": 160,
+          "observations": 120,
+          "checkups": 40,
+          "attachments": 40
+        },
+        "logicalSHA256": "e2245c7dfb5a72aa750d41ff3b4714fb7a2e6b2fbb654d98b7dd7f101a5f55ed"
+      },
+      "startupMethod": "standalone server.js",
+      "processStartToRevisionMs": 472.152,
+      "samples": [
+        {
+          "iteration": 0,
+          "formReadyMs": 196.72,
+          "saveToWriteBodyMs": 116.701,
+          "saveToFreshResponseMs": 33.547,
+          "saveToFreshFormMs": 278.163,
+          "putRequestMs": 3.773
+        },
+        {
+          "iteration": 1,
+          "formReadyMs": 137.041,
+          "saveToWriteBodyMs": 90.505,
+          "saveToFreshResponseMs": 32.581,
+          "saveToFreshFormMs": 229.111,
+          "putRequestMs": 2.454
+        },
+        {
+          "iteration": 2,
+          "formReadyMs": 134.311,
+          "saveToWriteBodyMs": 83.152,
+          "saveToFreshResponseMs": 28.307,
+          "saveToFreshFormMs": 220.771,
+          "putRequestMs": 2.722
+        },
+        {
+          "iteration": 3,
+          "formReadyMs": 129.198,
+          "saveToWriteBodyMs": 85.866,
+          "saveToFreshResponseMs": 34.078,
+          "saveToFreshFormMs": 218.843,
+          "putRequestMs": 2.26
+        },
+        {
+          "iteration": 4,
+          "formReadyMs": 129.708,
+          "saveToWriteBodyMs": 87.295,
+          "saveToFreshResponseMs": 40.426,
+          "saveToFreshFormMs": 223.574,
+          "putRequestMs": 2.458
+        }
+      ],
+      "warmSummary": {
+        "formReadyMs": {
+          "count": 4,
+          "median": 132.01,
+          "min": 129.198,
+          "max": 137.041
+        },
+        "saveToWriteBodyMs": {
+          "count": 4,
+          "median": 86.581,
+          "min": 83.152,
+          "max": 90.505
+        },
+        "saveToFreshResponseMs": {
+          "count": 4,
+          "median": 33.33,
+          "min": 28.307,
+          "max": 40.426
+        },
+        "saveToFreshFormMs": {
+          "count": 4,
+          "median": 222.173,
+          "min": 218.843,
+          "max": 229.111
+        },
+        "putRequestMs": {
+          "count": 4,
+          "median": 2.456,
+          "min": 2.26,
+          "max": 2.722
+        }
+      },
+      "gates": {
+        "success": 5,
+        "invalid": 5,
+        "staleReplay": 5,
+        "unauthorized": 1,
+        "wrongPatientUnchanged": 5,
+        "encryptedNotesVerifiedInFreshForm": true,
+        "observedBrowserPUTs": 5,
+        "observedAIWorkPOSTs": 0,
+        "observedServer5xx": 0,
+        "apiRequestFailures": 0,
+        "navigationRequestFailures": 14,
+        "childStopped": true
+      },
+      "status": "pass"
+    },
+    {
+      "id": "baseline-2",
+      "receiptSHA256": "28c2803bed824084acb57dc85ccc1ad420a635fa70b5bf7f68b0997d790daa0f",
+      "measuredAt": "2026-10-06T05:40:20.202Z",
+      "source": {
+        "head": "47e24f6cf5eea42b34f320d6d675e07fc96bd2a5",
+        "diffSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnessSHA256": "4d843f72f4703b143b93af483fe44c622d8d811444ec463d8b630c4285b29ab5",
+        "seedSHA256": "c833193bdb8c2a9390e353e47c2973a9600406a04b0299b6ed8d1e9ae2b03f4c",
+        "lockSHA256": "7b589bc317aa501fc5d121d121061af8a305e8e2cc661b3b162b9a7c6f0aa2d3"
+      },
+      "artifact": {
+        "serverSHA256": "611857d7f89b4e66dd8663f9c96e8c4c8cdcae0affa198e8dd2e8be4c2d8d4fc",
+        "applicationSHA256": "6fc18248b3ab97d3a82ceb2143957768bf8ddfec938fcb11925066e36f8c3ed3"
+      },
+      "environment": {
+        "node": "v24.21.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "os": "27.2.0",
+        "cpu": "Apple M4 Max",
+        "logicalCores": 14,
+        "memoryBytes": 38654705664,
+        "timezone": "Europe/Rome",
+        "browser": "145.0.7632.6",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        }
+      },
+      "protocol": {
+        "patients": 20,
+        "samples": 5,
+        "firstVisit": "fresh page, already started/authenticated server; not OS-cold",
+        "warm": "same browser context and server, full document navigation",
+        "startupSamples": 1,
+        "statistics": "raw samples and median/range only; no P95 or wall-clock CI threshold",
+        "formReady": "loaded and enabled firstName plus decrypted address/notes and two related checkups",
+        "saveToFresh": "click through real PUT body EOF, app GET of advanced version, all post-save clinical reads complete, then newly opened editable form; includes test-driver observation overhead",
+        "ai": "no provider configured; no feature kill switch changed; requests observed, not intercepted"
+      },
+      "seed": {
+        "schemaVersion": "mediflow.performance_seed.v2",
+        "seed": "mediflow-performance-2026-07-17",
+        "patients": 20,
+        "entries": 160,
+        "observations": 120,
+        "documents": 40,
+        "checkups": 40,
+        "fixtureRevision": 2,
+        "provenance": "deterministic synthetic records; not a real-patient distribution",
+        "cardinalities": {
+          "users": 1,
+          "ambulatories": 1,
+          "patients": 20,
+          "memberships": 20,
+          "entries": 160,
+          "observations": 120,
+          "checkups": 40,
+          "attachments": 40
+        },
+        "logicalSHA256": "e2245c7dfb5a72aa750d41ff3b4714fb7a2e6b2fbb654d98b7dd7f101a5f55ed"
+      },
+      "startupMethod": "standalone server.js",
+      "processStartToRevisionMs": 401.094,
+      "samples": [
+        {
+          "iteration": 0,
+          "formReadyMs": 193.526,
+          "saveToWriteBodyMs": 111.12,
+          "saveToFreshResponseMs": 32.66,
+          "saveToFreshFormMs": 271.218,
+          "putRequestMs": 3.785
+        },
+        {
+          "iteration": 1,
+          "formReadyMs": 140.967,
+          "saveToWriteBodyMs": 91.425,
+          "saveToFreshResponseMs": 36.378,
+          "saveToFreshFormMs": 238.87,
+          "putRequestMs": 3.102
+        },
+        {
+          "iteration": 2,
+          "formReadyMs": 133.152,
+          "saveToWriteBodyMs": 89.109,
+          "saveToFreshResponseMs": 33.78,
+          "saveToFreshFormMs": 226.779,
+          "putRequestMs": 2.501
+        },
+        {
+          "iteration": 3,
+          "formReadyMs": 129.852,
+          "saveToWriteBodyMs": 85.469,
+          "saveToFreshResponseMs": 38.752,
+          "saveToFreshFormMs": 219.249,
+          "putRequestMs": 2.685
+        },
+        {
+          "iteration": 4,
+          "formReadyMs": 130.405,
+          "saveToWriteBodyMs": 80.201,
+          "saveToFreshResponseMs": 26.284,
+          "saveToFreshFormMs": 217.676,
+          "putRequestMs": 2.206
+        }
+      ],
+      "warmSummary": {
+        "formReadyMs": {
+          "count": 4,
+          "median": 131.779,
+          "min": 129.852,
+          "max": 140.967
+        },
+        "saveToWriteBodyMs": {
+          "count": 4,
+          "median": 87.289,
+          "min": 80.201,
+          "max": 91.425
+        },
+        "saveToFreshResponseMs": {
+          "count": 4,
+          "median": 35.079,
+          "min": 26.284,
+          "max": 38.752
+        },
+        "saveToFreshFormMs": {
+          "count": 4,
+          "median": 223.014,
+          "min": 217.676,
+          "max": 238.87
+        },
+        "putRequestMs": {
+          "count": 4,
+          "median": 2.593,
+          "min": 2.206,
+          "max": 3.102
+        }
+      },
+      "gates": {
+        "success": 5,
+        "invalid": 5,
+        "staleReplay": 5,
+        "unauthorized": 1,
+        "wrongPatientUnchanged": 5,
+        "encryptedNotesVerifiedInFreshForm": true,
+        "observedBrowserPUTs": 5,
+        "observedAIWorkPOSTs": 0,
+        "observedServer5xx": 0,
+        "apiRequestFailures": 0,
+        "navigationRequestFailures": 18,
+        "childStopped": true
+      },
+      "status": "pass"
+    },
+    {
+      "id": "current-1",
+      "receiptSHA256": "8880c3777ff320cf9c4e5f110c13dece7b2c4aa2785b6960fb9e86da4efa4f4f",
+      "measuredAt": "2026-10-15T17:00:05.943Z",
+      "source": {
+        "head": "31b8d039099c2daca5d2b80ca5ea78e3523e8d12",
+        "diffSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnessSHA256": "18e8cdc9d5f271e5cb549d057fadea405e667e29c584dc010e765ae226d689e2",
+        "seedSHA256": "8a8f757ef92bcf8bbb99490646d89609611bafea1a4b615b5479663a00e0bcd8",
+        "lockSHA256": "bad5cf3361e7ab322e4045f5013d083db9be85f79bdf89d3d2091fc54362f352"
+      },
+      "artifact": {
+        "serverSHA256": "c5f08cfd3ada8bd75db977a5ecca8ded671066d29e3a6b9c4d961465e0579f45",
+        "applicationSHA256": "2557fac7c8bafc435e53ae810c0f6f56e56d730c26864b41481700d6e5d15499"
+      },
+      "environment": {
+        "node": "v24.21.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "os": "27.2.0",
+        "cpu": "Apple M4 Max",
+        "logicalCores": 14,
+        "memoryBytes": 38654705664,
+        "timezone": "Europe/Rome",
+        "browser": "145.0.7632.6",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        }
+      },
+      "protocol": {
+        "patients": 20,
+        "samples": 5,
+        "firstVisit": "fresh page, already started/authenticated server; not OS-cold",
+        "warm": "same browser context and server, full document navigation",
+        "startupSamples": 1,
+        "statistics": "raw samples and median/range only; no P95 or wall-clock CI threshold",
+        "formReady": "loaded and enabled firstName plus decrypted address/notes and two related checkups",
+        "saveToFresh": "click through real PUT body EOF, app GET of advanced version, all post-save clinical reads complete, then newly opened editable form; includes test-driver observation overhead",
+        "ai": "no provider configured; no feature kill switch changed; requests observed, not intercepted"
+      },
+      "seed": {
+        "schemaVersion": "mediflow.performance_seed.v2",
+        "seed": "mediflow-performance-2026-07-17",
+        "patients": 20,
+        "entries": 160,
+        "observations": 120,
+        "documents": 40,
+        "checkups": 40,
+        "fixtureRevision": 2,
+        "provenance": "deterministic synthetic records; not a real-patient distribution",
+        "cardinalities": {
+          "users": 1,
+          "ambulatories": 1,
+          "patients": 20,
+          "memberships": 20,
+          "entries": 160,
+          "observations": 120,
+          "checkups": 40,
+          "attachments": 40
+        },
+        "logicalSHA256": "af6ec2fae10d4bf8345aa4f24a337562546fe8998285f17d12776c92c7de4765"
+      },
+      "startupMethod": "source-runtime",
+      "processStartToRevisionMs": 2915.421,
+      "samples": [
+        {
+          "iteration": 0,
+          "formReadyMs": 192.93,
+          "saveToWriteBodyMs": 106.178,
+          "saveToFreshResponseMs": 33.532,
+          "saveToFreshFormMs": 264.454,
+          "putRequestMs": 3.915
+        },
+        {
+          "iteration": 1,
+          "formReadyMs": 132.188,
+          "saveToWriteBodyMs": 83.31,
+          "saveToFreshResponseMs": 39.903,
+          "saveToFreshFormMs": 218.324,
+          "putRequestMs": 2.925
+        },
+        {
+          "iteration": 2,
+          "formReadyMs": 129.426,
+          "saveToWriteBodyMs": 86.959,
+          "saveToFreshResponseMs": 32.108,
+          "saveToFreshFormMs": 222.135,
+          "putRequestMs": 2.616
+        },
+        {
+          "iteration": 3,
+          "formReadyMs": 130.567,
+          "saveToWriteBodyMs": 80.682,
+          "saveToFreshResponseMs": 27.233,
+          "saveToFreshFormMs": 215.049,
+          "putRequestMs": 2.776
+        },
+        {
+          "iteration": 4,
+          "formReadyMs": 128.461,
+          "saveToWriteBodyMs": 85.381,
+          "saveToFreshResponseMs": 40.182,
+          "saveToFreshFormMs": 219.206,
+          "putRequestMs": 2.687
+        }
+      ],
+      "warmSummary": {
+        "formReadyMs": {
+          "count": 4,
+          "median": 129.996,
+          "min": 128.461,
+          "max": 132.188
+        },
+        "saveToWriteBodyMs": {
+          "count": 4,
+          "median": 84.346,
+          "min": 80.682,
+          "max": 86.959
+        },
+        "saveToFreshResponseMs": {
+          "count": 4,
+          "median": 36.005,
+          "min": 27.233,
+          "max": 40.182
+        },
+        "saveToFreshFormMs": {
+          "count": 4,
+          "median": 218.765,
+          "min": 215.049,
+          "max": 222.135
+        },
+        "putRequestMs": {
+          "count": 4,
+          "median": 2.731,
+          "min": 2.616,
+          "max": 2.925
+        }
+      },
+      "gates": {
+        "success": 5,
+        "invalid": 5,
+        "staleReplay": 5,
+        "unauthorized": 1,
+        "wrongPatientUnchanged": 5,
+        "encryptedNotesVerifiedInFreshForm": true,
+        "observedBrowserPUTs": 5,
+        "observedAIWorkPOSTs": 0,
+        "observedServer5xx": 0,
+        "apiRequestFailures": 0,
+        "navigationRequestFailures": 19,
+        "childStopped": true
+      },
+      "status": "pass"
+    },
+    {
+      "id": "current-2",
+      "receiptSHA256": "bc303b67f35a36729aacac879df5e64eba492b43be5e423dc91142d70f65e13c",
+      "measuredAt": "2026-10-15T17:00:42.223Z",
+      "source": {
+        "head": "31b8d039099c2daca5d2b80ca5ea78e3523e8d12",
+        "diffSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "harnessSHA256": "18e8cdc9d5f271e5cb549d057fadea405e667e29c584dc010e765ae226d689e2",
+        "seedSHA256": "8a8f757ef92bcf8bbb99490646d89609611bafea1a4b615b5479663a00e0bcd8",
+        "lockSHA256": "bad5cf3361e7ab322e4045f5013d083db9be85f79bdf89d3d2091fc54362f352"
+      },
+      "artifact": {
+        "serverSHA256": "c5f08cfd3ada8bd75db977a5ecca8ded671066d29e3a6b9c4d961465e0579f45",
+        "applicationSHA256": "2557fac7c8bafc435e53ae810c0f6f56e56d730c26864b41481700d6e5d15499"
+      },
+      "environment": {
+        "node": "v24.21.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "os": "27.2.0",
+        "cpu": "Apple M4 Max",
+        "logicalCores": 14,
+        "memoryBytes": 38654705664,
+        "timezone": "Europe/Rome",
+        "browser": "145.0.7632.6",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        }
+      },
+      "protocol": {
+        "patients": 20,
+        "samples": 5,
+        "firstVisit": "fresh page, already started/authenticated server; not OS-cold",
+        "warm": "same browser context and server, full document navigation",
+        "startupSamples": 1,
+        "statistics": "raw samples and median/range only; no P95 or wall-clock CI threshold",
+        "formReady": "loaded and enabled firstName plus decrypted address/notes and two related checkups",
+        "saveToFresh": "click through real PUT body EOF, app GET of advanced version, all post-save clinical reads complete, then newly opened editable form; includes test-driver observation overhead",
+        "ai": "no provider configured; no feature kill switch changed; requests observed, not intercepted"
+      },
+      "seed": {
+        "schemaVersion": "mediflow.performance_seed.v2",
+        "seed": "mediflow-performance-2026-07-17",
+        "patients": 20,
+        "entries": 160,
+        "observations": 120,
+        "documents": 40,
+        "checkups": 40,
+        "fixtureRevision": 2,
+        "provenance": "deterministic synthetic records; not a real-patient distribution",
+        "cardinalities": {
+          "users": 1,
+          "ambulatories": 1,
+          "patients": 20,
+          "memberships": 20,
+          "entries": 160,
+          "observations": 120,
+          "checkups": 40,
+          "attachments": 40
+        },
+        "logicalSHA256": "af6ec2fae10d4bf8345aa4f24a337562546fe8998285f17d12776c92c7de4765"
+      },
+      "startupMethod": "source-runtime",
+      "processStartToRevisionMs": 2914.661,
+      "samples": [
+        {
+          "iteration": 0,
+          "formReadyMs": 193.178,
+          "saveToWriteBodyMs": 108.619,
+          "saveToFreshResponseMs": 36.405,
+          "saveToFreshFormMs": 270.826,
+          "putRequestMs": 3.879
+        },
+        {
+          "iteration": 1,
+          "formReadyMs": 145.698,
+          "saveToWriteBodyMs": 92.321,
+          "saveToFreshResponseMs": 38.463,
+          "saveToFreshFormMs": 235.543,
+          "putRequestMs": 3.063
+        },
+        {
+          "iteration": 2,
+          "formReadyMs": 134.882,
+          "saveToWriteBodyMs": 81.717,
+          "saveToFreshResponseMs": 28.979,
+          "saveToFreshFormMs": 229.155,
+          "putRequestMs": 2.782
+        },
+        {
+          "iteration": 3,
+          "formReadyMs": 129.301,
+          "saveToWriteBodyMs": 74.717,
+          "saveToFreshResponseMs": 32.753,
+          "saveToFreshFormMs": 210.161,
+          "putRequestMs": 2.434
+        },
+        {
+          "iteration": 4,
+          "formReadyMs": 130.204,
+          "saveToWriteBodyMs": 84.331,
+          "saveToFreshResponseMs": 41.523,
+          "saveToFreshFormMs": 217,
+          "putRequestMs": 2.689
+        }
+      ],
+      "warmSummary": {
+        "formReadyMs": {
+          "count": 4,
+          "median": 132.543,
+          "min": 129.301,
+          "max": 145.698
+        },
+        "saveToWriteBodyMs": {
+          "count": 4,
+          "median": 83.024,
+          "min": 74.717,
+          "max": 92.321
+        },
+        "saveToFreshResponseMs": {
+          "count": 4,
+          "median": 35.608,
+          "min": 28.979,
+          "max": 41.523
+        },
+        "saveToFreshFormMs": {
+          "count": 4,
+          "median": 223.077,
+          "min": 210.161,
+          "max": 235.543
+        },
+        "putRequestMs": {
+          "count": 4,
+          "median": 2.736,
+          "min": 2.434,
+          "max": 3.063
+        }
+      },
+      "gates": {
+        "success": 5,
+        "invalid": 5,
+        "staleReplay": 5,
+        "unauthorized": 1,
+        "wrongPatientUnchanged": 5,
+        "encryptedNotesVerifiedInFreshForm": true,
+        "observedBrowserPUTs": 5,
+        "observedAIWorkPOSTs": 0,
+        "observedServer5xx": 0,
+        "apiRequestFailures": 0,
+        "navigationRequestFailures": 21,
+        "childStopped": true
+      },
+      "status": "pass"
+    }
+  ],
+  "fixtureReconciliation": {
+    "historicalLogicalSHA256": "e2245c7dfb5a72aa750d41ff3b4714fb7a2e6b2fbb654d98b7dd7f101a5f55ed",
+    "currentLogicalSHA256": "af6ec2fae10d4bf8345aa4f24a337562546fe8998285f17d12776c92c7de4765",
+    "currentProjectionOnHistoricalColumnsSHA256": "e2245c7dfb5a72aa750d41ff3b4714fb7a2e6b2fbb654d98b7dd7f101a5f55ed",
+    "matchesHistorical": true,
+    "tables": {
+      "users": {
+        "rows": 1,
+        "addedColumns": [
+          "recovery_salt",
+          "recovery_verifier_hash",
+          "recovery_wrapped_master_key",
+          "unlock_verifier_hash"
+        ],
+        "addedColumnValues": {
+          "unlock_verifier_hash": [
+            null
+          ],
+          "recovery_wrapped_master_key": [
+            null
+          ],
+          "recovery_salt": [
+            null
+          ],
+          "recovery_verifier_hash": [
+            null
+          ]
+        }
+      },
+      "ambulatories": {
+        "rows": 1,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      },
+      "patients": {
+        "rows": 20,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      },
+      "memberships": {
+        "rows": 20,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      },
+      "entries": {
+        "rows": 160,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      },
+      "observations": {
+        "rows": 120,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      },
+      "checkups": {
+        "rows": 40,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      },
+      "attachments": {
+        "rows": 40,
+        "addedColumns": [],
+        "addedColumnValues": {}
+      }
+    },
+    "interpretation": "Logical hash differs because schema evolved; projection onto historical columns matches exactly. Added user credential columns are null in this synthetic seed; observation column order differs."
+  },
+  "staticComparison": {
+    "algorithm": {
+      "source": "git ls-tree -rlz REV and git cat-file blob; working tree untouched",
+      "tracked_totals": "All tracked Git blobs, including docs/assets/lockfiles and symlink blob bytes; no gitlinks or filesystem-followed symlinks. These totals are not exclusively source code.",
+      "code_extensions": [
+        ".bash",
+        ".c",
+        ".cjs",
+        ".command",
+        ".cpp",
+        ".css",
+        ".go",
+        ".h",
+        ".hpp",
+        ".html",
+        ".js",
+        ".jsx",
+        ".m",
+        ".mjs",
+        ".mm",
+        ".pl",
+        ".ps1",
+        ".py",
+        ".rb",
+        ".rs",
+        ".sass",
+        ".scss",
+        ".sh",
+        ".sql",
+        ".svelte",
+        ".swift",
+        ".ts",
+        ".tsx",
+        ".vue",
+        ".zsh"
+      ],
+      "code_exclusions": "Top-level docs, whitepaper, licenses, screenshots; all non-code extensions except Dockerfile. JSON/YAML/TOML/assets excluded from code counts.",
+      "classification_precedence": [
+        "generated: path segment generated/__generated__ or generated token in basename or next-env.d.ts; plus explicit SQLite amalgamation and companion vendored header paths",
+        "deferred: top-level experiments/proposals/prototypes",
+        "test: top-level tests/e2e, test directory names ending tests, __tests__/uitests, .test./.spec. basename, *Tests.swift",
+        "tooling: top-level scripts/tools/.github and all root-level code files",
+        "product: remaining selected code"
+      ],
+      "lines": "LF count plus one for a nonempty blob lacking final LF; includes blanks/comments; no parsing or semantic inference",
+      "native_split": "native/ prefix vs all remaining code as web_or_shared",
+      "direct_runtime_dependencies": "Union of root package.json dependencies and optionalDependencies names; peer/dev dependencies excluded",
+      "runtime_lock_entries": "Non-root package-lock.json packages entries with dev != true and link != true; includes optional and nested duplicate package paths, not unique package names",
+      "generated_explicit_vendor_paths": [
+        "native/MediFlowMac/Sources/MediFlowSQLiteC/sqlite3.c",
+        "native/MediFlowMac/Sources/MediFlowSQLiteC/include/sqlite3.h"
+      ]
+    },
+    "results": [
+      {
+        "revision": "47e24f6cf5eea42b34f320d6d675e07fc96bd2a5",
+        "tracked_blob_files": 3009,
+        "tracked_blob_bytes": 50231370,
+        "classified_code_files": 2496,
+        "classified_code_bytes": 33226652,
+        "code": {
+          "deferred": {
+            "files": 9,
+            "physical_lines": 782,
+            "bytes": 48662
+          },
+          "deferred:web_or_shared": {
+            "files": 9,
+            "physical_lines": 782,
+            "bytes": 48662
+          },
+          "product": {
+            "files": 1321,
+            "physical_lines": 217322,
+            "bytes": 10724099
+          },
+          "product:native": {
+            "files": 137,
+            "physical_lines": 41891,
+            "bytes": 1862331
+          },
+          "product:web_or_shared": {
+            "files": 1184,
+            "physical_lines": 175431,
+            "bytes": 8861768
+          },
+          "test": {
+            "files": 925,
+            "physical_lines": 177089,
+            "bytes": 9902798
+          },
+          "test:native": {
+            "files": 110,
+            "physical_lines": 27042,
+            "bytes": 1376097
+          },
+          "test:web_or_shared": {
+            "files": 815,
+            "physical_lines": 150047,
+            "bytes": 8526701
+          },
+          "tooling": {
+            "files": 239,
+            "physical_lines": 45572,
+            "bytes": 2489504
+          },
+          "tooling:web_or_shared": {
+            "files": 239,
+            "physical_lines": 45572,
+            "bytes": 2489504
+          },
+          "generated": {
+            "files": 2,
+            "physical_lines": 279937,
+            "bytes": 10061589
+          },
+          "generated:native": {
+            "files": 2,
+            "physical_lines": 279937,
+            "bytes": 10061589
+          }
+        },
+        "root_direct_runtime_dependencies": 33,
+        "root_dependencies": 33,
+        "root_optional_dependencies": 0,
+        "lockfile_version": 3,
+        "runtime_lock_entries": 345,
+        "runtime_lock_optional_entries": 75,
+        "runtime_dependency_names": [
+          "@firecrawl/anydoc",
+          "@hookform/resolvers",
+          "@mediflow/web-auth-lifecycle-owner",
+          "@modelcontextprotocol/server",
+          "@tailwindcss/typography",
+          "@tanstack/react-virtual",
+          "@types/bcryptjs",
+          "@types/uuid",
+          "bcryptjs",
+          "better-sqlite3",
+          "clsx",
+          "date-fns",
+          "dexie",
+          "dexie-react-hooks",
+          "dotenv",
+          "drizzle-orm",
+          "framer-motion",
+          "jspdf",
+          "jspdf-autotable",
+          "lucide-react",
+          "next",
+          "openai",
+          "pdf-lib",
+          "pdfjs-dist",
+          "pm2",
+          "react",
+          "react-dom",
+          "react-dropzone",
+          "react-hook-form",
+          "react-markdown",
+          "tailwind-merge",
+          "uuid",
+          "zod"
+        ]
+      },
+      {
+        "revision": "31b8d039099c2daca5d2b80ca5ea78e3523e8d12",
+        "tracked_blob_files": 3194,
+        "tracked_blob_bytes": 52002337,
+        "classified_code_files": 2622,
+        "classified_code_bytes": 34601489,
+        "code": {
+          "deferred": {
+            "files": 9,
+            "physical_lines": 782,
+            "bytes": 48662
+          },
+          "deferred:web_or_shared": {
+            "files": 9,
+            "physical_lines": 782,
+            "bytes": 48662
+          },
+          "product": {
+            "files": 1363,
+            "physical_lines": 223135,
+            "bytes": 11087446
+          },
+          "product:native": {
+            "files": 140,
+            "physical_lines": 42200,
+            "bytes": 1878468
+          },
+          "product:web_or_shared": {
+            "files": 1223,
+            "physical_lines": 180935,
+            "bytes": 9208978
+          },
+          "test": {
+            "files": 981,
+            "physical_lines": 190256,
+            "bytes": 10710784
+          },
+          "test:native": {
+            "files": 111,
+            "physical_lines": 27234,
+            "bytes": 1390711
+          },
+          "test:web_or_shared": {
+            "files": 870,
+            "physical_lines": 163022,
+            "bytes": 9320073
+          },
+          "tooling": {
+            "files": 267,
+            "physical_lines": 48924,
+            "bytes": 2693008
+          },
+          "tooling:web_or_shared": {
+            "files": 267,
+            "physical_lines": 48924,
+            "bytes": 2693008
+          },
+          "generated": {
+            "files": 2,
+            "physical_lines": 279937,
+            "bytes": 10061589
+          },
+          "generated:native": {
+            "files": 2,
+            "physical_lines": 279937,
+            "bytes": 10061589
+          }
+        },
+        "root_direct_runtime_dependencies": 28,
+        "root_dependencies": 28,
+        "root_optional_dependencies": 0,
+        "lockfile_version": 3,
+        "runtime_lock_entries": 340,
+        "runtime_lock_optional_entries": 75,
+        "runtime_dependency_names": [
+          "@firecrawl/anydoc",
+          "@hookform/resolvers",
+          "@mediflow/web-auth-lifecycle-owner",
+          "@modelcontextprotocol/server",
+          "@tailwindcss/typography",
+          "@tanstack/react-virtual",
+          "bcryptjs",
+          "better-sqlite3",
+          "clsx",
+          "date-fns",
+          "drizzle-orm",
+          "framer-motion",
+          "jspdf",
+          "jspdf-autotable",
+          "lucide-react",
+          "next",
+          "openai",
+          "pdf-lib",
+          "pdfjs-dist",
+          "pm2",
+          "react",
+          "react-dom",
+          "react-dropzone",
+          "react-hook-form",
+          "react-markdown",
+          "tailwind-merge",
+          "uuid",
+          "zod"
+        ]
+      }
+    ],
+    "limits": [
+      "Path/extension classification only; no complexity, cycles, reachability, executable-LOC or authoritative-operation claims.",
+      "Root-level product entrypoints/configuration are included in tooling by explicit path rule.",
+      "Generated content without declared generated path/name can remain in another category; fixtures follow enclosing test/tooling classification.",
+      "Runtime lock entries describe lock metadata, not actually installed platform packages or package bytes.",
+      "Generated includes bundled SQLite amalgamation and companion vendor header; separated from maintained product code, not a claim that all vendor/generated content is detected."
+    ]
+  },
+  "listContext": {
+    "comparability": "Context only: seed/schema, Next.js (historical 16.2.6) and Node/OS changed; no causal performance claim or regression budget. Same nominal cardinalities do not establish identical workload.",
+    "reports": [
+      {
+        "id": "historical",
+        "receiptSHA256": "aac23073cf520eb512baf5a4e4226e3bd6508dc989739e82f466f6666b469cc2",
+        "measuredAt": "2026-07-17T13:28:50.625Z",
+        "git": {
+          "head": "7d9ce0f51e5851a3850d99fbb220c92b0be910f0",
+          "base": "d09c949a35b1326a7528bd6d24f4bc96bceaf845"
+        },
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "darwin 27.0.0 arm64",
+          "hardwareModel": "Mac16,5",
+          "cpu": "Apple M4 Max",
+          "logicalCores": 14,
+          "memoryGiB": 36
+        },
+        "protocol": {
+          "server": "Next.js standalone production server",
+          "measuredRuns": 7,
+          "warmupRunsExcludedPerRoute": 1,
+          "statistic": "median",
+          "seed": "mediflow-performance-2026-07-17",
+          "rowsPerPatient": {
+            "entries": 8,
+            "observations": 6,
+            "documents": 2
+          },
+          "documentRouteUsesMetadataOnly": true,
+          "clientCost": "JSON.parse + AES-256-GCM Node simulation for every ENC field"
+        },
+        "volumes": [
+          {
+            "patients": 200,
+            "routes": {
+              "patients": {
+                "path": "/api/patients",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 5.493,
+                    "clientDecryptMs": 11.6,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 5.227,
+                    "clientDecryptMs": 12.426,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 5.163,
+                    "clientDecryptMs": 12.598,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.835,
+                    "clientDecryptMs": 12.762,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.534,
+                    "clientDecryptMs": 10.408,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 5.075,
+                    "clientDecryptMs": 10.218,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.739,
+                    "clientDecryptMs": 10.874,
+                    "payloadBytes": 229581,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  }
+                ],
+                "median": {
+                  "routeMs": 5.075,
+                  "clientDecryptMs": 11.6,
+                  "payloadBytes": 229581,
+                  "records": 200,
+                  "encryptedFields": 1200
+                }
+              },
+              "entries": {
+                "path": "/api/entries",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 10.529,
+                    "clientDecryptMs": 41.596,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 9.057,
+                    "clientDecryptMs": 47.98,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 9.284,
+                    "clientDecryptMs": 48.3,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 8.039,
+                    "clientDecryptMs": 44.404,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 9.44,
+                    "clientDecryptMs": 49.535,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 9.333,
+                    "clientDecryptMs": 48.083,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 8.942,
+                    "clientDecryptMs": 47.495,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  }
+                ],
+                "median": {
+                  "routeMs": 9.284,
+                  "clientDecryptMs": 47.98,
+                  "payloadBytes": 1018401,
+                  "records": 1600,
+                  "encryptedFields": 4800
+                }
+              },
+              "observations": {
+                "path": "/api/observations",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 7.984,
+                    "clientDecryptMs": 12.681,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 7.397,
+                    "clientDecryptMs": 13.103,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 8.431,
+                    "clientDecryptMs": 12.741,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 8.349,
+                    "clientDecryptMs": 12.364,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 8.833,
+                    "clientDecryptMs": 11.517,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 8.205,
+                    "clientDecryptMs": 13.086,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 7.142,
+                    "clientDecryptMs": 12.98,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  }
+                ],
+                "median": {
+                  "routeMs": 8.205,
+                  "clientDecryptMs": 12.741,
+                  "payloadBytes": 694941,
+                  "records": 1200,
+                  "encryptedFields": 1200
+                }
+              },
+              "documents": {
+                "path": "/api/attachments?metadataOnly=true",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 4.756,
+                    "clientDecryptMs": 13.133,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.46,
+                    "clientDecryptMs": 14.69,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.701,
+                    "clientDecryptMs": 16.024,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.765,
+                    "clientDecryptMs": 16.231,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 3.47,
+                    "clientDecryptMs": 16.19,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.737,
+                    "clientDecryptMs": 16.095,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.794,
+                    "clientDecryptMs": 16.267,
+                    "payloadBytes": 350283,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  }
+                ],
+                "median": {
+                  "routeMs": 4.737,
+                  "clientDecryptMs": 16.095,
+                  "payloadBytes": 350283,
+                  "records": 400,
+                  "encryptedFields": 1600
+                }
+              }
+            }
+          },
+          {
+            "patients": 2000,
+            "routes": {
+              "patients": {
+                "path": "/api/patients",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 20.958,
+                    "clientDecryptMs": 108.833,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 17.356,
+                    "clientDecryptMs": 123.876,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 17.591,
+                    "clientDecryptMs": 118.78,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 16.169,
+                    "clientDecryptMs": 118.689,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 16.435,
+                    "clientDecryptMs": 118.548,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 15.823,
+                    "clientDecryptMs": 119.273,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 15.626,
+                    "clientDecryptMs": 118.996,
+                    "payloadBytes": 2299401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  }
+                ],
+                "median": {
+                  "routeMs": 16.435,
+                  "clientDecryptMs": 118.78,
+                  "payloadBytes": 2299401,
+                  "records": 2000,
+                  "encryptedFields": 12000
+                }
+              },
+              "entries": {
+                "path": "/api/entries",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 67.823,
+                    "clientDecryptMs": 437.562,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 71.283,
+                    "clientDecryptMs": 481.323,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 70.075,
+                    "clientDecryptMs": 435.388,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 66.328,
+                    "clientDecryptMs": 434.44,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 65.37,
+                    "clientDecryptMs": 431.195,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 65.547,
+                    "clientDecryptMs": 436.633,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 65.164,
+                    "clientDecryptMs": 457.862,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  }
+                ],
+                "median": {
+                  "routeMs": 66.328,
+                  "clientDecryptMs": 436.633,
+                  "payloadBytes": 10184001,
+                  "records": 16000,
+                  "encryptedFields": 48000
+                }
+              },
+              "observations": {
+                "path": "/api/observations",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 58.84,
+                    "clientDecryptMs": 139.454,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 57.014,
+                    "clientDecryptMs": 128.773,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 56.714,
+                    "clientDecryptMs": 118.424,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 55.907,
+                    "clientDecryptMs": 135.707,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 57.204,
+                    "clientDecryptMs": 135.597,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 56.423,
+                    "clientDecryptMs": 131.246,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 61.421,
+                    "clientDecryptMs": 138.344,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  }
+                ],
+                "median": {
+                  "routeMs": 57.014,
+                  "clientDecryptMs": 135.597,
+                  "payloadBytes": 6949941,
+                  "records": 12000,
+                  "encryptedFields": 12000
+                }
+              },
+              "documents": {
+                "path": "/api/attachments?metadataOnly=true",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 26.221,
+                    "clientDecryptMs": 161.109,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 21.596,
+                    "clientDecryptMs": 161.275,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 21.195,
+                    "clientDecryptMs": 160.692,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 21.087,
+                    "clientDecryptMs": 160.828,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 21.523,
+                    "clientDecryptMs": 172.426,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 23.945,
+                    "clientDecryptMs": 183.648,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 21.142,
+                    "clientDecryptMs": 183.524,
+                    "payloadBytes": 3497020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  }
+                ],
+                "median": {
+                  "routeMs": 21.523,
+                  "clientDecryptMs": 161.275,
+                  "payloadBytes": 3497020,
+                  "records": 4000,
+                  "encryptedFields": 16000
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "current",
+        "receiptSHA256": "71b47683ecc23a6db5f93ab2322f19290a27745d4b0b18ece0b66141e9bf3b0e",
+        "measuredAt": "2026-10-15T17:02:55.517Z",
+        "git": {
+          "head": "31b8d039099c2daca5d2b80ca5ea78e3523e8d12",
+          "base": "31b8d039099c2daca5d2b80ca5ea78e3523e8d12"
+        },
+        "environment": {
+          "node": "v24.21.0",
+          "platform": "darwin 27.2.0 arm64",
+          "hardwareModel": "Mac16,5",
+          "cpu": "Apple M4 Max",
+          "logicalCores": 14,
+          "memoryGiB": 36
+        },
+        "protocol": {
+          "server": "Next.js standalone production server",
+          "measuredRuns": 7,
+          "warmupRunsExcludedPerRoute": 1,
+          "statistic": "median",
+          "seed": "mediflow-performance-2026-07-17",
+          "rowsPerPatient": {
+            "entries": 8,
+            "observations": 6,
+            "documents": 2
+          },
+          "documentRouteUsesMetadataOnly": true,
+          "clientCost": "JSON.parse + AES-256-GCM Node simulation for every ENC field"
+        },
+        "volumes": [
+          {
+            "patients": 200,
+            "routes": {
+              "patients": {
+                "path": "/api/patients",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 4.761,
+                    "clientDecryptMs": 12.493,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.457,
+                    "clientDecryptMs": 12.723,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.293,
+                    "clientDecryptMs": 12.675,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.253,
+                    "clientDecryptMs": 12.765,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.122,
+                    "clientDecryptMs": 12.725,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 4.454,
+                    "clientDecryptMs": 11.689,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 3.924,
+                    "clientDecryptMs": 12.112,
+                    "payloadBytes": 243981,
+                    "records": 200,
+                    "encryptedFields": 1200
+                  }
+                ],
+                "median": {
+                  "routeMs": 4.293,
+                  "clientDecryptMs": 12.675,
+                  "payloadBytes": 243981,
+                  "records": 200,
+                  "encryptedFields": 1200
+                }
+              },
+              "entries": {
+                "path": "/api/entries",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 7.944,
+                    "clientDecryptMs": 42.079,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 8.063,
+                    "clientDecryptMs": 49.593,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 8.233,
+                    "clientDecryptMs": 49.483,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 9.206,
+                    "clientDecryptMs": 44.117,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 8.854,
+                    "clientDecryptMs": 48.541,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 8.907,
+                    "clientDecryptMs": 48.144,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  },
+                  {
+                    "routeMs": 7.753,
+                    "clientDecryptMs": 47.28,
+                    "payloadBytes": 1018401,
+                    "records": 1600,
+                    "encryptedFields": 4800
+                  }
+                ],
+                "median": {
+                  "routeMs": 8.233,
+                  "clientDecryptMs": 48.144,
+                  "payloadBytes": 1018401,
+                  "records": 1600,
+                  "encryptedFields": 4800
+                }
+              },
+              "observations": {
+                "path": "/api/observations",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 7.019,
+                    "clientDecryptMs": 13.003,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 7.154,
+                    "clientDecryptMs": 12.787,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 6.682,
+                    "clientDecryptMs": 12.832,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 7.023,
+                    "clientDecryptMs": 12.56,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 6.787,
+                    "clientDecryptMs": 12.808,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 6.99,
+                    "clientDecryptMs": 12.985,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  },
+                  {
+                    "routeMs": 7.521,
+                    "clientDecryptMs": 13.208,
+                    "payloadBytes": 694941,
+                    "records": 1200,
+                    "encryptedFields": 1200
+                  }
+                ],
+                "median": {
+                  "routeMs": 7.019,
+                  "clientDecryptMs": 12.832,
+                  "payloadBytes": 694941,
+                  "records": 1200,
+                  "encryptedFields": 1200
+                }
+              },
+              "documents": {
+                "path": "/api/attachments?metadataOnly=true",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 4.159,
+                    "clientDecryptMs": 15.876,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.019,
+                    "clientDecryptMs": 15.699,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 3.743,
+                    "clientDecryptMs": 16.23,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 3.906,
+                    "clientDecryptMs": 15.283,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 3.543,
+                    "clientDecryptMs": 15.857,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 3.834,
+                    "clientDecryptMs": 16.299,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  },
+                  {
+                    "routeMs": 4.23,
+                    "clientDecryptMs": 16.093,
+                    "payloadBytes": 401083,
+                    "records": 400,
+                    "encryptedFields": 1600
+                  }
+                ],
+                "median": {
+                  "routeMs": 3.906,
+                  "clientDecryptMs": 15.876,
+                  "payloadBytes": 401083,
+                  "records": 400,
+                  "encryptedFields": 1600
+                }
+              }
+            }
+          },
+          {
+            "patients": 2000,
+            "routes": {
+              "patients": {
+                "path": "/api/patients",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 16.385,
+                    "clientDecryptMs": 118.731,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 16.239,
+                    "clientDecryptMs": 125.924,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 14.802,
+                    "clientDecryptMs": 126.5,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 14.921,
+                    "clientDecryptMs": 118.307,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 14.056,
+                    "clientDecryptMs": 119.465,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 14.537,
+                    "clientDecryptMs": 118.304,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 17.565,
+                    "clientDecryptMs": 132.286,
+                    "payloadBytes": 2443401,
+                    "records": 2000,
+                    "encryptedFields": 12000
+                  }
+                ],
+                "median": {
+                  "routeMs": 14.921,
+                  "clientDecryptMs": 119.465,
+                  "payloadBytes": 2443401,
+                  "records": 2000,
+                  "encryptedFields": 12000
+                }
+              },
+              "entries": {
+                "path": "/api/entries",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 64.425,
+                    "clientDecryptMs": 452.739,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 64.271,
+                    "clientDecryptMs": 440.678,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 64.322,
+                    "clientDecryptMs": 441.29,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 61.618,
+                    "clientDecryptMs": 438.246,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 62.799,
+                    "clientDecryptMs": 444.34,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 63.317,
+                    "clientDecryptMs": 440.948,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  },
+                  {
+                    "routeMs": 63.322,
+                    "clientDecryptMs": 436.014,
+                    "payloadBytes": 10184001,
+                    "records": 16000,
+                    "encryptedFields": 48000
+                  }
+                ],
+                "median": {
+                  "routeMs": 63.322,
+                  "clientDecryptMs": 440.948,
+                  "payloadBytes": 10184001,
+                  "records": 16000,
+                  "encryptedFields": 48000
+                }
+              },
+              "observations": {
+                "path": "/api/observations",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 55.432,
+                    "clientDecryptMs": 136.072,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 55.061,
+                    "clientDecryptMs": 128.994,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 55.579,
+                    "clientDecryptMs": 116.594,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 54.508,
+                    "clientDecryptMs": 132.733,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 53.818,
+                    "clientDecryptMs": 128.691,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 54.94,
+                    "clientDecryptMs": 116.397,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  },
+                  {
+                    "routeMs": 54.93,
+                    "clientDecryptMs": 136.019,
+                    "payloadBytes": 6949941,
+                    "records": 12000,
+                    "encryptedFields": 12000
+                  }
+                ],
+                "median": {
+                  "routeMs": 54.94,
+                  "clientDecryptMs": 128.994,
+                  "payloadBytes": 6949941,
+                  "records": 12000,
+                  "encryptedFields": 12000
+                }
+              },
+              "documents": {
+                "path": "/api/attachments?metadataOnly=true",
+                "warmupRunsExcluded": 1,
+                "samples": [
+                  {
+                    "routeMs": 25.218,
+                    "clientDecryptMs": 142.238,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 25.658,
+                    "clientDecryptMs": 160.365,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 21.453,
+                    "clientDecryptMs": 160.624,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 25.198,
+                    "clientDecryptMs": 161.156,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 19.859,
+                    "clientDecryptMs": 160.057,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 25.574,
+                    "clientDecryptMs": 163.402,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  },
+                  {
+                    "routeMs": 22.121,
+                    "clientDecryptMs": 161.054,
+                    "payloadBytes": 4005020,
+                    "records": 4000,
+                    "encryptedFields": 16000
+                  }
+                ],
+                "median": {
+                  "routeMs": 25.198,
+                  "clientDecryptMs": 160.624,
+                  "payloadBytes": 4005020,
+                  "records": 4000,
+                  "encryptedFields": 16000
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "notMeasured": {
+    "runtime_peak_and_steady_RSS": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "historical_package_bytes": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "headless_query_and_proposal_latency": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "document_ingestion_and_review_latency": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "complete_restore_time": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "critical_module_complexity": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "cycles": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "reachable_code": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "duplicated_authoritative_operations": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    },
+    "build_and_test_duration": {
+      "status": "ND",
+      "reason": "No comparable historical/final measurement pair is available in the bounded evidence set."
+    }
+  },
+  "limitations": [
+    "Two process replays per revision; four warm samples per replay. No P95, confidence interval or acceptance threshold inferred.",
+    "First sample uses fresh page and an already running/authenticated server, not an OS-cold start.",
+    "Startup methods differ (standalone server.js vs source-runtime); increase is observed but not attributed exclusively to code or startup guard.",
+    "Browser-observed AI work POST absence is not a general process/network egress attestation.",
+    "Golden checks here do not separately verify durable audit, cancellation, complete recovery, all negative cases or cross-platform qualification.",
+    "Static counts are physical lines, not complexity or executable code."
+  ]
+}
