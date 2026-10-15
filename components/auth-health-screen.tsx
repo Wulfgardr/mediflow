@@ -1,156 +1,119 @@
-/* @Codex */
 'use client';
 
 import React from 'react';
-import { AlertTriangle, Database, RefreshCw } from 'lucide-react';
-/* @Codex */
+import { RefreshCw } from 'lucide-react';
 import type { AuthHealthPayload } from '@/lib/security/client-auth-api';
+import styles from './auth-health-screen.module.css';
 
-/* @Codex */
 type AuthDbState = NonNullable<NonNullable<AuthHealthPayload['db']>['state']>;
 
-/* @Codex */
-const formatDbState = (state?: AuthDbState) => {
-    switch (state) {
-        case 'ready':
-            return 'pronto';
-        case 'missing':
-            return 'assente';
-        case 'schema-missing':
-            return 'schema mancante';
-        case 'unavailable':
-            return 'non disponibile';
-        default:
-            return 'n/d';
-    }
+const DB_STATE_LABEL: Record<AuthDbState, string> = {
+    ready: 'pronto',
+    missing: 'assente',
+    'schema-missing': 'schema mancante',
+    unavailable: 'non disponibile',
 };
 
-/* @Codex */
+// Title and plain explanation for each condition; the server's nextAction stays the instruction.
+const CONDITIONS: Record<string, { title: string; text: string }> = {
+    DB_NATIVE_DEPENDENCY_INVALID: {
+        title: 'Un componente va ricompilato',
+        text: 'Il modulo SQLite non corrisponde alla versione di Node in uso, quindi l’archivio non si può aprire.',
+    },
+    DB_NATIVE_DEPENDENCY_MISSING: {
+        title: 'Mancano le dipendenze',
+        text: 'Il modulo SQLite non è installato, quindi l’archivio non si può aprire.',
+    },
+    DB_MISSING: {
+        title: 'L’archivio non è dove dovrebbe essere',
+        text: 'La cartella dei dati esiste, ma il file dell’archivio non c’è. MediFlow non ne crea uno nuovo al suo posto, per non nascondere un archivio spostato.',
+    },
+    DB_SCHEMA_MISSING: {
+        title: 'L’archivio non è completo',
+        text: 'Il file c’è, ma mancano le tabelle che MediFlow si aspetta.',
+    },
+    DB_QUERY_FAILED: {
+        title: 'L’archivio non si riesce a leggere',
+        text: 'Il file c’è, ma la lettura non riesce: di solito dipende dai permessi o dall’integrità del file.',
+    },
+    DATA_DIR_UNAVAILABLE: {
+        title: 'La cartella dei dati non è raggiungibile',
+        text: 'MediFlow non riesce ad aprire la cartella in cui conserva l’archivio.',
+    },
+};
+
+const FALLBACK = {
+    title: 'Non riesco a verificare l’archivio',
+    text: 'Il controllo dell’archivio locale non è riuscito.',
+};
+
 export function AuthHealthScreen({
     health,
     onRetry,
     onRepair,
-    isRepairing
+    isRepairing,
 }: {
     health: AuthHealthPayload;
     onRetry: () => void;
-    /* @Codex */
     onRepair?: () => void;
-    /* @Codex */
     isRepairing?: boolean;
 }) {
-    /* @Codex */
-    const friendlyMessage = (() => {
-        switch (health.error?.code) {
-            case 'DB_NATIVE_DEPENDENCY_INVALID':
-                return 'Modulo nativo SQLite incompatibile con il runtime Node corrente (mismatch ABI). È necessario ricompilarlo.';
-            case 'DB_NATIVE_DEPENDENCY_MISSING':
-                return 'Modulo nativo SQLite mancante. Reinstalla le dipendenze.';
-            case 'DB_MISSING':
-                return 'Database locale non trovato. Verifica la cartella dati o ripristina un backup.';
-            case 'DB_SCHEMA_MISSING':
-                return 'Schema del database mancante. Ripristina un DB valido o esegui le migrazioni.';
-            case 'DB_QUERY_FAILED':
-                return 'Impossibile leggere il database locale. Verifica permessi e integrità del file.';
-            case 'DATA_DIR_UNAVAILABLE':
-                return 'Cartella dati non accessibile. Verifica permessi e percorso.';
-            case 'AUTH_CHECK_FAILED':
-                return 'Impossibile verificare lo stato di sicurezza.';
-            default:
-                return health.error?.message || 'Impossibile verificare lo stato del database locale.';
-        }
-    })();
-
-    /* @Codex */
+    const code = health.error?.code;
+    const condition = (code && CONDITIONS[code]) || { ...FALLBACK, text: health.error?.message || FALLBACK.text };
     const remediationCommand = health.error?.remediationCommand;
-    /* @Codex */
     const nextAction = health.error?.nextAction;
-
     const details = [
-        health.db?.state ? ['Stato archivio', formatDbState(health.db.state)] : null,
+        code ? ['Codice', code] : null,
+        health.db?.state ? ['Stato dell’archivio', DB_STATE_LABEL[health.db.state] ?? 'non noto'] : null,
         health.error?.category ? ['Categoria', health.error.category] : null,
     ].filter(Boolean) as Array<[string, string]>;
 
     return (
-        <div className="fixed inset-0 z-[100] flex h-screen w-screen items-center justify-center bg-[color:var(--lume-surface-canvas)] p-6">
-            <div className="lume-focal w-full max-w-2xl space-y-6 rounded-[var(--lume-radius-panel)] border p-8" style={{ borderColor: 'var(--lume-rule)', background: 'var(--lume-surface-focal)', boxShadow: '0 18px 44px -26px color-mix(in srgb, var(--lume-ink) 45%, transparent)' }}>
-                <div className="flex items-start gap-4">
-                    <div className="p-3 text-[color:var(--lume-signal-warning)]">
-                        <AlertTriangle className="w-6 h-6" />
-                    </div>
-                    <div className="space-y-2">
-                        <h1 className="text-lg font-semibold" style={{ color: 'var(--lume-ink)' }}>Problema Database</h1>
-                        <p className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{friendlyMessage}</p>
-                        {health.error?.code && (
-                            <p className="lume-registro text-xs text-[color:var(--lume-signal-warning)]">Codice: {health.error.code}</p>
-                        )}
-                    </div>
-                </div>
+        <div className={styles.screen}>
+            <main className={styles.sheet} role="alert" aria-labelledby="auth-health-title">
+                <p className={styles.brand}>MediFlow<b>.</b></p>
+                <h1 id="auth-health-title" className={styles.title}>{condition.title}</h1>
+                <p className={styles.text}>{condition.text}</p>
 
-                {/* @Codex */}
                 {nextAction && (
-                    <div className="mf-alert mf-alert-warning p-4 text-sm">
-                        <div className="font-semibold mb-1">Prossima azione</div>
-                        <p>{nextAction}</p>
-                    </div>
+                    <section className={styles.block}>
+                        <h2 className={styles.label}>Cosa fare</h2>
+                        <p className={styles.text}>{nextAction}</p>
+                    </section>
                 )}
 
-                {/* @Codex */}
                 {remediationCommand && (
-                    <div className="border-t border-[color:var(--lume-rule)] py-4">
-                        <div className="mb-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>Comando consigliato (esegui manualmente nel terminale)</div>
-                        <code className="type-code block break-all whitespace-pre-wrap select-all text-xs" style={{ color: 'var(--lume-ink)' }}>
-                            {remediationCommand}
-                        </code>
-                        <p className="mt-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                            Esegui il comando con lo stesso runtime Node usato per avviare MediFlow. Non eseguito automaticamente per sicurezza.
-                        </p>
-                    </div>
+                    <section className={styles.block}>
+                        <h2 className={styles.label}>Comando da eseguire nel terminale</h2>
+                        <code className={styles.command}>{remediationCommand}</code>
+                        <p className={styles.note}>Usa la stessa versione di Node con cui avvii MediFlow. Il comando non parte da solo.</p>
+                    </section>
                 )}
 
-                {details.length > 0 && (
-                    <div className="border-t border-[color:var(--lume-rule)] py-4">
-                        <div className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                            <Database className="w-4 h-4 text-[color:var(--lume-signal-warning)]" />
-                            Dettagli locale
-                        </div>
-                        <div className="grid grid-cols-1 gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                            {details.map(([label, value]) => (
-                                <div key={label} className="flex items-center justify-between gap-4">
-                                    <span>{label}</span>
-                                    <span className="break-all" style={{ color: 'var(--lume-ink)' }}>{value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex flex-wrap gap-3">
-                    <button
-                        onClick={onRetry}
-                        className="ui-btn-primary lume-press px-4 py-2 text-sm"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        Riprova controllo
+                <div className={styles.actions}>
+                    <button type="button" onClick={onRetry} className="ui-btn-primary lume-press px-4 py-2">
+                        <RefreshCw aria-hidden="true" className="h-4 w-4" />
+                        Riprova
                     </button>
-                    {/* @Codex */}
                     {onRepair && (
-                        <button
-                            onClick={onRepair}
-                            disabled={isRepairing}
-                            className="mf-btn-secondary lume-press px-4 py-2 text-sm disabled:opacity-60"
-                        >
-                            {isRepairing ? 'Ripristino in corso...' : 'Ripristina DB da legacy'}
+                        <button type="button" onClick={onRepair} disabled={isRepairing}
+                            className="mf-btn-secondary lume-press px-4 py-2 disabled:opacity-60">
+                            {isRepairing ? 'Recupero in corso' : 'Recupera dall’archivio precedente'}
                         </button>
                     )}
                 </div>
 
-                <p className="text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
-                    Se hai usato strumenti di pulizia, verifica che la cartella dati e il file{' '}
-                    <code className="type-code text-xs" style={{ color: 'var(--lume-ink)' }}>medical.db</code> non siano
-                    stati rimossi o spostati. In caso di dubbi, ripristina un backup locale.
-                </p>
-            </div>
+                {details.length > 0 && (
+                    <dl className={styles.details}>
+                        {details.map(([label, value]) => (
+                            <div key={label}>
+                                <dt>{label}</dt>
+                                <dd className={label === 'Codice' ? styles.code : undefined}>{value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                )}
+            </main>
         </div>
     );
 }
