@@ -21,8 +21,8 @@ main{width:min(520px,100% - 32px);margin:48px 0;background:var(--paper);border:1
 .mark{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
 .brand{font:500 21px/1 Newsreader,Georgia,serif;letter-spacing:-.01em}.brand b{color:var(--fresh);font-weight:500}
 .version{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
-h1{font:400 26px/1.2 Newsreader,Georgia,serif;margin:0 0 8px}
-#status{margin:0 0 20px;color:var(--muted);min-height:21px}#status.error{color:var(--critical)}
+h1{font:400 26px/1.2 Newsreader,Georgia,serif;margin:0 0 20px}
+#status{margin:-12px 0 20px;color:var(--muted)}#status:empty{display:none}#status.error{color:var(--critical)}
 ul{list-style:none;margin:0;padding:0;border-top:1px solid var(--rule)}
 li{border-bottom:1px solid var(--rule)}
 .choice,.unavailable{display:flex;gap:14px;align-items:flex-start;width:100%;padding:14px 4px;text-align:left;font:inherit;color:inherit;background:none;border:0}
@@ -67,7 +67,7 @@ ${development ? row('sviluppo', 'Modalità sviluppo', 'Questa cartella ha modifi
 <li data-step="pronto"><span class="dot" aria-hidden="true"></span>Pronto</li>
 </ol>
 <div id="install" class="install" hidden><button class="link" id="approve">Installa le dipendenze (npm ci)</button></div>
-<footer><span class="folder" title="${escape(folder)}">${escape(folder)}</span><span><button class="link" id="change" hidden>Cambia scelta</button> <button class="link" id="stop">Arresta</button></span></footer>
+<footer><span class="folder" title="${escape(folder)}">${escape(folder)}</span><button class="link" id="stop">Arresta</button></footer>
 <noscript><p>Attiva JavaScript oppure riapri il lanciatore dal terminale con --senza-browser.</p></noscript>
 <script nonce="${nonce}">
 const base=${JSON.stringify(base)};let choosing=new URLSearchParams(location.search).has('scegli');let stopped=false;
@@ -77,11 +77,10 @@ async function action(name,data={}){try{const r=await fetch(base+'/'+name,{metho
 document.querySelectorAll('[data-choice]').forEach(b=>b.addEventListener('click',()=>{choosing=false;action('choose',{choice:b.dataset.choice,remember:$('remember').checked});}));
 $('approve').onclick=()=>action('install');
 $('stop').onclick=async()=>{stopped=true;await action('stop');$('choices').hidden=true;$('steps').hidden=true;$('title').textContent='MediFlow si sta arrestando';say('Puoi chiudere questa scheda quando il terminale conferma l’arresto.');};
-$('change').onclick=()=>{choosing=true;history.replaceState(null,'','?scegli=1');render(last);document.querySelector('[data-choice]').focus();};
 const minutes=ms=>{const s=Math.max(0,Math.round(ms/1000));return s<60?s+' s':Math.floor(s/60)+' min '+String(s%60).padStart(2,'0')+' s';};
-let last={};
-function render(state){last=state;const working=(state.busy||state.ready)&&!choosing;
-$('choices').hidden=working;$('steps').hidden=!working;$('change').hidden=!working||!!state.ready;
+
+function render(state){const working=(state.busy||state.ready)&&!choosing;
+$('choices').hidden=working;$('steps').hidden=!working;
 $('title').textContent=working?(state.ready?'MediFlow è pronto':'Avvio di MediFlow'):'Come vuoi usare MediFlow?';
 if(working){const at=order.indexOf(state.step);document.querySelectorAll('#steps li').forEach((li,i)=>{li.className=i<at||state.ready?'done':i===at?'current':'';});
 $('elapsed').textContent=state.step==='versione'&&state.since?minutes(Date.now()-state.since):'';
