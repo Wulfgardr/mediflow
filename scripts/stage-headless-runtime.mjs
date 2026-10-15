@@ -92,7 +92,8 @@ async function sourceClosure() {
     // Share the already-normalized SQLite loader/native target, never a second Mach-O.
     // Web standalone is shared separately. Mini is a different delivery lane,
     // and SQLite uses the normalized/signed copy already inside the app.
-    ignore: sharedRuntimeDependency,
+    ignore: file => sharedRuntimeDependency(file)
+      || file.replaceAll('\\', '/') === 'scripts/headless-web-server.mjs',
     readFile: async file => {
       let bytes;
       try { bytes = await fs.promises.readFile(file, 'utf8'); }
@@ -101,7 +102,8 @@ async function sourceClosure() {
         ? traceSourceText(ts, file, bytes, ROOT) : bytes;
     },
   });
-  const files = new Set([...sourceFiles, '.nvmrc', 'package.json', 'LICENSE', 'CREDITS.md']);
+  // The bootstrap loads Next only from the admitted standalone closure.
+  const files = new Set([...sourceFiles, 'scripts/headless-web-server.mjs', '.nvmrc', 'package.json', 'LICENSE', 'CREDITS.md']);
   // The existing DB bootstrap reads the migration journal and SQL by filename.
   const drizzle = physicalPath(path.join(ROOT, 'drizzle'), true);
   for (const name of fs.readdirSync(drizzle).filter(name => /^\d[^/]*\.sql$/u.test(name)).sort()) files.add(`drizzle/${name}`);
@@ -149,7 +151,7 @@ export async function stageHeadlessRuntime(app) {
   const sqlitePackage = physicalPath(path.dirname(requireWeb.resolve('better-sqlite3/package.json')), true);
   if (!sqlite.startsWith(`${sqlitePackage}${path.sep}`)
     || sqlitePackage !== path.join(layout.web, 'node_modules/better-sqlite3')) deny('SQLite escaped the app.');
-  const required = ['server.js', 'package.json', '.next/BUILD_ID', 'mediflow-build-identity.json',
+  const required = ['server.js', 'package.json', '.next/BUILD_ID', '.next/required-server-files.json', 'mediflow-build-identity.json',
     'mediflow-runtime-contract.json'].map(name => `Resources/WebRuntime/${name}`);
   const shared = [...required,
     ...physicalFiles(sqlitePackage).map(name => `Resources/WebRuntime/node_modules/better-sqlite3/${name}`),

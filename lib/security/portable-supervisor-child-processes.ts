@@ -15,6 +15,7 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const LOADER = path.join(ROOT, 'scripts', 'register-strip-types-loader.mjs');
 const MINI_TARGET = path.join(ROOT, 'packages', 'mini', 'src', 'cli.ts');
 const MCP_TARGET = path.join(ROOT, 'scripts', 'intelligent-host-mcp-stdio.mjs');
+const WEB_BOOTSTRAP = fileURLToPath(new URL('../../scripts/headless-web-server.mjs', import.meta.url));
 const WEB_DIRECTORY = path.join(ROOT, '.next', 'standalone');
 const WEB_TARGET = path.join(WEB_DIRECTORY, 'server.js');
 const ROOT_REAL = fs.realpathSync(ROOT);
@@ -124,13 +125,14 @@ export function createPortableSupervisorProductionChildProcessesV1(
     : requireAbsoluteFile(options.mcpTargetPath ?? MCP_TARGET, 'mcp', ROOT_REAL);
   const webDirectory = requireAbsoluteDirectory(options.webDirectory ?? WEB_DIRECTORY, 'web_directory');
   const webTargetPath = requireAbsoluteFile(options.webTargetPath ?? WEB_TARGET, 'web', webDirectory);
+  const webBootstrap = requireAbsoluteFile(WEB_BOOTSTRAP, 'web_bootstrap', ROOT_REAL);
   const dataDir = requireAbsoluteDirectory(options.dataDir, 'data_directory');
   if (path.dirname(webTargetPath) !== webDirectory) throw new Error('web_path_invalid');
 
   const spawnChild = options.spawnChild ?? ((command, args, spawnOptions) =>
     spawn(command, [...args], spawnOptions));
   const webEnvironment: NodeJS.ProcessEnv = {
-    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir,
+    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '0', MEDIFLOW_DATA_DIR: dataDir,
   };
   if (options.webBuildIdentity) {
     const identity = options.webBuildIdentity;
@@ -160,7 +162,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
 
   let web: ChildProcess;
   try {
-    web = spawnChild(nodePath, [webTargetPath], {
+    web = spawnChild(nodePath, [webBootstrap, webTargetPath], {
       cwd: webDirectory,
       env: webEnvironment,
       shell: false,

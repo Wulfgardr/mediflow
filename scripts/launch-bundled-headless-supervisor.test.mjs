@@ -36,11 +36,12 @@ function fixture(t) {
   write(path.join(web, 'mediflow-build-identity.json'), JSON.stringify(identity));
   write(path.join(web, 'mediflow-runtime-contract.json'), JSON.stringify(contract));
   write(path.join(web, '.next/BUILD_ID'), identity.buildId);
+  write(path.join(web, '.next/required-server-files.json'), '{"config":{}}');
   write(path.join(web, 'server.js'), '// Layout only, not a server and never executed.\n');
   write(path.join(web, 'package.json'), '{}\n');
   write(path.join(runtime, '.nvmrc'), '24\n');
   for (const name of ['package.json', 'scripts/mediflow-headless-supervisor.mjs', 'scripts/intelligent-host-mcp-stdio.mjs',
-    'scripts/node-runtime-contract.mjs', 'scripts/register-strip-types-loader.mjs', 'lib/security/portable-supervisor-production.ts']) {
+    'scripts/node-runtime-contract.mjs', 'scripts/register-strip-types-loader.mjs', 'scripts/headless-web-server.mjs', 'lib/security/portable-supervisor-production.ts']) {
     write(path.join(runtime, name), fs.readFileSync(path.join(ROOT, name)));
   }
   write(path.join(runtime, 'scripts/headless-source-loader.mjs'), fs.readFileSync(path.join(ROOT, 'scripts/register-strip-types-loader.mjs')));
@@ -82,6 +83,8 @@ for (const [label, mutate] of [
   ['mode substitution', f => fs.chmodSync(path.join(f.runtime, 'package.json'), 0o755)],
   ['roster mode', f => fs.chmodSync(f.rosterFile, 0o755)],
   ['launcher mode', f => fs.chmodSync(f.launcher, 0o755)],
+  ['shared Web config digest', f => fs.appendFileSync(path.join(f.web, '.next/required-server-files.json'), '\n')],
+  ['headless Web bootstrap digest', f => fs.appendFileSync(path.join(f.runtime, 'scripts/headless-web-server.mjs'), '\n')],
   ['shared Web digest', f => fs.appendFileSync(path.join(f.web, 'server.js'), '\n')],
   ['wrong revision with valid digest', f => {
     const name = 'Resources/WebRuntime/mediflow-build-identity.json';
