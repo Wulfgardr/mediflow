@@ -22,7 +22,7 @@ function repositorySources(overrides = {}) {
   };
 }
 
-test('accepts the integrated local 0.8.6 runtime crosswalk', () => {
+test('accepts the integrated local 0.9.0 runtime crosswalk', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
   assert.doesNotThrow(() => validateFabricGenerativeRuntimeCrosswalk(manifest));
   assert.deepEqual(manifest.capabilities.map(({ id }) => id), [
@@ -109,9 +109,9 @@ test('pins the historical semantic receipt without relabeling it', () => {
   );
 });
 
-test('pins package release identity to 0.8.6', () => {
+test('pins package release identity to 0.9.0', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
-  const stalePackage = readFileSync('package.json', 'utf8').replace('"version": "0.8.6"', '"version": "0.8.4"');
+  const stalePackage = readFileSync('package.json', 'utf8').replace('"version": "0.9.0"', '"version": "0.8.4"');
   assert.throws(
     () => validateFabricGenerativeRuntimeCrosswalk(manifest, repositorySources({ 'package.json': stalePackage })),
     /package version/u,
@@ -121,7 +121,7 @@ test('pins package release identity to 0.8.6', () => {
 test('manifest remains a new runtime artifact, separate from the historical receipt', () => {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'));
   assert.equal(manifest.schema, 'mediflow.ai.fabric-generative-runtime-crosswalk.v1');
-  assert.equal(manifest.release, '0.8.6');
+  assert.equal(manifest.release, '0.9.0');
   assert.equal(manifest.integrationStatus, 'local_source_integrated');
   assert.equal(manifest.applyPolicy, 'none');
   assert.notEqual(MANIFEST_PATH, manifest.historicalArtifacts[0].path);
@@ -140,7 +140,7 @@ test('requires opaque catalog choice and preserves CLI admission and proposal-on
 });
 
 import { TREATMENT_PORTABLE_RUNTIME_CROSSWALK, validateTreatmentReasoningPortableCrosswalk } from './check-fabric-generative-runtime-crosswalk.mjs';
-test('capability-local v2 map pins the untouched v1 crosswalk and keeps runtime qualification unobserved', () => {
+test('capability-local v2 map pins the current v1 crosswalk and keeps runtime qualification unobserved', () => {
   const result = validateTreatmentReasoningPortableCrosswalk();
   assert.equal(result.provider, 'athena_transformers'); assert.equal(result.runtimeQualification, 'not_observed'); assert.equal(result.applyPolicy, 'none');
   assert.equal(TREATMENT_PORTABLE_RUNTIME_CROSSWALK.integrationStatus, 'proposed_not_integrated');

@@ -9,11 +9,11 @@ Un gestionale aperto e gratuito per il lavoro in ambulatorio.<br>
 Cartelle, documenti e attività da seguire, anche senza intelligenza artificiale.
 
 
-[![Versione sorgente](https://img.shields.io/badge/sorgente-0.8.6-33506b?style=flat)](./docs/analysis/2026-09-07-086-release-verification.md)
+[![Versione sorgente](https://img.shields.io/badge/sorgente-0.9.0-33506b?style=flat)](./CHANGELOG.md#090---2026-10-15)
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
 [![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
-[![Uso locale su Mac](https://img.shields.io/badge/0.8.6-Mac%20%7C%20localhost-6e7681?style=flat)](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
+[![Runtime locale](https://img.shields.io/badge/0.9.0-sorgente%20%7C%20localhost-6e7681?style=flat)](./docs/STATE_OF_THE_SYSTEM.md)
 
 [**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
@@ -31,34 +31,34 @@ non sono la condizione per usare il gestionale.
 cartella e il lavoro da seguire. La schermata è stata acquisita dal candidato
 `ddff0a929` e contiene esclusivamente dati sintetici.*
 
-> **MediFlow 0.8.6 è disponibile come [codice sorgente](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6), pubblicato il 20 settembre 2026.**
+> **MediFlow 0.9.0 — release sorgente per runtime locale Web e Headless.**
 >
-> Questa release distribuisce i sorgenti del runtime locale per Mac, utilizzabile
-> dal browser tramite `localhost` oppure senza interfaccia grafica da client e
-> agenti autorizzati. Non comprende un installer firmato o notarizzato
-> dell’applicazione nativa.
+> Comprende il runtime Web locale e Headless con Node 24, per macOS ARM,
+> Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM su Parallels.
+> Le [note 0.9.0](./CHANGELOG.md#090---2026-10-15) distinguono prove accettate,
+> quarantene temporanee e limiti. La [pagina GitHub della release](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
+> riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna.
 >
-> La pubblicazione dei sorgenti non autorizza l’uso con dati clinici reali. Prima
-> di un impiego effettivo, il professionista o l’organizzazione responsabile deve
-> verificare finalità e base giuridica, informativa, ruoli e autorizzazioni,
-> misure di sicurezza e, quando previsto, consenso dell’interessato. La valutazione
-> del deployment resta aperta in [WUL-688](https://linear.app/wulfgardr/issue/WUL-688).
+> La consegna dei sorgenti non autorizza l'uso con dati clinici reali.
+> L'ammissione dell'installazione e dei flussi resta una decisione separata
+> del professionista o dell'organizzazione responsabile.
 
 <details>
 <summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
 
-La [release pubblicata su GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
-comprende gli archivi ZIP e TAR.GZ del codice. Non comprende un installer
-nativo firmato o notarizzato e non attesta app complete per Windows, Linux,
-iOS o iPadOS, né una validazione clinica.
+GitHub fornisce gli archivi ZIP e TAR.GZ del codice sorgente. Per l’avvio qualificato
+serve un checkout Git pulito del tag `v0.9.0` con Node 24: gli archivi privi
+di `.git` non costituiscono un profilo di avvio qualificato.
+App e installer nativi firmati o notarizzati restano fuori da questa release;
+i loro metadati seguono il percorso nativo separato.
+La [0.8.6 pubblicata il 20 settembre 2026](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
+resta una release storica con le proprie [verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
 
-Le funzioni AI sono facoltative; i servizi esterni, compresa l’integrazione
+Le funzioni AI sono facoltative; i servizi esterni, compresa l'integrazione
 ChatGPT, sono spenti per impostazione predefinita e richiedono una scelta
-esplicita. Configurare un servizio non dimostra che funzioni, così come una
-prova sintetica non ne qualifica l’uso clinico. Ogni verifica conserva la
-revisione su cui è stata eseguita: le prove precedenti non si estendono
-automaticamente alla 0.8.6.
-[Verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
+esplicita. Configurare un servizio non dimostra che funzioni; le prove
+sintetiche e la pubblicazione dei sorgenti non attestano idoneità clinica.
+Ogni verifica conserva la revisione su cui è stata eseguita.
 
 </details>
 
@@ -254,7 +254,7 @@ Per partire dai sorgenti servono Git, **Node.js 24.x** e le dipendenze del
 progetto. Per valutazione e sviluppo usa fixture sintetiche.
 
 ```sh
-git clone https://github.com/Wulfgardr/mediflow
+git clone --branch v0.9.0 --depth 1 https://github.com/Wulfgardr/mediflow
 cd mediflow
 nvm use
 npm ci
@@ -266,11 +266,12 @@ gestore. `better-sqlite3` deve corrispondere all’ABI del Node attivo.
 
 | Ambiente Web locale | Avvio |
 | --- | --- |
-| macOS | `./Start_MediFlow.command` |
+| macOS ARM | `./Start_MediFlow.command` |
 
 Apri `http://localhost:3000`. Il launcher controlla checkout e porta, così da
-non aprire per errore un’altra istanza. Gli altri sistemi operativi e i client
-nativi non fanno parte della distribuzione dichiarata per la 0.8.6.
+non aprire per errore un’altra istanza. I profili Windows e Linux della 0.9.0
+sono quelli dichiarati nello [stato del sistema](./docs/STATE_OF_THE_SYSTEM.md);
+i client nativi seguono un percorso distinto.
 
 Su macOS, una checkout `main` che non contiene aggiornamenti già noti a Git
 si ferma prima di aprire l’archivio: aggiorna con `git pull --ff-only` e rilancia.
@@ -278,15 +279,15 @@ Il controllo è locale e non scarica aggiornamenti. Ollama, se installato,
 si avvia in background senza ritardare l’apertura della cartella.
 
 Questi comandi non attivano provider AI, servizio WHO o altri connettori
-opzionali. Il clone segue il ramo predefinito pubblico: non seleziona il tag
-della release né la base di una revisione editoriale.
+opzionali. Il clone seleziona il tag `v0.9.0`; conserva il checkout Git pulito
+per costruire e verificare il runtime della release.
 
 <details>
 <summary><strong>Apple: account gratuito, Xcode e distribuzione</strong></summary>
 
 Per compilare e testare le applicazioni Apple serve Xcode completo: le sole
 Command Line Tools non coprono SwiftUI e XCTest. Sono verifiche del seguito
-nativo, non condizioni di consegna della release sorgente 0.8.6.
+nativo, non condizioni di consegna della release sorgente 0.9.0.
 
 Un Apple Account gratuito consente sviluppo e prove personali entro i limiti
 del Personal Team; Developer ID e notarizzazione Mac richiedono l’Apple
