@@ -245,6 +245,14 @@ Gli adapter non aprono direttamente SQLite. La cifratura protegge i campi
 clinici sensibili secondo il contratto documentato: non è una dichiarazione
 di cifratura integrale di ogni metadato o dell’intero file database.
 
+Preferenze e ricevute del lanciatore sono separate per cartella sorgente nella
+configurazione utente: `~/Library/Application Support/MediFlow/launcher` su
+macOS, `%APPDATA%\MediFlow\launcher` su Windows e
+`$XDG_CONFIG_HOME/mediflow/launcher` oppure `~/.config/mediflow/launcher` su Linux.
+Il lanciatore non le scrive nella cartella scelta con `MEDIFLOW_DATA_DIR`.
+Il primo avvio tollera soltanto le voci di servizio elencate nell'[ADR 0138](./docs/adr/0138-explicit-data-directory-bootstrap.md#emendamento-2026-10);
+altre voci senza database richiedono un recupero esplicito.
+
 [Topologia dei dati](./docs/topologia-dati-flussi.md) ·
 [Sicurezza](./SECURITY.md) · [Limiti noti](./docs/known-limitations.md)
 

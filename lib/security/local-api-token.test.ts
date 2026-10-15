@@ -101,3 +101,16 @@ test('keeps generated token files isolated between temporary directories', () =>
         });
     });
 });
+
+
+test('import alone leaves a nonexistent data directory untouched', () => {
+    withTemporaryDataDir(root => {
+        const dataDir = path.join(root, 'not-created');
+        const result = spawnSync(process.execPath, [
+            '--import', loaderPath, '--input-type=module', '--eval',
+            `await import(${JSON.stringify(tokenModuleUrl)});`,
+        ], { cwd: repoRoot, encoding: 'utf8', env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir } });
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(fs.existsSync(dataDir), false);
+    });
+});
