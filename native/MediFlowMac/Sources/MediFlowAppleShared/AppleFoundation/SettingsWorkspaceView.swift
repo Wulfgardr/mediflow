@@ -423,7 +423,13 @@ struct SettingsWorkspaceView: View {
                         set: { if let area = $0 { selectedArea = area } }
                     )) {
                         ForEach(SettingsArea.allCases) { area in
-                            Label(area.title, systemImage: area.symbol).tag(area)
+                            Label {
+                                Text(area.title)
+                            } icon: {
+                                Image(systemName: area.symbol)
+                                    .foregroundStyle(PlatformColors.secondaryInk)
+                            }
+                            .tag(area)
                         }
                     }
                     .listStyle(.sidebar)
