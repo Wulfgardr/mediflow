@@ -144,7 +144,7 @@ async function setup(page: Page, info?: TestInfo) {
     const root = page.getByTestId('onboarding-setup');
     await expect(page).toHaveTitle(/MediFlow/);
     await expect(root.getByRole('heading', { name: 'Chi sei?', exact: true })).toBeVisible();
-    await expect(root.getByLabel('Avanzamento setup', { exact: true })).toHaveText('Passo 1 di 2');
+    await expect(root.getByLabel('Avanzamento della configurazione', { exact: true })).toHaveText('Passo 1 di 2');
     const next = root.getByRole('button', { name: 'Avanti', exact: true });
     await expect(next).toBeDisabled();
     const name = root.getByLabel('Nome e cognome', { exact: true });
@@ -161,7 +161,7 @@ async function setup(page: Page, info?: TestInfo) {
     if (info) await capture(page, info, 'identity', setupSelector);
     await next.press('Enter');
     await expect(root.getByRole('heading', { name: 'Proteggi l’accesso', exact: true })).toBeVisible();
-    await expect(root.getByLabel('Avanzamento setup', { exact: true })).toHaveText('Passo 2 di 2');
+    await expect(root.getByLabel('Avanzamento della configurazione', { exact: true })).toHaveText('Passo 2 di 2');
     await expect(root.locator('#setup-pin-help')).toContainText('da 4 a 64 caratteri');
     const pin = root.getByLabel('PIN di conferma', { exact: true });
     const confirmation = root.getByLabel('Conferma PIN', { exact: true });

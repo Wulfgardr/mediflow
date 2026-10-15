@@ -58,11 +58,11 @@ launcherTest('launcher choice supports keyboard, both themes and a verified redi
     const chooser = await createChoiceServer({ root: path.resolve(__dirname, '..'), state: () => state,
         choose: (choice: string, remember: boolean) => {
             selection = { choice, remember };
-            Object.assign(state, { busy: true, message: 'Preparazione di MediFlow.' });
+            Object.assign(state, { busy: true, step: 'versione', since: Date.now(), message: 'Preparazione di questa versione.' });
         }, install: () => {}, stop: async () => {} });
     try {
         await page.goto(chooser.url);
-        await expect(page.getByRole('heading', { name: 'Avvio', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Come vuoi usare MediFlow?', exact: true })).toBeVisible();
         for (const colorScheme of ['light', 'dark'] as const) {
             await page.emulateMedia({ colorScheme });
             await page.setViewportSize({ width: colorScheme === 'light' ? 390 : 1280, height: 850 });
@@ -75,10 +75,9 @@ launcherTest('launcher choice supports keyboard, both themes and a verified redi
         const web = page.getByRole('button', { name: /^Nel browser/u });
         await web.focus();
         await page.keyboard.press('Enter');
-        await expect(page.getByRole('status')).toHaveText('Preparazione di MediFlow.');
+        await expect(page.getByRole('heading', { name: 'Avvio di MediFlow', exact: true })).toBeVisible();
+        await expect(page.locator('#steps li.current')).toContainText('Preparazione della versione');
         expect(selection).toEqual({ choice: 'web', remember: true });
-        await page.getByRole('link', { name: 'Cambia', exact: true }).click();
-        await expect(web).toBeVisible();
         expect((await probeRunningInstance(target, fingerprint)).ok).toBe(true);
         Object.assign(state, { busy: false, ready: true, url: target, message: 'Pronto' });
         await page.goto(chooser.url);
