@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { crc32 } from 'node:zlib';
-import { unzipSync } from 'fflate';
+import { Unzip, UnzipInflate } from 'fflate';
 import { isWhoEmbeddedTitle } from './icd11-embedded-contract';
 import { isWhoCanonicalMmsUri } from './icd11-who-local-contract';
 
@@ -57,9 +57,32 @@ function tabulationBytes(original: Uint8Array): { bytes: Uint8Array; filename: s
         if (candidates.length !== 1) return fail('Formato WHO non riconosciuto: serve un solo SimpleTabulation-ICD-11-MMS-<lingua>.txt; XLSX non supportato');
         const selected = candidates[0];
         if (selected !== 'SimpleTabulation-ICD-11-MMS-en.txt') return fail('Lingua WHO non supportata: richiesto inglese');
-        const unzipped = unzipSync(original, { filter: file => file.name === selected && file.originalSize <= WHO_TABULATION_MAX_BYTES });
-        const bytes = unzipped[selected], metadata = files.get(selected)!;
-        if (!bytes || bytes.length !== metadata.size || crc32(bytes) !== metadata.crc) throw new Error('checksum');
+        const metadata = files.get(selected)!;
+        const chunks: Uint8Array[] = [];
+        let found = false, complete = false, produced = 0, checksum = 0;
+        const unzip = new Unzip(file => {
+            if (file.name !== selected) return;
+            if (found) throw new Error('duplicate tabulation');
+            found = true;
+            file.ondata = (error, chunk, final) => {
+                if (error) throw error;
+                produced += chunk.length;
+                if (produced > WHO_TABULATION_MAX_BYTES || produced > metadata.size) throw new Error('limits');
+                checksum = crc32(chunk, checksum);
+                chunks.push(chunk);
+                complete = final;
+            };
+            file.start();
+        });
+        unzip.register(UnzipInflate);
+        // Bound each synchronous inflate step, including when ZIP sizes are forged.
+        const inputChunkBytes = 1024;
+        for (let offset = 0; offset < original.length; offset += inputChunkBytes) {
+            const end = Math.min(offset + inputChunkBytes, original.length);
+            unzip.push(original.subarray(offset, end), end === original.length);
+        }
+        if (!complete || produced !== metadata.size || checksum !== metadata.crc) throw new Error('checksum');
+        const bytes = Buffer.concat(chunks, produced);
         return { bytes, filename: selected, ignoredFiles: [...files.keys()].filter(name => name !== selected).sort() };
     } catch (error) {
         if (error instanceof WhoCatalogError) throw error;

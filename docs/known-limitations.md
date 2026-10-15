@@ -250,6 +250,10 @@ dell'archivio reale è verificato, comprese le note multilinea. Le combinazioni
 postcoordinate non vengono verificate dal catalogo tabellare. Dati WHO CC BY-ND
 3.0 IGO, non MIT; nessuna garanzia clinica deriva dalla presenza di un codice.
 
+L'estrazione ZIP rifiuta una tabulazione che produca più di 64 MiB o più byte
+di quelli dichiarati nell'archivio; richiede dimensione esatta e CRC completo.
+La decompressione è sincrona e limitata a blocchi, senza un timer dedicato.
+
 Il catalogo pubblico usa un DB dedicato e conserva l'archivio originale e una
 versione precedente ripristinabile. Il backup clinico non lo include. Il contratto
 incorporato delle route web WHO è additivo. Le route v1 paired conservano il
