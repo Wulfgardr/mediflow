@@ -30,7 +30,12 @@ export function createWhoCatalogStore(databasePath: string) {
             CREATE TRIGGER IF NOT EXISTS icd_catalog_fts_delete AFTER DELETE ON icd_catalog_entries BEGIN
                 INSERT INTO icd_catalog_fts(icd_catalog_fts,rowid,title) VALUES('delete',old.id,old.title); END;`);
     }
-    const state = () => db.prepare('SELECT active, previous, staged, revision FROM icd_catalog_state WHERE singleton=1').get() as {
+    const readState = db.prepare('SELECT active, previous, staged, revision FROM icd_catalog_state WHERE singleton=1');
+    const readCode = db.prepare('SELECT code,uri,title,chapter,leaf,residual FROM icd_catalog_entries WHERE generation=? AND code=?');
+    const readSearch = db.prepare(fts
+        ? 'SELECT e.code,e.uri,e.title,e.chapter,e.leaf,e.residual FROM icd_catalog_fts CROSS JOIN icd_catalog_entries e ON e.id=icd_catalog_fts.rowid WHERE icd_catalog_fts MATCH ? AND e.generation=? ORDER BY rank,e.code LIMIT 26'
+        : "SELECT code,uri,title,chapter,leaf,residual FROM icd_catalog_entries WHERE generation=? AND normalized LIKE ? ESCAPE '\\' ORDER BY code LIMIT 26");
+    const state = () => readState.get() as {
         active: string | null; previous: string | null; staged: string | null; revision: number };
     const generation = (id: string) => db.prepare('SELECT * FROM icd_catalog_generations WHERE id=?').get(id) as StoredGeneration | undefined;
     const entries = (id: string): WhoCatalogEntry[] => (db.prepare('SELECT code,uri,title,chapter,leaf,residual FROM icd_catalog_entries WHERE generation=? ORDER BY code').all(id) as (Omit<WhoCatalogEntry, 'leaf' | 'residual'> & { leaf: number; residual: number })[])
@@ -120,7 +125,7 @@ export function createWhoCatalogStore(databasePath: string) {
     }
     function findCode(code: string): WhoCatalogEntry | null {
         const active = requireActive();
-        const raw = db.prepare('SELECT code,uri,title,chapter,leaf,residual FROM icd_catalog_entries WHERE generation=? AND code=?').get(active.id, code) as (Omit<WhoCatalogEntry, 'leaf' | 'residual'> & { leaf: number; residual: number }) | undefined;
+        const raw = readCode.get(active.id, code) as (Omit<WhoCatalogEntry, 'leaf' | 'residual'> & { leaf: number; residual: number }) | undefined;
         return raw ? { ...raw, leaf: Boolean(raw.leaf), residual: Boolean(raw.residual) } : null;
     }
     function search(query: string): { entries: WhoCatalogEntry[]; partial: boolean; manifest: WhoCatalogManifest } {
@@ -130,10 +135,8 @@ export function createWhoCatalogStore(databasePath: string) {
         let found: WhoCatalogEntry[] = [];
         if (normalized) {
             const rows = fts
-                ? db.prepare('SELECT e.code,e.uri,e.title,e.chapter,e.leaf,e.residual FROM icd_catalog_fts JOIN icd_catalog_entries e ON e.id=icd_catalog_fts.rowid WHERE icd_catalog_fts MATCH ? AND e.generation=? ORDER BY rank,e.code LIMIT 26')
-                    .all(normalized.split(' ').filter(Boolean).map(token => `"${token}"*`).join(' AND '), active.id)
-                : db.prepare("SELECT code,uri,title,chapter,leaf,residual FROM icd_catalog_entries WHERE generation=? AND normalized LIKE ? ESCAPE '\\' ORDER BY code LIMIT 26")
-                    .all(active.id, `%${normalized.replace(/[\\%_]/gu, '\\$&').replace(/ /gu, '%')}%`);
+                ? readSearch.all(normalized.split(' ').filter(Boolean).map(token => `"${token}"*`).join(' AND '), active.id)
+                : readSearch.all(active.id, `%${normalized.replace(/[\\%_]/gu, '\\$&').replace(/ /gu, '%')}%`);
             found = (rows as (Omit<WhoCatalogEntry, 'leaf' | 'residual'> & { leaf: number; residual: number })[]).map(row => ({ ...row, leaf: Boolean(row.leaf), residual: Boolean(row.residual) }));
         }
         const combined = exact ? [exact, ...found.filter(row => row.code !== exact.code)] : found;

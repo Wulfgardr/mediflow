@@ -183,7 +183,7 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
     const readiness = await page.request.get('/api/icd/proxy');
     expect(readiness.status()).toBe(200);
     expect((await readiness.json()).deployment).toBe('embedded');
-    const search = await page.request.get('/api/icd/proxy?q=amber');
+    const search = await page.request.get('/api/icd/proxy?q=amb');
     expect(search.status()).toBe(200);
     expect((await search.json()).receipt.source).toBe('embedded');
     await page.goto('/settings/repertori#who-setup');
