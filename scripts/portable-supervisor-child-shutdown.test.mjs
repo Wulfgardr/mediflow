@@ -80,7 +80,7 @@ test('shutdown immediately severs IPC, stays synchronous, and preserves the spaw
   children.onTerminal((reason) => terminal.push(reason));
   assert.deepEqual(calls[0].options.env, { MEDIFLOW_AIP_OPERATION_RPC: 'late_bound_authenticated_inherited_child_ipc_v1' });
   assert.deepEqual(calls[1].options.env, {
-    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: options.dataDir,
+    NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '0', MEDIFLOW_DATA_DIR: options.dataDir,
   });
   assert.deepEqual(calls[0].options.stdio, ['inherit', 'inherit', 'inherit', 'ipc']);
   assert.deepEqual(calls[1].options.stdio, ['ignore', 2, 2, 'ipc']);
@@ -248,7 +248,9 @@ test('real owned children exit after termination even when POSIX SIGTERM is hand
     await within(Promise.all(tracked.map(({ exited }) => exited)), 3_000, 'real child cleanup timed out');
   });
   const options = fixture(t, (command, args, spawnOptions) => {
-    const child = spawn(command, [...args], spawnOptions);
+    const isWeb = args[0] === path.join(ROOT, 'scripts/headless-web-server.mjs');
+    if (isWeb) assert.deepEqual(args, [path.join(ROOT, 'scripts/headless-web-server.mjs'), options.webTargetPath]);
+    const child = spawn(command, isWeb ? [options.webTargetPath] : [...args], spawnOptions);
     tracked.push(trackChild(child));
     return child;
   }, `

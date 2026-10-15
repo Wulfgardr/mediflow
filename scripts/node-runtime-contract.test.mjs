@@ -139,13 +139,14 @@ function approvedSharedFixture(t) {
     writeFixture(path.join(web, 'package.json'), '{}');
     writeFixture(path.join(web, 'server.js'), 'throw new Error("Synthetic server must not run");');
     writeFixture(path.join(web, '.next/BUILD_ID'), identity.buildId);
+    writeFixture(path.join(web, '.next/required-server-files.json'), '{"config":{}}');
     writeFixture(path.join(web, 'mediflow-build-identity.json'), JSON.stringify(identity));
     writeFixture(path.join(web, 'mediflow-runtime-contract.json'), JSON.stringify({ schemaVersion: 1,
         node: { major: node.major, version: node.version, moduleVersion: node.moduleVersion },
         platform: node.platform, arch: node.arch, betterSqlite3Version: 'synthetic-no-native-binding' }));
     writeFixture(path.join(runtime, '.nvmrc'), '24\n');
     writeFixture(path.join(runtime, 'package.json'), JSON.stringify({ type: 'module', engines: { node: '>=24 <25' } }));
-    for (const name of ['scripts/mediflow-headless-supervisor.mjs', 'scripts/node-runtime-contract.mjs']) {
+    for (const name of ['scripts/mediflow-headless-supervisor.mjs', 'scripts/node-runtime-contract.mjs', 'scripts/headless-web-server.mjs']) {
         writeFixture(path.join(runtime, name), fs.readFileSync(path.join(sourceRoot, name)));
     }
     writeFixture(path.join(runtime, 'scripts/intelligent-host-mcp-stdio.mjs'), 'throw new Error("No agent execution");');

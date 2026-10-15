@@ -92,6 +92,8 @@ server.listen(0, '127.0.0.1', () => {
 `, 'utf8');
 
 fs.writeFileSync(harnessPath, `
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 const root = ${JSON.stringify(ROOT_URL)};
 const url = (relative) => new URL(relative, root).href;
@@ -137,6 +139,11 @@ const commitTerminalAudit = createPortableSupervisorSemanticAuditPortV1({
 const children = createPortableSupervisorProductionChildProcessesV1({
   dataDir: ${JSON.stringify(dataDir)},
   webDirectory: ${JSON.stringify(webDirectory)}, webTargetPath: ${JSON.stringify(webTarget)},
+  spawnChild: (command, args, options) => {
+    const isWeb = args[0] === ${JSON.stringify(path.join(ROOT, 'scripts/headless-web-server.mjs'))};
+    if (isWeb) assert.deepEqual(args, [${JSON.stringify(path.join(ROOT, 'scripts/headless-web-server.mjs'))}, ${JSON.stringify(webTarget)}]);
+    return spawn(command, isWeb ? [${JSON.stringify(webTarget)}] : args, options);
+  },
 });
 const checkup = createCheckupStatusTransitionSupervisorPortV1({
   randomBytes, sendWeb: children.sendWeb,

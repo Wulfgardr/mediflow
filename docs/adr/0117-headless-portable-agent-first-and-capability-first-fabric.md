@@ -472,3 +472,23 @@ payload. Non è una firma né protegge da chi può sostituire anche questi input
 fidati o modificare file durante l'esecuzione. Il bundle macOS firmato conserva
 il proprio percorso di ammissione separato. Questo requisito riguarda i profili
 sorgente, non installer, qualifica clinica o rilascio.
+
+## Emendamento 2026-10-15: porta Web posseduta dal Supervisor
+
+Il backend Web di ciascun Supervisor usa `startServer` Next con `port: 0`,
+`hostname: 127.0.0.1` e retry disabilitato. Il kernel assegna la porta al
+listener definitivo: nessun probe con rilascio della porta e nessuna adozione
+di processi o listener esistenti. Il bootstrap legge la configurazione dello
+standalone ammesso; il `server.js` generato resta il percorso Web ordinario.
+
+Quando Next ha inizializzato gli handler, il bootstrap pubblica su stderr
+`MEDIFLOW_HEADLESS_WEB_READY {"url":"http://127.0.0.1:<porta>"}`. Il chiamante
+apre quell’URL per il login e l’attivazione Web trusted. L’indirizzo non è una
+credenziale e non conferisce autorità; stdout resta riservato al protocollo
+MCP. Cookie, selezione, challenge e grant continuano a usare i controlli
+esistenti e IPC ereditato. Perdita del parent o fallimento del bootstrap
+chiudono il backend; il Supervisor termina soltanto i propri figli.
+
+La regressione sintetica avvia due supervisor con archivi separati, verifica
+porte diverse, login e rifiuto del cookie dell’altro archivio, e ripete
+discovery e `tools/list` mentre entrambi i backend sono pronti e attivi.
