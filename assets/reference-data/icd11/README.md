@@ -1,21 +1,35 @@
 # Asset ICD-11 MMS
 
-Il dataset WHO reale non è incluso in questa tranche. Non inserire qui le
-fixture sintetiche dei test. La ricerca mostra catalogo assente finché non
-viene fornito un archivio autorizzato o confermato l'aggiornamento dalla UI.
+Include `catalog.zip`, archivio WHO ufficiale originale e non modificato,
+SimpleTabulation MMS 2026-01 inglese, scaricato il 15 ottobre 2026 da:
+<https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip>.
 
-Per il bundle servono `catalog.zip` (archivio WHO originale, non modificato) e
-`manifest.json`, generato e verificato con il parser di
-`lib/reference-data/icd11-embedded-parser.ts`:
+- Dimensione: 4.214.980 byte.
+- SHA-256: `f1356588f40953a83e3af2b662deab47c5e269f944d1ea4ed0cfeb2007c7cd39`.
+- Versione nell'intestazione: 17 gennaio 2026, 05:30 UTC.
+- 37.052 record logici: 35.664 categorie con codice, 1.360 blocchi e 28 capitoli.
 
-- `schemaVersion`: `mediflow.icd11-catalog-manifest.v1`
-- `sourceUrl`: URL SimpleTabulation 2026-01 dichiarato nel parser
-- `releaseId`: `2026-01`; `language`: `en`
-- `license`: `CC BY-ND 3.0 IGO`; `attribution`: `World Health Organization (WHO)`
-- `sha256`: 64 cifre esadecimali minuscole; `bytes`: byte dell'archivio originale
-- `rows`, `categories`, `withoutCode`: conteggi verificati dal parser
+`manifest.json` è generato e verificato da `parseWhoTabulation` in
+`lib/reference-data/icd11-embedded-parser.ts` sullo ZIP originale. Registra URL,
+release, lingua, attribuzione, licenza, hash, byte, conteggi, data di versione,
+file selezionato e file ignorati. Non costituisce una firma WHO.
 
-Il manifest non costituisce una firma WHO. Il dataset non diventa MIT.
-Il parser ammette solo tab-separated UTF-8, anche in ZIP. Un archivio con solo
-XLSX viene rifiutato esplicitamente e richiede una decisione successiva sul
-supporto del formato, senza conversioni silenziose.
+Il parser sceglie esattamente `SimpleTabulation-ICD-11-MMS-en.txt`.
+`readme.txt` e il gemello `.xlsx` sono conservati nello ZIP ma ignorati;
+XLSX da solo non è supportato. Zero o più file SimpleTabulation `.txt` candidati
+sono rifiutati, così come una lingua diversa dall'inglese.
+Il TXT contiene BOM UTF-8, record CRLF, campi quotati e CodingNote multilinea,
+anche con LF non quotati. La colonna finale Version è metadato d'intestazione,
+non una colonna dati. Le 100 righe fisiche di continuazione non sono record.
+
+Solo le categorie con codice vengono indicizzate. Per ricerca e visualizzazione
+si toglie il prefisso di profondità dei titoli e si associa la release 2026-01
+agli URI MMS senza anno. `originalUri` nel risultato del parser e l'archivio
+integrale conservano la fonte originale; non viene riscritto l'archivio WHO.
+BrowserLink è una formula Excel e non viene eseguita né usata.
+
+International Classification of Diseases, Eleventh Revision (ICD-11).
+World Health Organization (WHO), 2019. <https://icd.who.int/browse11>.
+Dati sotto licenza [CC BY-ND 3.0 IGO](https://creativecommons.org/licenses/by-nd/3.0/igo/),
+separata dalla MIT del software. [Attribuzione e condizioni](../../../licenses/who-icd11/NOTICE.md).
+L'inclusione non implica approvazione di MediFlow da parte della WHO.

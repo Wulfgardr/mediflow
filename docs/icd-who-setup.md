@@ -3,11 +3,12 @@
 La ricerca usa il catalogo WHO incorporato verificato: nessuna credenziale,
 connessione o servizio Docker è necessario durante la consultazione. La release
 supportata è MMS **2026-01, solo inglese**. La versione italiana non è inclusa.
-Questa tranche contiene soltanto fixture sintetiche per i test: il catalogo WHO
-reale non è stato scaricato né incorporato. In assenza di dati viene mostrato
-**Assente**, senza codici inventati o un catalogo parziale presentato come completo.
+Il bundle include l’archivio WHO ufficiale non modificato e il manifest:
+35.664 categorie con codice, 1.360 blocchi e 28 capitoli verificati. Al primo uso
+il servizio importa le categorie nel DB dedicato, senza scaricare dati.
+Un bundle assente, alterato o disabilitato non viene attivato.
 
-## Acquisizione e uso offline
+## Aggiornamento e uso offline
 
 In **Impostazioni, Repertori, Terminologia WHO**:
 
@@ -28,7 +29,7 @@ conservata. Il backup clinico attuale non comprende questo database pubblico:
 per trasferirlo, ad app arrestata copiare il file con gli eventuali file WAL/SHM,
 oppure acquisire di nuovo lo stesso archivio autorizzato. Non copiare un DB in uso.
 
-Un distributore può fornire l'archivio originale in
+L’archivio originale è incluso in
 `assets/reference-data/icd11/catalog.zip` con `manifest.json`, secondo il
 [contratto degli asset](../assets/reference-data/icd11/README.md). Il primo uso
 nel processo verifica hash, dimensioni, schema e conteggi; non sovrascrive un
@@ -47,9 +48,9 @@ presenza nel catalogo, non appropriatezza o correttezza clinica. Una combinazion
 postcoordinata non viene validata usando il solo codice base.
 
 Il parser accetta **tab-separated UTF-8 con intestazioni riconosciute**, anche
-in ZIP; XLSX e formati diversi vengono rifiutati esplicitamente. Lo schema reale
-del file WHO e il percorso con dati ufficiali restano da verificare dopo
-l'acquisizione autorizzata. Hash e conteggi garantiscono coerenza con il manifest,
+in ZIP: viene selezionato il solo TXT SimpleTabulation inglese, ignorando
+readme e XLSX gemello. Sono supportati BOM, campi quotati e note multilinea;
+XLSX da solo e formati diversi vengono rifiutati esplicitamente. Hash e conteggi garantiscono coerenza con il manifest,
 non costituiscono una firma WHO.
 
 **ICD-11, World Health Organization (WHO), CC BY-ND 3.0 IGO.** I dati WHO non

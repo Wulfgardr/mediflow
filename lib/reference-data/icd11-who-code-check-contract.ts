@@ -1,4 +1,4 @@
-import { parseWhoEmbeddedReference, type WhoEmbeddedReference } from './icd11-embedded-contract';
+import { isWhoEmbeddedTitle, parseWhoEmbeddedReference, type WhoEmbeddedReference } from './icd11-embedded-contract';
 /* @Codex */
 import { parseWhoLocalReference, whoExactRecord, type WhoLocalReference } from './icd11-who-local-contract';
 
@@ -72,8 +72,7 @@ export function parseWhoCodeCheckResult(value: unknown, requestedCode: string): 
     if (!entry || entry.canonicalUri !== whoCodeInfoReference(requestedCode) || !isWhoCheckStemUri(entry.stemUri)
         || entry.stemCode !== requestedCode.split(/[&/]/u)[0]) return null;
     const title = receipt.source === 'embedded'
-        ? typeof entry.stemTitle === 'string' && entry.stemTitle.trim() && entry.stemTitle.length <= 4096
-            && !/[\u0000-\u001f\u007f<>\u202a-\u202e\u2066-\u2069]/u.test(entry.stemTitle) ? entry.stemTitle : null
+        ? isWhoEmbeddedTitle(entry.stemTitle) ? entry.stemTitle : null
         : parseWhoStemTitle({ '@id': entry.stemUri, code: entry.stemCode,
             title: { '@language': 'en', '@value': entry.stemTitle } }, entry as Omit<WhoCheckedCode, 'stemTitle'>);
     return title ? Object.freeze({ ...root, entry: Object.freeze(entry), receipt }) as WhoCodeCheckResult : null;

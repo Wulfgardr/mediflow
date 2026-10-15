@@ -171,8 +171,9 @@ Per supporto, apri una issue o consulta la documentazione tecnica.
 
 In Impostazioni, Repertori, Terminologia WHO si legge lo stato del catalogo
 MMS 2026-01 inglese. Un catalogo pronto permette ricerca per codice o titolo
-senza Docker, credenziali o rete. Questa tranche non include dati WHO reali:
-serve prima un'acquisizione autorizzata. Aggiorna dalla WHO scarica un'anteprima
+senza Docker, credenziali o rete. Il bundle include l’archivio WHO originale:
+35.664 categorie con codice, importate e verificate al primo uso.
+Aggiorna dalla WHO scarica un’anteprima
 con conferma; Attiva catalogo verificato richiede una seconda conferma e conserva
 la versione precedente ripristinabile. Il download non invia dati della cartella.
 

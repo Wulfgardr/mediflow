@@ -17,6 +17,11 @@ export type WhoEmbeddedReadiness = Readonly<{
     releaseId: '2026-01'; language: 'en'; deployment: 'embedded';
     catalogState: 'ready' | 'absent' | 'unverified'; datasetSnapshotId: string | null;
 }>;
+export function isWhoEmbeddedTitle(value: unknown): value is string {
+    return typeof value === 'string' && Boolean(value.trim()) && value.length <= 4096
+        && !/[\u0000-\u001f\u007f\u061c\u200e\u200f\ud800-\udfff\u202a-\u202e\u2066-\u2069]/u.test(value)
+        && !/[<>]/u.test(value.replace(/[<>](?=\s*\d)/gu, ''));
+}
 export function parseWhoEmbeddedReference(value: unknown): WhoEmbeddedReference | null {
     const r = whoExactRecord(value, ['releaseId', 'language', 'bindingId', 'datasetSnapshotId']);
     return r && r.releaseId === '2026-01' && r.language === 'en' && r.bindingId === WHO_EMBEDDED_BINDING
@@ -40,8 +45,7 @@ export function parseWhoEmbeddedSearchResponse(value: unknown): WhoEmbeddedSearc
         const e = whoExactRecord(raw, ['code', 'description', 'system', 'canonicalUri']);
         if (!e || typeof e.code !== 'string' || !/^[A-Z0-9][A-Z0-9.-]{0,31}$/u.test(e.code)
             || seen.has(e.code) || e.system !== 'ICD-11' || !isWhoCanonicalMmsUri(e.canonicalUri, e.code)
-            || typeof e.description !== 'string' || !e.description.trim() || e.description.length > 4096
-            || /[\u0000-\u001f\u007f<>\u202a-\u202e\u2066-\u2069]/u.test(e.description)) return null;
+            || !isWhoEmbeddedTitle(e.description)) return null;
         seen.add(e.code); entries.push(Object.freeze(e) as WhoEmbeddedEntry);
     }
     const r = whoExactRecord(root.receipt, ['schemaVersion', 'operation', 'releaseId', 'language', 'bindingId',

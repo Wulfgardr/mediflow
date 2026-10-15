@@ -109,7 +109,7 @@ test('code-check audit persists only provenance and outcome, never code or title
     assert.deepEqual(await listAuditEvents({ eventType: 'reference_data.icd11.code_check' }), events);
 });
 
-const { zipSync, strToU8 } = await import('fflate');
+const { zipSync, unzipSync, strToU8 } = await import('fflate');
 const { parseWhoTabulation, WHO_CATALOG_MAX_BYTES, WHO_TABULATION_MAX_BYTES, WhoCatalogError } = await import('./icd11-embedded-parser');
 const { createWhoCatalogStore } = await import('./icd11-embedded-store');
 const { createWhoCatalogRuntime } = await import('./icd11-catalog-runtime');
@@ -123,7 +123,7 @@ const { parseWhoCodeCheckResult } = await import('./icd11-who-code-check-contrac
 const { diagnosisSchema } = await import('../schemas');
 const fixtureText = fs.readFileSync('lib/reference-data/fixtures/icd11-simple-tabulation.synthetic.tsv', 'utf8');
 const fixtureBytes = Buffer.from(fixtureText);
-const zippedFixture = () => zipSync({ 'SimpleTabulation.synthetic.txt': strToU8(fixtureText) });
+const zippedFixture = () => zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': strToU8(fixtureText) });
 const noop = () => undefined;
 function activeCatalog(filename = ':memory:') {
     const store = createWhoCatalogStore(filename);
@@ -161,13 +161,97 @@ test('embedded parser fails closed on malformed headers, duplicate codes and URI
     assert.throws(() => parseWhoTabulation(Buffer.from([0xff, 0x0a])), /UTF-8/u);
     assert.throws(() => parseWhoTabulation(Buffer.alloc(WHO_CATALOG_MAX_BYTES + 1)), /Dimensione/u);
     assert.throws(() => parseWhoTabulation(zipSync({ 'large.txt': new Uint8Array(WHO_TABULATION_MAX_BYTES + 1) })), /limiti/u);
-    assert.throws(() => parseWhoTabulation(zipSync({ 'a.txt': fixtureBytes, 'b.txt': fixtureBytes })), /un solo/u);
+    assert.throws(() => parseWhoTabulation(zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': fixtureBytes, 'SimpleTabulation-ICD-11-MMS-fr.txt': fixtureBytes })), /un solo/u);
     assert.throws(() => parseWhoTabulation(zipSync({ 'table.xlsx': strToU8('synthetic') })), /XLSX non supportato/u);
     assert.throws(() => parseWhoTabulation(zippedFixture().slice(0, -4)), /ZIP/u);
-    const corrupt = zipSync({ 'table.txt': [fixtureBytes, { level: 0 }] });
-    corrupt[40] ^= 1;
+    const corrupt = zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': [fixtureBytes, { level: 0 }] });
+    corrupt[80] ^= 1;
     assert.throws(() => parseWhoTabulation(corrupt), /ZIP/u);
 });
+
+const officialLayoutFixture = fs.readFileSync('lib/reference-data/fixtures/icd11-official-layout.synthetic.zip');
+test('official export layout handles BOM, quoted multiline notes, bare LF notes and header-only version metadata', () => {
+    const parsed = parseWhoTabulation(officialLayoutFixture);
+    assert.equal(parsed.manifest.rows, 5);
+    assert.equal(parsed.manifest.categories, 3);
+    assert.equal(parsed.manifest.blocks, 1);
+    assert.equal(parsed.manifest.chapters, 1);
+    assert.equal(parsed.manifest.versionDate, '2026-01-17T05:30:00.000Z');
+    assert.deepEqual(parsed.manifest.ignoredFiles, ['SimpleTabulation-ICD-11-MMS-en.xlsx', 'readme.txt']);
+    assert.equal(parsed.entries[0].title, 'Synthetic amber condition');
+    assert.equal(parsed.entries[0].originalUri, 'http:' + '//id.who.int/icd/release/11/mms/1000000001');
+    assert.equal(parsed.entries[0].uri, 'http:' + '//id.who.int/icd/release/11/2026-01/mms/1000000001');
+    assert.equal(parsed.entries[1].residual, true);
+    assert.equal(parsed.entries[2].title, 'Synthetic threshold <80% and > 20 units');
+    const files = unzipSync(officialLayoutFixture);
+    const filename = 'SimpleTabulation-ICD-11-MMS-en.txt';
+    const text = new TextDecoder().decode(files[filename]);
+    for (const bad of [text.replace('2026 Jan 17', '2025 Jan 17'), text.replace('2026 Jan 17', '2026 Jan 32'),
+        text.replace('Synthetic amber condition', 'Synthetic "bad" condition'), text.slice(0, -2),
+        text.replace('Synthetic amber condition', 'Synthetic <script>condition</script>'),
+        text.replace('Synthetic amber condition', 'Synthetic \u202econdition'),
+        text.replace('Synthetic amber condition', 'Synthetic\ncondition'),
+        text.replace('\tcategory\t', '\tunknown\t')]) {
+        assert.throws(() => parseWhoTabulation(zipSync({ ...files, [filename]: strToU8(bad) })), WhoCatalogError);
+    }
+    assert.throws(() => parseWhoTabulation(zipSync({ 'readme.txt': fixtureBytes })), /un solo/u);
+    assert.throws(() => parseWhoTabulation(zipSync({ 'SimpleTabulation-ICD-11-MMS-fr.txt': fixtureBytes })), /Lingua/u);
+});
+
+test('official bundled catalog bootstraps an empty dedicated database, survives restart and searches with FTS5',
+    { skip: !fs.existsSync('assets/reference-data/icd11/catalog.zip') }, async context => {
+        const root = path.resolve('assets/reference-data/icd11');
+        const original = fs.readFileSync(path.join(root, 'catalog.zip'));
+        const expected: unknown = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+        const parseStart = performance.now();
+        const parsed = parseWhoTabulation(original, expected);
+        const parseMs = performance.now() - parseStart;
+        assert.equal(parsed.manifest.sha256, 'f1356588f40953a83e3af2b662deab47c5e269f944d1ea4ed0cfeb2007c7cd39');
+        assert.equal(parsed.manifest.categories, 35664);
+        assert.equal(parsed.manifest.blocks, 1360);
+        assert.equal(parsed.manifest.chapters, 28);
+        assert.equal(parsed.manifest.rows, 37052);
+        const directory = fs.mkdtempSync(path.join(dataDir, 'official-public-catalog-'));
+        const filename = path.join(directory, 'icd11-catalog.sqlite');
+        const { bootstrapWhoCatalogBundle } = await import('./icd11-embedded-production');
+        let store = createWhoCatalogStore(filename);
+        try {
+            assert.equal(store.status().state, 'absent');
+            assert.equal(bootstrapWhoCatalogBundle(store, root, false), 'verified');
+            assert.equal(store.status().state, 'absent');
+            const importStart = performance.now();
+            assert.equal(bootstrapWhoCatalogBundle(store, root, true), 'verified');
+            const importMs = performance.now() - importStart;
+            assert.equal(store.status().state, 'ready');
+            assert.equal(store.status().revision, 1);
+            assert.equal(store.status().searchEngine, 'fts5');
+            for (const [code, title] of [['1A00', 'Cholera'], ['BA00', 'Essential hypertension'],
+                ['5A11', 'Type 2 diabetes mellitus'], ['CA40', 'Pneumonia']]) {
+                assert.equal(store.findCode(code)?.title, title);
+                assert.match(store.findCode(code)!.uri, /^http:\/\/id\.who\.int\/icd\/release\/11\/2026-01\/mms\//u);
+            }
+            assert.ok(store.search('hypertension').entries.some(entry => entry.code === 'BA00'));
+            assert.ok(store.search('diabetes').entries.some(entry => entry.code === '5A11'));
+            const runtime = syntheticRuntime(store);
+            const response = await runtime.search('GOLD 2');
+            const { parseWhoEmbeddedSearchResponse } = await import('./icd11-embedded-contract');
+            assert.ok(parseWhoEmbeddedSearchResponse({ schemaVersion: 'mediflow.reference-data.icd11-search-response.v3', ...response }));
+            assert.ok(response.entries.some(entry => entry.code === 'XS7U' && entry.description.includes('<80%')));
+            assert.ok(parseWhoCodeCheckResult(await runtime.checkCode('XS7U'), 'XS7U'));
+            const times = Array.from({ length: 25 }, () => {
+                const start = performance.now(); store.search('hypertension'); return performance.now() - start;
+            }).sort((a, b) => a - b);
+            store.close();
+            const dbBytes = fs.statSync(filename).size;
+            store = createWhoCatalogStore(filename);
+            assert.equal(store.status().state, 'ready');
+            assert.equal(store.findCode('BA00')?.title, 'Essential hypertension');
+            assert.equal(bootstrapWhoCatalogBundle(store, root, true), 'verified');
+            assert.equal(store.status().revision, 1);
+            context.diagnostic(JSON.stringify({ parseMs, bootstrapMs: importMs, dbBytes,
+                searchMedianMs: times[12], searchMaxMs: times.at(-1), query: 'hypertension', samples: times.length }));
+        } finally { store.close(); fs.rmSync(directory, { recursive: true, force: true }); }
+    });
 
 test('catalog stage and activation are separate, CAS guarded, atomic with audit, and preserve a rollback across restart', () => {
     const filename = path.join(dataDir, 'synthetic-reference.sqlite');
@@ -178,7 +262,7 @@ test('catalog stage and activation are separate, CAS guarded, atomic with audit,
     store.activate(first.previewId, 0, noop, 'synthetic');
     assert.equal(store.status().state, 'ready');
     assert.equal(store.status().searchEngine, 'fts5');
-    const secondBytes = zipSync({ 'table.txt': strToU8(fixtureText.replace('Synthetic amber condition', 'Synthetic blue condition')) });
+    const secondBytes = zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': strToU8(fixtureText.replace('Synthetic amber condition', 'Synthetic blue condition')) });
     const second = store.stage(secondBytes, 1, noop, 'synthetic');
     assert.throws(() => store.activate(second.previewId, 0, noop, 'synthetic'), /cambiato/u);
     let checks = 0;

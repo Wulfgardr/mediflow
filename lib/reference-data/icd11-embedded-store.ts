@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import { normalizeWhoText, parseWhoTabulation, WhoCatalogError, type WhoCatalogEntry, type WhoCatalogManifest } from './icd11-embedded-parser';
+import { normalizeWhoText, parseWhoTabulation, WhoCatalogError, type WhoCatalogEntry as ParsedWhoCatalogEntry, type WhoCatalogManifest } from './icd11-embedded-parser';
 
+type WhoCatalogEntry = Omit<ParsedWhoCatalogEntry, 'originalUri'>;
 export type WhoCatalogStatus = Readonly<{ state: 'ready' | 'absent' | 'unverified'; enabled: boolean; revision: number;
     manifest: WhoCatalogManifest | null; previousAvailable: boolean; searchEngine: 'fts5' | 'like' }>;
 type StoredGeneration = { id: string; manifest: string; original: Buffer };
@@ -45,7 +46,7 @@ export function createWhoCatalogStore(databasePath: string) {
         const found = generation(id);
         if (!found) throw new WhoCatalogError('Catalogo WHO non verificato');
         const parsed = parseWhoTabulation(found.original, JSON.parse(found.manifest));
-        const ordered = [...parsed.entries].sort((a, b) => a.code < b.code ? -1 : a.code > b.code ? 1 : 0);
+        const ordered = parsed.entries.map(({ code, uri, title, chapter, leaf, residual }) => ({ code, uri, title, chapter, leaf, residual })).sort((a, b) => a.code < b.code ? -1 : a.code > b.code ? 1 : 0);
         if (JSON.stringify(entries(id)) !== JSON.stringify(ordered)) throw new WhoCatalogError('Indice WHO non corrispondente al file originale');
         if (fts) db.prepare("INSERT INTO icd_catalog_fts(icd_catalog_fts,rank) VALUES('integrity-check',1)").run();
         verified.set(id, parsed.manifest);
