@@ -2,6 +2,7 @@
 
 /* @Codex: installed inventory and explicit model choices for local settings. */
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 /* @Codex */
 import { isInstalledOllamaModel, parseInstalledOllamaModels } from '@/lib/installed-ollama-models';
@@ -189,7 +190,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                 <p id={`installed-status-${selectorId}`} role="status" className={styles.notice}>
                     {!targetUrl ? 'Inserisci prima l’indirizzo di Ollama.' : loading ? 'Lettura da Ollama in corso…'
                         : error ? error : installedModels.length === 0 ? 'Nessun modello installato in Ollama.'
-                            : `${installedModels.length} modelli presenti in Ollama.`}
+                            : `${formatCountLabel(installedModels.length, 'modello presente', 'modelli presenti')} in Ollama.`}
                 </p>
                 {value && !loading && !error && currentInventory && !installedSelection && (
                     <p className={styles.hint}>La selezione attuale «{value}» non è presente nell’elenco. Scegli un modello installato o consulta i consigli.</p>

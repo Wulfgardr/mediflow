@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -957,7 +958,7 @@ export default function NewEntryPage() {
                                 {patient ? `${patient.lastName} ${patient.firstName}` : 'Caricamento...'}
                             </p>
                             <p className="lume-registro mt-2 text-xs text-[color:var(--lume-ink-muted)]">
-                                {visitEntryCount} visite · {sourceCount} fonti
+                                {formatCountLabel(visitEntryCount, 'visita', 'visite')} · {formatCountLabel(sourceCount, 'fonte', 'fonti')}
                             </p>
                             {patient?.diagnoses?.length ? (
                                 <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '../format-count';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 /* @Codex */
 import { isInstalledOllamaModel } from '@/lib/installed-ollama-models';
@@ -295,7 +296,7 @@ export function useAiSettingsController() {
                 status: health.status === 'ok' && installedModels.length > 0 ? 'ok' : 'error',
                 message: health.status === 'ok'
                     ? installedModels.length > 0
-                        ? `Ollama è raggiungibile: ${installedModels.length} modelli presenti. Questo test non abilita le funzioni cliniche.`
+                        ? `Ollama è raggiungibile: ${formatCountLabel(installedModels.length, 'modello presente', 'modelli presenti')}. Questo test non abilita le funzioni cliniche.`
                         : 'Ollama è raggiungibile, ma non contiene modelli. Consulta i consigli qui sotto.'
                     : 'Ollama non è raggiungibile. Controlla indirizzo e servizio locale, poi riprova.',
                 models: installedModels,

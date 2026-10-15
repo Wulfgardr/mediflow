@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex */
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useRef, useState } from 'react';
 import { Database } from 'lucide-react';
 import {
@@ -69,7 +70,7 @@ export default function ExemptionDbManager() {
                 <div>
                     <p className="section-kicker">Repertorio amministrativo</p>
                     <h2 className="text-lg font-semibold">Codifiche Esenzioni</h2>
-                    <p className="text-sm">{status ? `${status.count.toLocaleString()} codici nel repertorio` : 'Conteggio non disponibile'}</p>
+                    <p className="text-sm">{status ? `${formatCountLabel(status.count, 'codice', 'codici')} nel repertorio` : 'Conteggio non disponibile'}</p>
                 </div>
             </div>
             <p className="text-sm">Importa un file locale: prima controlli l’anteprima, poi confermi l’aggiornamento. I codici assenti dal file restano nel repertorio e le assegnazioni ai pazienti restano invariate.</p>
@@ -108,7 +109,7 @@ export default function ExemptionDbManager() {
                         : 'nessuna colonna aggiuntiva nel file'}.</p>
                     {preview.sample.length > 0 && <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <caption className="text-left">Campione: prime {preview.sample.length} righe valide</caption>
+                            <caption className="text-left">{preview.sample.length === 1 ? 'Campione: una riga valida' : `Campione: prime ${preview.sample.length} righe valide`}</caption>
                             <thead><tr><th scope="col" className="p-2">Codice</th><th scope="col" className="p-2">Descrizione</th></tr></thead>
                             <tbody>{preview.sample.map((row) => <tr key={row.line}><td className="p-2">{row.code}</td><td className="p-2">{row.description}</td></tr>)}</tbody>
                         </table>
@@ -129,7 +130,7 @@ export default function ExemptionDbManager() {
                 </div>
             )}
             {receipt && <div className="space-y-2 rounded-xl border p-4 text-sm" aria-label="Ricevuta import">
-                <p>{receipt.applied} codici applicati: {receipt.inserted} nuovi, {receipt.updated} aggiornati. {verified ? 'Rilettura confermata.' : 'Verifica lo stato con Rileggi stato.'}</p>
+                <p>{formatCountLabel(receipt.applied, 'codice applicato', 'codici applicati')}: {formatCountLabel(receipt.inserted, 'nuovo', 'nuovi')}, {formatCountLabel(receipt.updated, 'aggiornato', 'aggiornati')}. {verified ? 'Rilettura confermata.' : 'Verifica lo stato con Rileggi stato.'}</p>
                 <details><summary>Ricevuta e hash fonte</summary>
                     <p className="break-all">Operazione: {receipt.operationKey}</p>
                     <p className="break-all">SHA-256: {receipt.manifest.sourceSha256}</p>
@@ -141,7 +142,7 @@ export default function ExemptionDbManager() {
                 {source && <button type="button" className="ui-btn-secondary min-h-11" disabled={busy} onClick={() => void run(() => makePreview(source))}>Genera nuova anteprima</button>}
                 <button type="button" className="ui-btn-secondary min-h-11" disabled={busy} onClick={() => void run(() => reread())}>Rileggi stato</button>
             </div>
-            {status?.latestReceipt && !receipt && <p className="text-xs">Ultimo import registrato: {status.latestReceipt.committedAt}, {status.latestReceipt.applied} codici. La registrazione non attesta l’attualità normativa della fonte.</p>}
+            {status?.latestReceipt && !receipt && <p className="text-xs">Ultimo import registrato: {status.latestReceipt.committedAt}, {formatCountLabel(status.latestReceipt.applied, 'codice', 'codici')}. La registrazione non attesta l’attualità normativa della fonte.</p>}
         </section>
     );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import ink from './ink-secondary.module.css';
 import styles from './clinical-register.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
@@ -235,7 +236,7 @@ export default function TreatmentReasoningPanel({
 
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <span className="apple-chip">{sourceSummary.total} fonti</span>
+                                <span className="apple-chip">{formatCountLabel(sourceSummary.total, 'fonte', 'fonti')}</span>
                                 <span className="apple-chip">review-only</span>
                                 <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { differenceInYears } from 'date-fns';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -145,7 +146,7 @@ export default function AnalyticsPage() {
             subtitle="Una domanda alla volta sui dati già registrati in questa postazione."
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
-            statusLabel={`${stats.totalInRange} schede tra ${normalizedAgeRange[0]} e ${normalizedAgeRange[1]} anni`}
+            statusLabel={`${formatCountLabel(stats.totalInRange, 'scheda', 'schede')} tra ${normalizedAgeRange[0]} e ${normalizedAgeRange[1]} anni`}
             navItems={navItems}
         >
             <section
@@ -210,7 +211,7 @@ export default function AnalyticsPage() {
                 <dl className={styles.factList}>
                     <div className={styles.factRow}>
                         <dt>Assistenza domiciliare integrata</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.adiCount}</span> {proposal && stats.adiCount === 1 ? 'scheda' : 'schede'}</dd>
+                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.adiCount}</span> {stats.adiCount === 1 ? 'scheda' : 'schede'}</dd>
                     </div>
                     <div className={styles.factRow}>
                         <dt>Con almeno una diagnosi registrata</dt>

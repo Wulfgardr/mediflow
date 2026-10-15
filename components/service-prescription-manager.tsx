@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import {
@@ -408,10 +409,10 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
 
     const headerActions = (
         <>
-            <span className="apple-chip">{prescriptions?.length ?? 0} prestazioni</span>
-            <span className="apple-chip">{prescriptionItems?.length ?? 0} voci</span>
-            <span className="apple-chip">{openCount} aperte</span>
-            <span className="apple-chip">{reportCount} referti</span>
+            <span className="apple-chip">{formatCountLabel(prescriptions?.length ?? 0, 'prestazione', 'prestazioni')}</span>
+            <span className="apple-chip">{formatCountLabel(prescriptionItems?.length ?? 0, 'voce', 'voci')}</span>
+            <span className="apple-chip">{formatCountLabel(openCount, 'aperta', 'aperte')}</span>
+            <span className="apple-chip">{formatCountLabel(reportCount, 'referto', 'referti')}</span>
             <button
                 type="button"
                 onClick={() => setIsFormOpen((value) => !value)}
@@ -477,7 +478,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                             <p className="text-xs font-normal text-[color:var(--lume-ink-muted)]">
                                 {form.itemsText.trim().length === 0
                                     ? 'Lascia vuoto per una singola voce con il nome della prestazione.'
-                                    : `${parsedItemsPreview.length} voci pronte al salvataggio.`}
+                                    : `${formatCountLabel(parsedItemsPreview.length, 'voce pronta', 'voci pronte')} al salvataggio.`}
                             </p>
                         </label>
                         <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
@@ -684,7 +685,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         const priority = item.priority ?? 'unknown';
                         const childItems = itemsByPrescription.get(item.id) ?? [];
                         return <tr key={item.id}>
-                            <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${childItems.length} voci` : ''}</small>
+                            <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${formatCountLabel(childItems.length, 'voce', 'voci')}` : ''}</small>
                                 <details className={styles.recordDetails}><summary>Dettagli, referti e documenti</summary>
                                     <p>Prescritta il {formatDate(item.prescribedAt) ?? '–'}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">

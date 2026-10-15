@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import ink from './ink-secondary.module.css';
 import styles from './clinical-register.module.css';
 import { useEffect, useMemo, useState } from 'react';
@@ -525,7 +526,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                             <h3 className="text-base font-semibold text-[color:var(--lume-ink)]">Smart Import</h3>
                             <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span className="inline-flex items-center rounded-full bg-[color:var(--lume-surface-field)] px-1.5 py-0.5 text-xs font-semibold uppercase tracking-tight text-[color:var(--lume-ink-muted)]">
-                                    {sourceCount} fonti
+                                    {formatCountLabel(sourceCount, 'fonte', 'fonti')}
                                 </span>
                                 {analysis && (
                                     <span className="break-all text-xs font-medium uppercase tracking-tight text-[color:var(--lume-ink-muted)]">
@@ -599,7 +600,7 @@ export default function PatientSmartImportPanel({ patient, entries, activeTherap
                         <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-focal)] p-4 lg:grid-cols-3">
                             <div className="flex flex-col">
                                 <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Selezionati</span>
-                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{selectedCount} pronti</span>
+                                <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{formatCountLabel(selectedCount, 'pronto', 'pronti')}</span>
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Reviewabili</span>

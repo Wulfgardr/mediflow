@@ -135,19 +135,33 @@ async function cleanupFixture(page: Page, id: string) {
   }, id);
 }
 
-for (const theme of ['light', 'dark'] as const) {
-  test(`Punto: testo renderizzato su tutte le pagine ordinarie, ${theme}`, async ({ page }, info) => {
-    test.setTimeout(300_000);
-    await page.setViewportSize({ width: 1440, height: 960 });
-    await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
-    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+const ROUTES = ['/', '/?area=incarico', '/?area=turno', '/?area=diario', '/?area=repertori', '/analytics', '/scales',
+  '/patients/[id]/modules', '/patients/[id]/scales', '/patients/[id]/scales/adl',
+  '/patients/[id]/entries/new', '/patients/[id]/edit', '/patients/new', '/patients/import', ...settingsRoutes()];
+
+const typographyTest = test.extend<{ patientFixture: { id: string; name: string } }>({
+  patientFixture: async ({ page }, runTest) => {
     const fixture = await createFixture(page);
     try {
-      const routes = ['/', '/?area=incarico', '/?area=turno', '/?area=diario', '/?area=repertori', '/analytics', '/scales',
-        `/patients/${fixture.id}/modules`, `/patients/${fixture.id}/scales`, `/patients/${fixture.id}/scales/adl`,
-        `/patients/${fixture.id}/entries/new`, `/patients/${fixture.id}/edit`, '/patients/new', '/patients/import', ...settingsRoutes()];
-      for (const route of routes) {
-        await test.step(route, async () => {
+      await runTest(fixture);
+    } finally {
+      await cleanupFixture(page, fixture.id);
+    }
+  },
+});
+
+for (const routePattern of ROUTES) {
+  typographyTest.describe(`Punto: testo renderizzato ${routePattern}`, () => {
+    typographyTest.setTimeout(routePattern.endsWith('/modules') ? 180_000 : 120_000);
+    for (const theme of ['light', 'dark'] as const) {
+      typographyTest.describe(theme, () => {
+        typographyTest.beforeEach(async ({ page }) => {
+          await page.setViewportSize({ width: 1440, height: 960 });
+          await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
+          await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+        });
+        typographyTest('pagina e dettagli', async ({ page, patientFixture: fixture }, info) => {
+          const route = routePattern.replace('[id]', fixture.id);
           const response = await page.goto(route);
           expect(response?.ok(), route).toBeTruthy();
           await page.waitForLoadState('networkidle');
@@ -176,6 +190,7 @@ for (const theme of ['light', 'dark'] as const) {
             await screenshot(page, 'scheda', theme);
             for (const pane of PANES) {
               await openPatientSection(page, pane);
+              if (pane === 'diario') await expect(page.locator('#diario > h3 .apple-chip')).toHaveText('1 voce');
               await expandDetails(page);
               await assertType(page, `scheda-${pane}`, info);
             }
@@ -183,14 +198,26 @@ for (const theme of ['light', 'dark'] as const) {
             await expandDetails(page);
             await assertType(page, `${route}-dettagli`, info);
           }
+          if (route === '/settings/profilo') {
+            const onboarding = page.getByTestId('work-profile-onboarding');
+            await expect(onboarding).toHaveAttribute('aria-busy', 'false');
+            await assertType(page, 'onboarding', info);
+            await screenshot(page, 'profilo', theme);
+          }
         });
-      }
-      await page.goto('/settings/profilo');
-      const onboarding = page.getByTestId('work-profile-onboarding');
-      await expect(onboarding).toHaveAttribute('aria-busy', 'false');
-      await assertType(page, 'onboarding', info);
-      await screenshot(page, 'profilo', theme);
+      });
+    }
+  });
+}
 
+for (const theme of ['light', 'dark'] as const) {
+  typographyTest.describe(`Punto: preferenze di lettura, ${theme}`, () => {
+    typographyTest.setTimeout(120_000);
+    typographyTest.beforeEach(async ({ page }) => {
+      await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
+      await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    });
+    typographyTest('scheda a larghezze e dimensioni del testo diverse', async ({ page, patientFixture: fixture }, info) => {
       await page.goto(`/patients/${fixture.id}/modules`);
       await expect(page.getByRole('heading', { name: fixture.name, exact: true })).toBeVisible();
       for (const [width, rootSize] of [[390, 16], [1440, 20], [768, 32]]) {
@@ -198,9 +225,7 @@ for (const theme of ['light', 'dark'] as const) {
         await page.evaluate(size => { document.documentElement.style.fontSize = `${size}px`; }, rootSize);
         await assertType(page, `preferenza-${width}-${rootSize}`, info);
       }
-    } finally {
-      await cleanupFixture(page, fixture.id);
-    }
+    });
   });
 }
 

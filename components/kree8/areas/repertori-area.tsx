@@ -1,3 +1,4 @@
+import { formatCountLabel as formatCatalogCount } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -82,12 +83,6 @@ async function fetchCatalogCount(path: string): Promise<number> {
   if (!response.ok) throw new Error(`Catalog count failed: ${response.status}`);
   const payload = await response.json() as { count?: unknown };
   return Number(payload.count || 0);
-}
-
-/* @Codex */
-function formatCatalogCount(count: number, singular: string, plural: string): string {
-  const label = count === 1 ? singular : plural;
-  return `${count.toLocaleString('it-IT')} ${label}`;
 }
 
 /* @Codex */

@@ -1,3 +1,4 @@
+import { formatCountLabel } from '../../format-count';
 /* WUL-262 review-queue summary for patient detail.
    Pure view model: aggregates EXISTING panel statuses (Patient Insight,
    evidence stack, Smart Import, document archive) into compact review-first
@@ -193,7 +194,7 @@ function buildEvidenceRow(evidence: ReviewQueueEvidenceItem[]): PatientReviewQue
             'evidence',
             'Evidenze documentali',
             'da-rivedere',
-            `${toReviewCount} referti su ${total} ancora in revisione${criticalNote}.`,
+            `${formatCountLabel(toReviewCount, 'referto', 'referti')} su ${total} ancora in revisione${criticalNote}.`,
             { anchor },
         );
     }
@@ -203,7 +204,7 @@ function buildEvidenceRow(evidence: ReviewQueueEvidenceItem[]): PatientReviewQue
             'evidence',
             'Evidenze documentali',
             'gia-applicato',
-            `${total} referti verificati · ${appliedDiagnoses} diagnosi già applicate alla scheda.`,
+            `${formatCountLabel(total, 'referto verificato', 'referti verificati')} · ${formatCountLabel(appliedDiagnoses, 'diagnosi già applicata', 'diagnosi già applicate')} alla scheda.`,
             { anchor },
         );
     }
@@ -212,7 +213,7 @@ function buildEvidenceRow(evidence: ReviewQueueEvidenceItem[]): PatientReviewQue
         'evidence',
         'Evidenze documentali',
         'disponibile',
-        `${total} referti verificati, nessuna revisione in sospeso.`,
+        `${formatCountLabel(total, 'referto verificato', 'referti verificati')}, nessuna revisione in sospeso.`,
         { anchor },
     );
 }
@@ -234,7 +235,7 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
             'smart-import',
             'Smart Import',
             'bloccato',
-            `${input.sourceCount} fonti presenti, ma anteprima e proposte sono ferme.`,
+            `${formatCountLabel(input.sourceCount, 'fonte presente', 'fonti presenti')}, ma anteprima e proposte sono ferme.`,
             {
                 anchor,
                 blockedReason:
@@ -247,7 +248,7 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
         'smart-import',
         'Smart Import',
         'disponibile',
-        `${input.sourceCount} fonti pronte: l'anteprima parte solo su richiesta dal pannello.`,
+        `${formatCountLabel(input.sourceCount, 'fonte pronta', 'fonti pronte')}: l'anteprima parte solo su richiesta dal pannello.`,
         { anchor },
     );
 }
@@ -271,7 +272,7 @@ function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientRevi
             'archive',
             'Archivio documenti',
             'serve-testo',
-            `${input.missingTextCount} allegati su ${input.attachmentsCount} senza testo estratto: estrazione locale o revisione manuale da completare.`,
+            `${formatCountLabel(input.missingTextCount, 'allegato', 'allegati')} su ${input.attachmentsCount} senza testo estratto: estrazione locale o revisione manuale da completare.`,
             { anchor },
         );
     }
@@ -280,7 +281,7 @@ function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientRevi
         'archive',
         'Archivio documenti',
         'disponibile',
-        `${input.attachmentsCount} allegati con testo disponibile per revisione e analisi.`,
+        `${formatCountLabel(input.attachmentsCount, 'allegato', 'allegati')} con testo disponibile per revisione e analisi.`,
         { anchor },
     );
 }
