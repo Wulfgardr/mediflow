@@ -735,7 +735,7 @@ struct AgendaWorkspaceView: View {
             case .progress:
                 ProgressView()
             case .message(let message):
-                Text(message).foregroundStyle(.secondary)
+                Text(message).foregroundStyle(PlatformColors.secondaryInk)
             case .rows:
                 ForEach([AgendaPill.coral, .yellow, .blue, .green, .muted], id: \.rawValue) { group in
                     let rows = model.rows.filter { $0.presentation.pill == group }
