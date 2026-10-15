@@ -267,9 +267,14 @@ public struct MediFlowMacRootView: View {
     }
 
     private func destinationRow(_ item: ClinicalWorkspaceSection) -> some View {
-        Label(item.title, systemImage: item.symbolName)
-            .tag(item)
-            .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
+        Label {
+            Text(item.title)
+        } icon: {
+            Image(systemName: item.symbolName)
+                .foregroundStyle(PlatformColors.secondaryInk)
+        }
+        .tag(item)
+        .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
     }
 
     /// Runtime is the home-base status of this very Mac, so it belongs with the
