@@ -2,7 +2,7 @@
 /* @Codex */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -325,4 +325,106 @@ test('shutdown asks an owned runtime to stop and waits for its exit', async () =
     await once(child, 'message');
     await stopOwnedChild(child, 3000);
     assert.equal(child.exitCode, 0);
+});
+
+
+import { launcherConfigDirectory, prepareLauncherState } from './launcher-state.mjs';
+
+test('launcher configuration follows the operating system, independently of the archive', () => {
+    assert.equal(launcherConfigDirectory({ platform: 'darwin', home: '/Users/synthetic', env: {} }), '/Users/synthetic/Library/Application Support/MediFlow/launcher');
+    assert.equal(launcherConfigDirectory({ platform: 'linux', home: '/home/synthetic', env: {} }), '/home/synthetic/.config/mediflow/launcher');
+    assert.equal(launcherConfigDirectory({ platform: 'linux', home: '/home/synthetic', env: { XDG_CONFIG_HOME: '/custom/config' } }), '/custom/config/mediflow/launcher');
+    assert.equal(launcherConfigDirectory({ platform: 'win32', home: 'C:\\Users\\synthetic', env: { APPDATA: 'C:\\Roaming' } }), 'C:\\Roaming\\MediFlow\\launcher');
+    assert.throws(() => launcherConfigDirectory({ platform: 'linux', home: '/home/synthetic', env: { XDG_CONFIG_HOME: 'relative' } }));
+});
+
+function launcherStateFixture(t) {
+    const home = mkdtempSync(path.join(tmpdir(), 'mediflow-launcher-state-'));
+    t.after(() => rmSync(home, { recursive: true, force: true }));
+    const dataDir = path.join(home, 'archive');
+    const options = { home, env: { MEDIFLOW_DATA_DIR: dataDir, APPDATA: path.join(home, 'Roaming'), XDG_CONFIG_HOME: path.join(home, 'config') } };
+    return { home, dataDir, options };
+}
+
+test('launcher preferences and ownership never create or write to the selected archive', t => {
+    const { home, dataDir, options } = launcherStateFixture(t);
+    const state = prepareLauncherState(repoRoot, options);
+    assert.equal(existsSync(dataDir), false);
+    mkdirSync(dataDir);
+    writeFileSync(path.join(dataDir, 'clinical-backup.zip'), 'untouched');
+    atomicJson(state.preferencesFile, { schemaVersion: 1, choice: 'web' });
+    claimLauncher(state.lockDirectory, cleanIdentity);
+    assert.deepEqual(prepareLauncherState(repoRoot, options), state);
+    assert.deepEqual(readdirSync(dataDir), ['clinical-backup.zip']);
+    assert.equal(readFileSync(path.join(dataDir, 'clinical-backup.zip'), 'utf8'), 'untouched');
+    const other = path.join(home, 'other-source');
+    mkdirSync(other);
+    assert.notEqual(prepareLauncherState(other, options).preferencesFile, state.preferencesFile);
+    if (process.platform !== 'win32') {
+        for (const directory of [path.dirname(path.dirname(state.preferencesFile)), path.dirname(state.preferencesFile), state.lockDirectory]) {
+            assert.equal(statSync(directory).mode & 0o777, 0o700);
+        }
+        for (const file of [state.preferencesFile, path.join(state.lockDirectory, 'instance.json')]) {
+            assert.equal(statSync(file).mode & 0o777, 0o600);
+        }
+    }
+});
+
+test('migration moves only exact launcher preferences and an inactive receipt for this source', t => {
+    const { dataDir, options } = launcherStateFixture(t);
+    mkdirSync(dataDir);
+    const state = prepareLauncherState(repoRoot, options);
+    const lock = path.join(dataDir, path.basename(state.lockDirectory));
+    mkdirSync(lock);
+    atomicJson(path.join(lock, 'instance.json'), { pid: 2147483647, checkoutPath: repoRoot });
+    atomicJson(path.join(dataDir, 'launcher-preferences.json'), { schemaVersion: 1, choice: 'web' });
+    writeFileSync(path.join(dataDir, 'backup.db'), 'untouched');
+    prepareLauncherState(repoRoot, options);
+    assert.deepEqual(readdirSync(dataDir), ['backup.db']);
+    assert.equal(JSON.parse(readFileSync(state.preferencesFile)).choice, 'web');
+    assert.equal(JSON.parse(readFileSync(path.join(path.dirname(state.preferencesFile), 'legacy-instance.json'))).checkoutPath, repoRoot);
+});
+
+test('migration preserves unknown files, symlinks and active launcher ownership', t => {
+    const { dataDir, options } = launcherStateFixture(t);
+    mkdirSync(dataDir);
+    const state = prepareLauncherState(repoRoot, options);
+    const lock = path.join(dataDir, path.basename(state.lockDirectory));
+    mkdirSync(lock);
+    atomicJson(path.join(lock, 'instance.json'), { pid: process.pid, checkoutPath: repoRoot });
+    assert.throws(() => prepareLauncherState(repoRoot, options), /ancora in corso/u);
+    atomicJson(path.join(lock, 'instance.json'), { pid: 2147483647, checkoutPath: '/unknown-source' });
+    atomicJson(path.join(dataDir, 'launcher-preferences.json'), { schemaVersion: 1, choice: 'web', unknown: true });
+    prepareLauncherState(repoRoot, options);
+    assert.equal(existsSync(lock), true);
+    assert.equal(existsSync(state.preferencesFile), false);
+    rmSync(path.join(dataDir, 'launcher-preferences.json'));
+    atomicJson(state.preferencesFile, { schemaVersion: 1, choice: 'agenti' });
+    symlinkSync(state.preferencesFile, path.join(dataDir, 'launcher-preferences.json'));
+    prepareLauncherState(repoRoot, options);
+    assert.equal(readFileSync(path.join(dataDir, 'launcher-preferences.json'), 'utf8'), readFileSync(state.preferencesFile, 'utf8'));
+});
+
+test('migration preserves both preferences when a newer configuration already exists', t => {
+    const { dataDir, options } = launcherStateFixture(t);
+    mkdirSync(dataDir);
+    const state = prepareLauncherState(repoRoot, options);
+    atomicJson(state.preferencesFile, { schemaVersion: 1, choice: 'agenti' });
+    atomicJson(path.join(dataDir, 'launcher-preferences.json'), { schemaVersion: 1, choice: 'web' });
+    prepareLauncherState(repoRoot, options);
+    assert.deepEqual(readdirSync(dataDir), []);
+    assert.equal(JSON.parse(readFileSync(state.preferencesFile)).choice, 'agenti');
+    assert.ok(readdirSync(path.dirname(state.preferencesFile)).some(name => name.includes('.migrated-')));
+});
+
+
+test('overlapping configuration and archive paths fail before creating either directory', t => {
+    const { home, options } = launcherStateFixture(t);
+    const config = path.join(home, 'overlap');
+    const overlapping = { ...options, platform: 'linux', env: { XDG_CONFIG_HOME: config, MEDIFLOW_DATA_DIR: config } };
+    assert.throws(() => prepareLauncherState(repoRoot, overlapping), /si sovrappone/u);
+    assert.equal(existsSync(config), false);
+    overlapping.env.MEDIFLOW_DATA_DIR = path.join(config, 'mediflow/launcher/clinical');
+    assert.throws(() => prepareLauncherState(repoRoot, overlapping), /si sovrappone/u);
+    assert.equal(existsSync(config), false);
 });

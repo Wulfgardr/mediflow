@@ -28,7 +28,13 @@ Per orientarti prima dell'avvio o approfondire una scelta:
    prepara la build di produzione: la pagina mostra le fasi e il tempo.
 5. Il browser apre MediFlow soltanto dopo il controllo della revisione.
 
-**Ricorda la mia scelta** salva la preferenza nella cartella dati.
+**Ricorda la mia scelta** salva una preferenza per questa cartella sorgente
+nella configurazione utente: `~/Library/Application Support/MediFlow/launcher`
+su Mac, `%APPDATA%\MediFlow\launcher` su Windows,
+`$XDG_CONFIG_HOME/mediflow/launcher` o `~/.config/mediflow/launcher` su Linux.
+La cartella scelta con `MEDIFLOW_DATA_DIR` non riceve preferenze o lock del
+lanciatore. I vecchi file riconosciuti del lanciatore vengono spostati nella
+configurazione; se un vecchio avvio è ancora attivo occorre prima arrestarlo.
 **Cambia** nella pagina di attesa torna alle scelte. Per riaprirle dal
 terminale usa `node scripts/mediflow.mjs --scegli`. **Arresta MediFlow** o
 Ctrl+C chiudono i processi di questo avvio. Un'altra istanza resta intatta.
@@ -46,6 +52,11 @@ accesso clinico da solo. I servizi AI restano facoltativi.
 ---
 
 ## 🔑 2. Sicurezza e PIN
+
+Una cartella senza database che contiene solo i file di servizio riconosciuti
+consente il primo avvio. Se contiene backup, residui SQLite o altre voci
+sconosciute, MediFlow segnala il database mancante: verifica il percorso o
+ripristina esplicitamente un backup. Non eliminare file per aggirare il controllo.
 
 Al primo avvio MediFlow ti chiede di creare un **Profilo Medico** e un
 **PIN**, con cui proteggere l'accesso ai dati cifrati.

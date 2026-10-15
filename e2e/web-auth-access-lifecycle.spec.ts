@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
+test.use({ initialRuntimeServices: true });
+
 const STRONG_AUTH_CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
 
 function mutationHeaders(etag: string): Record<string, string> {
@@ -17,7 +19,7 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   const pin = process.env.E2E_PIN || '1234';
   const request = page.request;
 
-  // Bootstrap this test's empty server via ordinary UI, with a real wrapped key.
+  // Bootstrap with only PM2 service files, through ordinary UI and a real wrapped key.
   // Close the UI before retiring its session, then exercise the original API lifecycle.
   const setupContext = await browser.newContext({ baseURL });
   try {

@@ -3,7 +3,7 @@ import { test as base, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:net';
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { trustedWebRequestHeaders } from './trusted-web-request';
@@ -35,8 +35,9 @@ export function isolatedRuntimeArguments(bundle: string): string[] {
 
 type IsolatedRuntime = Readonly<{ url: string }>;
 
-export const test = base.extend<{ isolatedRuntime: IsolatedRuntime }>({
-  isolatedRuntime: async ({}, provide, testInfo) => {
+export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean }>({
+  initialRuntimeServices: [false, { option: true }],
+  isolatedRuntime: async ({ initialRuntimeServices }, provide, testInfo) => {
     const bundle = path.resolve(process.env.E2E_ISOLATED_STANDALONE_DIR
       || path.join(repositoryRoot, process.env.MEDIFLOW_NEXT_DIST_DIR || '.next', 'standalone'));
     const serverPath = path.join(bundle, 'server.js');
@@ -61,6 +62,10 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime }>({
     const dataDirectory = path.join(directory, 'data');
     mkdirSync(dataDirectory, { mode: 0o700 });
     expect(readdirSync(dataDirectory)).toEqual([]);
+    if (initialRuntimeServices) {
+      mkdirSync(path.join(dataDirectory, 'pm2'), { mode: 0o700 });
+      writeFileSync(path.join(dataDirectory, 'pm2/pm2.log'), 'synthetic runtime log', { mode: 0o600 });
+    }
     const log = openSync(path.join(directory, 'server.log'), 'wx', 0o600);
     const environment: NodeJS.ProcessEnv = { ...process.env,
       NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: String(port),
@@ -102,7 +107,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime }>({
         'HTML and runtime must share the bundle metadata; pass its supported MEDIFLOW_APP_* environment.').toBe(true);
       const initial = await fetch(`${url}/api/auth/check`);
       expect(initial.status).toBe(200);
-      expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false });
+      expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false, db: { state: 'ready' } });
       initialEmptyAccount = true;
       await provide({ url });
     } finally {
@@ -119,7 +124,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime }>({
         contentType: 'application/json',
         body: JSON.stringify({
           isolated: true, url, node: process.versions.node, platform: process.platform, arch: process.arch,
-          emptyDataBeforeStart: true, initialEmptyAccount, sourceFingerprint, childStopped: true,
+          emptyDataBeforeStart: !initialRuntimeServices, initialRuntimeServices, initialEmptyAccount, sourceFingerprint, childStopped: true,
           serverSHA256: createHash('sha256').update(readFileSync(serverPath)).digest('hex'),
           runtimeContractSHA256: createHash('sha256').update(readFileSync(contractPath)).digest('hex'),
           sharedDatabaseUsed: false, accountOrDatabaseRestore: false,

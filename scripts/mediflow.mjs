@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { checkNode, knownMainUpdates, openUrl, probeRunningInstance, readProductIdentity, waitForRunningInstance } from './launcher-helpers.mjs';
 import { verifySourceRuntime } from './source-runtime.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
+import { prepareLauncherState } from './launcher-state.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHOICES = ['web', 'mac', 'agenti', 'sviluppo'];
@@ -74,20 +75,6 @@ export function atomicJson(file, value) {
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
-}
-
-function preferencesLocation(env = process.env) {
-  const dataDir = env.MEDIFLOW_DATA_DIR || (process.platform === 'darwin'
-    ? path.join(os.homedir(), 'Library/Application Support/MediFlow') : path.join(os.homedir(), '.mediflow'));
-  try {
-    if (!path.isAbsolute(dataDir)) throw new Error('Percorso relativo');
-    fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-    fs.accessSync(dataDir, fs.constants.W_OK);
-    return path.join(dataDir, 'launcher-preferences.json');
-  } catch {
-    if (env.MEDIFLOW_DATA_DIR) throw new Error('MEDIFLOW_DATA_DIR deve essere un percorso assoluto e scrivibile.');
-    return path.join(os.homedir(), '.mediflow-launcher.json');
-  }
 }
 
 function nativeApplication(root) {
@@ -184,9 +171,7 @@ export async function main(args = process.argv.slice(2)) {
   if (options.desktop) { log(`Collegamento creato: ${installDesktopEntry()}`); return; }
   if (knownMainUpdates(ROOT)) throw new Error('Questa copia non contiene aggiornamenti già noti a Git. Esegui git pull --ff-only e riapri MediFlow.');
   const identity = readProductIdentity(ROOT);
-  const preferencesFile = preferencesLocation();
-  const key = crypto.createHash('sha256').update(fs.realpathSync(ROOT)).digest('hex').slice(0, 16);
-  const lockDirectory = path.join(path.dirname(preferencesFile), `.mediflow-launcher-${key}`);
+  const { preferencesFile, lockDirectory } = prepareLauncherState(ROOT);
   const existing = await findExistingInstance(readJson(path.join(lockDirectory, 'instance.json')), identity);
   if (existing) {
     const url = options.choose ? `${existing.choiceUrl}?scegli=1` : existing.url;
