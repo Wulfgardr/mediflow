@@ -48,14 +48,19 @@ lo standalone dopo la preparazione: Web (`npm start`) e Headless verificano
 lo stesso contenuto prima dell'avvio. Vedi l'[ammissione sorgente](./runtime-payload-ledger.md#source-production-startup).
 
 Il Supervisor possiede Web standalone e MCP come figli separati, con IPC
-ereditato. Aprire il Web locale, autenticarsi e selezionare un paziente prima
+ereditato. Ogni backend ascolta su `127.0.0.1` con una porta libera assegnata
+dal kernel. Dopo la readiness, stderr riporta
+`MEDIFLOW_HEADLESS_WEB_READY {"url":"http://127.0.0.1:<porta>"}`. Aprire
+quell’URL nel browser e autenticarsi e selezionare un paziente prima
 dell'attivazione; la preview checkup richiede inoltre il ruolo e la selezione
 specifici del Web. Non passare PIN, cookie, chiavi, ID paziente o conferme nel
 client MCP. Il comando `mcp:intelligent-host` da solo non crea autorità.
 
 La prova sintetica riproducibile è `npm run smoke:intelligent-host:production`,
 dopo la build. Prepara archivi temporanei isolati, senza copia legacy, esegue
-le cinque operazioni reali e confronta discovery/catalogo con i descrittori.
+due supervisor contemporanei su porte diverse e archivi separati, con login
+sugli URL annunciati e discovery/`tools/list` ripetuti dopo la readiness; esegue
+poi le cinque operazioni reali e confronta discovery/catalogo con i descrittori.
 Verifica scope e conferma contraffatti, input troppo grande, revisione errata,
 lettura ripetuta, revoca e chiusura. I negativi condivisi di cancellazione,
 frame malformati e budget vivono anche in `test:mcp:intelligent-host` e

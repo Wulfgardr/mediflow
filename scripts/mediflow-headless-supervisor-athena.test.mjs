@@ -31,7 +31,7 @@ const mcpFixtureDirectory = fs.mkdtempSync(path.join(root, 'scripts', '.athena-p
 const mcpTargetPath = path.join(mcpFixtureDirectory, 'mcp.mjs');
 const KEY = 'MEDIFLOW_ATHENA_MLX_GENERATE_BIN';
 const MCP_ENV = { MEDIFLOW_AIP_OPERATION_RPC: 'late_bound_authenticated_inherited_child_ipc_v1' };
-const BASE_WEB_ENV = { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3000', MEDIFLOW_DATA_DIR: dataDir };
+const BASE_WEB_ENV = { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '0', MEDIFLOW_DATA_DIR: dataDir };
 const seam = Symbol.for('mediflow.synthetic.mf085.supervisor-athena');
 let current = null;
 
@@ -54,7 +54,7 @@ globalThis[seam] = {
       spawnChild: (command, args, spawnOptions) => {
         current.calls.push({ command, args, options: spawnOptions });
         if (current.failSpawn === current.calls.length) throw new Error('synthetic spawn failure');
-        const child = current.real ? spawn(command, args, spawnOptions) : new SyntheticChild();
+        const child = current.real ? spawn(command, current.calls.length === 2 ? [webTargetPath] : args, spawnOptions) : new SyntheticChild();
         current.children.push(child);
         return child;
       },
@@ -139,7 +139,7 @@ function assertEnvironments(ctx, value) {
   assert.deepEqual(ctx.calls[1].options.env,
     { ...BASE_WEB_ENV, ...(value === undefined ? {} : { [KEY]: value }) });
   for (const call of ctx.calls) assert.equal(call.options.shell, false);
-  assert.deepEqual(ctx.calls[1].args, [webTargetPath]);
+  assert.deepEqual(ctx.calls[1].args, [path.join(root, 'scripts/headless-web-server.mjs'), webTargetPath]);
 }
 
 test('production root passes only the approved parent runner through typed options to Web, never MCP', () =>
