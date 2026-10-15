@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex WUL-672: local Search only; provisioning and activation are host-owned. */
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
@@ -40,7 +41,7 @@ export function WhoSetupPanel() {
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!canVerify || probe.kind === 'running'} onClick={() => void verify()}>{probe.kind === 'running' ? 'Verifica in corso…' : 'Verifica con termine di esempio'}</button>
         </div>
         <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">La verifica cerca il termine pubblico “cholera”. Non usa dati della cartella e non cambia la configurazione.</p>
-        {probe.kind === 'done' && <p className="mt-3 text-sm" role="status">{probe.receipt.source === 'live' ? ('deployment' in probe.receipt ? 'Risposta dal servizio WHO locale' : 'Risposta WHO ricevuta') : 'Risposta dalla cache: non verifica il servizio corrente'} · {probe.receipt.resultCount} risultati · <time dateTime={probe.receipt.completedAt}>{new Date(probe.receipt.completedAt).toLocaleString('it-IT')}</time>.</p>}
+        {probe.kind === 'done' && <p className="mt-3 text-sm" role="status">{probe.receipt.source === 'live' ? ('deployment' in probe.receipt ? 'Risposta dal servizio WHO locale' : 'Risposta WHO ricevuta') : 'Risposta dalla cache: non verifica il servizio corrente'} · {formatCountLabel(probe.receipt.resultCount, 'risultato', 'risultati')} · <time dateTime={probe.receipt.completedAt}>{new Date(probe.receipt.completedAt).toLocaleString('it-IT')}</time>.</p>}
         {state.kind === 'ready' && 'deployment' in state.readiness && <p className="mt-2 text-xs">
             Modalità locale · {state.readiness.lastLiveObservedAt
                 ? <>Ultima risposta diretta: <time dateTime={state.readiness.lastLiveObservedAt}>{new Date(state.readiness.lastLiveObservedAt).toLocaleString('it-IT')}</time>.</>

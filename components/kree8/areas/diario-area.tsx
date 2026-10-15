@@ -1,3 +1,4 @@
+import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
@@ -133,8 +134,8 @@ function DiarioArea({
             <UserSquare2 size={13} />
             Apri quadro
           </button>
-          <PillBadge variant="neutral">{isLoading ? '…' : `${diaryState.activeCount} attive`}</PillBadge>
-          <PillBadge variant="neutral">{isLoading ? '…' : `${diaryState.patientCount} pazienti`}</PillBadge>
+          <PillBadge variant="neutral">{isLoading ? '…' : formatCountLabel(diaryState.activeCount, 'attiva', 'attive')}</PillBadge>
+          <PillBadge variant="neutral">{isLoading ? '…' : formatCountLabel(diaryState.patientCount, 'paziente', 'pazienti')}</PillBadge>
         </div>}
       </header>
 
@@ -150,8 +151,8 @@ function DiarioArea({
           </div>
           <span className={proposal ? diaryStyles.count : `${diaryStyles.count} lume-registro`}>
             {isLoading ? '…' : proposal
-              ? `${visibleEntries.length} ${visibleEntries.length === 1 ? 'voce' : 'voci'} · ${diaryState.patientCount} ${diaryState.patientCount === 1 ? 'paziente' : 'pazienti'}`
-              : `${visibleEntries.length} voci · dati locali`}
+              ? `${formatCountLabel(visibleEntries.length, 'voce', 'voci')} · ${formatCountLabel(diaryState.patientCount, 'paziente', 'pazienti')}`
+              : `${formatCountLabel(visibleEntries.length, 'voce', 'voci')} · dati locali`}
           </span>
         </header>
 
@@ -215,7 +216,7 @@ function DiarioArea({
                       {entry.attachmentCount > 0 ? (
                         <span className={diaryStyles.attachmentCount}>
                           <Paperclip size={11} />
-                          {entry.attachmentCount} allegati
+                          {formatCountLabel(entry.attachmentCount, 'allegato', 'allegati')}
                         </span>
                       ) : null}
                       <span className={diaryStyles.entryActions}>

@@ -1,3 +1,4 @@
+import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
 import {
   ArrowUpRight,
@@ -30,7 +31,7 @@ function LiveDocumentReviewArea({
   const reason = isWorkspaceLoading
     ? 'Il contesto locale è ancora in caricamento.'
     : hasEvidence
-      ? `${documentNames.length} documenti recenti · ${documentInsightCount} sintesi locali · ${codingHints.length} richiami da verificare.`
+      ? `${formatCountLabel(documentNames.length, 'documento recente', 'documenti recenti')} · ${formatCountLabel(documentInsightCount, 'sintesi locale', 'sintesi locali')} · ${formatCountLabel(codingHints.length, 'richiamo da verificare', 'richiami da verificare')}.`
       : 'Non risultano evidenze recenti o codifiche aperte per questo caso.';
 
   return (

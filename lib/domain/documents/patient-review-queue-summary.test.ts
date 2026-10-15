@@ -139,6 +139,37 @@ test('smart import without analysis stays on-demand and never auto-runs', () => 
     assert.equal(smartImport.anchor, '#documenti');
 });
 
+test('una sola fonte concorda il conteggio con lo stato disponibile o bloccato', () => {
+    const input = baseInput();
+    input.smartImport = { enabled: true, sourceCount: 1 };
+    assert.equal(buildPatientReviewQueueSummary(input).rows[2].detail,
+        "1 fonte pronta: l'anteprima parte solo su richiesta dal pannello.");
+    input.smartImport.enabled = false;
+    assert.equal(buildPatientReviewQueueSummary(input).rows[2].detail,
+        '1 fonte presente, ma anteprima e proposte sono ferme.');
+});
+
+test('un referto, una diagnosi e un allegato concordano al singolare', () => {
+    const input = baseInput();
+    input.evidence = [{ qualityLevel: 'yellow', appliedDiagnosesCount: 0 }];
+    input.archive = { attachmentsCount: 1, missingTextCount: 1 };
+    let summary = buildPatientReviewQueueSummary(input);
+    assert.equal(summary.rows[1].detail, '1 referto su 1 ancora in revisione.');
+    assert.equal(summary.rows[3].detail,
+        '1 allegato su 1 senza testo estratto: estrazione locale o revisione manuale da completare.');
+
+    input.evidence = [{ qualityLevel: 'green', appliedDiagnosesCount: 1 }];
+    input.archive.missingTextCount = 0;
+    summary = buildPatientReviewQueueSummary(input);
+    assert.equal(summary.rows[1].detail,
+        '1 referto verificato · 1 diagnosi già applicata alla scheda.');
+    assert.equal(summary.rows[3].detail,
+        '1 allegato con testo disponibile per revisione e analisi.');
+    input.evidence[0].appliedDiagnosesCount = 0;
+    assert.equal(buildPatientReviewQueueSummary(input).rows[1].detail,
+        '1 referto verificato, nessuna revisione in sospeso.');
+});
+
 test('smart import ignores legacy analysis state and remains an on-demand preview', () => {
     const input = baseInput();
     const legacySmartImport = {

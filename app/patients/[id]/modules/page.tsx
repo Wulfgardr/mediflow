@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams } from 'next/navigation';
@@ -769,7 +770,7 @@ export default function PatientDetailPage() {
                     id="timeline"
                     kicker="Timeline"
                     title="Timeline clinica"
-                    count={`${nonScaleEntries.length + (checkups ?? []).length + documentInsights.length} eventi`}
+                    count={formatCountLabel(nonScaleEntries.length + (checkups ?? []).length + documentInsights.length, 'evento', 'eventi')}
                     summary="Diario, controlli e referti in ordine cronologico."
                     surfaceClassName={workspaceStyles.clinicalSection}
                 >
@@ -781,7 +782,7 @@ export default function PatientDetailPage() {
                     kicker="Diario"
                     title="Diario clinico"
                     icon={FileText}
-                    count={`${nonScaleEntries.length} voci`}
+                    count={formatCountLabel(nonScaleEntries.length, 'voce', 'voci')}
                     summary={nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : 'Apri le voci attive del diario.'}
                     surfaceClassName={workspaceStyles.clinicalSection}
                     keepMounted
@@ -794,7 +795,7 @@ export default function PatientDetailPage() {
                         kicker="Terapie"
                         title="Terapie farmacologiche"
                         icon={Pill}
-                        count={workspace ? `${workspace.activeTherapiesCount} attive` : undefined}
+                        count={workspace ? formatCountLabel(workspace.activeTherapiesCount, 'attiva', 'attive') : undefined}
                         summary={workspace?.activeTherapiesCount === 0 ? 'Nessuna terapia attiva registrata.' : undefined}
                         surfaceClassName={workspaceStyles.clinicalSection}
                         keepMounted
@@ -855,7 +856,7 @@ export default function PatientDetailPage() {
                         kicker="SISS / FSE"
                         title="SISS e FSE"
                         icon={ShieldCheck}
-                        count={sissHandoffCount !== undefined ? `${sissHandoffCount} passaggi` : undefined}
+                        count={sissHandoffCount !== undefined ? formatCountLabel(sissHandoffCount, 'passaggio', 'passaggi') : undefined}
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={workspaceStyles.clinicalSection}
                     >
@@ -902,7 +903,7 @@ export default function PatientDetailPage() {
                         title="Scale di valutazione"
                         icon={Activity}
                         surfaceClassName={workspaceStyles.clinicalSection}
-                        count={scaleEntries.length > 0 ? `${scaleEntries.length} registrate` : undefined}
+                        count={scaleEntries.length > 0 ? formatCountLabel(scaleEntries.length, 'registrata', 'registrate') : undefined}
                         summary="Risultati registrati e nuove valutazioni."
                     >
                         {/* @Codex: Read stored results without rescoring historical instruments. */}
