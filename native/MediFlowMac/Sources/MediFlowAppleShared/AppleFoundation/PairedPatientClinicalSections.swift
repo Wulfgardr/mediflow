@@ -499,6 +499,7 @@ struct PairedPatientClinicalSections: View {
                     TextField("Parametro LOINC", text: display)
                         .accessibilityIdentifier("\(primaryIdentifier)-display")
                     TextField("Codice LOINC", text: code)
+                        .codice()
                         .accessibilityIdentifier("\(primaryIdentifier)-code")
                         .onChange(of: code.wrappedValue) { _ in
                             onCodeQueryChanged()

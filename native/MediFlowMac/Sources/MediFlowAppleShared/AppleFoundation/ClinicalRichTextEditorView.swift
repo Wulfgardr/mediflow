@@ -52,7 +52,7 @@ struct ClinicalRichTextEditorView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(8)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+        .background(PlatformColors.cardBackground, in: RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)-preserved-block")
     }
@@ -96,8 +96,16 @@ struct ClinicalRichTextEditorView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius, style: .continuous)
-                .stroke(isFocused ? Color.accentColor : PlatformColors.separator, lineWidth: isFocused ? 1.5 : 1)
+                .strokeBorder(PlatformColors.strongSeparator, lineWidth: 1)
         )
+        .overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius + 3, style: .continuous)
+                    .stroke(PlatformColors.freshInk, lineWidth: 2)
+                    .padding(-3)
+                    .allowsHitTesting(false)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("\(accessibilityPrefix)-block-\(block.id.uuidString)")
     }
@@ -130,7 +138,7 @@ struct ClinicalRichTextEditorView: View {
     private func styleToggle(_ style: ClinicalInlineStyle, symbol: String, label: String, block: ClinicalRichTextEditorBlock) -> some View {
         Button { inlineEditor.toggle(style) } label: {
             Image(systemName: symbol)
-                .foregroundStyle(inlineEditor.styles.contains(style) ? Color.accentColor : .secondary)
+                .foregroundStyle(inlineEditor.styles.contains(style) ? PlatformColors.freshInk : PlatformColors.secondaryInk)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
