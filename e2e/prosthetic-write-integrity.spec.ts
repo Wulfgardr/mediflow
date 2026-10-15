@@ -28,11 +28,23 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
         const response = await page.request.get(`/api/prosthetic-prescriptions?patientId=${patientId}`);
         expect(response.status()).toBe(200); return await response.json() as Array<{ id: string; version: number; status: string }>;
     };
+    await page.evaluate(async () => {
+        const body = { sourceName: 'repertorio-sintetico.csv', base64: btoa('codice_sistema,codice,descrizione,versione,fonte,ambito,data_inizio,data_fine\nSistema inventato,DEMO-E2E,Ausilio sintetico di verifica,v1,Fonte sintetica E2E,Dimostrazione,,\n') };
+        const preview = await fetch('/api/prosthetics/catalog/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const value = await preview.json();
+        if (!value.proof) throw new Error('Anteprima sintetica non valida');
+        const commit = await fetch('/api/prosthetics/catalog/commit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, proof: value.proof, acceptSubset: true }) });
+        if (!commit.ok) throw new Error('Import sintetico non riuscito');
+    });
     await page.goto(`/patients/${patientId}/modules`);
     await openPatientSection(page, 'protesica');
     const pane = page.locator('#protesica');
     await pane.getByRole('button', { name: 'Nuova voce', exact: true }).click();
-    await pane.getByLabel('Descrizione ausilio').fill('Ausilio sintetico di verifica');
+    await pane.getByText('Cerca un ausilio nel repertorio', { exact: true }).click();
+    await pane.getByLabel('Codice, descrizione o codifica', { exact: true }).fill('DEMO-E2E');
+    await pane.getByRole('button', { name: 'Cerca nel repertorio', exact: true }).click();
+    await pane.getByRole('button', { name: 'Usa voce nella bozza', exact: true }).click();
+    await expect(pane.getByLabel('Descrizione ausilio')).toHaveValue('Ausilio sintetico di verifica');
     await pane.getByLabel('Motivazione clinico-funzionale', { exact: true }).fill('Motivazione sintetica riservata');
     // @Codex: a rejected audit must keep the draft and permit a deliberate retry.
     const faultDb = new Database(join(dir, 'medical.db'), { fileMustExist: true });
@@ -49,8 +61,9 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     await pane.getByRole('button', { name: 'Salva voce', exact: true }).click();
     const created = await create; expect(created.status()).toBe(201);
     const { id } = await created.json() as { id: string };
-    await expect(pane.getByText('Ausilio sintetico di verifica', { exact: true })).toBeVisible();
+    await expect(pane.locator('td > strong').filter({ hasText: /^Ausilio sintetico di verifica$/u })).toBeVisible();
     const initial = read(id); expect(initial.row).toMatchObject({ version: 1, patient_id: patientId });
+    expect(JSON.parse(String(initial.row?.catalog_snapshot))).toMatchObject({ code: 'DEMO-E2E', source: { name: 'Fonte sintetica E2E', version: 'v1' } });
     expect(String(initial.row?.clinical_reason)).toMatch(/^ENC:/u);
     expect(initial.events.map(x => x.event_type)).toEqual(['prosthetic.prescription.created']);
     expect((await http()).find(x => x.id === id)?.version).toBe(1);
@@ -59,6 +72,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     expect((await update).status()).toBe(200);
     await expect(pane.getByText('Collaudata', { exact: true })).toBeVisible();
     const updated = read(id); expect(updated.row).toMatchObject({ version: 2, status: 'tested' });
+    expect(updated.row?.catalog_snapshot).toBe(initial.row?.catalog_snapshot);
     expect(updated.row?.clinical_reason).toBe(initial.row?.clinical_reason);
     expect(updated.events.map(x => x.event_type)).toEqual(['prosthetic.prescription.created', 'prosthetic.prescription.updated']);
     expect(updated.events.map(x => JSON.parse(String(x.redacted_metadata)).resourceVersion)).toEqual([1, 2]);
@@ -67,7 +81,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     await pane.getByRole('button', { name: 'Elimina Ausilio sintetico di verifica', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await remove).status()).toBe(200);
-    await expect(pane.getByText('Ausilio sintetico di verifica', { exact: true })).toHaveCount(0);
+    await expect(pane.locator('td > strong').filter({ hasText: /^Ausilio sintetico di verifica$/u })).toHaveCount(0);
     const deleted = read(id); expect(deleted.row).toBeUndefined(); expect((await http()).find(x => x.id === id)).toBeUndefined();
     expect(deleted.events.map(x => x.event_type)).toEqual(['prosthetic.prescription.created', 'prosthetic.prescription.updated', 'prosthetic.prescription.deleted']);
     expect(deleted.events.every(x => x.source_surface === 'web')).toBe(true);

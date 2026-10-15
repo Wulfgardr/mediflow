@@ -165,3 +165,45 @@ organizzative e operative con cui usi il sistema.
 
 ---
 Per supporto, apri una issue o consulta la documentazione tecnica.
+
+
+## Fonti personali della protesica
+
+In Repertori, Protesica e ausili mostra il numero di fonti e voci locali.
+Apri Gestisci fonti per importare un listino o nomenclatore della tua ATS/ASL
+oppure un elenco aziendale. Non è un catalogo normativo completo e MediFlow
+non verifica eleggibilità, validità prescrittiva o attualità della fonte.
+
+1. Esporta l’eventuale foglio Excel in CSV UTF-8. XLSX non è letto direttamente.
+2. Scegli il file (massimo 2 MiB e 20.000 righe), indica virgola o punto e virgola
+   e associa esplicitamente le otto colonne. Le colonne delle date possono
+   contenere celle vuote. Codifica, codice, descrizione, versione, fonte e ambito
+   sono obbligatori; ogni file dichiara una sola fonte/versione/ambito/codifica.
+3. Indica ente, data e note se utili. Genera una nuova anteprima dopo qualsiasi
+   modifica alla mappatura o ai metadati. Controlla campione, errori e conteggi,
+   accetta la fonte e conferma. Duplicati o errori bloccano tutto il file.
+4. In Fonti e originali allega PDF o altri documenti senza dati dei pazienti.
+   Puoi indicare pagina o sezione. Massimo 25 MiB per originale, 100 MiB e 1.000
+   documenti complessivi. Gli originali sono aggiuntivi e non sostituibili dalla UI.
+   Il collegamento scarica il documento per aprirlo con l’applicazione locale.
+
+Fonti diverse con lo stesso codice convivono. A parità di nome, versione e
+ambito l’import aggiorna la fonte esistente; una versione diversa crea una
+fonte distinta. I codici assenti dal file restano. I dati precedenti sono
+migrati in fonti derivate dai campi già presenti, senza recuperare voci che
+fossero state sovrascritte prima dell’aggiornamento.
+
+Nella nuova prescrizione cerca e filtra per fonte, poi premi Usa voce nella
+bozza. Il codice mantiene la propria codifica e non compila automaticamente
+il campo ISO. Salva solo dopo la revisione clinica. Una revisione cambiata
+richiede una nuova scelta. Modificare manualmente la descrizione nella bozza
+annulla la selezione dal catalogo. La prescrizione conserva uno snapshot della
+voce, della fonte e dei riferimenti agli originali presenti al salvataggio;
+gli import successivi non lo modificano. Le prescrizioni precedenti restano
+leggibili e non ricevono provenienze ricostruite automaticamente.
+
+Originali, catalogo e snapshot di provenienza sono in chiaro nel database
+locale; la descrizione clinica segue la cifratura dei campi esistenti. Il backup
+web e quello schedulato includono gli originali; il ripristino è atomico.
+Un originale mancante o alterato non viene restituito come verificato. Gli
+aggiornamenti degli originali richiedono una nuova allegazione esplicita.

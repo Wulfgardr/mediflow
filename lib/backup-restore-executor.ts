@@ -1,8 +1,10 @@
+import { isProstheticsSnapshot } from './reference-data/prosthetics-snapshot';
 /* @Codex */
 import { eq } from 'drizzle-orm';
 /* @Codex */
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
 /* @Codex */
+import { migrateProstheticsSources } from './reference-data/prosthetics-catalog-schema';
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
 import { dbServer, openDbServer, runDbServerImmediateTransaction } from './db-server';
 import { ArchiveReplacedError, rotateSqliteArchiveGeneration } from './archive-generation';
@@ -25,6 +27,8 @@ import {
     exemptionImportReceipts,
     prostheticsCatalogEntries,
     prostheticsCatalogReceipts,
+    prostheticsCatalogSources,
+    prostheticsCatalogDocuments,
     headlessSoapActiveRoleAttestations,
     headlessSoapEntryCommits,
     messages,
@@ -76,6 +80,8 @@ const CLEAR_ORDER: BackupCollectionName[] = [
     'exemptionImportReceipts',
     'prostheticsCatalogEntries',
     'prostheticsCatalogReceipts',
+    'prostheticsCatalogSources',
+    'prostheticsCatalogDocuments',
     'ambulatories',
 ];
 
@@ -86,6 +92,8 @@ const INSERT_ORDER: BackupCollectionName[] = [
     'exemptionImportReceipts',
     'prostheticsCatalogEntries',
     'prostheticsCatalogReceipts',
+    'prostheticsCatalogSources',
+    'prostheticsCatalogDocuments',
     'conversations',
     'patients',
     'physicianReviewAttestations',
@@ -128,6 +136,8 @@ const TABLE_LOOKUP = {
     exemptionImportReceipts,
     prostheticsCatalogEntries,
     prostheticsCatalogReceipts,
+    prostheticsCatalogSources,
+    prostheticsCatalogDocuments,
     messages,
     observations,
     patients,
@@ -209,7 +219,7 @@ function insertRows<T extends Record<string, unknown>>(
     if (rows.length === 0) return;
     for (const group of chunk(rows, 250)) {
         /* @Codex Repertory dates are declared source text, not clinical timestamp columns. */
-        runner.insert(table).values(table === prostheticsCatalogEntries ? group : group.map(normalizeInsertRow)).run();
+        runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
     }
 }
 
@@ -362,7 +372,11 @@ export function restoreBackupArtifact(
     beforeMutation: BackupRestoreMutationFence,
 ): BackupRestoreResult {
     assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
-    assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? []);
+    assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? [], artifact.payload.prostheticsCatalogSources ?? [], artifact.payload.prostheticsCatalogDocuments ?? []);
+    for (const prescription of artifact.payload.prostheticPrescriptions ?? []) {
+        if (prescription.catalogSnapshot !== undefined && prescription.catalogSnapshot !== null && !isProstheticsSnapshot(prescription.catalogSnapshot))
+            throw new Error('PROSTHETICS_SNAPSHOT_BACKUP_INVALID');
+    }
     const coverage = backupAuditCoverage(artifact.payload);
     let audit: BackupRestoreResult['audit'] = { coverage, inserted: 0, reused: 0 };
     revokeAttachmentExtractionLocatorGeneration();
@@ -388,6 +402,7 @@ export function restoreBackupArtifact(
                 ? soapAttestations : artifact.payload[collection] ?? []);
         }
 
+        migrateProstheticsSources(dbServer.$client);
         insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
         if (coverage === 'included') insertBackupAudits(plan);
         restoreHeadlessSoapEntryCommits(headlessSoapRows);

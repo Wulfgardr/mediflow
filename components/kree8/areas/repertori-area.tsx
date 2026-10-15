@@ -100,6 +100,7 @@ function buildLiveCatalogState(
   drugCount: number,
   exemptionCount: number,
   icdReadiness: ICDReadiness | null,
+  prosthetics: { count: number; sourceCount: number } | null,
 ): Kree8CatalogClientState {
   const rows: Kree8CatalogRow[] = [
     {
@@ -125,6 +126,13 @@ function buildLiveCatalogState(
       actionLabel: exemptionCount > 0 ? 'Impostazioni' : 'Importa',
     },
     {
+      id: 'prosthetics', name: 'Protesica e ausili',
+      sub: prosthetics ? 'Fonti personali e originali locali. Validità da verificare sulla fonte.' : 'Stato della protesica non leggibile. Riprova la lettura.',
+      freshness: prosthetics ? catalogFreshnessFromCount(prosthetics.count) : 'off',
+      age: prosthetics ? `${prosthetics.sourceCount} fonti · ${formatCatalogCount(prosthetics.count, 'voce', 'voci')}` : 'non verificato',
+      href: '/settings/repertori', actionLabel: prosthetics?.count ? 'Gestisci fonti' : 'Importa',
+    },
+    {
       id: 'icd',
       name: 'ICD-11 WHO',
       sub: icdReadiness
@@ -144,7 +152,7 @@ function buildLiveCatalogState(
   return {
     status: 'ready',
     rows,
-    indexedCount: drugCount + exemptionCount,
+    indexedCount: drugCount + exemptionCount + (prosthetics?.count ?? 0),
   };
 }
 
@@ -157,12 +165,13 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
     async () => {
       if (isReview) return REVIEW_CATALOG_STATE;
       try {
-        const [drugCount, exemptionCount, icdReadiness] = await Promise.all([
+        const [drugCount, exemptionCount, icdReadiness, prosthetics] = await Promise.all([
           fetchCatalogCount('/api/drugs?count=1'),
           fetchCatalogCount('/api/exemptions?count=1'),
           getICDReadiness().catch(() => null),
+          fetch('/api/prosthetics/catalog/status', { cache: 'no-store' }).then(async response => { if (!response.ok) throw new Error('Catalog unavailable'); return await response.json() as { count: number; sourceCount: number }; }).catch(() => null),
         ]);
-        return buildLiveCatalogState(drugCount, exemptionCount, icdReadiness);
+        return buildLiveCatalogState(drugCount, exemptionCount, icdReadiness, prosthetics);
       } catch (error) {
         console.error('[MediFlow] Kree8 catalog status failed:', error);
         return {
@@ -178,7 +187,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       rows: [],
       indexedCount: 0,
     },
-    ['drugs', 'exemptions'],
+    ['drugs', 'exemptions', 'prosthetics_catalog_entries'],
   );
 
   const catalogs = catalogState?.rows ?? [];

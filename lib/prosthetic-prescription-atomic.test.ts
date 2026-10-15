@@ -214,3 +214,46 @@ test('duplicate prosthetic create IDs return generic conflict without domain or 
         assert.deepEqual(read(ids.id), before);
     }
 });
+
+test('scelta catalogo verificata sul server, snapshot riletto immutabile, conflitto e audit atomico anche paired', async () => {
+    const { createProstheticsCatalog } = await import('./reference-data/prosthetics-catalog-service.ts');
+    const { PROSTHETICS_TEMPLATE } = await import('./reference-data/prosthetics-catalog-contract.ts');
+    const catalog = createProstheticsCatalog(dbServer.$client);
+    const bytes = Buffer.from(PROSTHETICS_TEMPLATE);
+    const preview = catalog.preview(bytes, 'inventato.csv', session.userId);
+    catalog.commit({ bytes, sourceName: 'inventato.csv', proof: preview.proof!, acceptSubset: true }, session.userId, () => {});
+    const entry = catalog.search('').entries[0];
+    const catalogSelection = { entryId: entry.id, revision: catalog.status().revision };
+    const ids = seed();
+    const body = { ...ids, prescribedAt: '2026-10-15', description: 'ENC:synthetic:reviewed', catalogSelection };
+    const created = await writer.createHostProstheticPrescription({ request, session }, body);
+    assert.equal(created.status, 201);
+    const readback = (await writer.listProstheticPrescriptions(ids.patientId))[0];
+    assert.equal(readback.catalogSnapshot?.source.name, 'Fonte sintetica');
+    assert.equal(readback.catalogSnapshot?.code, 'DEMO-001');
+    assert.equal(readback.catalogSnapshot?.description, entry.description);
+    const snapshot = structuredClone(readback.catalogSnapshot);
+    const newBytes = Buffer.from(PROSTHETICS_TEMPLATE.replace('Ausilio inventato, non prescrivibile', 'Ausilio aggiornato inventato'));
+    const updated = catalog.preview(newBytes, 'inventato.csv', session.userId);
+    catalog.commit({ bytes: newBytes, sourceName: 'inventato.csv', proof: updated.proof!, acceptSubset: true }, session.userId, () => {});
+    assert.deepEqual((await writer.listProstheticPrescriptions(ids.patientId))[0].catalogSnapshot, snapshot);
+    const staleIds = seed(), before = read(staleIds.id);
+    assert.equal((await writer.createHostProstheticPrescription({ request, session }, { ...body, ...staleIds })).status, 412);
+    assert.deepEqual(read(staleIds.id), before);
+    const currentSelection = { entryId: entry.id, revision: catalog.status().revision };
+    const pairedIds = seed();
+    assert.equal((await writer.createNetworkScopedProstheticPrescription({ request, session: pairedSession, pairedClient, scopeAmbulatoryId: ambulatoryId, patientId: pairedIds.patientId },
+        { ...body, ...pairedIds, catalogSelection: currentSelection })).status, 201);
+    const pairedRows = await writer.listNetworkScopedProstheticPrescriptions(pairedIds.patientId, ambulatoryId);
+    assert.equal(pairedRows[0].catalogSnapshot?.source.sha256, catalog.search('').entries[0].sourceSha256);
+    sql.exec("CREATE TRIGGER synthetic_catalog_audit BEFORE INSERT ON audit_events BEGIN SELECT RAISE(IGNORE); END");
+    const failedIds = seed();
+    try { await assert.rejects(writer.createHostProstheticPrescription({ request, session }, { ...body, ...failedIds, catalogSelection: currentSelection })); }
+    finally { sql.exec('DROP TRIGGER synthetic_catalog_audit'); }
+    assert.deepEqual(read(failedIds.id), { row: null, audit: [] });
+    const prior = read(ids.id);
+    assert.equal((await writer.updateHostProstheticPrescription({ request, session, id: ids.id }, { version: 1, catalogSelection })).status, 412);
+    assert.deepEqual(read(ids.id), prior);
+    assert.equal((await writer.updateHostProstheticPrescription({ request, session, id: ids.id }, { version: 1, status: 'tested' })).status, 200);
+    assert.deepEqual((await writer.listProstheticPrescriptions(ids.patientId))[0].catalogSnapshot, snapshot);
+});

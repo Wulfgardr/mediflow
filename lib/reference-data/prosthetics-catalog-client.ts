@@ -1,6 +1,7 @@
+import { notifyDbChange } from '../live-query';
 /* @Codex */
-import { PROSTHETICS_MAX_BYTES } from './prosthetics-catalog-contract';
-export type ProstheticsSource = { sourceName: string; base64: string };
+import { PROSTHETICS_MAX_BYTES, type ProstheticsImportOptions } from './prosthetics-catalog-contract';
+export type ProstheticsSource = { sourceName: string; base64: string; options?: ProstheticsImportOptions };
 export class ProstheticsClientError extends Error {
     readonly code: string;
     constructor(code: string, message: string) { super(message); this.code = code; }
@@ -13,6 +14,7 @@ export async function prostheticsRequest<T>(action: string, signal: AbortSignal,
     const value = await response.json();
     signal.throwIfAborted();
     if (!response.ok) throw new ProstheticsClientError(value.error ?? 'REQUEST_FAILED', value.message ?? 'Sessione non disponibile. Accedi e riprova.');
+    if (action === 'commit' || action === 'documents' && body) notifyDbChange('prosthetics_catalog_entries');
     return value as T;
 }
 export async function readProstheticsSource(file: File, signal: AbortSignal): Promise<ProstheticsSource> {

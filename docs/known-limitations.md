@@ -236,3 +236,13 @@ La `0.8.5` non consegna:
 - operazioni planner ulteriori, accesso SQL diretto o scritture;
 - invocazione AI dai client paired;
 - app complete Windows o Linux.
+
+
+## Fonti personali protesica
+
+- Import diretto XLSX non disponibile: esportare in CSV UTF-8, con virgola o punto e virgola e mappatura esplicita.
+- Nessuna estrazione AI, attestazione normativa o aggiornamento clinico automatico.
+- Fonti derivate da nome/versione/ambito; una versione differente crea una fonte distinta. La migrazione non recupera collisioni già avvenute nelle versioni precedenti.
+- Originali aggiuntivi nel database locale, in chiaro, fino a 25 MiB ciascuno e 100 MiB totali (massimo 1.000). Nessuna cancellazione o sostituzione dalla UI.
+- Snapshot di provenienza in chiaro e additivo nei DTO web/network; nessuna provenienza automatica per prescrizioni esistenti. Il client nativo può ignorare i nuovi campi e non offre qui la gestione delle fonti.
+- Il collegamento all’originale richiede una sessione web autenticata e scarica il documento; non è un visualizzatore integrato. Il riferimento a pagina è dichiarato dall’operatore e non validato contro il contenuto.

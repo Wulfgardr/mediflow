@@ -10,9 +10,10 @@ import { upgradeObservationTimestampDefault, upgradeReviewPatientReferenceDefaul
 import { readSqliteArchiveGeneration } from './archive-generation';
 
 // 1: the first versioned schema (C09). 2: ADR 0143 credentials. 3: archive generation (ADR 0144).
+// 4: fonti protesica, originali e snapshot di provenienza.
 // A version is validated without DDL at every start: any change to the canonical
 // schema needs a new number, or the archives already stamped are refused.
-export const CURRENT_SQLITE_SCHEMA_VERSION = 3;
+export const CURRENT_SQLITE_SCHEMA_VERSION = 4;
 // Same values as scripts/native-first-install-contract.json, which the native
 // helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
 const reservation = { applicationId: 1296451154, userVersion: 0 };

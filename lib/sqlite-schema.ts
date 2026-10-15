@@ -631,7 +631,6 @@ function applySchemaGuards(sqlite: Database.Database) {
     }
     /* @Codex: fail closed on an unsupported import-receipt schema. */
     ensureExemptionImportSchema(sqlite);
-    ensureProstheticsCatalogSchema(sqlite);
     /* @Codex */
     try {
         const therapyColumns = (sqlite.prepare("PRAGMA table_info(therapies)").all() as TableInfoRow[]).map((col) => col.name);
@@ -715,6 +714,7 @@ function applySchemaGuards(sqlite: Database.Database) {
             )
         `).run();
         ensureColumn(sqlite, 'prosthetic_prescriptions', 'version', 'version INTEGER NOT NULL DEFAULT 1');
+        ensureProstheticsCatalogSchema(sqlite);
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_patient_idx ON prosthetic_prescriptions(patient_id)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_prescribed_idx ON prosthetic_prescriptions(prescribed_at DESC)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_status_idx ON prosthetic_prescriptions(status)').run();

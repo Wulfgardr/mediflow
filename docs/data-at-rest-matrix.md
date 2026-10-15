@@ -212,18 +212,37 @@ locali salvano ciò che ricevono.
 ### `prosthetic_prescriptions`: prescrizioni protesiche
 
 - Cifrate: `description`, `measures`, `clinical_reason`, `regional_prescription_id`, `supplier`, `collaudo_outcome`, `document_refs`, `notes`
-- In chiaro: `id`, `patient_id`, `prescribed_at`, `status`, `category`, `iso_code`, `collaudo_at`, `source`, `version`, `created_at`, `updated_at`
-- Leggibile senza chiave: categoria, codice ISO, stato e date.
+- In chiaro: `id`, `patient_id`, `prescribed_at`, `status`, `category`, `iso_code`, `collaudo_at`, `source`, `version`, `created_at`, `updated_at`, `catalog_snapshot`
+- Leggibile senza chiave: categoria, codice ISO, stato, date e snapshot della voce scelta con descrizione, fonte e riferimenti agli originali. Lo snapshot collega una scelta al paziente ed è dato sanitario in chiaro.
 
 ### `prosthetics_catalog_entries`: repertorio della protesica
 
-- In chiaro: `id`, `code_system`, `code`, `description`, `version`, `source`, `scope`, `start_date`, `end_date`, `source_sha256`, `operation_key`, `imported_at`
-- Leggibile senza chiave: dato pubblico di riferimento.
+- In chiaro: `id`, `code_system`, `code`, `description`, `version`, `source`, `scope`, `start_date`, `end_date`, `source_sha256`, `operation_key`, `imported_at`, `source_id`
+- Leggibile senza chiave: dati di repertorio dichiarati dall’operatore, anche interni.
 
 ### `prosthetics_catalog_receipts`: ricevute di import della protesica
 
 - In chiaro: `id`, `operation_key`, `receipt_json`
-- Leggibile senza chiave: dato di riferimento.
+- Leggibile senza chiave: metadati del repertorio dichiarato, anche interno.
+
+### `prosthetics_catalog_sources`: fonti personali della protesica
+
+- In chiaro: `id`, `name`, `authority`, `scope`, `version`, `date`, `sha256`, `notes`
+- Leggibile senza chiave: provenienza dichiarata dall’operatore, senza attestazione normativa.
+
+### `prosthetics_catalog_documents`: originali delle fonti protesiche
+
+- In chiaro: `id`, `source_id`, `name`, `sha256`, `size`, `page`, `base64`
+- Leggibile senza chiave: originali completi. Allegare soltanto documenti di repertorio privi di dati dei pazienti.
+
+Gli originali sono conservati nel database SQLite sotto la data dir, separati
+logicamente dai pazienti, senza copie in directory pubbliche. Database creato
+con permessi 0600, directory predefinita 0700; per archivi esistenti l’allegato
+verifica permessi e proprietà di database e sidecar su POSIX prima di scrivere.
+Windows segue le autorizzazioni dell’account e della cartella. Base64 e SHA-256
+non cifrano. Le route richiedono sessione attiva, rispondono no-store e verificano
+hash/dimensione prima del download. Originali e fonti entrano nel backup web e
+schedulato e nel ripristino atomico. Conservare i backup come gli altri dati sensibili.
 
 ### `service_catalog_entries`: repertorio delle prestazioni
 

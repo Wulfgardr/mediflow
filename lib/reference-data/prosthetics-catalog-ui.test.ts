@@ -42,7 +42,7 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
             if (url.pathname === '/') { await route.fulfill({ contentType: 'text/html', body: '<html lang="it"><body><div id="root"></div><script src="/bundle.js"></script></body></html>' }); return; }
             if (url.pathname === '/bundle.js') { await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles[0].text }); return; }
             const action = url.pathname.split('/').at(-1);
-            if (!['preview', 'commit', 'status', 'search', 'template'].includes(action!)) { await route.abort(); return; }
+            if (!['preview', 'commit', 'status', 'search', 'template', 'sources', 'documents'].includes(action!)) { await route.abort(); return; }
             const request = new Request(req.url(), { method: req.method(), headers: req.headers(), body: req.method() === 'POST' ? req.postData() : undefined });
             const response = await prostheticsCatalogRequest(action as 'preview', request);
             if (action === 'commit') { commits++; if (loseResponse) { loseResponse = false; await route.abort('failed'); return; } }
