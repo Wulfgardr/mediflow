@@ -3,14 +3,14 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { createLocalProviderBindingReader, HOST_LOCAL_PROVIDER_SETTING_KEYS,
     type HostLocalProviderSettingsSnapshot } from '../local-provider-binding-reader';
-import { attestLocalOllamaModel, OllamaLocalityError, strictOllamaLoopbackBaseUrl } from '../ollama-locality';
+import { attestLocalOllamaModel, OllamaLocalityError, strictOllamaLoopbackBaseUrl, type OllamaVersionMismatch } from '../ollama-locality';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { ProviderLifecycleStoreError } from './provider-lifecycle-store';
 import { startOnboarding, advanceOnboarding } from './onboarding';
 import * as owner from '../../security/web-auth-lifecycle-owner-adapter';
 
 export class LocalProviderOnboardingError extends Error {
-    constructor(public readonly code: string) { super(code); this.name = 'LocalProviderOnboardingError'; }
+    constructor(public readonly code: string, public readonly versionMismatch?: OllamaVersionMismatch) { super(code); this.name = 'LocalProviderOnboardingError'; }
 }
 function deny(code: string): never { throw new LocalProviderOnboardingError(code); }
 type Sources = Readonly<{
@@ -133,6 +133,9 @@ export function createLocalProviderOnboardingService(sources: Sources) {
                 } catch (error) {
                     assertActive();
                     if (error instanceof OllamaLocalityError) {
+                        if (error.code === 'provider_version_unsupported')
+                            throw new LocalProviderOnboardingError(error.code, error.versionMismatch);
+                        if (error.code === 'provider_unready') deny('provider_unready');
                         if (error.code === 'model_not_local') deny('model_absent_or_not_local');
                         if (error.code === 'endpoint_not_loopback' || error.code === 'model_cloud_reference') deny('locality_denied');
                     }

@@ -14,10 +14,12 @@ const messages: Record<string, string> = {
     available_unqualified: 'Collegamento locale attivo. Le funzioni mantengono le proprie abilitazioni e verifiche.',
     degraded: 'Collegamento da recuperare: controlla Ollama, poi avvia una nuova verifica.',
     revoked: 'Collegamento revocato. Questa pagina non può riattivarlo: rivolgiti all’operatore del computer.',
-    configuration_missing: 'Scegli un modello Ollama già installato e salva la configurazione qui sopra, poi aggiorna lo stato.',
+    configuration_missing: 'Scegli un modello Ollama già installato e salva la configurazione qui sopra. Lo stato verrà riletto automaticamente.',
     configuration_changed: 'La configurazione o lo stato sono cambiati. Rileggi lo stato prima di confermare una nuova verifica.',
     owner_locked: 'Sessione scaduta o applicazione bloccata. Accedi di nuovo e rileggi lo stato; nessuna operazione riparte automaticamente.',
-    provider_unreachable: 'Ollama non è raggiungibile o non è pronto. Apri Ollama, controlla la versione, poi rileggi lo stato prima di riprovare.',
+    provider_unreachable: 'Ollama non è raggiungibile. Apri Ollama, controlla il collegamento, poi rileggi lo stato prima di riprovare.',
+    provider_unready: 'Ollama risponde, ma non è pronto per la verifica locale. Controlla il servizio e rileggi lo stato prima di riprovare.',
+    provider_version_unsupported: 'La versione di Ollama non è ammessa. Aggiorna MediFlow o installa una versione di Ollama ammessa.',
     model_absent_or_not_local: 'Il modello salvato è assente o non verificabile come locale. Scegli un modello già installato, salva e rileggi lo stato.',
     locality_denied: 'La configurazione non identifica un modello locale consentito. Controlla il collegamento Ollama salvato.',
     verification_interrupted: 'Verifica interrotta o scaduta. Controlla che Ollama sia pronto e rileggi lo stato prima di una nuova verifica.',
@@ -34,7 +36,7 @@ const messages: Record<string, string> = {
 };
 const explain = (code: string) => Object.hasOwn(messages, code) ? messages[code] : messages.state_unavailable;
 
-export function LocalProviderOnboardingPanel() {
+export function LocalProviderOnboardingPanel({ configurationRevision = 0 }: { configurationRevision?: number }) {
     const [view, setView] = useState(INITIAL_LOCAL_ONBOARDING_VIEW);
     const workflow = useRef<ReturnType<typeof createLocalProviderOnboardingWorkflow> | null>(null);
     useEffect(() => {
@@ -44,7 +46,7 @@ export function LocalProviderOnboardingPanel() {
         workflow.current = controller;
         void controller.refresh();
         return () => { controller.dispose(); if (workflow.current === controller) workflow.current = null; };
-    }, []);
+    }, [configurationRevision]);
     const { status, functions, phase, busy } = view;
     const needsResume = ['interrupted', 'failed'].includes(phase);
     const canActivate = !busy && !!status?.canActivate && ['ready', 'completed'].includes(phase);
@@ -76,7 +78,9 @@ export function LocalProviderOnboardingPanel() {
             </li>)}
         </ol>
         {/* Outside aria-busy: cancellation and live phase announcements remain accessible. */}
-        <p role="status" aria-live="polite" aria-atomic="true">{explain(view.messageCode)}</p>
+        <p role="status" aria-live="polite" aria-atomic="true">{view.messageCode === 'provider_version_unsupported' && view.versionMismatch
+            ? `Versione di Ollama trovata: ${view.versionMismatch.serverVersion}. Versioni ammesse: ${view.versionMismatch.supportedVersions}. Aggiorna MediFlow o installa una versione di Ollama ammessa.`
+            : explain(view.messageCode)}</p>
         <div className="flex flex-wrap gap-3">
             <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={!canActivate}
                 onClick={() => void workflow.current?.activate()}>

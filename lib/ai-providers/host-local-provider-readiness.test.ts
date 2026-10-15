@@ -79,7 +79,7 @@ test('legge una volta provider, adapter, base e modello prima della attestazione
 });
 
 test('mappa gli errori locality in dinieghi fissi senza dettagli raw', async () => {
-    for (const code of ['endpoint_not_loopback', 'provider_unready'] as const) {
+    for (const code of ['endpoint_not_loopback', 'provider_unready', 'provider_version_unsupported'] as const) {
         const result = await createHostLocalProviderReadinessForTest(async () => { throw new OllamaLocalityError(code); })
             .observeClinical(resolution());
         assertDenied(result, PROVIDER_DENIED);
