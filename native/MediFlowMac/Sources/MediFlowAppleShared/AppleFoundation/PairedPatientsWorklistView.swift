@@ -418,7 +418,7 @@ struct PairedPatientsWorklistView: View {
                         .buttonStyle(.plain)
                         .disabled(!model.canChangePatientSelection)
                         // @Codex: Flat, separated records; selection is still model-owned.
-                        .background(model.selectedPatientID == patient.id ? Color.accentColor.opacity(0.10) : .clear)
+                        .background(model.selectedPatientID == patient.id ? PlatformColors.selection : .clear)
                         .overlay(alignment: .bottom) { Divider() }
                         .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
                         .accessibilityIdentifier("patient-cell-\(patient.id)")
@@ -941,7 +941,7 @@ private struct WorklistRowHover: ViewModifier {
             .padding(.horizontal, 4)
             .background(
                 RoundedRectangle(cornerRadius: ClinicalChartMetrics.rowRadius, style: .continuous)
-                    .fill(Color.secondary.opacity(isHovering ? 0.10 : 0))
+                    .fill(isHovering ? PlatformColors.hover : .clear)
             )
             .contentShape(Rectangle())
             .onHover { isHovering = $0 }

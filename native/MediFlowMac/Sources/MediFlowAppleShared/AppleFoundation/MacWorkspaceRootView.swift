@@ -262,6 +262,7 @@ public struct MediFlowMacRootView: View {
             }
         }
         .listStyle(.sidebar)
+        .listItemTint(.monochrome)
         .navigationTitle("MediFlow")
         .accessibilityIdentifier("clinical-workspace-navigation")
     }

@@ -86,9 +86,10 @@ struct ClinicalScaleFormView: View {
                 .font(.body.weight(.semibold)).foregroundStyle(PlatformColors.pencil)
             if let result {
                 Text("\(result.score)/\(definition.maxScore)")
-                    .font(.system(size: 32, weight: .semibold)).monospacedDigit()
+                    .inkRegister(weight: .semibold)
                     .accessibilityIdentifier("scale-score")
-                Text(result.interpretation).chartProse()
+                Text(result.interpretation).inkRegister()
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("Valutazione incompleta: selezionare esplicitamente tutte le risposte richieste.")
                     .font(.callout)
@@ -101,21 +102,36 @@ struct ClinicalScaleFormView: View {
     private func submissionBar(showsResult: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Divider()
-            HStack(alignment: .center, spacing: 20) {
-                if showsResult { resultPanel }
-                else { Text("Risultato in bozza").font(.body.weight(.semibold)).foregroundStyle(PlatformColors.pencil) }
-                Spacer(minLength: 8)
-                Button("Invia") {
-                    guard result != nil else { return }
-                    onSubmit(answers)
+            if showsResult {
+                VStack(alignment: .leading, spacing: 12) {
+                    resultPanel
+                    submitButton
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(result == nil)
-                .accessibilityIdentifier("submit-scale-button")
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+            } else {
+                HStack(alignment: .center, spacing: 20) {
+                    Text("Risultato in bozza")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(PlatformColors.pencil)
+                    Spacer(minLength: 8)
+                    submitButton
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
         }
         .background(PlatformColors.chartCardSurface)
+    }
+
+    private var submitButton: some View {
+        Button("Invia") {
+            guard result != nil else { return }
+            onSubmit(answers)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(result == nil)
+        .accessibilityIdentifier("submit-scale-button")
     }
 }

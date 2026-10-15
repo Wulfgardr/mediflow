@@ -431,7 +431,10 @@ public struct AppleFoundationMobileRootView: View {
                 Button {
                     selectedOtherSection = item
                     selectSection(item)
-                } label: { Label(item.title, systemImage: item.symbolName) }
+                } label: {
+                    Label(item.title, systemImage: item.symbolName)
+                        .foregroundStyle(PlatformColors.ink)
+                }
                 .frame(minHeight: 44)
                 .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
             }
@@ -450,10 +453,14 @@ public struct AppleFoundationMobileRootView: View {
             HStack {
                 Label(item.title, systemImage: item.symbolName)
                 Spacer(minLength: 12)
-                if item == section { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                if item == section { Image(systemName: "checkmark") }
             }
+            .foregroundStyle(PlatformColors.ink)
+            .frame(minHeight: LumeGeometry.rowHeight)
         }
         .buttonStyle(.plain)
+        .listRowBackground(item == section ? PlatformColors.selection : Color.clear)
+        .accessibilityAddTraits(item == section ? .isSelected : [])
         .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
     }
 
@@ -465,6 +472,7 @@ public struct AppleFoundationMobileRootView: View {
             List(ClinicalWorkspaceSection.projectSections) { item in
                 NavigationLink(value: item) {
                     Label(item.title, systemImage: item.symbolName)
+                        .foregroundStyle(PlatformColors.ink)
                 }
                 .accessibilityIdentifier("clinical-workspace-section-\(item.rawValue)-button")
             }
