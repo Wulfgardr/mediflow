@@ -1,7 +1,7 @@
 # ADR 0133: Repertorio protesica locale da fonte dichiarata
 
 Date: 2026-09-07
-Status: Candidate — WUL-693, revisione del coordinatore richiesta
+Status: Candidate, WUL-693, revisione del coordinatore richiesta
 
 ## Confine
 
@@ -103,7 +103,7 @@ Il CSV UTF-8 accetta separatore virgola o punto e virgola e mappatura esplicita
 per indice delle otto colonne. Il proof lega anche mappatura e metadati fonte.
 Nessuna estrazione AI e nessuna dipendenza Excel aggiunta: esportare XLSX in CSV.
 
-Gli originali sono bytes base64 in una tabella SQLite separata dai pazienti,
+Gli originali sono bytes BLOB in una tabella SQLite separata dai pazienti,
 nel database sotto la data dir. Metadati, hash, dimensione e bytes sono atomici;
 i documenti sono immutabili e aggiuntivi, massimo 25 MiB ciascuno e 100 MiB
 complessivi. Nessun percorso o URL viene accettato. Il nome segue attachment-path.
@@ -128,3 +128,34 @@ Il payload standalone del backup schedulato include anche i validatori puri di
 mappatura/snapshot e attachment-path, con pin delle sorgenti e tracing Next
 espliciti. La chiusura runtime non aggiunge dipendenze ed è provata in un
 processo isolato senza accesso al database.
+
+### Correzione di integrità 2026-10-15
+
+Le ricevute immutabili conservano i metadati di ciascun import, inclusi ente,
+data e note. La fonte resta il raggruppamento corrente; lo snapshot ricostruisce
+la provenienza dalla ricevuta della voce e ne conserva `operationKey`.
+Ogni originale è legato a fonte e `operation_key` dell'import corrente al
+momento dell'allegazione. Una voce assente dal CSV successivo conserva metadati
+e originali del proprio import, anche riutilizzando esplicitamente l'id fonte.
+Gli originali precedenti restano scaricabili e inclusi nei backup.
+
+I byte sono BLOB SQLite, non TEXT base64; base64 resta solo nel trasporto JSON
+e nel backup v1. La versione schema 4, non ancora pubblicata, incorpora questa
+forma. La migrazione da versione 3 conserva ricevute e archivio originale
+verificato; il backfill delle fonti decide dai dati residui ed è transazionale
+e ripetibile anche fuori dal bootstrap. Non è prevista l'ammissione degli
+archivi di sviluppo già marcati 4 con lo schema candidato precedente.
+
+Export web, export schedulato, parsing e restore verificano ogni riferimento
+dello snapshot contro gli originali inclusi: presenza, fonte, import, nome,
+pagina, hash e dimensione. Il restore verifica prima del fence e di qualsiasi
+cancellazione. Un backup incompleto è rifiutato, senza ricostruzioni implicite.
+
+Il limite del proxy Next copre l'envelope base64 di 25 MiB più 16 KiB di
+metadati; il lettore bounded della route resta l'autorità di ammissione.
+`MEDIFLOW_ATTACHMENT_MAX_BYTES` limita i nuovi upload. La verifica dei BLOB già
+conservati usa dimensione e hash registrati e il tetto di integrità di 25 MiB,
+indipendentemente da successive riduzioni del limite di ammissione.
+
+Il client Apple attuale ignora lo snapshot: visualizzazione della provenienza
+e gestione delle fonti sono disponibili soltanto sul percorso web.

@@ -1,5 +1,5 @@
 import type { ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
-import { sqliteTable, text, integer, primaryKey, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, blob, primaryKey, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // Local authority, deliberately excluded from portable backup collections.
@@ -649,5 +649,5 @@ export const prostheticsCatalogSources = sqliteTable('prosthetics_catalog_source
 });
 export const prostheticsCatalogDocuments = sqliteTable('prosthetics_catalog_documents', {
     id: text('id').primaryKey().notNull(), sourceId: text('source_id').notNull(), name: text('name').notNull(), sha256: text('sha256').notNull(),
-    size: integer('size').notNull(), page: text('page'), base64: text('base64').notNull(),
+    size: integer('size').notNull(), page: text('page'), bytes: blob('bytes', { mode: 'buffer' }).notNull(), operationKey: text('operation_key').notNull(),
 });

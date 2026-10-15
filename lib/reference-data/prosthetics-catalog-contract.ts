@@ -38,7 +38,7 @@ export type ProstheticsImportOptions = { mapping?: ProstheticsMapping; sourceDet
 export type ProstheticsCatalogSelection = { entryId: string; revision: string };
 export type ProstheticsSnapshot = {
     entryId: string; code: string; codeSystem: string; description: string;
-    source: ProstheticsSourceRecord; documents: ProstheticsDocument[]; revision: string;
+    source: ProstheticsSourceRecord; documents: ProstheticsDocument[]; revision: string; operationKey: string;
 };
 export function prostheticsSourceId(row: Pick<ProstheticsRow, 'source' | 'version' | 'scope'>): string {
     return JSON.stringify([row.source, row.version, row.scope]);
@@ -60,4 +60,11 @@ export function isProstheticsDate(value: unknown): value is string {
     if (typeof value !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(value) || value.slice(0, 4) < '0100') return false;
     const date = new Date(`${value}T00:00:00.000Z`);
     return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function prostheticsImportSource(manifest: ProstheticsManifest, sourceId: string): ProstheticsSourceRecord {
+    const metadata = manifest.metadata!;
+    const details = manifest.options?.sourceDetails;
+    return { id: sourceId, name: metadata.source, authority: details?.authority || metadata.scope, scope: metadata.scope,
+        version: metadata.version, date: details?.date ?? null, sha256: manifest.sha256, notes: details?.notes ?? '' };
 }

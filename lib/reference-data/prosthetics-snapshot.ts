@@ -5,8 +5,8 @@ function object(value: unknown, keys: string[]): value is Record<string, unknown
 }
 const sha = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{64}$/u.test(value);
 export function isProstheticsSnapshot(value: unknown): value is ProstheticsSnapshot {
-    if (!object(value, ['entryId','code','codeSystem','description','source','documents','revision']) || !isProstheticsText(value.entryId, 2048)
-        || !isProstheticsText(value.code) || !isProstheticsText(value.codeSystem) || !isProstheticsText(value.description, 2000) || !sha(value.revision)) return false;
+    if (!object(value, ['entryId','code','codeSystem','description','source','documents','revision','operationKey']) || !isProstheticsText(value.entryId, 2048)
+        || !isProstheticsText(value.code) || !isProstheticsText(value.codeSystem) || !isProstheticsText(value.description, 2000) || !sha(value.revision) || !sha(value.operationKey)) return false;
     const source = value.source;
     if (!object(source, ['id','name','authority','scope','version','date','sha256','notes']) || !isProstheticsText(source.id, 1024)
         || ['name','authority','scope','version'].some(key => !isProstheticsText(source[key])) || !sha(source.sha256)

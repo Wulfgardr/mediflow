@@ -22,14 +22,14 @@ export function ensureProstheticsCatalogSchema(connection: Database.Database) {
 );
 CREATE TABLE IF NOT EXISTS prosthetics_catalog_documents (
     id TEXT PRIMARY KEY NOT NULL, source_id TEXT NOT NULL, name TEXT NOT NULL,
-    sha256 TEXT NOT NULL, size INTEGER NOT NULL, page TEXT, base64 TEXT NOT NULL
+    sha256 TEXT NOT NULL, size INTEGER NOT NULL, page TEXT, bytes BLOB NOT NULL, operation_key TEXT NOT NULL
 );
 `);
     const entryColumns = connection.prepare('PRAGMA table_info(prosthetics_catalog_entries)').all() as { name: string }[];
     if (!entryColumns.some(c => c.name === 'source_id')) {
         connection.exec("ALTER TABLE prosthetics_catalog_entries ADD COLUMN source_id TEXT NOT NULL DEFAULT ''");
-        migrateProstheticsSources(connection);
     }
+    migrateProstheticsSources(connection);
     const prescriptions = connection.prepare('PRAGMA table_info(prosthetic_prescriptions)').all() as { name: string }[];
     if (prescriptions.length && !prescriptions.some(c => c.name === 'catalog_snapshot')) connection.exec('ALTER TABLE prosthetic_prescriptions ADD COLUMN catalog_snapshot TEXT');
     for (const [table, expected] of [
@@ -52,13 +52,15 @@ CREATE TABLE IF NOT EXISTS prosthetics_catalog_documents (
 }
 
 export function migrateProstheticsSources(connection: Database.Database) {
-    const rows = connection.prepare(`SELECT id, code_system AS codeSystem, code, description, source, version, scope,
-        source_sha256 AS sha256 FROM prosthetics_catalog_entries WHERE source_id = '' ORDER BY imported_at, id`).all() as (ProstheticsRow & { id: string; sha256: string })[];
-    for (const row of rows) {
-        const sourceId = prostheticsSourceId(row);
-        connection.prepare(`INSERT INTO prosthetics_catalog_sources (id,name,authority,scope,version,date,sha256,notes)
-            VALUES (?,?,?,?,?,NULL,?,'') ON CONFLICT(id) DO UPDATE SET sha256=excluded.sha256`)
-            .run(sourceId, row.source, row.scope, row.scope, row.version, row.sha256);
-        connection.prepare('UPDATE prosthetics_catalog_entries SET id=?, source_id=? WHERE id=?').run(prostheticsIdentity(row), sourceId, row.id);
-    }
+    connection.transaction(() => {
+        const rows = connection.prepare(`SELECT id, code_system AS codeSystem, code, description, source, version, scope,
+            source_sha256 AS sha256 FROM prosthetics_catalog_entries WHERE source_id = '' ORDER BY imported_at, id`).all() as (ProstheticsRow & { id: string; sha256: string })[];
+        for (const row of rows) {
+            const sourceId = prostheticsSourceId(row);
+            connection.prepare(`INSERT INTO prosthetics_catalog_sources (id,name,authority,scope,version,date,sha256,notes)
+                VALUES (?,?,?,?,?,NULL,?,'') ON CONFLICT(id) DO UPDATE SET sha256=excluded.sha256`)
+                .run(sourceId, row.source, row.scope, row.scope, row.version, row.sha256);
+            connection.prepare('UPDATE prosthetics_catalog_entries SET id=?, source_id=? WHERE id=?').run(prostheticsIdentity(row), sourceId, row.id);
+        }
+    }).immediate();
 }

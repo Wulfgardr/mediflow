@@ -7,7 +7,7 @@ import type Database from 'better-sqlite3';
 import { buildAttachmentPath } from '../attachment-path';
 import { getAttachmentPayloadByteSize, resolveMaxAttachmentBytes } from '../attachment-payload';
 import { parseProstheticsCsv } from './prosthetics-catalog-parser';
-import { prostheticsSourceId, prostheticsIdentity, isProstheticsText, type ProstheticsImportOptions, type ProstheticsSourceRecord, type ProstheticsDocument, type ProstheticsCatalogSelection, type ProstheticsSnapshot, type ProstheticsRow, type ProstheticsEntry, type ProstheticsManifest, type ProstheticsChanges, type ProstheticsReceipt, type ProstheticsStatus, type ProstheticsPreview } from './prosthetics-catalog-contract';
+import { prostheticsImportSource, prostheticsSourceId, prostheticsIdentity, isProstheticsText, type ProstheticsImportOptions, type ProstheticsSourceRecord, type ProstheticsDocument, type ProstheticsCatalogSelection, type ProstheticsSnapshot, type ProstheticsRow, type ProstheticsEntry, type ProstheticsManifest, type ProstheticsChanges, type ProstheticsReceipt, type ProstheticsStatus, type ProstheticsPreview } from './prosthetics-catalog-contract';
 
 export class ProstheticsCatalogError extends Error {
     readonly code: string;
@@ -47,7 +47,7 @@ function latest(connection: Database.Database): ProstheticsReceipt | null {
     return row ? JSON.parse(row.receipt_json) as ProstheticsReceipt : null;
 }
 function revision(connection: Database.Database, operationKey?: string): string {
-    return hash({ rows: connection.prepare(`${SELECT_ENTRIES} ORDER BY id COLLATE BINARY`).all(), sources: connection.prepare('SELECT * FROM prosthetics_catalog_sources ORDER BY id').all(), documents: connection.prepare('SELECT id,source_id,name,sha256,size,page FROM prosthetics_catalog_documents ORDER BY id').all(), operationKey: operationKey ?? latest(connection)?.operationKey ?? null });
+    return hash({ rows: connection.prepare(`${SELECT_ENTRIES} ORDER BY id COLLATE BINARY`).all(), sources: connection.prepare('SELECT * FROM prosthetics_catalog_sources ORDER BY id').all(), documents: connection.prepare('SELECT id,source_id,name,sha256,size,page,operation_key FROM prosthetics_catalog_documents ORDER BY id').all(), operationKey: operationKey ?? latest(connection)?.operationKey ?? null });
 }
 function changes(connection: Database.Database, rows: (ProstheticsRow & { sourceId: string })[]): ProstheticsChanges {
     const existing = connection.prepare(`${SELECT_ENTRIES} WHERE id = ?`);
@@ -81,18 +81,18 @@ export function createProstheticsCatalog(connection: Database.Database) {
                 const id = randomUUID();
                 const doc: ProstheticsDocument = { id, sourceId: input.sourceId, name: buildAttachmentPath(null, input.name, id).slice('attachments/'.length),
                     sha256: createHash('sha256').update(bytes).digest('hex'), size: bytes.length, page: input.page };
-                const result = connection.prepare(`INSERT INTO prosthetics_catalog_documents (id,source_id,name,sha256,size,page,base64)
-                    VALUES (@id,@sourceId,@name,@sha256,@size,@page,@base64)`).run({ ...doc, base64: bytes.toString('base64') });
+                const result = connection.prepare(`INSERT INTO prosthetics_catalog_documents (id,source_id,name,sha256,size,page,bytes,operation_key)
+                    VALUES (@id,@sourceId,@name,@sha256,@size,@page,@bytes,@operationKey)`).run({ ...doc, bytes, operationKey: currentSourceImport(connection, input.sourceId) });
                 if (result.changes !== 1) throw new Error('PROSTHETICS_DOCUMENT_WRITE_FAILED');
                 assertCurrent(); return doc;
             }).immediate();
         },
         document(id: string, expectedHash?: string) {
             assertPrivateArchive(connection);
-            const doc = connection.prepare('SELECT id, source_id AS sourceId, name, sha256, size, page, base64 FROM prosthetics_catalog_documents WHERE id=?').get(id) as (ProstheticsDocument & { base64: string }) | undefined;
+            const doc = connection.prepare('SELECT id, source_id AS sourceId, name, sha256, size, page, bytes FROM prosthetics_catalog_documents WHERE id=?').get(id) as (ProstheticsDocument & { bytes: Buffer }) | undefined;
             if (!doc) throw new ProstheticsCatalogError('DOCUMENT_NOT_FOUND', 'Originale non disponibile.', 404);
-            const bytes = decodeProstheticsDocument(doc.base64);
-            if (bytes.length !== doc.size || createHash('sha256').update(bytes).digest('hex') !== doc.sha256 || (expectedHash && doc.sha256 !== expectedHash))
+            const bytes = doc.bytes;
+            if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > 25 * 1024 * 1024 || bytes.length !== doc.size || createHash('sha256').update(bytes).digest('hex') !== doc.sha256 || (expectedHash && doc.sha256 !== expectedHash))
                 throw new ProstheticsCatalogError('DOCUMENT_CHANGED', 'Originale modificato: integrità non verificata.', 409);
             if (buildAttachmentPath(`attachments/${doc.name}`, doc.name, doc.id) !== `attachments/${doc.name}`)
                 throw new ProstheticsCatalogError('DOCUMENT_CHANGED', 'Nome originale modificato: integrità non verificata.', 409);
@@ -102,12 +102,17 @@ export function createProstheticsCatalog(connection: Database.Database) {
             if (revision(connection) !== selection.revision) throw new ProstheticsCatalogError('CATALOG_REVISION_CONFLICT', 'Il repertorio è cambiato: scegli nuovamente la voce.', 409);
             const entry = connection.prepare(`${SELECT_ENTRIES} WHERE id=?`).get(selection.entryId) as ProstheticsEntry | undefined;
             if (!entry) throw new ProstheticsCatalogError('ENTRY_NOT_FOUND', 'Voce non disponibile.', 409);
-            const source = connection.prepare('SELECT * FROM prosthetics_catalog_sources WHERE id=?').get(entry.sourceId) as ProstheticsSourceRecord | undefined;
-            if (!source) throw new ProstheticsCatalogError('SOURCE_NOT_FOUND', 'Fonte non disponibile.', 409);
-            const originals = documents(connection, source.id);
+            const row = connection.prepare('SELECT receipt_json FROM prosthetics_catalog_receipts WHERE operation_key=?').get(entry.operationKey) as { receipt_json: string } | undefined;
+            if (!row) throw new ProstheticsCatalogError('SOURCE_NOT_FOUND', 'Provenienza della voce non disponibile.', 409);
+            const receipt = JSON.parse(row.receipt_json) as ProstheticsReceipt;
+            const source = prostheticsImportSource(receipt.manifest, entry.sourceId);
+            if (source.sha256 !== entry.sourceSha256 || source.version !== entry.version || source.name !== entry.source || source.scope !== entry.scope
+                || (receipt.manifest.options?.sourceDetails?.id ?? prostheticsSourceId(receipt.manifest.metadata!)) !== entry.sourceId)
+                throw new ProstheticsCatalogError('SOURCE_CHANGED', 'Provenienza della voce incoerente.', 409);
+            const originals = documents(connection, source.id, entry.operationKey);
             for (const doc of originals) this.document(doc.id, doc.sha256);
             return { entryId: entry.id, code: entry.code, codeSystem: entry.codeSystem, description: entry.description,
-                source: { ...source, sha256: entry.sourceSha256, version: entry.version, name: entry.source }, documents: originals, revision: selection.revision };
+                source, documents: originals, revision: selection.revision, operationKey: entry.operationKey };
         },
         status(): ProstheticsStatus {
             return connection.transaction(() => ({ revision: revision(connection), count: count(connection), sourceCount: (connection.prepare('SELECT count(*) n FROM prosthetics_catalog_sources').get() as { n: number }).n, latestReceipt: latest(connection) }))();
@@ -193,8 +198,8 @@ function assertPrivateArchive(connection: Database.Database) {
             throw new ProstheticsCatalogError('ARCHIVE_PERMISSIONS', 'L’archivio deve essere accessibile soltanto al proprietario prima di conservare o aprire originali.', 409);
     }
 }
-function documents(connection: Database.Database, sourceId: string): ProstheticsDocument[] {
-    return connection.prepare('SELECT id,source_id AS sourceId,name,sha256,size,page FROM prosthetics_catalog_documents WHERE source_id=? ORDER BY id').all(sourceId) as ProstheticsDocument[];
+function documents(connection: Database.Database, sourceId: string, operationKey?: string): ProstheticsDocument[] {
+    return connection.prepare('SELECT id,source_id AS sourceId,name,sha256,size,page FROM prosthetics_catalog_documents WHERE source_id=? AND (? IS NULL OR operation_key=?) ORDER BY id').all(sourceId, operationKey ?? null, operationKey ?? null) as ProstheticsDocument[];
 }
 export function decodeProstheticsDocument(base64: string): Buffer {
     const size = getAttachmentPayloadByteSize(base64);
@@ -205,3 +210,15 @@ export function decodeProstheticsDocument(base64: string): Buffer {
     return bytes;
 }
 export type ProstheticsCatalog = ReturnType<typeof createProstheticsCatalog>;
+
+function currentSourceImport(connection: Database.Database, sourceId: string): string {
+    const source = connection.prepare('SELECT * FROM prosthetics_catalog_sources WHERE id=?').get(sourceId) as ProstheticsSourceRecord;
+    for (const row of connection.prepare('SELECT operation_key,receipt_json FROM prosthetics_catalog_receipts ORDER BY id DESC').iterate() as Iterable<{ operation_key: string; receipt_json: string }>) {
+        const receipt = JSON.parse(row.receipt_json) as ProstheticsReceipt;
+        const manifest = receipt.manifest;
+        if ((manifest.options?.sourceDetails?.id ?? prostheticsSourceId(manifest.metadata!)) !== sourceId) continue;
+        const imported = prostheticsImportSource(manifest, sourceId);
+        if ((Object.keys(source) as (keyof ProstheticsSourceRecord)[]).every(key => source[key] === imported[key])) return row.operation_key;
+    }
+    throw new ProstheticsCatalogError('SOURCE_NOT_FOUND', 'Import della fonte non disponibile.', 409);
+}

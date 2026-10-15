@@ -232,17 +232,19 @@ locali salvano ciò che ricevono.
 
 ### `prosthetics_catalog_documents`: originali delle fonti protesiche
 
-- In chiaro: `id`, `source_id`, `name`, `sha256`, `size`, `page`, `base64`
+- In chiaro: `id`, `source_id`, `name`, `sha256`, `size`, `page`, `bytes` (BLOB), `operation_key`
 - Leggibile senza chiave: originali completi. Allegare soltanto documenti di repertorio privi di dati dei pazienti.
 
 Gli originali sono conservati nel database SQLite sotto la data dir, separati
 logicamente dai pazienti, senza copie in directory pubbliche. Database creato
 con permessi 0600, directory predefinita 0700; per archivi esistenti l’allegato
 verifica permessi e proprietà di database e sidecar su POSIX prima di scrivere.
-Windows segue le autorizzazioni dell’account e della cartella. Base64 e SHA-256
-non cifrano. Le route richiedono sessione attiva, rispondono no-store e verificano
+Windows segue le autorizzazioni dell’account e della cartella. BLOB, base64 nel
+backup JSON e SHA-256 non cifrano. Le route richiedono sessione attiva, rispondono no-store e verificano
 hash/dimensione prima del download. Originali e fonti entrano nel backup web e
-schedulato e nel ripristino atomico. Conservare i backup come gli altri dati sensibili.
+schedulato e nel ripristino atomico. Ogni riferimento documentale dello snapshot
+è verificato contro fonte, import e byte inclusi prima di esportare o cancellare
+dati nel restore. Conservare i backup come gli altri dati sensibili.
 
 ### `service_catalog_entries`: repertorio delle prestazioni
 

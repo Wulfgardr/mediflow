@@ -2,10 +2,11 @@ import { normalizeProstheticsImportOptions } from './prosthetics-import-options.
 /* @Codex */
 import { buildAttachmentPath } from '../attachment-path.ts';
 import { createHash } from 'node:crypto';
-import { PROSTHETICS_CONTRACT, PROSTHETICS_MAX_BYTES, PROSTHETICS_MAX_ROWS, isProstheticsText, isProstheticsDate, prostheticsIdentity } from './prosthetics-catalog-contract.ts';
-import type { ProstheticsReceipt, ProstheticsEntry } from './prosthetics-catalog-contract.ts';
+import { PROSTHETICS_CONTRACT, PROSTHETICS_MAX_BYTES, PROSTHETICS_MAX_ROWS, isProstheticsText, isProstheticsDate, prostheticsIdentity, prostheticsImportSource, prostheticsSourceId } from './prosthetics-catalog-contract.ts';
+import { isProstheticsSnapshot } from './prosthetics-snapshot.ts';
+import type { ProstheticsReceipt, ProstheticsEntry, ProstheticsSourceRecord } from './prosthetics-catalog-contract.ts';
 const SHA = /^[a-f0-9]{64}$/u;
-const fail = (): never => { throw new Error('PROSTHETICS_CATALOG_BACKUP_INVALID'); };
+function fail(): never { throw new Error('PROSTHETICS_CATALOG_BACKUP_INVALID'); }
 function object(value: unknown): Record<string, unknown> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) fail();
     return value as Record<string, unknown>;
@@ -21,7 +22,7 @@ const timestamp = (value: unknown) => typeof value === 'string' && /^\d{4}-\d\d-
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
 /** Identical validation for web export, scheduled export and pre-mutation restore. */
-export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unknown[], sources: unknown[] = [], documents: unknown[] = []): void {
+export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unknown[], sources: unknown[] = [], documents: unknown[] = [], prescriptions: { catalogSnapshot?: unknown }[] = []): void {
     if (!Array.isArray(entries) || !Array.isArray(receipts) || entries.length > 100_000 || receipts.length > 100_000) fail();
     const sourceImports = new Set<string>();
     const receiptIds = new Set<number>(), operations = new Map<string, ProstheticsReceipt>();
@@ -68,17 +69,20 @@ export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unk
         sourceIds.add(source.id as string);
     }
     const documentIds = new Set<string>();
+    const documentRows = new Map<string, Record<string, unknown>>();
     let totalSize = 0;
     for (const value of documents) {
-        const doc = keys(value, ['id','sourceId','name','sha256','size','page','base64']);
-        if (typeof doc.id !== 'string' || !/^[a-f0-9-]{36}$/u.test(doc.id) || documentIds.has(doc.id) || !sourceIds.has(String(doc.sourceId))
+        const doc = keys(value, ['id','sourceId','name','sha256','size','page','base64','operationKey']);
+        if (typeof doc.id !== 'string' || !/^[a-f0-9-]{36}$/u.test(doc.id) || documentIds.has(doc.id) || !sourceIds.has(String(doc.sourceId)) || !operations.has(String(doc.operationKey))
             || !isProstheticsText(doc.name, 300) || buildAttachmentPath(`attachments/${doc.name}`, doc.name, doc.id) !== `attachments/${doc.name}`
             || !sha(doc.sha256) || !count(doc.size, 25 * 1024 * 1024) || doc.size === 0 || typeof doc.base64 !== 'string'
             || doc.base64.length > Math.ceil(25 * 1024 * 1024 / 3) * 4 || (doc.page !== null && !isProstheticsText(doc.page, 100))) fail();
         const bytes = Buffer.from(doc.base64 as string, 'base64');
         if (bytes.toString('base64') !== doc.base64 || bytes.length !== doc.size || createHash('sha256').update(bytes).digest('hex') !== doc.sha256) fail();
         totalSize += bytes.length; if (totalSize > 100 * 1024 * 1024) fail();
-        documentIds.add(doc.id as string);
+        const manifest = operations.get(String(doc.operationKey))!.manifest;
+        if ((manifest.options?.sourceDetails?.id ?? prostheticsSourceId(manifest.metadata!)) !== doc.sourceId) fail();
+        documentIds.add(doc.id as string); documentRows.set(doc.id as string, doc);
     }
     const ids = new Set<string>();
     for (const value of entries) {
@@ -95,4 +99,26 @@ export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unk
             || Object.entries(receipt.manifest.metadata!).some(([key, value]) => row[key] !== value)) fail();
         ids.add(entry.id);
     }
+    for (const prescription of prescriptions) {
+        const snapshot = prescription.catalogSnapshot;
+        if (snapshot === undefined || snapshot === null) continue;
+        if (!isProstheticsSnapshot(snapshot)) fail();
+        const sourceMatches = (source: ProstheticsSourceRecord) => (Object.keys(source) as (keyof ProstheticsSourceRecord)[])
+            .every(key => snapshot.source[key] === source[key]);
+        const imported = operations.get(snapshot.operationKey);
+        if (!imported || (imported.manifest.options?.sourceDetails?.id ?? prostheticsSourceId(imported.manifest.metadata!)) !== snapshot.source.id
+            || !sourceMatches(prostheticsImportSource(imported.manifest, snapshot.source.id))) fail();
+        for (const ref of snapshot.documents) {
+            const doc = documentRows.get(ref.id);
+            if (!doc || doc.operationKey !== snapshot.operationKey || (Object.keys(ref) as (keyof typeof ref)[]).some(key => ref[key] !== doc[key])) fail();
+            const manifest = operations.get(String(doc.operationKey))!.manifest;
+            if (!sourceMatches(prostheticsImportSource(manifest, ref.sourceId))) fail();
+        }
+    }
+}
+
+export function serializeProstheticsDocument(row: { bytes: Buffer } & Record<string, unknown>): Record<string, unknown> {
+    const { bytes, ...metadata } = row;
+    if (!Buffer.isBuffer(bytes)) fail();
+    return { ...metadata, base64: bytes.toString('base64') };
 }
