@@ -206,7 +206,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
 
     const headerActions = (
         <>
-            <span className="apple-chip">{prescriptions?.length ?? 0} voci</span>
+            <span className="apple-chip">{prescriptions?.length ?? 0} {prescriptions?.length === 1 ? 'voce' : 'voci'}</span>
             <span className="apple-chip">{testedCount} collaudi</span>
             <button
                 type="button"
@@ -341,6 +341,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         const refs = parseDocumentRefs(item.documentRefs);
                          return <tr key={item.id}>
                             <td><strong>{item.description}</strong><small>{categoryLabel(item.category)}</small>
+                                {item.source === 'document_review' && <small>Da documento</small>}
                                 <details className={styles.recordDetails}><summary>Misure, collaudo e documenti</summary>
                                     <p>Prescritta il {new Date(item.prescribedAt).toLocaleDateString('it-IT')}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
