@@ -1034,12 +1034,15 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "issue-143-usable-patient-home")
 
         let visibleTabs = app.tabBars.firstMatch.buttons.allElementsBoundByIndex
-        XCTAssertEqual(visibleTabs.count, 5, "Compact navigation should expose four sections and system overflow")
-        visibleTabs[4].tap()
+        XCTAssertEqual(visibleTabs.map(\.label), ["Pazienti", "Agenda", "Diario", "Altro"],
+                       "Compact navigation must expose the four Punto d'inchiostro destinations")
+        visibleTabs[3].tap()
 
-        let overflowDestinations = app.tables.firstMatch.cells
-        XCTAssertEqual(overflowDestinations.count, 2, "Compact overflow should contain Scale and Settings")
-        overflowDestinations.element(boundBy: 1).tap()
+        for destination in ["analytics", "scales", "settings", "runtime", "overview", "milestones"] {
+            XCTAssertTrue(app.buttons["clinical-workspace-section-\(destination)-button"].exists,
+                          "Altro must retain the \(destination) destination")
+        }
+        app.buttons["clinical-workspace-section-settings-button"].tap()
         XCTAssertTrue(sectionView("clinical-workspace-settings-view").waitForExistence(timeout: 10))
 
         let connection = app.buttons["settings-mediflow-connection-button"]
@@ -1368,6 +1371,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(sectionView("therapy-row-therapy-active").exists)
 
         openPatientSection(.prescriptions)
+        let createService = sectionView("service-create-disclosure")
+        XCTAssertTrue(scrollDown(to: createService, requireHittable: true))
+        XCTAssertFalse(app.textFields["new-service-name"].exists,
+                       "The creation form must stay behind its disclosure until requested")
+        createService.tap()
         XCTAssertTrue(app.textFields["new-service-name"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Nessuna prestazione registrata."].exists)
         XCTAssertFalse(sectionView("checkup-row-checkup-pending").exists)
