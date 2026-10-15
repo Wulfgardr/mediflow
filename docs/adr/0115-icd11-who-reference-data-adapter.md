@@ -5,7 +5,7 @@ Status: Accepted
 
 Amendment: 2026-09-06, WUL-672, candidato locale da `07725c7`.
 
-## Amendment WUL-673 — consultazione WHO paired nell'app Mac (2026-09-12)
+## Amendment WUL-673: consultazione WHO paired nell'app Mac (2026-09-12)
 
 Run `e25d456b66df489786a4e27d63f1966b`, base
 `73442886cecb9b5c21446974819822c058d848d4`. Questo amendment additivo
@@ -72,7 +72,7 @@ materiale allegato. Xcode/build Mac, pinning reale, WHO live/UI e qualifica
 exact-candidate Mac/localhost/Headless restano al parent/Astra (WUL-697).
 Questo contributo non chiude WUL-673 né dichiara parità delle altre piattaforme.
 
-## Decisione vigente per il candidato 0.8.6 — prima del codice
+## Decisione vigente per il candidato 0.8.6: prima del codice
 
 L'utente ha scelto il **sidecar WHO locale** il 6 settembre, come registrato
 nel [packet WUL-672](../analysis/2026-09-05-086-who-decision.md#1-decisione-utente-catalogo-who-con-sidecar-locale).
@@ -142,7 +142,7 @@ Il vecchio container MediFlow, la porta 8888 e i suoi launcher restano ritirati.
   Export e migrazione dei record storici restano un gate separato: il candidato
   non attesta conformita dell'intero ciclo di utilizzo ICD.
 
-### Compatibilita Search osservata il 7 settembre 2026 — WUL-673
+### Compatibilita Search osservata il 7 settembre 2026: WUL-673
 
 La prima prova locale reale della release WHO 2026-01 restituisce anche
 combinazioni di codici: `theCode` contiene i separatori ICD `&` o `/`, mentre
@@ -167,7 +167,7 @@ Fonte: [WHO API v2, CodeInfo e combinazioni](https://icd.who.int/docs/icd-api/Wh
 Questa estensione del riferimento non abilita cross-check, autocode o export
 FHIR e non qualifica l'uso clinico della classificazione.
 
-### Verifica esplicita del codice — integrazione 0.8.6, WUL-673
+### Verifica esplicita del codice: integrazione 0.8.6, WUL-673
 
 Search per termini e verifica del codice sono operazioni distinte. La nuova
 route autenticata `GET /api/icd/code-check?code=...&release=2026-01` usa soltanto
@@ -224,7 +224,7 @@ entita base con titolo inglese. Le prove HTTP/UI integrate restano gate separati
   riletta al confine di ogni operazione e prima della pubblicazione; nessuna
   promessa di osservare istantaneamente cambi esterni fra due letture.
 
-### Setup guidato locale — WUL-673, 7 settembre 2026
+### Setup guidato locale: WUL-673, 7 settembre 2026
 
 Il percorso guidato aggiunge una CLI locale a operazioni nominate e una guida
 interattiva nelle impostazioni. Non introduce API di provisioning, accesso Docker
@@ -265,7 +265,7 @@ I test usano Docker fake e fixture sintetiche, con directory dati temporanea
 esplicita. Il read-only sul deployment qualificato e la fixture UI sono prove
 separate da un'installazione nuova end-to-end. Nessuna modifica `/api/v1`.
 
-### Revisione del percorso ordinario — WUL-673, prima del codice
+### Revisione del percorso ordinario: WUL-673, prima del codice
 
 La prima guida CLI richiedeva editing JSON, hash e qualifica manuale: non
 soddisfa il percorso ordinario richiesto e non viene promossa a onboarding
@@ -320,7 +320,7 @@ completo. La revisione conserva la CLI tecnica per il gestore e aggiunge
   codice/titolo/URI e licenza distinta del software. Nessuna accettazione o
   certificazione legale e prodotta da questo ADR.
 
-## Decisione storica del 1 settembre — target online superato nel candidato
+## Decisione storica del 1 settembre: target online superato nel candidato
 
 Issue: [GitHub #306](https://github.com/Wulfgardr/mediflow/issues/306)
 
@@ -598,3 +598,61 @@ registrato dal glob `lib/**/*.test.ts` di `scripts/run-unit-suite.mjs`.
 Nessun OAuth, chiamata autenticata WHO, attivazione del trasporto, cutover,
 cache o writer e introdotto. La qualifica live e la consegna Docker-free
 restano verifiche successive distinte.
+
+## Emendamento 2026-10: catalogo ICD-11 incorporato
+
+Decisione di Leonardo del 15 ottobre 2026: catalogo ICD-11 incorporato.
+Questa sezione prevale sulle precedenti restrizioni al solo sidecar e riconcilia
+ADR 0115 con la base offline prevista da ADR 0070.
+
+La ricerca usa prima la SimpleTabulation MMS 2026-01 inglese verificata,
+conservata in un database SQLite dedicato ai soli dati pubblici di repertorio.
+Non richiede Docker, credenziali o rete. Il servizio WHO locale già qualificato
+resta opzionale quando il catalogo è assente, mai come ripiego su risultati
+vuoti o su errori del catalogo pronto. Un kill switch separato può disabilitare
+il catalogo e i suoi aggiornamenti. Nessuna diagnosi è scritta automaticamente.
+
+Il bundle contiene l'archivio originale e un manifest con URL fisso, release,
+lingua, licenza, hash SHA-256, byte e conteggi. Al primo uso del servizio nel
+processo vengono verificati manifest, archivio e proiezione SQLite; una verifica
+fallita non rende disponibile il catalogo corrotto. Gli asset sono inclusi anche
+nella distribuzione standalone. In questa tranche NON è distribuito il dataset
+WHO: soltanto fixture sintetiche, mai caricate automaticamente in produzione.
+
+Il parser accetta solo tab-separated UTF-8 con intestazioni SimpleTabulation
+riconosciute, anche dentro ZIP. XLSX, versioni diverse, strutture ignote,
+duplicati e input incompleti falliscono esplicitamente. Non si inventano
+conversioni né traduzioni. Sono indicizzate solo categorie con codice,
+con URI MMS, titolo originale, capitolo e indicatori foglia/residuale.
+FTS5 usa token letterali parametrizzati, con fallback LIKE normalizzato solo
+quando SQLite non supporta FTS5. Le risposte sono limitate a 25 voci e dichiarano
+la provenienza incorporata e l'eventuale troncamento.
+
+L'aggiornamento esplicito scarica soltanto dall'URL WHO fissato, senza redirect,
+con limite di byte, deadline e SHA-256. Il download produce un'anteprima con
+conteggi e hash. Una seconda conferma attiva esattamente quella versione tramite
+CAS in una transazione IMMEDIATE; dati, manifest e audit locale sono atomici.
+La versione precedente resta disponibile e ripristinabile con conferma. Un errore,
+una sessione scaduta o un conflitto conserva il catalogo precedente. Le ricerche
+e le verifiche codice mantengono l'audit applicativo privo di query e codici;
+importazioni e ripristini hanno anche uno storico atomico nel DB di repertorio.
+Gli errori di acquisizione registrano soltanto operazione, autore e timestamp,
+senza payload remoto o termini clinici.
+Il download non riceve mai termini clinici, pazienti, documenti o credenziali.
+
+I dati WHO restano CC BY-ND 3.0 IGO, separati dalla licenza MIT del software;
+l'archivio originale viene conservato senza modifiche e accompagnato
+ dall'attribuzione World Health Organization. SHA-256 prova integrità rispetto
+al manifest, non una firma WHO. La prima distribuzione reale richiede ancora
+l'acquisizione autorizzata e la verifica dello schema effettivo. La copertura è
+solo delle categorie tabellari inglesi: niente sinonimi, traduzione italiana,
+postcoordinazione o validazione clinica. Il controllo codice verifica soltanto
+la presenza nel catalogo, non la correttezza di una diagnosi.
+
+Le route web esistenti mantengono code, description, system e canonicalUri;
+le risposte del catalogo hanno un contratto additivo distinto dal sidecar,
+senza digest di immagini inventati. Il riferimento resta nel JSON clinico
+cifrato già esistente. I client paired devono supportare il nuovo contratto
+prima di essere dichiarati compatibili. Le route v1 paired conservano il runtime
+sidecar con il contratto precedente: nessun impatto OpenAPI v1. Nessuna modifica
+a scritture cliniche o autorizzazioni è implicata da questa decisione.

@@ -1,0 +1,4 @@
+Foundation URI	Linearization (release) URI	Code	BlockId	Title	ClassKind	DepthInKind	IsResidual	ChapterNo	BrowserLink	isLeaf	Primary tabulation	Grouping1	Grouping2	Grouping3	Grouping4	Grouping5	Version: 2026-01
+http://id.who.int/icd/entity/1000000000	http://id.who.int/icd/release/11/2026-01/mms/1000000000			Synthetic chapter	chapter	1	false	01		false							
+http://id.who.int/icd/entity/1000000001	http://id.who.int/icd/release/11/2026-01/mms/1000000001	AA00		Synthetic amber condition	category	1	false	01		true							
+http://id.who.int/icd/entity/1000000002	http://id.who.int/icd/release/11/2026-01/mms/1000000002	AA01		Synthetic amber unspecified condition	category	1	true	01		true							

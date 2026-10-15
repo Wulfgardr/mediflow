@@ -277,6 +277,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        {
+            path: 'lib/reference-data/icd11-embedded-parser.ts',
+            pattern: "^export const WHO_CATALOG_URL = 'https://icdcdn\\.who\\.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en\\.zip';$",
+            reason: 'ADR 0115: fixed public WHO archive, explicit confirmed acquisition only, no redirects, credentials or clinical payload.',
+        },
         {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^const stemUri = 'http://id\\.who\\.int/icd/release/11/2026-01/mms/123456789';$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
         {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^            codeInfoResourceUri: `http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/\\$\\{encodeURIComponent\\(code\\)\\}`,$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
         {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['foundation namespace', \\{ stemId: 'http://id\\.who\\.int/icd/entity/123456789' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
