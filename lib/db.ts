@@ -2,7 +2,7 @@
 // Replaces Dexie DB with Fetch calls
 
 import { encryptData, decryptData } from './security/security';
-import type { WhoLocalReference } from './reference-data/icd11-who-local-contract'; // @Codex
+import type { WhoReference } from './reference-data/icd11-reference'; // @Codex
 import { notifyDbChange } from './live-query';
 import {
     LOCKED_DATA_PLACEHOLDER,
@@ -159,7 +159,7 @@ export interface Diagnosis {
     system: string;
     date: Date;
     canonicalUri?: string; // @Codex
-    reference?: WhoLocalReference; // @Codex
+    reference?: WhoReference; // @Codex
 }
 
 export interface ClinicalEntry {

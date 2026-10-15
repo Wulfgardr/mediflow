@@ -71,6 +71,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": [
       "./package.json",
+      "./assets/reference-data/icd11/*",
       "./LICENSE",
       "./CREDITS.md",
       "./app/fonts/*-OFL.txt",
