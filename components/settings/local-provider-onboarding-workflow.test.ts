@@ -154,7 +154,7 @@ test('cancel is not rollback: refresh can discover an already committed activati
     response.resolve(Response.json(f.status));
 });
 
-for (const code of ['configuration_changed', 'provider_busy', 'provider_unreachable', 'model_absent_or_not_local', 'verification_interrupted']) {
+for (const code of ['configuration_changed', 'provider_busy', 'provider_unreachable', 'provider_unready', 'provider_version_unsupported', 'model_absent_or_not_local', 'verification_interrupted']) {
     test(`${code} invalidates the old revision and never retries automatically`, async () => {
         const f = fixture(); await f.controller.refresh();
         f.handle(call => call.init.method === 'POST' ? Response.json({ error: code }, { status: code === 'provider_unreachable' ? 503 : 409 }) : undefined);
@@ -248,3 +248,18 @@ for (const kind of ['read', 'post'] as const) {
         const count = f.calls.length; context.mock.timers.tick(200_000); await nextTurn(); assert.equal(f.calls.length, count);
     });
 }
+
+test('versione non ammessa arriva alla vista e viene cancellata alla rilettura', async () => {
+    const f = fixture(); await f.controller.refresh();
+    const versionMismatch = { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' };
+    f.handle(call => call.init.method === 'POST'
+        ? Response.json({ error: 'provider_version_unsupported', versionMismatch }, { status: 409 }) : undefined);
+    await f.controller.activate();
+    assert.equal(f.view().phase, 'failed');
+    assert.equal(f.view().messageCode, 'provider_version_unsupported');
+    assert.deepEqual(f.view().versionMismatch, versionMismatch);
+    assert.equal(f.posts().length, 1);
+    await f.controller.refresh();
+    assert.equal(f.view().versionMismatch, undefined);
+    assert.equal(f.posts().length, 1);
+});
