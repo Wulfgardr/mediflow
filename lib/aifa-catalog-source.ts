@@ -16,7 +16,7 @@ export function compareAifaSource(remote: AifaRemoteState, manifest: AifaCatalog
     if (remote.outcome === 'unavailable') return remote;
     if (!count) return { ...remote, outcome: 'available' };
     if (!manifest || manifest.sourceUrl !== AIFA_DOWNLOAD_URL) return { ...remote, outcome: 'unavailable', reason: 'local_metadata_absent' };
-    const comparable = remote.etag && manifest.etag ? remote.etag === manifest.etag
+    const comparable = remote.etag && manifest.etag ? remote.etag.replace(/^W\//, '') === manifest.etag.replace(/^W\//, '')
         : remote.lastModified && manifest.lastModified ? remote.lastModified === manifest.lastModified : null;
     return { ...remote, outcome: comparable === null ? 'unavailable' : comparable ? 'unchanged' : 'available',
         ...(comparable === null ? { reason: 'local_metadata_absent' as const } : {}) };

@@ -7,6 +7,10 @@ import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
+import { IncomingMessage } from 'node:http';
+import { Socket } from 'node:net';
+import { NodeNextRequest } from 'next/dist/server/base-http/node.js';
+import { NextRequestAdapter } from 'next/dist/server/web/spec-extension/adapters/next-request.js';
 import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from './aifa-catalog';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -332,11 +336,14 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal(getAifaCatalogSnapshot(), committed);
     const catalog = await loadCatalogModules();
     t.mock.method(globalThis, 'fetch', async () => {
-        catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'CONCURRENT SYNTHETIC', nameSearch: 'concurrent synthetic' }]);
+        const concurrent = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+        try {
+            concurrent.prepare('UPDATE drugs SET name = ?, name_search = ?').run('CONCURRENT SYNTHETIC', 'concurrent synthetic');
+        } finally { concurrent.close(); }
         return new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } });
     });
     assert.equal((await POST(request())).status, 409);
-    assert.equal((await catalog.searchAifaCatalog('concurrent', 1)).rows[0].aic, '000000999');
+    assert.equal((await catalog.searchAifaCatalog('concurrent', 1)).rows[0].name, 'CONCURRENT SYNTHETIC');
     const changed = getAifaCatalogSnapshot();
     t.mock.method(globalThis, 'fetch', async () => {
         current = null;
@@ -479,7 +486,7 @@ test('reduction below 90% requires confirmation bound to both catalog and file; 
     } finally { sqlite.exec('DROP TRIGGER synthetic_aifa_audit_fail'); sqlite.close(); catalog.clearAifaCatalog(); }
 });
 
-test('HEAD route authenticates, rejects input, respects permission and retires with its session without replacing the catalog', async t => {
+test('HEAD route accepts zero-byte Next.js POST streams, authenticates, rejects input and retires with its session', async t => {
     const catalog = await loadCatalogModules();
     const load = createRequire(import.meta.url);
     const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
@@ -497,7 +504,16 @@ test('HEAD route authenticates, rejects input, respects permission and retires w
         calls++; assert.equal(init.method, 'HEAD');
         return new Response(null, { headers: { etag: '"head-route"', 'Last-Modified': 'Wed, 14 Oct 2026 23:02:27 GMT' } });
     });
-    const request = () => syntheticExemptionRequest('http://localhost/api/drugs/source', { method: 'POST' });
+    const request = () => {
+        const incoming = new IncomingMessage(new Socket());
+        incoming.method = 'POST';
+        incoming.url = 'http://localhost/api/drugs/source';
+        incoming.headers = { ...Object.fromEntries(syntheticExemptionRequest(incoming.url, { method: 'POST' }).headers), 'content-length': '0' };
+        incoming.push(null);
+        const adapted = NextRequestAdapter.fromNodeNextRequest(new NodeNextRequest(incoming), new AbortController().signal);
+        assert.ok(adapted.body, 'Next.js supplies a stream even for a zero-byte POST');
+        return adapted;
+    };
     assert.equal((await route.POST(request())).status, 401); assert.equal((await route.GET()).status, 401); assert.equal(calls, 0);
     const control = owner.bootstrapControl()!;
     const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-aifa-head-login' });
@@ -508,7 +524,9 @@ test('HEAD route authenticates, rejects input, respects permission and retires w
     const before = catalog.getAifaCatalogSnapshot();
     try {
         resetRemote(); setNetwork('disabled');
-        assert.equal((await (await route.POST(request())).json()).networkAllowed, false); assert.equal(calls, 0);
+        const disabled = await route.POST(request());
+        assert.equal(disabled.status, 200);
+        assert.equal((await disabled.json()).networkAllowed, false); assert.equal(calls, 0);
         assert.equal((await route.POST(syntheticExemptionRequest('http://localhost/api/drugs/source?url=invalid', { method: 'POST' }))).status, 400);
         assert.equal((await route.POST(syntheticExemptionRequest('http://localhost/api/drugs/source', { method: 'POST', body: '{}' }))).status, 400);
         setNetwork('enabled');
@@ -524,4 +542,72 @@ test('HEAD route authenticates, rejects input, respects permission and retires w
         assert.equal(catalog.getAifaCatalogSnapshot(), before);
         assert.equal((await route.GET()).status, 401);
     } finally { if (current) owner.retire(current, 'dispose'); resetRemote(); }
+});
+
+test('confirmation rejects a different file or catalog even when reduction is no longer below 90%', async t => {
+    const catalog = await loadCatalogModules();
+    const { AifaReductionError, AifaUpdateError } = await import('./aifa-catalog-lock');
+    const makeFile = (count: number) => new File(['CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n' + Array.from({ length: count }, (_, index) =>
+        `${String(index + 1).padStart(9, '0')};SINTETICO ${index};A01AA01;Principio inventato`).join('\n')], 'synthetic.csv');
+    const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-10-15', version: 'synthetic-confirmation' };
+    for (const scenario of ['different file', 'changed catalog']) await t.test(scenario, async () => {
+        catalog.clearAifaCatalog();
+        await catalog.replaceAifaCatalog(makeFile(100), manifest);
+        let confirmation = '';
+        await assert.rejects(catalog.replaceAifaCatalog(makeFile(80), manifest), (error: unknown) => {
+            assert.ok(error instanceof AifaReductionError);
+            confirmation = error.confirmation;
+            return true;
+        });
+        if (scenario === 'changed catalog') {
+            catalog.clearAifaCatalog();
+            await catalog.replaceAifaCatalog(makeFile(80), manifest);
+        }
+        const before = catalog.getAifaCatalogSnapshot();
+        try {
+            await assert.rejects(catalog.replaceAifaCatalog(makeFile(scenario === 'different file' ? 95 : 80), manifest,
+                undefined, { confirmedReduction: confirmation }), (error: unknown) => error instanceof AifaUpdateError && error.status === 409);
+            assert.equal(catalog.getAifaCatalogSnapshot(), before);
+        } finally { catalog.clearAifaCatalog(); }
+    });
+});
+
+test('manual import excludes legacy replacement and clearing through services and v1 routes', async t => {
+    const catalog = await loadCatalogModules();
+    const { AifaUpdateError } = await import('./aifa-catalog-lock');
+    const load = createRequire(import.meta.url);
+    const route = load('../app/api/v1/drugs/route.ts') as typeof import('../app/api/v1/drugs/route');
+    const { getOrCreateLocalApiToken } = await import('./security/local-api-token');
+    const token = getOrCreateLocalApiToken();
+    const legacy = [{ aic: '000000999', name: 'LEGACY SINTETICO' }];
+    const request = (method: string) => new Request('http://localhost/api/v1/drugs', {
+        method, headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        ...(method === 'POST' ? { body: JSON.stringify(legacy) } : {}),
+    });
+    const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000101;SINTETICO;A01AA01;Inventato';
+    for (const writer of ['replace', 'clear', 'POST', 'DELETE']) await t.test(writer, async () => {
+        catalog.clearAifaCatalog();
+        catalog.replaceUnverifiedDrugCatalog(legacy);
+        const before = catalog.getAifaCatalogSnapshot();
+        const file = new File([csv], 'synthetic.csv');
+        const bytes = await file.arrayBuffer();
+        let resume!: (value: ArrayBuffer) => void;
+        t.mock.method(file, 'arrayBuffer', () => new Promise<ArrayBuffer>(resolve => { resume = resolve; }));
+        const pending = catalog.replaceAifaCatalog(file, { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
+            downloadedAt: '2026-10-15', version: 'synthetic-lock' });
+        const conflict = (error: unknown) => error instanceof AifaUpdateError && error.status === 409;
+        try {
+            if (writer === 'replace') assert.throws(() => catalog.replaceUnverifiedDrugCatalog(legacy), conflict);
+            else if (writer === 'clear') assert.throws(() => catalog.clearAifaCatalog(), conflict);
+            else {
+                const response = await route[writer as 'POST' | 'DELETE'](request(writer));
+                assert.equal(response.status, 409);
+                assert.deepEqual(await response.json(), { error: 'Operazione AIFA già in corso' });
+            }
+            assert.equal(catalog.getAifaCatalogSnapshot(), before);
+        } finally { resume(bytes); await pending; }
+        assert.equal((await catalog.searchAifaCatalog('sintetico', 10)).rows[0].aic, '000000101');
+        assert.equal((await route.POST(request('POST'))).status, 200);
+        assert.equal((await route.DELETE(request('DELETE'))).status, 200);
+    });
 });

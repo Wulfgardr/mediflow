@@ -98,10 +98,15 @@ ricontrollata prima della richiesta e durante download e sostituzione.
 
 All'apertura di Repertori o delle impostazioni Repertori, un endpoint locale
 autenticato verifica soltanto l'URL fisso con HEAD. Timeout: 8 secondi;
-redirect rifiutati, nessun fallback GET. La visita non scarica il CSV. Nessun
+redirect rifiutati, nessun fallback GET. La visita non scarica il CSV. Il POST locale accetta uno stream con zero byte
+e rifiuta contenuto effettivo, anche senza Content-Length attendibile. La
+lettura condivide i limiti del POST di aggiornamento: un secondo e 32 letture,
+con interruzione alla cancellazione della richiesta o della sessione. Nessun
 cookie, credenziale, ricerca o dato clinico viene inviato ad AIFA. Il controllo
 non è un job in background: occorre aprire una delle due aree. Verifica,
-download e importazione manuale condividono un'esclusione per processo.
+download, importazione manuale, caricamento legacy e svuotamento condividono
+un'esclusione per processo. Anche POST e DELETE di `/api/v1/drugs` rispondono
+409 quando un'operazione detiene l'esclusione; non attendono né scrivono.
 
 `aifaCatalogRemoteState`, separato dal manifest, conserva ETag, Last-Modified,
 Content-Length, checkedAt ed esito della verifica. La prenotazione del tentativo
@@ -112,7 +117,8 @@ verifica non disponibile fino alla scadenza delle 24 ore. I metadati mancanti
 o non confrontabili non sono dichiarati «nessuna variazione».
 
 Il manifest v1 accetta tre campi HTTP opzionali, compatibili con i manifest
-preesistenti senza migrazione SQL. Il confronto privilegia ETag, poi
+preesistenti senza migrazione SQL. Il confronto privilegia ETag, con confronto
+debole: `W/"tag"` e `"tag"` identificano la stessa versione. Poi usa
 Last-Modified; Content-Length da solo non identifica una versione. Un catalogo
 senza tali metadati può essere aggiornato esplicitamente per acquisirli. La
 data di scarico locale è distinta dalla data pubblicata da AIFA.
@@ -136,7 +142,8 @@ Un catalogo con meno del 90% degli AIC unici correnti viene rifiutato nella
 transazione, prima della cancellazione. Una conferma esplicita può superare
 solo questo controllo. La conferma è legata a SHA-256 del file e snapshot
 locale: un file differente o una modifica concorrente richiedono una nuova
-conferma. Per il download viene riacquisito il CSV; non si conserva una copia
+conferma. Se presente, la conferma viene verificata anche quando il nuovo
+conteggio non è più sotto soglia. Per il download viene riacquisito il CSV; non si conserva una copia
 temporanea fuori dal database. Non vengono superati i controlli di struttura,
 colonne, dimensione, sessione o audit.
 

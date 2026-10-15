@@ -163,10 +163,13 @@ export async function replaceAifaCatalog(
                 .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY)).get()?.value);
             const previousCount = Number(transaction.select({ total: sql<number>`count(*)` }).from(drugs).get()?.total ?? 0);
             const reduction = previousCount > 0 && parsed.drugs.length < previousCount * AIFA_MINIMUM_REPLACEMENT_RATIO;
-            if (reduction) {
+            if (reduction || options.confirmedReduction !== undefined) {
                 currentSnapshot ??= catalogSnapshot(transaction);
                 const confirmation = `${currentSnapshot}:${manifest.sha256}`;
-                if (options.confirmedReduction !== confirmation) throw new AifaReductionError(confirmation, previousCount, parsed.drugs.length);
+                if (options.confirmedReduction !== confirmation) {
+                    if (reduction) throw new AifaReductionError(confirmation, previousCount, parsed.drugs.length);
+                    throw new AifaUpdateError('Il file o il catalogo sono cambiati: rileggi lo stato e ripeti l’operazione', 409);
+                }
             }
             transaction.delete(drugs).run();
             for (let offset = 0; offset < parsed.drugs.length; offset += INSERT_BATCH_SIZE) {
@@ -225,31 +228,37 @@ export async function confirmAifaCatalogUnchanged(snapshot: string, assertCurren
 }
 
 export function clearAifaCatalog(): void {
-    dbServer.transaction((transaction) => {
-        transaction.delete(drugs).run();
-        transaction.delete(settings)
-            .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
-            .run();
-    });
+    const release = acquireAifaCatalogOperation();
+    try {
+        dbServer.transaction((transaction) => {
+            transaction.delete(drugs).run();
+            transaction.delete(settings)
+                .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
+                .run();
+        });
+    } finally { release(); }
 }
 
 export function replaceUnverifiedDrugCatalog(items: readonly (typeof drugs.$inferInsert)[]): void {
-    if (items.length === 0) throw new Error('Catalogo farmaci legacy vuoto');
+    const release = acquireAifaCatalogOperation();
+    try {
+        if (items.length === 0) throw new Error('Catalogo farmaci legacy vuoto');
 
-    const normalizedItems = items.map((item) => ({
-        ...item,
-        packagingSearch: item.packagingSearch ?? normalizeAifaSearchText(item.packaging || ''),
-    }));
+        const normalizedItems = items.map((item) => ({
+            ...item,
+            packagingSearch: item.packagingSearch ?? normalizeAifaSearchText(item.packaging || ''),
+        }));
 
-    dbServer.transaction((transaction) => {
-        transaction.delete(drugs).run();
-        for (let offset = 0; offset < normalizedItems.length; offset += INSERT_BATCH_SIZE) {
-            transaction.insert(drugs).values(normalizedItems.slice(offset, offset + INSERT_BATCH_SIZE)).run();
-        }
-        transaction.delete(settings)
-            .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
-            .run();
-    });
+        dbServer.transaction((transaction) => {
+            transaction.delete(drugs).run();
+            for (let offset = 0; offset < normalizedItems.length; offset += INSERT_BATCH_SIZE) {
+                transaction.insert(drugs).values(normalizedItems.slice(offset, offset + INSERT_BATCH_SIZE)).run();
+            }
+            transaction.delete(settings)
+                .where(eq(settings.key, AIFA_CATALOG_MANIFEST_SETTING_KEY))
+                .run();
+        });
+    } finally { release(); }
 }
 
 export async function searchAifaCatalog(

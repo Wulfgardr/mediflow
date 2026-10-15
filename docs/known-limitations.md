@@ -35,7 +35,10 @@ FORNITURA e STATO_AMMINISTRATIVO; fascia e prezzo sono assenti dalla fonte
 corrente. Il catalogo non certifica disponibilità, rimborsabilità o appropriatezza.
 La conferma di una riduzione sotto il 90% richiede un nuovo download e vale
 solo per lo stesso file e lo stesso catalogo locale. L'audit transazionale
-copre le sostituzioni AIFA, non la pulizia o il caricamento legacy.
+copre le sostituzioni AIFA, non la pulizia o il caricamento legacy. Questi
+ultimi condividono comunque l'esclusione con verifica e importazioni AIFA;
+il conflitto restituisce 409. L'esclusione è per processo, non tra più processi;
+il download remoto conserva anche il controllo dello snapshot in transazione.
 
 ## VoiceOver su iPhone e iPad
 
