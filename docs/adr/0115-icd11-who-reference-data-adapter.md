@@ -667,6 +667,14 @@ ZIP, ammette solo inglese e dichiara nel manifest gli altri file ignorati,
 compresi readme e XLSX gemello. Restano limiti ZIP, CRC e rifiuto di ambiguità,
 corruzione, duplicati e release diverse. Non viene introdotta lettura XLSX.
 
+La decompressione della tabulazione usa uno stream alimentato con blocchi
+compressi di 1 KiB. Ogni blocco prodotto viene contato prima di conservarlo:
+il superamento di 64 MiB o della dimensione dichiarata interrompe l'estrazione.
+L'output deve essere completo e coincidere con la dimensione dichiarata;
+il CRC incrementale copre tutti i byte prodotti, senza troncamento al prefisso.
+La decompressione resta sincrona, con lavoro limitato per ciascun blocco di input;
+la deadline del download non costituisce un timer di interruzione del parser.
+
 Il layout ufficiale ha record CRLF, BOM UTF-8, campi quotati con virgolette
 raddoppiate e note multilinea. CodingNote contiene anche LF non quotati:
 questi vengono ammessi solo nella colonna delle note del layout ufficiale.

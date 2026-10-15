@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { crc32 } from 'node:zlib';
 import Database from 'better-sqlite3';
 import { WHO_LOCAL_BINDING_ID, type WhoLocalReceipt } from './icd11-who-local-contract.ts';
 
@@ -167,6 +168,42 @@ test('embedded parser fails closed on malformed headers, duplicate codes and URI
     const corrupt = zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': [fixtureBytes, { level: 0 }] });
     corrupt[80] ^= 1;
     assert.throws(() => parseWhoTabulation(corrupt), /ZIP/u);
+});
+
+function withZipMetadata(archive: Uint8Array, size: number, checksum: number): Buffer {
+    const forged = Buffer.from(archive);
+    const directory = forged.readUInt32LE(forged.length - 6);
+    forged.writeUInt32LE(size, 22);
+    forged.writeUInt32LE(checksum, 14);
+    forged.writeUInt32LE(size, directory + 24);
+    forged.writeUInt32LE(checksum, directory + 16);
+    return forged;
+}
+
+test('embedded parser rejects a ZIP expanding past 64 MiB with the size and CRC of a valid TSV prefix', () => {
+    const expanded = Buffer.alloc(67_109_557);
+    fixtureBytes.copy(expanded);
+    const archive = zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': expanded });
+    assert.ok(archive.length < 100_000);
+    assert.ok(expanded.length > WHO_TABULATION_MAX_BYTES);
+    const forged = withZipMetadata(archive, fixtureBytes.length, crc32(fixtureBytes));
+    assert.throws(() => parseWhoTabulation(forged), /Archivio ZIP WHO/u);
+});
+
+test('embedded parser requires exact output size and full CRC for stored and deflated ZIP entries', () => {
+    const bytes = Buffer.from(fixtureText.replace('Synthetic amber condition', 'Synthetic '.repeat(300)));
+    const expected = parseWhoTabulation(bytes).entries;
+    for (const level of [0, 6] as const) {
+        const archive = zipSync({ 'SimpleTabulation-ICD-11-MMS-en.txt': [bytes, { level }] });
+        assert.deepEqual(parseWhoTabulation(archive).entries, expected);
+        for (const [size, checksum] of [
+            [bytes.length - 1, crc32(bytes.subarray(0, -1))],
+            [bytes.length + 1, crc32(bytes)],
+            [bytes.length, crc32(bytes.subarray(0, 1_024))],
+        ]) {
+            assert.throws(() => parseWhoTabulation(withZipMetadata(archive, size, checksum)), /Archivio ZIP WHO/u);
+        }
+    }
 });
 
 const officialLayoutFixture = fs.readFileSync('lib/reference-data/fixtures/icd11-official-layout.synthetic.zip');
