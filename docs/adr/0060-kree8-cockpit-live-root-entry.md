@@ -77,3 +77,11 @@ storici per evitare collisione visuale.
 - Collegare il cockpit sintetico a dati clinici reali: tracciato da `WUL-273`.
 - Introdurre un selettore visuale o profili preview estetici.
 - Rimuovere immediatamente tutte le superfici Graphite secondarie.
+
+## Emendamento 2026-10
+
+Il lanciatore locale presenta una scelta fra browser, app Mac disponibile e
+accesso per agenti (ADR 0068, emendamento ottobre 2026). Questa scelta riguarda
+il processo da avviare. La root web conserva una sola shell ufficiale, senza
+profili estetici concorrenti. Il riferimento storico al precedente file di
+avvio non identifica più l'ingresso utente corrente.
