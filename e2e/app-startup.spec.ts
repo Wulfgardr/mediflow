@@ -69,10 +69,10 @@ launcherTest('launcher choice supports keyboard, both themes and a verified redi
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
             await page.screenshot({ path: testInfo.outputPath(`avvio-${colorScheme}.png`) });
         }
-        const remember = page.getByRole('checkbox', { name: 'Ricorda la mia scelta' });
+        const remember = page.getByRole('checkbox', { name: 'Ricorda questa scelta al prossimo avvio' });
         await remember.focus();
         await page.keyboard.press('Space');
-        const web = page.getByRole('button', { name: 'Apri MediFlow', exact: true });
+        const web = page.getByRole('button', { name: /^Nel browser/u });
         await web.focus();
         await page.keyboard.press('Enter');
         await expect(page.getByRole('status')).toHaveText('Preparazione di MediFlow.');

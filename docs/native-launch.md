@@ -11,7 +11,7 @@ Riferimenti correlati:
 Apri `MediFlow.command` nella radice e scegli **App per Mac**. Il lanciatore
 apre il bundle locale già costruito e ne controlla l'identità rispetto ai
 sorgenti. Se il bundle manca, la voce spiega che serve Xcode completo;
-**Apri MediFlow** resta il percorso web.
+**Nel browser** resta il percorso web.
 
 La preparazione del bundle è un'operazione di sviluppo distinta:
 
