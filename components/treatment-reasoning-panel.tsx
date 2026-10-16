@@ -1,23 +1,13 @@
 'use client';
 
 import { formatCountLabel } from '@/lib/format-count';
-import ink from './ink-secondary.module.css';
-import styles from './clinical-register.module.css';
+import design from './treatment-reasoning.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import {
-    AlertTriangle,
-    BrainCircuit,
-    ChevronDown,
-    ClipboardList,
-    RefreshCw,
-    ShieldCheck,
-    Sparkles,
-} from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
 import PrivacyBlur from '@/components/privacy-blur';
-import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
 import {
     AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
     isAiTreatmentReasoningEnabledValue,
@@ -54,23 +44,17 @@ const AMBULATORY_MISSING_ERROR = 'Aggiungi un ambulatorio nelle impostazioni, po
 
 function severityClasses(severity: SafetySeverity): string {
     switch (severity) {
-        case 'urgent_review':
-            return 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]';
-        case 'caution':
-            return 'border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]';
-        case 'info':
-            return 'border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink)]';
-        default: {
-            const exhaustive: never = severity;
-            return exhaustive;
-        }
+        case 'urgent_review': return design.critical;
+        case 'caution': return design.warning;
+        case 'info': return design.information;
+        default: { const exhaustive: never = severity; return exhaustive; }
     }
 }
 
 function actionPolicyLabel(action: SuggestedAction): string {
     switch (action.writePolicy) {
         case 'form_prefill_only':
-            return 'prefill futuro';
+            return 'Solo preparazione, senza applicazione';
         case 'no_write':
             return 'nessuna scrittura';
         case 'review_only':
@@ -225,268 +209,153 @@ export default function TreatmentReasoningPanel({
     };
 
     return (
-        <div className={`${styles.register} ${styles.review}`} data-testid="treatment-reasoning-panel">
-            <div className={styles.toolbar}>
-                <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                        <h3 className="flex items-center gap-2 text-[color:var(--lume-ink)]" style={{ font: 'var(--type-strong)' }}>
-                            <BrainCircuit className="h-4 w-4 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                            Ragionamento terapeutico
-                        </h3>
-                        <p className="mt-1 text-[color:var(--lume-ink-muted)]" style={{ font: 'var(--type-meta)' }}>
-                            {formatCountLabel(sourceSummary.total, 'fonte', 'fonti')} · solo revisione · {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'motore locale da scegliere'}
-                        </p>
-                    </div>
+        <section className={design.panel} data-testid="treatment-reasoning-panel" aria-label="Ragionamento terapeutico">
+            <header className={design.header}>
+                <p className={design.sectionLabel}>Proposte</p>
+                <h3>Ragionamento terapeutico</h3>
+                <p className={design.meta}>Supporto alle terapie · solo revisione. Nessuna modifica alla cartella.</p>
+            </header>
 
-                    <div className={styles.reasoningActions}>
-                        <FunctionModelPicker picker={picker} />
-                        <button
-                            type="button"
-                            onClick={loadProposal}
-                            disabled={!canPrepare}
-                            aria-describedby="treatment-reasoning-boundary-note"
-                            className={`${styles.control} ${styles.primary} shrink-0 ${styles.reasoningAction}`}
-                        >
-                            {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-                            {publication ? 'Aggiorna bozza' : 'Genera bozza'}
-                        </button>
-                    </div>
-                    <p id="treatment-reasoning-boundary-note" className="sr-only">
-                        Anteprima di sola revisione. Non scrive né applica modifiche alla scheda clinica.
-                    </p>
-                </div>
+            <dl className={design.sourceCounts} aria-label="Fonti disponibili per la proposta">
+                {sourceSummaryItems.map(([label, value]) => (
+                    <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
+                ))}
+            </dl>
+
+            {!treatmentReasoningEnabled && <div className={design.notice}>
+                <p className={design.strong}>Ragionamento terapeutico spento</p>
+                <p>Si accende per funzione nelle impostazioni dell’Intelligence Fabric.</p>
+                <Link href="/settings/ai/funzioni">Apri le funzioni cliniche</Link>
+            </div>}
+
+            <div className={design.modelSelection}>
+                <p className={design.groupLabel}>Modello per la proposta</p>
+                <FunctionModelPicker picker={picker} />
             </div>
 
-            <div className="space-y-4 py-4">
-                {!treatmentReasoningEnabled ? (
-                    <div className="rounded-[12px] border border-[color:var(--lume-rule)] bg-[color:var(--lume-surface-field)] p-4 text-sm text-[color:var(--lume-ink-muted)]">
-                        <p className="font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico spento</p>
-                        <p className="mt-1">Si accende per funzione nelle impostazioni dell’Intelligence Fabric.</p>
-                        <Link href="/settings/ai/funzioni" className="mt-2 inline-block font-semibold underline underline-offset-4">
-                            Apri le funzioni cliniche
-                        </Link>
-                    </div>
-                ) : null}
+            {error && <div role="alert" className={design.error}>
+                <span aria-hidden="true">✕</span><p>{error}</p>
+            </div>}
 
-                {error ? (
-                    <div role="alert" className="flex items-start gap-2 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] p-3 text-xs text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span>{error}</span>
-                    </div>
-                ) : null}
-
-                {proposal && !isGenerating ? (
-                    <div className="space-y-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm">
-                        <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
-                        <label className="grid gap-2 font-medium">Ambulatorio per questa bozza
-                            <select className="min-h-11 min-w-0 w-full rounded-xl border px-3 py-2 bg-[color:var(--lume-surface-focal)]" value={ambulatory?.ambulatoryId ?? ''}
-                                onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
-                                <option value="">Scegli l’ambulatorio</option>
-                                {proposal.ambulatories.map((row) => <option key={row.ambulatoryId} value={row.ambulatoryId}>{row.name}{row.address ? ` · ${row.address}` : ''}</option>)}
-                            </select>
-                        </label>
-                        <label className="flex min-h-11 items-start gap-3 py-2">
-                            <input className="mt-1 h-4 w-4" type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-                            Confermo paziente e ambulatorio per una bozza da rivedere. La cartella resta invariata.
-                        </label>
-                        <div className="flex flex-wrap gap-3">
-                            <button type="button" className="ui-btn-primary" disabled={!treatmentReasoningEnabled || !ambulatory || !confirmed || !picker.canGenerate || isBusy} onClick={generatePreview}>Conferma e genera bozza</button>
-                            <button type="button" className="ui-btn-secondary" onClick={cancelProposal}>Annulla</button>
+            {proposal && !isGenerating ? (
+                <div className={design.preparation}>
+                    <h4>Conferma il contesto</h4>
+                    <p><PrivacyBlur>Paziente: {proposal.patientName}</PrivacyBlur></p>
+                    <label className={design.field}>Ambulatorio per questa proposta
+                        <select value={ambulatory?.ambulatoryId ?? ''}
+                            onChange={(event) => { setAmbulatory(proposal.ambulatories.find((row) => row.ambulatoryId === event.target.value) ?? null); setConfirmed(false); }}>
+                            <option value="">Scegli l’ambulatorio</option>
+                            {proposal.ambulatories.map((row) => <option key={row.ambulatoryId} value={row.ambulatoryId}>{row.name}{row.address ? ` · ${row.address}` : ''}</option>)}
+                        </select>
+                    </label>
+                    <label className={design.confirmation}>
+                        <input type="checkbox" disabled={!ambulatory} checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+                        <span>Confermo paziente e ambulatorio per una proposta da rivedere. La cartella resta invariata.</span>
+                    </label>
+                    <div className={design.actionBar}>
+                        <p className={design.meta}>Verranno usate solo le fonti del contesto confermato.</p>
+                        <div className={design.actions}>
+                            <button type="button" className={design.secondary} onClick={cancelProposal}>Annulla</button>
+                            <button type="button" className={design.primary} disabled={!treatmentReasoningEnabled || !ambulatory || !confirmed || !picker.canGenerate || isBusy} onClick={generatePreview}>Conferma e genera proposta</button>
                         </div>
                     </div>
-                ) : null}
+                </div>
+            ) : !isGenerating && !picker.view.remote?.state && !picker.view.remote?.loading ? (
+                <div className={design.actionBar}>
+                    <p className={design.meta}>La preparazione richiede la conferma di paziente e ambulatorio. Non avvia una generazione automatica.</p>
+                    <button type="button" onClick={loadProposal} disabled={!canPrepare}
+                        aria-describedby="treatment-reasoning-boundary-note" className={design.primary}>
+                        {loadingProposal ? 'Preparazione…' : publication ? 'Prepara una nuova proposta' : 'Prepara proposta'}
+                    </button>
+                </div>
+            ) : null}
+            <p id="treatment-reasoning-boundary-note" className={design.meta}>
+                {!publication && !isBusy && !proposal ? 'Anteprima manuale per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.' : null}
+            </p>
 
-                <div className={styles.reviewCounts}>
-                    {sourceSummaryItems.map(([label, value]) => (
-                        <div key={label}>
-                            <span className="block text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
-                            <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{value}</span>
-                        </div>
-                    ))}
+            {isGenerating && <div role="status" aria-live="polite" className={design.loading}>
+                <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+                <p>Preparazione della proposta…</p>
+            </div>}
+
+            {publication && !isGenerating && <article className={design.proposal} data-testid="treatment-reasoning-proposal" data-ink-state="proposal">
+                <header className={design.proposalHeader}>
+                    <h4><span className={design.pencilPoint} aria-hidden="true" />Proposta</h4>
+                    <p className={design.meta}>Da verificare sulle fonti · {formatDateTime(publication.capturedAt)}</p>
+                    <p className={design.meta}>Supporto alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
+                </header>
+                <div className={design.recommendation}>
+                    <p className={design.groupLabel}>Indicazione da valutare</p>
+                    <p className={design.pencil}><PrivacyBlur intensity="sm">{publication.value.data.recommendation || publication.value.summary}</PrivacyBlur></p>
+                    <DocumentReferenceChip references={[...(publication.sourceBindings.find(binding => binding.claimPath === 'data.recommendation')?.evidenceRefs ?? [])]} />
+                    {publication.value.summary !== publication.value.data.recommendation && <>
+                        <p className={design.pencil}><PrivacyBlur intensity="sm">{publication.value.summary}</PrivacyBlur></p>
+                        <DocumentReferenceChip references={[...(publication.sourceBindings.find(binding => binding.claimPath === 'summary')?.evidenceRefs ?? [])]} />
+                    </>}
                 </div>
 
-                {!publication && !isBusy && !proposal ? (
-                    <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-sm leading-6 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)]">
-                        Anteprima manuale dal motore selezionato per verificare coerenza, rischi e prossime azioni. Non modifica la scheda e richiede sempre revisione clinica.
-                    </div>
-                ) : null}
-
-                {isGenerating ? (
-                    <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
-                        <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                        <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
-                    </div>
-                ) : null}
-
-                {publication && !isGenerating ? (
-                    <div className="space-y-5">
-                        <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]">
-                            <div className="flex items-center gap-2">
-                                <ShieldCheck className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Anteprima da rivedere</p>
-                            </div>
-                            <p className={ink.pencil + " mt-2 text-sm leading-6"}>
-                                <PrivacyBlur intensity="sm">{publication.value.data.recommendation || publication.value.summary}</PrivacyBlur>
-                            </p>
-                            {publication.value.summary !== publication.value.data.recommendation ? (
-                                <p className={ink.pencil + " mt-2 text-sm leading-6"}>
-                                    <PrivacyBlur intensity="sm">{publication.value.summary}</PrivacyBlur>
-                                </p>
-                            ) : null}
-                            <div className="mt-3 flex items-start gap-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] pt-3 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
-                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <p>Supporto alla revisione: non è una prescrizione, esegue 0 scritture e non applica modifiche.</p>
-                            </div>
+                {(publication.value.data.caveats.length > 0 || publication.value.data.safetyFlags.length > 0) && <section className={design.group}>
+                    <h4>Cautele e informazioni mancanti</h4>
+                    {publication.value.data.safetyFlags.map(flag => <div key={flag.id} className={`${design.signal} ${severityClasses(flag.severity)}`}>
+                        <span aria-hidden="true">{flag.severity === 'urgent_review' ? '◆' : flag.severity === 'caution' ? '▲' : 'ℹ'}</span>
+                        <div><p className={design.strong}>{flag.severity === 'urgent_review' ? 'Revisione urgente' : flag.severity === 'caution' ? 'Cautela' : 'Informazione'} · <PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
+                            <p><PrivacyBlur intensity="sm">{flag.rationale}</PrivacyBlur></p>
+                            <DocumentReferenceChip references={[...flag.evidenceRefs]} />
                         </div>
+                    </div>)}
+                    {publication.value.data.caveats.map((caveat, index) => <div key={`${index}-${caveat}`} className={`${design.signal} ${design.warning}`}>
+                        <span aria-hidden="true">▲</span><p><PrivacyBlur intensity="sm">{caveat}</PrivacyBlur></p>
+                    </div>)}
+                </section>}
 
-                        {publication.value.data.caveats.length > 0 ? (
-                            <div className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-4 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                                    <h4 className="text-xs font-semibold uppercase tracking-normal">Dati mancanti e limiti</h4>
-                                </div>
-                                <ul className="mt-3 space-y-2 text-sm leading-5">
-                                    {publication.value.data.caveats.map((caveat, index) => (
-                                        <li key={`${index}-${caveat}`} className="flex gap-2">
-                                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--lume-signal-warning)]" />
-                                            <span><PrivacyBlur intensity="sm">{caveat}</PrivacyBlur></span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        ) : null}
+                <div className={design.reviewColumns}>
+                    <section className={design.group}>
+                        <h4>Elementi a sostegno</h4>
+                        {publication.value.data.keyEvidence.length === 0 ? <p className={design.meta}>Nessuna evidenza chiave strutturata.</p>
+                            : publication.value.data.keyEvidence.map(evidence => <div key={evidence.id} className={design.proposalRow}>
+                                <p className={design.pencil}><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
+                                <DocumentReferenceChip references={[...evidence.evidenceRefs]} />
+                            </div>)}
+                    </section>
+                    {publication.value.data.suggestedActions.length > 0 && <section className={design.group}>
+                        <h4>Azioni da valutare</h4>
+                        {publication.value.data.suggestedActions.map(action => <div key={action.id} className={design.proposalRow}>
+                            <p className={design.strong}><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
+                            <p className={design.pencil}><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
+                            <DocumentReferenceChip references={[...action.evidenceRefs]} />
+                            <p className={design.meta}>{actionPolicyLabel(action)}</p>
+                        </div>)}
+                    </section>}
+                </div>
 
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <ClipboardList className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                    <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
-                                </div>
-                                {publication.value.data.keyEvidence.length === 0 ? (
-                                    <p className={`rounded-[14px] border p-3 text-xs ${semanticSignalSurfaceClass('critical')}`}>Nessuna evidenza chiave strutturata.</p>
-                                ) : publication.value.data.keyEvidence.map((evidence) => (
-                                    <div key={evidence.id} className={styles.proposalRow}>
-                                        <p className="text-sm font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
-                                        <DocumentReferenceChip references={[...evidence.evidenceRefs]} />
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                    <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
-                                </div>
-                                {publication.value.data.safetyFlags.length === 0 ? (
-                                    <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato nella proposta.</p>
-                                ) : publication.value.data.safetyFlags.map((flag) => (
-                                    <div key={flag.id} className={`rounded-[16px] border p-3 ${severityClasses(flag.severity)}`}>
-                                        <p className="text-sm font-semibold"><PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
-                                        <p className="mt-1 text-xs leading-5"><PrivacyBlur intensity="sm">{flag.rationale}</PrivacyBlur></p>
-                                        <DocumentReferenceChip references={[...flag.evidenceRefs]} />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {publication.value.data.suggestedActions.length > 0 ? (
-                            <div className="space-y-3">
-                                <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
-                                <div className="min-w-0">
-                                    {publication.value.data.suggestedActions.map((action) => (
-                                        <div key={action.id} className={styles.proposalRow}>
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-semibold text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
-                                                <span className="apple-chip">{actionPolicyLabel(action)}</span>
-                                            </div>
-                                            <p className={ink.pencil + " mt-2 text-sm leading-6"}><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
-                                            <DocumentReferenceChip references={[...action.evidenceRefs]} />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ) : null}
-
-                        {publication.value.data.reasoning.length > 0 ? (
-                            <details className="group rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)]">
-                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                    Traccia sintetica del ragionamento
-                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
-                                </summary>
-                                <ol className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3 text-sm leading-5 text-[color:var(--lume-ink)]">
-                                    {publication.value.data.reasoning.map((item, index) => (
-                                        <li key={`${index}-${item}`} className="flex gap-2">
-                                            <span className="font-semibold text-[color:var(--lume-ink-muted)]">{index + 1}.</span>
-                                            <span><PrivacyBlur intensity="sm">{item}</PrivacyBlur></span>
-                                        </li>
-                                    ))}
-                                </ol>
-                            </details>
-                        ) : null}
-
-                        <details className="group rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]">
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                Fonti citate per claim
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
-                            </summary>
-                            <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3">
-                                {publication.sourceBindings.map((binding) => (
-                                    <div key={binding.claimPath} className={styles.proposalRow}>
-                                        <span className="break-all lume-code text-[color:var(--lume-ink-muted)]">{binding.claimPath}</span>
-                                        <p className="mt-1 font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
-                                        <DocumentReferenceChip references={[...binding.evidenceRefs]} />
-                                    </div>
-                                ))}
-                            </div>
-                        </details>
-
-                        <details className="group rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]">
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                Receipt, provenienza e currentness
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
-                            </summary>
-                            <dl className="grid gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3 text-xs sm:grid-cols-2">
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provider attestato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd>
-                                </div>
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Stato</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
-                                </div>
-                                {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Motore e artefatto attestati</dt>
-                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd>
-                                </div>}
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Currentness</dt>
-                                    <dd className="mt-1 text-[color:var(--lume-ink)]">Acquisita {formatDateTime(publication.capturedAt)}</dd>
-                                </div>
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Revisione sorgente</dt>
-                                    <dd className="mt-1 break-all lume-code text-[color:var(--lume-ink)]">{publication.sourceRevision}</dd>
-                                </div>
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Receipt Fabric</dt>
-                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.fabricReceipt.provider === 'chatgpt_subscription' ? <>OpenAI · {publication.fabricReceipt.model} · {publication.fabricReceipt.effort} · testo redatto inviato con consenso</> : <>{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</>}</dd>
-                                </div>
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provenienza</dt>
-                                    <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.provenance.preprocessing.join(' → ')}</dd>
-                                </div>
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione receipt</dt>
-                                    <dd className="mt-1 break-all lume-code text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
-                                </div>
-                                <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione provenienza</dt>
-                                    <dd className="mt-1 break-all lume-code text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
-                                </div>
-                            </dl>
-                        </details>
-                    </div>
-                ) : null}
-            </div>
-        </div>
+                {publication.value.data.reasoning.length > 0 && <details className={design.details}>
+                    <summary>Come è stata formulata</summary>
+                    <ol>{publication.value.data.reasoning.map((item, index) => <li key={`${index}-${item}`} className={design.pencil}><PrivacyBlur intensity="sm">{item}</PrivacyBlur></li>)}</ol>
+                </details>}
+                <details className={design.details}>
+                    <summary>Fonti della proposta</summary>
+                    <div>{publication.sourceBindings.map(binding => <div key={binding.claimPath} className={design.proposalRow}>
+                        <p className={design.meta}>Passaggio <code>{binding.claimPath}</code></p>
+                        <p className={design.pencil}><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
+                        <DocumentReferenceChip references={[...binding.evidenceRefs]} />
+                    </div>)}</div>
+                </details>
+                <details className={design.details}>
+                    <summary>Origine e dettagli della generazione</summary>
+                    <p className={design.meta}>Receipt, provenienza e currentness</p>
+                    <dl className={design.origin}>
+                        <div><dt>Servizio utilizzato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd></div>
+                        <div><dt>Stato verificato</dt><dd>{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd></div>
+                        {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div><dt>Motore e artefatto attestati</dt><dd>{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd></div>}
+                        <div><dt>Contesto acquisito</dt><dd>{formatDateTime(publication.capturedAt)}</dd></div>
+                        <div><dt>Revisione delle fonti</dt><dd><code>{publication.sourceRevision}</code></dd></div>
+                        <div><dt>Ricevuta di esecuzione</dt><dd>{publication.fabricReceipt.provider === 'chatgpt_subscription' ? <>OpenAI · {publication.fabricReceipt.model} · {publication.fabricReceipt.effort} · testo redatto inviato con consenso</> : <>{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</>}</dd></div>
+                        <div><dt>Preparazione delle fonti</dt><dd>{publication.provenance.preprocessing.join(' → ')}</dd></div>
+                        <div><dt>Identificativo della ricevuta</dt><dd><code>{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</code></dd></div>
+                        <div><dt>Identificativo della provenienza</dt><dd><code>{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</code></dd></div>
+                    </dl>
+                </details>
+            </article>}
+        </section>
     );
 }
