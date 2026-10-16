@@ -54,9 +54,13 @@ il salvataggio confermato con rilettura da completare, e un esito non confermato
 Negli ultimi due casi il lotto si ferma: i file restanti sono indicati come
 non avviati e non vengono ritentati automaticamente. Il medico può controllare
 l'archivio prima di riprovare; non viene dichiarato un successo globale.
-Cambio paziente/sessione, background e uscita cancellano il lotto e nascondono
-nomi ed esiti del contesto precedente. Una risposta tardiva non riavvia il
-lotto; un task precedente ancora in chiusura impedisce un nuovo batch.
+Lo stop volontario nello stesso contesto conserva i file già confermati,
+segnala l'esito non ancora confermato del file in corso e lascia i restanti
+non avviati. Un ack utile ancora ricevuto può confermare quel file; una
+cancellazione non dimostra che non sia stato salvato. Cambio paziente/sessione,
+background e uscita cancellano invece nomi ed esiti per riservatezza. Una
+risposta tardiva non riavvia il lotto; un task precedente ancora in chiusura
+impedisce un nuovo batch.
 
 ## Prove della tranche e limiti
 
@@ -67,10 +71,10 @@ lotto; un task precedente ancora in chiusura impedisce un nuovo batch.
   pairing/righe sintetici; tutti e tre i client Apple, quattro consensi,
   binding delle fonti, revoca/rotazione/logout e perimetro proposal-only.
   Nessuna generazione remota o qualifica runtime viene simulata come PASS.
-- 56 test Swift mirati su macOS: modello ordinary, proiezione, decifratura
+- 57 test Swift mirati su macOS: modello ordinary, proiezione, decifratura
   client originaria, invalidazione e upload documentale; include batch
   sequenziale, stop all'esito incerto, ack con refresh fallito, cancellazione
-  con completamento tardivo e cambio contesto.
+  con completamento tardivo, stop dopo un successo e cambio contesto.
 
 Comandi riusabili dal checkout, con `DEVELOPER_DIR` esplicito, Node 24 e
 `MEDIFLOW_DATA_DIR` sintetica nuova:
