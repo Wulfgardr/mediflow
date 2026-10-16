@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkTestSelection, discoverTestFiles } from './check-test-selection.mjs';
+import { checkTestSelection, discoverTestFiles, existingListedPaths } from './check-test-selection.mjs';
 
 const exclusion = (path) => ({ path, reason: 'synthetic helper', owner: '@synthetic' });
 
@@ -32,4 +32,9 @@ test('a new or renamed test that no suite takes fails, and so does a stale or co
 test('an empty or failing selector fails instead of silently selecting nothing', () => {
   const errors = checkTestSelection([], { empty: { files: [], errors: [] }, broken: { files: [], errors: ['unreadable'] } }, []).errors;
   assert.deepEqual(errors, ['EMPTY_SELECTION: empty', 'INCOMPLETE_SELECTION: broken: unreadable', 'EMPTY_SELECTION: broken']);
+});
+
+test('a deleted file still listed by git is not read as a test', () => {
+  const present = new Set(['lib/kept.test.ts']);
+  assert.deepEqual(existingListedPaths('lib/kept.test.ts\0lib/deleted.test.ts\0', (file) => present.has(file)), ['lib/kept.test.ts']);
 });
