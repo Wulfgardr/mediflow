@@ -148,7 +148,8 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
     public mutating func setKind(id: UUID, kind: ClinicalRichTextEditorBlock.EditableKind) {
         guard let index = blocks.firstIndex(where: { $0.id == id }), let runs = blocks[index].runs,
               let currentKind = blocks[index].editableKind, currentKind != kind else { return }
-        if currentKind == .bulletItem || currentKind == .numberedItem || currentKind == .blockquote {
+        if currentKind == .bulletItem || currentKind == .numberedItem || currentKind == .blockquote
+            || kind == .bulletItem || kind == .numberedItem {
             materializeContainers()
         }
         let oldPath = blocks[index].containers
@@ -161,7 +162,17 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
         }
         switch kind {
         case .bulletItem, .numberedItem:
-            newPath += [.list(UUID(), isOrdered: kind == .numberedItem), .listItem(id)]
+            let ordered = kind == .numberedItem
+            var followingIndex = index + 1
+            while !oldPath.isEmpty, followingIndex < blocks.count,
+                  blocks[followingIndex].containers.starts(with: oldPath) { followingIndex += 1 }
+            let previous = compatibleList(at: index - 1, parent: newPath, isOrdered: ordered)
+            let following = compatibleList(at: followingIndex, parent: newPath, isOrdered: ordered)
+            let group = previous ?? following ?? .list(UUID(), isOrdered: ordered)
+            if let following, following != group {
+                replaceContiguousContainerPrefix(newPath + [following], with: newPath + [group], startingAt: followingIndex)
+            }
+            newPath += [group, .listItem(id)]
         case .blockquote:
             newPath.append(.blockquote(UUID()))
         default: break
@@ -195,7 +206,9 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
         if let last = newPath.last, case .listItem = last,
            newPath.count >= 2, case .list(_, let ordered) = newPath[newPath.count - 2] {
             guard let previous = previousListItem(before: index) else { return false }
-            newPath = previous + [.list(UUID(), isOrdered: ordered), last]
+            let group = compatibleList(at: index - 1, parent: previous, isOrdered: ordered)
+                ?? .list(UUID(), isOrdered: ordered)
+            newPath = previous + [group, last]
         } else {
             newPath.append(.blockquote(UUID()))
         }
@@ -251,11 +264,27 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
     ) {
         blocks[index].containers = new
         guard let last = old.last, case .listItem = last else { return }
-        var cursor = index + 1
+        replaceContiguousContainerPrefix(old, with: new, startingAt: index + 1)
+    }
+
+    private mutating func replaceContiguousContainerPrefix(
+        _ old: [ClinicalRichTextEditorBlock.Container], with new: [ClinicalRichTextEditorBlock.Container], startingAt index: Int
+    ) {
+        var cursor = index
         while cursor < blocks.count, blocks[cursor].containers.starts(with: old) {
             blocks[cursor].containers = new + blocks[cursor].containers.dropFirst(old.count)
             cursor += 1
         }
+    }
+
+    private func compatibleList(
+        at index: Int, parent: [ClinicalRichTextEditorBlock.Container], isOrdered: Bool
+    ) -> ClinicalRichTextEditorBlock.Container? {
+        guard blocks.indices.contains(index) else { return nil }
+        let path = blocks[index].containers
+        guard path.starts(with: parent), path.count > parent.count,
+              case .list(_, let ordered) = path[parent.count], ordered == isOrdered else { return nil }
+        return path[parent.count]
     }
 
     private func previousListItem(before index: Int) -> [ClinicalRichTextEditorBlock.Container]? {
@@ -264,8 +293,10 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
         let parent = Array(path.dropLast())
         for candidate in blocks[..<index].reversed() {
             guard candidate.containers.starts(with: parent) else { break }
-            if candidate.containers.count == path.count, case .listItem = candidate.containers.last,
-               candidate.containers != path { return candidate.containers }
+            if candidate.containers.count >= path.count, case .listItem = candidate.containers[path.count - 1] {
+                let itemPath = Array(candidate.containers.prefix(path.count))
+                if itemPath != path { return itemPath }
+            }
         }
         return nil
     }
@@ -273,7 +304,11 @@ public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
     private mutating func materializeContainers() {
         var list: ClinicalRichTextEditorBlock.Container?
         for index in blocks.indices {
-            guard blocks[index].containers.isEmpty, let kind = blocks[index].editableKind else { list = nil; continue }
+            if let container = blocks[index].containers.first {
+                if case .list = container { list = container } else { list = nil }
+                continue
+            }
+            guard let kind = blocks[index].editableKind else { list = nil; continue }
             switch kind {
             case .bulletItem, .numberedItem:
                 let ordered = kind == .numberedItem
