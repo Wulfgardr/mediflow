@@ -292,7 +292,7 @@ test('invalid explicit QA namespace fails before build or staging', t => {
 });
 test('incomplete shared checkout identity fails before Xcode staging', t => {
   const input = buildFixture(t);
-  write(path.join(input.bin, 'git'), '#!/bin/bash\nif [[ "$1" == "branch" && "$2" == "--show-current" ]]; then exit 0; fi\nexec /usr/bin/git "$@"\n', 0o755);
+  write(path.join(input.bin, 'git'), '#!/bin/bash\nif [[ "$1" == "branch" && "$2" == "--show-current" ]]; then exit 1; fi\nexec /usr/bin/git "$@"\n', 0o755);
 
   const result = input.run();
 
