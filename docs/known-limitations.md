@@ -202,8 +202,8 @@ non a una production root Fabric.
 
 | Gate | Implementato | Verificato localmente | Parte non pronta | Esito |
 | --- | --- | --- | --- | --- |
-| F6 — OCR selettivo | AnyDoc first-pass e fallback Apple Vision locale sulle sole pagine PDF `needsOcr` | Contratti bounded, fail-closed e percorso sintetico sul Mac eleggibile | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
-| F7 — provider esterni | Provider v2, secret broker, adapter ufficiali e probe amministrativa review-only OpenAI/Anthropic `default OFF` | Transport fake, route admin-only e denial prima della rete | Credenziali, rete live, retention account e runtime readiness cloud | `INTEGRATED / DEFAULT_OFF` |
+| F6: OCR selettivo | AnyDoc first-pass e fallback Apple Vision locale sulle sole pagine PDF `needsOcr` | Contratti bounded, fail-closed e percorso sintetico sul Mac eleggibile | DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale | Fallback locale integrato |
+| F7: provider esterni | Provider v2, secret broker, adapter ufficiali e probe amministrativa review-only OpenAI/Anthropic `default OFF` | Transport fake, route admin-only e denial prima della rete | Credenziali, rete live, retention account e runtime readiness cloud | `INTEGRATED / DEFAULT_OFF` |
 
 Un account, un login o un abbonamento consumer OpenAI/Anthropic non forniscono
 accesso alle API. Allo stesso modo, la presenza di registry, adapter e probe
@@ -256,3 +256,12 @@ La `0.8.5` non consegna:
 - operazioni planner ulteriori, accesso SQL diretto o scritture;
 - invocazione AI dai client paired;
 - app complete Windows o Linux.
+
+## Materiali storici
+
+Il whitepaper, gli strumenti del gemello 0.8.6, sei verbali di luglio, quattro
+proposte superate e gli originali PNG 0.8 sono conservati nello storico Git
+e nel [tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
+Non sono inclusi nell’albero corrente. Restano le immagini ottimizzate e il
+manifest con hash, dimensioni e collegamenti agli originali. Le prove
+storiche non attestano il funzionamento della versione corrente.

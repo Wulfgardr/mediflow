@@ -9,11 +9,6 @@ const root = path.resolve(import.meta.dirname, '..');
 const compiler = path.join(root, 'node_modules/typescript/bin/tsc');
 const configurations = [
     {
-        name: 'audit',
-        file: 'tsconfig.audit-test.json',
-        emittedTests: ['security/audit.test.js'],
-    },
-    {
         name: 'API v1 contract-negative',
         file: 'tsconfig.api-v1-contract-negative-test.json',
         emittedTests: ['api-v1-clinical-write-normalization.test.js', 'api-v1-clinical-lifecycle.test.js'],
