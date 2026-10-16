@@ -35,12 +35,12 @@ non prova Windows 11 x64; un simulatore non prova un dispositivo fisico.
 | Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) aperta: delta `44cb68a5cc2f9f66bd170cd5be6f313990aa9d97`, head `c3d8f117e812f0fdea507daf76a93e060a636a57` sopra #541 | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora in corso. |
 | Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) aperta, head `128efccfd75d7d5940e1ac50ef80d4e7d0d87abd` | 55 test Swift, sette test Web e build Mac/iOS riusciti. Corretti i casi di raggruppamento e numerazione segnalati dalla review indipendente; review finale senza rilievi. Interazione e rilettura dall'host ancora da provare. |
 
-Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce i
-quattro contributi: build Mac completa, build iOS Simulator e verifica rigorosa
+Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce
+accesso, CSV, documenti multipli e allegati del diario: build Mac completa, build iOS Simulator e verifica rigorosa
 della firma riuscite. Il successivo candidato
 `74266b111ef6709ab0ac8d510f5c7a94fdcf2ccf` ha superato build, firma e
-controllo della revisione del server. L'app Mac è bloccata: la prova UI
-attende lo sblocco dell'utente. Questi esiti non attestano distribuzione,
+controllo della revisione del server. L'interazione sul nuovo candidato
+resta da verificare. Questi esiti non attestano distribuzione,
 notarizzazione, tutte le interazioni o hardware mobile fisico.
 
 Nella prova Mac precedente mancavano tre permessi di lettura nella fixture.
