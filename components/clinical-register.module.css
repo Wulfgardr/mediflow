@@ -119,3 +119,9 @@
  .controls > :is(button,a), .control, .rowButton, .formDisclosure > summary { min-height: 44px; }
  .form :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-height: 44px; }
 }
+
+/* Row commands inside a register table: quiet text, a border only on hover; the bin stays an icon. */
+.rowControls { flex-wrap: nowrap; gap: 2px; }
+.rowControls > :is(button,a) { min-height: 36px; padding: 6px 8px; border-color: transparent; color: var(--lume-ink); }
+.rowControls > button:not([aria-label]) svg { display: none; }
+.rowControls > button[aria-label] { color: var(--lume-ink-muted); }

@@ -237,7 +237,7 @@ export default function TreatmentReasoningPanel({
                             <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                 <span className="apple-chip">{formatCountLabel(sourceSummary.total, 'fonte', 'fonti')}</span>
-                                <span className="apple-chip">review-only</span>
+                                <span className="apple-chip">solo revisione</span>
                                 <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
                                 </span>
@@ -264,15 +264,12 @@ export default function TreatmentReasoningPanel({
 
             <div className="space-y-4 p-5">
                 {!treatmentReasoningEnabled ? (
-                    <div className="flex items-start gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] p-4 text-sm text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                        <div>
-                            <p className="font-semibold">Treatment Reasoning disabilitato</p>
-                            <p className="mt-1 text-xs leading-5">Il controllo locale impedisce di avviare nuove anteprime da questo pannello. Il gate del server resta l’autorità finale su ogni richiesta.</p>
-                            <Link href="/settings/ai/funzioni" className="mt-2 inline-block text-xs font-semibold underline underline-offset-4">
-                                Apri Impostazioni AI
-                            </Link>
-                        </div>
+                    <div className="rounded-[12px] border border-[color:var(--lume-rule)] bg-[color:var(--lume-surface-field)] p-4 text-sm text-[color:var(--lume-ink-muted)]">
+                        <p className="font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico spento</p>
+                        <p className="mt-1">Si accende per funzione nelle impostazioni dell’Intelligence Fabric.</p>
+                        <Link href="/settings/ai/funzioni" className="mt-2 inline-block font-semibold underline underline-offset-4">
+                            Apri le funzioni cliniche
+                        </Link>
                     </div>
                 ) : null}
 
