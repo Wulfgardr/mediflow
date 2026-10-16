@@ -5,7 +5,9 @@ import test from 'node:test';
 import {
     clinicalRichTextToPlainText,
     compactClinicalRichText,
-    sanitizeClinicalRichTextHtml,, stripMarkdownMarks } from './clinical-rich-text.ts';
+    sanitizeClinicalRichTextHtml,
+    stripMarkdownMarks,
+} from './clinical-rich-text.ts';
 
 test('sanitizeClinicalRichTextHtml keeps the supported subset and strips unsafe payloads', () => {
     const input = '<div><strong onclick="alert(1)">Piano</strong><script>alert(1)</script><img src=x onerror=1 /><ul><li>Terapia</li></ul></div>';
