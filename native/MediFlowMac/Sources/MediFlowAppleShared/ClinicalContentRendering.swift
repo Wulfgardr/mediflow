@@ -8,6 +8,10 @@ import UIKit
 #endif
 
 public enum ClinicalContentRendering {
+    public enum ForegroundStyle: Equatable, Sendable {
+        case primary, secondary
+    }
+
     private static let supportedHTMLMarkers = [
         "<p", "</p", "<br", "<strong", "</strong", "<b", "</b", "<em", "</em",
         "<i", "</i", "<u", "</u", "<s", "</s", "<ul", "</ul", "<ol", "</ol",
@@ -20,7 +24,9 @@ public enum ClinicalContentRendering {
     }
 
     @MainActor
-    public static func nativeAttributedString(from content: String) -> NSAttributedString {
+    public static func nativeAttributedString(
+        from content: String, foregroundStyle: ForegroundStyle = .primary
+    ) -> NSAttributedString {
         #if canImport(AppKit) || canImport(UIKit)
         let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
             .documentType: NSAttributedString.DocumentType.html,
@@ -45,13 +51,15 @@ public enum ClinicalContentRendering {
             let base = NSFont.systemFont(ofSize: 13.5)
             let traits = original?.fontDescriptor.symbolicTraits ?? []
             let font = NSFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits), size: 13.5) ?? base
-            styled.addAttributes([.font: font, .foregroundColor: NSColor.labelColor], range: range)
+            let color = foregroundStyle == .secondary ? NSColor.secondaryLabelColor : NSColor.labelColor
+            styled.addAttributes([.font: font, .foregroundColor: color], range: range)
             #elseif canImport(UIKit)
             let original = value as? UIFont
             let base = UIFontMetrics(forTextStyle: .body).scaledFont(for: UIFont(name: "Newsreader16pt-Regular", size: 17) ?? UIFont.systemFont(ofSize: 17))
             let traits = original?.fontDescriptor.symbolicTraits ?? []
             let font = UIFont(descriptor: base.fontDescriptor.withSymbolicTraits(traits) ?? base.fontDescriptor, size: base.pointSize)
-            styled.addAttributes([.font: font, .foregroundColor: UIColor.label], range: range)
+            let color = foregroundStyle == .secondary ? UIColor.secondaryLabel : UIColor.label
+            styled.addAttributes([.font: font, .foregroundColor: color], range: range)
             #endif
         }
         styled.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: styled.length)) { value, range, _ in
@@ -104,13 +112,17 @@ public enum ClinicalContentRendering {
 
 public struct ClinicalContentText: View {
     private let content: String
+    private let foregroundStyle: ClinicalContentRendering.ForegroundStyle
 
-    public init(_ content: String) {
+    public init(_ content: String, foregroundStyle: ClinicalContentRendering.ForegroundStyle = .primary) {
         self.content = content
+        self.foregroundStyle = foregroundStyle
     }
 
     public var body: some View {
-        ClinicalContentPlatformText(content: ClinicalContentRendering.nativeAttributedString(from: content))
+        ClinicalContentPlatformText(content: ClinicalContentRendering.nativeAttributedString(
+            from: content, foregroundStyle: foregroundStyle
+        ))
     }
 }
 
