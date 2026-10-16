@@ -41,7 +41,7 @@ struct MobilePairedStatusPresentation: Equatable {
         case .sessionExpired:
             return Self(phase: .sessionExpired, title: "Sessione scaduta", detail: "Accedi di nuovo per leggere o modificare dati.", symbolName: "person.crop.circle.badge.exclamationmark", actionTitle: "Accedi")
         case .notLoaded:
-            return Self(phase: .notLoaded, title: "Home-base non configurato", detail: "Collega questo dispositivo per caricare il perimetro autorizzato.", symbolName: "link.badge.plus", actionTitle: "Configura")
+            return Self(phase: .notLoaded, title: "Home-base non configurato", detail: "Collega al computer MediFlow per aprire le cartelle autorizzate.", symbolName: "link.badge.plus", actionTitle: "Configura")
         }
     }
 }
