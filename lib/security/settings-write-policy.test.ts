@@ -42,7 +42,7 @@ test('local token can write only the enumerated bootstrap keys', () => {
     assert.equal(evaluateSettingsWrite('clinicName', localTokenSession).allowed, true);
 
     // Operator/AI keys: denied for the local token.
-    for (const key of ['aiUrl', 'aiProvider', 'aiModel_clinical', 'aiPatientInsightKillSwitch', 'aiTreatmentReasoningKillSwitch', 'aiOcrKillSwitch', 'uiStyleMode']) {
+    for (const key of ['aiUrl', 'aiProvider', 'aiModel_clinical', 'aiPatientInsightKillSwitch', 'aiTreatmentReasoningKillSwitch', 'aiOcrKillSwitch', 'uiStyleMode', 'aifaNetworkAccess']) {
         const decision = evaluateSettingsWrite(key, localTokenSession);
         assert.equal(decision.allowed, false, `${key} must be denied for local-token`);
         assert.equal(decision.allowed === false && decision.status, 403);
@@ -60,7 +60,7 @@ test('local token cannot write an unknown key (400) but web session can (allowed
 });
 
 test('server-managed and retired OCR keys are denied on every HTTP channel', () => {
-    for (const key of ['network.nodeId', 'network.pairing.state', 'backupScheduler', 'aiModel_ocr', 'aiOcrKillSwitch', 'onboarding.workProfile']) {
+    for (const key of ['network.nodeId', 'network.pairing.state', 'backupScheduler', 'aiModel_ocr', 'aiOcrKillSwitch', 'onboarding.workProfile', 'aifaCatalogRemoteState', 'aifaCatalogManifest']) {
         assert.equal(evaluateSettingsWrite(key, webAdminSession).allowed, false, `${key} denied for web-admin`);
         assert.equal(evaluateSettingsWrite(key, webSession).allowed, false, `${key} denied for web-session`);
         assert.equal(evaluateSettingsWrite(key, localTokenSession).allowed, false, `${key} denied for local-token`);

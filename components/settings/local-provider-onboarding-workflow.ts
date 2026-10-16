@@ -1,5 +1,6 @@
 /* @Codex */
 import { parseFunctionStatus, type FunctionStatusSnapshot } from '../../lib/function-status';
+import type { OllamaVersionMismatch } from '../../lib/ai-providers/ollama-locality';
 import type { LocalProviderOnboardingStatus } from '../../lib/ai-providers/fabric/local-provider-onboarding-service';
 
 export type LocalOnboardingPhase = 'reading_configuration' | 'ready' | 'verifying'
@@ -9,6 +10,7 @@ export type LocalOnboardingView = Readonly<{
     status: LocalProviderOnboardingStatus | null;
     functions: FunctionStatusSnapshot | null;
     messageCode: string;
+    versionMismatch?: OllamaVersionMismatch;
     busy: boolean;
 }>;
 export const INITIAL_LOCAL_ONBOARDING_VIEW: LocalOnboardingView = Object.freeze({
@@ -24,7 +26,7 @@ const functionsEndpoint = '/api/system/function-status';
 const activatableStates = new Set(['missing', 'degraded', 'available_unqualified']);
 const terminalStates = new Set(['revoked', 'owner_locked', 'credential_mismatch', 'corrupt']);
 class WorkflowError extends Error {
-    constructor(readonly code: string) { super(code); }
+    constructor(readonly code: string, readonly versionMismatch?: OllamaVersionMismatch) { super(code); }
 }
 
 /** A display projection, never authority. Unknown/inconsistent snapshots deny actions. */
@@ -65,10 +67,10 @@ export function createLocalProviderOnboardingWorkflow(
         if (disposed) return;
         view = Object.freeze(next); changed(view);
     }
-    function fail(code: string) {
+    function fail(code: string, versionMismatch?: OllamaVersionMismatch) {
         publish({ phase: code === 'request_cancelled' || code === 'verification_interrupted' || code === 'request_timed_out'
             ? 'interrupted' : terminalStates.has(code) ? 'blocked' : 'failed',
-        status: null, functions: null, messageCode: code, busy: false });
+        status: null, functions: null, messageCode: code, versionMismatch, busy: false });
     }
     async function json(operation: Operation, url: string, init?: RequestInit): Promise<unknown> {
         assertCurrent(operation);
@@ -92,7 +94,13 @@ export function createLocalProviderOnboardingWorkflow(
                 assertCurrent(operation);
                 if (!response.ok) {
                     const error = body && typeof body === 'object' && 'error' in body ? body.error : null;
-                    throw new WorkflowError(typeof error === 'string' ? error : 'state_unavailable');
+                    const detail = error === 'provider_version_unsupported' && body && typeof body === 'object'
+                        && 'versionMismatch' in body ? body.versionMismatch : null;
+                    const versionMismatch = detail && typeof detail === 'object'
+                        && 'serverVersion' in detail && typeof detail.serverVersion === 'string'
+                        && 'supportedVersions' in detail && typeof detail.supportedVersions === 'string'
+                        ? { serverVersion: detail.serverVersion, supportedVersions: detail.supportedVersions } : undefined;
+                    throw new WorkflowError(typeof error === 'string' ? error : 'state_unavailable', versionMismatch);
                 }
                 return body;
             })]);
@@ -154,7 +162,8 @@ export function createLocalProviderOnboardingWorkflow(
         } catch (error) {
             // A detached operation has no UI authority, including in finally.
             if (!disposed && active === operation)
-                fail(error instanceof WorkflowError ? error.code : 'state_unavailable');
+                fail(error instanceof WorkflowError ? error.code : 'state_unavailable',
+                    error instanceof WorkflowError ? error.versionMismatch : undefined);
         } finally {
             if (active === operation) active = null;
             operation.controller.abort();

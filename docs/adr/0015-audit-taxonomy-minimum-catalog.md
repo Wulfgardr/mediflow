@@ -1156,3 +1156,17 @@ L'audit è fonte del backfill storico, non il ledger consultato dai create.
 Purge anteriori senza eventi disponibili non sono ricostruibili. La qualifica
 vale sull'archivio corrente attraverso riaperture; export/restore/sostituzione
 con archivi anteriori restano nel confine C15, qui non qualificato.
+
+## Emendamento 2026-10: aggiornamenti AIFA
+
+`reference_data.aifa.updated` identifica tentativi e sostituzioni del catalogo
+pubblico AIFA (ADR 0125). Il subject è `reference_data`, riferimento `aifa`.
+Attore, superficie ed esito seguono l'envelope esistente. `aifaCatalog` nei
+metadati ammette solo modalità `remote`/`manual`, manifest canonici prima e dopo
+oppure null, e indicatore booleano di riduzione confermata. I manifest sono
+metadati della fonte pubblica, senza informazioni sui pazienti. I tentativi
+rifiutati hanno un reasonCode controllato; nessun errore grezzo della rete.
+Sostituzione riuscita, manifest e audit condividono la transazione IMMEDIATE:
+se l'evento non viene scritto, il catalogo precedente resta intatto. Un 304
+registra l'assenza di modifiche senza sostituire i dati. Pulizia e importazione
+legacy restano fuori dal perimetro di questo evento.
