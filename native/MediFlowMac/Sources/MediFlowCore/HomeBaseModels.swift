@@ -1096,6 +1096,8 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
 /// diagnoses carry the array-JSON STRING (structured fields), like the update payload.
 /// Mirrors normalizePatientCreateInput (lib/patient-write-normalization.ts).
 public struct HomeBasePatientCreatePayload: Encodable, Sendable {
+    public let id: String?
+    public let ambulatoryId: String?
     public let firstName: String
     public let lastName: String
     public let taxCode: String
@@ -1112,6 +1114,8 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
     public let isArchived: Bool
 
     public init(
+        id: String? = nil,
+        ambulatoryId: String? = nil,
         firstName: String,
         lastName: String,
         taxCode: String,
@@ -1127,6 +1131,8 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
         isAdi: Bool = false,
         isArchived: Bool = false
     ) {
+        self.id = id
+        self.ambulatoryId = ambulatoryId
         self.firstName = firstName
         self.lastName = lastName
         self.taxCode = taxCode
@@ -1144,7 +1150,7 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case firstName, lastName, taxCode, birthDate, address, phone, caregiver
+        case id, ambulatoryId, firstName, lastName, taxCode, birthDate, address, phone, caregiver
         case exemptions, diagnoses, monitoringProfile, statusReason, notes, isAdi
     }
 

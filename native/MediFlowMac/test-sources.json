@@ -91,6 +91,7 @@
     "PairedPatientsWorkspaceOfflineCacheTests.swift",
     "PairedPatientsWorkspaceSelectionTests.swift",
     "PairedPatientsWorkspaceSessionExpiryTests.swift",
+    "PatientCSVImportTests.swift",
     "PatientFieldCryptoTests.swift",
     "PatientReportDocumentTests.swift",
     "PatientSummaryPresentationTests.swift",

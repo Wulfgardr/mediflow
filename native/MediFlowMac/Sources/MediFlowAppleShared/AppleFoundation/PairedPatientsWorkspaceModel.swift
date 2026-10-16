@@ -47,6 +47,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             clearSelectedPatientWorkspace()
         }
     }
+    @Published private(set) var patientCSVImport: PatientCSVImportModel?
     @Published private(set) var availableAmbulatories: [NetworkAmbulatorySummary] = []
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     @Published private(set) var selectedPatientID: String?
@@ -62,6 +63,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 selectedPatientID = nil
             }
             guard previousID != currentID else { return }
+            patientCSVImport?.invalidate()
             cancelEditingPatient()
             editablePatientFields = [:]
             lockedPatientFields = []
@@ -1627,6 +1629,54 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         !isWorking
         && connectionState != .cached && connectionState != .pairedOfflineDegraded
         && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
+    }
+
+    var canStartPatientCSVImport: Bool {
+        canStartCreatingPatient && connectionState == .pairedOnline
+            && masterKey != nil && ambulatoryId.trimmedOrNil != nil
+    }
+
+    func preparePatientCSVImport() {
+        guard canStartPatientCSVImport, patientCSVImport == nil,
+              let cookie = sessionCookie, let credentials = pairedCredentials,
+              let scope = ambulatoryId.trimmedOrNil else { return }
+        let login = loginGeneration
+        let workspace = workspaceGeneration
+        let server = serverURL
+        let pin = tlsPin
+        let selection = selectedPatientID
+        let current = { [weak self] in
+            guard let self else { return false }
+            return !Task.isCancelled && self.loginGeneration == login && self.workspaceGeneration == workspace
+                && self.sessionCookie == cookie && self.pairedCredentials == credentials
+                && self.ambulatoryId.trimmedOrNil == scope && self.serverURL == server && self.tlsPin == pin
+                && self.selectedPatientID == selection && self.connectionState == .pairedOnline
+                && self.masterKey != nil && self.permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
+        }
+        let client: any HomeBasePatientsDataSource = dataSourceFactory?(self)
+            ?? HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: server, tlsPin: pin))
+        let name = availableAmbulatories.first(where: { $0.id == scope })?.name ?? scope
+        patientCSVImport = PatientCSVImportModel(destination: name, isCurrent: current, read: {
+            guard current() else { throw CancellationError() }
+            return try await client.fetchPatients(credentials: credentials, sessionCookie: cookie,
+                ambulatoryId: scope, includeDeleted: true)
+        }, create: { [weak self] row, id in
+            guard let self, current(), row.eligible, row.cells.count == 6, let code = row.taxCode else { throw CancellationError() }
+            let payload = HomeBasePatientCreatePayload(id: id, ambulatoryId: scope,
+                firstName: row.cells[0], lastName: row.cells[1], taxCode: code,
+                birthDate: row.cells[3].isEmpty ? nil : PatientCSV.birthDate(row.cells[3]),
+                address: try self.sealField(row.cells[4].isEmpty ? nil : row.cells[4]),
+                phone: try self.sealField(row.cells[5].isEmpty ? nil : row.cells[5]))
+            guard current() else { throw CancellationError() }
+            return try await client.createPatient(payload: payload, credentials: credentials,
+                sessionCookie: cookie, ambulatoryId: scope)
+        })
+    }
+
+    func resetPatientCSVImport() {
+        guard patientCSVImport?.busy != true, patientCSVImport?.hasUncertainResult != true else { return }
+        patientCSVImport = nil
+        preparePatientCSVImport()
     }
 
     var canCreatePatient: Bool {
@@ -3927,6 +3977,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     private func invalidateLoginGeneration() {
         loginGeneration &+= 1
+        patientCSVImport?.invalidate()
         clinicalSessionInvalidations.send() // clear retained cross-patient models synchronously.
     }
 
@@ -4441,6 +4492,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     private func invalidatePatientLoadContext() {
         workspaceGeneration &+= 1
+        patientCSVImport?.invalidate()
         activePatientLoadRequestID = nil
         refreshWorkingState()
     }
@@ -4908,7 +4960,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
         // A refresh of the same chart keeps its section; a new context does not.
-        if selectedPatientID != preservingSelectionID { activePatientSection = .overview }
+        if selectedPatientID != preservingSelectionID {
+            patientCSVImport?.invalidate()
+            activePatientSection = .overview
+        }
         cachedPatientProfile = nil
         cachedProfileLockedFields = []
         cachedProfileMetadata = nil
