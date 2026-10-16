@@ -28,7 +28,9 @@ export const PATIENT_CHILD_TABLES = [
     { name: 'servicePrescriptions', table: servicePrescriptions, patientId: servicePrescriptions.patientId },
     { name: 'prostheticPrescriptions', table: prostheticPrescriptions, patientId: prostheticPrescriptions.patientId },
     { name: 'sissHandoffEvents', table: sissHandoffEvents, patientId: sissHandoffEvents.patientId },
+    /* @Codex */
     { name: 'documentDiagnosisProposals', table: documentDiagnosisProposals, patientId: documentDiagnosisProposals.patientId },
+    /* @Codex */
     { name: 'durableReviewPatientLinks', table: durableReviewPatientLinks, patientId: durableReviewPatientLinks.patientId },
     { name: 'observations', table: observations, patientId: observations.patientId },
     { name: 'checkups', table: checkups, patientId: checkups.patientId },
@@ -65,6 +67,7 @@ export function countPatientCascadeRows(runner: PatientCascadeRunner, patientId:
 // Synchronous cascade delete of every clinical child row for one patient.
 // Call inside a dbServer.transaction so a mid-flight failure rolls back atomically.
 export function purgePatientCascade(runner: PatientCascadeRunner, patientId: string): PatientCascadeCounts {
+    /* @Codex */
     revokeAttachmentExtractionLocatorGeneration();
     const counts = {} as PatientCascadeCounts;
     for (const child of PATIENT_CHILD_TABLES) {
@@ -95,6 +98,7 @@ export function countOrphanedClinicalRows(runner: PatientCascadeRunner): Patient
 
 // Explicit-flag cleanup used by fix-orphans AFTER its relink step (ADR 0066 punto 5).
 export function purgeOrphanedClinicalRows(runner: PatientCascadeRunner): PatientCascadeCounts {
+    /* @Codex */
     revokeAttachmentExtractionLocatorGeneration();
     const counts = {} as PatientCascadeCounts;
     for (const child of PATIENT_CHILD_TABLES) {
