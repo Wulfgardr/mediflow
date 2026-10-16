@@ -273,12 +273,12 @@ Il confine ha due lati e il gate controlla entrambi:
    riporta a ogni esecuzione il conteggio corrente dei file analizzati, senza
    fissarlo nella documentazione. L'allowlist è a sua volta verificata:
    ammettere `diagnoses` fa fallire il gate, quindi non si aggira allargandola.
-2. **La lane che può scrivere dati clinici non importa il percorso AI.** È ciò che rende
-   la revisione umana una proprietà strutturale invece che una convenzione: proporre e
-   applicare restano due percorsi separati, e l'operatore che seleziona i candidati sta
-   in mezzo. Se `commitPatientSmartImport` potesse chiamare un modello per riempire
-   `diagnoses`, la selezione esplicita diventerebbe decorativa senza che nessun test se
-   ne accorga.
+2. **Le anteprime documentali non espongono apply clinico.** Smart Import e
+   Document Synthesis restituiscono proposte da rivedere; il writer legacy Smart
+   Import senza caller runtime è stato rimosso in WUL-774. La route legacy conserva
+   il `410` dopo l'autenticazione. Un futuro apply richiede un contratto separato
+   con gesto esplicito, versione concorrente, transazione e audit; la sola
+   accettazione di una review non modifica diagnosi o terapie.
 
 Come `check:schema-writers`, l'allowlist è stale-sensitive nelle due direzioni: un
 contratto che non descrive più una scrittura reale fa fallire il gate tanto quanto una
