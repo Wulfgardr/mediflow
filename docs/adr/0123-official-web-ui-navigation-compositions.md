@@ -50,9 +50,9 @@ Adottiamo l'opzione 3, su autorizzazione esplicita dell'utente.
 - La barra, la dicitura di studio sintetico e il suo spazio riservato sono
   assenti senza il flag. I token e la disposizione della UI funzionano anche
   con inset zero.
-- Gli strumenti `tools/runtime-twin-086/` restano invocazioni esplicite per
-  fixture marcate. Non sono importati da app, startup o bundle di prodotto;
-  seed, receipt, credenziali sintetiche e directory dati non migrano nel
+- Gli strumenti storici per fixture marcate sono conservati nel
+  [tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/design/2026-09-05-086-runtime-twin.md#avvio-isolato).
+  Seed, receipt, credenziali sintetiche e directory dati non migrano nel
   percorso ordinario.
 - Cartelle aperte e form restano nei rispettivi owner della sessione. La
   promozione preserva i limiti documentati del guard di navigazione: non
@@ -74,3 +74,9 @@ un clic, moduli progressivi, bozza e salvataggio/rilettura su dati sintetici.
 Le prove del twin restano prove del confronto. Build, test e QA del candidato
 integrato vanno registrati separatamente. L'accettazione di questo contratto
 non attesta PR, release, parity completa o verifica su tutte le piattaforme.
+
+## Emendamento 2026-10
+
+Gli script del gemello sintetico 0.8.6 sono rimossi dall’albero corrente e
+restano nello storico Git e nel tag v0.9.0. Le disposizioni della UI di
+prodotto e il flag di confronto restano nel perimetro della decisione originale.
