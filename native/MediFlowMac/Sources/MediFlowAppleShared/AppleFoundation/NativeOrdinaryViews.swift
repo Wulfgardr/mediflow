@@ -56,9 +56,8 @@ private struct NativeOrdinaryExperience: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Proposte").chartGroupHeading()
                     Text(function.title).inkRegister(weight: .semibold)
-                    Text("Supporto alle terapie · solo revisione. Nessuna modifica alla cartella.").chartMetadata()
-                    Text("OpenAI · abbonamento ChatGPT · consenso per ogni proposta").chartMetadata()
-                }.padding(.bottom, 18)
+                    Text("Con l’abbonamento ChatGPT").chartMetadata()
+                }.padding(.bottom, 8)
             } else {
                 Text("\(function.title) con OpenAI").font(.headline)
             }
