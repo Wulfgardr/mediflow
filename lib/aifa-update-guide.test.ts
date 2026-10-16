@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertAifaGuideStatus, createAifaUpdateGuide, type AifaGuideState } from './aifa-update-guide.ts';
-import { updateAifaCatalog } from './aifa-importer.ts';
+import { AifaReductionConfirmationRequired, updateAifaCatalog } from './aifa-importer.ts';
 import type { AifaCatalogClientStatus, AifaImportClientResult } from './aifa-importer.ts';
 import type { AifaCatalogManifestInput } from './aifa-catalog.ts';
 
@@ -215,4 +215,36 @@ test('real client preserves server errors and propagates request cancellation wi
     });
     const abort = new AbortController(); const pending = updateAifaCatalog(abort.signal); abort.abort();
     await assert.rejects(pending, { name: 'AbortError' }); assert.equal(calls, 2);
+});
+
+
+test('reduction retry requires explicit confirmation and sends only the bound confirmation once', async () => {
+    for (const allow of [false, true]) {
+        const events: AifaGuideState[] = [];
+        const confirmations: (string | undefined)[] = [];
+        const bound = `${'a'.repeat(64)}:${'b'.repeat(64)}`;
+        const result = catalog('synthetic-reduced', 2);
+        const guide = createAifaUpdateGuide({ read: async () => result, importFile: async () => result, clear: async () => undefined,
+            update: async (_signal, confirmation) => {
+                confirmations.push(confirmation);
+                if (!confirmation) throw new AifaReductionConfirmationRequired('Riduzione sotto il 90%', bound);
+                assert.equal(confirmation, bound); return result;
+            },
+        }, state => events.push(state));
+        let prompts = 0;
+        await guide.update(async message => { prompts++; assert.match(message, /90%/); return allow; });
+        assert.equal(prompts, 1); assert.deepEqual(confirmations, allow ? [undefined, bound] : [undefined]);
+        assert.equal(events.at(-1)?.phase, 'idle');
+        assert.equal(events.at(-1)?.reconciliationRequired, false);
+        assert.match(events.at(-1)!.notice!.text, allow ? /Aggiornamento confermato/ : /Riduzione non confermata/);
+        guide.dispose();
+    }
+});
+
+test('304 client receipt is reconciled as no variation rather than a replaced catalog', async () => {
+    const f = fixture();
+    f.ports.update = async () => ({ ...catalog(), notModified: true });
+    await f.guide.refresh(); await f.guide.update();
+    assert.match(f.last().notice!.text, /non segnala variazioni/);
+    assert.equal(f.last().reconciliationRequired, false);
 });

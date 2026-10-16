@@ -93,3 +93,91 @@ test('deadline is also checked synchronously by the transaction guard after pars
     }, transport(response)), { status: 504 });
     await withAifaDownload(new AbortController().signal, async () => undefined, transport(response));
 });
+
+test('conditional GET preserves AIFA validators, handles 304 without import and rejects unbound 304', async () => {
+    const metadata = { etag: '"synthetic-v1"', lastModified: 'Wed, 14 Oct 2026 23:02:27 GMT' };
+    let unchanged = 0;
+    const result = await withAifaDownload(new AbortController().signal, async () => assert.fail('304 must not import'),
+        (async (_url, init) => {
+            assert.deepEqual(init?.headers, { Accept: 'text/csv', 'Accept-Encoding': 'identity',
+                'If-None-Match': metadata.etag, 'If-Modified-Since': metadata.lastModified });
+            return new Response(null, { status: 304 });
+        }) as typeof fetch, { validators: metadata, notModified: async () => { unchanged++; return 'unchanged'; } });
+    assert.equal(result, 'unchanged'); assert.equal(unchanged, 1);
+    await assert.rejects(withAifaDownload(new AbortController().signal, async () => assert.fail('import'),
+        transport(() => new Response(null, { status: 304 }))), { status: 502 });
+    await withAifaDownload(new AbortController().signal, async (_file, acquisition) => {
+        assert.equal(acquisition.etag, metadata.etag); assert.equal(acquisition.lastModified, metadata.lastModified);
+        assert.equal(acquisition.contentLength, Buffer.byteLength(csv));
+    }, transport(() => new Response(csv, { headers: { ...metadata, 'last-modified': metadata.lastModified, 'content-type': 'text/csv', 'content-length': String(Buffer.byteLength(csv)) } })));
+});
+
+test('truncated and overlong Content-Length payloads never reach the writer', async () => {
+    for (const length of [Buffer.byteLength(csv) - 1, Buffer.byteLength(csv) + 1]) {
+        await assert.rejects(withAifaDownload(new AbortController().signal, async () => assert.fail('incomplete file imported'),
+            transport(() => new Response(csv, { headers: { 'Content-Type': 'text/csv', 'Content-Length': String(length) } }))), { status: 422 });
+    }
+});
+
+test('HEAD uses the fixed credential-free source and 304 reuses only previously bound metadata', async () => {
+    const { readAifaSource } = await import('./aifa-catalog-source');
+    const headers = { etag: '"synthetic-head"', 'last-modified': 'Wed, 14 Oct 2026 23:02:27 GMT', 'content-length': '82557001' };
+    let requests = 0;
+    const metadata = await readAifaSource({}, new AbortController().signal, (async (url, init) => {
+        requests++;
+        assert.equal(url, AIFA_DOWNLOAD_URL); assert.equal(init?.method, 'HEAD'); assert.equal(init?.redirect, 'error');
+        assert.equal(init?.credentials, 'omit'); assert.equal(init?.body, undefined);
+        return new Response(null, { headers });
+    }) as typeof fetch);
+    assert.deepEqual(metadata, { etag: headers.etag, lastModified: headers['last-modified'], contentLength: 82557001 });
+    assert.deepEqual(await readAifaSource(metadata, new AbortController().signal, (async (_url, init) => {
+        requests++; assert.equal((init?.headers as Record<string, string>)['If-None-Match'], headers.etag);
+        return new Response(null, { status: 304 });
+    }) as typeof fetch), metadata);
+    assert.equal(requests, 2);
+    await assert.rejects(readAifaSource({}, new AbortController().signal, transport(() => new Response(null, { status: 304 }))));
+});
+
+test('HEAD fails closed on redirects, missing validators, invalid dates and status errors without GET fallback', async () => {
+    const { readAifaSource } = await import('./aifa-catalog-source');
+    for (const factory of [
+        () => new Response(null, { status: 302, headers: { location: 'https://example.invalid/catalog' } }),
+        () => { const response = new Response(null, { headers: { etag: '"test"' } }); Object.defineProperty(response, 'url', { value: 'https://example.invalid/catalog' }); return response; },
+        () => new Response(null, { headers: { 'content-length': '82557001' } }),
+        () => new Response(null, { headers: { 'last-modified': '1' } }),
+        () => new Response(null, { status: 503 }),
+    ]) {
+        let calls = 0;
+        await assert.rejects(readAifaSource({}, new AbortController().signal, (async (_url, init) => {
+            calls++; assert.equal(init?.method, 'HEAD'); return factory();
+        }) as typeof fetch));
+        assert.equal(calls, 1);
+    }
+});
+
+test('HEAD timeout bounds even an uncooperative transport and never downloads a body', async t => {
+    const { readAifaSource, AIFA_SOURCE_TIMEOUT_MS } = await import('./aifa-catalog-source');
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let calls = 0;
+    const pending = readAifaSource({}, new AbortController().signal, (async (_url, init) => {
+        calls++; assert.equal(init?.method, 'HEAD'); return new Promise<Response>(() => undefined);
+    }) as typeof fetch);
+    t.mock.timers.tick(AIFA_SOURCE_TIMEOUT_MS);
+    await assert.rejects(pending, /AIFA_HEAD_TIMEOUT/);
+    assert.equal(calls, 1);
+});
+
+test('progress reports observed bytes and total, then validation and idle', async () => {
+    const { getAifaDownloadProgress } = await import('./aifa-catalog-download');
+    const { setImmediate: nextTurn } = await import('node:timers/promises');
+    const bytes = new TextEncoder().encode(csv);
+    let source!: ReadableStreamDefaultController<Uint8Array>;
+    const pending = withAifaDownload(new AbortController().signal, async () => {
+        assert.equal(getAifaDownloadProgress()?.phase, 'validating'); return 'done';
+    }, transport(() => new Response(new ReadableStream({ start(controller) { source = controller; controller.enqueue(bytes.slice(0, 10)); } }),
+        { headers: { 'Content-Type': 'text/csv', 'Content-Length': String(bytes.length) } })));
+    await nextTurn();
+    assert.deepEqual(getAifaDownloadProgress(), { receivedBytes: 10, totalBytes: bytes.length, phase: 'downloading' });
+    source.enqueue(bytes.slice(10)); source.close();
+    assert.equal(await pending, 'done'); assert.equal(getAifaDownloadProgress(), null);
+});

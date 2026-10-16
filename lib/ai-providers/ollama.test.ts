@@ -50,7 +50,7 @@ test('costruisce il payload con think:false solo per task testuali', () => {
     assert.equal('num_ctx' in ocrPayload.options, false);
 });
 
-test('attesta e invoca la chat sullo stesso loopback canonico', async (t) => {
+for (const serverVersion of ['0.32.5', '0.40.4']) test(`attesta ${serverVersion} e invoca la chat sullo stesso loopback canonico`, async (t) => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const localModel = {
@@ -62,7 +62,7 @@ test('attesta e invoca la chat sullo stesso loopback canonico', async (t) => {
     globalThis.fetch = (async (input, init) => {
         const url = String(input);
         calls.push({ url, init });
-        if (url.endsWith('/api/version')) return Response.json({ version: '0.32.5' });
+        if (url.endsWith('/api/version')) return Response.json({ version: serverVersion });
         if (url.endsWith('/api/tags')) return Response.json({ models: [localModel] });
         if (url.endsWith('/api/show')) return Response.json({ details: { format: 'gguf' } });
         if (url.endsWith('/api/generate')) return Response.json({ model: localModel.model });

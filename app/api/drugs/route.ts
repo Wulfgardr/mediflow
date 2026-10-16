@@ -1,7 +1,10 @@
+import { AifaReductionError, AifaUpdateError } from '@/lib/aifa-catalog-lock';
+import { buildAuditWriteInputFromRequest } from '@/lib/security/audit';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import {
+    recordAifaCatalogRejection,
     clearAifaCatalog,
     getAifaCatalogStatus,
     replaceAifaCatalog,
@@ -88,14 +91,31 @@ export async function POST(request: Request) {
         if (!(file instanceof File) || !file.name.toLocaleLowerCase('it-IT').endsWith('.csv')) {
             return NextResponse.json({ error: 'CSV AIFA richiesto' }, { status: 400 });
         }
-        const result = await replaceAifaCatalog(file, manifestInputFromForm(form));
+        const confirmation = form.get('reductionConfirmation');
+        if (confirmation !== null && (typeof confirmation !== 'string' || !/^[a-f0-9]{64}:[a-f0-9]{64}$/.test(confirmation))) {
+            return NextResponse.json({ error: 'Conferma della riduzione AIFA non valida' }, { status: 400 });
+        }
+        const result = await replaceAifaCatalog(file, manifestInputFromForm(form), undefined, {
+            confirmedReduction: typeof confirmation === 'string' ? confirmation : undefined,
+            audit: buildAuditWriteInputFromRequest(request, session, { eventType: 'reference_data.aifa.updated', subjectType: 'reference_data', subjectRef: 'aifa' }),
+        });
         return NextResponse.json(result, {
             headers: { [CATALOG_STATUS_HEADER]: result.state },
         });
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'Importazione AIFA non riuscita';
-        console.warn('[MediFlow] AIFA catalog import rejected:', message);
-        return NextResponse.json({ error: message }, { status: 400 });
+        const replacement = archiveReplacementResponse(error);
+        if (replacement) return replacement;
+        const message = error instanceof AifaUpdateError ? error.message
+            : error instanceof Error && /^(CSV AIFA non valido:|URL fonte AIFA|Data di scarico AIFA|Versione dataset AIFA|File AIFA)/.test(error.message)
+                ? error.message : 'Importazione AIFA non riuscita; catalogo conservato';
+        await recordAifaCatalogRejection(buildAuditWriteInputFromRequest(request, session, {
+            eventType: 'reference_data.aifa.updated', subjectType: 'reference_data', subjectRef: 'aifa', outcome: 'failure',
+            redactedMetadata: { flags: ['mode:manual'], reasonCode: 'import-rejected' },
+        })).catch(() => undefined);
+        return NextResponse.json({ error: message, ...(error instanceof AifaReductionError ? {
+            code: 'AIFA_REDUCTION_CONFIRMATION_REQUIRED', confirmation: error.confirmation,
+            previousCount: error.previousCount, nextCount: error.nextCount,
+        } : {}) }, { status: error instanceof AifaUpdateError ? error.status : 400 });
     }
 }
 
