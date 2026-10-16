@@ -379,3 +379,15 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
     ]);
     assert.equal(summary.isTruncated, false);
 });
+
+
+test('AIFA audit metadata retains only canonical public manifests', async () => {
+    const { buildAifaCatalogManifest, AIFA_CATALOG_DEFAULT_SOURCE_URL } = await import('../aifa-catalog');
+    const manifest = buildAifaCatalogManifest({ sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
+        version: 'synthetic-audit', downloadedAt: '2026-10-15', etag: '"synthetic"' },
+    { sha256: 'a'.repeat(64), fileName: 'synthetic.csv', rowCount: 1 });
+    const metadata = sanitizeAuditMetadata({ aifaCatalog: { mode: 'remote', before: null,
+        after: { ...manifest, unexpected: 'must disappear' } as typeof manifest, forcedReduction: false } });
+    assert.deepEqual(metadata?.aifaCatalog, { mode: 'remote', before: null, after: manifest, forcedReduction: false });
+    assert.equal(AUDIT_EVENT_TYPES.includes('reference_data.aifa.updated'), true);
+});

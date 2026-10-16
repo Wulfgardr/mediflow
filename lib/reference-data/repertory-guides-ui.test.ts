@@ -49,6 +49,14 @@ async function fixture(entry: string, width: number, api: (route: Route) => Prom
             }
             if (url.pathname === '/bundle.js') { await route.fulfill({ contentType: 'text/javascript', body: bundle.outputFiles.find(file => file.path.endsWith('.js'))!.text }); return; }
             if (url.pathname === '/bundle.css') { await route.fulfill({ contentType: 'text/css', body: bundle.outputFiles.find(file => file.path.endsWith('.css'))?.text ?? '' }); return; }
+            if (url.pathname === '/api/drugs/source') {
+                await route.fulfill({ json: { networkAllowed: true, networkPreference: true, catalog: status(), remote: {
+                    outcome: 'available', lastModified: 'Wed, 14 Oct 2026 23:02:27 GMT', checkedAt: '2026-10-15T08:00:00.000Z', etag: '"new"',
+                } } }); return;
+            }
+            if (url.pathname === '/api/drugs/update' && route.request().method() === 'GET') {
+                await route.fulfill({ json: { progress: { receivedBytes: 1048576, totalBytes: 2097152, phase: 'downloading' } } }); return;
+            }
             await api(route);
         });
         await page.goto(ORIGIN);
@@ -89,12 +97,13 @@ test('AIFA UI: no write on mount, abort, explicit read recovery, successful upda
         catalog = status('synthetic-new', 4); await route.fulfill({ json: catalog });
     });
     try {
-        const p = f.page; const update = p.getByRole('button', { name: 'Aggiorna da AIFA', exact: true });
-        await viewCatalog(p, 'synthetic-old'); assert.equal(updates, 0); assert.equal(reads, 1);
+        const p = f.page; const update = p.getByRole('button', { name: 'Aggiorna ora', exact: true });
+        await viewCatalog(p, 'synthetic-old'); await expect(p.getByTestId('aifa-remote-notice')).toContainText('14 ottobre 2026'); await expect(update).toBeEnabled(); assert.equal(updates, 0); assert.equal(reads, 1);
         traceAifa('initial-read-done', started);
         traceAifa('held-update-click-start', started);
         await update.click(); await expect.poll(() => updates).toBe(1);
         await expect(update).toBeDisabled(); await viewCatalog(p, 'synthetic-old');
+        await expect(p.getByRole('progressbar', { name: 'Download AIFA' })).toHaveAttribute('value', '1048576');
         traceAifa('held-update-observed', started);
         traceAifa('cancel-click-start', started);
         await p.getByRole('button', { name: 'Annulla', exact: true }).click();
@@ -135,9 +144,9 @@ test('AIFA UI: manual CSV reselect after declined confirmation; failed clear pre
         for (let attempt = 0; attempt < 2; attempt++) {
             await upload.setInputFiles(csv);
             const dialog = p.getByRole('dialog', { name: 'Importare il file AIFA?', exact: true });
-            await expect(dialog).toBeVisible(); await expect(p.getByRole('button', { name: 'Aggiorna da AIFA', exact: true })).toBeDisabled();
+            await expect(dialog).toBeVisible(); await expect(p.getByRole('button', { name: 'Aggiorna ora', exact: true })).toBeDisabled();
             await dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
-            await expect(dialog).toHaveCount(0); await expect(p.getByRole('button', { name: 'Aggiorna da AIFA', exact: true })).toBeEnabled();
+            await expect(dialog).toHaveCount(0); await expect(p.getByRole('button', { name: 'Aggiorna ora', exact: true })).toBeEnabled();
         }
         assert.equal(imports, 0);
         await p.getByRole('button', { name: 'Svuota catalogo', exact: true }).click();

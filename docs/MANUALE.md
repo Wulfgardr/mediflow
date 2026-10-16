@@ -165,3 +165,43 @@ organizzative e operative con cui usi il sistema.
 
 ---
 Per supporto, apri una issue o consulta la documentazione tecnica.
+
+## Catalogo farmaci AIFA
+
+In **Impostazioni > Repertori**, abilita **Consenti verifiche e download del
+catalogo pubblico AIFA via Internet** per permettere l'accesso alla fonte
+ufficiale. Senza consenso puoi continuare a consultare il catalogo locale e
+caricare un CSV già scaricato. La condivisione in rete locale non abilita
+questo accesso Internet.
+
+Quando apri Repertori o le relative impostazioni, MediFlow controlla le sole
+intestazioni del file AIFA, al massimo ogni 24 ore, anche dopo un riavvio.
+Mostra «Aggiornamento disponibile», «Nessuna variazione» oppure «Verifica non
+disponibile». Un controllo fallito non svuota il catalogo. Per cataloghi
+importati in precedenza può mancare una data AIFA confrontabile: aggiornarli
+esplicitamente permette di acquisirla.
+
+**Aggiorna ora** scarica e valida il CSV. La data AIFA indica la pubblicazione
+dichiarata dal server; la data di scarico indica l'acquisizione locale. Il
+catalogo cambia solo dopo il completamento dei controlli. Il progresso mostra
+i byte ricevuti, poi la validazione. Se AIFA risponde che il file non è cambiato,
+non viene sostituito. Annullare richiede comunque di rileggere lo stato, perché
+la richiesta potrebbe essere già stata completata.
+
+Una riduzione sotto il 90% delle confezioni locali richiede una conferma
+aggiuntiva. Il catalogo viene conservato finché non confermi; per aggiornamenti
+via Internet il file viene scaricato nuovamente e deve essere identico a quello
+controllato e il catalogo locale deve essere rimasto invariato. La verifica
+vale anche se il secondo file non presenta più una riduzione sotto soglia.
+Se file o catalogo sono cambiati, rileggi lo stato e ripeti l'operazione.
+Gli altri errori di validazione non possono essere forzati.
+
+Durante una verifica o importazione, altri caricamenti e lo svuotamento del
+catalogo vengono rifiutati come operazione già in corso. Attendi il termine
+e ripeti l'azione.
+
+Il CSV deve contenere AIC, denominazione, ATC e principi attivi. La copertura
+è descrittiva e parziale: FORNITURA e STATO_AMMINISTRATIVO non sono conservati;
+fascia e prezzo non sono presenti nel feed corrente. I dati non certificano
+rimborsabilità, disponibilità o appropriatezza. Ogni sostituzione AIFA riuscita
+conserva provenienza e audit locale. Nessun dato clinico viene inviato ad AIFA.
