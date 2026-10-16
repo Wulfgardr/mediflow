@@ -30,9 +30,10 @@ più transizioni lifecycle del profilo. I percorsi assenti restano assenti.
   caller prodotto di create/link/command; il worker del record store è un harness
   di prova. Il command ha audit atomico, record/link no: non sono applicazione
   clinica né servizi da concedere agli agenti per colmare una differenza.
-- `L-01` conserva il helper Smart Import senza caller runtime, distinto dal
-  client diretto verso la route ritirata. `X-13` conserva l'export legacy della
-  sintesi senza attribuirgli un consumer UI. Le preview non scrivono la cartella.
+- `L-01` e `X-13` sono ritirati in WUL-774 dopo la verifica dell'assenza di
+  caller runtime: helper Smart Import ed export legacy della sintesi sono rimossi.
+  La route legacy conserva il `410` autenticato; le preview Fabric non scrivono
+  la cartella. Le righe storiche restano nel CSV con disposizione `retired`.
 - I writer raw di [attachment-currentness-host](../lib/attachment-currentness-host.ts)
   sono raggiunti da D-01/D-02 dentro l'audit dell'adapter, non da local-extraction:
   la rilettura extraction è preview; cancellarne il grant non elimina l'allegato.

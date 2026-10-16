@@ -59,11 +59,27 @@ conversazioni può sembrare una inbox intelligente già operativa.
 | Atena | Treatment Reasoning usa il contratto `mediflow.treatment_reasoning.v1`, un runtime locale e un kill switch. | Le policy di scrittura previste sono `no_write`, `review_only` e `form_prefill_only`; gli intenti delle azioni restano un dominio distinto. |
 | Conversazioni | Esistono tabelle e route CRUD per conversazioni e messaggi. | Non esistono ancora inbox intelligente, buffer effimero locale, chiarimento guidato o conversione confermata in record clinici. |
 
-Le evidenze principali sono `lib/ai-service.ts`, `lib/ai-egress-gate.ts`,
-`lib/domain/documents/document-synthesis-service.ts`,
+I riferimenti mantenuti sono `lib/ai-service.ts`, `lib/ai-egress-gate.ts`,
+`lib/ai-providers/fabric/document-synthesis-production-operation.ts`,
 `app/api/patients/[id]/smart-import/route.ts`, `lib/ai-summary-service.ts`,
 `lib/treatment-reasoning-service.ts` e le route CRUD di conversazioni e
 messaggi.
+
+## Stato corrente dei percorsi documentali
+
+WUL-774 ritira i backend legacy privi di caller runtime, compreso il writer
+Smart Import. Le anteprime correnti passano dalla capability host
+`lib/domain/documents/patient-smart-import-host-capability.ts` e dalla composition
+Document Synthesis Fabric: producono soltanto proposte, senza apply clinico.
+La route Smart Import legacy resta autenticata e risponde `410`; il suo ritiro
+precede questa pulizia. La tabella precedente descrive la baseline storica.
+
+Le regressioni su parser, evidenze e matching restano nei test dei moduli
+mantenuti. Le prove Fabric proteggono proposta, provenienza e validità corrente
+delle fonti. `physician-review-command.test.ts` verifica versione della review,
+replay, audit atomico e rollback dello stato di review: accettare una review non
+applica diagnosi o terapie al paziente. I writer clinici ordinari mantengono le
+proprie prove di versione, audit e rollback; non sostituiscono un apply documentale.
 
 ## Decisione
 
@@ -97,8 +113,9 @@ configurato.
   elementi clinici candidati e confronti con terminologie o cataloghi
   configurati.
 - **Provenienza e revisione:** ogni candidato indica fonte ed evidenza. Le
-  diagnosi della sintesi restano in `documentInsights`. Smart Import resta una
-  lane distinta con selezione e applicazione esplicite.
+  diagnosi della sintesi restano proposte. I `documentInsights` storici non
+  autorizzano apply; un futuro apply Smart Import richiede una lane distinta
+  con selezione e applicazione esplicite.
 - **Provider:** euristiche locali sempre disponibili; Ollama opzionale per le
   lane configurate; Apple Vision è solo il fallback OCR macOS già governato.
   Altri provider richiedono un packet separato.
@@ -107,7 +124,7 @@ configurato.
 - **Test richiesti:** fixture sintetiche per parsing, provenienza, deduplica,
   ICD-11, farmaco, principio attivo e posologia; falsifier per envelope
   ambiguo; prova che la sintesi non modifichi record clinici strutturati e che
-  Smart Import applichi solo candidati e campi selezionati.
+  le anteprime Smart Import non applichino diagnosi o terapie.
 
 ### 2. Derivazione e riconciliazione anagrafica
 
