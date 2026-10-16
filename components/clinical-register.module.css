@@ -126,4 +126,4 @@
 .rowControls > button:not([aria-label]) svg { display: none; }
 .rowControls > button[aria-label] { color: var(--lume-ink-muted); }
 .rowControls > :is(button,a) { white-space: nowrap; overflow-wrap: normal; }
-@media (min-width: 701px) { .therapyTable :is(th,td):last-child { width: 15rem; } }
+@media (min-width: 701px) { .therapyTable :is(th,td):last-child { width: 19rem; } }
