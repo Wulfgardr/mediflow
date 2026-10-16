@@ -227,35 +227,30 @@ export default function TreatmentReasoningPanel({
     return (
         <div className={`${styles.register} ${styles.review}`} data-testid="treatment-reasoning-panel">
             <div className={styles.toolbar}>
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]">
-                            <BrainCircuit className="h-5 w-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <span className="apple-chip">{formatCountLabel(sourceSummary.total, 'fonte', 'fonti')}</span>
-                                <span className="apple-chip">solo revisione</span>
-                                <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                    {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
-                                </span>
-                            </div>
-                        </div>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                        <h3 className="flex items-center gap-2 text-[color:var(--lume-ink)]" style={{ font: 'var(--type-strong)' }}>
+                            <BrainCircuit className="h-4 w-4 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
+                            Ragionamento terapeutico
+                        </h3>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]" style={{ font: 'var(--type-meta)' }}>
+                            {formatCountLabel(sourceSummary.total, 'fonte', 'fonti')} · solo revisione · {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'motore locale da scegliere'}
+                        </p>
                     </div>
 
-                    <FunctionModelPicker picker={picker} />
-                    <button
-                        type="button"
-                        onClick={loadProposal}
-                        disabled={!canPrepare}
-                        aria-describedby="treatment-reasoning-boundary-note"
-                        className={`${styles.control} ${styles.primary}`}
-                    >
-                        {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-                        {publication ? 'Aggiorna bozza' : 'Genera bozza'}
-                    </button>
+                    <div className="flex min-w-0 flex-wrap items-start gap-2 lg:flex-nowrap [&>[data-testid^=model-picker]]:my-0 [&>[data-testid^=model-picker]]:min-w-[18rem]">
+                        <FunctionModelPicker picker={picker} />
+                        <button
+                            type="button"
+                            onClick={loadProposal}
+                            disabled={!canPrepare}
+                            aria-describedby="treatment-reasoning-boundary-note"
+                            className={`${styles.control} ${styles.primary} shrink-0 whitespace-nowrap`}
+                        >
+                            {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+                            {publication ? 'Aggiorna bozza' : 'Genera bozza'}
+                        </button>
+                    </div>
                     <p id="treatment-reasoning-boundary-note" className="sr-only">
                         Anteprima di sola revisione. Non scrive né applica modifiche alla scheda clinica.
                     </p>

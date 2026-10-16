@@ -826,7 +826,8 @@
 /* @Codex: command text shares the same weight as the clinical actions. */
 :global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) {
     min-height: var(--lume-control-height);
-    padding: 10px 14px;
+    padding: 8px 14px;
+    white-space: nowrap;
     gap: var(--lume-control-gap);
     font-size: 0.875rem;
     line-height: 1.5;
