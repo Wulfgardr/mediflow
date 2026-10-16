@@ -3672,26 +3672,29 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// nothing is sent in that case. A successfully created attachment enters the
     /// OCR queue as `pending`/`paired_upload` server-side (D2): the refreshed list
     /// shows that state with the existing Italian label, not a new one.
-    func uploadAttachmentForSelectedPatient(patientId: String, fileName: String, mimeType: String, rawData: Data) async {
+    @discardableResult
+    func uploadAttachmentForSelectedPatient(patientId: String, fileName: String, mimeType: String, rawData: Data) async -> PairedAttachmentUploadOutcome {
         guard selectedPatient?.id == patientId else {
             errorMessage = "Il paziente selezionato e cambiato: scegli di nuovo il documento."
-            return
+            return .unconfirmed
         }
-        guard canUploadAttachment else { return }
+        guard canUploadAttachment else { return .unconfirmed }
         guard let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
-            return
+            return .unconfirmed
         }
         let trimmedName = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             errorMessage = "Il documento non ha un nome file valido."
-            return
+            return .unconfirmed
         }
         let precheck = HomeBaseAttachmentWirePrecheck.check(rawByteCount: rawData.count)
         guard !precheck.exceedsLimit else {
             errorMessage = precheck.message
-            return
+            return .unconfirmed
         }
+        var acknowledged = false
+        var refreshed = false
         await runTask {
             guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
             let dataURL = HomeBaseAttachmentDataURL.encode(mimeType: mimeType, bytes: rawData)
@@ -3722,6 +3725,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: self.ambulatoryId.trimmedOrNil
             )
+            acknowledged = true
             let fetchedAttachments = try await self.fetchDecryptedAttachments(
                 patientId: patientId,
                 credentials: credentials,
@@ -3732,8 +3736,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             self.attachments = fetchedAttachments
             self.attachmentsPatientId = patientId
             self.attachmentsLoadState = .loaded
+            refreshed = true
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
         }
+        return acknowledged ? (refreshed ? .uploaded : .uploadedNeedsRefresh) : .unconfirmed
     }
 
     private func invalidateAttachmentPatientState() {

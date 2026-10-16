@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "MediFlow native Mac ordinary OpenAI supplemental contract",
-    "version": "0.8.6-native-ordinary.2",
-    "description": "Supplement to the canonical v1 spec, not a reconstruction of files absent from the supplied snapshot. ADR0134 / ADR0076 Mac addendum. Source/logic candidate, not OS qualification, release or clinical apply."
+    "title": "MediFlow native Apple ordinary OpenAI supplemental contract",
+    "version": "0.8.6-native-ordinary.3",
+    "description": "Supplement to the canonical v1 spec, not a reconstruction of files absent from the supplied snapshot. ADR0134 / ADR0076 paired Apple adapter; computation remains on the qualified host. Source/logic candidate, not OS qualification, release or clinical apply."
   },
   "paths": {
     "/api/v1/network/ai/chatgpt/ordinary/prepare": {
@@ -18,7 +18,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "202": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -116,7 +116,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -204,7 +204,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -295,7 +295,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -386,7 +386,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -477,7 +477,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -568,7 +568,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -659,7 +659,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "200": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -750,7 +750,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "202": {
             "description": "No-store response; no clinical apply authority. Cleanup false blocks reuse.",
@@ -868,7 +868,7 @@
           }
         ],
         "x-authority-ceiling": "scoped_local_candidate",
-        "x-native-only": "macos",
+        "x-native-only": ["macos", "ios", "ipados"],
         "responses": {
           "400": {
             "description": "Invalid body/path/method",

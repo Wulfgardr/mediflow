@@ -1,5 +1,4 @@
-/* Mac-only, explicit consent/login/catalog/turn; never auto-apply. */
-#if os(macOS)
+/* Shared paired client: explicit consent/login/catalog/turn; never auto-apply. */
 import Foundation
 import Combine
 import MediFlowCore
@@ -291,4 +290,3 @@ final class NativeOrdinaryModel: ObservableObject {
         }
     }
 }
-#endif
