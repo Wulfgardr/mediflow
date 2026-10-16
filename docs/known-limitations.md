@@ -39,7 +39,10 @@ l'annullamento del tentativo di accesso, con chiusura del processo e rimozione
 dei temporanei. Un modello assente dal catalogo è stato rifiutato senza sostituzioni.
 La generazione nelle quattro funzioni non è ancora stata verificata: le prove UI con
 risposte simulate non dimostrano che il servizio abbia generato una proposta.
-Non è stata concessa l'ammissione all'uso clinico. Dettagli e riferimenti sono
+Un successivo tentativo Patient Insight ha completato accesso e catalogo, ma
+si è fermato per quota esaurita senza produrre una proposta. Il catalogo non
+garantisce una quota disponibile: il controllo prima della generazione può
+impedire di procedere. Non è stata concessa l'ammissione all'uso clinico. Dettagli e riferimenti sono
 nella [nota WUL-778](./adr/0134-chatgpt-subscription-synthesis-execution.md#riqualifica-del-substrato-e-piano-prolite--wul-778).
 
 Ogni operazione apre un processo isolato e richiede un nuovo accesso. La

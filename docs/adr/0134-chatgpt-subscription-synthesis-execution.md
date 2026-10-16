@@ -610,8 +610,13 @@ Le quattro generazioni ordinarie non sono state eseguite. Il tentativo Patient
 Insight è scaduto aspettando la passkey, prima del catalogo e della generazione;
 la chiusura e la rimozione dei temporanei sono confermate. Ogni operazione
 richiede un nuovo accesso nel proprio processo isolato: la passkey può essere
-richiesta nuovamente. Non vengono condivise credenziali fra operazioni o con
-l'ambiente Codex di sviluppo.
+richiesta nuovamente. In un successivo tentativo Patient Insight, accesso e
+catalogo reali sono riusciti; la generazione è stata negata con
+`quota_exhausted`, senza proposta, con chiusura e pulizia confermate. Il
+controllo delle quote precede `thread/start` e `turn/start`; una lettura
+ufficiale delle quote ha corroborato l'esaurimento. Questa prova non attesta
+l'interruzione di una generazione già iniziata. Non vengono condivise
+credenziali fra operazioni o con l'ambiente Codex di sviluppo.
 
 Queste prove non attestano il percorso UI completo, l'installazione del delta
 o l'ammissione all'uso clinico. I test con risposte simulate restano distinti
