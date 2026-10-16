@@ -1,4 +1,3 @@
-/* @Codex */
 import fs from 'node:fs';
 import { registerHooks } from 'node:module';
 import path from 'node:path';

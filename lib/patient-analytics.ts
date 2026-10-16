@@ -1,4 +1,3 @@
-/* @Codex */
 // Only the aggregate's inputs are needed here; no DB/React/runtime dependency.
 export type AnalyticsDiagnosis = { system: string; code: string; description: string };
 export type AnalyticsPatient = {
@@ -95,7 +94,7 @@ export function buildAnalyticsStats(
 
         if (!patient.diagnoses?.length) continue;
         withDiagnoses += 1;
-        /* @Codex: Schede counts each diagnosis key once per patient, not each occurrence. */
+        /* Schede counts each diagnosis key once per patient, not each occurrence. */
         const seen = new Set<string>();
         for (const diagnosis of patient.diagnoses) {
             const key = diagnosisKey(diagnosis);

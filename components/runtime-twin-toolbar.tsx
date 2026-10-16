@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-676: local design comparison; never changes clinical state. */
+/* WUL-676: local design comparison; never changes clinical state. */
 import { useRuntimeTwinDesign } from './runtime-twin-design';
 import styles from './runtime-twin-toolbar.module.css';
 

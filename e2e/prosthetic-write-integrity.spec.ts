@@ -1,4 +1,4 @@
-/* @Codex: synthetic ordinary Web workflow, real HTTP and SQLite readback. */
+/* synthetic ordinary Web workflow, real HTTP and SQLite readback. */
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
@@ -48,7 +48,7 @@ test('Web creates, records testing, and removes a prosthetic prescription with o
     await pane.getByRole('button', { name: 'Usa voce nella bozza', exact: true }).click();
     await expect(pane.getByLabel('Descrizione ausilio')).toHaveValue('Ausilio sintetico di verifica');
     await pane.getByLabel('Motivazione clinico-funzionale', { exact: true }).fill('Motivazione sintetica riservata');
-    // @Codex: a rejected audit must keep the draft and permit a deliberate retry.
+    // a rejected audit must keep the draft and permit a deliberate retry.
     const faultDb = new Database(join(dir, 'medical.db'), { fileMustExist: true });
     try {
         expect(faultDb.prepare('SELECT id FROM patients WHERE id=?').get(patientId)).toEqual({ id: patientId });

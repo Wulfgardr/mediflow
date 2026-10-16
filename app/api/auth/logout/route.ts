@@ -6,7 +6,6 @@ import { completePortableSupervisorWebLifecycleMutationV1 } from '@/lib/security
 const SESSION_COOKIE_NAME = 'mediflow_session';
 const CONTROL_COOKIE_NAME = 'mediflow_auth_control';
 
-/* @Codex */
 export async function POST(request: Request) {
     let bearerCookie: unknown = null;
     let controlCookie: unknown = null;

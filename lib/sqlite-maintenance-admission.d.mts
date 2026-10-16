@@ -1,4 +1,3 @@
-/* @Codex */
 import type Database from 'better-sqlite3';
 
 export class SqliteMaintenanceHoldError extends Error {

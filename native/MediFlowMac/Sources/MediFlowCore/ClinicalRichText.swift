@@ -1,4 +1,3 @@
-/* @Codex */
 public struct ClinicalRichTextDocument: Equatable, Sendable {
     public var blocks: [ClinicalRichTextBlock]
 
@@ -96,7 +95,7 @@ public enum ClinicalRichText {
         document.blocks.map(render(block:)).joined()
     }
 
-    /* @Codex: Editing projection only. The public lossless parser and sanitizer
+    /* Editing projection only. The public lossless parser and sanitizer
        contract stay unchanged. Accept exactly the editor's balanced grammar;
        never recover malformed/nested unsupported HTML by dropping tokens. */
     static func inlineEditorProjection(_ original: ClinicalRichTextBlock) -> ClinicalRichTextDocument? {

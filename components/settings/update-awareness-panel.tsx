@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useState } from 'react';
 import { Bell, CheckCircle, ExternalLink, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';

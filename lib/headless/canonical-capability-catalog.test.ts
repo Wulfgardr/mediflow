@@ -7,7 +7,6 @@ import {
   resolveHeadlessCanonicalCapability,
 } from './canonical-capability-catalog';
 
-/* @Codex */
 type Crosswalk = Readonly<{ records: readonly Readonly<{
   id: string;
   sourceIdentity: Readonly<{ sourceRow: number }>;

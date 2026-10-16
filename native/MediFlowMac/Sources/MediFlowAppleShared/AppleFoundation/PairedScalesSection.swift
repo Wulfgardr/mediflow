@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedScalesSection: View {
     let entries: [HomeBaseEntrySummary]
     let isWorking: Bool
@@ -129,7 +128,7 @@ struct PairedScalesSection: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
                                     .chartRowTitle()
-                                // @Codex MF085-002: provenance visible before expanding stored interpretation.
+                                // MF085-002: provenance visible before expanding stored interpretation.
                                 if let provenance = item.provenanceLabel {
                                     Text(provenance).chartMetadata()
                                 }

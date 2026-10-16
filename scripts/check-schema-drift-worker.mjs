@@ -1,4 +1,3 @@
-/* @Codex */
 // WUL-268 (STREAM A): schema drift check worker.
 //
 // Runs under the strip-types loader + the "@/" resolve hook (see

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -18,7 +17,7 @@ import { extractAnyDocLocalBytes, extractAnyDocPageRoutingBytes } from './anydoc
 const real = process.env.MEDIFLOW_TEST_TESSERACT_REAL === '1';
 const realOptions = { skip: real ? false : 'Provision pinned artifacts and set MEDIFLOW_TEST_TESSERACT_REAL=1; this is not OCR proof.' };
 const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
-// @Codex: Mac tests explicitly probe development artifacts; production remains Vision.
+// Mac tests explicitly probe development artifacts; production remains Vision.
 const inspectCapability = () => inspectAnyDocDesktopOcrCapability({ developmentSmoke: process.platform === 'darwin' });
 const preflightArgs = ['scripts/run-strip-types.mjs', 'scripts/check-anydoc-desktop-ocr.ts',
     ...(process.platform === 'darwin' ? ['--development-tesseract-smoke'] : [])];
@@ -56,7 +55,6 @@ test('real desktop OCR prerequisites are explicitly required for qualification r
     assert.equal(inspectCapability().qualification, 'pending_target_benchmark');
 });
 
-/* @Codex */
 test('desktop preflight requires real AnyDoc and detects its missing binding before recovery', realOptions, () => {
     const cli = () => spawnSync(process.execPath,
         preflightArgs, { encoding: 'utf8' });
@@ -153,7 +151,6 @@ test('native-only PDF bypasses OCR and scanned PDF with blank page remains block
     assert.equal(empty.status, 'review_required'); assert.equal(empty.candidateUse, 'blocked');
 });
 
-/* @Codex */
 test('preflight detects missing and altered native renderer payload before OCR availability', realOptions, () => {
     const profile = profiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
     assert.ok(profile);
@@ -170,7 +167,6 @@ test('preflight detects missing and altered native renderer payload before OCR a
     assert.equal(inspectCapability().status, 'artifacts_verified');
 });
 
-/* @Codex */
 test('real WASM shares immediate child admission and permits retry after process close', realOptions, async () => {
     const first = runAnyDocTesseractDocument([image()]);
     const concurrent = await runAnyDocTesseractDocument([image()]);
@@ -180,7 +176,6 @@ test('real WASM shares immediate child admission and permits retry after process
     assert.equal((await runAnyDocTesseractDocument([image()])).status, 'recognized');
 });
 
-/* @Codex */
 test('Mac production preflight is not a Vision capability or a raw binary signature check',
     { skip: process.platform !== 'darwin' }, () => {
         const capability = inspectAnyDocDesktopOcrCapability();

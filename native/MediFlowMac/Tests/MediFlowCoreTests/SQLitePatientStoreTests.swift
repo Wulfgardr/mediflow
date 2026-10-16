@@ -34,7 +34,6 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertNil(p.diagnoses, "the default list projection stays minimal")
     }
 
-    /* @Codex */
     func testListPatientsProjectsEncryptedDiagnosesOnlyForActiveOptIn() throws {
         let store = SQLitePatientStore(path: fixturePath())
         let active = try XCTUnwrap(try store.listPatients(includeDiagnoses: true).first)
@@ -67,7 +66,6 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertEqual(diagnoses.first?.system, "ICD-10")
     }
 
-    /* @Codex */
     func testLoadRawPatientDetailPreservesCiphertext() throws {
         let raw = try XCTUnwrap(try SQLitePatientStore(path: fixturePath()).loadRawPatientDetail(id: "fixture-1"))
         XCTAssertTrue(raw.address?.hasPrefix(CryptoService.encPrefix) == true)
@@ -127,7 +125,6 @@ final class SQLitePatientStoreTests: XCTestCase {
         return destination
     }
 
-    /* @Codex */
     func testArchiveFieldsAreSealedReadBackAndPreservedByUnrelatedUpdate() throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
@@ -503,7 +500,6 @@ final class SQLitePatientStoreTests: XCTestCase {
 
     // MARK: Restore
 
-    /* @Codex */
     func testRestorePatientClearsTombstoneAndBumpsVersion() throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
@@ -526,7 +522,6 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertNil(try store.listPatients(includeDeleted: true).first?.deletedAt)
     }
 
-    /* @Codex */
     func testRestorePatientVersionMismatchConflictsAndKeepsTombstone() throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
@@ -546,7 +541,6 @@ final class SQLitePatientStoreTests: XCTestCase {
         XCTAssertNotNil(try store.listPatients(includeDeleted: true).first?.deletedAt)
     }
 
-    /* @Codex */
     func testRestorePatientActiveOrMissingReturnsNotFound() throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }

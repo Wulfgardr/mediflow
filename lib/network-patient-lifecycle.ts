@@ -1,34 +1,23 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { canIncrementVersion } from './version-concurrency';
-/* @Codex */
 import { randomUUID } from 'node:crypto';
-/* @Codex */
 import { and, eq, isNotNull } from 'drizzle-orm';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { buildPatientVersionConflictPayload, parseExpectedVersion } from './patient-concurrency';
-/* @Codex */
 import {
     activePatients,
     buildPatientRestoreValues,
     buildPatientTombstoneValues,
 } from './patient-lifecycle';
-/* @Codex */
 import { normalizePatientCreateInput } from './patient-write-normalization';
-/* @Codex */
 import { patients, patientRetiredIds, patientsToAmbulatories } from './schema';
-/* @Codex */
 import {
     NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS,
 } from './network-patient-write';
-/* @Codex */
 import { requestIdFromRequest, writeAuditEventInTransaction } from './security/audit';
-/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 
-/* @Codex */
 export const NETWORK_PATIENT_LIFECYCLE_CAPABILITY = 'network.replica.write-patient-lifecycle';
 
 type NetworkPatientLifecycleContext = NetworkWriteContext & {
@@ -46,7 +35,7 @@ type PatientLifecycleSnapshot = {
     isArchived: boolean | null;
 };
 
-/* @Codex: required lifecycle audit shares the authoritative SQLite transaction. */
+/* required lifecycle audit shares the authoritative SQLite transaction. */
 function writeNetworkLifecycleAudit(
     tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
     context: NetworkWriteContext,
@@ -115,7 +104,6 @@ function hasRequiredString(value: unknown): boolean {
     return typeof value === 'string' && value.trim().length > 0;
 }
 
-/* @Codex */
 export function validateNetworkPatientCreateBody(
     body: Record<string, unknown>,
     scopeAmbulatoryId: string
@@ -170,7 +158,6 @@ export function validateNetworkPatientCreateBody(
     return { ok: true };
 }
 
-/* @Codex */
 export function validateNetworkDeletionReason(
     deletionReason: unknown
 ): { ok: true } | { ok: false; status: 400; value: { error: string } } {
@@ -219,7 +206,6 @@ function selectTombstonedPatientSnapshot(
     return current ?? null;
 }
 
-/* @Codex */
 export async function createNetworkScopedPatient(
     context: NetworkWriteContext,
     body: Record<string, unknown>
@@ -258,7 +244,6 @@ export async function createNetworkScopedPatient(
     return { status: 201, value: { id: normalized.values.id, version: 1 } };
 }
 
-/* @Codex */
 export async function deleteNetworkScopedPatient(
     context: NetworkPatientLifecycleContext,
     body: Record<string, unknown>
@@ -323,7 +308,6 @@ export async function deleteNetworkScopedPatient(
     return commit;
 }
 
-/* @Codex */
 export async function restoreNetworkScopedPatient(
     context: NetworkPatientLifecycleContext,
     body: Record<string, unknown>

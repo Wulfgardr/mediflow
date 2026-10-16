@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: real SQLite candidate oracle for the eight ordinary diary mutations. */
+/* real SQLite candidate oracle for the eight ordinary diary mutations. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -358,7 +358,7 @@ test('Web legacy create accepts createdAt and normalized updatedAt without clien
     assert.equal(after.audit.length, 1);
 });
 
-/* @Codex: route-level byte fixture verifies admission before any SQLite read/write. */
+/* route-level byte fixture verifies admission before any SQLite read/write. */
 function streamedRequest(surface: Surface, operation: Operation, chunks: Uint8Array[], headers: Record<string, string> = {}) {
     let pulls = 0, cancels = 0;
     const stream = new ReadableStream<Uint8Array>({

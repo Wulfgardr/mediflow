@@ -1,4 +1,4 @@
-/* @Codex: synthetic transport; ordinary facade, crypto key lifecycle and label reader. */
+/* synthetic transport; ordinary facade, crypto key lifecycle and label reader. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { db } from './db';

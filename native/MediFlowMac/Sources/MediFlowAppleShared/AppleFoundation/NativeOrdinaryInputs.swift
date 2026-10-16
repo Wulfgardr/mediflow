@@ -1,4 +1,4 @@
-/* @Codex — selector snapshots only; clinical text never enters the native preparation DTO. */
+/* selector snapshots only; clinical text never enters the native preparation DTO. */
 #if os(macOS)
 import Foundation
 import CryptoKit

@@ -1,4 +1,4 @@
-/* @Codex: synthetic Docker and filesystem fixtures only. */
+/* synthetic Docker and filesystem fixtures only. */
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, writeFileSync, statSync, symlinkSync, rmSync } from 'node:fs';
 import os from 'node:os';

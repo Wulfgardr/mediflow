@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { type SmartImportProjection } from './smart-import-projection.ts';

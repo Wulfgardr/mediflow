@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     DETERMINISTIC_CAPABILITY_IDS,
     EGRESS_PROFILES,
@@ -174,7 +173,6 @@ export const FABRIC_REVIEW_LABELS: Readonly<Record<FabricReviewPolicy, string>> 
     informational: 'Solo lettura',
 });
 
-/* @Codex */
 export type FabricAvailabilityCopy = Readonly<{
     title: string;
     description: string;

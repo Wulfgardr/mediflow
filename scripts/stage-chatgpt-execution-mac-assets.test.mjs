@@ -1,4 +1,4 @@
-/* @Codex — synthetic filesystem tests; public bytes/signatures are not supplied. */
+/* synthetic filesystem tests; public bytes/signatures are not supplied. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

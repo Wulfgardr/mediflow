@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useRef, useState } from 'react';
 import { checkWhoCode, whoCodeCheckErrorMessage } from '@/lib/icd-code-check-client';
 import { isWhoCheckCode, type WhoCodeCheckResult } from '@/lib/reference-data/icd11-who-code-check-contract';

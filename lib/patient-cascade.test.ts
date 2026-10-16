@@ -54,7 +54,6 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-cascade-'));
     const sqlite = new Database(path.join(dir, 'medical.db'));
     const migrationsDir = path.join(ROOT_DIR, 'drizzle');
-    /* @Codex */
     sqlite.exec(`CREATE TABLE durable_review_records (
         id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
         receipt_ref TEXT NOT NULL, provenance_ref TEXT NOT NULL, receipt_binding TEXT NOT NULL, provenance_binding TEXT NOT NULL,
@@ -72,7 +71,6 @@ function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Data
         if (sql.trim().length === 0) continue;
         sqlite.exec(sql);
     }
-    /* @Codex */
     sqlite.exec(`
         ALTER TABLE attachments ADD COLUMN document_source_ref TEXT NOT NULL DEFAULT '${'0'.repeat(64)}'
             CHECK (length(document_source_ref) = 64 AND document_source_ref NOT GLOB '*[^0-9a-f]*');
@@ -95,7 +93,6 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
     sqlite.prepare(
         "INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, 'Mario', 'Rossi', 'RSSMRA80A01H501X')"
     ).run(patientId);
-    /* @Codex */
     const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
     const currentnessRef = digest(patientId);
     const patientRef = `ptr_${digest(`synthetic:patient:${suffix}`).slice(0, 32)}`;
@@ -136,7 +133,6 @@ function insertPatientWithChildren(sqlite: Database.Database, patientId: string)
     sqlite.prepare(
         "INSERT INTO siss_handoff_events (id, patient_id, action, module_label, started_at) VALUES (?, ?, 'open', 'Test', 1)"
     ).run(`sh-${suffix}`, patientId);
-    /* @Codex */
     sqlite.prepare(
         "INSERT INTO document_diagnosis_proposals (id, patient_id, source_document_key, candidate_key, payload, status, confidence) VALUES (?, ?, ?, ?, 'ENC:fixture:cipher', 'pending', 'high')"
     ).run(`dp-${suffix}`, patientId, `source-${suffix}`, `candidate-${suffix}`);
@@ -166,7 +162,6 @@ function expectAllOnes(counts: PatientCascadeCounts, label: string): void {
     }
 }
 
-/* @Codex */
 function insertAuthorityPatientWithAttachment(sqlite: Database.Database, patientId: string, sourceRef: string): void {
     sqlite.prepare("INSERT OR IGNORE INTO ambulatories (id, name) VALUES ('amb-test', 'Ambulatorio Test')").run();
     sqlite.prepare("INSERT INTO patients (id, first_name, last_name, tax_code) VALUES (?, 'Ada', 'Synthetic', ?)")
@@ -261,7 +256,7 @@ test('patient purge revokes old locators and operations before deleting attachme
             (id, patient_id, name, type, size, path, data, document_source_ref, document_revision, document_freshness_epoch)
             VALUES (?, ?, 'replacement.rtf', 'application/rtf', 4, 'replacement.rtf', ?, ?, 1, 1)`)
             .run(`at-${patientId}`, patientId, 'data:text/rtf;base64,VGVzdA==', 'b'.repeat(64));
-        /* @Codex Purge removes the ambulatory membership that authorizes the
+        /* Purge removes the ambulatory membership that authorizes the
            selected patient. The prior source authority must remain unusable;
            re-establish membership and a new selected session before minting. */
         assert.equal(authority.issue({ attachmentId: `at-${patientId}` }), null);

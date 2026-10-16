@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { CHATGPT_SYNTHESIS_FIXTURE } from '../chatgpt-execution/synthetic-synthesis-fixture';

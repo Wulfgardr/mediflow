@@ -4,14 +4,12 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { messages } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);

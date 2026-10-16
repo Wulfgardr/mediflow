@@ -73,7 +73,7 @@ const basePayload = {
     ],
     exemptions: [],
     exemptionImportReceipts: [],
-    prostheticsCatalogEntries: [], // @Codex Additive repertory generation.
+    prostheticsCatalogEntries: [], // Additive repertory generation.
     prostheticsCatalogReceipts: [],
     prostheticsCatalogSources: [],
     prostheticsCatalogDocuments: [],
@@ -167,7 +167,6 @@ test('rejects proxy and accessor attachment tuples without reading them', async 
     assert.equal(reads, 0); assert.equal(traps, 0);
 });
 
-/* @Codex */
 test('includes durable review records and replay operations in the authenticated artifact', async () => {
     const payload = {
         ...basePayload,
@@ -192,7 +191,6 @@ test('includes durable review records and replay operations in the authenticated
     assert.equal(artifact.manifest.recordCounts.headlessSoapEntryCommits, 0);
 });
 
-/* @Codex */
 test('normalizes an authenticated pre-H7b artifact to an empty SOAP commit ledger', async () => {
     const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
     delete artifact.payload.headlessSoapEntryCommits;
@@ -209,7 +207,6 @@ test('normalizes an authenticated pre-H7b artifact to an empty SOAP commit ledge
     assert.deepEqual(parsed.manifest.collections, BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents'));
 });
 
-/* @Codex */
 test('rejects command state without the append-only audit ledger needed for replay', async () => {
     await assert.rejects(
         createBackupArtifact({
@@ -220,13 +217,11 @@ test('rejects command state without the append-only audit ledger needed for repl
     );
 });
 
-/* @Codex */
 async function sha256(value: string): Promise<string> {
     const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/* @Codex */
 async function framedSha256(fields: readonly string[]): Promise<string> {
     const packet = frame(fields);
     assert.ok(packet);
@@ -234,7 +229,6 @@ async function framedSha256(fields: readonly string[]): Promise<string> {
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/* @Codex */
 async function headlessSoapCommitFixture() {
     const commandId = `hsac_${'1'.repeat(64)}`;
     const approvalRef = `hsaa_${'2'.repeat(64)}`;
@@ -409,7 +403,7 @@ test('included general audit contains every H7b snapshot field-exactly', async (
     }
 });
 
-/* @Codex Recomputed digests and the outer checksum cannot legitimize semantically forged H7b evidence. */
+/* Recomputed digests and the outer checksum cannot legitimize semantically forged H7b evidence. */
 test('rejects a digest-consistent H7b artifact with forged binding, plaintext entry and PHI audit', async () => {
     const fixture = await headlessSoapCommitFixture();
     const digest = (domain: string, payload: string) => sha256(`${domain}\0${payload}`);
@@ -567,7 +561,6 @@ test('rejects malformed, noncanonical, or orphan H7b commit ledger rows before r
     );
 });
 
-/* @Codex */
 async function durableReviewLedgerFixture() {
     const record = {
         id: `review_${'a'.repeat(32)}`,
@@ -601,7 +594,6 @@ async function durableReviewLedgerFixture() {
     return { record, operation };
 }
 
-/* @Codex */
 async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
     const { record, operation } = await durableReviewLedgerFixture();
     const artifact = JSON.parse(await serializeBackupArtifact({
@@ -617,7 +609,6 @@ async function checksumValidDurableArtifact(mutate: (artifact: any) => void | Pr
     return artifact;
 }
 
-/* @Codex */
 async function checksumValidAuthorityArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
     const { record, operation } = await durableReviewLedgerFixture();
     const artifact = JSON.parse(await serializeBackupArtifact({
@@ -650,7 +641,6 @@ async function checksumValidAuthorityArtifact(mutate: (artifact: any) => void | 
     return artifact;
 }
 
-/* @Codex */
 async function checksumValidHeadlessSoapAttestationArtifact(mutate: (artifact: any) => void | Promise<void>): Promise<Record<string, unknown>> {
     const artifact = JSON.parse(await serializeBackupArtifact({
         ...basePayload,
@@ -859,7 +849,6 @@ test('rejects checksum-valid malformed durable review authority rows before rest
     }
 });
 
-/* @Codex */
 test('rejects hostile durable review authority rows without invoking accessors or proxy traps', async () => {
     const authorityRow = {
         actorRef: 'actor-synthetic',
@@ -1028,7 +1017,6 @@ test('preserves patient assigned ambulatory ids inside the backup payload', asyn
     assert.deepEqual(parsed.payload.patients[0].assignedAmbulatoryIds, ['amb-2', 'amb-1', 'amb-2']);
 });
 
-/* @Codex */
 async function legacyArtifact(): Promise<Record<string, any>> {
     const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
     delete artifact.payload.documentDiagnosisProposals;
@@ -1081,7 +1069,6 @@ test('accepts an authentic legacy v1 artifact and normalizes missing optional co
     assert.equal(parsed.manifest.checksum, normalizedChecksum);
 });
 
-/* @Codex */
 test('accepts a legacy artifact without durable review collections', async () => {
     const artifact = JSON.parse(await serializeBackupArtifact(basePayload));
     delete artifact.payload.durableReviewRecords;

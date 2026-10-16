@@ -2,7 +2,6 @@ import MediFlowCore
 import SwiftUI
 import Combine
 
-/* @Codex */
 enum ClinicalNavigationAvailability: Equatable {
     case ready, locked, busy
 }

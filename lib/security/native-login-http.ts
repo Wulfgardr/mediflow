@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { NextResponse } from 'next/server';
@@ -68,7 +67,6 @@ async function auditSuccess(request: Request, user: Account, session: ReturnType
 }
 
 /** The sole native login seam: admission is burned on every path and only rechecked after PIN verification. */
-/* @Codex */
 export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDependencies = {}) {
     // An account with a passphrase refuses the PIN here until the native clients send the verifier (ADR 0143).
     const verify = dependencies.verify ?? verifyUnlockCredentials;

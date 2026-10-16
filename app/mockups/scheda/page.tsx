@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX: banco di prova NON autenticato per la nuova composizione
+/* WUL-UIUX: banco di prova NON autenticato per la nuova composizione
    della Scheda su paziente complesso. Usa i componenti reali (identity lens,
    striscia segnali, sezioni collassabili, shell con scrollspy) con dati statici
    e placeholder al posto dei gestori pesanti, per testare disposizione, logica

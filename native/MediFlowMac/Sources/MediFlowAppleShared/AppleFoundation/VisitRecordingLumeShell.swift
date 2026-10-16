@@ -1,4 +1,3 @@
-/* @Codex */
 #if os(macOS)
 import MediFlowCore
 import SwiftUI

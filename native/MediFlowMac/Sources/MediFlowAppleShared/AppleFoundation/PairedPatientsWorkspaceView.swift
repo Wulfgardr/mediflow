@@ -6,9 +6,9 @@ struct PairedPatientsWorkspaceView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.clinicalPatientNavigation) private var linkedPatient // @Codex
-    @Environment(\.clinicalNavigationInteraction) private var navigationInteraction // @Codex
-    @State private var navigationInteractionID = UUID() // @Codex
+    @Environment(\.clinicalPatientNavigation) private var linkedPatient
+    @Environment(\.clinicalNavigationInteraction) private var navigationInteraction
+    @State private var navigationInteractionID = UUID()
     @ObservedObject private var model: PairedPatientsWorkspaceModel
     // S6 (D7-bis): gates the new document surfaces on the effective capability
     // matrix returned for this pairing. The server downgrades host-supported but
@@ -16,7 +16,7 @@ struct PairedPatientsWorkspaceView: View {
     // guidance before a data-plane call can fail with 403.
     @ObservedObject private var capabilities: ClinicalWorkspaceCapabilitiesStore
     @State private var confirmsClearingPairing = false
-    @State private var showsConnectionSetup = false // @Codex
+    @State private var showsConnectionSetup = false
     @State private var entryDeletionCandidate: HomeBaseEntrySummary?
     @State private var confirmsDeletingTherapy = false
     @State private var therapyDeletionCandidateId: String?
@@ -46,7 +46,7 @@ struct PairedPatientsWorkspaceView: View {
     @State private var selectedFseObservationId: String?
     @State private var expandedInsightId: String?
     @State private var isCompactPatientHeaderExpanded = false
-    // @Codex: A navigation destination, not authority to operate on this patient.
+    // A navigation destination, not authority to operate on this patient.
     @State private var compactPatientID: String?
 
     init(model: PairedPatientsWorkspaceModel, capabilities: ClinicalWorkspaceCapabilitiesStore) {
@@ -57,14 +57,14 @@ struct PairedPatientsWorkspaceView: View {
     var body: some View {
         deleteDialogWorkspace
         #if os(macOS)
-            .modifier(VisitRecordingWorkspaceScope(model: model)) // @Codex
+            .modifier(VisitRecordingWorkspaceScope(model: model))
         #endif
     }
 
     private var platformWorkspace: some View {
         layoutBody
         #if os(macOS)
-        .textFieldStyle(.roundedBorder) // @Codex: Native desktop field geometry.
+        .textFieldStyle(.roundedBorder) // Native desktop field geometry.
         // No window-wide background fill: the sidebar material, the toolbar and
         // the scroll-edge effect are drawn by the system, and an opaque
         // windowBackgroundColor painted over the whole workspace is exactly what
@@ -138,7 +138,6 @@ struct PairedPatientsWorkspaceView: View {
                     .accessibilityLabel("Ambulatorio attivo")
                     .accessibilityValue(activeAmbulatoryScopeLabel)
                     .accessibilityIdentifier("ambulatory-scope-picker")
-                    // @Codex
                     .contentShape(.interaction, Rectangle().inset(by: -4))
                 }
             }
@@ -176,7 +175,6 @@ struct PairedPatientsWorkspaceView: View {
                 onCancel: { presentingScale = nil }
             )
         }
-        /* @Codex */
         .sheet(isPresented: $showsConnectionSetup) {
             PairedHomeBaseCredentialsSheet(
                 model: model,
@@ -189,7 +187,7 @@ struct PairedPatientsWorkspaceView: View {
         .sheet(item: $entryDeletionCandidate) { entry in
             PairedDiaryDeleteSheet(entry: entry, model: model)
         }
-        // @Codex: The diary and documents share this presenter even when only
+        // The diary and documents share this presenter even when only
         // one clinical section is mounted. Opening a document never saves a draft.
         .sheet(item: attachmentSheetCandidate, onDismiss: {
             if !usesInlineAttachmentPreview { model.dismissAttachmentDetail() }
@@ -212,26 +210,26 @@ struct PairedPatientsWorkspaceView: View {
 
     private var eventWorkspace: some View {
         sheetWorkspace
-        // @Codex: A deep link must not replace the patient behind an existing
+        // A deep link must not replace the patient behind an existing
         // scale, confirmation or document/setup sheet. Keep their state owners.
         .onAppear {
             navigationInteraction?.register(navigationInteractionID, { navigationPresentationIsOpen })
         }
         .onDisappear { navigationInteraction?.unregister(navigationInteractionID) }
         #if os(macOS)
-        // @Codex: The split already shows the selected patient. Consume this
+        // The split already shows the selected patient. Consume this
         // one-shot intent so returning to the workspace cannot replay it.
         .onAppear { revealLinkedPatient(isWide: true) }
         .onChange(of: linkedPatient?.id) { _ in revealLinkedPatient(isWide: true) }
         #endif
-        // @Codex: The archive summary remains available when Documents is not mounted.
+        // The archive summary remains available when Documents is not mounted.
         .task(id: attachmentReadPatientID) {
             guard attachmentReadPatientID != nil, model.attachmentsLoadState == .idle else { return }
-            // @Codex: This shared read belongs to the patient context. Leaving a
+            // This shared read belongs to the patient context. Leaving a
             // section must not cancel it; the model rejects stale responses.
             Task { await model.loadSelectedPatientAttachments(reportStatus: false) }
         }
-        // @Codex: A presentation must not outlive its patient context.
+        // A presentation must not outlive its patient context.
         .onChange(of: model.selectedPatient?.id) { patientID in
             if attachmentDetailCandidate?.patientId != patientID {
                 attachmentDetailCandidate = nil
@@ -250,12 +248,11 @@ struct PairedPatientsWorkspaceView: View {
         }
         .onChange(of: scenePhase) { newValue in
             guard newValue == .active else { return }
-            model.refreshOfflineCacheIfNeeded() // @Codex
+            model.refreshOfflineCacheIfNeeded()
             Task { await model.checkNetworkRevisionOnForeground() }
         }
     }
 
-    /* @Codex */
     private var attachmentReadPatientID: String? {
         guard capabilities.hasCapability("network.replica.readonly-documents") else { return nil }
         #if DEBUG
@@ -381,7 +378,7 @@ struct PairedPatientsWorkspaceView: View {
     }
     #endif
 
-    // @Codex: Compact uses a destination; wide layouts retain list and chart together.
+    // Compact uses a destination; wide layouts retain list and chart together.
     @ViewBuilder
     private var layoutBody: some View {
         #if os(macOS)
@@ -389,7 +386,7 @@ struct PairedPatientsWorkspaceView: View {
         #else
         GeometryReader { proxy in
             mobileWorkspace(containerWidth: proxy.size.width)
-                // @Codex: Reuse the existing width decision; this only opens
+                // Reuse the existing width decision; this only opens
                 // the chart selected by a successfully completed navigation read.
                 .onAppear { revealLinkedPatient(isWide: usesSplitLayout(containerWidth: proxy.size.width)) }
                 .onChange(of: linkedPatient?.id) { _ in
@@ -405,7 +402,6 @@ struct PairedPatientsWorkspaceView: View {
         #endif
     }
 
-    /* @Codex */
     private func revealLinkedPatient(isWide: Bool) {
         guard let linkedPatient else { return }
         if model.selectedPatient?.id == linkedPatient.patientID {
@@ -455,7 +451,7 @@ struct PairedPatientsWorkspaceView: View {
 
                 Divider()
 
-                // @Codex: Identity and navigation stay outside the scrolling
+                // Identity and navigation stay outside the scrolling
                 // plane. Section changes reset the scroll without replacing it.
                 VStack(spacing: 0) {
                     if let detail = model.selectedPatient {
@@ -484,7 +480,7 @@ struct PairedPatientsWorkspaceView: View {
                 }
                 .frame(width: PatientsWorkspaceLayout.detailWidth(forContainerWidth: containerWidth))
                 .background(PlatformColors.chartCardSurface)
-                .accessibilityElement(children: .contain) // @Codex: Preserve child navigation identifiers.
+                .accessibilityElement(children: .contain) // Preserve child navigation identifiers.
                 .accessibilityIdentifier("patient-workspace-detail")
             }
         } else {
@@ -506,12 +502,12 @@ struct PairedPatientsWorkspaceView: View {
                     #endif
                 }
                 .padding(20)
-                // @Codex: Use the workspace's offered width without asking the
+                // Use the workspace's offered width without asking the
                 // enclosing navigation container for another layout measurement.
                 .frame(width: containerWidth, alignment: .topLeading)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                // @Codex: The chart header belongs to the chart destination.
+                // The chart header belongs to the chart destination.
                 #if DEBUG
                 if focusedDetailOnly, let detail = model.selectedPatient {
                     VStack(spacing: 0) {
@@ -524,12 +520,10 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private var compactDetailIsPresented: Binding<Bool> {
         Binding(get: { compactPatientID != nil }, set: { if !$0 { compactPatientID = nil } })
     }
 
-    /* @Codex */
     private var compactWorklist: some View {
         PairedPatientsWorklistView(
             model: model,
@@ -548,7 +542,6 @@ struct PairedPatientsWorkspaceView: View {
         .chartCard()
     }
 
-    /* @Codex */
     private var compactPatientDestination: some View {
         ScrollViewReader { scroll in
             ScrollView {
@@ -578,7 +571,7 @@ struct PairedPatientsWorkspaceView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if let detail = model.selectedPatient, detail.id == compactPatientID {
                 VStack(spacing: 0) {
-                    // @Codex: One 44pt context row leaves clinical space above
+                    // One 44pt context row leaves clinical space above
                     // the keyboard. Native compact toolbars cap controls at 36pt.
                     if verticalSizeClass == .compact {
                         compactHeightPatientNavigation(detail)
@@ -594,7 +587,6 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private func compactHeightPatientNavigation(_ detail: HomeBasePatientDetail) -> some View {
         HStack(spacing: 12) {
             Text("\(detail.lastName) \(detail.firstName)")
@@ -623,7 +615,7 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityIdentifier("patient-section-navigation")
     }
 
-    /* @Codex: The wide chart always states identity and recency. */
+    /* The wide chart always states identity and recency. */
     private func mobileWidePatientHeader(_ detail: HomeBasePatientDetail) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("\(detail.lastName) \(detail.firstName)")
@@ -653,14 +645,12 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityIdentifier("patient-workspace-header")
     }
 
-    /* @Codex */
     private var mobileCanvasColor: Color {
         colorScheme == .dark
             ? LumePalette.guardia.canvas
             : PlatformColors.groupedBackground
     }
 
-    /* @Codex */
     @ViewBuilder
     private var mobilePairedStatus: some View {
         #if DEBUG
@@ -681,7 +671,7 @@ struct PairedPatientsWorkspaceView: View {
                 isWorking: model.isWorking,
                 errorMessage: model.errorMessage,
                 reconciliationLine: model.reconciliationLine,
-                cacheIsStale: model.cacheIsStale // @Codex
+                cacheIsStale: model.cacheIsStale
             )
         ) {
             switch model.connectionState {
@@ -695,7 +685,6 @@ struct PairedPatientsWorkspaceView: View {
     #endif
 
     #if os(macOS)
-    /* @Codex */
     /// Window toolbar for the patients workspace.
     ///
     /// The chart actions live here, not in a grid inside the chart: on macOS the
@@ -798,7 +787,7 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    // @Codex: A single desktop split below the app navigation. A nested
+    // A single desktop split below the app navigation. A nested
     // NavigationSplitView extends its toolbar material over the patient header;
     // HSplitView leaves that chrome to the root NavigationStack.
     private var macOSWorkspace: some View {
@@ -820,7 +809,7 @@ struct PairedPatientsWorkspaceView: View {
             .frame(minWidth: 240, idealWidth: 270, maxWidth: 300, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("patient-workspace-sidebar")
-            // @Codex: The identity is outside the scrolling plane, including
+            // The identity is outside the scrolling plane, including
             // its system edge effect; it must remain readable during a scroll.
             VStack(spacing: 0) {
                 if let detail = model.selectedPatient {
@@ -830,7 +819,7 @@ struct PairedPatientsWorkspaceView: View {
                         .padding(.bottom, 8)
                     Divider()
                 }
-                // @Codex: Keep the split pane stable while resetting only its scroll
+                // Keep the split pane stable while resetting only its scroll
                 // position. Replacing the pane identity also moved AppKit's divider.
                 ScrollViewReader { scroll in
                     ScrollView {
@@ -853,7 +842,6 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private func patientWorkspaceHeader(_ detail: HomeBasePatientDetail) -> some View {
         let name = "\(detail.lastName) \(detail.firstName)"
         let metadata = patientWorkspaceHeaderMetadata(detail)
@@ -882,7 +870,6 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityIdentifier("patient-workspace-header")
     }
 
-    /* @Codex */
     private func patientWorkspaceHeaderVertical(name: String, metadata: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             patientWorkspaceHeaderName(name)
@@ -890,14 +877,12 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private func patientWorkspaceHeaderName(_ name: String) -> some View {
         Text(name)
             .inkVoice(28)
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /* @Codex */
     private func patientWorkspaceHeaderAtoms(_ metadata: String) -> some View {
         Text(metadata)
             .font(.subheadline)
@@ -906,7 +891,6 @@ struct PairedPatientsWorkspaceView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /* @Codex */
     private func patientWorkspaceHeaderMetadata(_ detail: HomeBasePatientDetail) -> String {
         var atoms = [PairedPatientsWorkspaceSupport.compactTaxCode(detail.taxCode)]
         if let age = PairedPatientsWorkspaceSupport.age(from: detail.birthDate) {
@@ -922,7 +906,6 @@ struct PairedPatientsWorkspaceView: View {
 
     #endif
 
-    /* @Codex */
     @ViewBuilder
     private var patientDetailContent: some View {
         if let detail = model.selectedPatient {
@@ -943,7 +926,7 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex: A historical profile never enters the editable online chart. */
+    /* A historical profile never enters the editable online chart. */
     private func cachedPatientProfile(_ profile: HomeBasePatientDetail) -> some View {
         CachedPatientProfileView(
             profile: profile,
@@ -952,7 +935,6 @@ struct PairedPatientsWorkspaceView: View {
         )
     }
 
-    /* @Codex */
     private func pendingPatientDetail(patientID: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if model.isWorking {
@@ -993,7 +975,6 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityIdentifier("patient-detail-pending")
     }
 
-    /* @Codex */
     private func retryPatientDetailButton(patientID: String) -> some View {
         Button("Ricarica scheda") {
             guard let patient = model.patients.first(where: { $0.id == patientID }) else { return }
@@ -1011,7 +992,6 @@ struct PairedPatientsWorkspaceView: View {
     }
     #endif
 
-    /* @Codex */
     @ViewBuilder
     private var connectionSetupBanner: some View {
         if let message = connectionSetupMessage {
@@ -1038,7 +1018,6 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private var isPatientWorklistUsable: Bool {
         switch model.connectionState {
         case .pairedOnline:
@@ -1050,7 +1029,6 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private var connectionSetupMessage: String? {
         guard !isPatientWorklistUsable else { return nil }
         if model.errorMessage != nil {
@@ -1084,18 +1062,17 @@ struct PairedPatientsWorkspaceView: View {
             Image(systemName: "person.text.rectangle")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-                .accessibilityHidden(true) // @Codex: The adjacent text states the empty selection.
+                .accessibilityHidden(true) // The adjacent text states the empty selection.
             Text("Seleziona un paziente")
                 .font(.headline)
             Text("Scegli un paziente dall'elenco per vederne scheda, diario, terapie, controlli e osservazioni.")
                 .font(.subheadline)
-                // @Codex
                 .lumeInchiostro(bozza: true)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, minHeight: 320)
-        .accessibilityElement(children: .contain) // @Codex: Keep the container identifier off its children.
+        .accessibilityElement(children: .contain) // Keep the container identifier off its children.
     }
 
     /// Native disclosure for the open patient's identity.
@@ -1156,7 +1133,7 @@ struct PairedPatientsWorkspaceView: View {
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        // @Codex: Identity is an opaque part of the clinical document.
+        // Identity is an opaque part of the clinical document.
         .background(PlatformColors.chartCardSurface)
         // No accessibility label override here on purpose: an explicit label on
         // the group merges it into one element and hides the native disclosure
@@ -1233,7 +1210,6 @@ struct PairedPatientsWorkspaceView: View {
                 .accessibilityIdentifier("workspace-error-message")
         } else if let status = model.statusMessage {
             Text(status)
-                // @Codex
                 .font(.caption)
                 .lumeInchiostro(bozza: false)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1305,7 +1281,6 @@ struct PairedPatientsWorkspaceView: View {
 
 
 
-    /* @Codex */
     private var patientSectionPicker: some View {
         #if os(iOS)
         MobilePatientSectionNavigation(selection: $model.activePatientSection)
@@ -1341,7 +1316,6 @@ struct PairedPatientsWorkspaceView: View {
         #endif
     }
 
-    /* @Codex */
     private var populatedPatientSections: [(section: PatientWorkspaceSection, count: Int)] {
         // These are loaded records, not totals: paired list routes can be bounded.
         let sections: [(section: PatientWorkspaceSection, count: Int)] = [
@@ -1353,7 +1327,6 @@ struct PairedPatientsWorkspaceView: View {
         return sections.filter { $0.count > 0 }
     }
 
-    /* @Codex */
     private var patientContents: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("In questa cartella")
@@ -1372,7 +1345,6 @@ struct PairedPatientsWorkspaceView: View {
         .accessibilityIdentifier("patient-chart-contents")
     }
 
-    /* @Codex */
     private var attachmentContentsStatus: String {
         switch model.attachmentsLoadState {
         case .loaded: return model.attachments.isEmpty ? "Nessun documento" : "\(model.attachments.count) caricati"
@@ -1383,7 +1355,6 @@ struct PairedPatientsWorkspaceView: View {
         }
     }
 
-    /* @Codex */
     private func patientSectionLink(_ section: PatientWorkspaceSection, status: String) -> some View {
         Button {
             model.activePatientSection = section
@@ -1411,7 +1382,7 @@ struct PairedPatientsWorkspaceView: View {
     @ViewBuilder
     private func selectedPatientSections(_ detail: HomeBasePatientDetail) -> some View {
         VStack(alignment: .leading, spacing: Self.sectionSpacing) {
-            // @Codex: Keep only the active clinical section in the reading pane.
+            // Keep only the active clinical section in the reading pane.
             // Drafts and existing action bindings remain owned by the workspace/model.
             switch model.activePatientSection {
             case .overview:
@@ -1428,7 +1399,7 @@ struct PairedPatientsWorkspaceView: View {
             NativeSmartImportView(workspaceModel: model).chartCard()
             #endif
             #if !os(macOS)
-            // @Codex: Patient facts precede optional collection summaries.
+            // Patient facts precede optional collection summaries.
             if !populatedPatientSections.isEmpty ||
                 (capabilities.hasCapability("network.replica.readonly-documents") &&
                  (model.attachmentsLoadState != .loaded || !model.attachments.isEmpty)) {
@@ -1528,18 +1499,17 @@ private extension View {
     @ViewBuilder
     func chartCard() -> some View {
         #if os(macOS)
-        // @Codex: The reading pane is the clinical surface. A section needs
+        // The reading pane is the clinical surface. A section needs
         // hierarchy and spacing, not a second full-width rounded envelope.
         frame(maxWidth: .infinity, alignment: .leading)
         #else
-        // @Codex: The reading pane owns its padding and opaque surface.
+        // The reading pane owns its padding and opaque surface.
         frame(maxWidth: .infinity, alignment: .leading)
         #endif
     }
 }
 
 #if os(macOS)
-/* @Codex */
 private struct MacPatientSectionNavigation: View {
     @Binding var selection: PatientWorkspaceSection
 
@@ -1627,7 +1597,6 @@ private struct CompactContainerWidth: ViewModifier {
     }
 }
 
-/* @Codex */
 private extension View {
     @ViewBuilder
     func compactContainerWidth(inset: CGFloat = 0) -> some View {
@@ -1645,7 +1614,6 @@ private extension View {
     }
 }
 
-/* @Codex */
 extension PairedPatientsWorkspaceView {
     static func age(from birthDate: Date?) -> Int? {
         PairedPatientsWorkspaceSupport.age(from: birthDate)

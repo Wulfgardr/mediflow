@@ -1,12 +1,8 @@
-/* @Codex */
 import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './security/audit';
-/* @Codex */
 import type { SissTransportMode } from './siss-adapter';
 
-/* @Codex */
 export type SissPrescriptionAuditEntrypoint = 'patient-context' | 'therapy-panel';
 
-/* @Codex */
 export function buildSissPrescriptionLaunchAuditMetadata(input: {
     entrypoint: SissPrescriptionAuditEntrypoint;
     mode?: SissTransportMode | null;

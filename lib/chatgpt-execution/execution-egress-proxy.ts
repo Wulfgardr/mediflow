@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';

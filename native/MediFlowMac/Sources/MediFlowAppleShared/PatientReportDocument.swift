@@ -15,7 +15,6 @@ private typealias ReportFont = UIFont
 private typealias ReportColor = UIColor
 #endif
 
-/* @Codex */
 public struct PatientReportContent: Equatable, Sendable {
     public let title: String
     public let generatedLabel: String
@@ -39,14 +38,12 @@ public struct PatientReportContent: Equatable, Sendable {
     }
 }
 
-/* @Codex */
 public struct PatientReportSection: Equatable, Sendable {
     public let title: String
     public let rows: [PatientReportLine]
     public let emptyMessage: String
 }
 
-/* @Codex */
 public struct PatientReportLine: Equatable, Sendable {
     public let primary: String
     public let details: [String]
@@ -61,7 +58,6 @@ public struct PatientReportLine: Equatable, Sendable {
     }
 }
 
-/* @Codex */
 public enum PatientReportDocument {
     public static func build(
         patient: HomeBasePatientDetail,
@@ -325,7 +321,6 @@ public enum PatientReportDocument {
     }()
 }
 
-/* @Codex */
 public enum PatientReportPDFRenderer {
     public static func render(_ content: PatientReportContent, to directory: URL = FileManager.default.temporaryDirectory) throws -> URL {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -445,7 +440,6 @@ public enum PatientReportPDFRenderer {
     }
 }
 
-/* @Codex */
 public enum PatientReportPDFError: Error, Equatable {
     case cannotCreateFile
     case cannotCreateContext

@@ -1,25 +1,17 @@
 import { createProstheticsCatalog, ProstheticsCatalogError } from './reference-data/prosthetics-catalog-service';
 import type { ProstheticsCatalogSelection } from './reference-data/prosthetics-catalog-contract';
-/* @Codex */
 import { and, desc, eq } from 'drizzle-orm';
-/* @Codex */
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import {
     prostheticPrescriptionCreateSchema,
     prostheticPrescriptionUpdateSchema,
     type ProstheticPrescriptionCreatePayload,
     type ProstheticPrescriptionUpdatePayload,
 } from './api-schemas/prescriptions';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { activePatients } from './patient-lifecycle';
-/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
-/* @Codex */
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
-/* @Codex */
 import {
     PROSTHETIC_PRESCRIPTION_CATEGORY_SET,
     PROSTHETIC_PRESCRIPTION_SOURCE_SET,
@@ -30,9 +22,7 @@ import {
     parseOptionalPrescriptionDate,
     parsePrescriptionDate,
 } from './prescription-domain';
-/* @Codex */
 import { patients, patientsToAmbulatories, prostheticPrescriptions } from './schema';
-/* @Codex */
 import {
     listChangedFields,
     auditContextFromSession,
@@ -42,12 +32,9 @@ import {
     type AuditEventType,
     type AuditRedactedMetadata,
 } from './security/audit';
-/* @Codex */
 import type { ServerSession } from './security/server-session';
 
-/* @Codex */
 export const NETWORK_PROSTHETIC_PRESCRIPTION_READ_CAPABILITY = 'network.replica.readonly-prosthetic-prescriptions';
-/* @Codex */
 export const NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY = 'network.replica.write-prosthetic-prescriptions';
 
 type MutationResponse =
@@ -197,7 +184,7 @@ function selectConflictSnapshot(tx: Parameters<Parameters<typeof dbServer.transa
     }).from(prostheticPrescriptions).where(eq(prostheticPrescriptions.id, id)).get() ?? null;
 }
 
-/* @Codex: audit actor and surface derive from admitted context, never request headers. */
+/* audit actor and surface derive from admitted context, never request headers. */
 function prostheticAuditInput(
     context: HostContext | NetworkWriteContext,
     surface: 'host' | 'network',
@@ -223,7 +210,6 @@ function prostheticAuditInput(
     };
 }
 
-/* @Codex */
 export async function listProstheticPrescriptions(patientId: string | null) {
     let query = dbServer.select().from(prostheticPrescriptions);
     if (patientId) {
@@ -233,7 +219,6 @@ export async function listProstheticPrescriptions(patientId: string | null) {
     return query.orderBy(desc(prostheticPrescriptions.prescribedAt));
 }
 
-/* @Codex */
 export async function listNetworkScopedProstheticPrescriptions(patientId: string, scopeAmbulatoryId: string) {
     const rows = await dbServer.select({ item: prostheticPrescriptions })
         .from(prostheticPrescriptions)
@@ -243,7 +228,6 @@ export async function listNetworkScopedProstheticPrescriptions(patientId: string
     return rows.map((row) => row.item);
 }
 
-/* @Codex */
 export async function createHostProstheticPrescription(context: HostContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = prostheticPrescriptionCreateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
@@ -269,7 +253,6 @@ export async function createHostProstheticPrescription(context: HostContext, raw
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function updateHostProstheticPrescription(context: HostContext & { id: string }, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = prostheticPrescriptionUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
@@ -313,7 +296,6 @@ async function updateProstheticPrescription(
     return commit;
 }
 
-/* @Codex */
 export async function deleteHostProstheticPrescription(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
     const commit = dbServer.transaction((tx): MutationResponse => {
         const existing = selectConflictSnapshot(tx, context.id);
@@ -332,7 +314,6 @@ export async function deleteHostProstheticPrescription(context: HostContext & { 
     return commit;
 }
 
-/* @Codex */
 export async function createNetworkScopedProstheticPrescription(context: NetworkPatientContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = prostheticPrescriptionCreateSchema.safeParse({ ...rawBody, patientId: context.patientId });
     if (!parsed.success) return badRequest('Payload non valido');
@@ -356,7 +337,6 @@ export async function createNetworkScopedProstheticPrescription(context: Network
     return commit;
 }
 
-/* @Codex */
 export async function updateNetworkScopedProstheticPrescription(context: NetworkPrescriptionContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = prostheticPrescriptionUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');

@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import MediFlowCore
 
-/* @Codex */
 final class ClinicalRichTextEditorTests: XCTestCase {
     private struct Fixture: Decodable {
         let name: String
@@ -28,7 +27,7 @@ final class ClinicalRichTextEditorTests: XCTestCase {
 
     // MARK: - Round trip over the S5 web-parity fixtures
 
-    // @Codex: Opening an existing record and saving without edits preserves
+    // Opening an existing record and saving without edits preserves
     // every sanitized byte, including the four formerly normalized fragments.
     func testEditorRoundTripsWebFixtures() throws {
         let fixtures = try loadFixtures()

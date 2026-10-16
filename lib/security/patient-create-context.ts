@@ -1,4 +1,4 @@
-/* @Codex: bounded consumer preconditions, never a source of auth/selection authority. */
+/* bounded consumer preconditions, never a source of auth/selection authority. */
 import { randomBytes } from 'node:crypto';
 import type * as LifecycleOwner from './web-auth-lifecycle-owner-adapter.ts';
 

@@ -3,7 +3,6 @@ import test from 'node:test';
 import { createSemanticQueryPlanValidatorV1 } from './semantic-query-plan';
 import { SemanticQueryExecutionV1Error, createSemanticQueryExecutorV1 } from './semantic-query-executor';
 
-/* @Codex */
 const record = <T extends object>(value: T): Readonly<T> => Object.freeze(Object.assign(Object.create(null), value));
 const policy = () => record({ purposeCode: 'care_coordination', scope: 'selected_patient', generation: 7,
   revocationGeneration: 2, selectionEpoch: 11, maxSteps: 2, maxDurationMs: 100, maxOutputBytes: 4096 });

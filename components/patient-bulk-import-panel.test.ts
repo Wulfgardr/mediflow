@@ -1,4 +1,4 @@
-/* @Codex: STATIC integration checks, not React rendering or an authentication proof. */
+/* STATIC integration checks, not React rendering or an authentication proof. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';

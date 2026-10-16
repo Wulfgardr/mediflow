@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { FunctionPreferencesPanel } from '@/components/function-models/function-preferences-panel';
 import { useCallback } from 'react';
 import type { FunctionModelPreferences } from '@/lib/function-models/browser';
@@ -9,15 +8,12 @@ import Link from 'next/link';
 // WUL-297 Funzioni cliniche AI: moved from the monolithic settings page.
 
 import { CheckCircle, Save, Sparkles } from 'lucide-react';
-/* @Codex */
 import functionStyles from '@/components/settings/function-status-panel.module.css';
 import {
     AI_INSIGHT_MODE_OPTIONS,
 } from '@/lib/ai-insight-settings';
 import { cn } from '@/lib/utils';
-/* @Codex */
 import { useAiSettingsController } from '@/lib/hooks/use-ai-settings-controller';
-/* @Codex */
 import {
     SETTINGS_CARD_CLASS,
     SETTINGS_INPUT_CLASS,
@@ -44,7 +40,7 @@ export default function SettingsAiFunctionsPage() {
         saveAiConfig,
     } = useAiSettingsController();
 
-    /* @Codex: mirror confirmed switches into the existing shared configuration draft. */
+    /* mirror confirmed switches into the existing shared configuration draft. */
     const syncPreferences = useCallback((dto: FunctionModelPreferences) => {
         for (const row of dto.functions) {
             if (row.id === 'patient_insight') setPatientInsightEnabled(row.enabled);
@@ -62,7 +58,7 @@ export default function SettingsAiFunctionsPage() {
                 description="Scegli quali proposte usare. Puoi modificare ogni funzione e salvare le preferenze."
             />
 
-            {/* @Codex: per-proposal access stays separate from local model preferences. */}
+            {/* per-proposal access stays separate from local model preferences. */}
             <aside className={SETTINGS_CARD_CLASS} aria-label="ChatGPT e modelli delle funzioni">
                 <p>Le preferenze locali restano sul computer. Per usare OpenAI, scegli il canale nella funzione e prepara una proposta: servono consenso sul contesto redatto, accesso dedicato e verifica dei modelli disponibili per quel tentativo.</p>
                 <Link href="/settings/ai/chatgpt" className="underline">Gestisci OpenAI · ChatGPT</Link>
@@ -134,10 +130,10 @@ export default function SettingsAiFunctionsPage() {
 
                 </details>
 
-                {/* @Codex: advanced controls remain available below the function choices. */}
+                {/* advanced controls remain available below the function choices. */}
                 <details className={SETTINGS_CARD_CLASS}>
                     <summary className={functionStyles.advancedSummary}>Regola contesto e lunghezza delle sintesi</summary>
-                    {/* @Codex WUL-273: Patient Insight runtime settings stay neutral and role-led. */}
+                    {/* WUL-273: Patient Insight runtime settings stay neutral and role-led. */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <Sparkles className="h-4 w-4" />

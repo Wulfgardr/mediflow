@@ -1,4 +1,4 @@
-// @Codex MF085-002/003: canonical source provenance and the production write gate. See ADR 0118.
+// MF085-002/003: canonical source provenance and the production write gate. See ADR 0118.
 import Foundation
 
 public struct ClinicalScaleInstrumentProvenance: Codable, Equatable, Sendable {

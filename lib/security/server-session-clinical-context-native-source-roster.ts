@@ -1,4 +1,4 @@
-/* @Codex — pure roster/projection mechanics, never an authority issuer or decryptor. */
+/* pure roster/projection mechanics, never an authority issuer or decryptor. */
 import { ProductError } from '../chatgpt-product/product-contract';
 import { NATIVE_PROJECTION_FIELDS, type NativeProjectionBody, type NativeProjectionSelector } from '../chatgpt-product/native-ordinary-projection-wire';
 import type { NativeOrdinarySourceRows } from './server-session-clinical-context-native-source-rows';

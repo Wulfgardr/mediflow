@@ -1,4 +1,4 @@
-/* @Codex: real isolated runtime, real setup/key wrapping/client encryption/API.
+/* real isolated runtime, real setup/key wrapping/client encryption/API.
  * Every name, CF, address, telephone and PIN below is a SYNTHETIC fixture.
  * No route interception, auth substitution, DB manipulation, skipped tests or custom timeouts.
  */
@@ -86,7 +86,7 @@ async function unlockAfterReload(page: Page): Promise<void> {
     if (await input.isVisible()) await unlockPassphrase(page);
     await expect(panel).toBeVisible();
 }
-// @Codex: first access can open Agenda; use the visible patient-area navigation.
+// first access can open Agenda; use the visible patient-area navigation.
 async function openNewPatient(page: Page): Promise<void> {
     await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
         .getByRole('link', { name: 'Pazienti', exact: true }).click();
@@ -105,7 +105,7 @@ async function createExistingFromUi(page: Page): Promise<WirePatient> {
     const saved = page.waitForResponse(item => isPatientCreate(item.request()));
     await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
     expect((await saved).status()).toBe(201);
-    // @Codex WUL-732: la creazione torna esplicitamente alla lista pazienti.
+    // WUL-732: la creazione torna esplicitamente alla lista pazienti.
     await expect(page).toHaveURL(/\/\?area=incarico$/u);
     const rows = await list(page); expect(rows).toHaveLength(1);
     return rows[0];

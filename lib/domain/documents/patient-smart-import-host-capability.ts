@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata, ordinaryApplicationIsCurrent } from '../../chatgpt-product/ordinary-flow';
 import { createSmartImportOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';

@@ -8,7 +8,6 @@ import Foundation
 import Crypto  // swift-crypto: re-exports CryptoKit on Apple, BoringSSL on Linux/Windows (ADR 0071)
 
 public enum PatientFieldCrypto {
-    /* @Codex */
     public enum EditableField: Equatable, Sendable {
         case absent
         case plaintext(String)
@@ -20,12 +19,10 @@ public enum PatientFieldCrypto {
         }
     }
 
-    /* @Codex */
     public static func resolveStringField(_ value: String?, masterKey: SymmetricKey?) -> EditableField {
         resolveField(value, masterKey: masterKey) { CryptoService.jsonDecodeString($0) ?? $0 }
     }
 
-    /* @Codex */
     public static func resolveStructuredField(_ value: String?, masterKey: SymmetricKey?) -> EditableField {
         resolveField(value, masterKey: masterKey) { $0 }
     }
@@ -109,13 +106,12 @@ public enum PatientFieldCrypto {
             updatedAt: detail.updatedAt,
             deletedAt: detail.deletedAt,
             deletionReason: decryptStringField(detail.deletionReason, masterKey: masterKey),
-            // @Codex: archive provenance is sealed JSON-string data, like notes.
+            // archive provenance is sealed JSON-string data, like notes.
             archiveReason: decryptStringField(detail.archiveReason, masterKey: masterKey),
             archiveNote: decryptStringField(detail.archiveNote, masterKey: masterKey)
         )
     }
 
-    /* @Codex */
     public static func encryptedPatchValue(
         _ plaintext: String?, original: EditableField, masterKey: SymmetricKey, structured: Bool = false
     ) -> PatchValue<String> {

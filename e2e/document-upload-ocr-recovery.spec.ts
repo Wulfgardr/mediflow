@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';

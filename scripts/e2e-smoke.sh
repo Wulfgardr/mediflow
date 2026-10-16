@@ -1,11 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-# @Codex
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# @Codex
 E2E_DATA_DIR="${MEDIFLOW_E2E_DATA_DIR:-$ROOT_DIR/tmp-e2e-data}"
 LOG_DIR="$E2E_DATA_DIR/logs"
 DEV_LOG="$LOG_DIR/next-dev.log"

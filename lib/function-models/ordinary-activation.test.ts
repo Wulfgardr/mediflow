@@ -1,4 +1,4 @@
-/* @Codex — public/synthetic configuration + browser seams, not runtime admission. */
+/* public/synthetic configuration + browser seams, not runtime admission. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { randomUUID } from 'node:crypto';

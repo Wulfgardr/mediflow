@@ -1,5 +1,5 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
-/* @Codex: paired observation boundary delegates ordinary writes to the single required-audit operation. */
+/* paired observation boundary delegates ordinary writes to the single required-audit operation. */
 import { v4 as uuidv4 } from 'uuid';
 import { requestIdFromRequest } from './security/audit';
 import { normalizeObservationCreateInput, normalizeObservationUpdateInput } from './api-v1-clinical-write-normalization';

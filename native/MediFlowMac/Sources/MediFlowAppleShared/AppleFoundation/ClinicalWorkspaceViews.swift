@@ -1,9 +1,8 @@
 import CryptoKit
-import Combine // @Codex
+import Combine
 import SwiftUI
 import MediFlowCore
 
-/* @Codex */
 struct ClinicalWorkspaceConnection {
     struct Identity: Hashable {
         let clientId: String
@@ -20,9 +19,9 @@ struct ClinicalWorkspaceConnection {
     let sessionCookie: String
     let ambulatoryId: String?
     let masterKey: SymmetricKey?
-    var serverURL: String? = nil // @Codex
-    var tlsPin: String? = nil // @Codex
-    var sessionGeneration: UInt = 0 // @Codex
+    var serverURL: String? = nil
+    var tlsPin: String? = nil
+    var sessionGeneration: UInt = 0
 
     var identity: Identity {
         Identity(
@@ -34,7 +33,7 @@ struct ClinicalWorkspaceConnection {
         )
     }
 
-    // @Codex: the read snapshot omits masterKey. Decryption obtains the key
+    // the read snapshot omits masterKey. Decryption obtains the key
     // from the current connection only after the pending read is validated.
     var readRequest: ClinicalWorkspaceReadRequest {
         ClinicalWorkspaceReadRequest(dataSource: dataSource, credentials: credentials,
@@ -42,7 +41,6 @@ struct ClinicalWorkspaceConnection {
     }
 }
 
-/* @Codex */
 struct ClinicalWorkspaceReadRequest {
     let dataSource: any HomeBasePatientsDataSource
     let credentials: HomeBasePairedCredentials
@@ -56,7 +54,6 @@ struct ClinicalWorkspaceReadRequest {
     }
 }
 
-/* @Codex */
 enum ClinicalWorkspaceLoadState: Equatable {
     case idle
     case loading
@@ -154,7 +151,6 @@ enum NetworkCapabilityKey {
     static let computeVisitDraft = "network.compute.visit-draft"
 }
 
-/* @Codex */
 @MainActor
 final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
@@ -270,7 +266,6 @@ final class ClinicalWorkspaceCapabilitiesStore: ObservableObject {
     }
 }
 
-/* @Codex */
 struct AgendaWorkspaceRow: Identifiable, Equatable {
     let checkup: AgendaCheckup
     let patientName: String
@@ -278,7 +273,6 @@ struct AgendaWorkspaceRow: Identifiable, Equatable {
     var id: String { checkup.id }
 }
 
-/* @Codex */
 @MainActor
 final class AgendaWorkspaceModel: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
@@ -287,18 +281,18 @@ final class AgendaWorkspaceModel: ObservableObject {
     @Published private(set) var plannedCount = 0
     @Published private(set) var activePatientCount = 0
 
-    private var requestGeneration: UInt = 0 // @Codex
-    private var invalidationSubscription: AnyCancellable? // @Codex
+    private var requestGeneration: UInt = 0
+    private var invalidationSubscription: AnyCancellable?
     private let connectionProvider: () -> ClinicalWorkspaceConnection?
     private let now: () -> Date
 
     init(connectionProvider: @escaping () -> ClinicalWorkspaceConnection?, now: @escaping () -> Date = Date.init, invalidations: AnyPublisher<Void, Never>? = nil) {
         self.connectionProvider = connectionProvider
         self.now = now
-        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() } // @Codex
+        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() }
     }
 
-    // @Codex: called synchronously on lock/session/scope changes, even off-screen.
+    // called synchronously on lock/session/scope changes, even off-screen.
     private func invalidateReadContext() {
         requestGeneration &+= 1
         rows = []
@@ -356,7 +350,7 @@ final class AgendaWorkspaceModel: ObservableObject {
             let patients = try await patientsRequest
             let checkups = try await checkupsRequest
             guard requestGeneration == generation,
-                  connection.current(using: connectionProvider) != nil else { return } // @Codex
+                  connection.current(using: connectionProvider) != nil else { return }
             let names = Dictionary(patients.map { ($0.id, "\($0.firstName) \($0.lastName)") }, uniquingKeysWith: { first, _ in first })
             let agendaCheckups = checkups.map { AgendaCheckup(id: $0.id, patientId: $0.patientId, date: $0.date, status: $0.status) }
             rows = AgendaPresentation.agendaCandidates(from: agendaCheckups, now: currentDate).map { checkup in
@@ -372,13 +366,12 @@ final class AgendaWorkspaceModel: ObservableObject {
             state = .loaded
         } catch {
             guard requestGeneration == generation,
-                  connection.current(using: connectionProvider) != nil else { return } // @Codex
+                  connection.current(using: connectionProvider) != nil else { return }
             state = .failed("Impossibile caricare l'agenda: \(error.localizedDescription)")
         }
     }
 }
 
-/* @Codex */
 struct GlobalDiaryWorkspaceRow: Identifiable, Equatable {
     let item: GlobalDiaryItem
     let date: Date
@@ -396,7 +389,6 @@ struct GlobalDiaryWorkspaceRow: Identifiable, Equatable {
     var id: String { item.id }
 }
 
-/* @Codex */
 @MainActor
 final class GlobalDiaryWorkspaceModel: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
@@ -404,16 +396,16 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
     @Published private(set) var activeCount = 0
     @Published private(set) var patientCount = 0
 
-    private var requestGeneration: UInt = 0 // @Codex
-    private var invalidationSubscription: AnyCancellable? // @Codex
+    private var requestGeneration: UInt = 0
+    private var invalidationSubscription: AnyCancellable?
     private let connectionProvider: () -> ClinicalWorkspaceConnection?
 
     init(connectionProvider: @escaping () -> ClinicalWorkspaceConnection?, invalidations: AnyPublisher<Void, Never>? = nil) {
         self.connectionProvider = connectionProvider
-        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() } // @Codex
+        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() }
     }
 
-    // @Codex: called synchronously on lock/session/scope changes, even off-screen.
+    // called synchronously on lock/session/scope changes, even off-screen.
     private func invalidateReadContext() {
         requestGeneration &+= 1
         rows = []
@@ -449,7 +441,7 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
             let patients = try await patientsRequest
             let encryptedEntries = try await entriesRequest
             guard requestGeneration == generation,
-                  let current = connection.current(using: connectionProvider) else { return } // @Codex
+                  let current = connection.current(using: connectionProvider) else { return }
             let entries = encryptedEntries.map { ClinicalFieldCrypto.decryptEntry($0, masterKey: current.masterKey) }
             let presentation = GlobalDiaryPresentation.buildState(
                 entries: entries.map {
@@ -473,7 +465,7 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
             state = .loaded
         } catch {
             guard requestGeneration == generation,
-                  connection.current(using: connectionProvider) != nil else { return } // @Codex
+                  connection.current(using: connectionProvider) != nil else { return }
             state = .failed("Impossibile caricare il diario globale: \(error.localizedDescription)")
         }
     }
@@ -486,7 +478,6 @@ final class GlobalDiaryWorkspaceModel: ObservableObject {
     }
 }
 
-/* @Codex */
 @MainActor
 final class PopulationAnalyticsWorkspaceModel: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
@@ -494,18 +485,18 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
     @Published var minimumAge = 0 { didSet { normalizeRange() } }
     @Published var maximumAge = 120 { didSet { normalizeRange() } }
 
-    private var requestGeneration: UInt = 0 // @Codex
-    private var invalidationSubscription: AnyCancellable? // @Codex
+    private var requestGeneration: UInt = 0
+    private var invalidationSubscription: AnyCancellable?
     private let connectionProvider: () -> ClinicalWorkspaceConnection?
     private let now: () -> Date
 
     init(connectionProvider: @escaping () -> ClinicalWorkspaceConnection?, now: @escaping () -> Date = Date.init, invalidations: AnyPublisher<Void, Never>? = nil) {
         self.connectionProvider = connectionProvider
         self.now = now
-        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() } // @Codex
+        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() }
     }
 
-    // @Codex: called synchronously on lock/session/scope changes, even off-screen.
+    // called synchronously on lock/session/scope changes, even off-screen.
     private func invalidateReadContext() {
         requestGeneration &+= 1
         statistics = nil
@@ -538,7 +529,7 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
                 includeDiagnoses: true
             )
             guard requestGeneration == generation,
-                  let current = connection.current(using: connectionProvider) else { return } // @Codex
+                  let current = connection.current(using: connectionProvider) else { return }
             let patients = summaries
                 .filter { $0.isArchived != true && $0.deletedAt == nil }
                 .map { summary in
@@ -558,7 +549,7 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
             state = .loaded
         } catch {
             guard requestGeneration == generation,
-                  connection.current(using: connectionProvider) != nil else { return } // @Codex
+                  connection.current(using: connectionProvider) != nil else { return }
             state = .failed("Impossibile caricare gli analytics: \(error.localizedDescription)")
         }
     }
@@ -570,26 +561,25 @@ final class PopulationAnalyticsWorkspaceModel: ObservableObject {
     }
 }
 
-/* @Codex */
 @MainActor
 final class ClinicalScalesCatalogModel: ObservableObject {
     @Published private(set) var state: ClinicalWorkspaceLoadState = .idle
     @Published private(set) var patients: [HomeBasePatientSummary] = []
     @Published private(set) var visiblePatients: [HomeBasePatientSummary] = []
 
-    private var requestGeneration: UInt = 0 // @Codex
-    private var invalidationSubscription: AnyCancellable? // @Codex
+    private var requestGeneration: UInt = 0
+    private var invalidationSubscription: AnyCancellable?
     private let connectionProvider: () -> ClinicalWorkspaceConnection?
     private var searchTask: Task<Void, Never>?
 
     init(connectionProvider: @escaping () -> ClinicalWorkspaceConnection?, invalidations: AnyPublisher<Void, Never>? = nil) {
         self.connectionProvider = connectionProvider
-        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() } // @Codex
+        invalidationSubscription = invalidations?.sink { [weak self] in self?.invalidateReadContext() }
     }
 
     deinit { searchTask?.cancel() }
 
-    // @Codex: called synchronously on lock/session/scope changes, even off-screen.
+    // called synchronously on lock/session/scope changes, even off-screen.
     private func invalidateReadContext() {
         requestGeneration &+= 1
         searchTask?.cancel()
@@ -614,13 +604,13 @@ final class ClinicalScalesCatalogModel: ObservableObject {
                 includeDeleted: false
             ).filter { $0.isArchived != true && $0.deletedAt == nil }
             guard requestGeneration == generation,
-                  connection.current(using: connectionProvider) != nil else { return } // @Codex
+                  connection.current(using: connectionProvider) != nil else { return }
             patients = loadedPatients
             visiblePatients = patients
             state = .loaded
         } catch {
             guard requestGeneration == generation,
-                  connection.current(using: connectionProvider) != nil else { return } // @Codex
+                  connection.current(using: connectionProvider) != nil else { return }
             state = .failed("Impossibile caricare i pazienti: \(error.localizedDescription)")
         }
     }
@@ -649,7 +639,6 @@ final class ClinicalScalesCatalogModel: ObservableObject {
     }
 }
 
-/* @Codex */
 struct ClinicalCapabilityGateView: View {
     let store: ClinicalWorkspaceCapabilitiesStore
     let capability: String
@@ -679,7 +668,6 @@ struct ClinicalCapabilityGateView: View {
     }
 }
 
-/* @Codex */
 struct AgendaWorkspaceView: View {
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -812,7 +800,6 @@ struct AgendaWorkspaceView: View {
     }
 }
 
-/* @Codex */
 struct GlobalDiaryWorkspaceView: View {
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -908,7 +895,7 @@ struct GlobalDiaryWorkspaceView: View {
                             }
                             if row.attachmentCount > 0 { Label("\(row.attachmentCount) allegati", systemImage: "paperclip").chartMetadata() }
                         }
-                        .accessibilityIdentifier("clinical-workspace-diary-row-\(row.id)") // @Codex
+                        .accessibilityIdentifier("clinical-workspace-diary-row-\(row.id)")
                         .padding(.vertical, ClinicalChartMetrics.itemSpacing / 2)
                     }
                 }
@@ -924,7 +911,6 @@ struct GlobalDiaryWorkspaceView: View {
     }
 }
 
-/* @Codex */
 struct PopulationAnalyticsWorkspaceView: View {
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -997,7 +983,7 @@ struct PopulationAnalyticsWorkspaceView: View {
                         metric("Con diagnosi", statistics.withDiagnoses, statistics.totalInRange)
                         count("Senza data di nascita", statistics.withoutBirthDate)
                     }
-                    .accessibilityIdentifier("clinical-workspace-analytics-summary") // @Codex
+                    .accessibilityIdentifier("clinical-workspace-analytics-summary")
                 } footer: {
                     Text("Le percentuali sono sui \(statistics.totalInRange) pazienti in fascia. Chi non ha una data di nascita resta fuori dalla fascia e non entra in quel conteggio.")
                 }
@@ -1071,7 +1057,6 @@ struct PopulationAnalyticsWorkspaceView: View {
     private func distributionRow(_ label: String, value: Int, total: Int) -> some View { VStack(alignment: .leading, spacing: 4) { HStack { Text(label); Spacer(); Text("\(value)").foregroundStyle(.secondary) }; ProgressView(value: Double(value), total: Double(max(total, 1))) } }
 }
 
-/* @Codex */
 struct ClinicalScalesWorkspaceView: View {
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -1080,7 +1065,7 @@ struct ClinicalScalesWorkspaceView: View {
     @State private var pendingScale: ClinicalScaleDefinition?
     @State private var selectedScale: ClinicalScaleDefinition?
     @State private var showsPatientPicker = false
-    @State private var readContextID = UUID() // @Codex
+    @State private var readContextID = UUID()
 
     init(capabilities: ClinicalWorkspaceCapabilitiesStore, workspaceModel: PairedPatientsWorkspaceModel) {
         self.capabilities = capabilities
@@ -1097,7 +1082,7 @@ struct ClinicalScalesWorkspaceView: View {
             guard capabilities.hasCapability("network.replica.readonly-patients") else { return }
             await model.load()
         }
-        .onReceive(workspaceModel.clinicalWorkspaceInvalidations) { // @Codex
+        .onReceive(workspaceModel.clinicalWorkspaceInvalidations) {
             readContextID = UUID()
             query = ""
             pendingScale = nil
@@ -1136,7 +1121,6 @@ struct ClinicalScalesWorkspaceView: View {
     private var patientPicker: some View {
         NavigationStack {
             List(model.visiblePatients) { patient in
-                /* @Codex */
                 Button { Task { await open(patient) } } label: {
                     VStack(alignment: .leading) {
                         Text("\(patient.firstName) \(patient.lastName)")
@@ -1162,11 +1146,11 @@ struct ClinicalScalesWorkspaceView: View {
     }
 
     private func open(_ patient: HomeBasePatientSummary) async {
-        let contextID = readContextID // @Codex
+        let contextID = readContextID
         showsPatientPicker = false
         await workspaceModel.loadPatient(patient)
         guard contextID == readContextID, workspaceModel.clinicalWorkspaceConnection != nil,
-              workspaceModel.selectedPatient?.id == patient.id else { return } // @Codex
+              workspaceModel.selectedPatient?.id == patient.id else { return }
         selectedScale = pendingScale
         pendingScale = nil
     }

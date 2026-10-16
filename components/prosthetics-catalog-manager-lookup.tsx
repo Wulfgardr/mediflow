@@ -1,5 +1,4 @@
 'use client';
-/* @Codex */
 import { useEffect, useRef, useState } from 'react';
 import { ProstheticsOriginalLinks, type SourceWithDocuments } from './prosthetics-source-documents';
 import { prostheticsRequest } from '@/lib/reference-data/prosthetics-catalog-client';

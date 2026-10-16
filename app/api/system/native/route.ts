@@ -1,11 +1,9 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-/* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 import { apiInternalError } from '@/lib/api-error-response';
 
@@ -21,7 +19,6 @@ function isLocalRequest(request: Request): boolean {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();

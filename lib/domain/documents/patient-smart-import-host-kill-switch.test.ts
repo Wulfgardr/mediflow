@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createPatientSmartImportHostKillSwitch } from './patient-smart-import-host-kill-switch';

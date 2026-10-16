@@ -1,4 +1,3 @@
-/* @Codex */
 import { argv, exit, stdin, stdout } from 'node:process';
 import { runMiniSession } from './session.ts';
 import { MINI_MAX_INPUT_BYTES, parseMiniRequest, executeMiniRequest, serializeMiniResponse,

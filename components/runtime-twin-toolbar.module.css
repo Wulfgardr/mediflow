@@ -1,4 +1,4 @@
-/* @Codex WUL-676: a reserved strip keeps the comparison outside product controls. */
+/* WUL-676: a reserved strip keeps the comparison outside product controls. */
 .toolbar {
     position: fixed;
     inset: 0 0 auto;

@@ -1,4 +1,4 @@
-/* @Codex: real React components, ConfirmProvider and client functions in an isolated Chromium fixture.
+/* real React components, ConfirmProvider and client functions in an isolated Chromium fixture.
  * Local HTTP responses below are INVENTED UI fixtures, not the real backend, authentication or a live AIFA feed.
  * Host commands are displayed/copied only. No WHO installation or provider call takes place.
  * Run with the repository's Node24 loader and locked esbuild/Playwright/React dependencies.
@@ -11,7 +11,7 @@ import { build } from 'esbuild';
 import type { AifaCatalogClientStatus, AifaImportClientResult } from '../aifa-importer';
 
 const ORIGIN = 'http://127.0.0.1:48974';
-/* @Codex: synchronous, payload-free stage markers survive a cancelled test. */
+/* synchronous, payload-free stage markers survive a cancelled test. */
 const traceAifa = (phase: string, started: bigint) => {
     const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
     writeSync(2, `[unit-stage:aifa] elapsed_ms=${elapsedMs.toFixed(1)} phase=${phase}\n`);

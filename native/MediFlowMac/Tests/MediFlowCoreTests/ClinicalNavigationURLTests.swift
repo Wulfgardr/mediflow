@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import MediFlowCore
 
-/* @Codex */
 final class ClinicalNavigationURLTests: XCTestCase {
     func testEveryKnownAreaAndPatientSectionHasAnExactRoute() throws {
         for area in ClinicalNavigationArea.allCases {

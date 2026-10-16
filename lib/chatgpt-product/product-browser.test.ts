@@ -1,4 +1,4 @@
-/* @Codex — browser controller -> actual strict HTTP/root/binding, no socket. */
+/* browser controller -> actual strict HTTP/root/binding, no socket. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 const { createProductFixture, deferred, tick } = await import('./product-production.test.ts');

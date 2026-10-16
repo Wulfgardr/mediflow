@@ -1,4 +1,4 @@
-/* @Codex — PDF.js standard-font closure: only emitted package assets, never document URLs. */
+/* PDF.js standard-font closure: only emitted package assets, never document URLs. */
 import { PreviewError } from './document-viewer-policy.ts';
 
 const STANDARD_FONT_MAX_BYTES = 512 * 1024;

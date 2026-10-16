@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: C05 real admin restore handler and synthetic SQLite with auth seam. */
+/* C05 real admin restore handler and synthetic SQLite with auth seam. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -91,7 +91,7 @@ function post(rawBody: string, extraHeaders: Record<string, string> = {}) {
     }));
 }
 
-/* @Codex: route-level stream fixture observes byte-budget pull and cancellation behavior. */
+/* route-level stream fixture observes byte-budget pull and cancellation behavior. */
 function streamedPost(chunks: Uint8Array[], extraHeaders: Record<string, string> = {}) {
     let pulls = 0, cancels = 0;
     const stream = new ReadableStream<Uint8Array>({

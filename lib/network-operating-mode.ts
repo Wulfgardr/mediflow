@@ -1,4 +1,3 @@
-/* @Codex */
 import type {
     NetworkCapabilitiesResponse,
     NetworkAiRuntimeSummary,

@@ -1,4 +1,4 @@
-/* @Codex: synthetic lifecycle tests; no host, credentials or provider requests. */
+/* synthetic lifecycle tests; no host, credentials or provider requests. */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { mkdirSync } from 'node:fs';

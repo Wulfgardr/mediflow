@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { once } from 'node:events';

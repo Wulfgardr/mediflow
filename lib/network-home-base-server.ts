@@ -1,4 +1,3 @@
-/* @Codex */
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -27,7 +26,6 @@ import {
     normalizeNetworkOperatingMode,
     type PairingIntentDraftResult,
 } from '@/lib/network-contract';
-/* @Codex */
 import {
     addPendingPairingIntent,
     confirmPendingPairingIntent,
@@ -36,13 +34,9 @@ import {
     serializeNetworkPairingState,
     type NetworkPairingState,
 } from '@/lib/network-pairing-model';
-/* @Codex */
 import { getNetworkAiRuntimeSummary as resolveNetworkAiRuntimeSummary } from '@/lib/network-ai-runtime';
-/* @Codex */
 import { getNetworkIdentitySummary as resolveNetworkIdentitySummary } from '@/lib/network-identity';
-/* @Codex */
 import type { ServerSession } from '@/lib/security/server-session';
-/* @Codex */
 import { authenticatePairedClientRequest } from '@/lib/network-paired-client-auth';
 
 type NetworkSettingsSnapshot = Partial<Record<(typeof NETWORK_SETTINGS_KEYS)[number], string>>;
@@ -126,12 +120,10 @@ export async function getNetworkCapabilities(): Promise<NetworkCapabilitiesRespo
     });
 }
 
-/* @Codex */
 export async function getNetworkAiRuntimeSummary(): Promise<NetworkAiRuntimeSummary> {
     return resolveNetworkAiRuntimeSummary();
 }
 
-/* @Codex */
 export async function getNetworkIdentitySummary(
     session: ServerSession | null,
     activeAmbulatoryId: string | null
@@ -139,7 +131,6 @@ export async function getNetworkIdentitySummary(
     return resolveNetworkIdentitySummary(session, activeAmbulatoryId);
 }
 
-/* @Codex */
 export async function loadNetworkPairingState(): Promise<NetworkPairingState> {
     const generation = currentArchiveGeneration();
     const rawValue = await loadSettingValue(NETWORK_PAIRING_STATE_KEY);
@@ -249,13 +240,11 @@ export async function postNetworkPairingIntent(payload: unknown): Promise<Pairin
     return result;
 }
 
-/* @Codex */
 export async function listNetworkPairingIntents(): Promise<NetworkPairingIntentResponse[]> {
     const pairingState = await loadNetworkPairingState();
     return pairingState.intents;
 }
 
-/* @Codex */
 export async function confirmNetworkPairingIntent(intentId: string): Promise<{
     status: 201 | 404 | 409;
     value: NetworkPairingConfirmationResponse | { error: string; code?: string; message?: string };
@@ -299,7 +288,6 @@ export async function getNetworkOperatingMode(): Promise<NetworkOperatingMode> {
     return normalizeNetworkOperatingMode(await loadSettingValue(NETWORK_MODE_KEY));
 }
 
-/* @Codex */
 export async function authenticateNetworkPairedClient(request: Request) {
     const pairingState = await loadNetworkPairingState();
     return authenticatePairedClientRequest(request, pairingState.clients);

@@ -7,7 +7,6 @@ import AppKit
 import UIKit
 #endif
 
-/* @Codex */
 struct PairedPatientDocumentsSection: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
@@ -55,7 +54,7 @@ struct PairedPatientDocumentsSection: View {
         VStack(alignment: .leading, spacing: ClinicalChartMetrics.groupSpacing) {
             documentsSection
 
-            // @Codex: the empty archive starts with upload, not empty analyses.
+            // the empty archive starts with upload, not empty analyses.
             if !model.attachments.isEmpty || !model.documentInsights.isEmpty || !model.evidenceStackInsights.isEmpty {
                 Divider()
                 DisclosureGroup {
@@ -94,7 +93,6 @@ struct PairedPatientDocumentsSection: View {
 
     // MARK: - S6 (Wave 5): documenti, archivio intelligente, follow-up, FSE
 
-    /* @Codex */
     private var documentsSection: some View {
         Group {
             if capabilities.hasCapability("network.replica.readonly-documents") {
@@ -155,7 +153,7 @@ struct PairedPatientDocumentsSection: View {
         }
     }
 
-    /* @Codex: reuse the shared distinction between unread and genuinely empty. */
+    /* reuse the shared distinction between unread and genuinely empty. */
     @ViewBuilder
     private var attachmentList: some View {
         switch ClinicalWorkspaceSectionContent(
@@ -310,7 +308,6 @@ struct PairedPatientDocumentsSection: View {
         .modifier(LumeRigaListaModifier(isSelected: attachmentDetailCandidate?.id == attachment.id))
     }
 
-    /* @Codex */
     private var documentInsightsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             if model.documentInsights.isEmpty {
@@ -445,7 +442,6 @@ struct PairedPatientDocumentsSection: View {
         .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
-    /* @Codex */
     private var followupSuggestionsSection: some View {
         Group {
             if !model.followupSuggestions.isEmpty {
@@ -488,7 +484,6 @@ struct PairedPatientDocumentsSection: View {
         .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
-    /* @Codex */
     private var fseDocumentValidationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Controlla una terapia o un’osservazione rispetto al profilo FSE prima dell’export. Disponibile online.")
@@ -605,5 +600,4 @@ struct PairedPatientDocumentsSection: View {
         return formatter
     }()
 
-    /* @Codex */
 }

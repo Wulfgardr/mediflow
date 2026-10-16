@@ -3,27 +3,20 @@ import {
     estimateAIInsightComplexityScore,
     getAIInsightRuntimeSettings,
 } from '@/lib/ai-insight-settings';
-/* @Codex */
 import { renderDocumentEvidencePackContext } from '@/lib/domain/documents/document-evidence-pack';
-/* @Codex */
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
-/* @Codex */
 import { dedupeDocumentInsightsForContext } from '@/lib/domain/documents/document-insight-context';
-/* @Codex */
 import { normalizeDocumentInput } from '@/lib/domain/documents/document-input-normalization';
-/* @Codex */
 import {
     parseDocumentParseEvidenceArtifactSnapshot,
     projectDocumentInsightFromArtifact,
 } from '@/lib/domain/documents/document-parse-evidence-artifact';
-/* @Codex */
 import {
     MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION,
     buildEvidenceQueue,
     getIncludedEvidenceQueueItems,
     type EvidenceQueueCitation,
 } from '@/lib/domain/documents/evidence-queue-contract';
-/* @Codex */
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { scaleInterpretationVersionLabel } from '@/lib/scale-history';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
@@ -35,7 +28,6 @@ export interface PatientContext {
     patientName?: string;
 }
 
-/* @Codex */
 export interface PatientInsightSourceRef {
     id: string;
     section: string;
@@ -47,7 +39,6 @@ export interface PatientInsightSourceRef {
     citation?: EvidenceQueueCitation;
 }
 
-/* @Codex */
 export interface PatientInsightContextSnapshot {
     prompt: string;
     sourceRefs: PatientInsightSourceRef[];
@@ -129,7 +120,6 @@ const CONTAMINATED_NOTE_MARKERS = [
     '**riassunto clinico:**',
 ];
 
-/* @Codex */
 const LOW_SIGNAL_ATTACHMENT_SUMMARIES = [
     'nessuna informazione rilevante trovata.',
     'allegato alla visita',
@@ -138,15 +128,12 @@ const LOW_SIGNAL_ATTACHMENT_SUMMARIES = [
     'analisi completata (nessuna diagnosi esplicita rilevata)',
 ];
 
-/* @Codex */
 const MAX_ATTACHMENT_TEXT_RECOVERY = 2;
 
-/* @Codex */
 export interface PatientInsightContextBuildOptions {
     recoverAttachmentText?: (attachment: Attachment) => Promise<string>;
 }
 
-/* @Codex */
 interface AttachmentContextCandidate {
     line: string;
     documentDate: unknown;
@@ -157,7 +144,6 @@ interface AttachmentContextCandidate {
     omittedLowSignalSummary: boolean;
 }
 
-/* @Codex */
 interface DocumentContextCandidate {
     line: string;
     documentDate: unknown;
@@ -166,7 +152,6 @@ interface DocumentContextCandidate {
     stableBackground: boolean;
 }
 
-/* @Codex */
 interface PatientInsightSourceLine {
     promptLine: string;
     versionSignature?: string;
@@ -194,14 +179,12 @@ function compactText(value: string | null | undefined, maxChars = 220): string {
     return `${normalized.slice(0, Math.max(0, maxChars - 1)).trimEnd()}...`;
 }
 
-/* @Codex */
 function isLowSignalAttachmentSummary(value: string | null | undefined): boolean {
     const normalized = (value ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
     if (!normalized) return true;
     return LOW_SIGNAL_ATTACHMENT_SUMMARIES.some((candidate) => normalized === candidate);
 }
 
-/* @Codex */
 function canAttemptAttachmentTextRecovery(attachment: Attachment): boolean {
     const summary = typeof attachment.summarySnapshot === 'string'
         ? attachment.summarySnapshot
@@ -216,7 +199,6 @@ function formatDate(value: unknown): string {
     return parsed.toLocaleDateString('it-IT');
 }
 
-/* @Codex */
 function formatVersionTimestamp(value: unknown): string {
     if (!value) return '';
     const parsed = value instanceof Date ? value : new Date(value as string | number);
@@ -229,12 +211,10 @@ function compareDatesDesc(left: unknown, right: unknown): number {
     return rightTime - leftTime;
 }
 
-/* @Codex */
 function compareDatesAsc(left: unknown, right: unknown): number {
     return compareDatesDesc(right, left);
 }
 
-/* @Codex */
 function buildDocumentSourceLabel(fileName: string, date: unknown): string {
     const formattedDate = formatDate(date);
     if (fileName && formattedDate) return `${fileName} (${formattedDate})`;
@@ -275,7 +255,6 @@ function normalizeComparableDocumentText(value: string): string {
         .trim();
 }
 
-/* @Codex */
 function extractDocumentDomainTags(value: string): string[] {
     const tags = DOCUMENT_DOMAIN_RULES
         .filter((rule) => rule.pattern.test(value))
@@ -300,12 +279,10 @@ function scoreNovelDocumentHighlight(line: string): number {
     return score;
 }
 
-/* @Codex */
 function isStableBackgroundDocumentContext(value: string): boolean {
     return STABLE_BACKGROUND_DOCUMENT_MARKERS.test(value);
 }
 
-/* @Codex */
 function sharesDocumentDomain(
     left: Pick<DocumentContextCandidate, 'domainTags'>,
     right: Pick<DocumentContextCandidate, 'domainTags'>,
@@ -314,7 +291,6 @@ function sharesDocumentDomain(
     return left.domainTags.some((tag) => right.domainTags.includes(tag));
 }
 
-/* @Codex */
 function shouldSuppressStaleDocumentCandidate(
     candidate: DocumentContextCandidate | AttachmentContextCandidate,
     selected: DocumentContextCandidate | AttachmentContextCandidate,
@@ -409,7 +385,6 @@ function renderStructuredDocumentData(insight: DocumentInsight): string[] {
     return parts;
 }
 
-/* @Codex */
 function scoreDocumentContextPriority(value: string): number {
     const normalized = value.toLowerCase();
     let score = 0;
@@ -505,7 +480,6 @@ function renderDocumentInsightContext(insight: DocumentInsight, maxChars: number
     };
 }
 
-/* @Codex */
 function resolveDocumentInsightContextSource(
     insight: DocumentInsight,
     attachmentArtifactSnapshot: string | null | undefined,
@@ -514,7 +488,6 @@ function resolveDocumentInsightContextSource(
     return artifact ? projectDocumentInsightFromArtifact(artifact) : insight;
 }
 
-/* @Codex */
 function renderRecoveredAttachmentContext(
     fileName: string,
     createdAt: unknown,
@@ -531,14 +504,12 @@ function renderRecoveredAttachmentContext(
         : `Estratto diretto allegato: ${excerpt}`;
 }
 
-/* @Codex */
 async function defaultRecoverAttachmentText(_attachment: Attachment): Promise<string> {
     // Persisted parse/evidence artifacts are the only automatic context source.
     // Raw attachment bytes are never re-extracted invisibly from this caller.
     return '';
 }
 
-/* @Codex */
 async function buildAttachmentContextCandidate(
     attachment: Attachment,
     maxChars: number,
@@ -629,7 +600,6 @@ function renderSourceRefs(refs: PatientInsightSourceRef[]): string {
     return refs.map((ref) => `[${ref.id}] ${ref.promptLine}`).join('\n');
 }
 
-/* @Codex */
 export async function buildPatientInsightContext(
     patientId: string,
     options: PatientInsightContextBuildOptions = {},

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

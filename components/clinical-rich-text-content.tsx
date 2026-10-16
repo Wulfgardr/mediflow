@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import ReactMarkdown from 'react-markdown';
 
 import { isClinicalRichTextHtml, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
@@ -12,7 +11,6 @@ interface ClinicalRichTextContentProps {
 }
 
 export function ClinicalRichTextContent({ className, content }: ClinicalRichTextContentProps) {
-    /* @Codex */
     if (isClinicalRichTextHtml(content)) {
         return (
             <div

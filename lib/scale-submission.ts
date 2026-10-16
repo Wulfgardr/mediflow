@@ -1,4 +1,4 @@
-// @Codex MF085-003: production write seam; never trust a caller-supplied total or interpretation.
+// MF085-003: production write seam; never trust a caller-supplied total or interpretation.
 import { SCALES } from './scale-definitions';
 import { calculateScaleResult, ScaleValidationError } from './scale-validation';
 

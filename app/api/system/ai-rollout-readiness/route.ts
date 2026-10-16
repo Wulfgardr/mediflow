@@ -1,4 +1,3 @@
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { inArray } from 'drizzle-orm';

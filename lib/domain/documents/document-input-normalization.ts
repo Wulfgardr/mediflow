@@ -1,22 +1,17 @@
-/* @Codex */
 import { splitDocumentIntoLines } from './document-excerpt';
 
-/* @Codex */
 export type DocumentInputSourceKind = 'text' | 'ocr' | 'xml';
 
-/* @Codex */
 export type DocumentNormalizationDateHint = {
     raw: string;
     iso: string;
 };
 
-/* @Codex */
 export type DocumentNormalizationSection = {
     heading: string;
     content: string;
 };
 
-/* @Codex */
 export type DocumentNormalizationHints = {
     structuredNarrative: boolean;
     detectedHeadings: string[];
@@ -25,7 +20,6 @@ export type DocumentNormalizationHints = {
     temporalityPhrases: string[];
 };
 
-/* @Codex */
 export type NormalizedDocumentInput = {
     sourceKind: DocumentInputSourceKind;
     normalizedText: string;
@@ -33,18 +27,13 @@ export type NormalizedDocumentInput = {
     hints: DocumentNormalizationHints;
 };
 
-/* @Codex */
 type NormalizeDocumentInputOptions = {
     sourceKind?: DocumentInputSourceKind | 'auto';
 };
 
-/* @Codex */
 const XML_SECTION_REGEX = /<(?:\w+:)?section\b[\s\S]*?<\/(?:\w+:)?section>/giu;
-/* @Codex */
 const XML_BREAK_TAG_REGEX = /<\/?(?:\w+:)?(?:br|p|paragraph|content|item|caption|tr|table|tbody|thead|ul|ol|list|entry|td|th)\b[^>]*>/giu;
-/* @Codex */
 const XML_TAG_REGEX = /<\/?(?:\w+:)?[A-Za-z0-9_-]+\b[^>]*>/gu;
-/* @Codex */
 const XML_ENTITY_MAP: Record<string, string> = {
     amp: '&',
     lt: '<',
@@ -54,7 +43,6 @@ const XML_ENTITY_MAP: Record<string, string> = {
     nbsp: ' ',
 };
 
-/* @Codex */
 const HEADING_KEYWORDS = [
     'anamnesi',
     'diagnosi',
@@ -77,13 +65,11 @@ const HEADING_KEYWORDS = [
     'motivo',
 ];
 
-/* @Codex */
 const HEADING_BOUNDARY_REGEX = new RegExp(
     `\\s{2,}(?=(?:${HEADING_KEYWORDS.join('|')})\\w*)`,
     'giu',
 );
 
-/* @Codex */
 const NEGATION_PATTERNS = [
     /\bnega(?:to|ta|te|ti)?\b/giu,
     /\bnegativ[oaie]\b/giu,
@@ -94,7 +80,6 @@ const NEGATION_PATTERNS = [
     /\bsenza\b/giu,
 ];
 
-/* @Codex */
 const TEMPORALITY_PATTERNS = [
     /\banamnesi remota\b/giu,
     /\bpregress\w*\b/giu,
@@ -106,10 +91,8 @@ const TEMPORALITY_PATTERNS = [
     /\bcontroll\w*\b/giu,
 ];
 
-/* @Codex */
 const DATE_TOKEN_REGEX = /\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/g;
 
-/* @Codex */
 function detectSourceKind(raw: string, requested: NormalizeDocumentInputOptions['sourceKind']): DocumentInputSourceKind {
     if (requested && requested !== 'auto') return requested;
 
@@ -123,7 +106,6 @@ function detectSourceKind(raw: string, requested: NormalizeDocumentInputOptions[
     return newlineCount <= 2 && whitespaceBursts >= 4 ? 'ocr' : 'text';
 }
 
-/* @Codex */
 function extractXmlTagContent(source: string, tagName: string): string {
     const pattern = new RegExp(
         `<(?:\\w+:)?${tagName}\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tagName}>`,
@@ -132,7 +114,6 @@ function extractXmlTagContent(source: string, tagName: string): string {
     return source.match(pattern)?.[1] ?? '';
 }
 
-/* @Codex */
 function decodeXmlEntities(source: string): string {
     return source.replace(/&(#x?[0-9A-Fa-f]+|[A-Za-z]+);/g, (_, entity: string) => {
         if (entity.startsWith('#x') || entity.startsWith('#X')) {
@@ -149,7 +130,6 @@ function decodeXmlEntities(source: string): string {
     });
 }
 
-/* @Codex */
 function normalizeHeadingLabel(value: string): string {
     const trimmed = value
         .replace(/\s+/g, ' ')
@@ -160,7 +140,6 @@ function normalizeHeadingLabel(value: string): string {
     return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
-/* @Codex */
 function looksLikeHeading(line: string): boolean {
     const normalized = line
         .replace(/\s+/g, ' ')
@@ -175,7 +154,6 @@ function looksLikeHeading(line: string): boolean {
     return HEADING_KEYWORDS.some((keyword) => normalized.includes(keyword));
 }
 
-/* @Codex */
 function extractInlineHeadingSection(line: string): DocumentNormalizationSection | null {
     const colonIndex = line.indexOf(':');
     if (colonIndex <= 0 || colonIndex > 80) return null;
@@ -187,7 +165,6 @@ function extractInlineHeadingSection(line: string): DocumentNormalizationSection
     return { heading, content };
 }
 
-/* @Codex */
 function xmlFragmentToPlainText(fragment: string): string {
     return decodeXmlEntities(
         fragment
@@ -201,7 +178,6 @@ function xmlFragmentToPlainText(fragment: string): string {
     );
 }
 
-/* @Codex */
 function normalizeXmlSections(raw: string): { normalizedText: string; sections: DocumentNormalizationSection[] } {
     const matches = Array.from(raw.matchAll(XML_SECTION_REGEX));
     const sections: DocumentNormalizationSection[] = [];
@@ -242,7 +218,6 @@ function normalizeXmlSections(raw: string): { normalizedText: string; sections: 
     };
 }
 
-/* @Codex */
 function normalizeFreeText(raw: string): { normalizedText: string; sections: DocumentNormalizationSection[] } {
     const cleaned = raw
         .replace(/\r/g, '\n')
@@ -307,7 +282,6 @@ export function expandTwoDigitYear(twoDigitYear: string, currentYear: number): n
     return candidate > currentYear ? 1900 + yy : candidate;
 }
 
-/* @Codex */
 function collectNormalizedDates(text: string): DocumentNormalizationDateHint[] {
     const seen = new Set<string>();
     const dates: DocumentNormalizationDateHint[] = [];
@@ -344,7 +318,6 @@ function collectNormalizedDates(text: string): DocumentNormalizationDateHint[] {
     return dates;
 }
 
-/* @Codex */
 function collectPatternHits(text: string, patterns: RegExp[]): string[] {
     const seen = new Set<string>();
     const hits: string[] = [];
@@ -365,7 +338,6 @@ function collectPatternHits(text: string, patterns: RegExp[]): string[] {
     return hits;
 }
 
-/* @Codex */
 export function normalizeDocumentInput(
     raw: string,
     options: NormalizeDocumentInputOptions = {},

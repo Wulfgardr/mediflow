@@ -1,5 +1,5 @@
-void import.meta.url; // @Codex: explicit ESM for top-level mock setup.
-/* @Codex — synthetic content, mock local NER only; no authority or runtime proof. */
+void import.meta.url; // explicit ESM for top-level mock setup.
+/* synthetic content, mock local NER only; no authority or runtime proof. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mockOrdinaryModule } from './ordinary-module.test-support.ts';

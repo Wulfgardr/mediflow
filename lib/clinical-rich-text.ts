@@ -1,4 +1,3 @@
-/* @Codex */
 const ALLOWED_RICH_TEXT_TAGS = new Set([
     'p',
     'br',
@@ -17,7 +16,6 @@ const ALLOWED_RICH_TEXT_TAGS = new Set([
 
 const RICH_TEXT_HTML_PATTERN = /<\/?(?:p|br|strong|em|u|s|ul|ol|li|h[1-3]|blockquote|b|i|strike|div)\b/i;
 
-/* @Codex */
 // Matches any `<` that does NOT begin a reconstructed allowed tag token (`<tag>` or
 // `</tag>`). After the allowlist pass below every legitimate tag is emitted without
 // attributes, so anything else (malformed/unterminated tags the tag regex could not

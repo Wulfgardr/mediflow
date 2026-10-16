@@ -1,4 +1,4 @@
-/* @Codex — source candidate; gated by exact protocol/config/OS qualification. */
+/* source candidate; gated by exact protocol/config/OS qualification. */
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { ExecutionError, type ExecutionTransport } from './execution-contract';

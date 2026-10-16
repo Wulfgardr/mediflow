@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
@@ -99,7 +98,7 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(leadDiagnosis).toContainText(diagnosisDescription);
   await expect(leadDiagnosis).toContainText('EF00 · ICD-11');
 
-  /* @Codex: la lista clinica espone ciascun codice come item autonomo e
+  /* la lista clinica espone ciascun codice come item autonomo e
      conserva codice, descrizione e sistema nel suo contenuto. */
   const secondaryDiagnosisItem = diagnosesList
     .getByRole('listitem')

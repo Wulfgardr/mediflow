@@ -76,7 +76,6 @@ export class PdfTextLayerUnreadableError extends Error {
     }
 }
 
-/* @Codex */
 export class DocumentTextUnavailableError extends Error {
     readonly status = 'review_required' as const;
     readonly reason = 'unsupported_local_extraction' as const;
@@ -111,7 +110,6 @@ export class DocumentTextUnavailableError extends Error {
     }
 }
 
-/* @Codex */
 function inspectionFailure(error: unknown): DocumentTextUnavailableError {
     if (error instanceof DocumentTextUnavailableError) return error;
     if (error instanceof PdfTextLayerUnreadableError) {
@@ -120,7 +118,6 @@ function inspectionFailure(error: unknown): DocumentTextUnavailableError {
     return new DocumentTextUnavailableError('Ispezione PDF locale non disponibile.', 'parser_failed');
 }
 
-/* @Codex */
 export interface PdfTextLayerResult {
     text: string;
     state: 'native' | 'mixed' | 'ocr_required';
@@ -129,9 +126,7 @@ export interface PdfTextLayerResult {
     pages: Array<{ page: number; text: string; needsOcr: boolean }>;
 }
 
-/* @Codex */
 const IMAGE_EXTENSION_REGEX = /\.(apng|avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i;
-/* @Codex */
 const PERSON_PLACEHOLDER_TOKENS = new Set([
     'NOME',
     'COGNOME',
@@ -145,17 +140,14 @@ const PERSON_PLACEHOLDER_TOKENS = new Set([
     'SIG.RA'
 ]);
 
-/* @Codex */
 export function isPdfDocumentInput(file: Pick<File, 'name' | 'type'>): boolean {
     return file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
 }
 
-/* @Codex */
 export function isImageDocumentInput(file: Pick<File, 'name' | 'type'>): boolean {
     return file.type.startsWith('image/') || IMAGE_EXTENSION_REGEX.test(file.name || '');
 }
 
-/* @Codex */
 function sanitizePersonValue(value: string | undefined): string | undefined {
     if (!value) return undefined;
 
@@ -181,7 +173,6 @@ function sanitizePersonValue(value: string | undefined): string | undefined {
     return normalized;
 }
 
-/* @Codex */
 function stripPatientIdentityTail(value: string): string {
     return value
         .replace(/\s*,?\s*(?:nat[oa]|data\s+di\s+nascita|nato\s+a)\b.*$/i, '')
@@ -190,7 +181,6 @@ function stripPatientIdentityTail(value: string): string {
         .trim();
 }
 
-/* @Codex */
 function isLikelySurnameFirstPatientValue(label: string, candidate: string): boolean {
     if (/^cognome\b.*\bnome$/i.test(label)) return true;
     if (!/^(paziente|assistito)$/i.test(label.trim())) return false;
@@ -200,7 +190,6 @@ function isLikelySurnameFirstPatientValue(label: string, candidate: string): boo
     return parts.every((part) => part === part.toLocaleUpperCase('it-IT') && /[A-ZÀ-Ý]{2,}/.test(part));
 }
 
-/* @Codex */
 function extractPatientName(text: string): { firstName?: string; lastName?: string } {
     const lines = text
         .split(/\r?\n/)
@@ -250,7 +239,6 @@ function extractPatientName(text: string): { firstName?: string; lastName?: stri
     return { firstName, lastName };
 }
 
-/* @Codex */
 function extractPatientAddress(text: string): string | undefined {
     const cleanText = text.replace(/\s+/g, ' ');
     const match = cleanText.match(/\bindirizzo\s*[:.]?\s*(.{4,140}?)(?=\s+(?:ausl|asl|medico curante|diagnosi|farmaco|posologia|codice fiscale|cf|telefono|data\b|$))/i);
@@ -264,7 +252,6 @@ function extractPatientAddress(text: string): string | undefined {
     return /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(address) ? address : undefined;
 }
 
-/* @Codex */
 function extractClinicalValueAfterLabelLine(text: string): string | undefined {
     const lines = text
         .split(/\r?\n/)
@@ -361,7 +348,6 @@ export async function extractPdfTextLayer(file: Blob): Promise<PdfTextLayerResul
     };
 }
 
-/* @Codex */
 export async function extractTextFromPdf(file: Blob): Promise<string> {
     const layer = await extractPdfTextLayer(file);
     if (layer.state !== 'native') {
@@ -381,7 +367,6 @@ export async function extractTextFromPdf(file: Blob): Promise<string> {
     return layer.text;
 }
 
-/* @Codex */
 export async function extractDocumentTextForSummary(file: File): Promise<string> {
     const isPdf = isPdfDocumentInput(file);
     const isImage = isImageDocumentInput(file);
@@ -423,7 +408,6 @@ export async function extractDocumentTextForSummary(file: File): Promise<string>
  * Parse patient fields deterministically from a PDF with a complete native
  * text layer. Images, scans, and mixed PDFs stop at the typed review boundary.
  */
-/* @Codex */
 export async function extractPatientDataSmart(file: File): Promise<ExtractedPatientData> {
     const isImage = isImageDocumentInput(file);
     const isPdf = isPdfDocumentInput(file);
@@ -477,7 +461,6 @@ function isValidCodiceFiscale(cf: string): boolean {
     return /^[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]$/i.test(cf);
 }
 
-/* @Codex */
 function parseItalianBirthDate(value: string): Date | undefined {
     const [day, month, year] = value.split(/[\/\-.]/).map(Number);
     const date = new Date(Date.UTC(year, month - 1, day));
@@ -489,7 +472,6 @@ function parseItalianBirthDate(value: string): Date | undefined {
         : undefined;
 }
 
-/* @Codex */
 export function mergeExtractedPatientDataWithTextFallback(
     aiResult: ExtractedPatientData,
     fallbackText: string,

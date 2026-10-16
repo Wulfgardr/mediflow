@@ -1,4 +1,4 @@
-/* @Codex: MCP-only app entrypoint. Invoke with an explicit, provisioned Node;
+/* MCP-only app entrypoint. Invoke with an explicit, provisioned Node;
  * never an env shebang, PATH search, runtime installer or second supervisor. */
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';

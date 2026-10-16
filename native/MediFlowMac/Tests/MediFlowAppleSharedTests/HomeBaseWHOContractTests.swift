@@ -1,4 +1,4 @@
-// @Codex: WUL-673. Synthetic fixtures, shared by DTO/client/store tests.
+// WUL-673. Synthetic fixtures, shared by DTO/client/store tests.
 import Foundation
 import XCTest
 @testable import MediFlowAppleShared

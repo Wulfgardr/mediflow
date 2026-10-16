@@ -4,7 +4,6 @@ import { ambulatories, patients } from '@/lib/schema';
 import { isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 import { apiInternalError } from '@/lib/api-error-response';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
@@ -13,7 +12,6 @@ import { archiveGenerationForSession } from '@/lib/security/archive-session-gene
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();
@@ -69,7 +67,7 @@ export async function POST(request: Request) {
         });
 
     } catch (error) {
-        /* @Codex: preserva il contratto `success: false`, ma il dettaglio
+        /* preserva il contratto `success: false`, ma il dettaglio
            dell'eccezione resta solo nel log server. */
         return apiInternalError('POST /api/system/migrate', error, {
             extra: { success: false },

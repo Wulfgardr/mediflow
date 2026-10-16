@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
@@ -110,7 +109,7 @@ async function resolvePrincipal(resolve: ResolvePrincipal): Promise<Authenticate
     }
 }
 
-/** @Codex Bounded, process-local ledger for one verifier; it stores no credential or authority. */
+/** Bounded, process-local ledger for one verifier; it stores no credential or authority. */
 function createPinAttemptBudget(readNow: () => number) {
     const actors = new Map<string, Map<string, PinAttemptRecord>>();
     let latestObservedAt: number | null = null;

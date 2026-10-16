@@ -1,4 +1,4 @@
-/* @Codex — pure presentation/source checks; NOT a runtime or browser substitute. */
+/* pure presentation/source checks; NOT a runtime or browser substitute. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

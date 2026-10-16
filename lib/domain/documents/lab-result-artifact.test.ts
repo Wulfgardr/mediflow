@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { LAB_RESULT_ARTIFACT_SCHEMA_VERSION, readLabResultArtifact } from './lab-result-artifact.ts';

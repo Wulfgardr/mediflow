@@ -54,7 +54,7 @@ export function ThemeProvider({
     storageKey = 'mediflow-theme',
     ...props
 }: ThemeProviderProps) {
-    /* @Codex: lazy initializer keeps the React state aligned with the inline
+    /* lazy initializer keeps the React state aligned with the inline
        theme bootstrap script in app/layout.tsx so the first render matches
        the painted html.dark/.light class: no FOUC, no class flicker. */
     const [theme, setTheme] = useState<Theme>(() => readStoredTheme(storageKey, defaultTheme));

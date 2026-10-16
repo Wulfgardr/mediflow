@@ -22,7 +22,6 @@ import type { PillVariant } from '@/lib/patient-workspace';
 import { agendaFilterMatches } from '@/lib/ui-semantic-signal';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import agendaStyles from './turno-area.module.css';
-/* @Codex */
 const AI_QUEUE: Kree8DecisionCard[] = [
   {
     title: 'Follow-up suggerito',
@@ -55,7 +54,6 @@ const AI_QUEUE: Kree8DecisionCard[] = [
   },
 ];
 
-/* @Codex */
 const AGENDA_HEADING_ID = 'turno-agenda-heading';
 
 function TurnoArea({

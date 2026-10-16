@@ -1,4 +1,4 @@
-/* @Codex WUL-560 L7B */
+/* WUL-560 L7B */
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -11,7 +11,7 @@ import {
 const canonicalItems = () => [
     { href: '#quadro', label: 'Quadro', meta: 'q' },
     { href: '#attenzione', label: 'Attenzione', meta: 'a' },
-    // @Codex WUL-678: each domain has a real menu target.
+    // WUL-678: each domain has a real menu target.
     { href: '#identita', label: 'Anagrafica' },
     { href: '#clinica', label: 'Diagnosi' },
     { href: '#amministrazione', label: 'Amministrazione' },

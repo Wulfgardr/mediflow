@@ -41,7 +41,7 @@ export default function ServiceArchitecturePanel() {
 
     const checkServices = useCallback(async () => {
         setIsRefreshing(true);
-        // @Codex: show the address actually used by this browser, not a default port.
+        // show the address actually used by this browser, not a default port.
         setServices(prev => ({ ...prev, app: { ...prev.app, port: window.location.origin } }));
 
         // Check AI (Ollama)
@@ -71,7 +71,7 @@ export default function ServiceArchitecturePanel() {
             }));
         }
 
-        // @Codex: readiness only; never send a synthetic diagnosis to WHO.
+        // readiness only; never send a synthetic diagnosis to WHO.
         try {
             const readiness = await getICDReadiness();
             setServices(prev => ({
@@ -107,7 +107,7 @@ export default function ServiceArchitecturePanel() {
         return () => clearInterval(interval);
     }, [checkServices]);
 
-    /* @Codex: connection checks do not establish model execution or Fabric readiness. */
+    /* connection checks do not establish model execution or Fabric readiness. */
     const whoDisabled = services.icd.readiness === 'disabled';
     const whoConfigured = services.icd.readiness === 'configured';
     const rows = [

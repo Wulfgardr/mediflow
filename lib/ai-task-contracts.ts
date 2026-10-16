@@ -1,4 +1,3 @@
-/* @Codex */
 import { filterServicePrescriptionTherapyCandidates, isServicePrescriptionLikeTherapy } from './prescription-boundary';
 import { stripModelArtifacts } from './model-artifacts';
 import { AI_TASK_EXTRACTION_SCHEMA_VERSION } from './ai-task-contract-prompts';
@@ -6,7 +5,6 @@ import { SMART_IMPORT_PROPOSAL_WIRE_LIMITS } from './smart-import-proposal-wire'
 
 export { SMART_IMPORT_PROPOSAL_WIRE_LIMITS } from './smart-import-proposal-wire';
 
-/* @Codex */
 export {
     AI_TASK_EXTRACTION_SCHEMA_VERSION,
     buildDocumentSynthesisExtractionPrompt,
@@ -14,10 +12,8 @@ export {
     buildSmartImportExtractionPrompt,
 } from './ai-task-contract-prompts';
 
-/* @Codex */
 export type AITaskKind = 'patient_insight' | 'smart_import' | 'document_synthesis';
 
-/* @Codex */
 export interface AITaskEnvelope<TTask extends AITaskKind, TData> {
     schemaVersion: typeof AI_TASK_EXTRACTION_SCHEMA_VERSION;
     task: TTask;
@@ -25,7 +21,6 @@ export interface AITaskEnvelope<TTask extends AITaskKind, TData> {
     data: TData;
 }
 
-/* @Codex */
 export interface AITaskParseResult<T> {
     value: T;
     rawJson: string | null;
@@ -35,12 +30,11 @@ export interface AITaskParseResult<T> {
     repairedTruncation: boolean;
 }
 
-/* @Codex */
 export function isEnvelopeUsable(envelope: { validJson?: unknown; validTask?: unknown }): boolean {
     return envelope.validJson === true && envelope.validTask === true;
 }
 
-/* @Codex: contratto WUL-362 - rilevazione e risoluzione canonica degli envelope moderni.
+/* contratto WUL-362 - rilevazione e risoluzione canonica degli envelope moderni.
    Evidenza minima bilanciata: schemaVersion col prefisso mediflow.ai.extract, oppure
    task noto accompagnato da almeno uno tra schemaVersion, data e summary. La sola
    chiave task non basta: uno snippet dimostrativo storico resta leggibile. */
@@ -64,7 +58,6 @@ const ENVELOPE_SNIFF_SCHEMA_PATTERN = /["']schemaversion["']\s*:\s*["']mediflow\
 const ENVELOPE_SNIFF_TASK_PATTERN = /["']task["']\s*:\s*["'](patient_insight|smart_import|document_synthesis)["']/i;
 const ENVELOPE_SNIFF_SUPPORT_PATTERN = /["'](schemaversion|data|summary)["']\s*:/i;
 
-/* @Codex */
 type EnvelopeScanBudget = {
     chars: number;
     fragmentCharacterVisits: number;
@@ -74,7 +67,6 @@ type EnvelopeScanBudget = {
     truncated: boolean;
 };
 
-/* @Codex */
 function createEnvelopeScanBudget(): EnvelopeScanBudget {
     return {
         chars: 0,
@@ -86,7 +78,6 @@ function createEnvelopeScanBudget(): EnvelopeScanBudget {
     };
 }
 
-/* @Codex */
 function consumeScanChars(budget: EnvelopeScanBudget, amount: number): boolean {
     budget.chars += amount;
     if (budget.chars > ENVELOPE_SCAN_MAX_CHARS) {
@@ -96,7 +87,7 @@ function consumeScanChars(budget: EnvelopeScanBudget, amount: number): boolean {
     return true;
 }
 
-/* @Codex WUL-362 R5b: il limite dei candidati reali appartiene all'intera
+/* WUL-362 R5b: il limite dei candidati reali appartiene all'intera
    scansione, non alla singola stringa o al singolo layer. */
 function consumeRealFragment(budget: EnvelopeScanBudget): boolean {
     if (budget.realFragments >= ENVELOPE_SCAN_MAX_FRAGMENTS) {
@@ -107,7 +98,6 @@ function consumeRealFragment(budget: EnvelopeScanBudget): boolean {
     return true;
 }
 
-/* @Codex */
 function readEnvelopeKey(record: Record<string, unknown>, lowerCaseName: string): unknown {
     for (const key of Object.keys(record)) {
         if (key.toLowerCase() === lowerCaseName) return record[key];
@@ -115,7 +105,7 @@ function readEnvelopeKey(record: Record<string, unknown>, lowerCaseName: string)
     return undefined;
 }
 
-/* @Codex: evidenza minima bilanciata (contratto punto 4) */
+/* evidenza minima bilanciata (contratto punto 4) */
 function declaresModernEnvelopeRecord(record: Record<string, unknown>): boolean {
     const schemaValue = readEnvelopeKey(record, 'schemaversion');
     if (typeof schemaValue === 'string' && isModernSchemaVersionValue(schemaValue)) {
@@ -129,7 +119,7 @@ function declaresModernEnvelopeRecord(record: Record<string, unknown>): boolean 
         || readEnvelopeKey(record, 'summary') !== undefined;
 }
 
-/* @Codex: applica una sola decodifica degli escape JavaScript al segmento.
+/* applica una sola decodifica degli escape JavaScript al segmento.
    Gli escape di controllo restano caratteri di controllo; gli escape di
    identita rimuovono solo il backslash. Le sequenze Unicode o esadecimali non
    valide restano letterali, cosi non producono lettere sintetiche. */
@@ -201,13 +191,13 @@ function decodeJavascriptStyleEscapesOnce(text: string): string {
     return decoded;
 }
 
-/* @Codex: sniff allineato all'evidenza minima, per frammenti dichiarati non parseabili */
+/* sniff allineato all'evidenza minima, per frammenti dichiarati non parseabili */
 function sniffMatchesModernEnvelope(text: string): boolean {
     return ENVELOPE_SNIFF_SCHEMA_PATTERN.test(text)
         || (ENVELOPE_SNIFF_TASK_PATTERN.test(text) && ENVELOPE_SNIFF_SUPPORT_PATTERN.test(text));
 }
 
-/* @Codex: il match usa il segmento grezzo oppure la sua singola decodifica.
+/* il match usa il segmento grezzo oppure la sua singola decodifica.
    I layer stringificati successivi restano responsabilita del walk JSON. */
 function sniffDeclaresModernEnvelope(text: string): boolean {
     if (sniffMatchesModernEnvelope(text)) return true;
@@ -215,7 +205,7 @@ function sniffDeclaresModernEnvelope(text: string): boolean {
     return sniffMatchesModernEnvelope(decodeJavascriptStyleEscapesOnce(text));
 }
 
-/* @Codex: contratto WUL-362 F1 - evidenza aggregata delle chiavi RAW di un
+/* contratto WUL-362 F1 - evidenza aggregata delle chiavi RAW di un
    documento JSON, letta prima della riduzione last-wins di JSON.parse. La
    primitive decodifica internamente le chiavi e i soli valori stringa necessari
    (task, schemaVersion) e restituisce esclusivamente booleani aggregati: nessuna
@@ -250,7 +240,6 @@ function isKnownTaskValue(value: string): boolean {
     return KNOWN_AI_TASK_IDS.has(asciiLowerCase(value.trim()));
 }
 
-/* @Codex */
 type RawObjectScope = {
     kind: 'object';
     exactKeys: Set<string>;
@@ -261,7 +250,7 @@ type RawObjectScope = {
     supportSeen: boolean;
 };
 
-/* @Codex: uno scope oggetto dichiara evidenza moderna se, sulle sole chiavi e
+/* uno scope oggetto dichiara evidenza moderna se, sulle sole chiavi e
    valori RAW dello stesso scope, vale almeno uno dei tre casi del contratto:
    schemaVersion MediFlow valida; task noto con chiave di supporto; duplicazione
    o collisione di task con almeno un valore task noto. Scope, elementi di array
@@ -375,7 +364,6 @@ function scanJsonDocumentKeyEvidence(rawJson: string): JsonDocumentKeyEvidence {
     return { status: 'complete', hasAmbiguousKeys, declaresModernEnvelope };
 }
 
-/* @Codex */
 function findBalancedJsonEnd(
     text: string,
     start: number,
@@ -413,7 +401,6 @@ function findBalancedJsonEnd(
     return -1;
 }
 
-/* @Codex */
 function findNextJsonOpener(
     text: string,
     start: number,
@@ -427,7 +414,7 @@ function findNextJsonOpener(
     return -1;
 }
 
-/* @Codex WUL-362 F2: segmenti top-level non sovrapposti di un testo libero. Un
+/* WUL-362 F2: segmenti top-level non sovrapposti di un testo libero. Un
    gruppo bilanciato non e da solo una prova di candidatura JSON: la
    classificazione (parse o sniff) resta al chiamante, che conta nel budget solo
    i candidati reali. Un opener senza chiusura non inghiotte il resto: il tratto
@@ -475,7 +462,7 @@ function* iterateJsonFragmentSegments(
     }
 }
 
-/* @Codex: hook deterministico e limitato alla regressione del costo di scansione. */
+/* hook deterministico e limitato alla regressione del costo di scansione. */
 export function __testMeasureJsonFragmentScanWork(text: string): {
     characterVisits: number;
     truncated: boolean;
@@ -490,10 +477,9 @@ export function __testMeasureJsonFragmentScanWork(text: string): {
     };
 }
 
-/* @Codex */
 type EnvelopeRecordVisitor = (record: Record<string, unknown>, path: ReadonlyArray<string | number>) => void;
 
-/* @Codex: attraversamento bounded condiviso di oggetti, array e stringhe annidate.
+/* attraversamento bounded condiviso di oggetti, array e stringhe annidate.
    I percorsi attraversano anche i layer stringificati, cosi la parentela dei
    candidati resta un confronto di prefissi. */
 function walkEnvelopeTree(
@@ -552,7 +538,7 @@ function walkEnvelopeTree(
     }
 }
 
-/* @Codex: prima il parse diretto (contenuti persistiti JSON puri), poi TUTTI i
+/* prima il parse diretto (contenuti persistiti JSON puri), poi TUTTI i
    frammenti non sovrapposti; un frammento dichiarato ma non parseabile passa
    dallo sniff fail-closed. */
 function scanTextForEnvelopes(
@@ -576,7 +562,7 @@ function scanTextForEnvelopes(
         };
 
         walkEnvelopeTree(root, path, 0, budget, onDocumentRecord, onDocumentSniffDeclared);
-        // @Codex WUL-362 F1: l'evidenza si legge sulle chiavi RAW, prima della
+        // WUL-362 F1: l'evidenza si legge sulle chiavi RAW, prima della
         // riduzione last-wins di JSON.parse. Una dichiarazione moderna visibile
         // solo nelle chiavi raw (oscurata da duplicati o collisioni) e una
         // chiave ambigua in un documento che dichiara degradano entrambe
@@ -600,7 +586,7 @@ function scanTextForEnvelopes(
     } catch {
         // non era JSON puro: scansione multi-frammento
     }
-    // @Codex WUL-362 F2: nel budget frammenti contano solo i candidati reali,
+    // WUL-362 F2: nel budget frammenti contano solo i candidati reali,
     // cioe i gruppi JSON parseabili e i segmenti con sniff moderno. Un marcatore
     // canonico [Sx] o una parentesi bilanciata di prosa non consumano nulla. Il
     // nono candidato reale tronca fail-closed senza essere classificato:
@@ -632,7 +618,7 @@ function scanTextForEnvelopes(
     }
 }
 
-/* @Codex: rilevazione tri-state per il rescue legacy (contratto punto 3).
+/* rilevazione tri-state per il rescue legacy (contratto punto 3).
    present blocca, unknown (limite raggiunto) blocca, solo absent consente. */
 export function detectModernEnvelopeEvidence(text: string): ModernEnvelopeEvidence {
     const raw = text || '';
@@ -653,7 +639,7 @@ export function detectModernEnvelopeEvidence(text: string): ModernEnvelopeEviden
     return 'absent';
 }
 
-/* @Codex: risoluzione canonica dell'envelope per il read-path del Patient Insight.
+/* risoluzione canonica dell'envelope per il read-path del Patient Insight.
    Il recupero testuale a valle gira solo sullo stato legacy-text; ogni esaurimento
    dei budget degrada fail-closed ad ambiguous. */
 export type InsightEnvelopeResolution =
@@ -662,13 +648,12 @@ export type InsightEnvelopeResolution =
     | { status: 'ambiguous' }
     | { status: 'legacy-text' };
 
-/* @Codex */
 type InsightCandidateClass =
     | { kind: 'usable'; envelope: AITaskParseResult<PatientInsightExtraction>; canonical: string }
     | { kind: 'other-task-valid' }
     | { kind: 'declared-invalid'; tolerableAncestor: boolean };
 
-/* @Codex: la serializzazione del candidato e conteggiata nel budget caratteri */
+/* la serializzazione del candidato e conteggiata nel budget caratteri */
 function classifyInsightCandidate(
     record: Record<string, unknown>,
     budget: EnvelopeScanBudget,
@@ -695,13 +680,11 @@ function classifyInsightCandidate(
     return { kind: 'declared-invalid', tolerableAncestor: compatibleSchema && compatibleTask };
 }
 
-/* @Codex */
 function isStrictPathPrefix(prefix: ReadonlyArray<string | number>, path: ReadonlyArray<string | number>): boolean {
     if (prefix.length >= path.length) return false;
     return prefix.every((segment, index) => segment === path[index]);
 }
 
-/* @Codex */
 export function resolveInsightEnvelope(content: string): InsightEnvelopeResolution {
     const raw = content || '';
     const trimmed = raw.trim();
@@ -759,16 +742,12 @@ export function resolveInsightEnvelope(content: string): InsightEnvelopeResoluti
     return { status: 'legacy-text' };
 }
 
-/* @Codex */
 export type SmartImportConfidence = 'high' | 'medium' | 'low';
 
-/* @Codex */
 export type TherapySuggestionState = 'active' | 'transition' | 'uncertain' | 'inactive';
 
-/* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
 
-/* @Codex */
 export interface DocumentDiagnosisSuggestionContract {
     code: string;
     description: string;
@@ -777,7 +756,6 @@ export interface DocumentDiagnosisSuggestionContract {
     confidence?: SmartImportConfidence;
 }
 
-/* @Codex */
 export interface PatientInsightExtractionData {
     currentState: string[];
     alerts: string[];
@@ -785,10 +763,8 @@ export interface PatientInsightExtractionData {
     gaps: string[];
 }
 
-/* @Codex */
 export type PatientInsightExtraction = AITaskEnvelope<'patient_insight', PatientInsightExtractionData>;
 
-/* @Codex */
 export interface PatientInsightRenderContract {
     currentState: string[];
     alerts: string[];
@@ -796,7 +772,6 @@ export interface PatientInsightRenderContract {
     gaps: string[];
 }
 
-/* @Codex */
 export interface SmartImportDiagnosisExtraction {
     label: string;
     icdQuery: string;
@@ -806,7 +781,6 @@ export interface SmartImportDiagnosisExtraction {
     explicitCode?: string;
 }
 
-/* @Codex */
 export interface SmartImportTherapyExtraction {
     drugMention: string;
     drugQuery: string;
@@ -820,10 +794,8 @@ export interface SmartImportTherapyExtraction {
     sourceId?: string;
 }
 
-/* @Codex */
 export type SmartImportServicePrescriptionCategory = 'lab' | 'imaging' | 'visit' | 'rehab' | 'screening' | 'procedure' | 'other';
 
-/* @Codex */
 export interface SmartImportServicePrescriptionItemExtraction {
     serviceName: string;
     category?: SmartImportServicePrescriptionCategory;
@@ -834,7 +806,6 @@ export interface SmartImportServicePrescriptionItemExtraction {
     sourceId?: string;
 }
 
-/* @Codex */
 export interface SmartImportServicePrescriptionExtraction {
     serviceName: string;
     category?: SmartImportServicePrescriptionCategory;
@@ -851,17 +822,14 @@ export interface SmartImportServicePrescriptionExtraction {
     items?: SmartImportServicePrescriptionItemExtraction[];
 }
 
-/* @Codex */
 export interface SmartImportExtractionData {
     diagnoses: SmartImportDiagnosisExtraction[];
     therapies: SmartImportTherapyExtraction[];
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 }
 
-/* @Codex */
 export type SmartImportExtraction = AITaskEnvelope<'smart_import', SmartImportExtractionData>;
 
-/* @Codex */
 export interface DocumentSynthesisExtractionData {
     qualityLevel: DocumentQualityLevel;
     qualityReason?: string;
@@ -872,7 +840,6 @@ export interface DocumentSynthesisExtractionData {
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 }
 
-/* @Codex */
 export type DocumentSynthesisExtraction = AITaskEnvelope<'document_synthesis', DocumentSynthesisExtractionData>;
 
 const MAX_SHARED_SUMMARY_CHARS = 220;
@@ -961,7 +928,7 @@ function parseLegacyDocumentSynthesisPayload(response: string): {
     therapyCandidates: SmartImportTherapyExtraction[];
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 } | null {
-    // @Codex: rescue consentito solo con evidenza moderna assente (tri-state);
+    // rescue consentito solo con evidenza moderna assente (tri-state);
     // present e unknown (scansione interrotta da un limite) bloccano entrambi.
     if (detectModernEnvelopeEvidence(response) !== 'absent') return null;
     const extraction = extractJsonObject(response);
@@ -1049,7 +1016,7 @@ function parseEnvelope(
 
     const { rawJson, repairedTruncation } = extraction;
 
-    // @Codex: un secondo root JSON rende la risposta ambigua. Non scegliere il
+    // un secondo root JSON rende la risposta ambigua. Non scegliere il
     // primo envelope quando il modello ha prodotto una seconda risposta.
     if (extraction.hasAmbiguousLeadingJsonRoot || hasAmbiguousTrailingJsonRoot(extraction.trailingContent)) {
         return {
@@ -1064,7 +1031,7 @@ function parseEnvelope(
 
     try {
         const parsed = JSON.parse(rawJson) as Record<string, unknown>;
-        // @Codex WUL-362 F1: duplicati esatti e collisioni ASCII case-insensitive
+        // WUL-362 F1: duplicati esatti e collisioni ASCII case-insensitive
         // delle chiavi riservate invalidano l'envelope; un esito unknown della
         // primitive resta fail-closed, mai un envelope valido.
         const keyEvidence = scanJsonDocumentKeyEvidence(rawJson);
@@ -1175,7 +1142,6 @@ function normalizeServicePrescriptionCategory(value: unknown): SmartImportServic
     return undefined;
 }
 
-/* @Codex */
 function normalizeServicePrescriptionItem(value: unknown, parent: { category?: SmartImportServicePrescriptionCategory; evidence: string; sourceId?: string }): SmartImportServicePrescriptionItemExtraction | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
@@ -1333,7 +1299,7 @@ export interface ExtractedJsonObject {
     hasAmbiguousLeadingJsonRoot?: boolean;
 }
 
-// @Codex: dopo un envelope completo, un altro valore JSON o il suo prefisso
+// dopo un envelope completo, un altro valore JSON o il suo prefisso
 // incompleto e ambiguo. Il parser non sceglie mai arbitrariamente il primo.
 function hasAmbiguousTrailingJsonRoot(trailingContent: string | undefined): boolean {
     if (!trailingContent?.trim()) return false;
@@ -1384,7 +1350,7 @@ interface JsonContainer {
     parent: JsonContainer | null;
 }
 
-// @Codex: chiude solo i contenitori osservati nello stesso prefisso JSON.
+// chiude solo i contenitori osservati nello stesso prefisso JSON.
 function closeJsonContainers(fragment: string, container: JsonContainer | null): string {
     let closed = fragment;
     for (let current = container; current; current = current.parent) {
@@ -1393,7 +1359,7 @@ function closeJsonContainers(fragment: string, container: JsonContainer | null):
     return closed;
 }
 
-// @Codex: delimita una radice completa senza interpretarne ancora il contenuto.
+// delimita una radice completa senza interpretarne ancora il contenuto.
 function extractBalancedJsonValue(candidate: string, rootStart: number): string | null {
     let container: JsonContainer | null = null;
     let inString = false;
@@ -1433,7 +1399,7 @@ function extractBalancedJsonValue(candidate: string, rootStart: number): string 
     return null;
 }
 
-// @Codex: una riparazione dichiarata deve essere un oggetto JSON parsabile.
+// una riparazione dichiarata deve essere un oggetto JSON parsabile.
 function isParsableJsonObject(value: string, requireMember = false): boolean {
     try {
         const parsed = JSON.parse(value) as unknown;
@@ -1451,7 +1417,7 @@ export function extractJsonObject(response: string): ExtractedJsonObject | null 
     const fenceStart = fenced?.index ?? -1;
     const hasRootBeforeFence = fenceStart >= 0
         && hasAmbiguousTrailingJsonRoot(clean.slice(0, fenceStart));
-    // @Codex: un fence puo isolare una riparazione di troncamento, ma non puo
+    // un fence puo isolare una riparazione di troncamento, ma non puo
     // nascondere un root precedente o il testo dopo la chiusura del fence.
     const usesFencedCandidate = Boolean(fencedCandidate && /[\[{]/.test(fencedCandidate) && !hasRootBeforeFence);
     const candidate = usesFencedCandidate ? fencedCandidate! : clean;

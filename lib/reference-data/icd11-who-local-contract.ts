@@ -1,4 +1,3 @@
-/* @Codex */
 // Public data-only contract. No runtime, environment, HTTP or credential imports.
 export const WHO_LOCAL_BINDING_ID = 'who.icd11.v2.2026-01.mms.en.local.v1' as const;
 export const WHO_LOCAL_TTL_MS = 86_400_000;
@@ -33,7 +32,7 @@ function isWhoEntityUri(value: unknown): value is string {
         && /^http:\/\/id\.who\.int\/icd\/release\/11\/2026-01\/mms\/[1-9][0-9]{0,19}(?:\/(?:other|unspecified))?$/u.test(value);
 }
 
-/* @Codex: WHO identifies a code combination through its official CodeInfo resource. */
+/* WHO identifies a code combination through its official CodeInfo resource. */
 const CODEINFO_PREFIX = 'http:' + '//id.who.int/icd/release/11/2026-01/mms/codeinfo/';
 const isCombinationCode = (code: string) => code.length <= 32
     && /^[A-Z0-9][A-Z0-9.-]*(?:[&/][A-Z0-9][A-Z0-9.-]*)+$/u.test(code) && code !== 'N/A';

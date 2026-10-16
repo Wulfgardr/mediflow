@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import Database from 'better-sqlite3';
 
@@ -274,7 +273,7 @@ function readLedger(idempotencyKey: string): LedgerRow | null {
     return row as LedgerRow | null;
 }
 
-/* @Codex Ledger collisions are durable corruption; only orphan identifiers are fresh idempotency conflicts. */
+/* Ledger collisions are durable corruption; only orphan identifiers are fresh idempotency conflicts. */
 function deterministicIdentifierDenial(commandId: string, entryId: string, auditEventId: string, receiptRef: string):
 'receipt_unavailable' | 'idempotency_conflict' | null {
     const ledgerValues = prepare(SELECT_LEDGER_COLLISION).all(commandId, entryId, auditEventId, receiptRef);

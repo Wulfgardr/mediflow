@@ -1,12 +1,7 @@
-/* @Codex */
 import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import type { CheckupSummary } from './api/v1/types';
-/* @Codex */
 import { checkups, patientsToAmbulatories } from './schema';
-/* @Codex */
 import { normalizeCheckupStatus, checkupStatusFilterValues } from './status-normalization';
 
 type NetworkCheckupListFilters = {
@@ -16,9 +11,7 @@ type NetworkCheckupListFilters = {
     dateTo?: Date | null;
 };
 
-/* @Codex */
 export const NETWORK_CHECKUP_READ_CAPABILITY = 'network.replica.readonly-checkups';
-/* @Codex */
 export const NETWORK_AGENDA_READ_CAPABILITY = 'network.replica.readonly-agenda';
 
 function toIsoString(value: unknown): string | null {
@@ -44,7 +37,6 @@ function toCheckupSummary(checkup: typeof checkups.$inferSelect): CheckupSummary
     };
 }
 
-/* @Codex */
 export async function listNetworkScopedCheckups(
     patientId: string,
     scopeAmbulatoryId: string,
@@ -72,7 +64,6 @@ export async function listNetworkScopedCheckups(
     return rows.map((row) => toCheckupSummary(row.checkup));
 }
 
-/* @Codex */
 export async function listNetworkScopedCheckupsForAmbulatory(
     scopeAmbulatoryId: string,
     filters: NetworkCheckupListFilters = {}
@@ -97,7 +88,6 @@ export async function listNetworkScopedCheckupsForAmbulatory(
     return rows.map((row) => toCheckupSummary(row.checkup));
 }
 
-/* @Codex */
 export async function getNetworkScopedCheckup(
     patientId: string,
     checkupId: string,

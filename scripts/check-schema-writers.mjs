@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 // Ogni tabella dichiarata in lib/schema.ts deve avere almeno un writer specifico:
 // un modulo non-infrastrutturale che esegue .insert/.update/.delete su quel simbolo.

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { headlessSoapActiveRoleSessionGrantProductionOwner } from './headless-soap-active-role-session-grant-production-internal';

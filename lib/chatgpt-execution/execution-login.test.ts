@@ -1,4 +1,4 @@
-/* @Codex — attached source protocol only, fake transport; not binary qualification. */
+/* attached source protocol only, fake transport; not binary qualification. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { join } from 'node:path';

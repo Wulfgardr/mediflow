@@ -1,4 +1,3 @@
-/* @Codex */
 // WUL-268 (STREAM A): resolve hook for the schema drift check worker.
 //
 // lib/db-server.ts and lib/schema.ts use the "@/*" TypeScript path alias and

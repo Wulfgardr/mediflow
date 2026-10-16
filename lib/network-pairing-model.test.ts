@@ -1,12 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import {
     buildNetworkNodeSummary,
     createPairingIntentDraft,
     NETWORK_MODE_KEY,
 } from './network-contract.ts';
-/* @Codex */
 import {
     addPendingPairingIntent,
     confirmPendingPairingIntent,
@@ -17,7 +15,6 @@ import {
     type NetworkPairingState,
     type StoredNetworkPairedClient,
 } from './network-pairing-model.ts';
-/* @Codex */
 import { authenticatePairedClientRequest } from './network-paired-client-auth.ts';
 
 function buildHomeBaseIntent() {
@@ -122,7 +119,6 @@ test('authenticatePairedClientRequest requires both paired client headers', () =
     assert.equal(authenticatePairedClientRequest(invalidRequest, result.nextState.clients), null);
 });
 
-/* @Codex */
 function buildStoredClient(clientId: string, token: string): StoredNetworkPairedClient {
     return {
         clientId,
@@ -137,7 +133,6 @@ function buildStoredClient(clientId: string, token: string): StoredNetworkPaired
     };
 }
 
-/* @Codex */
 function buildRemovalState(): NetworkPairingState {
     return {
         intents: [buildHomeBaseIntent()],

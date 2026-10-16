@@ -6,18 +6,13 @@ import { dbServer } from '@/lib/db-server';
 import { checkups } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromSession, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { createCheckupOperation } from '@/lib/checkup-write-operation';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
-/* @Codex */
 import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
 // Only plaintext columns are sortable server-side (notes is ENC:, not sortable).
@@ -27,7 +22,6 @@ const CHECKUP_SORT_COLUMNS = {
     updatedAt: checkups.updatedAt,
 } as const;
 
-/* @Codex */
 function parseRequiredDate(value: unknown): Date | null {
     if (typeof value !== 'string' && typeof value !== 'number') return null;
     const date = new Date(value);
@@ -35,7 +29,6 @@ function parseRequiredDate(value: unknown): Date | null {
 }
 
 export async function GET(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -79,7 +72,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -92,22 +84,17 @@ export async function POST(request: Request) {
         const parsedBody = parseApiBody(checkupCreateSchema, rawBody);
         if (!parsedBody.ok) return parsedBody.response;
         const body = parsedBody.data;
-        /* @Codex */
         const auditBody = body as Record<string, unknown>;
-        /* @Codex */
         const normalizedStatus = body.status === undefined ? 'pending' : parseCheckupStatus(body.status);
         if (body.status !== undefined && !normalizedStatus) {
             return NextResponse.json({ error: 'Invalid checkup status' }, { status: 400 });
         }
-        /* @Codex */
         if (typeof body.patientId !== 'string' || body.patientId.trim().length === 0) {
             return NextResponse.json({ error: 'patientId required' }, { status: 400 });
         }
-        /* @Codex */
         if (typeof body.title !== 'string' || body.title.trim().length === 0) {
             return NextResponse.json({ error: 'title required' }, { status: 400 });
         }
-        /* @Codex */
         const checkupDate = parseRequiredDate(body.date);
         if (!checkupDate) {
             return NextResponse.json({ error: 'Valid checkup date required' }, { status: 400 });
@@ -120,10 +107,8 @@ export async function POST(request: Request) {
             patientId: body.patientId,
             date: checkupDate,
             title: body.title,
-            /* @Codex */
             notes: body.notes ?? null,
             status: normalizedStatus ?? 'pending',
-            /* @Codex */
             source: body.source ?? 'manual',
             version: 1,
             createdAt: new Date(),
@@ -131,7 +116,7 @@ export async function POST(request: Request) {
             deletedAt: null,
             deletionReason: null,
         };
-        // @Codex: admission, row insert and required audit share one IMMEDIATE transaction.
+        // admission, row insert and required audit share one IMMEDIATE transaction.
         const context = auditContextFromSession(session);
         const result = createCheckupOperation({
             patientId: body.patientId, checkupId: String(newId), values: checkupValues, mode: 'web',

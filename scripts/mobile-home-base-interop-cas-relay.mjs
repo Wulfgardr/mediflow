@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex: Relay verified test checkpoints between two real native UI writers.
+/* Relay verified test checkpoints between two real native UI writers.
    No HTTP, clinical writer, app flag, simulator control or production import. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

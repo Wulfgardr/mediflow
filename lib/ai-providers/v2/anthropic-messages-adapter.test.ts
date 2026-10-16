@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAbsentProviderLifecycleV2, transitionProviderLifecycleV2 } from './provider-lifecycle.ts';

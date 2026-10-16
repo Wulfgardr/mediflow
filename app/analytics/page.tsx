@@ -6,17 +6,15 @@ import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
-/* @Codex */
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { RangeInput } from '@/components/range-input';
 import { db } from '@/lib/db';
-/* @Codex */
 import { buildAnalyticsStats, isAnalyticsPatient, normalizeAgeRange } from '@/lib/patient-analytics';
 import { useLiveQuery } from '@/lib/live-query';
 
 import styles from './analytics.module.css';
 
-/* @Codex LUME-110/68 */
+/* LUME-110/68 */
 type AuditSummary = {
     days: number;
     totalEvents: number;
@@ -53,7 +51,7 @@ function ProgressLine({ label, value, total }: { label: string; value: number; t
 }
 
 function SectionHeading({ label, title, description }: { label: string; title: string; description: string }) {
-    /* @Codex: the title carries the meaning; presentation labels belong only to the comparison. */
+    /* the title carries the meaning; presentation labels belong only to the comparison. */
     const { proposal } = useRuntimeTwinDesign();
     return (
         <div className={styles.sectionHeading}>
@@ -67,7 +65,6 @@ function SectionHeading({ label, title, description }: { label: string; title: s
 }
 
 export default function AnalyticsPage() {
-    /* @Codex */
     const { proposal } = useRuntimeTwinDesign();
     const navItems = proposal
         ? ANALYTICS_NAV_ITEMS.map(({ href, label }) => ({ href, label: href === '#domanda' ? 'Popolazione' : label }))

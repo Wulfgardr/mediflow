@@ -1,6 +1,5 @@
 import CoreGraphics
 
-/* @Codex */
 /// Patient-local navigation only. These values are not API routes or capability keys.
 enum PatientWorkspaceSection: String, CaseIterable, Identifiable {
     case overview, diary, scales, therapies, clinical, prescriptions, documents
@@ -75,7 +74,7 @@ enum PatientsWorkspaceLayout {
         isAccessibilitySize: Bool,
         isCompactHeight: Bool = false
     ) -> Bool {
-        // @Codex: A wide, short viewport still needs one full clinical column.
+        // A wide, short viewport still needs one full clinical column.
         // Size class describes available height here, never device identity.
         guard !isAccessibilitySize, !isCompactHeight else { return false }
         guard containerWidth.isFinite, containerWidth > 0 else { return false }

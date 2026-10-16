@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: synthetic real-SQLite oracle for the ten ordinary service writes. */
+/* synthetic real-SQLite oracle for the ten ordinary service writes. */
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -158,7 +158,7 @@ test('ten successful writes persist one minimal event', async () => {
     }
 });
 
-/* @Codex: a suppressed child removal must roll back the aggregate delete. */
+/* a suppressed child removal must roll back the aggregate delete. */
 test('parent hard delete rolls back if one child DELETE is ignored', async () => {
     const ids = seed(); insertParent(ids); insertItem(ids); const before = snapshot(ids);
     sql.exec('CREATE TRIGGER synthetic_child_ignore BEFORE DELETE ON service_prescription_items BEGIN SELECT RAISE(IGNORE); END');
@@ -168,7 +168,7 @@ test('parent hard delete rolls back if one child DELETE is ignored', async () =>
     if (!baseline) { assert.ok(error); assert.deepEqual(snapshot(ids), before); }
 });
 
-/* @Codex: admission, scope, and version precedence use the current transaction state. */
+/* admission, scope, and version precedence use the current transaction state. */
 test('patient, parent, paired scope, stale version and retry', async () => {
     if (baseline) return;
     for (const op of operations) for (const kind of ['deleted', 'archived'] as const) {
@@ -200,7 +200,7 @@ test('patient, parent, paired scope, stale version and retry', async () => {
     }
 });
 
-/* @Codex: two independent SQLite connections contend after an explicit startup barrier. */
+/* two independent SQLite connections contend after an explicit startup barrier. */
 function launchChild(mode: 'update' | 'tombstone', ids: ReturnType<typeof seed>) {
     const child = spawn(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/fixtures/service-atomic-process.ts', mode, ids.patientId, ids.prescriptionId],
         { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: dir } });
@@ -233,7 +233,7 @@ test('independent SQLite writers serialize a version and observe parent tombston
     assert.equal((await later.result).status, 404); assert.equal((snapshot(deleted).parent as Record<string, unknown>).version, 3);
 });
 
-/* @Codex: identity and actor are admitted by the host, not selected by body or headers. */
+/* identity and actor are admitted by the host, not selected by body or headers. */
 test('host system actor and paired patient identity survive body spoofing', async () => {
     if (baseline) return;
     const ids = seed(); const other = seed();

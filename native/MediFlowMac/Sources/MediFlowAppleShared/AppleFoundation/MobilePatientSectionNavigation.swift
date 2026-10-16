@@ -1,7 +1,7 @@
 #if os(iOS)
 import SwiftUI
 
-/* @Codex: Presentation only; selection remains owned by the patient workspace. */
+/* Presentation only; selection remains owned by the patient workspace. */
 struct MobilePatientSectionNavigation: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding var selection: PatientWorkspaceSection

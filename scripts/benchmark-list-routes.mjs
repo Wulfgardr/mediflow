@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import { spawn } from 'node:child_process';
 import { createDecipheriv } from 'node:crypto';

@@ -1,4 +1,3 @@
-/* @Codex */
 import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { ICD11_WHO_BINDING, Icd11WhoServiceError } from './icd11-who-service.ts';

@@ -1,4 +1,4 @@
-/* @Codex WUL-676: actual workflows on the marked, synthetic prototype only. */
+/* WUL-676: actual workflows on the marked, synthetic prototype only. */
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';

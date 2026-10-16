@@ -1,4 +1,4 @@
-/* @Codex — legacy utility compatibility; Mac custody lives in execution-mac-qualification. */
+/* legacy utility compatibility; Mac custody lives in execution-mac-qualification. */
 import 'server-only';
 import type { spawn } from 'node:child_process';
 import { ExecutionError, type ExecutionTransport } from './execution-contract';

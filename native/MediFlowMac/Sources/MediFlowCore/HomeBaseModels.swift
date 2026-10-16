@@ -104,12 +104,11 @@ public struct HomeBasePatientDetail: Identifiable, Codable, Hashable, Sendable {
     public let updatedAt: Date?
     public let deletedAt: Date?
     public let deletionReason: String?
-    /* @Codex: existing encrypted profile fields, optional for older readers. */
+    /* existing encrypted profile fields, optional for older readers. */
     public let archiveReason: String?
     public let archiveNote: String?
 }
 
-/* @Codex */
 /// Fields of a clinical record whose stored value was an ENC envelope the client
 /// could not open — no master key, or the wrong one.
 ///
@@ -406,7 +405,6 @@ public struct HomeBaseNetworkAiRuntimeSummary: Codable, Equatable, Sendable {
         public let executionAuthorized: Bool
     }
 
-    /* @Codex */
     public struct FabricProjection: Codable, Equatable, Sendable {
         public struct Venues: Codable, Equatable, Sendable {
             public let localProcess: String
@@ -451,7 +449,6 @@ public struct HomeBaseNetworkAiRuntimeSummary: Codable, Equatable, Sendable {
     public let guardrails: [String]
 }
 
-/* @Codex */
 public struct HomeBaseTherapySummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, drugName: String, aic: String?, atc: String?, activePrinciple: String?, dosage: String, motivation: String?, diagnosisCode: String?, diagnosisName: String?, status: String, startDate: Date, endDate: Date?, version: Int, createdAt: Date?, updatedAt: Date?, deletedAt: Date?, deletionReason: String?) {
         self.id = id; self.patientId = patientId; self.drugName = drugName; self.aic = aic; self.atc = atc; self.activePrinciple = activePrinciple; self.dosage = dosage; self.motivation = motivation; self.diagnosisCode = diagnosisCode; self.diagnosisName = diagnosisName; self.status = status; self.startDate = startDate; self.endDate = endDate; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
@@ -476,7 +473,6 @@ public struct HomeBaseTherapySummary: Identifiable, Codable, Hashable, Sendable 
     public let deletionReason: String?
 }
 
-/* @Codex */
 public struct HomeBaseCheckupSummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, date: Date, title: String, notes: String?, status: String, source: String?, version: Int, createdAt: Date?, updatedAt: Date?, deletedAt: Date?, deletionReason: String?) {
         self.id = id; self.patientId = patientId; self.date = date; self.title = title; self.notes = notes; self.status = status; self.source = source; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
@@ -495,7 +491,6 @@ public struct HomeBaseCheckupSummary: Identifiable, Codable, Hashable, Sendable 
     public let deletionReason: String?
 }
 
-/* @Codex */
 public struct HomeBaseObservationSummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, codeSystem: String, code: String, display: String, unitSystem: String, unitCode: String, value: String, notes: String?, observedAt: Date, source: String?, version: Int, createdAt: Date?, updatedAt: Date?, deletedAt: Date?, deletionReason: String?) {
         self.id = id; self.patientId = patientId; self.codeSystem = codeSystem; self.code = code; self.display = display; self.unitSystem = unitSystem; self.unitCode = unitCode; self.value = value; self.notes = notes; self.observedAt = observedAt; self.source = source; self.version = version; self.createdAt = createdAt; self.updatedAt = updatedAt; self.deletedAt = deletedAt; self.deletionReason = deletionReason
@@ -518,7 +513,6 @@ public struct HomeBaseObservationSummary: Identifiable, Codable, Hashable, Senda
     public let deletionReason: String?
 }
 
-/* @Codex */
 public struct HomeBaseServicePrescriptionSummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, prescribedAt: Date, status: String, category: String,
                 priority: String?, codeSystem: String?, serviceCode: String?, serviceName: String,
@@ -551,7 +545,6 @@ public struct HomeBaseServicePrescriptionSummary: Identifiable, Codable, Hashabl
     public let updatedAt: Date?
 }
 
-/* @Codex */
 public struct HomeBaseServicePrescriptionItemSummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, prescriptionId: String, ordinal: Int, status: String,
                 category: String?, codeSystem: String?, serviceCode: String?, serviceName: String,
@@ -585,7 +578,6 @@ public struct HomeBaseServicePrescriptionItemSummary: Identifiable, Codable, Has
     public let updatedAt: Date?
 }
 
-/* @Codex */
 public struct HomeBaseProstheticPrescriptionSummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, patientId: String, prescribedAt: Date, status: String, category: String,
                 isoCode: String?, description: String, measures: String?, clinicalReason: String?,
@@ -615,7 +607,6 @@ public struct HomeBaseProstheticPrescriptionSummary: Identifiable, Codable, Hash
     public let updatedAt: Date?
 }
 
-/* @Codex */
 public struct HomeBaseServiceCatalogEntrySummary: Identifiable, Codable, Hashable, Sendable {
     public init(id: String, codeSystem: String, serviceCode: String, displayName: String,
                 category: String, branchCode: String?, synonyms: String?, source: String,
@@ -636,7 +627,6 @@ public struct HomeBaseServiceCatalogEntrySummary: Identifiable, Codable, Hashabl
     public let updatedAt: Date?
 }
 
-/* @Codex */
 public struct HomeBaseCatalogCountResponse: Codable, Hashable, Sendable {
     public let count: Int
 
@@ -645,7 +635,6 @@ public struct HomeBaseCatalogCountResponse: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct NetworkRevisionSummary: Codable, Hashable, Sendable {
     public let revision: String
     public let sourceFingerprint: String
@@ -658,7 +647,6 @@ public struct NetworkRevisionSummary: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct NetworkCapability: Codable, Hashable, Sendable {
     public let key: String
     public let status: String
@@ -673,7 +661,6 @@ public struct NetworkCapability: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct NetworkCapabilitiesResponse: Codable, Hashable, Sendable {
     public let nodeId: String
     public let operatingMode: String
@@ -688,7 +675,6 @@ public struct NetworkCapabilitiesResponse: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct NetworkNodeSummary: Codable, Hashable, Sendable {
     public struct Transport: Codable, Hashable, Sendable {
         public let apiBasePath: String
@@ -715,7 +701,6 @@ public struct NetworkNodeSummary: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct NetworkIdentitySummary: Codable, Hashable, Sendable {
     public struct OperatorSummary: Codable, Hashable, Sendable {
         public let userId: String?
@@ -786,7 +771,6 @@ public struct NetworkAmbulatorySummary: Identifiable, Codable, Hashable, Sendabl
     public let createdAt: String?
 }
 
-/* @Codex */
 public struct HomeBaseAmbulatoryCreatePayload: Encodable, Sendable {
     public let id: String?
     public let name: String
@@ -815,7 +799,6 @@ public struct HomeBaseAmbulatoryCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseAmbulatoryUpdatePayload: Encodable, Sendable {
     public let expectedVersion: Int
     public let name: String?
@@ -859,7 +842,6 @@ public struct HomeBaseAmbulatoryUpdatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseAffectedAmbulatory: Decodable, Equatable, Sendable {
     public let id: String
     public let version: Int
@@ -870,7 +852,6 @@ public struct HomeBaseAffectedAmbulatory: Decodable, Equatable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseAmbulatoryMutationResponse: Decodable, Equatable, Sendable {
     public let success: Bool
     public let id: String?
@@ -899,7 +880,6 @@ public struct HomeBaseAmbulatoryMutationResponse: Decodable, Equatable, Sendable
     }
 }
 
-/* @Codex */
 public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     public let id: String
     public let type: String
@@ -927,7 +907,6 @@ public struct HomeBaseEntryCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseEntryUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let type: String?
@@ -1042,7 +1021,6 @@ public struct HomeBasePatientUpdatePayload: Encodable, Sendable {
     // as diagnoses). birthDate: omit/null/value, matching normalizeBirthDateForUpdate.
     public let exemptions: PatchValue<String>
     public let birthDate: PatchValue<Date>
-    /* @Codex */
     public let archiveReason: PatchValue<String>
     public let archiveNote: PatchValue<String>
 
@@ -1176,7 +1154,6 @@ public struct HomeBasePatientCreatePayload: Encodable, Sendable {
     // from the struct, not from its JSON encoding.
 }
 
-/* @Codex */
 public struct HomeBasePatientSoftDeletePayload: Encodable, Sendable {
     public let version: Int
     public let deletionReason: String?
@@ -1187,7 +1164,6 @@ public struct HomeBasePatientSoftDeletePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBasePatientRestorePayload: Encodable, Sendable {
     public let version: Int
 
@@ -1196,7 +1172,6 @@ public struct HomeBasePatientRestorePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
     public let drugName: String
     public let aic: String?
@@ -1237,7 +1212,6 @@ public struct HomeBaseTherapyCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let drugName: String?
@@ -1331,7 +1305,6 @@ public struct HomeBaseTherapyUpdatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseCheckupCreatePayload: Encodable, Sendable {
     public let date: Date
     public let title: String
@@ -1348,7 +1321,6 @@ public struct HomeBaseCheckupCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let date: Date?
@@ -1380,7 +1352,6 @@ public struct HomeBaseCheckupUpdatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseObservationCreatePayload: Encodable, Sendable {
     public let codeSystem: String
     public let code: String
@@ -1415,7 +1386,6 @@ public struct HomeBaseObservationCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseObservationUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let codeSystem: String?
@@ -1459,7 +1429,6 @@ public struct HomeBaseObservationUpdatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseServicePrescriptionCreatePayload: Encodable, Sendable {
     public let id: String?
     public let patientId: String
@@ -1491,7 +1460,6 @@ public struct HomeBaseServicePrescriptionCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseServicePrescriptionUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let prescribedAt: Date?
@@ -1552,7 +1520,6 @@ public struct HomeBaseServicePrescriptionUpdatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseServicePrescriptionItemCreatePayload: Encodable, Sendable {
     public let id: String?
     public let prescriptionId: String
@@ -1583,7 +1550,6 @@ public struct HomeBaseServicePrescriptionItemCreatePayload: Encodable, Sendable 
     }
 }
 
-/* @Codex */
 public struct HomeBaseServicePrescriptionItemUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let ordinal: Int?
@@ -1642,7 +1608,6 @@ public struct HomeBaseServicePrescriptionItemUpdatePayload: Encodable, Sendable 
     }
 }
 
-/* @Codex */
 public struct HomeBaseProstheticPrescriptionCreatePayload: Encodable, Sendable {
     public let id: String?
     public let patientId: String
@@ -1670,7 +1635,6 @@ public struct HomeBaseProstheticPrescriptionCreatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseProstheticPrescriptionUpdatePayload: Encodable, Sendable {
     public let version: Int
     public let prescribedAt: Date?
@@ -1724,7 +1688,6 @@ public struct HomeBaseProstheticPrescriptionUpdatePayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public enum HomeBaseJSONValue: Codable, Equatable, Sendable {
     case string(String)
     case number(Double)
@@ -1763,7 +1726,6 @@ public enum HomeBaseJSONValue: Codable, Equatable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseFseDocumentValidationPayload: Encodable, Sendable {
     public let profile: String
     public let document: HomeBaseJSONValue?
@@ -1776,7 +1738,6 @@ public struct HomeBaseFseDocumentValidationPayload: Encodable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseFseValidationIssue: Codable, Hashable, Sendable {
     public let field: String
     public let code: String
@@ -1789,7 +1750,6 @@ public struct HomeBaseFseValidationIssue: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseFseValidationItem: Codable, Hashable, Sendable {
     public let id: String
     public let ok: Bool
@@ -1804,7 +1764,6 @@ public struct HomeBaseFseValidationItem: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseFseValidationSummary: Codable, Hashable, Sendable {
     public let total: Int
     public let ok: Int
@@ -1820,7 +1779,6 @@ public struct HomeBaseFseValidationSummary: Codable, Hashable, Sendable {
     }
 }
 
-/* @Codex */
 public struct HomeBaseValidatePatientExportResponse: Codable, Hashable, Sendable {
     public let patientId: String
     public let hasErrors: Bool
@@ -1835,7 +1793,6 @@ public struct HomeBaseValidatePatientExportResponse: Codable, Hashable, Sendable
     }
 }
 
-/* @Codex */
 public struct HomeBaseFseDocumentValidationResponse: Codable, Hashable, Sendable {
     public let ok: Bool
     public let profile: String
@@ -1850,7 +1807,6 @@ public struct HomeBaseFseDocumentValidationResponse: Codable, Hashable, Sendable
     }
 }
 
-/* @Codex */
 public struct HomeBaseMutationAcknowledgement: Decodable, Equatable, Sendable {
     public let success: Bool
 

@@ -1,4 +1,3 @@
-/* @Codex */
 import { db } from '@/lib/db';
 import { DEFAULT_TEXT_MODEL, isStaleTextModel } from './ai-model-selection';
 export {

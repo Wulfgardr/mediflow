@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 

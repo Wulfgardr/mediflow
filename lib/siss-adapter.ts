@@ -1,12 +1,8 @@
-/* @Codex */
 import { randomUUID } from 'node:crypto';
 import { sanitizeAuditMetadata, type AuditRedactedMetadata } from './security/audit';
-/* @Codex */
 import { SISS_ACTIONS, type SissAction } from './siss-actions';
-/* @Codex */
 import { SISS_ACTION_URLS } from './siss-urls';
 
-/* @Codex */
 export const SISS_ERROR_CODES = [
     'SISS_INVALID_INPUT',
     'SISS_AUTH_REQUIRED',
@@ -18,14 +14,11 @@ export const SISS_ERROR_CODES = [
 ] as const;
 export type SissErrorCode = (typeof SISS_ERROR_CODES)[number];
 
-/* @Codex */
 export const SISS_TRANSPORT_MODES = ['portal-handoff', 'certified-api'] as const;
 export type SissTransportMode = (typeof SISS_TRANSPORT_MODES)[number];
 
-/* @Codex */
 export const SISS_PORTAL_URLS: Record<SissAction, string> = SISS_ACTION_URLS;
 
-/* @Codex */
 export type SissTransportRequest = {
     action: SissAction;
     fiscalCode: string;
@@ -33,7 +26,6 @@ export type SissTransportRequest = {
     attempt: number;
 };
 
-/* @Codex */
 export type SissTransportResponse =
     | {
         ok: true;
@@ -53,10 +45,8 @@ export type SissTransportResponse =
         flags?: string[];
     };
 
-/* @Codex */
 export type SissTransport = (request: SissTransportRequest) => Promise<SissTransportResponse>;
 
-/* @Codex */
 export type SissAdapterRequest = {
     action: SissAction;
     fiscalCode: string;
@@ -64,7 +54,6 @@ export type SissAdapterRequest = {
     maxAttempts?: number;
 };
 
-/* @Codex */
 export type SissAdapterResult = {
     action: SissAction;
     mode: SissTransportMode;
@@ -82,7 +71,6 @@ type SissAdapterDeps = {
     createCorrelationId?: () => string;
 };
 
-/* @Codex */
 export class SissAdapterError extends Error {
     readonly code: SissErrorCode;
     readonly retryable: boolean;
@@ -116,7 +104,6 @@ export class SissAdapterError extends Error {
     }
 }
 
-/* @Codex */
 export async function executeSissAdapterRequest(
     input: SissAdapterRequest,
     deps: SissAdapterDeps,
@@ -209,7 +196,6 @@ export async function executeSissAdapterRequest(
     });
 }
 
-/* @Codex */
 export function createSissPortalHandoffTransport(): SissTransport {
     return async ({ action }) => ({
         ok: true,
@@ -220,18 +206,15 @@ export function createSissPortalHandoffTransport(): SissTransport {
     });
 }
 
-/* @Codex */
 export function createSissCorrelationId(): string {
     return `siss-${randomUUID()}`;
 }
 
-/* @Codex */
 export function calculateSissRetryDelayMs(attempt: number): number {
     const normalized = Math.max(1, Math.trunc(attempt));
     return Math.min(250 * normalized, 1000);
 }
 
-/* @Codex */
 export function buildSissAuditMetadata(input: {
     action: SissAction;
     attempts: number;

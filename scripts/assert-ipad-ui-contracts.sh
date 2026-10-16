@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# @Codex
 set -euo pipefail
 
 # xcodebuild prints a final `passed` line even when XCTest recorded XCTSkip.

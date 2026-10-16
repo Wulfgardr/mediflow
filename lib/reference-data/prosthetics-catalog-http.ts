@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { requireSession, unauthorizedResponse } from '../security/server-auth';
 // Reuse the canonical bounded 2 MiB/base64 envelope and lifecycle resource of ADR 0127.

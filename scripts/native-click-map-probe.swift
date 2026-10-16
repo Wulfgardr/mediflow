@@ -1,5 +1,4 @@
 #!/usr/bin/env swift
-/* @Codex */
 
 import AppKit
 import ApplicationServices
@@ -51,7 +50,6 @@ func children(of element: AXUIElement) -> [AXUIElement] {
     attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
 }
 
-/* @Codex */
 func parent(of element: AXUIElement) -> AXUIElement? {
     guard let value = attribute(element, kAXParentAttribute) else { return nil }
     return (value as! AXUIElement)
@@ -73,23 +71,19 @@ func role(of element: AXUIElement) -> String {
     attribute(element, kAXRoleAttribute) as? String ?? ""
 }
 
-/* @Codex */
 func roleDescription(of element: AXUIElement) -> String {
     attribute(element, kAXRoleDescriptionAttribute) as? String ?? ""
 }
 
-/* @Codex */
 func elementAttribute(_ element: AXUIElement, _ name: String) -> AXUIElement? {
     guard let value = attribute(element, name) else { return nil }
     return (value as! AXUIElement)
 }
 
-/* @Codex */
 func numericValue(of element: AXUIElement) -> Double? {
     (attribute(element, kAXValueAttribute) as? NSNumber)?.doubleValue
 }
 
-/* @Codex */
 func nativeList(in element: AXUIElement) -> AXUIElement? {
     let nativeListRoles = [kAXOutlineRole as String, kAXTableRole as String, "AXList"]
     return findElement(in: element, where: { nativeListRoles.contains(role(of: $0)) })
@@ -208,7 +202,7 @@ func windowContainsHomeBaseShell(_ window: AXUIElement) -> Bool {
     findElement(in: window, where: { identifier(of: $0) == "homebase-runtime-status-card" }) != nil
 }
 
-// @Codex: WUL-401 P6 preparatory coverage for the universal clinical shell.
+// WUL-401 P6 preparatory coverage for the universal clinical shell.
 func windowContainsClinicalShell(_ window: AXUIElement) -> Bool {
     findElement(in: window, where: {
         identifier(of: $0).hasPrefix("clinical-workspace-section-")
@@ -250,7 +244,7 @@ func openClinicalSection(
         throw ProbeFailure(message: "Unable to open clinical section \(section)")
     }
 
-    // @Codex: SwiftUI attaches this identifier to the AXStaticText inside the
+    // SwiftUI attaches this identifier to the AXStaticText inside the
     // List row. AXPress reports success for that static text but does not move
     // the List selection; select its owning AXRow through the AXOutline instead.
     guard selectPatientRow(sectionLabel, within: sectionList) else {
@@ -272,7 +266,6 @@ func openClinicalSection(
     report.pass("Opened clinical section \(section)")
 }
 
-/* @Codex */
 func selectPatientRow(_ row: AXUIElement, within list: AXUIElement) -> Bool {
     var rowCandidates: [AXUIElement] = []
     var candidate: AXUIElement? = row
@@ -319,7 +312,6 @@ func selectPatientRow(_ row: AXUIElement, within list: AXUIElement) -> Bool {
     return press(nativeRow)
 }
 
-/* @Codex */
 func selectedItemsContain(_ identifierName: String, list: AXUIElement) -> Bool {
     let selectionAttribute: String
     switch role(of: list) {
@@ -338,10 +330,9 @@ func selectedItemsContain(_ identifierName: String, list: AXUIElement) -> Bool {
     }
 }
 
-/* @Codex */
 func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
     guard let window = try? appWindow(for: app),
-          // @Codex: `patient-detail-name` is intentionally iOS-only. macOS
+          // `patient-detail-name` is intentionally iOS-only. macOS
           // owns the title/toolbar chrome and exposes this persistent header as
           // the canonical selected-patient AX surface.
           let detailHeader = findElement(in: window, where: {
@@ -353,7 +344,6 @@ func detailNameMatches(_ expected: String, app: NSRunningApplication) -> Bool {
         .contains(where: { $0.contains(expected) })
 }
 
-/* @Codex */
 func workspaceHeader(
     exposing expectedName: String,
     app: NSRunningApplication
@@ -376,7 +366,6 @@ func workspaceHeader(
     return (header, detail)
 }
 
-/* @Codex */
 func containsAXText(_ expectedText: String, in element: AXUIElement) -> Bool {
     findElement(in: element, where: { candidate in
         [descriptionValue(of: candidate), value(of: candidate), title(of: candidate)]
@@ -384,8 +373,7 @@ func containsAXText(_ expectedText: String, in element: AXUIElement) -> Bool {
     }) != nil
 }
 
-/* @Codex
- The selection contract must bind the selected list row to both the persistent
+/* The selection contract must bind the selected list row to both the persistent
  workspace header and a patient-specific value inside the same detail pane.
  The patient-bound value is deliberately supplied by the synthetic fixture and
  is not emitted in probe output.
@@ -401,7 +389,6 @@ func patientWorkspaceBinding(
     return containsAXText(patientBoundText, in: snapshot.detail)
 }
 
-/* @Codex */
 func dumpWorkspaceHeaderAX(exposing expectedName: String, app: NSRunningApplication) {
     guard let header = workspaceHeader(exposing: expectedName, app: app)?.header else {
         print("AX DUMP patient-workspace-header unavailable")
@@ -423,15 +410,13 @@ func dumpWorkspaceHeaderAX(exposing expectedName: String, app: NSRunningApplicat
     print("AX DUMP patient-workspace-header END")
 }
 
-/* @Codex */
 struct WorkspaceHeaderAXContract {
     let role: String
     let roleDescription: String
     let headingLevel: Int?
 }
 
-/* @Codex
- SwiftUI's accessibilityHeading(_:) sets a semantic heading level; on macOS it
+/* SwiftUI's accessibilityHeading(_:) sets a semantic heading level; on macOS it
  does not promise that the element's raw role is AXHeading. AXHeadingLevel is
  public only from macOS 26, so macOS 14 may expose neither raw heading signal.
  Keep name and autonomy as hard requirements, and validate level 1 whenever the
@@ -456,7 +441,6 @@ func workspaceHeaderAXContract(
     )
 }
 
-/* @Codex */
 func simulatePatientDetailScroll(app: NSRunningApplication) -> Bool {
     guard let window = try? appWindow(for: app),
           let detail = findElement(in: window, where: {
@@ -487,7 +471,6 @@ func simulatePatientDetailScroll(app: NSRunningApplication) -> Bool {
     })
 }
 
-/* @Codex */
 func waitForPatientRow(
     _ identifierName: String,
     in app: NSRunningApplication,
@@ -510,7 +493,6 @@ func waitForPatientRow(
     return nil
 }
 
-/* @Codex */
 func runPatientWorkspaceHeaderProbe(app: NSRunningApplication, report: inout ProbeReport) throws {
     try openClinicalSection("patients", expectedView: "patients-selection-list", app: app, report: &report)
 

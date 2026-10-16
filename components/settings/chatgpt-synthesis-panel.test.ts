@@ -1,4 +1,4 @@
-/* @Codex — source wiring checks. Actual DOM acceptance is the separate .spec.ts. */
+/* source wiring checks. Actual DOM acceptance is the separate .spec.ts. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';

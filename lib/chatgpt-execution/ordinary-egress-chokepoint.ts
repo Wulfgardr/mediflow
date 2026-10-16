@@ -1,4 +1,4 @@
-/* @Codex — one named governed boundary, no free callback or boolean grant. */
+/* one named governed boundary, no free callback or boolean grant. */
 import 'server-only';
 import { appendChatGptEgressAudit } from '../ai-egress-audit';
 import { assertOrdinaryProductConsent, type OrdinaryProductConsent } from '../chatgpt-product/product-consent';

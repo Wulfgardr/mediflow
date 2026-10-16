@@ -1,4 +1,4 @@
-/* @Codex: WUL-720 one authoritative patient tombstone and required audit commit. */
+/* WUL-720 one authoritative patient tombstone and required audit commit. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
 import { buildPatientVersionConflictPayload } from './patient-concurrency';
@@ -18,7 +18,7 @@ export type PatientDeleteOperationResult =
     | { status: 200; value: { success: true } }
     | { status: 404 | 409; value: Record<string, unknown> };
 
-/* @Codex: IMMEDIATE acquires the writer lock before the active/version read. */
+/* IMMEDIATE acquires the writer lock before the active/version read. */
 export function deletePatientOperation(input: PatientDeleteOperationInput): PatientDeleteOperationResult {
     return dbServer.transaction((tx): PatientDeleteOperationResult => {
         const existing = tx.select({ id: patients.id, version: patients.version,

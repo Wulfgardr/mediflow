@@ -1,4 +1,3 @@
-/* @Codex */
 import { clinicalRichTextToPlainText } from '../../clinical-rich-text';
 import type { ClinicalEntry, Diagnosis, DocumentInsight, Patient, Therapy } from '../../db';
 import { normalizeClinicalText } from './clinical-text-normalization';

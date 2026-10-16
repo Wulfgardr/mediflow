@@ -1,4 +1,4 @@
-/* @Codex: in-memory Web client; no provider preferences or credential persistence. */
+/* in-memory Web client; no provider preferences or credential persistence. */
 import type { AccountAction, AccountLimitWindow, AccountModel, AccountNotice, AccountOperation, AccountRateLimits, AccountStatus } from './account-contract';
 
 export type AccountBrowserView = Readonly<{

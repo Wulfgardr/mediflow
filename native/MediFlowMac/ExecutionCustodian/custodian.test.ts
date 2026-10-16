@@ -1,4 +1,4 @@
-/* @Codex — real macOS-only native tests over synthetic processes, never a provider,
+/* real macOS-only native tests over synthetic processes, never a provider,
  * account, fabricated OS receipt or issuer. Non-Mac skip is NOT an acceptance pass.
  * node scripts/run-strip-types.mjs --test native/MediFlowMac/ExecutionCustodian/custodian.test.ts */
 import assert from 'node:assert/strict';

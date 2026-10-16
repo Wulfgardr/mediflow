@@ -1,4 +1,4 @@
-/* @Codex — application-level allocation/complexity budgets, not a PDF parser heap quota. */
+/* application-level allocation/complexity budgets, not a PDF parser heap quota. */
 import { assertImageSize, clearPreviewCanvas, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 
 export type PreviewOperatorList = { fnArray: number[]; argsArray: unknown[] };

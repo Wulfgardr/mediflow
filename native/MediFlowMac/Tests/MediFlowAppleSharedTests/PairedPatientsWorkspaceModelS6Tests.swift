@@ -2,7 +2,6 @@ import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
     func testServiceTransitionPropagatesStatusDateAndChildVersions() async throws {
         let patient = detail(id: "p1")
@@ -53,7 +52,6 @@ final class PairedPatientsWorkspaceModelS6Tests: XCTestCase {
         XCTAssertFalse(canExportOffline)
     }
 
-    /* @Codex */
     func testCreatePayloadsUseWebDefaultWireValues() async {
         let patient = detail(id: "p1")
         let source = S6MockDataSource(details: ["p1": patient])
@@ -184,11 +182,8 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
     private let aiRuntime: HomeBaseNetworkAiRuntimeSummary?
     private(set) var lastServiceUpdate: ServiceUpdate?
     private(set) var itemUpdates: [ItemUpdate] = []
-    /* @Codex */
     private(set) var lastServiceCreatePayload: HomeBaseServicePrescriptionCreatePayload?
-    /* @Codex */
     private(set) var lastServiceItemCreatePayload: HomeBaseServicePrescriptionItemCreatePayload?
-    /* @Codex */
     private(set) var lastProstheticCreatePayload: HomeBaseProstheticPrescriptionCreatePayload?
     private(set) var fetchPatientCount = 0
     private(set) var fetchAmbulatoriesCount = 0

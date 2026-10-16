@@ -1,7 +1,5 @@
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_CASE_PACK_SCHEMA_VERSION = 'mediflow.document_case_pack.v1';
 
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_ARCHETYPES = [
     'mixed-profile',
     'discharge-letter',
@@ -12,10 +10,8 @@ export const DOCUMENT_INTELLIGENCE_ARCHETYPES = [
     'rehab-adi',
 ] as const;
 
-/* @Codex */
 export type DocumentIntelligenceArchetype = typeof DOCUMENT_INTELLIGENCE_ARCHETYPES[number];
 
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_FACT_KINDS = [
     'problem',
     'medication',
@@ -24,10 +20,8 @@ export const DOCUMENT_INTELLIGENCE_FACT_KINDS = [
     'functional_status',
 ] as const;
 
-/* @Codex */
 export type DocumentIntelligenceFactKind = typeof DOCUMENT_INTELLIGENCE_FACT_KINDS[number];
 
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_TEMPORALITIES = [
     'current',
     'historical',
@@ -35,10 +29,8 @@ export const DOCUMENT_INTELLIGENCE_TEMPORALITIES = [
     'unknown',
 ] as const;
 
-/* @Codex */
 export type DocumentIntelligenceFactTemporality = typeof DOCUMENT_INTELLIGENCE_TEMPORALITIES[number];
 
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_STATUSES = [
     'active',
     'suspended',
@@ -48,16 +40,12 @@ export const DOCUMENT_INTELLIGENCE_STATUSES = [
     'unknown',
 ] as const;
 
-/* @Codex */
 export type DocumentIntelligenceFactStatus = typeof DOCUMENT_INTELLIGENCE_STATUSES[number];
 
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_ORIGINS = ['documented', 'inferred'] as const;
 
-/* @Codex */
 export type DocumentIntelligenceFactOrigin = typeof DOCUMENT_INTELLIGENCE_ORIGINS[number];
 
-/* @Codex */
 export const DOCUMENT_INTELLIGENCE_NEGATIVE_REASONS = [
     'negated',
     'family_history',
@@ -66,10 +54,8 @@ export const DOCUMENT_INTELLIGENCE_NEGATIVE_REASONS = [
     'uncertain',
 ] as const;
 
-/* @Codex */
 export type DocumentIntelligenceNegativeReason = typeof DOCUMENT_INTELLIGENCE_NEGATIVE_REASONS[number];
 
-/* @Codex */
 export interface DocumentIntelligenceCodingHints {
     system?: string;
     code?: string;
@@ -77,7 +63,6 @@ export interface DocumentIntelligenceCodingHints {
     aifaQuery?: string;
 }
 
-/* @Codex */
 export interface DocumentIntelligenceGoldFact {
     kind: DocumentIntelligenceFactKind;
     label: string;
@@ -88,26 +73,22 @@ export interface DocumentIntelligenceGoldFact {
     codingHints?: DocumentIntelligenceCodingHints;
 }
 
-/* @Codex */
 export interface DocumentIntelligenceNegativeAssertion {
     label: string;
     reason: DocumentIntelligenceNegativeReason;
     note?: string;
 }
 
-/* @Codex */
 export interface DocumentIntelligenceExpectedEvidencePack {
     requiredKinds: DocumentIntelligenceFactKind[];
 }
 
-/* @Codex */
 export interface DocumentIntelligenceExpectedSmartImport {
     diagnosisLabels?: string[];
     therapyLabels?: string[];
     blockedLabels?: string[];
 }
 
-/* @Codex */
 export interface DocumentIntelligenceCasePack {
     schemaVersion: typeof DOCUMENT_INTELLIGENCE_CASE_PACK_SCHEMA_VERSION;
     id: string;
@@ -240,12 +221,10 @@ function parseExpectedSmartImport(value: unknown, path: string): DocumentIntelli
     return Object.keys(expected).length > 0 ? expected : undefined;
 }
 
-/* @Codex */
 export function collectDocumentIntelligenceFactKinds(casePack: DocumentIntelligenceCasePack): DocumentIntelligenceFactKind[] {
     return Array.from(new Set(casePack.goldFacts.map((fact) => fact.kind)));
 }
 
-/* @Codex */
 export function parseDocumentIntelligenceCasePack(value: unknown): DocumentIntelligenceCasePack {
     if (!isRecord(value)) {
         throw new Error('Expected document intelligence case pack object');

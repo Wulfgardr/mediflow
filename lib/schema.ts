@@ -28,11 +28,8 @@ export const users = sqliteTable('users', {
     passwordHash: text('password_hash').notNull(),
     encryptedMasterKey: text('encrypted_master_key').notNull(),
     salt: text('salt').notNull(),
-    /* @Codex */
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
-    /* @Codex */
     firstFailedLoginAt: integer('first_failed_login_at', { mode: 'timestamp' }),
-    /* @Codex */
     lockedUntil: integer('locked_until', { mode: 'timestamp' }),
     /* ADR 0143. All four stay null while the account still unlocks with a PIN. */
     unlockVerifierHash: text('unlock_verifier_hash'),
@@ -42,7 +39,6 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const physicianReviewAttestations = sqliteTable('physician_review_attestations', {
     actorRef: text('actor_ref').primaryKey().references(() => users.id).notNull(),
     schemaVersion: text('schema_version').notNull(),
@@ -55,7 +51,6 @@ export const physicianReviewAttestations = sqliteTable('physician_review_attesta
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const headlessSoapActiveRoleAttestations = sqliteTable('headless_soap_active_role_attestations', {
     attestationRef: text('attestation_ref').primaryKey().notNull(),
     actorRef: text('actor_ref').references(() => users.id, { onDelete: 'restrict' }).notNull().unique(),
@@ -74,7 +69,6 @@ export const headlessSoapActiveRoleAttestations = sqliteTable('headless_soap_act
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const headlessCheckupActiveRoleAttestations = sqliteTable('headless_checkup_active_role_attestations', {
     attestationRef: text('attestation_ref').primaryKey().notNull(),
     actorRef: text('actor_ref').references(() => users.id, { onDelete: 'restrict' }).notNull().unique(),
@@ -112,13 +106,9 @@ export const patients = sqliteTable('patients', {
     address: text('address'),
     phone: text('phone'),
     caregiver: text('caregiver'),
-    /* @Codex */
     exemptions: text('exemptions'),
-    /* @Codex */
     diagnoses: text('diagnoses'),
-    /* @Codex */
     monitoringProfile: text('monitoring_profile'),
-    /* @Codex */
     statusReason: text('status_reason'),
     notes: text('notes'),
     aiSummary: text('ai_summary'),
@@ -128,14 +118,11 @@ export const patients = sqliteTable('patients', {
     documentInsights: text('document_insights'), // JSON array of DocumentInsight
     isAdi: integer('is_adi', { mode: 'boolean' }).default(false),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
-    /* @Codex */
     archiveReason: text('archive_reason'),
-    /* @Codex */
     archiveNote: text('archive_note'),
     // WUL-306 (ADR 0066): soft-delete tombstone, same lifecycle as entries/therapies/checkups
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
     deletionReason: text('deletion_reason'),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     ambulatoryId: text('ambulatory_id').references(() => ambulatories.id),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
@@ -172,24 +159,16 @@ export const entries = sqliteTable('entries', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     type: text('type').notNull(),
-    /* @Codex */
     title: text('title').notNull().default('Voce clinica'),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     content: text('content').notNull(),
-    /* @Codex */
     setting: text('setting'),
-    /* @Codex */
     metadata: text('metadata'),
-    /* @Codex */
     attachments: text('attachments'),
-    /* @Codex */
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
-    /* @Codex */
     deletionReason: text('deletion_reason'),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
@@ -203,30 +182,20 @@ export const therapies = sqliteTable('therapies', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     drugName: text('drug_name').notNull(),
-    /* @Codex */
     aic: text('aic'),
-    /* @Codex */
     atc: text('atc'),
-    /* @Codex */
     activePrinciple: text('active_principle'),
     dosage: text('dosage').notNull(),
-    /* @Codex */
     motivation: text('motivation'),
-    /* @Codex */
     diagnosisCode: text('diagnosis_code'),
-    /* @Codex */
     diagnosisName: text('diagnosis_name'),
     status: text('status').notNull(),
     startDate: integer('start_date', { mode: 'timestamp' }).notNull(),
     endDate: integer('end_date', { mode: 'timestamp' }),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
-    /* @Codex */
     deletionReason: text('deletion_reason'),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
@@ -234,7 +203,6 @@ export const therapies = sqliteTable('therapies', {
     patientDeletedIdx: index('therapies_patient_deleted_idx').on(t.patientId, t.deletedAt),
 }));
 
-/* @Codex */
 export const observations = sqliteTable('observations', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
@@ -252,19 +220,15 @@ export const observations = sqliteTable('observations', {
     refLow: text('ref_low'),
     refHigh: text('ref_high'),
     refText: text('ref_text'),
-    /* @Codex Link esplicito e locale tra un risultato registrato e la prestazione attesa. */
+    /* Link esplicito e locale tra un risultato registrato e la prestazione attesa. */
     servicePrescriptionItemId: text('service_prescription_item_id').references(
         () => servicePrescriptionItems.id,
         { onDelete: 'set null' },
     ),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
-    /* @Codex */
     deletionReason: text('deletion_reason'),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
@@ -274,7 +238,6 @@ export const observations = sqliteTable('observations', {
     servicePrescriptionItemIdx: index('observations_service_prescription_item_idx').on(t.servicePrescriptionItemId),
 }));
 
-/* @Codex */
 export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
     catalogSnapshot: text('catalog_snapshot', { mode: 'json' }).$type<ProstheticsSnapshot>(),
     id: text('id').primaryKey(),
@@ -293,13 +256,11 @@ export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
     source: text('source').notNull().default('manual'),
     documentRefs: text('document_refs'),
     notes: text('notes'),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const servicePrescriptions = sqliteTable('service_prescriptions', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
@@ -320,13 +281,11 @@ export const servicePrescriptions = sqliteTable('service_prescriptions', {
     source: text('source').notNull().default('manual'),
     documentRefs: text('document_refs'),
     notes: text('notes'),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const servicePrescriptionItems = sqliteTable('service_prescription_items', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
@@ -347,13 +306,11 @@ export const servicePrescriptionItems = sqliteTable('service_prescription_items'
     performedAt: integer('performed_at', { mode: 'timestamp' }),
     reportReceivedAt: integer('report_received_at', { mode: 'timestamp' }),
     outcomeNote: text('outcome_note'),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const serviceCatalogEntries = sqliteTable('service_catalog_entries', {
     id: text('id').primaryKey(),
     codeSystem: text('code_system').notNull(),
@@ -369,7 +326,6 @@ export const serviceCatalogEntries = sqliteTable('service_catalog_entries', {
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     id: text('id').primaryKey(),
     version: integer('version').notNull().default(1),
@@ -387,7 +343,6 @@ export const sissHandoffEvents = sqliteTable('siss_handoff_events', {
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const documentDiagnosisProposals = sqliteTable('document_diagnosis_proposals', {
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
@@ -415,7 +370,6 @@ export const documentDiagnosisProposals = sqliteTable('document_diagnosis_propos
     ),
 }));
 
-/* @Codex */
 export const durableReviewRecords = sqliteTable('durable_review_records', {
     id: text('id').primaryKey(), patientRef: text('patient_ref').notNull(), reviewId: text('review_id').notNull().unique(), reviewRevision: integer('review_revision').notNull(),
     receiptRef: text('receipt_ref').notNull(), provenanceRef: text('provenance_ref').notNull(),
@@ -424,7 +378,6 @@ export const durableReviewRecords = sqliteTable('durable_review_records', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const durableReviewPatientLinks = sqliteTable('durable_review_patient_links', {
     reviewId: text('review_id').primaryKey().references(() => durableReviewRecords.reviewId).notNull(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
@@ -432,20 +385,17 @@ export const durableReviewPatientLinks = sqliteTable('durable_review_patient_lin
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const durableReviewOperations = sqliteTable('durable_review_operations', {
     id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(),
     operation: text('operation').notNull(), expectedReviewRevision: integer('expected_review_revision').notNull(), operationDigest: text('operation_digest').notNull(), recordSnapshot: text('record_snapshot').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 }, (t) => ({ reviewKeyUnique: uniqueIndex('durable_review_operations_review_key_unique').on(t.reviewId, t.idempotencyKey) }));
 
-/* @Codex */
 export const durableReviewCommandStates = sqliteTable('durable_review_command_states', {
     reviewId: text('review_id').primaryKey(), reviewState: text('review_state').notNull(), revision: integer('revision').notNull(), action: text('action').notNull(),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const durableReviewCommandOperations = sqliteTable('durable_review_command_operations', {
     id: text('id').primaryKey(), reviewId: text('review_id').notNull(), idempotencyKey: text('idempotency_key').notNull(), commandDigest: text('command_digest').notNull(),
     resultSnapshot: text('result_snapshot').notNull(), auditEventId: text('audit_event_id').notNull(), createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
@@ -457,19 +407,13 @@ export const checkups = sqliteTable('checkups', {
     patientId: text('patient_id').references(() => patients.id).notNull(),
     date: integer('date', { mode: 'timestamp' }).notNull(),
     title: text('title').notNull(),
-    /* @Codex */
     notes: text('notes'),
     status: text('status').default('pending'),
-    /* @Codex */
     source: text('source'),
-    /* @Codex */
     version: integer('version').notNull().default(1),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     deletedAt: integer('deleted_at', { mode: 'timestamp' }),
-    /* @Codex */
     deletionReason: text('deletion_reason'),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
@@ -484,7 +428,6 @@ export const conversations = sqliteTable('conversations', {
     title: text('title').notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
     isArchived: integer('is_archived', { mode: 'boolean' }).default(false),
-    /* @Codex */
     isDeleted: integer('is_deleted', { mode: 'boolean' }).default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
@@ -510,7 +453,6 @@ export const settings = sqliteTable('settings', {
     value: text('value').notNull(),
 });
 
-/* @Codex */
 export const auditEvents = sqliteTable('audit_events', {
     eventId: text('event_id').primaryKey(),
     schemaVersion: integer('schema_version').notNull().default(1),
@@ -527,7 +469,6 @@ export const auditEvents = sqliteTable('audit_events', {
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const headlessSoapEntryCommits = sqliteTable('headless_soap_entry_commits', {
     idempotencyKey: text('idempotency_key').primaryKey().notNull(),
     approvalRef: text('approval_ref').notNull(),
@@ -560,20 +501,15 @@ export const attachments = sqliteTable('attachments', {
     size: integer('size').notNull(),
     path: text('path').notNull(),
     data: text('data'), // Base64 content
-    /* @Codex */
     summarySnapshot: text('summary_snapshot'),
-    /* @Codex */
     parseEvidenceArtifactSnapshot: text('parse_evidence_artifact_snapshot'),
     ocrQueueState: text('ocr_queue_state'),
     ocrQueueReason: text('ocr_queue_reason'),
     ocrQueueUpdatedAt: integer('ocr_queue_updated_at', { mode: 'timestamp' }),
     ocrReplayArtifactSnapshot: text('ocr_replay_artifact_snapshot'),
     createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
-    /* @Codex */
     documentSourceRef: text('document_source_ref').notNull().unique(),
-    /* @Codex */
     documentRevision: integer('document_revision').notNull(),
-    /* @Codex */
     documentFreshnessEpoch: integer('document_freshness_epoch').notNull(),
 }, (t) => ({
     // WUL-268 (STREAM A): mirrors runtime guards in db-server.ts.
@@ -590,22 +526,17 @@ export const drugs = sqliteTable('drugs', {
     class: text('class'),
     price: integer('price'), // stored as cents or float? using integer for simplicity or check import logic
     atc: text('atc'),
-    /* @Codex */
     aicSearch: text('aic_search'),
-    /* @Codex */
     nameSearch: text('name_search'),
-    /* @Codex */
     activePrincipleSearch: text('active_principle_search'),
-    /* @Codex */
     packagingSearch: text('packaging_search'),
 }, (t) => ({
-    /* @Codex: aic is already indexed by the primary key; these cover accent-folded prefix search. */
+    /* aic is already indexed by the primary key; these cover accent-folded prefix search. */
     aicSearchIdx: index('drugs_aic_search_idx').on(t.aicSearch),
     nameSearchIdx: index('drugs_name_search_idx').on(t.nameSearch),
     activePrincipleSearchIdx: index('drugs_active_principle_search_idx').on(t.activePrincipleSearch),
 }));
 
-/* @Codex */
 export const exemptions = sqliteTable('exemptions', {
     code: text('code').primaryKey(),
     description: text('description').notNull(),
@@ -619,14 +550,12 @@ export const exemptions = sqliteTable('exemptions', {
     updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(unixepoch())`),
 });
 
-/* @Codex */
 export const exemptionImportReceipts = sqliteTable('exemption_import_receipts', {
     id: integer('id').primaryKey({ autoIncrement: true }).notNull(),
     operationKey: text('operation_key').notNull().unique(),
     receiptJson: text('receipt_json').notNull(),
 });
 
-/* @Codex */
 export const prostheticsCatalogEntries = sqliteTable('prosthetics_catalog_entries', {
     sourceId: text('source_id').notNull().default(''),
     id: text('id').primaryKey().notNull(),
@@ -637,7 +566,6 @@ export const prostheticsCatalogEntries = sqliteTable('prosthetics_catalog_entrie
     sourceSha256: text('source_sha256').notNull(), operationKey: text('operation_key').notNull(),
     importedAt: text('imported_at').notNull(),
 });
-/* @Codex */
 export const prostheticsCatalogReceipts = sqliteTable('prosthetics_catalog_receipts', {
     id: integer('id').primaryKey({ autoIncrement: true }).notNull(),
     operationKey: text('operation_key').notNull().unique(), receiptJson: text('receipt_json').notNull(),

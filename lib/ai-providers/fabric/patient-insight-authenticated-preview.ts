@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, type NativeOrdinaryHostSourceCapture } from '../../security/server-session-clinical-context-native-sources';
 import { getNativeOrdinaryApplicationContext } from '../../chatgpt-product/native-ordinary-composition';

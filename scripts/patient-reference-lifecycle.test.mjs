@@ -1,4 +1,4 @@
-/* @Codex: post-fix ADR 0066 tests. Real Drizzle + better-sqlite3 and unchanged
+/* post-fix ADR 0066 tests. Real Drizzle + better-sqlite3 and unchanged
  * production schema mappings, synthetic :memory: tables only; no bootstrap.
  * DB composition/schema-readiness/auth/provider factories are declared doubles.
  * Transactions use real SQLite IMMEDIATE; no fallback ORM or dependency skip.

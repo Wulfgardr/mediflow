@@ -1,4 +1,4 @@
-/* @Codex: WUL-673. Synthetic authority/transport; real canonical runtime and parsers. */
+/* WUL-673. Synthetic authority/transport; real canonical runtime and parsers. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { setImmediate as nextTurn } from 'node:timers/promises';

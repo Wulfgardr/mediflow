@@ -1,4 +1,4 @@
-/* @Codex — Synthetic login-only unit peer. NO product/session/consent authority, OS
+/* Synthetic login-only unit peer. NO product/session/consent authority, OS
  * observation or network. Separate from the parent-only product fixture. */
 import type { ExecutionCode, ExecutionMethod, ExecutionTransport } from '../execution-contract';
 import { expectedExecutionConfig, expectedExecutionEnvironment } from '../execution-login.ts';

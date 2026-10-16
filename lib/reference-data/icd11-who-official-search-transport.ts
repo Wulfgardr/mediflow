@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 import {
     ICD11_WHO_BINDING,

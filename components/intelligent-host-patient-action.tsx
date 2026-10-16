@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import { Sparkles } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -43,7 +42,6 @@ function messageFor(state: ViewState): string {
     }
 }
 
-/* @Codex */
 export function IntelligentHostPatientAction({
     patientId,
     ambulatoryId,

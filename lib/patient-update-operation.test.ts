@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: WUL-718 synthetic SQLite and real patient PUT routes; auth seams only. */
+/* WUL-718 synthetic SQLite and real patient PUT routes; auth seams only. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';

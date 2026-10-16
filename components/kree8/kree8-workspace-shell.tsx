@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -21,7 +20,7 @@ export type Kree8WorkspaceNavItem = {
   meta?: string;
 };
 
-/* @Codex WUL-560 L7A: the group vocabulary is closed here; callers may only
+/* WUL-560 L7A: the group vocabulary is closed here; callers may only
    bind existing sections in the separate mapping packet. */
 export const KREE8_CLINICAL_RAIL_GROUPS = [
   { id: 'quadro-decisioni', label: 'Quadro e decisioni' },
@@ -72,10 +71,10 @@ export function Kree8WorkspaceShell({
   children,
 }: Kree8WorkspaceShellProps) {
   const isClinical = variant === 'clinical';
-  /* @Codex WUL-UIUX: scrollspy. Su una Scheda lunga la rail evidenzia la sezione
+  /* WUL-UIUX: scrollspy. Su una Scheda lunga la rail evidenzia la sezione
      in vista (aria-current) cosi non si perde l'orientamento. */
   const [activeHref, setActiveHref] = useState<string | null>(null);
-  /* @Codex WUL-55 F2c: mirror durevole di activeHref; ogni generazione dell'effetto
+  /* WUL-55 F2c: mirror durevole di activeHref; ogni generazione dell'effetto
      (una per navKey) rilegge currentHref da qui, cosi un cambio navKey azzera un
      aria-current stantio invece di ereditarlo. */
   const activeHrefRef = useRef<string | null>(null);
@@ -91,14 +90,14 @@ export function Kree8WorkspaceShell({
   const navKey = renderedNavItems.map((item) => item.href).join('|');
   const PrimaryActionIcon = primaryAction?.icon;
   const { proposal, composition } = useRuntimeTwinDesign();
-  /* @Codex: analysis/catalog navigation tracks position without reshaping data. */
+  /* analysis/catalog navigation tracks position without reshaping data. */
   const overviewMode = variant === 'overview' && proposal;
   const [folderSection, setFolderSection] = useState('quadro');
   const [folderNavOpen, setFolderNavOpen] = useState(false);
   const folderToggleRef = useRef<HTMLButtonElement>(null);
   const folderMode = isClinical && proposal;
 
-  /* @Codex: a patient route may unmount the invoking control before the title
+  /* a patient route may unmount the invoking control before the title
      mounts. Treat only body or that detached control as unowned focus, once per
      destination pathname; a connected control always retains the user's focus. */
   useEffect(() => {
@@ -114,7 +113,7 @@ export function Kree8WorkspaceShell({
     title.focus({ preventScroll: true });
   }, [isClinical, pathname]);
 
-  /* @Codex WUL-678: resolve deep links within this patient, select their real
+  /* WUL-678: resolve deep links within this patient, select their real
      section, then reveal and focus the requested disclosure. Never run its action. */
   useEffect(() => {
     const root = rootRef.current;
@@ -146,7 +145,7 @@ export function Kree8WorkspaceShell({
           // A later keyboard/pointer choice wins over this deferred focus pass.
           const active = document.activeElement;
           if (active !== initiatingFocus && active !== document.body) return;
-          // @Codex: a routed record has already placed its heading as the
+          // a routed record has already placed its heading as the
           // destination. Keep that one-time transfer while still revealing the
           // requested section; later in-page hash navigation keeps its target focus.
           if (patientFocusPathRef.current === pathname && active === patientTitleRef.current) {
@@ -250,7 +249,7 @@ export function Kree8WorkspaceShell({
        segue l'ordine visivo anche con le due colonne (DOM e rail divergono). */
     const pickActive = () => {
       const observed = targets.filter((target) => visible.has(target.el) && isInWorkspaceViewport(target.el));
-      /* @Codex The observer margin is intentionally narrower than the scrollable
+      /* The observer margin is intentionally narrower than the scrollable
          workspace. If a responsive rail moves every target outside that margin,
          or a scroll leaves a stale observer entry, use the same visible-document
          rule without introducing another viewport threshold. */
@@ -297,7 +296,7 @@ export function Kree8WorkspaceShell({
         const live = next.find((entry) => entry.href === currentHref);
         commit(live ? live.href : null, live ? live.el : null);
       } else if (next.length > 0 && visible.size === 0 && focusEl === null) {
-        /* @Codex The first observer delivery is asynchronous. A responsive
+        /* The first observer delivery is asynchronous. A responsive
            rail can move every section below its root margin, leaving the
            workspace without a focal locus until the user scrolls. Seed the
            first declared destination; a visible observer target still

@@ -1,4 +1,3 @@
-/* @Codex */
 import type { BackupArtifact } from './backup-artifact';
 
 export type RestoredPatientAmbulatoryLink = {

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildFunctionStatus, parseFunctionStatus, FUNCTION_IDS, type FunctionStatusSources } from './function-status.ts';
@@ -47,7 +46,7 @@ test('incomplete, duplicate, invalid and falsely timestamped snapshots are rejec
     }
 });
 
-/* @Codex: observation failure cannot be presented as missing configuration. */
+/* observation failure cannot be presented as missing configuration. */
 test('read failures remain unavailable even when another prerequisite is missing', () => {
     for (const lifecycle of ['missing', 'available_unqualified']) {
         const result = row({ ...sources, ollamaLifecycle: lifecycle, clinicalBinding: { state: 'unavailable', model: null } }, 'patient_insight');
@@ -59,7 +58,6 @@ test('read failures remain unavailable even when another prerequisite is missing
     assert.doesNotThrow(() => parseFunctionStatus(long));
 });
 
-/* @Codex */
 test('status reports each persisted model default and denies stale preferences independently', () => {
     const input: FunctionStatusSources = { ...sources, functionBindings: {
         patient_insight: { state: 'configured', model: 'synthetic-alternative:1' },

@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex: presentation only; export/share retain the chart's existing gates. */
+/* presentation only; export/share retain the chart's existing gates. */
 import { Download, Share2 } from 'lucide-react';
 import SissPatientContextPanel from '@/components/siss-patient-context-panel';
 import SissHandoffDiary from '@/components/siss-handoff-diary';

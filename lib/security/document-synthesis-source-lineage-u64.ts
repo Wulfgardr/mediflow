@@ -1,4 +1,3 @@
-// @Codex
 import { types } from 'node:util';
 
 const ObjectCreate = Object.create;

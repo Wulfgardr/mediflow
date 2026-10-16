@@ -1,4 +1,3 @@
-/* @Codex */
 .overview {
     --lume-settings-register-family: var(--lume-font-sans);
     display: grid;
@@ -278,7 +277,7 @@
     font-size: 0.75rem;
     font-weight: 600;
 }
-/* @Codex WUL-522: read-only Intelligence Fabric registry. */
+/* WUL-522: read-only Intelligence Fabric registry. */
 .fabricBlockHeader {
     display: grid;
     gap: 0.35rem;
@@ -649,7 +648,7 @@
 .navGroupLabel {
     padding-inline: 0.35rem;
 }
-/* @Codex: center the full text block with symmetric spacing in every nav item. */
+/* center the full text block with symmetric spacing in every nav item. */
 .navItem {
     display: flex;
     align-items: center;
@@ -673,7 +672,7 @@
 .navItemCopy {
     min-width: 0;
 }
-/* @Codex WUL-676 candidate: neutral selection, readable density, no colour rail.
+/* WUL-676 candidate: neutral selection, readable density, no colour rail.
    Originale/Proposta changes presentation only; links and aria-current stay owned
    by SettingsNavSidebar and the canonical navigation registry. */
 :global(html[data-runtime-twin-design='proposal']) .navGroups { gap: 1.4rem; }
@@ -811,7 +810,7 @@
     }
 }
 
-/* @Codex WUL-676: the index is navigation, not a second stack of cards. */
+/* WUL-676: the index is navigation, not a second stack of cards. */
 :global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px; box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .navItemDescription { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 0.75rem; }
@@ -823,7 +822,7 @@
 :global(html[data-runtime-twin-design='proposal']) .sectionLabel { display: none; }
 
 :global(html[data-runtime-twin-design='proposal']) .navItemActive:hover { background: var(--lume-ink); color: var(--lume-surface-focal); }
-/* @Codex: command text shares the same weight as the clinical actions. */
+/* command text shares the same weight as the clinical actions. */
 :global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) {
     min-height: var(--lume-control-height);
     padding: 8px 14px;
@@ -838,7 +837,7 @@
 :global(html[data-runtime-twin-design='proposal']) :is(.sectionIntro, .overviewFocus, .previewSection, .indexHeading) h2 { margin-top: 0; font-size: var(--twin-type-section); font-weight: var(--twin-heading-weight); line-height: var(--twin-heading-leading); letter-spacing: -0.02em; }
 :global(html[data-runtime-twin-design='proposal']) .sectionIntro p:last-child { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
 
-/* @Codex: visible return on subroutes, including the collapsed mobile index. */
+/* visible return on subroutes, including the collapsed mobile index. */
 .returnLink {
     display: inline-flex;
     align-items: center;

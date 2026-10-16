@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# @Codex
 """Launch a separate Debug fixture bundle. Never stop existing applications.
 
 Requires an explicit, new output directory; retains app, logs and receipt there.

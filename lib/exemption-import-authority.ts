@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import type { ServerSession } from './security/server-auth';
 import {

@@ -4,7 +4,6 @@ import type { FhirPatientInput } from './types';
 
 export const CODICE_FISCALE_SYSTEM = "http://hl7.it/sid/codice-fiscale";
 
-/* @Codex */
 export function toFhirPatient(patient: FhirPatientInput, generatedAt: Date | string = new Date()): FhirPatient {
     return {
         resourceType: "Patient",

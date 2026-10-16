@@ -1,4 +1,3 @@
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { composeAnyDocCurrentSourceExtraction, composeAnyDocClientProjectionExtraction } from '@/lib/domain/documents/anydoc-current-source-composition';
 import { acquireAttachmentExtractionProjection, cancelAttachmentExtractionProjection } from '@/lib/domain/documents/attachment-extraction-projection-broker';

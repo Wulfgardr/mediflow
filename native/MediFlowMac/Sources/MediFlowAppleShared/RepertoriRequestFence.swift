@@ -1,4 +1,4 @@
-// @Codex: WUL-673. Value-only generation fence used by the actual Repertori store.
+// WUL-673. Value-only generation fence used by the actual Repertori store.
 import Foundation
 
 struct RepertoriRequestFence<Identity: Equatable> {

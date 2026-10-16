@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';

@@ -1,4 +1,3 @@
-/* @Codex */
 export type AiRolloutGuardLane =
     | 'patient_insight'
     | 'smart_import'

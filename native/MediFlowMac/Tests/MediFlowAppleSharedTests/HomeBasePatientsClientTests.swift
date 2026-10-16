@@ -1,5 +1,4 @@
 // Codex: created 2026-04-18
-// @Codex
 import Foundation
 import CryptoKit
 import XCTest
@@ -69,7 +68,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(created, HomeBaseCreatedResource(id: "attachment-1", version: nil))
     }
 
-    /* @Codex */
     func testLoginUsesPairedNativeRouteWithoutSourceSurfaceAuthority() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
@@ -108,7 +106,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result.role, "admin")
     }
 
-    /* @Codex */
     func testLoginRejectsMissingPairedCredentialsBeforeNetwork() async {
         let client = makeClient { _ in
             XCTFail("missing paired credentials must not create a request")
@@ -127,7 +124,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testLogoutAcceptsExactEmpty204AcknowledgementWithoutRetry() async throws {
         var requestCount = 0
         let client = makeClient { request in
@@ -145,7 +141,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
-    /* @Codex */
     func testLogoutRejectsNonempty204BodyAsContractWithoutRetry() async {
         var requestCount = 0
         let client = makeClient { request in
@@ -168,7 +163,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
-    /* @Codex */
     func testLogoutKeepsJson2xxAcknowledgementCompatibility() async throws {
         var requestCount = 0
         let client = makeClient { request in
@@ -187,7 +181,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
-    /* @Codex */
     func testLogoutRejectsEmpty200AcknowledgementAsContractWithoutRetry() async {
         var requestCount = 0
         let client = makeClient { request in
@@ -210,7 +203,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
-    /* @Codex */
     func testLogoutPreservesNon2xxTypedFailuresWithoutRetry() async {
         for (statusCode, message) in [(401, "Sessione non valida"), (409, "Logout in conflitto")] {
             var requestCount = 0
@@ -236,7 +228,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testLocalDataSourceForwardsPairedLoginCredentialsUnchanged() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.url?.path, "/api/auth/native/login")
@@ -324,7 +315,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(ambulatories.first?.version, 7)
     }
 
-    /* @Codex */
     func testFetchPatientsIncludeDeletedAddsQueryAndDecodesTombstoneFields() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -372,7 +362,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(patients.first?.deletionReason, "ENC:iv:cipher")
     }
 
-    /* @Codex */
     func testFetchPatientsIncludeDiagnosesPreservesCiphertextAndOptInDefault() async throws {
         var requests = 0
         let client = makeClient { request in
@@ -426,7 +415,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testSearchDrugsUsesNetworkCatalogRouteAndDecodesHostShape() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -486,7 +474,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         ])
     }
 
-    /* @Codex */
     func testSearchExemptionsUsesNetworkCatalogRouteAndDecodesHostShape() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -537,7 +524,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNotNil(exemptions.first?.updatedAt)
     }
 
-    /* @Codex */
     func testSearchTerminologyUsesNetworkRouteQueryAndDecodesOpenAPIShape() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -596,7 +582,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         ])
     }
 
-    /* @Codex */
     func testResolveTerminologyUsesNetworkRouteAndDecodesOpenAPIShape() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -638,7 +623,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(item.source, "local-static-ucum")
     }
 
-    /* @Codex */
     func testFetchTerminologySystemsUsesNetworkRouteAndTolerantDateDecode() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -684,7 +668,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(systems.first?.notes, "Catalogo locale derivato dai farmaci")
     }
 
-    /* @Codex */
     func testFetchEntriesUsesNetworkDiaryRouteAndDecodesVersion() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -741,7 +724,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(entries.first?.version, 4)
     }
 
-    /* @Codex */
     func testFetchScopedEntriesUsesGlobalRouteAndTolerantDates() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -768,7 +750,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNotNil(entries.first?.updatedAt)
     }
 
-    /* @Codex */
     func testCreateEntryPostsNetworkDiaryPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
@@ -811,7 +792,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseCreatedResource(id: "entry-2", version: 1))
     }
 
-    /* @Codex */
     func testUpdateEntryPutsNetworkDiaryPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -858,7 +838,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
     }
 
-    /* @Codex */
     func testSoftDeleteEntryPutsDeletedAtAndReason() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -899,7 +878,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
     }
 
-    /* @Codex */
     func testRestoreEntryPutsDeletedAtAndReasonNulls() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -944,7 +922,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
     }
 
-    /* @Codex */
     func testUpdateEntrySurfacesVersionConflictPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1003,7 +980,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testFetchTherapiesUsesNetworkTherapyRouteAndDecodesVersion() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -1066,7 +1042,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(therapies.first?.atc, "A10BA02")
     }
 
-    /* @Codex */
     func testCreateTherapyPostsNetworkTherapyPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
@@ -1114,7 +1089,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseCreatedResource(id: "therapy-2", version: 1))
     }
 
-    /* @Codex */
     func testUpdateTherapyPutsNetworkTherapyPayloadAndClearsEndDate() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1169,7 +1143,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
     }
 
-    /* @Codex */
     func testSoftDeleteTherapyPutsDeletedAtAndReason() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1210,7 +1183,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
     }
 
-    /* @Codex */
     func testUpdateTherapySurfacesVersionConflictPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1269,7 +1241,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testFetchCheckupsUsesNetworkCheckupRouteAndDecodesVersion() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -1318,7 +1289,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(checkups.first?.status, "pending")
     }
 
-    /* @Codex */
     func testFetchScopedCheckupsUsesGlobalRouteAndTolerantDates() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -1345,7 +1315,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNotNil(checkups.first?.date)
     }
 
-    /* @Codex */
     func testCreateAndUpdateCheckupUseNetworkPayloads() async throws {
         var seenMethods: [String] = []
         let client = makeClient { request in
@@ -1399,7 +1368,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(seenMethods, ["POST", "PUT"])
     }
 
-    /* @Codex */
     func testSoftDeleteCheckupPutsDeletedAtAndReason() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1435,7 +1403,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseMutationAcknowledgement(success: true))
     }
 
-    /* @Codex */
     func testUpdateCheckupSurfacesVersionConflictPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1486,7 +1453,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testFetchObservationsUsesNetworkObservationRouteAndDecodesVersion() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -1539,7 +1505,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(observations.first?.unitCode, "mm[Hg]")
     }
 
-    /* @Codex */
     func testCreateAndUpdateObservationUseNetworkPayloads() async throws {
         var seenMethods: [String] = []
         let client = makeClient { request in
@@ -1597,7 +1562,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(seenMethods, ["POST", "PUT"])
     }
 
-    /* @Codex */
     func testUpdateObservationSurfacesVersionConflictPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1648,7 +1612,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testSoftDeleteObservationPutsDeletedAtAndReason() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "PUT")
@@ -1843,7 +1806,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(ack.success)
     }
 
-    /* @Codex */
     func testCreatePatientPostsNetworkPatientPayload() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
@@ -1909,7 +1871,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseCreatedResource(id: "patient-new-1", version: 1))
     }
 
-    /* @Codex */
     func testSoftDeletePatientSendsDeleteWithVersionAndReason() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "DELETE")
@@ -1942,7 +1903,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(result, HomeBaseCreatedResource(id: "patient-1", version: 8))
     }
 
-    /* @Codex */
     func testRestorePatientPostsRestorePathWithVersion() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "POST")
@@ -2010,7 +1970,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNil(result[1].createdAt)
     }
 
-    /* @Codex */
     func testFetchServicePrescriptionsUsesPatientQueryAndDecodesOpenAPIShape() async throws {
         let client = makeClient { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -2025,7 +1984,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNotNil(result.first?.prescribedAt)
     }
 
-    /* @Codex */
     func testCreateAndUpdateServicePrescriptionUseCleanPayloads() async throws {
         var step = 0
         let client = makeClient { request in
@@ -2063,7 +2021,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(ack.success)
     }
 
-    /* @Codex */
     func testServicePrescriptionItemsMethodsUseExactRoutesAndCleanPayloads() async throws {
         var step = 0
         let client = makeClient { request in
@@ -2106,7 +2063,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(ack.success)
     }
 
-    /* @Codex */
     func testFetchServiceCatalogAndCountUseExactQueryShapes() async throws {
         var urls: [String] = []
         let client = makeClient { request in
@@ -2127,7 +2083,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         ])
     }
 
-    /* @Codex */
     func testProstheticPrescriptionMethodsUseCleanPayloadsAndDecodeSamples() async throws {
         var step = 0
         let client = makeClient { request in
@@ -2164,7 +2119,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(ack.success)
     }
 
-    /* @Codex */
     func testDiscoveryAndRevisionMethodsUsePairedHeadersAndDecodeSamples() async throws {
         var paths: [String] = []
         let client = makeClient { request in
@@ -2193,7 +2147,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertEqual(paths, ["/api/v1/network/capabilities", "/api/v1/network/identity", "/api/v1/network/node", "/api/v1/network/revision"])
     }
 
-    /* @Codex */
     func testFseValidationMethodsUseNetworkBoundaryAndDecodeResponses() async throws {
         var step = 0
         let client = makeClient { request in
@@ -2217,7 +2170,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertTrue(document.ok)
     }
 
-    /* @Codex */
     func testNewDataPlaneMethodsDispatchHttpThroughDataSourceExistential() async throws {
         var requests: [String] = []
         let client = makeClient { request in
@@ -2473,7 +2425,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         XCTAssertNil(request.httpBodyStream)
     }
 
-    /* @Codex */
     func testNativeConfigurationServicesUsePairedTransportAndExactCommand() async throws {
         let ids = ["patient_insight", "smart_import", "document_synthesis", "treatment_reasoning"]
         let object: [String: Any] = [
@@ -2523,7 +2474,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"), "native")
             let body = try self.requestObject(request)
             XCTAssertEqual(Set(body.keys), Set(["functionId", "patientId", "ambulatoryId", "patientRevision", "input"]))
-            // @Codex: only the host selector crosses the native preparation ingress.
+            // only the host selector crosses the native preparation ingress.
             XCTAssertEqual(body["input"] as? [String: String], ["selector": "current_patient_insight"])
             let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 202, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
             return (response, try JSONSerialization.data(withJSONObject: NativeOrdinaryTestFixtures.response(.patientInsight, "needs_consent")))

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import childProcess, { type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -120,7 +119,7 @@ for (const failure of ['absent', 'crash', 'timeout'] as const) {
         const calls = substituteRecognition(() => {
             if (!failing) return {};
             if (failure === 'absent') return { missing: true };
-            // @Codex: accelerate only after entering recognition. Earlier 30-second
+            // accelerate only after entering recognition. Earlier 30-second
             // PDF/AnyDoc timers must not expire under concurrent suite CPU load.
             if (failure === 'timeout') {
                 const timerMock = mock.method(globalThis, 'setTimeout', (callback: () => void, delay: number) =>
@@ -139,7 +138,7 @@ for (const failure of ['absent', 'crash', 'timeout'] as const) {
         if (failure === 'timeout') assert.equal(child.signalCode, 'SIGKILL');
         if (child.pid) assert.throws(() => process.kill(child.pid!, 0), { code: 'ESRCH' });
         assert.equal(fs.existsSync(temporaryRoots[0]), false);
-        // @Codex: the successful retry must use production deadlines, including under suite CPU load.
+        // the successful retry must use production deadlines, including under suite CPU load.
         restoreRecognitionTimers?.();
         failing = false;
         const retry = await composeAnyDocCurrentSourceExtraction(session, { attachmentId: ATTACHMENT });

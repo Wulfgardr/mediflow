@@ -8,13 +8,12 @@ import { TimelineEntryCard, TimelineEntryData } from './timeline-entry-card';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast-provider';
 import { LumeFilo } from '@/components/ui/lume-filo';
-/* @Codex */
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import twin from './twin-diary.module.css';
 
 interface TimelineProps {
     entries: TimelineEntryData[];
-    // @Codex: Shared clinical history, named for the section that owns it.
+    // Shared clinical history, named for the section that owns it.
     label?: string;
     emptyMessage?: string;
 }
@@ -32,7 +31,7 @@ export default function Timeline({
     const { showToast } = useToast();
 
     const handleDelete = async (entry: TimelineEntryData) => {
-        /* @Codex WUL-UIUX: motivazione obbligatoria raccolta in un dialogo
+        /* WUL-UIUX: motivazione obbligatoria raccolta in un dialogo
            accessibile e tematizzato, non piu con prompt() nativo. */
         const result = await confirm({
             title: 'Elimina voce clinica',

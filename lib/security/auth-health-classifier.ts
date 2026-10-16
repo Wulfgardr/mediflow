@@ -1,11 +1,9 @@
-/* @Codex */
 export type AuthHealthDbState =
     | 'ready'
     | 'missing'
     | 'schema-missing'
     | 'unavailable';
 
-/* @Codex */
 export type AuthHealthCategory =
     | 'native-dependency-invalid'
     | 'native-dependency-missing'
@@ -15,7 +13,6 @@ export type AuthHealthCategory =
     | 'query-failed'
     | 'unknown';
 
-/* @Codex */
 export type AuthHealthErrorCode =
     | 'DB_NATIVE_DEPENDENCY_INVALID'
     | 'DB_NATIVE_DEPENDENCY_MISSING'
@@ -25,7 +22,6 @@ export type AuthHealthErrorCode =
     | 'DB_QUERY_FAILED'
     | 'AUTH_CHECK_FAILED';
 
-/* @Codex */
 export type AuthHealthClassification = {
     code: AuthHealthErrorCode;
     category: AuthHealthCategory;
@@ -35,7 +31,6 @@ export type AuthHealthClassification = {
     nextAction?: string;
 };
 
-/* @Codex */
 const NATIVE_ABI_PATTERNS = [
     /NODE_MODULE_VERSION/i,
     /was compiled against a different Node\.js version/i,
@@ -43,14 +38,12 @@ const NATIVE_ABI_PATTERNS = [
     /ERR_DLOPEN_FAILED/i,
 ];
 
-/* @Codex */
 const NATIVE_MISSING_PATTERNS = [
     /Cannot find module ['"]better-sqlite3['"]/i,
     /Cannot find module ['"]drizzle-orm/i,
     /MODULE_NOT_FOUND/i,
 ];
 
-/* @Codex */
 function safeMessage(error: unknown): string {
     if (error instanceof Error && typeof error.message === 'string') {
         return error.message;
@@ -59,7 +52,6 @@ function safeMessage(error: unknown): string {
     return 'Unknown error';
 }
 
-/* @Codex */
 function errorCode(error: unknown): string | undefined {
     if (error && typeof error === 'object' && 'code' in error) {
         const code = (error as { code?: unknown }).code;
@@ -68,7 +60,6 @@ function errorCode(error: unknown): string | undefined {
     return undefined;
 }
 
-/* @Codex */
 export function classifyAuthHealthError(error: unknown): AuthHealthClassification {
     const message = safeMessage(error);
     const code = errorCode(error);

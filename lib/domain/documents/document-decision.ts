@@ -1,15 +1,10 @@
-/* @Codex */
 export const DOCUMENT_DECISION_SCHEMA_VERSION = 'mediflow.document_decision.v1';
-/* @Codex */
 export const DOCUMENT_DECISION_UNSPECIFIED_GENERATED_AT = 'unspecified';
 
-/* @Codex */
 export type DocumentTextState = 'text_present' | 'text_partial' | 'text_absent' | 'unreadable';
 
-/* @Codex */
 export type DocumentOcrStatus = 'not_needed' | 'needed' | 'queued' | 'completed' | 'failed';
 
-/* @Codex */
 export type DocumentDecisionClassification =
     | 'identity_document'
     | 'medication_prescription'
@@ -26,7 +21,6 @@ export type DocumentDecisionClassification =
     | 'mute_or_scanned'
     | 'unknown';
 
-/* @Codex */
 export type DocumentDecisionFamily =
     | 'identity'
     | 'prescription'
@@ -36,10 +30,8 @@ export type DocumentDecisionFamily =
     | 'administrative'
     | 'unknown';
 
-/* @Codex */
 export type DocumentDecisionConfidence = 'high' | 'medium' | 'low' | 'blocked';
 
-/* @Codex */
 export type DocumentDecisionIdentityRole =
     | 'patient_cf'
     | 'physician_cf'
@@ -48,14 +40,12 @@ export type DocumentDecisionIdentityRole =
     | 'facility_tax_code'
     | 'unknown_cf';
 
-/* @Codex */
 export type DocumentDecisionIdentityAction =
     | 'link_existing_patient'
     | 'create_patient_candidate'
     | 'review_identity'
     | 'attach_without_patient';
 
-/* @Codex */
 export type DocumentDecisionActionKind =
     | 'attach_only'
     | 'queue_ocr'
@@ -75,7 +65,6 @@ export type DocumentDecisionActionKind =
     | 'append_review_note'
     | 'blocked';
 
-/* @Codex */
 export type DocumentDecisionForbiddenReason =
     | 'missing_evidence_ref'
     | 'ambiguous_identity'
@@ -92,7 +81,6 @@ export type DocumentDecisionForbiddenReason =
     | 'target_field_locked'
     | 'structured_fact_already_present';
 
-/* @Codex */
 export type DocumentDecisionHumanRequirement =
     | 'identity_resolution'
     | 'ocr_review'
@@ -102,7 +90,6 @@ export type DocumentDecisionHumanRequirement =
     | 'prosthetic_completion'
     | 'exemption_confirmation';
 
-/* @Codex */
 export interface DocumentDecisionEvidenceRef {
     id: string;
     sourceId: string;
@@ -112,7 +99,6 @@ export interface DocumentDecisionEvidenceRef {
     snippet: string;
 }
 
-/* @Codex */
 export interface DocumentDecisionSource {
     documentId: string;
     attachmentId?: string;
@@ -124,7 +110,6 @@ export interface DocumentDecisionSource {
     ocrStatus: DocumentOcrStatus;
 }
 
-/* @Codex */
 export interface DocumentDecisionClassificationResult {
     type: DocumentDecisionClassification;
     family: DocumentDecisionFamily;
@@ -133,7 +118,6 @@ export interface DocumentDecisionClassificationResult {
     evidenceRefs: string[];
 }
 
-/* @Codex */
 export interface DocumentDecisionTaxCodeRole {
     value: string;
     role: DocumentDecisionIdentityRole;
@@ -141,7 +125,6 @@ export interface DocumentDecisionTaxCodeRole {
     evidenceRefs: string[];
 }
 
-/* @Codex */
 export interface DocumentDecisionIdentityCommon {
     candidatePatientIds: string[];
     taxCodes: DocumentDecisionTaxCodeRole[];
@@ -149,38 +132,32 @@ export interface DocumentDecisionIdentityCommon {
     humanRequired: boolean;
 }
 
-/* @Codex */
 export interface DocumentDecisionLinkExistingPatientIdentity extends DocumentDecisionIdentityCommon {
     action: 'link_existing_patient';
     patientId: string;
 }
 
-/* @Codex */
 export interface DocumentDecisionCreatePatientCandidateIdentity extends DocumentDecisionIdentityCommon {
     action: 'create_patient_candidate';
     patientId?: string;
 }
 
-/* @Codex */
 export interface DocumentDecisionReviewIdentity extends DocumentDecisionIdentityCommon {
     action: 'review_identity';
     patientId?: string;
 }
 
-/* @Codex */
 export interface DocumentDecisionAttachWithoutPatientIdentity extends DocumentDecisionIdentityCommon {
     action: 'attach_without_patient';
     patientId?: string;
 }
 
-/* @Codex */
 export type DocumentDecisionIdentity =
     | DocumentDecisionLinkExistingPatientIdentity
     | DocumentDecisionCreatePatientCandidateIdentity
     | DocumentDecisionReviewIdentity
     | DocumentDecisionAttachWithoutPatientIdentity;
 
-/* @Codex */
 export interface DocumentDecisionDomainItem {
     id: string;
     label: string;
@@ -191,14 +168,12 @@ export interface DocumentDecisionDomainItem {
     blockedReason?: DocumentDecisionForbiddenReason;
 }
 
-/* @Codex */
 export interface DocumentDecisionProstheticItem extends DocumentDecisionDomainItem {
     completeness: 'complete' | 'partial';
     requiredFieldsPresent: string[];
     missingRequiredFields: string[];
 }
 
-/* @Codex */
 export interface DocumentDecisionDomains {
     patientFields: DocumentDecisionDomainItem[];
     clinicalFacts: DocumentDecisionDomainItem[];
@@ -210,7 +185,6 @@ export interface DocumentDecisionDomains {
     ocrNeeded: DocumentDecisionDomainItem[];
 }
 
-/* @Codex */
 export interface DocumentDecisionAction {
     id: string;
     kind: DocumentDecisionActionKind;
@@ -221,7 +195,6 @@ export interface DocumentDecisionAction {
     blockedReason?: DocumentDecisionForbiddenReason;
 }
 
-/* @Codex */
 export interface DocumentDecisionWritePlan {
     mode: 'none' | 'review_required' | 'deterministic_apply_after_review';
     allowedActions: DocumentDecisionAction[];
@@ -229,7 +202,6 @@ export interface DocumentDecisionWritePlan {
     forbiddenActions: DocumentDecisionAction[];
 }
 
-/* @Codex */
 export interface DocumentDecisionModelMetadata {
     recognitionMode: 'deterministic' | 'local_llm' | 'hybrid' | 'manual';
     modelName?: string;
@@ -238,7 +210,6 @@ export interface DocumentDecisionModelMetadata {
     generatedAt: string;
 }
 
-/* @Codex */
 export interface DocumentDecision {
     schemaVersion: typeof DOCUMENT_DECISION_SCHEMA_VERSION;
     source: DocumentDecisionSource;
@@ -253,14 +224,12 @@ export interface DocumentDecision {
     negativeAssertions: DocumentDecisionForbiddenReason[];
 }
 
-/* @Codex */
 export interface ValidateDocumentDecisionResult {
     valid: boolean;
     errors: string[];
     reasons: DocumentDecisionForbiddenReason[];
 }
 
-/* @Codex */
 export interface DocumentDecisionIdentityInput {
     action?: DocumentDecisionIdentityAction;
     patientId?: string;
@@ -270,7 +239,6 @@ export interface DocumentDecisionIdentityInput {
     humanRequired?: boolean;
 }
 
-/* @Codex */
 export interface BuildDocumentDecisionInput {
     source: DocumentDecisionSource;
     classification: DocumentDecisionClassificationResult;
@@ -338,7 +306,6 @@ function allDomainItems(domains: DocumentDecisionDomains): DocumentDecisionDomai
     ];
 }
 
-/* @Codex */
 function normalizeIdentity(input: DocumentDecisionIdentityInput | undefined): DocumentDecisionIdentity {
     const requestedAction = input?.action ?? 'attach_without_patient';
     const candidatePatientIds = input?.candidatePatientIds ?? [];
@@ -401,7 +368,6 @@ function normalizeIdentity(input: DocumentDecisionIdentityInput | undefined): Do
     };
 }
 
-/* @Codex */
 export function buildDocumentDecision(input: BuildDocumentDecisionInput): DocumentDecision {
     const domains: DocumentDecisionDomains = {
         patientFields: input.domains?.patientFields ?? [],
@@ -458,14 +424,12 @@ export function buildDocumentDecision(input: BuildDocumentDecisionInput): Docume
     };
 }
 
-/* @Codex */
 interface DocumentDecisionViolation {
     code: DocumentDecisionForbiddenReason;
     message: string;
     actionIds: string[];
 }
 
-/* @Codex */
 function isOcrPending(decision: DocumentDecision): boolean {
     return decision.source.textState === 'text_absent'
         || decision.source.textState === 'text_partial'
@@ -473,15 +437,13 @@ function isOcrPending(decision: DocumentDecision): boolean {
         || decision.source.ocrStatus === 'needed';
 }
 
-/* @Codex */
 function servicePrescriptionReasonFor(decision: DocumentDecision): DocumentDecisionForbiddenReason {
     return decision.classification.type === 'lab_prescription' || decision.classification.type === 'imaging_prescription'
         ? 'lab_or_imaging_is_not_therapy'
         : 'service_prescription_is_not_drug';
 }
 
-/* @Codex
- * Reason-coded violation collector. Replaces the previous regex-on-error fallback so each
+/* * Reason-coded violation collector. Replaces the previous regex-on-error fallback so each
  * negative assertion ties back to a deterministic predicate plus the offending action ids.
  * Order is priority order: the first matching code wins for action-level blockedReason.
  */
@@ -624,7 +586,6 @@ function buildActionReasonMap(violations: DocumentDecisionViolation[]): Map<stri
     return map;
 }
 
-/* @Codex */
 export function validateDocumentDecision(decision: DocumentDecision): ValidateDocumentDecisionResult {
     const errors: string[] = [];
 
@@ -644,7 +605,6 @@ export function validateDocumentDecision(decision: DocumentDecision): ValidateDo
     };
 }
 
-/* @Codex */
 export function applyDocumentDecisionGuardrails(decision: DocumentDecision): DocumentDecision {
     const violations = collectDocumentDecisionViolations(decision);
     const baselineAssertions = unique(violations.map((violation) => violation.code));
@@ -688,7 +648,6 @@ export function applyDocumentDecisionGuardrails(decision: DocumentDecision): Doc
     };
 }
 
-/* @Codex */
 export function createDocumentDecisionEvidenceRef(
     id: string,
     snippet: string,
@@ -701,5 +660,4 @@ export function createDocumentDecisionEvidenceRef(
     };
 }
 
-/* @Codex */
 export { EMPTY_DOMAINS as EMPTY_DOCUMENT_DECISION_DOMAINS };

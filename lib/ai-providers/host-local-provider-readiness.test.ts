@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHostLocalProviderReadinessForTest, type HostLocalProviderReadinessResult } from './host-local-provider-readiness.ts';

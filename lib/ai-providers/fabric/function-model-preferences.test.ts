@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -215,7 +214,6 @@ test('authenticated settings HTTP is bounded, read-only on GET/preview, and rech
     authenticated = false; assert.equal((await handlers.GET(new Request('http://localhost/api/settings/ai/functions'))).status, 401);
 });
 
-/* @Codex */
 test('invalid explicit model roles and remote provider configuration do not fall back to another configured role', () => {
     const sources = fixture();
     for (const aiModel_clinical of ['', '  ', 'synthetic:cloud']) {
@@ -229,7 +227,6 @@ test('invalid explicit model roles and remote provider configuration do not fall
     assert.throws(() => resolveFunctionModelDispatch(remote, 'patient_insight'), /model_not_cataloged/);
 });
 
-/* @Codex */
 test('all four functions can persist their admitted binding and disable independently', () => {
     let sources = fixture();
     for (const functionId of FUNCTION_MODEL_IDS) {
@@ -253,7 +250,7 @@ test('ATHENA named dispatch accepts only its dedicated binding and preserves ter
     assert.equal(result.headers.get('x-mediflow-model-source'), 'host_configuration');
 });
 
-/* @Codex: ordinary request streams; all session state is synthetic and process-local. */
+/* ordinary request streams; all session state is synthetic and process-local. */
 function httpFixture(t: { after(callback: () => void): void }) {
     const session = issueSyntheticWebSession({ id: `synthetic-${randomUUID()}`, username: 'synthetic', role: 'admin' }, randomUUID());
     t.after(() => retireSyntheticWebSession(session));

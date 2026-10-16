@@ -1,5 +1,4 @@
 import { notifyDbChange } from '../live-query';
-/* @Codex */
 import { PROSTHETICS_MAX_BYTES, type ProstheticsImportOptions } from './prosthetics-catalog-contract';
 export type ProstheticsSource = { sourceName: string; base64: string; options?: ProstheticsImportOptions };
 export class ProstheticsClientError extends Error {

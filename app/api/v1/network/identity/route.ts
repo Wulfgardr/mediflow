@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-/* @Codex */
 import { unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { requireAccountSession } from '@/lib/security/paired-native-session';
-/* @Codex */
 import { getNetworkIdentitySummary } from '@/lib/network-home-base-server';
-/* @Codex */
 import { requireNetworkDiscoveryAuth } from '@/lib/network-write-context';
 
-/* @Codex */
 export async function GET(request: Request) {
     const auth = await requireNetworkDiscoveryAuth(request);
     if (!auth.ok) return auth.response;

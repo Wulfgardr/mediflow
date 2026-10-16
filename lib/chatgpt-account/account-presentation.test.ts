@@ -1,4 +1,4 @@
-/* @Codex WUL-684: synthetic presenter/controller tests; no provider or browser UI. */
+/* WUL-684: synthetic presenter/controller tests; no provider or browser UI. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { presentAccount, accountNotices } from './account-presentation.ts';

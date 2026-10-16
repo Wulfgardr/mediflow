@@ -1,4 +1,3 @@
-/* @Codex */
 import { isEgressGateOpen } from '../../ai-egress-gate';
 import type { CredentialClass } from './contract';
 

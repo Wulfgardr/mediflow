@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -94,7 +93,7 @@ test('HTTP maps authentication failures without parsing request content', async 
     assert.doesNotMatch(await response.text(), /patient\.synthetic|Synthetic follow-up/u);
 });
 
-/* @Codex: unavailable includes missing and soft-deleted patients (ADR 0066).
+/* unavailable includes missing and soft-deleted patients (ADR 0066).
  * Source/session/provider ports remain the existing declared unit-test doubles. */
 test('unavailable revision denies preview before selection, lease or capability', async () => {
     const value = fixture(null);

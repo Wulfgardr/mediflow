@@ -9,7 +9,6 @@ import {
     wrapMasterKeyVersioned,
     unwrapMasterKeyVersioned,
 } from '@/lib/security/security';
-/* @Codex */
 import {
     createPinRotationBundle,
     formatPinChangeFailure,
@@ -22,19 +21,14 @@ import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wi
 import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
 import { LockScreen } from '@/components/lock-screen';
 import { AppStartupScreen } from '@/components/app-startup-screen';
-/* @Codex */
 import { AuthHealthScreen } from '@/components/auth-health-screen';
-/* @Codex */
 import { useInactivityLock } from '@/lib/hooks/use-inactivity-lock';
-/* @Codex */
 import {
     clearSecuritySession,
     persistSecuritySession,
     restoreSecuritySession,
 } from '@/lib/security/client-security-session';
-/* @Codex */
 import { notifyDbChange } from '@/lib/live-query';
-/* @Codex */
 import {
     checkAuthHealthRequest,
     changePinRequest,
@@ -55,9 +49,7 @@ import {
 } from '@/lib/security/client-auth-api';
 import { createUnlockWrapping, createRecoveryWrapping, openRecoveryWrapping, deriveUnlockMaterial, openUnlockWrapping } from '@/lib/security/unlock-credential';
 import { planUnlock } from '@/lib/security/unlock-plan';
-/* @Codex */
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
-/* @Codex */
 import {
     createClinicianSoapEntrySealOwner,
     type ClinicianSoapEntryReopenResult,
@@ -75,7 +67,7 @@ export interface User {
     role: string;
 }
 
-/* @Codex: client availability only; the server still owns every session/fence. */
+/* client availability only; the server still owns every session/fence. */
 type AuthRecoveryState = 'ready' | 'required' | 'pending' | 'failed';
 
 interface SecurityContextType {
@@ -108,7 +100,6 @@ interface SecurityContextType {
     updateUser: (data: Partial<User>) => void;
 }
 
-/* @Codex */
 function formatLockedUntil(lockedUntil?: string) {
     if (!lockedUntil) return 'Accesso temporaneamente bloccato. Riprova più tardi.';
     const date = new Date(lockedUntil);
@@ -119,7 +110,6 @@ function formatLockedUntil(lockedUntil?: string) {
     }).format(date)}.`;
 }
 
-/* @Codex */
 function formatLoginFailure(payload: LoginFailurePayload | null, status: number, credential: UnlockParameters['credential'] = 'pin') {
     if (payload?.code === 'AUTH_LOCKED') {
         return payload.message || formatLockedUntil(payload.lockedUntil);
@@ -142,7 +132,6 @@ function formatLoginFailure(payload: LoginFailurePayload | null, status: number,
     return payload?.message || payload?.error || 'Errore durante il login.';
 }
 
-/* @Codex */
 function canOfferLegacyRepair(health: AuthHealthPayload | null): boolean {
     if (!health?.hasSession) return false;
 
@@ -167,7 +156,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [authErrorMessage, setAuthErrorMessage] = useState<string | null>(null);
     const [pinResiduesPending, setPinResiduesPending] = useState(false);
-    /* @Codex */
     const [authRecoveryState, setAuthRecoveryState] = useState<AuthRecoveryState>('ready');
     const authRecoveryStateRef = useRef<AuthRecoveryState>('ready');
     const lockReceiptGenerationRef = useRef(0);
@@ -184,16 +172,13 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         shownCredentialRef.current = unlock.credential;
         setUnlockCredential(unlock.credential);
     };
-    /* @Codex */
     const masterKeyRef = useRef<CryptoKey | null>(null);
     const wrappingRef = useRef<{ encryptedMasterKey: string; salt: string } | null>(null);
     const preparedAccessRef = useRef<{ generation: number; commit: () => Promise<AccessResult> } | null>(null);
     const [preparedKit, setPreparedKit] = useState<PreparedRecoveryKit | null>(null);
     const accessCommitPending = useRef(false);
     const accessPreparePending = useRef(false);
-    /* @Codex */
     const authorityAttemptGenerationRef = useRef(0);
-    /* @Codex */
     const clinicianSoapEntrySealOwnerRef = useRef<ClinicianSoapEntrySealOwner | null>(null);
     if (clinicianSoapEntrySealOwnerRef.current === null) {
         const browserCrypto = globalThis.crypto;
@@ -208,27 +193,22 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             },
         });
     }
-    /* @Codex */
     const authorityNetworkBarrierRef = useRef<ReturnType<typeof createClientAuthorityNetworkBarrier> | null>(null);
     if (authorityNetworkBarrierRef.current === null) {
         authorityNetworkBarrierRef.current = createClientAuthorityNetworkBarrier();
     }
-    /* @Codex */
     const [authHealth, setAuthHealth] = useState<AuthHealthPayload | null>(null);
-    /* @Codex */
     const [isRepairing, setIsRepairing] = useState(false);
     // WUL-UIUX: errore inline per i flussi setup/ripristino, al posto di alert() nativo.
     // Il toast non e utilizzabile qui: ToastProvider e montato dentro SecurityProvider.
     const [flowError, setFlowError] = useState<string | null>(null);
 
-    /* @Codex */
     const setActiveMasterKey = (key: CryptoKey | null) => {
         masterKeyRef.current = key;
         db.setKey(key);
         notifyDbChange();
     };
 
-    /* @Codex */
     const clearClientAuthority = () => {
         clearSecuritySession();
         wrappingRef.current = null;
@@ -250,23 +230,19 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return () => { window.removeEventListener(ARCHIVE_REPLACED_EVENT, replaced); uninstall(); };
     }, []);
 
-    /* @Codex */
     const runAuthorityNetworkRequest = <T,>(request: () => Promise<T>): Promise<T> => {
         const barrier = authorityNetworkBarrierRef.current;
         return barrier ? barrier.run(request) : request();
     };
 
-    /* @Codex */
     const sealClinicianSoapEntry = (fieldSet: ClinicianSoapEntryFieldSetV1) =>
         clinicianSoapEntrySealOwnerRef.current!.seal(fieldSet);
 
-    /* @Codex */
     const reopenClinicianSoapEntry = (
         bundle: ClinicianSoapEntrySealV1,
         expectedFieldSet: ClinicianSoapEntryFieldSetV1,
     ) => clinicianSoapEntrySealOwnerRef.current!.reopen(bundle, expectedFieldSet);
 
-    /* @Codex */
     const lock = () => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         const receiptGeneration = ++lockReceiptGenerationRef.current;
@@ -294,7 +270,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         onTimeout: lock,
     });
 
-    /* @Codex */
     useEffect(() => {
         const handleApiAuthUnavailable = () => {
             ++authorityAttemptGenerationRef.current;
@@ -311,9 +286,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const checkAuthStatus = async () => {
         try {
             const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
-            /* @Codex */
             if (controlState === 'stale') return;
-            /* @Codex */
             if (controlState === 'invalid') {
                 setAuthHealth({
                     status: 'error',
@@ -323,7 +296,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 clearClientAuthority();
                 return;
             }
-            /* @Codex */
             if (!data) {
                 setAuthHealth({
                     status: 'error',
@@ -336,7 +308,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 clearClientAuthority();
                 return;
             }
-            /* @Codex */
             if (!res.ok) {
                 setAuthHealth({
                     ...data,
@@ -348,14 +319,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            /* @Codex */
             if (data?.status === 'error' || data?.error) {
                 setAuthHealth(data);
                 setRequiresSetup(false);
                 clearClientAuthority();
                 return;
             }
-            /* @Codex */
             setAuthHealth(null);
             showUnlockCredential(readUnlockParameters(data.unlock));
 
@@ -366,12 +335,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             } else {
                 // Setup exists.
                 setRequiresSetup(false);
-                // @Codex - if server session is missing, lock and clear local session
+                // if server session is missing, lock and clear local session
                 if (data.hasSession === false) {
                     lock();
                     return;
                 }
-                /* @Codex: a shared active cookie cannot restore this tab's key.
+                /* a shared active cookie cannot restore this tab's key.
                    Offer an explicit renewal; mounting a tab must not lock its peers. */
                 if (data.hasSession === true && masterKeyRef.current === null
                     && authRecoveryStateRef.current !== 'pending') {
@@ -380,7 +349,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (e) {
             console.error("Auth check failed", e);
-            /* @Codex */
             setAuthHealth({
                 status: 'error',
                 error: { code: 'AUTH_CHECK_FAILED', message: 'Impossibile verificare lo stato di sicurezza.' }
@@ -390,7 +358,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    /* @Codex */
     const repairFromLegacy = async () => {
         if (isRepairing) return;
         setIsRepairing(true);
@@ -489,10 +456,9 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         pin: string,
         options: { shown?: UnlockParameters['credential']; longPinConfirmed?: boolean } = {},
     ): Promise<boolean | 'confirm'> => {
-        /* @Codex: also guard direct/queued callers, before capturing the PIN request fence. */
+        /* also guard direct/queued callers, before capturing the PIN request fence. */
         if (authRecoveryStateRef.current !== 'ready') return false;
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
-        /* @Codex */
         let unacceptedServerAuthority = false;
         const shown = options.shown ?? shownCredentialRef.current;
         let credential: UnlockParameters['credential'] = shown;
@@ -528,7 +494,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             const { response: res, payload, controlState } = result;
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
-            /* @Codex */
             if (res.ok && controlState !== 'accepted') {
                 lock();
                 setAuthErrorMessage('Risposta di login non verificabile. Sessione bloccata.');
@@ -542,7 +507,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return false;
             }
 
-            /* @Codex */
             unacceptedServerAuthority = true;
 
             const data = payload as {
@@ -555,7 +519,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 role: string;
                 earlierCopiesCleared?: boolean;
             } | null;
-            /* @Codex */
             if (!data
                 || typeof data.id !== 'string' || !data.id
                 || typeof data.username !== 'string' || !data.username
@@ -570,7 +533,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return false;
             }
             const { encryptedMasterKey, salt } = data;
-            /* @Codex */
             const userData: User = {
                 id: data.id,
                 username: data.username,
@@ -596,7 +558,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 lock();
                 return false;
             }
-            /* @Codex */
             unacceptedServerAuthority = false;
 
             wrappingRef.current = { encryptedMasterKey, salt: btoa(String.fromCharCode(...saltBytes)) };
@@ -640,7 +601,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
         } catch (e) {
             console.error("Login failed", e);
-            /* @Codex */
             if (unacceptedServerAuthority) {
                 lock();
                 setAuthErrorMessage('Errore durante il login.');
@@ -651,7 +611,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    /* @Codex */
     const changePin = async (currentPin: string, newPin: string): Promise<{ ok: true } | { ok: false; message: string }> => {
         if (!isAuthenticated || isLocked) {
             return { ok: false, message: "Sessione non disponibile. Effettua di nuovo l'accesso." };
@@ -667,7 +626,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return { ok: false, message: validationError };
         }
 
-        /* @Codex */
         let pinMutationDispatched = false;
         try {
             const rotation = await createPinRotationBundle(masterKey, newPin);
@@ -683,14 +641,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 return { ok: false, message: formatPinChangeFailure((payload as PinChangeFailurePayload | null) ?? null, res.status) };
             }
 
-            /* @Codex - a successful credential CAS terminally retires this Web session. */
+            /* a successful credential CAS terminally retires this Web session. */
             ++authorityAttemptGenerationRef.current;
             clearClientAuthority();
             setAuthErrorMessage('PIN aggiornato. Accedi con il nuovo PIN.');
             return { ok: true };
         } catch (e) {
             console.error('Change PIN failed', e);
-            /* @Codex - after dispatch the server outcome may be terminal even if the response is lost. */
+            /* after dispatch the server outcome may be terminal even if the response is lost. */
             if (pinMutationDispatched) lock();
             return { ok: false, message: 'Errore durante il cambio PIN.' };
         }
@@ -829,7 +787,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         La passphrase è attiva, ma la rimozione delle vecchie copie del prodotto o del registro temporaneo non è confermata: possono ancora contenere l’involucro protetto dal PIN. Il prossimo sblocco ritenta la bonifica dell’archivio; le copie già migrate richiedono verifica e non vengono eliminate. Conserva backup e kit; se l’avviso resta, chiedi assistenza.
     </p>;
 
-    /* @Codex */
     if (authHealth?.status === 'error') {
         return (
             <>
@@ -875,7 +832,6 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         );
     }
 
-    /* @Codex */
     if (isLocked || !isAuthenticated) {
         return (
             <SecurityContext.Provider value={{

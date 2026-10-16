@@ -1,4 +1,4 @@
-// @Codex MF085-002/003: run only against an explicitly disposable, loopback synthetic home-base.
+// MF085-002/003: run only against an explicitly disposable, loopback synthetic home-base.
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 
@@ -25,7 +25,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     const form = page.locator('#scala');
     await expect(form.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
     expect(writes).toBe(0);
-    // @Codex: button cancellation must preserve a partial draft until the explicit leave decision.
+    // button cancellation must preserve a partial draft until the explicit leave decision.
     const firstAnswer = form.getByRole('radio', { name: /^0\./ });
     await firstAnswer.focus();
     await page.keyboard.press('Space');
@@ -55,7 +55,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     }
     await expect.poll(() => writes).toBe(1);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#scale$`));
-    // @Codex: A successful write must be independently readable in the patient chart.
+    // A successful write must be independently readable in the patient chart.
     const history = page.getByRole('feed', { name: 'Storico delle scale del paziente', exact: true });
     await expect(history.getByRole('article')).toHaveCount(1);
     await expect(history.getByRole('article').first()).toContainText('ADL (Indice di Katz)');
@@ -81,7 +81,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await page.reload();
     const records = history.getByRole('article');
     await expect(records).toHaveCount(2);
-    // @Codex: same-day assessments can share a timestamp; verify identity, not tie order.
+    // same-day assessments can share a timestamp; verify identity, not tie order.
     const poma = records.filter({ hasText: 'Tinetti POMA-28 (v1)' });
     const adl = records.filter({ hasText: 'ADL (Indice di Katz)' });
     await expect(poma).toHaveCount(1);

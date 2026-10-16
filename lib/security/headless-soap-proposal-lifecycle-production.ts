@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { headlessSoapProposalLifecycleProductionOwner } from './headless-soap-proposal-lifecycle-production-internal';

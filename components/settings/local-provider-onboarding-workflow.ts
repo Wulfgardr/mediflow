@@ -1,4 +1,3 @@
-/* @Codex */
 import { parseFunctionStatus, type FunctionStatusSnapshot } from '../../lib/function-status';
 import type { OllamaVersionMismatch } from '../../lib/ai-providers/ollama-locality';
 import type { LocalProviderOnboardingStatus } from '../../lib/ai-providers/fabric/local-provider-onboarding-service';

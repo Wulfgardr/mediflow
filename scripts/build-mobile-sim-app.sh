@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# @Codex
 # Build the tracked Xcode project without regenerating it or booting a device.
 # Stdout is the absolute app path on success; build/install diagnostics go to stderr.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -1,4 +1,4 @@
-/* @Codex: ordinary onboarding and real file hashing with synthetic Docker only. */
+/* ordinary onboarding and real file hashing with synthetic Docker only. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, readFileSync, writeFileSync, chmodSync, existsSync, mkdirSync, rmSync, statSync, realpathSync } from 'node:fs';
@@ -350,7 +350,7 @@ test('status rejects a context changed to remote before inspecting any container
     assert.equal(docker.calls.length, 0);
 });
 
-/* @Codex round 2: bounded recovery diagnostics; synthetic Docker, never a live install. */
+/* round 2: bounded recovery diagnostics; synthetic Docker, never a live install. */
 test('fresh setup always requests exact license acceptance; declining one profile never authorizes another', async t => {
     for (const answer of ['', 's', 'accetto', 'ACCETTO ']) {
         const { deps, directory, docker } = fixture(t); deps.ask = async () => answer;
@@ -466,7 +466,7 @@ test('followup2 exit127 prerequisite is terminal at the first search attempt; di
     assert.ok(docker.calls.filter(a => a[2] === 'container' && a[3] === 'stop').every(a => a.at(-1) === id('a')));
 });
 
-// @Codex: synthetic Docker29 stdout regression; no live container or qualification evidence.
+// synthetic Docker29 stdout regression; no live container or qualification evidence.
 test('owned stop uses current timeout option, verifies state and rejects unrelated stdout', async t => {
     const f = fixture(t); const run = f.deps.run;
     f.deps.run = (args, timeout) => {

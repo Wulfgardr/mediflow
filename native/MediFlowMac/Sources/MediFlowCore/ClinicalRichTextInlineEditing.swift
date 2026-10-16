@@ -1,6 +1,6 @@
 import Foundation
 
-/* @Codex: Platform-independent inline operations. Ranges use native UTF-16 offsets. */
+/* Platform-independent inline operations. Ranges use native UTF-16 offsets. */
 public enum ClinicalInlineStyle: String, CaseIterable, Sendable {
     case bold, italic, underline, strikethrough
 
@@ -23,7 +23,6 @@ public enum ClinicalInlineStyle: String, CaseIterable, Sendable {
     }
 }
 
-/* @Codex */
 public enum ClinicalInlineEditing {
     public static func plainText(_ runs: [ClinicalRichTextTextRun]) -> String {
         runs.map(\.text).joined()
