@@ -1,4 +1,5 @@
-import { sqliteTable, text, integer, primaryKey, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
+import type { ProstheticsSnapshot } from './reference-data/prosthetics-catalog-contract';
+import { sqliteTable, text, integer, blob, primaryKey, index, uniqueIndex, check } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // Local authority, deliberately excluded from portable backup collections.
@@ -275,6 +276,7 @@ export const observations = sqliteTable('observations', {
 
 /* @Codex */
 export const prostheticPrescriptions = sqliteTable('prosthetic_prescriptions', {
+    catalogSnapshot: text('catalog_snapshot', { mode: 'json' }).$type<ProstheticsSnapshot>(),
     id: text('id').primaryKey(),
     patientId: text('patient_id').references(() => patients.id).notNull(),
     prescribedAt: integer('prescribed_at', { mode: 'timestamp' }).notNull(),
@@ -626,6 +628,7 @@ export const exemptionImportReceipts = sqliteTable('exemption_import_receipts', 
 
 /* @Codex */
 export const prostheticsCatalogEntries = sqliteTable('prosthetics_catalog_entries', {
+    sourceId: text('source_id').notNull().default(''),
     id: text('id').primaryKey().notNull(),
     codeSystem: text('code_system').notNull(), code: text('code').notNull(),
     description: text('description').notNull(), version: text('version').notNull(),
@@ -638,4 +641,13 @@ export const prostheticsCatalogEntries = sqliteTable('prosthetics_catalog_entrie
 export const prostheticsCatalogReceipts = sqliteTable('prosthetics_catalog_receipts', {
     id: integer('id').primaryKey({ autoIncrement: true }).notNull(),
     operationKey: text('operation_key').notNull().unique(), receiptJson: text('receipt_json').notNull(),
+});
+
+export const prostheticsCatalogSources = sqliteTable('prosthetics_catalog_sources', {
+    id: text('id').primaryKey().notNull(), name: text('name').notNull(), authority: text('authority').notNull(), scope: text('scope').notNull(),
+    version: text('version').notNull(), date: text('date'), sha256: text('sha256').notNull(), notes: text('notes').notNull(),
+});
+export const prostheticsCatalogDocuments = sqliteTable('prosthetics_catalog_documents', {
+    id: text('id').primaryKey().notNull(), sourceId: text('source_id').notNull(), name: text('name').notNull(), sha256: text('sha256').notNull(),
+    size: integer('size').notNull(), page: text('page'), bytes: blob('bytes', { mode: 'buffer' }).notNull(), operationKey: text('operation_key').notNull(),
 });

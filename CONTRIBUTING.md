@@ -119,23 +119,29 @@ nvm use
 npm ci
 ```
 
-### Avvio (stack web locale consigliato)
+### Avvio locale
+
+Apri `MediFlow.command` su macOS, `MediFlow.cmd` su Windows o `MediFlow.sh`
+su Linux. Tutti eseguono `scripts/mediflow.mjs` con Node 24. Per CI o terminali
+senza display:
 
 ```bash
-./Start_MediFlow.command
+node scripts/mediflow.mjs --scelta web --senza-browser
 ```
 
-Poi apri: `http://localhost:3000`
-
-`Start_MediFlow.command` avvia la web app con gli eventuali servizi locali
-opzionali. Per avviare invece il client macOS si usa il launcher separato
-`./scripts/Launch_MediFlowMac.command`: i due percorsi non coincidono.
-
-### Avvio (solo web)
+La produzione richiede Git pulito e una build verificata della revisione
+corrente. Il lanciatore costruisce quando serve. Su un albero modificato usa
+la scelta esplicita per sviluppo:
 
 ```bash
-npm run dev
+node scripts/mediflow.mjs --scelta sviluppo --senza-browser
 ```
+
+`--scegli` ignora la preferenza salvata. La pagina Avvio e Ctrl+C arrestano
+solo i figli posseduti dal lanciatore. `scripts/Launch_MediFlowMac.command`
+resta uno strumento interno di preparazione del bundle: il punto di ingresso
+utente per Mac è la voce **App per Mac**, disponibile solo con bundle costruito
+e identità coerente. Consulta [la guida nativa](docs/native-launch.md).
 
 ### Lint / Build
 
@@ -344,7 +350,7 @@ all'agente la proof o l'autorità di commit.
 - Migrazioni: `drizzle/`
 - Client nativo macOS: `native/`
 - Script: `scripts/`
-- Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `Start_MediFlow.command`
+- Guard revisione shell locale: `lib/app-revision.ts`, `app/api/system/revision/route.ts`, `components/app-revision-guard.tsx`, `scripts/mediflow.mjs`
 
 Documentazione tecnica:
 - [docs/STATE_OF_THE_SYSTEM.md](./docs/STATE_OF_THE_SYSTEM.md) (lettura completa dello stato corrente)

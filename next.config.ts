@@ -66,7 +66,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // The admitted source payload stays immutable across requests and restarts.
   // Next retains its in-memory cache and immutable build seeds; no disk ISR/image cache.
-  experimental: { isrFlushToDisk: false },
+  experimental: { isrFlushToDisk: false, proxyClientMaxBodySize: Math.ceil(25 * 1024 * 1024 / 3) * 4 + 16384 },
   /* @Codex */
   outputFileTracingIncludes: {
     "/*": [
@@ -87,6 +87,9 @@ const nextConfig: NextConfig = {
       "./lib/exemption-import-contract.ts",
       "./lib/reference-data/prosthetics-catalog-backup.ts",
       "./lib/reference-data/prosthetics-catalog-contract.ts",
+      "./lib/reference-data/prosthetics-import-options.ts",
+      "./lib/reference-data/prosthetics-snapshot.ts",
+      "./lib/attachment-path.ts",
       "./node_modules/better-sqlite3/package.json",
       "./node_modules/better-sqlite3/build/Release/better_sqlite3.node",
       "./node_modules/better-sqlite3/lib/index.js",

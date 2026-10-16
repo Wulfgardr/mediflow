@@ -9,12 +9,13 @@ export type ProstheticsRow = {
     source: string; scope: string; startDate: string | null; endDate: string | null;
 };
 export type ProstheticsEntry = ProstheticsRow & {
-    id: string; sourceSha256: string; operationKey: string; importedAt: string;
+    id: string; sourceId: string; sourceSha256: string; operationKey: string; importedAt: string;
 };
 export type ProstheticsDiagnostic = { row: number; column: string; code: string; message: string };
 export type ProstheticsManifest = {
     contract: typeof PROSTHETICS_CONTRACT; sourceName: string; sha256: string; bytes: number;
     metadata: Pick<ProstheticsRow, 'codeSystem' | 'version' | 'source' | 'scope'> | null;
+    options?: ProstheticsImportOptions;
     counts: { total: number; valid: number; invalid: number; duplicates: number; errors: number };
 };
 export type ProstheticsChanges = { inserted: number; updated: number; unchanged: number };
@@ -27,14 +28,29 @@ export type ProstheticsReceipt = {
     operationKey: string; manifest: ProstheticsManifest; previousRevision: string; revision: string;
     applied: number; changes: ProstheticsChanges; committedAt: string;
 };
-export type ProstheticsStatus = { revision: string; count: number; latestReceipt: ProstheticsReceipt | null };
+export type ProstheticsSourceRecord = {
+    id: string; name: string; authority: string; scope: string; version: string;
+    date: string | null; sha256: string; notes: string;
+};
+export type ProstheticsDocument = { id: string; sourceId: string; name: string; sha256: string; size: number; page: string | null };
+export type ProstheticsMapping = { delimiter: ',' | ';'; columns: Record<typeof PROSTHETICS_COLUMNS[number], number> };
+export type ProstheticsImportOptions = { mapping?: ProstheticsMapping; sourceDetails?: { id?: string; authority: string; date: string | null; notes: string } };
+export type ProstheticsCatalogSelection = { entryId: string; revision: string };
+export type ProstheticsSnapshot = {
+    entryId: string; code: string; codeSystem: string; description: string;
+    source: ProstheticsSourceRecord; documents: ProstheticsDocument[]; revision: string; operationKey: string;
+};
+export function prostheticsSourceId(row: Pick<ProstheticsRow, 'source' | 'version' | 'scope'>): string {
+    return JSON.stringify([row.source, row.version, row.scope]);
+}
+export type ProstheticsStatus = { revision: string; count: number; sourceCount: number; latestReceipt: ProstheticsReceipt | null };
 export type ProstheticsSelection = Pick<ProstheticsRow, 'codeSystem' | 'code' | 'description' | 'source' | 'version'>;
 /** Explicit field allowlist for the coordinator's form integration; never a clinical writer. */
 export function prostheticsSelection(row: ProstheticsRow): ProstheticsSelection {
     return { codeSystem: row.codeSystem, code: row.code, description: row.description, source: row.source, version: row.version };
 }
-export function prostheticsIdentity(row: Pick<ProstheticsRow, 'codeSystem' | 'code' | 'scope'>): string {
-    return JSON.stringify([row.codeSystem, row.code, row.scope]);
+export function prostheticsIdentity(row: Pick<ProstheticsRow, 'codeSystem' | 'code' | 'scope' | 'source' | 'version'> & { sourceId?: string }): string {
+    return JSON.stringify([row.sourceId ?? prostheticsSourceId(row), row.codeSystem, row.code, row.scope]);
 }
 export function isProstheticsText(value: unknown, max = 200): value is string {
     return typeof value === 'string' && value.length > 0 && value.length <= max
@@ -44,4 +60,11 @@ export function isProstheticsDate(value: unknown): value is string {
     if (typeof value !== 'string' || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/u.test(value) || value.slice(0, 4) < '0100') return false;
     const date = new Date(`${value}T00:00:00.000Z`);
     return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function prostheticsImportSource(manifest: ProstheticsManifest, sourceId: string): ProstheticsSourceRecord {
+    const metadata = manifest.metadata!;
+    const details = manifest.options?.sourceDetails;
+    return { id: sourceId, name: metadata.source, authority: details?.authority || metadata.scope, scope: metadata.scope,
+        version: metadata.version, date: details?.date ?? null, sha256: manifest.sha256, notes: details?.notes ?? '' };
 }

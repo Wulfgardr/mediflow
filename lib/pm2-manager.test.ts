@@ -109,6 +109,9 @@ test('PM2 is isolated and the port guard leaves an occupied service untouched', 
         // The probe must exercise the same CommonJS initialization boundary as PM2.
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const managerModule = require(managerPath) as typeof import('./pm2-manager');
+        assert.equal(environmentAtPM2Load, undefined, 'import must not initialize PM2');
+        assert.equal(process.env.PM2_HOME, unrelatedPM2Home);
+        assert.deepEqual(await managerModule.PM2Manager.getStatus(), { name: 'mlx-inference-server', status: 'stopped' });
         assert.deepEqual(environmentAtPM2Load, {
             home: isolatedPM2Home,
             noInteraction: 'true',
@@ -216,14 +219,15 @@ test('PM2 is isolated and the port guard leaves an occupied service untouched', 
 
 test('an oversized PM2 socket path fails before PM2 is loaded', {
     skip: process.platform === 'win32',
-}, () => {
+}, async () => {
     const moduleLoader = Module as unknown as CommonJSModuleLoader;
     const originalLoad = moduleLoader._load;
     const originalDataDir = process.env.MEDIFLOW_DATA_DIR;
     const originalNoInteraction = process.env.PM2_NO_INTERACTION;
     const managerPath = require.resolve('./pm2-manager');
     const dataDirPath = require.resolve('./data-dir');
-    const oversizedDataDir = path.join(os.tmpdir(), 'm'.repeat(180));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-pm2-lazy-'));
+    const oversizedDataDir = path.join(root, 'm'.repeat(180));
     let pm2LoadCalls = 0;
 
     process.env.MEDIFLOW_DATA_DIR = oversizedDataDir;
@@ -238,10 +242,11 @@ test('an oversized PM2 socket path fails before PM2 is loaded', {
     };
 
     try {
-        assert.throws(() => {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            require(managerPath);
-        }, /percorso socket MediFlow supera/);
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        require(managerPath);
+        assert.equal(fs.existsSync(oversizedDataDir), false, 'import must leave the data directory absent');
+        const { PM2Manager } = require.cache[managerPath]!.exports as typeof import('./pm2-manager');
+        await assert.rejects(PM2Manager.withConnection(async () => undefined), /percorso socket MediFlow supera/);
         assert.equal(pm2LoadCalls, 0);
     } finally {
         moduleLoader._load = originalLoad;
@@ -251,6 +256,6 @@ test('an oversized PM2 socket path fails before PM2 is loaded', {
         else process.env.MEDIFLOW_DATA_DIR = originalDataDir;
         if (originalNoInteraction === undefined) delete process.env.PM2_NO_INTERACTION;
         else process.env.PM2_NO_INTERACTION = originalNoInteraction;
-        fs.rmSync(oversizedDataDir, { recursive: true, force: true });
+        fs.rmSync(root, { recursive: true, force: true });
     }
 });

@@ -7,6 +7,8 @@ import { db, type ProstheticPrescription, type ProstheticPrescriptionCategory, t
 import { useLiveQuery } from '@/lib/live-query';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import { ProstheticsOriginalLinks } from './prosthetics-source-documents';
+import type { ProstheticsCatalogSelection } from '@/lib/reference-data/prosthetics-catalog-contract';
 import { ProstheticsCatalogLookup } from '@/components/prosthetics-catalog-manager-lookup';
 import { Badge } from '@/components/ui/badge';
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
@@ -18,6 +20,8 @@ type Props = {
 };
 
 type FormState = {
+    catalogSelection?: ProstheticsCatalogSelection;
+    catalogLabel?: string;
     prescribedAt: string;
     status: ProstheticPrescriptionStatus;
     category: ProstheticPrescriptionCategory;
@@ -140,7 +144,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     );
 
     const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-        setForm((current) => ({ ...current, [key]: value }));
+        setForm((current) => ({ ...current, [key]: value, ...(key === 'description' ? { catalogSelection: undefined, catalogLabel: undefined } : {}) }));
     };
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -157,6 +161,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
             await db.prostheticPrescriptions.add({
                 id: crypto.randomUUID(),
                 patientId,
+                catalogSelection: form.catalogSelection,
                 prescribedAt: new Date(form.prescribedAt),
                 status: form.status,
                 category: form.category,
@@ -245,7 +250,9 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         Cerca un ausilio nel repertorio
                     </summary>
                     <div className="pb-4">
-                        <ProstheticsCatalogLookup onCopyDescription={(description) => updateForm('description', description)} />
+                        <ProstheticsCatalogLookup onSelect={(entry, revision) => setForm(current => ({ ...current, description: entry.description,
+                            catalogSelection: { entryId: entry.id, revision }, catalogLabel: `${entry.source} · ${entry.version} · ${entry.codeSystem} ${entry.code}` }))} />
+                        {form.catalogLabel && <p className="text-sm">Fonte scelta: {form.catalogLabel}</p>}
                     </div>
                 </details>
             )}
@@ -341,6 +348,12 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                         const refs = parseDocumentRefs(item.documentRefs);
                          return <tr key={item.id}>
                             <td><strong>{item.description}</strong><small>{categoryLabel(item.category)}</small>
+                                {item.catalogSnapshot && <div className="space-y-2 text-sm">
+                                    <p>{item.catalogSnapshot.codeSystem} · {item.catalogSnapshot.code}</p>
+                                    <p>Fonte: {item.catalogSnapshot.source.name} · {item.catalogSnapshot.source.version}</p>
+                                    <details><summary>Provenienza registrata</summary><p className="break-all">SHA-256: {item.catalogSnapshot.source.sha256}</p><p>{item.catalogSnapshot.description}</p></details>
+                                    <ProstheticsOriginalLinks documents={item.catalogSnapshot.documents} />
+                                </div>}
                                 {item.source === 'document_review' && <small>Da documento</small>}
                                 <details className={styles.recordDetails}><summary>Misure, collaudo e documenti</summary>
                                     <p>Prescritta il {new Date(item.prescribedAt).toLocaleDateString('it-IT')}</p>

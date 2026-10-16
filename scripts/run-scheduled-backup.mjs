@@ -2,7 +2,7 @@
 /* @Codex */
 import { assertExemptionImportReceiptRows } from '../lib/exemption-import-receipt.ts';
 /* @Codex */
-import { assertProstheticsCatalogBackup } from '../lib/reference-data/prosthetics-catalog-backup.ts';
+import { assertProstheticsCatalogBackup, serializeProstheticsDocument } from '../lib/reference-data/prosthetics-catalog-backup.ts';
 
 import { assertBackupAuditSnapshots, canonicalizeBackupAuditRows } from '../lib/backup-audit.ts';
 import fs from 'fs';
@@ -43,6 +43,8 @@ const BACKUP_TABLES = {
   exemptionImportReceipts: 'exemption_import_receipts',
   prostheticsCatalogEntries: 'prosthetics_catalog_entries',
   prostheticsCatalogReceipts: 'prosthetics_catalog_receipts',
+  prostheticsCatalogSources: 'prosthetics_catalog_sources',
+  prostheticsCatalogDocuments: 'prosthetics_catalog_documents',
   messages: 'messages',
   observations: 'observations',
   patients: 'patients',
@@ -154,11 +156,14 @@ export function canonicalizeHeadlessSoapActiveRoleAttestations(payload) {
 export async function serializeBackupArtifact(payload, createdAt = new Date()) {
   /* @Codex Same receipt validation and ordering as the web export. */
   assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []);
-  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? []);
+  assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []);
+
   const canonicalPayload = {
     ...canonicalizeHeadlessSoapActiveRoleAttestations(payload),
     prostheticsCatalogEntries: payload.prostheticsCatalogEntries ?? [],
     prostheticsCatalogReceipts: payload.prostheticsCatalogReceipts ?? [],
+    prostheticsCatalogSources: payload.prostheticsCatalogSources ?? [],
+    prostheticsCatalogDocuments: payload.prostheticsCatalogDocuments ?? [],
     exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => a.id - b.id),
   };
   if (Object.hasOwn(payload, 'auditEvents')) {
@@ -439,7 +444,7 @@ function buildDataset(db, backupCollections) {
         collection,
         hasTable(db, BACKUP_TABLES[collection])
           ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) =>
-            collection === 'auditEvents' ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
+            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : collection === 'auditEvents' ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
           : [],
       ]),
     );
@@ -470,6 +475,9 @@ function buildDataset(db, backupCollections) {
     dataset.sissHandoffs = filterRowsByReference(dataset.sissHandoffs, 'patientId', patientIds);
     dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
 
+    for (const row of dataset.prostheticPrescriptions) {
+      if (typeof row.catalogSnapshot === 'string') row.catalogSnapshot = JSON.parse(row.catalogSnapshot);
+    }
     return dataset;
   })();
 }

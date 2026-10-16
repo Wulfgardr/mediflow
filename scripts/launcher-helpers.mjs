@@ -1,9 +1,5 @@
 #!/usr/bin/env node
 /* @Codex */
-// Cross-platform launcher helpers shared by Start_MediFlow.command (macOS),
-// Start-MediFlow.ps1 (Windows) and scripts/start-mediflow.sh (Linux).
-// Centralizes the fragile platform logic (port detection, browser open,
-// Node version check, worktree hash) so each launcher stays thin.
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -128,10 +124,10 @@ export function hashWorktreeStatus(status) {
 }
 
 /* @Codex */
-function readGitValue(args, cwd, fallback = 'unknown') {
+function readGitValue(args, cwd, fallback = 'unknown', whenEmpty = fallback) {
     const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
     if (result.status !== 0) return fallback;
-    return result.stdout.trim() || fallback;
+    return result.stdout.trim() || whenEmpty;
 }
 
 /** A local main checkout must contain the updates already known by Git. No fetch or implicit update. */
@@ -153,7 +149,8 @@ export function readProductIdentity(cwd = process.cwd()) {
     }
 
     const revision = readGitValue(['rev-parse', '--short=12', 'HEAD'], checkoutPath);
-    const branch = readGitValue(['branch', '--show-current'], checkoutPath);
+    // A detached checkout is "detached", as in scripts/source-runtime.mjs; a failing git stays "unknown".
+    const branch = readGitValue(['branch', '--show-current'], checkoutPath, 'unknown', 'detached');
     const status = readGitValue(['status', '--porcelain=v1'], checkoutPath, '');
     const worktreeHash = hashWorktreeStatus(status);
     const sourceFingerprint = `${branch}@${revision}:${worktreeHash}`;

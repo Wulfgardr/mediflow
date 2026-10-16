@@ -236,6 +236,13 @@ uno sviluppo separato. Il principio locale va letto insieme ai percorsi
 espliciti di pairing, cache, esportazione e backup, non come promessa che
 ogni dato sia confinato per sempre a un solo dispositivo.
 
+All'apertura su macOS e Linux, i file del database appartenenti all'utente
+sono resi accessibili solo a quell'utente. Se il controllo dei permessi fallisce,
+l'apertura si ferma e l'archivio va conservato per la verifica. Verifica e ripristino web ricevono
+il backup completo, inclusi originali e allegati paziente, senza il limite
+del proxy previsto per un singolo upload. Il JSON viene elaborato in memoria:
+la dimensione gestibile dipende dalle risorse del computer.
+
 ```mermaid
 flowchart LR
     web[Browser locale] --> host[Host MediFlow: servizi e API]
@@ -249,6 +256,14 @@ Gli adapter non aprono direttamente SQLite. La cifratura protegge i campi
 clinici sensibili secondo il contratto documentato: non è una dichiarazione
 di cifratura integrale di ogni metadato o dell’intero file database.
 
+Preferenze e ricevute del lanciatore sono separate per cartella sorgente nella
+configurazione utente: `~/Library/Application Support/MediFlow/launcher` su
+macOS, `%APPDATA%\MediFlow\launcher` su Windows e
+`$XDG_CONFIG_HOME/mediflow/launcher` oppure `~/.config/mediflow/launcher` su Linux.
+Il lanciatore non le scrive nella cartella scelta con `MEDIFLOW_DATA_DIR`.
+Il primo avvio tollera soltanto le voci di servizio elencate nell'[ADR 0138](./docs/adr/0138-explicit-data-directory-bootstrap.md#emendamento-2026-10);
+altre voci senza database richiedono un recupero esplicito.
+
 [Topologia dei dati](./docs/topologia-dati-flussi.md) ·
 [Sicurezza](./SECURITY.md) · [Limiti noti](./docs/known-limitations.md)
 
@@ -258,7 +273,7 @@ Per partire dai sorgenti servono Git, **Node.js 24.x** e le dipendenze del
 progetto. Per valutazione e sviluppo usa fixture sintetiche.
 
 ```sh
-git clone --branch v0.9.0 --depth 1 https://github.com/Wulfgardr/mediflow
+git clone https://github.com/Wulfgardr/mediflow
 cd mediflow
 nvm use
 npm ci
@@ -268,23 +283,48 @@ npm ci
 `nvm use` serve soltanto con nvm; altrimenti seleziona Node 24 con il tuo
 gestore. `better-sqlite3` deve corrispondere all’ABI del Node attivo.
 
-| Ambiente Web locale | Avvio |
+| Sistema | Doppio clic nella cartella del progetto |
 | --- | --- |
-| macOS ARM | `./Start_MediFlow.command` |
+| macOS | `MediFlow.command` |
+| Windows | `MediFlow.cmd` |
+| Linux | `MediFlow.sh` (eseguibile; l'apertura dipende dal file manager) |
 
-Apri `http://localhost:3000`. Il launcher controlla checkout e porta, così da
-non aprire per errore un’altra istanza. I profili Windows e Linux della 0.9.0
-sono quelli dichiarati nello [stato del sistema](./docs/STATE_OF_THE_SYSTEM.md);
-i client nativi seguono un percorso distinto.
+Il browser chiede come vuoi usare MediFlow: **Nel browser**, **Per un agente**
+oppure, su macOS, **App per Mac** se l'app è già costruita. La scelta si può
+ricordare. La prima volta per ogni versione MediFlow prepara la build di
+produzione e ne mostra l'avanzamento. Il terminale conserva i log: lascialo
+aperto; **Ctrl+C** o **Arresta** chiudono i processi di questo avvio. L'accesso per agenti mantiene i controlli e le autorizzazioni
+esistenti e riserva lo standard output al protocollo del client.
 
-Su macOS, una checkout `main` che non contiene aggiornamenti già noti a Git
-si ferma prima di aprire l’archivio: aggiorna con `git pull --ff-only` e rilancia.
-Il controllo è locale e non scarica aggiornamenti. Ollama, se installato,
-si avvia in background senza ritardare l’apertura della cartella.
+Il lanciatore propone `npm ci` se mancano le dipendenze, chiedendo conferma
+prima di accedere al registro npm. Usa sempre la produzione: quando manca una
+build verificata della revisione corrente, esegue `npm run build`. La prima
+preparazione può richiedere diversi minuti. Con modifiche non committate,
+la produzione si ferma e si può scegliere esplicitamente **Apri per sviluppo**.
 
-Questi comandi non attivano provider AI, servizio WHO o altri connettori
-opzionali. Il clone seleziona il tag `v0.9.0`; conserva il checkout Git pulito
-per costruire e verificare il runtime della release.
+**Ricorda la mia scelta** evita di scegliere al prossimo avvio. **Cambia**
+nella pagina di attesa riapre le scelte; dal terminale usa:
+
+```sh
+node scripts/mediflow.mjs --scegli
+node scripts/mediflow.mjs --scelta web --senza-browser
+# Solo Linux, facoltativo: aggiunge MediFlow al menu applicazioni
+node scripts/mediflow.mjs install-desktop-entry
+```
+
+Senza display o quando il browser non si apre, compare un menu nel terminale.
+Senza terminale interattivo usa `--scelta` e `--senza-browser`. Il server web
+usa `http://127.0.0.1:3000` (oppure `PORT`); la pagina Avvio usa una porta libera.
+Il riuso richiede la ricevuta di questa cartella e il fingerprint del server.
+Un'altra istanza non viene arrestata né adottata. `main` si ferma se mancano
+aggiornamenti già noti a Git, senza scaricarli. Ollama, se installato, parte
+in background senza ritardare l'apertura.
+
+Questi ingressi appartengono al sorgente corrente; il tag `v0.9.0` conserva
+i suoi ingressi originali. Il lanciatore non attiva provider AI, servizio WHO
+o altri connettori opzionali. Non è un installer con Node incluso e non
+certifica la parità nativa su Windows e Linux. Le evidenze per piattaforma
+restano nello [stato del sistema](./docs/STATE_OF_THE_SYSTEM.md).
 
 <details>
 <summary><strong>Apple: account gratuito, Xcode e distribuzione</strong></summary>
@@ -397,6 +437,13 @@ Il codice è pubblicato sotto [licenza MIT](./LICENSE), perché sia possibile
 esaminarlo e contribuire al suo sviluppo. Dataset, terminologie, modelli e
 fonti esterne conservano le rispettive condizioni d’uso: la licenza di
 MediFlow non le sostituisce. [Crediti e attribuzioni](./CREDITS.md).
+
+
+Il repertorio protesica supporta fonti personali distinte, originali locali e
+snapshot di provenienza nelle nuove prescrizioni scelte dal catalogo. Importa
+CSV UTF-8 con virgola o punto e virgola e mappatura colonne; per XLSX occorre
+prima esportare in CSV. Catalogo, originali e snapshot di provenienza sono in
+chiaro nel database locale. Vedi [manuale](docs/MANUALE.md#fonti-personali-della-protesica).
 
 Il [catalogo ICD-11 incorporato](docs/icd-who-setup.md) cerca categorie per codice
 o titolo inglese in SQLite. Dati WHO CC BY-ND 3.0 IGO, separati dalla licenza MIT:
