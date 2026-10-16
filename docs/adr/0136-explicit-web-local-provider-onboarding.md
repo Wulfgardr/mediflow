@@ -52,24 +52,6 @@ La 0.9.0 ammette puntualmente anche la release osservata 0.40.4, mantenendo
 la linea 0.32.x e le release 0.33.3 e 0.34.2.
 Nessun kill switch, preferenza o fallback cambia.
 
-## Limiti e alternative
-
-La receipt lifecycle attesta la transizione, non generazione riuscita,
-qualificazione clinica o sicurezza assoluta del processo Ollama. I controlli
-per operazione dei consumer rimangono obbligatori. La CLI resta indipendente.
-
-Scartati: shell dal Web, ammissione al caricamento pagina, scelta libera del
-target nel POST, riattivazione automatica di revocati. Se l'owner canonico non
-consente il tratto finale richiesto, mantenere CLI-only e proporre un comando
-host con grant specifico; non sostituire l'owner con un booleano client.
-
-## Verifica candidata
-
-Fixture sintetiche per servizio, route e componente montato: prima attivazione,
-idempotenza, recupero, modello assente, errore rete, binding/versione cambiati,
-owner bloccato e revoca. Lint e typecheck; nessuna build o inferenza live richiesta.
-La promozione resta soggetta alla verifica del parent sul tree integrato.
-
 ## Attesa del caricamento a freddo — WUL-694, 16 ottobre 2026
 
 Una prova sul candidato di compatibilità Ollama della PR #548 ha negato
@@ -99,3 +81,21 @@ la verifica del server circa 27. Lo stato finale è `available_unqualified`,
 con digest invariato. Questa prova non esercita l'intervallo aggiunto oltre
 30 secondi, coperto dai test a 55 e 60 secondi. Non include UI renderizzata
 o generazione di testo. Il modello caricato dalla prova è stato rilasciato.
+
+## Limiti e alternative
+
+La receipt lifecycle attesta la transizione, non generazione riuscita,
+qualificazione clinica o sicurezza assoluta del processo Ollama. I controlli
+per operazione dei consumer rimangono obbligatori. La CLI resta indipendente.
+
+Scartati: shell dal Web, ammissione al caricamento pagina, scelta libera del
+target nel POST, riattivazione automatica di revocati. Se l'owner canonico non
+consente il tratto finale richiesto, mantenere CLI-only e proporre un comando
+host con grant specifico; non sostituire l'owner con un booleano client.
+
+## Verifica candidata
+
+Fixture sintetiche per servizio, route e componente montato: prima attivazione,
+idempotenza, recupero, modello assente, errore rete, binding/versione cambiati,
+owner bloccato e revoca. Lint e typecheck; nessuna build o inferenza live richiesta.
+La promozione resta soggetta alla verifica del parent sul tree integrato.
