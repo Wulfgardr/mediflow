@@ -145,6 +145,7 @@ jobs:
               native/*) apple=true; continue ;;
               scripts/installability-v0-macos.test.mjs | scripts/build-installability-v0-macos.sh | scripts/installability-v0-macos-launcher.sh) apple=true; continue ;;
               scripts/swift-test-selection.mjs | scripts/local-test-selection.mjs | scripts/local-test-recipes.json) apple=true; continue ;;
+              scripts/macos-native-artifact.py | scripts/macos-native-artifact_test.py | scripts/build-apple-macos-app.sh) apple=true; continue ;;
               # @Codex: la gamba UI gira solo fuori dalle PR. Il merge che introduce o
               # corregge quella gamba deve quindi attivarla sul push a main.
               .github/workflows/apple-native.yml | scripts/assert-ipad-ui-contracts.sh)
@@ -181,6 +182,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Structure guard (no SPM app executables / dead roots)
         run: scripts/check-apple-structure.sh
+      - name: Native artifact import contracts
+        run: python3 scripts/macos-native-artifact_test.py
 
   native-build-test:
     needs: changes
@@ -253,14 +256,31 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
-            -scheme MediFlowMacApp -destination 'platform=macOS' \
-            build CODE_SIGNING_ALLOWED=NO
+            -scheme MediFlowMacApp -configuration Debug \
+            -derivedDataPath "${RUNNER_TEMP}/mediflow-macos" \
+            -destination 'platform=macOS,arch=arm64' \
+            build CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
       - name: Build iOS app
         if: ${{ !cancelled() }}
         run: |
           xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj \
             -scheme MediFlowMobileApp -destination 'generic/platform=iOS Simulator' \
             build CODE_SIGNING_ALLOWED=NO
+      - name: Export unsigned native macOS build
+        run: |
+          mkdir -p "${RUNNER_TEMP}/mediflow-native-artifact"
+          python3 scripts/macos-native-artifact.py export \
+            --app "${RUNNER_TEMP}/mediflow-macos/Build/Products/Debug/MediFlow.app" \
+            --output "${RUNNER_TEMP}/mediflow-native-artifact/MediFlow-native.zip" \
+            --revision "$(git rev-parse HEAD)" --configuration Debug --architecture arm64
+      - name: Retain native build for local packaging
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mediflow-macos-native-arm64-${{ github.sha }}
+          path: ${{ runner.temp }}/mediflow-native-artifact/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
 
   ui-tests:
     # Costoso in ATTESA, non in fattura (vedi la rettifica in testa al file):

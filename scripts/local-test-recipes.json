@@ -408,6 +408,15 @@
       "prerequisites": "Experimental VM modules and the existing mac-login loader; synthetic identity fixture, not real login."
     },
     {
+      "id": "scripts/macos-native-artifact_test.py",
+      "mode": "local",
+      "kind": "python",
+      "files": [
+        "scripts/macos-native-artifact_test.py"
+      ],
+      "prerequisites": "Python 3 unittest entrypoint; archive and receipt rejection contracts with synthetic bundles."
+    },
+    {
       "id": "scripts/launch-macos-synthetic.test.py",
       "mode": "local",
       "kind": "python",
