@@ -103,7 +103,9 @@ riguarda MediFlow, non l’hardware o gli eventuali servizi di terzi.
 La ricerca terminologica, i cataloghi farmaceutici e le scale aiutano a dare
 un significato condiviso alle informazioni, purché restino riconoscibili la
 fonte e la versione utilizzata. Il catalogo AIFA si può importare da file
-locale; il servizio WHO ICD-11 richiede una configurazione esplicita.
+locale o aggiornare con **Aggiorna ora**. Con il consenso Internet AIFA,
+l’apertura di Repertori verifica soltanto i metadati, al massimo ogni 24 ore;
+l’applicazione resta esplicita. Vedi il [manuale](./docs/MANUALE.md#catalogo-farmaci-aifa); il servizio WHO ICD-11 richiede una configurazione esplicita.
 
 Anche l’esportazione ha un confine preciso: FHIR segue il contratto
 dell’[ADR 0081](./docs/adr/0081-fhir-r4-export-v0-contract.md). Un formato

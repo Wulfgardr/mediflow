@@ -277,6 +277,11 @@ export const NEVER_REGRESS_ALLOWLIST = {
         },
     ],
     externalUrls: [
+        {
+            path: 'lib/aifa-catalog-download.test.ts',
+            pattern: 'https://example\\.invalid/catalog(?=["\\x27`])',
+            reason: 'Synthetic off-host redirect response for AIFA HEAD rejection tests; no request to the reserved invalid host.',
+        },
         {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^const stemUri = 'http://id\\.who\\.int/icd/release/11/2026-01/mms/123456789';$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
         {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^            codeInfoResourceUri: `http://id\\.who\\.int/icd/release/11/2026-01/mms/codeinfo/\\$\\{encodeURIComponent\\(code\\)\\}`,$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
         {"path": "lib/reference-data/icd11-who-cloud-code-check-contract.test.ts", "pattern": "^    \\['foundation namespace', \\{ stemId: 'http://id\\.who\\.int/icd/entity/123456789' \\}\\],$", "reason": "Inert synthetic cloud CodeInfo identity fixture; exact source line only, no transport permission."},
@@ -342,9 +347,9 @@ export const NEVER_REGRESS_ALLOWLIST = {
             reason: 'ADR0115: remove the already validated identifier prefix to construct a local path; never fetch this URI or its host.',
         },
         {
-            path: 'lib/aifa-catalog-download.ts',
+            path: 'lib/aifa-catalog.ts',
             pattern: 'https://drive\\.aifa\\.gov\\.it/farmaci/confezioni_fornitura\\.csv(?=["\\x27`])',
-            reason: 'ADR0125 fixes this official AIFA feed for an explicit authenticated update, without caller URL, redirects, cookies or clinical data; no automatic download on startup.',
+            reason: 'ADR0125 amendment: fixed public AIFA source for consented HEAD metadata checks and explicit GET updates, without redirects, cookies or clinical data.',
         },
         {
             path: 'lib/aifa-catalog-server.test.ts',

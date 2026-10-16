@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { ollamaLocalityErrorResponse } from './ollama-locality-response';
 import {
     assertLocalOllamaModelReference,
     assertLocalOllamaResponse,
@@ -50,7 +51,7 @@ test('limita il riferimento modello locale a 674 byte UTF-8 dopo trim senza ripa
     );
 });
 
-for (const serverVersion of ['0.32.5', '0.33.3', '0.34.2']) test(`attesta ${serverVersion} senza inviare un prompt`, async (t) => {
+for (const serverVersion of ['0.32.5', '0.33.3', '0.34.2', '0.40.4']) test(`attesta ${serverVersion} senza inviare un prompt`, async (t) => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = (async (input, init) => {
@@ -74,6 +75,8 @@ for (const serverVersion of ['0.32.5', '0.33.3', '0.34.2']) test(`attesta ${serv
 
     assert.equal(attestation.serverVersion, serverVersion);
     assert.equal(attestation.executionMode, 'local');
+    assert.doesNotThrow(() => assertLocalOllamaResponse({ model: LOCAL_MODEL.model, message: { content: 'synthetic' } }, attestation));
+    assert.throws(() => assertLocalOllamaResponse({ model: LOCAL_MODEL.model, remote_model: 'remote' }, attestation), /response_not_local/);
     assert.equal(attestation.canonicalModel, LOCAL_MODEL.name);
     assert.equal(calls.length, 5);
     assert.deepEqual(JSON.parse(String(calls[2]?.init?.body)), { model: LOCAL_MODEL.model });
@@ -108,7 +111,7 @@ test('rifiuta un modello remoto prima della chiamata show', async (t) => {
     assert.equal(urls.some((url) => url.endsWith('/api/show')), false);
 });
 
-for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.33.3-preview', '0.34.2-preview', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
+for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.33.3-preview', '0.34.2-preview', '0.40.3', '0.40.5', '0.40.4-preview', '0.40.4+build', '0.41.0', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => Response.json({ version: unqualified })) as typeof fetch;
     t.after(() => {
@@ -117,7 +120,12 @@ for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.
 
     await assert.rejects(
         () => attestLocalOllamaModel('http://127.0.0.1:11434', 'qwen-local'),
-        (error) => error instanceof OllamaLocalityError && error.code === 'provider_unready',
+        (error) => {
+            assert.ok(error instanceof OllamaLocalityError);
+            assert.equal(error.code, 'provider_version_unsupported');
+            assert.deepEqual(error.versionMismatch, { serverVersion: unqualified, supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' });
+            return true;
+        },
     );
 });
 
@@ -142,4 +150,21 @@ test('filtra descrittori remoti e rifiuta risposte non attestate', () => {
         ),
         (error) => error instanceof OllamaLocalityError && error.code === 'response_not_local',
     );
+});
+
+for (const body of [{}, { version: null }, null, []]) test('risposta versione incompleta indica servizio non pronto', async t => {
+    t.mock.method(globalThis, 'fetch', async () => Response.json(body));
+    await assert.rejects(attestLocalOllamaModel('http://127.0.0.1:11434', 'qwen-local'),
+        error => error instanceof OllamaLocalityError && error.code === 'provider_unready');
+});
+
+test('la risposta condivisa conserva HTTP 409 e dettagli solo per la versione non ammessa', async () => {
+    const versionMismatch = { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' };
+    const response = ollamaLocalityErrorResponse(new OllamaLocalityError('provider_version_unsupported', versionMismatch))!;
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), { error: 'Ollama local-only policy blocked the request',
+        code: 'provider_version_unsupported', versionMismatch });
+    assert.equal(ollamaLocalityErrorResponse(new OllamaLocalityError('provider_unready'))!.status, 503);
+    assert.equal(ollamaLocalityErrorResponse(new OllamaLocalityError('model_not_local'))!.status, 400);
+    assert.equal(ollamaLocalityErrorResponse(new Error('private detail')), null);
 });

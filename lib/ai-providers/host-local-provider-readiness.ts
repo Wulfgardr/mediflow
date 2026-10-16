@@ -70,7 +70,7 @@ async function observe(resolution: LocalProviderResolution, attestor: Attestor):
     try {
         await attestor(snapshot.baseUrl, snapshot.model, AbortSignal.timeout(READINESS_TIMEOUT_MS));
     } catch (error) {
-        if (error instanceof OllamaLocalityError && !['endpoint_not_loopback', 'provider_unready'].includes(error.code)) {
+        if (error instanceof OllamaLocalityError && !['endpoint_not_loopback', 'provider_unready', 'provider_version_unsupported'].includes(error.code)) {
             return deny('model_unavailable');
         }
         return deny('provider_unready');

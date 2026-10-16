@@ -7,16 +7,12 @@ import { useState, useEffect, useCallback, type ReactNode } from 'react';
 /* @Codex */
 import { isInstalledOllamaModel, parseInstalledOllamaModels } from '@/lib/installed-ollama-models';
 import styles from './guided-local-models.module.css';
-import { Check, Download, RefreshCw } from 'lucide-react';
+import { Check, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-/* @Codex */
-import { parseOllamaPullStreamLine } from '@/lib/ollama-pull-stream';
 import {
     SETTINGS_INPUT_CLASS,
     SETTINGS_SECONDARY_BUTTON_CLASS,
 } from '@/components/settings/settings-ui';
-import { useToast } from '@/components/ui/toast-provider';
-import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // --- Model Selector Component ---
 export interface ModelSelectorProps {
@@ -40,13 +36,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     const installedModels = currentInventory?.models ?? [];
     const loading = Boolean(targetUrl) && (!currentInventory || currentInventory.loading);
     const error = currentInventory?.error;
-    const [isPulling, setIsPulling] = useState(false);
-    const [pullProgress, setPullProgress] = useState(0);
-    const [pullStatus, setPullStatus] = useState("");
     const [showCustom, setShowCustom] = useState(false);
-    const [pullingModel, setPullingModel] = useState<string | null>(null);
-    const { showToast } = useToast();
-    const confirm = useConfirm();
 
     /* @Codex: each refresh owns an abort signal; ignored completions cannot replace a newer URL. */
     const checkInstalled = useCallback(() => { setRefresh(previous => previous + 1); }, []);
@@ -72,78 +62,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
         return () => { current = false; clearTimeout(timer); controller.abort(); };
     }, [provider, targetUrl, refresh]);
 
-    const handlePull = async (modelName: string) => {
-        const { confirmed } = await confirm({
-            title: `Scaricare il modello ${modelName}?`,
-            message: 'Il download può richiedere diversi GB e tempo a seconda della connessione.',
-            confirmLabel: 'Scarica'
-        });
-        if (!confirmed) return;
-
-        setIsPulling(true);
-        setPullingModel(modelName);
-        setPullProgress(0);
-        setPullStatus("Inizializzazione download...");
-
-        try {
-            const response = await fetch('/api/ai/pull', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-target-url': targetUrl,
-                },
-                body: JSON.stringify({ model: modelName })
-            });
-
-            if (!response.ok) throw new Error("Download failed to start");
-            if (!response.body) throw new Error("No response body");
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    // @Codex
-                    const data = parseOllamaPullStreamLine(line);
-                    if (!data) continue;
-
-                    if (data.status) setPullStatus(data.status);
-                    if (data.progress !== undefined) setPullProgress(data.progress);
-                }
-            }
-
-            // @Codex
-            const trailingData = parseOllamaPullStreamLine(buffer);
-            if (trailingData?.status) setPullStatus(trailingData.status);
-            if (trailingData?.progress !== undefined) setPullProgress(trailingData.progress);
-
-            showToast({ tone: 'success', title: `Modello ${modelName} installato` });
-            await checkInstalled();
-            onChange(modelName); // Auto select
-
-        } catch (e) {
-            console.error(e);
-            showToast({
-                tone: 'error',
-                title: 'Download non riuscito',
-                description: e instanceof Error ? e.message : 'Errore imprevisto'
-            });
-        } finally {
-            setIsPulling(false);
-            setPullingModel(null);
-            setPullProgress(0);
-            setPullStatus("");
-        }
-    };
-
     const isInstalled = (name: string) => isInstalledOllamaModel(installedModels, name);
     const installedSelection = installedModels.find(model => isInstalledOllamaModel([model], value));
 
@@ -154,8 +72,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
         selectedCardStyle: { borderColor: 'var(--lume-accent)', background: 'var(--lume-surface-focal)', boxShadow: '0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent)' },
         selectedDot: 'bg-[color:var(--lume-surface-focal)]',
         installedBadgeStyle: { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink)' },
-        downloadBadgeStyle: { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink)' },
-        progressStyle: { background: 'var(--lume-accent)' },
     };
     const c = modelSelectorTone;
 
@@ -202,7 +118,8 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                 {!showCustom ? (
                     <div className="grid gap-2">
                         <details>
-                            <summary>Altri modelli e download</summary>
+                            <summary>Altri modelli e installazione</summary>
+                            <p className={styles.hint}>Per scaricare un modello, apri il Terminale sul computer che ospita Ollama ed esegui il comando indicato. Poi aggiorna l’elenco dei modelli installati in MediFlow.</p>
                             <div className="grid gap-2">
                                 {recommended.map((model) => {
                                     const installed = isInstalled(model.name);
@@ -240,21 +157,10 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                                         <Check className="w-3 h-3" /> Installato
                                                     </span>
                                                 ) : (
-                                                    <button type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handlePull(model.name);
-                                                        }}
-                                                        aria-label={`Scarica ${model.name}`}
-                                                        disabled={isPulling}
-                                                        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm font-semibold transition-colors disabled:opacity-60"
-                                                        style={c.downloadBadgeStyle}
-                                                    >
-                                                        {isPulling && pullingModel === model.name ? (
-                                                            <RefreshCw className="w-3 h-3" />
-                                                        ) : <Download className="w-3 h-3" />}
-                                                        Scarica
-                                                    </button>
+                                                    <div className={styles.hint}>
+                                                        <span>Da installare con Ollama:</span>{' '}
+                                                        <code className="break-all">ollama pull {model.name}</code>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -294,26 +200,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                 )}
             </div>
 
-            {/* Global Pull Status */}
-            {isPulling && (
-                // @Codex WUL-229: pull status card now uses the shared liquid section primitive
-                <div className="mf-section mf-section-tight p-4">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
-                            <RefreshCw className="w-3 h-3" />
-                            Scaricamento {pullingModel ? `di ${pullingModel}` : 'in corso'}
-                        </span>
-                        <span className="lume-registro text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{pullProgress}%</span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)' }}>
-                        <div
-                            className="h-full transition-[width] duration-300"
-                            style={{ width: `${pullProgress}%`, ...c.progressStyle }}
-                        />
-                    </div>
-                    <p className="mt-2 truncate text-sm" style={{ color: 'var(--lume-ink-muted)' }}>{pullStatus}</p>
-                </div>
-            )}
+
         </div>
     );
 }

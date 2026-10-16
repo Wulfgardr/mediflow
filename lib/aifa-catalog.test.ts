@@ -29,8 +29,8 @@ test('parses the synthetic fixture with the real AIFA confezioni headers', () =>
         activePrinciple: 'Acido acetilsalicilico',
         company: 'AZIENDA SINTETICA UNO',
         packaging: '20 compresse da 100 mg; uso orale',
-        class: 'A',
-        price: 250,
+        class: null,
+        price: null,
         atc: 'B01AC06',
         aicSearch: '000000101',
         nameSearch: 'acido sintetico',
@@ -38,7 +38,7 @@ test('parses the synthetic fixture with the real AIFA confezioni headers', () =>
         packagingSearch: '20 compresse da 100 mg uso orale',
     });
     assert.equal(parsed.drugs[1].nameSearch, 'farmaco citta');
-    assert.equal(parsed.drugs[2].name, 'SOLUZIONE TEST');
+    assert.equal(parsed.drugs[2].name, 'SOLUZIONE "TEST"');
 });
 
 test('normalizes accents and rejects missing required AIFA headers', () => {
@@ -79,4 +79,38 @@ test('builds and validates the persisted provenance manifest', () => {
         downloadedAt: '2026-07-17',
         version: 'insecure-source',
     }), /dominio ufficiale aifa\.gov\.it/);
+});
+
+test('strict AIFA imports require ATC and active-principle columns even when AIC and name exist', () => {
+    assert.throws(() => parseAifaCsv('CODICE_AIC;DENOMINAZIONE\n000000101;TEST', true), /codice_atc/);
+    assert.throws(() => parseAifaCsv('CODICE_AIC;DENOMINAZIONE;CODICE_ATC\n000000101;TEST;A01AA01', true), /pa_associati/);
+});
+
+test('remote comparison never calls a legacy or metadata-free catalog unchanged', async () => {
+    const { compareAifaSource } = await import('./aifa-catalog-source');
+    const { AIFA_DOWNLOAD_URL } = await import('./aifa-catalog');
+    const manifest = buildAifaCatalogManifest({ sourceUrl: AIFA_DOWNLOAD_URL, version: 'synthetic-version', downloadedAt: '2026-10-15',
+        etag: '"local"', lastModified: 'Tue, 13 Oct 2026 23:02:27 GMT' }, { sha256: 'a'.repeat(64), fileName: 'synthetic.csv', rowCount: 3 });
+    const remote = { checkedAt: '2026-10-15T10:00:00Z', outcome: 'unchanged' as const, etag: '"remote"', lastModified: 'Wed, 14 Oct 2026 23:02:27 GMT' };
+    assert.equal(compareAifaSource(remote, manifest, 3).outcome, 'available');
+    assert.equal(compareAifaSource({ ...remote, etag: '"local"' }, manifest, 3).outcome, 'unchanged');
+    assert.equal(compareAifaSource(remote, null, 3).reason, 'local_metadata_absent');
+    assert.equal(compareAifaSource(remote, { ...manifest, etag: undefined, lastModified: undefined }, 3).outcome, 'unavailable');
+    assert.equal(compareAifaSource({ ...remote, outcome: 'unavailable' }, manifest, 3).outcome, 'unavailable');
+    assert.deepEqual(parseStoredAifaCatalogManifest(JSON.stringify(manifest)), manifest);
+});
+
+test('remote ETag comparison uses weak equivalence and preserves opaque tag case', async () => {
+    const { compareAifaSource } = await import('./aifa-catalog-source');
+    const { AIFA_DOWNLOAD_URL } = await import('./aifa-catalog');
+    const manifest = buildAifaCatalogManifest({ sourceUrl: AIFA_DOWNLOAD_URL, version: 'synthetic-weak', downloadedAt: '2026-10-15',
+        etag: '"same"' }, { sha256: 'a'.repeat(64), fileName: 'synthetic.csv', rowCount: 3 });
+    const remote = { checkedAt: '2026-10-15T10:00:00Z', outcome: 'unchanged' as const };
+    for (const local of ['"same"', 'W/"same"']) {
+        for (const etag of ['"same"', 'W/"same"']) {
+            assert.equal(compareAifaSource({ ...remote, etag }, { ...manifest, etag: local }, 3).outcome, 'unchanged');
+        }
+        assert.equal(compareAifaSource({ ...remote, etag: 'W/"Same"' }, { ...manifest, etag: local }, 3).outcome, 'available');
+        assert.equal(compareAifaSource({ ...remote, etag: 'W/"different"' }, { ...manifest, etag: local }, 3).outcome, 'available');
+    }
 });
