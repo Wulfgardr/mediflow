@@ -1,7 +1,7 @@
 <div align="center">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/design/punto-inchiostro/icona/punto-grafite.svg">
-  <img src="./docs/design/punto-inchiostro/icona/punto-giorno.svg" width="100" height="100" alt="MediFlow: un tratto che da matita diventa inchiostro e si chiude nel punto">
+  <img src="./docs/design/punto-inchiostro/icona/punto-giorno.svg" width="100" height="100" alt="Icona di MediFlow">
 </picture>
 
 # MediFlow
@@ -9,346 +9,250 @@
 **Ritrova il filo.**
 
 Un gestionale aperto e gratuito per il lavoro in ambulatorio.<br>
-Cartelle, documenti e attività da seguire, anche senza intelligenza artificiale.
-
+Cartelle, documenti e attività da seguire, anche senza intelligenza artificiale (AI).
 
 [![Versione sorgente](https://img.shields.io/badge/sorgente-0.9.0-33506b?style=flat)](./CHANGELOG.md#090---2026-10-15)
 [![Release pubblica](https://img.shields.io/github/v/release/Wulfgardr/mediflow?label=release&style=flat)](https://github.com/Wulfgardr/mediflow/releases/latest)
 [![Licenza](https://img.shields.io/badge/license-MIT-2ea043?style=flat)](./LICENSE)
-[![Local-first](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
+[![Dati locali](https://img.shields.io/badge/data-local--first-8957e5?style=flat)](#dove-stanno-i-dati)
 [![Runtime locale](https://img.shields.io/badge/0.9.0-sorgente%20%7C%20localhost-6e7681?style=flat)](./docs/STATE_OF_THE_SYSTEM.md)
 
 [**Scopri Get MediFlow**](https://getmediflow.dev) · [Perché nasce](#perché-nasce) · [Cosa puoi fare](#cosa-puoi-fare) · [Provalo](#provalo) · [Per chi sviluppa](#per-chi-sviluppa) · [Documentazione](#documentazione)
 
 </div>
 
-La tipografia web segue [Punto d'inchiostro](./docs/design/punto-inchiostro/01-specifica.md):
-caratteri inclusi localmente e corpi proporzionali alla preferenza del browser.
-I [limiti delle verifiche](./docs/known-limitations.md#nota-successiva-tipografia-web-ottobre-2026)
-restano distinti dalla disponibilità dei sorgenti.
-
-MediFlow nasce per tenere insieme ciò che, nel lavoro di ambulatorio, tende a
-disperdersi: la storia del paziente, i documenti che la raccontano e le attività
-che restano da seguire. Diario, terapie, misure e dati strutturati sono il punto
-di partenza. Le funzioni intelligenti si possono aggiungere quando servano;
-non sono la condizione per usare il gestionale.
+MediFlow riunisce la storia del paziente, i documenti e le attività ancora
+da seguire. Diario, diagnosi, terapie e misure si consultano nella cartella.
+Le funzioni AI sono facoltative e producono proposte da rivedere.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/pazienti-dark.png">
-  <img src="./docs/images/getmediflow-090/pazienti-light.png" alt="MediFlow: elenco pazienti con diagnosi principale, età e stato, e il riquadro della persona selezionata">
+  <img src="./docs/images/getmediflow-090/pazienti-light.png" alt="Elenco pazienti con diagnosi, età e stato, e riepilogo della persona selezionata">
 </picture>
 
-*La lista pazienti: un punto da cui riprendere la cartella e il lavoro da
-seguire. Le schermate attuali provengono dal runtime Web di produzione della
-[revisione di sviluppo `31d7a3268ff7`](https://github.com/Wulfgardr/mediflow/tree/31d7a3268ff7f38aebad40afc707f6b0b74762b1),
-acquisito il 16 ottobre 2026 con dodici persone inventate. Questa revisione
-è successiva al tag `v0.9.0`: le immagini non descrivono gli archivi della
-release distribuita. Seguono il tema chiaro o scuro del tuo GitHub; dimensioni
-e provenienza sono nel [manifest](./docs/images/getmediflow-090/manifest.json).*
+*Elenco pazienti con dati di esempio. Le 21 immagini sono del 16 ottobre 2026,
+[revisione `31d7a3268ff7`](https://github.com/Wulfgardr/mediflow/tree/31d7a3268ff7f38aebad40afc707f6b0b74762b1),
+successiva alla 0.9.0. [Provenienza delle immagini](./docs/images/getmediflow-090/manifest.json).*
 
-> **MediFlow 0.9.0: release sorgente per runtime locale Web e Headless.**
+> **Versione pubblicata: 0.9.0, codice sorgente.**
 >
-> Comprende il runtime Web locale e Headless con Node 24, per macOS ARM,
-> Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM su Parallels.
-> Le [note 0.9.0](./CHANGELOG.md#090---2026-10-15) distinguono prove accettate,
-> quarantene temporanee e limiti. La [pagina GitHub della release](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
-> riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna.
+> Comprende l'applicazione Web locale e l'accesso per agenti (Headless), con
+> Node 24. È stata provata su macOS Apple Silicon, Windows 11 ARM con Node
+> x64 emulato e Omarchy/Arch ARM su Parallels. App native e installer firmati
+> non sono inclusi.
 >
-> Dopo il tag sono entrati su `main`, e usciranno con la prossima versione:
-> un solo lanciatore per macOS, Windows e Linux; ICD-11 con il catalogo WHO
-> incluso, senza Docker; controllo e aggiornamento del catalogo AIFA con un
-> clic; protesica con fonti e documenti propri; Ollama 0.40.4; una sola voce
-> tipografica nell’interfaccia. Il dettaglio è nel [CHANGELOG](./CHANGELOG.md#non-ancora-rilasciato).
+> Le prove usano dati sintetici. La pubblicazione dei sorgenti non autorizza
+> l'uso clinico: l'ammissione dell'installazione e dei flussi spetta al
+> professionista o all'organizzazione responsabile.
 >
-> La consegna dei sorgenti non autorizza l'uso con dati clinici reali.
-> L'ammissione dell'installazione e dei flussi resta una decisione separata
-> del professionista o dell'organizzazione responsabile.
+> [Release e verifiche](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0) ·
+> [Novità successive, non ancora rilasciate](./CHANGELOG.md#non-ancora-rilasciato)
 
 <details>
-<summary><strong>Versione sorgente, verifiche e distribuzione</strong></summary>
+<summary><strong>Avvio della 0.9.0 e limiti delle verifiche</strong></summary>
 
-GitHub fornisce gli archivi ZIP e TAR.GZ del codice sorgente. Per l’avvio qualificato
-serve un checkout Git pulito del tag `v0.9.0` con Node 24: gli archivi privi
-di `.git` non costituiscono un profilo di avvio qualificato.
-App e installer nativi firmati o notarizzati restano fuori da questa release;
-i loro metadati seguono il percorso nativo separato.
-La [0.8.6 pubblicata il 20 settembre 2026](https://github.com/Wulfgardr/mediflow/releases/tag/v0.8.6)
-resta una release storica con le proprie [verifiche e limiti](./docs/analysis/2026-09-07-086-release-verification.md).
+L'avvio verificato richiede un checkout Git pulito del tag `v0.9.0` con
+Node 24, sui profili indicati sopra. Gli archivi ZIP e TAR.GZ forniti da
+GitHub contengono i sorgenti senza `.git`: il loro avvio non è stato qualificato.
+Segui il [README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md).
 
-Le funzioni AI sono facoltative; i servizi esterni, compresa l'integrazione
-ChatGPT, sono spenti per impostazione predefinita e richiedono una scelta
-esplicita. Configurare un servizio non dimostra che funzioni; le prove
-sintetiche e la pubblicazione dei sorgenti non attestano idoneità clinica.
-Ogni verifica conserva la revisione su cui è stata eseguita.
-
-</details>
-
-<details>
-<summary><strong>Le terapie, da vicino</strong></summary>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/terapie-dark.png">
-  <img src="./docs/images/getmediflow-090/terapie-light.png" alt="Terapie di Elena Moretti, paziente fittizia, con Ramipril 5 mg e Metformina, codici ATC e azioni di registro">
-</picture>
-
-Una schermata dell’interfaccia reale, con dati interamente sintetici, mostra
-come le terapie restino consultabili nel contesto della cartella. Ramipril
-5 mg e il codice ATC C09AA05 sono coerenti; l’esempio non costituisce
-un’indicazione terapeutica.
+Le [note 0.9.0](./CHANGELOG.md#090---2026-10-15) e lo
+[stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) riportano prove accettate e
+limiti. Due cause di instabilità dei test restano in quarantena fino al
+23 ottobre 2026 alle 00:00 UTC; i test continuano a essere eseguiti.
+Le verifiche valgono per la revisione su cui sono state svolte.
 
 </details>
 
 ## Perché nasce
 
-Seguire una persona nel tempo richiede più di una raccolta di campi. Alcune
-informazioni hanno bisogno di una codifica, altre di un testo che ne conservi
-il contesto; per altre ancora è essenziale poter tornare al referto originale.
-MediFlow prova a dare una struttura a questi materiali senza far coincidere
-la storia clinica con ciò che è più facile inserire in una tabella.
+Seguire una persona nel tempo richiede testi clinici, dati strutturati e
+documenti originali. MediFlow li tiene nella stessa cartella, per consultare
+la storia, ritrovare una fonte e preparare i controlli successivi.
 
-Per questo il gestionale deve restare utile anche con tutti i modelli AI
-spenti. È una scelta di autonomia, ma anche un modo di non imporre dipendenze
-a chi lavori con risorse limitate. La configurazione dei modelli resta
-legata agli strumenti disponibili sulla singola postazione.
-
-La modularità nasce dalla stessa ragione. Una postazione può aver bisogno di
-organizzare cartelle e documenti; un’altra può aggiungere strumenti per
-riesaminarli. Il progetto è aperto e gratuito, e intende rimanerlo, perché
-possa essere studiato, discusso e migliorato anche dall’esterno. La gratuità
-riguarda MediFlow, non l’hardware o gli eventuali servizi di terzi.
-
-### Ordine dove serve. Spazio per ragionare.
-
-La ricerca terminologica, i cataloghi farmaceutici e le scale aiutano a dare
-un significato condiviso alle informazioni, purché restino riconoscibili la
-fonte e la versione utilizzata. Il catalogo AIFA si può importare da file
-locale o aggiornare con **Aggiorna ora**. Con il consenso Internet AIFA,
-l’apertura di Repertori verifica soltanto i metadati, al massimo ogni 24 ore;
-l’applicazione resta esplicita. Vedi il [manuale](./docs/MANUALE.md#catalogo-farmaci-aifa).
-ICD-11 usa il catalogo WHO MMS 2026-01 incluso nell’applicazione, in inglese,
-senza Docker, credenziali o rete.
-
-Anche l’esportazione ha un confine preciso: FHIR segue il contratto
-dell’[ADR 0081](./docs/adr/0081-fhir-r4-export-v0-contract.md). Un formato
-condiviso è una base per lo scambio, non una garanzia di compatibilità con
-ogni sistema. La parità FHIRv2 resta da verificare.
+Il gestionale funziona anche senza AI. Si possono aggiungere le funzioni
+utili alla propria postazione, con configurazione e verifiche specifiche.
+Il codice è aperto e gratuito; hardware, modelli e servizi di terzi possono
+avere costi e condizioni proprie.
 
 ## Cosa puoi fare
 
-| Esigenza | Strumento | Confine da conoscere |
-| --- | --- | --- |
-| Ricostruire la storia | Diario, diagnosi, terapie, misure e contesto amministrativo | Le modifiche sono versionate; un conflitto richiede riesame. |
-| Ritrovare l’evidenza | Documenti collegati alla cartella e alle fonti | L’estrazione è locale per i formati supportati; gli errori restano espliciti. |
-| Preparare il seguito | Checkup, appuntamenti e attese aperte | Proporre un follow-up non significa averlo eseguito. |
-| Dare struttura alle parole | Ricerca terminologica e cataloghi | Catalogo WHO MMS 2026-01 in inglese incluso nell’applicazione; AIFA da file o con **Aggiorna ora**. |
-| Registrare una misura | Scale con risposte esplicite | Zero e risposta mancante restano distinti; fonte e versione si conservano nello storico. |
-| Riesaminare informazioni complesse | Quattro percorsi Intelligence Fabric | I risultati sono proposte da rivedere, senza scrittura clinica automatica. |
-| Accedere alle funzioni senza passare da ogni schermata | Supervisor, AIP e MCP | I permessi sono delimitati; gli adapter non accedono direttamente al database. |
+| Attività | Funzioni |
+| --- | --- |
+| Consultare e aggiornare la cartella | Diario, diagnosi, terapie, misure e dati amministrativi. Le modifiche sono versionate e i conflitti richiedono riesame. |
+| Consultare le fonti | Documenti originali collegati alla cartella; estrazione locale per i formati supportati. |
+| Organizzare il seguito | Checkup, appuntamenti e attività aperte. |
+| Usare termini e cataloghi | ICD-11, catalogo AIFA, esenzioni e protesica. Fonte e versione restano riconoscibili. |
+| Registrare le scale | Risposte e storico; lo zero resta distinto dalla risposta mancante. |
+| Riesaminare le informazioni con AI | Sintesi del paziente, importazione assistita, sintesi dei documenti e ragionamento terapeutico, sempre come proposte da rivedere. |
+| Usare un client agente autorizzato | Comandi MediFlow con autenticazione e permessi specifici, senza accesso diretto al database. |
 
 <details>
-<summary><strong>Guarda le altre schermate</strong></summary>
+<summary><strong>Schermate della cartella e delle attività</strong></summary>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/scheda-dark.png">
-  <img src="./docs/images/getmediflow-090/scheda-light.png" alt="Scheda di Elena Moretti: quadro clinico, terapie attive e diario">
+  <img src="./docs/images/getmediflow-090/scheda-light.png" alt="Scheda paziente con quadro clinico, terapie attive e diario">
 </picture>
 
-La scheda tiene insieme quadro clinico, terapie e diario della stessa persona.
+La scheda riunisce quadro clinico, terapie e diario della stessa persona.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/terapie-dark.png">
+  <img src="./docs/images/getmediflow-090/terapie-light.png" alt="Terapie del paziente con farmaco, dose e codice ATC">
+</picture>
+
+Le terapie si consultano nel contesto della cartella.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/diario-dark.png">
-  <img src="./docs/images/getmediflow-090/diario-light.png" alt="Diario di tutti i pazienti in ordine di data, con fonte e azioni di riga">
+  <img src="./docs/images/getmediflow-090/diario-light.png" alt="Diario di tutti i pazienti in ordine di data, con fonte e stato delle voci">
 </picture>
 
-Il diario raccoglie le voci di tutti i pazienti, con fonte e stato di ciascuna.
+Il diario raccoglie le voci dei pazienti, con fonte e stato di ciascuna.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/agenda-dark.png">
-  <img src="./docs/images/getmediflow-090/agenda-light.png" alt="Agenda con quattro controlli di oggi e i prossimi">
+  <img src="./docs/images/getmediflow-090/agenda-light.png" alt="Agenda con i controlli di oggi e quelli successivi">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/repertori-dark.png">
-  <img src="./docs/images/getmediflow-090/repertori-light.png" alt="Repertori: ICD-11 incluso; AIFA, esenzioni e protesica ancora da importare nella fixture isolata">
+  <img src="./docs/images/getmediflow-090/repertori-light.png" alt="Repertori con ICD-11 disponibile; AIFA, esenzioni e protesica da importare">
 </picture>
 
-I repertori dicono cosa è disponibile in locale e cosa manca: in questa
-fixture ICD-11 è incluso; AIFA, esenzioni e protesica restano da importare.
+I repertori indicano quali cataloghi sono disponibili. Nell'esempio AIFA,
+esenzioni e protesica sono ancora da importare.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/analisi-dark.png">
-  <img src="./docs/images/getmediflow-090/analisi-light.png" alt="Analisi della popolazione: fasce d’età e diagnosi più ricorrenti">
+  <img src="./docs/images/getmediflow-090/analisi-light.png" alt="Analisi della popolazione per fasce d'età e diagnosi più frequenti">
 </picture>
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/modelli-locali-dark.png">
-  <img src="./docs/images/getmediflow-090/modelli-locali-light.png" alt="Impostazioni dei modelli locali: indirizzo di Ollama e verifica della connessione">
-</picture>
-
-Collegare Ollama è un passaggio esplicito: la verifica legge l’elenco dei
-modelli e non genera testo. Tutte le schermate usano persone inventate.
-
-</details>
-
-<details>
-<summary><strong>Guarda la revisione documentale</strong></summary>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/documents-dark.png">
-  <img src="./docs/images/getmediflow-090/documents-light.png" alt="Documenti della persona inventata, con originale e revisione separati">
+  <img src="./docs/images/getmediflow-090/documents-light.png" alt="Documenti del paziente, con originale e revisione separati">
 </picture>
-
-Le fonti restano vicine alle informazioni da riesaminare. Anche qui i dati
-sono sintetici: la schermata documentale non dimostra che siano stati eseguiti
-un modello AI, un’estrazione AnyDoc o un riconoscimento OCR.
 
 </details>
 
-### Intelligence Fabric, in parole semplici
+<details>
+<summary><strong>Cataloghi e scambio dei dati</strong></summary>
 
-Si può pensare alla Fabric come a un’impalcatura: una struttura di supporto
-che organizza l’uso delle funzioni intelligenti senza rendere obbligatoria
-nessuna di esse. La prima scelta resta non usarle. Quando invece servano,
-non c’è ragione di chiedere allo stesso strumento di rispondere a ogni esigenza.
+ICD-11 include il catalogo WHO MMS 2026-01 in inglese, con ricerca per codice
+o titolo e senza connessione Internet. Non include sinonimi e
+postcoordinazione dell'API WHO. I dati WHO hanno licenza CC BY-ND 3.0 IGO,
+distinta dalla MIT. [Guida ICD-11](./docs/icd-who-setup.md).
 
-Riesaminare una terapia e mettere in relazione documenti diversi sono lavori
-differenti. Si può quindi preferire uno strumento locale per una funzione e
-valutare un altro modello, eventualmente esterno, per un’altra. È il principio
-che orienta il progetto, non la dichiarazione che qualunque combinazione sia
-già disponibile o clinicamente validata.
+Il catalogo AIFA si importa da file o con **Aggiorna ora**. Con il consenso
+Internet AIFA, l'apertura di Repertori controlla gli aggiornamenti al massimo
+una volta al giorno; l'installazione resta esplicita.
+[Guida AIFA](./docs/MANUALE.md#catalogo-farmaci-aifa).
 
-MediFlow distingue quattro percorsi: **Patient Insight** prepara una sintesi
-del contesto del paziente; **Smart Import** propone informazioni strutturate
-a partire da una fonte; **Document Synthesis** mette in relazione il contenuto
-dei documenti; **Treatment Reasoning** accompagna il riesame professionale in
-un percorso dedicato. In tutti i casi il risultato rimane una proposta.
+La protesica supporta fonti personali, documenti originali e provenienza
+nelle nuove prescrizioni scelte dal catalogo. Importa file CSV; per XLSX
+serve prima l'esportazione in CSV. Catalogo, originali e copie della
+provenienza sono in chiaro nel database locale.
+[Guida protesica](./docs/MANUALE.md#fonti-personali-della-protesica).
 
-La configurazione dà forma a questa scelta entro limiti precisi. Si possono
-usare soltanto le opzioni del catalogo ammesso dal sistema locale, l’*host*;
-un modello assente o non più valido non viene sostituito di nascosto. Le
-preferenze per funzione e per singola richiesta seguono ADR0129: non sono
-un’autorizzazione a scegliere liberamente provider, endpoint o modalità d’invio.
+I percorsi SISS/FSE accompagnano l'utente verso i canali ufficiali e non sono
+integrazioni regionali. L'esportazione FHIR segue il
+[contratto ADR 0081](./docs/adr/0081-fhir-r4-export-v0-contract.md);
+la parità FHIRv2 resta da verificare.
 
-Ollama può servire i primi tre percorsi, mentre ATHENA/MLX è opzionale e
-riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
+</details>
+
+### Funzioni AI facoltative
+
+Intelligence Fabric coordina quattro funzioni:
+
+- **Patient Insight:** sintesi del contesto del paziente.
+- **Smart Import:** proposta di dati strutturati a partire da una fonte.
+- **Document Synthesis:** sintesi del contenuto dei documenti.
+- **Treatment Reasoning (Ragionamento terapeutico):** supporto al riesame della terapia.
+
+Ogni risultato resta una proposta da rivedere; nessuna proposta modifica
+la cartella automaticamente. Si scelgono solo modelli ammessi dal sistema
+locale, per funzione o singola richiesta. Un modello assente o non più
+valido non viene sostituito automaticamente.
+
+Ollama può eseguire le prime tre funzioni. ATHENA/MLX è facoltativa e
+riservata al ragionamento terapeutico, con modello e configurazione locali.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/modelli-locali-dark.png">
+  <img src="./docs/images/getmediflow-090/modelli-locali-light.png" alt="Impostazioni dei modelli locali con indirizzo di Ollama e verifica della connessione">
+</picture>
+
+Collegare Ollama richiede una scelta esplicita. La verifica della connessione
+legge l'elenco dei modelli e non genera testo.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/ragionamento-terapeutico-dark.png">
-  <img src="./docs/images/getmediflow-090/ragionamento-terapeutico-light.png" alt="Ragionamento terapeutico: proposta da rivedere, cautele, elementi a sostegno e fonti vicine alle affermazioni">
+  <img src="./docs/images/getmediflow-090/ragionamento-terapeutico-light.png" alt="Ragionamento terapeutico con proposta da rivedere, cautele, elementi a sostegno e fonti">
 </picture>
 
-UI reale della stessa revisione di sviluppo, acquisita sul bundle Web di
-produzione con la fixture E2E canonica: una persona e una terapia inventate,
-proposta fittizia intercettata, nessuna inferenza. Il viewport più alto mostra
-il gruppo completo senza ritagliare controlli; dimensioni e hash sono nel
-[manifest](./docs/images/getmediflow-090/manifest.json).
+*Esempio di ragionamento terapeutico con risposta simulata, senza esecuzione
+di un modello. [Provenienza](./docs/images/getmediflow-090/manifest.json).*
 
-Il risultato è una **Proposta**: indicazione da valutare, cautele, elementi a
-sostegno e azioni restano distinti. Le fonti sono vicine alle affermazioni;
-traccia e dettagli sono espandibili. La scelta del modello precede la
-conferma di paziente e ambulatorio. Il percorso illustrato su
-[Get MediFlow](https://getmediflow.dev/#fabric) usa dati inventati e non
-esegue inferenza. Nessuna proposta applica modifiche alla cartella.
-
-L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
-Il percorso esterno richiede configurazione, consenso e controlli pertinenti
-all’operazione; non viene dichiarata una nuova prova live di account/provider
-consumer sul candidato finale. Collegare un account ChatGPT non equivale a
-possedere accesso alle API OpenAI, né dimostra l’idoneità all’uso con dati
-clinici reali.
+I servizi esterni, compresa l'integrazione ChatGPT, sono spenti per
+impostazione predefinita. Richiedono configurazione, consenso e controlli
+sui dati da inviare. Collegare un account ChatGPT non fornisce accesso alle
+API OpenAI e non attesta l'idoneità all'uso con dati clinici reali.
 
 <details>
-<summary><strong>Perché una proposta non è ancora una modifica</strong></summary>
+<summary><strong>Fonti, permessi e invio a servizi esterni</strong></summary>
 
-Una risposta è utile se si può capire da dove venga e se le fonti a cui si
-riferisce siano ancora valide. Ogni percorso conserva perciò provenienza,
-ricevuta e controlli di attualità. Queste evidenze permettono di riesaminare
-il risultato, ma non gli attribuiscono il diritto di scrivere nella cartella.
+Le proposte conservano fonti, provenienza e ricevute di esecuzione. Il sistema
+controlla la validità dei dati e delle autorizzazioni; le operazioni protette
+richiedono conferma e registrazione delle modifiche (audit).
 
-Le operazioni protette mantengono controlli propri di ruolo, contesto,
-conferma e audit. Anche gli agenti usano comandi MediFlow nominati, dopo
-l’autenticazione e nei permessi assegnati; non aprono direttamente il database.
-Il sistema verifica che dati e autorizzazioni siano ancora validi, richiede
-la conferma pertinente prima delle scritture cliniche e restituisce una
-ricevuta dell’esito.
+L'invio a servizi esterni richiede controlli specifici per ogni funzione.
+La minimizzazione e l'oscuramento degli identificativi non garantiscono
+l'anonimato: i dati riconducibili a una persona restano soggetti al GDPR.
+Il testo narrativo clinico resta bloccato se mancano i requisiti previsti.
+Nei percorsi ordinari ChatGPT, l'assenza o l'incoerenza dei rapporti di
+verifica o dell'installazione del sistema di oscuramento impedisce l'invio.
 
-[Confini Fabric e headless](./docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md).
+La configurazione di un servizio non ne dimostra il funzionamento. Le prove
+con trasporto simulato non attestano l'esecuzione su account o servizi reali.
 
-</details>
-
-<details>
-<summary><strong>Provider esterni e offuscamento: condizioni e limiti</strong></summary>
-
-Scegliere un servizio esterno significa anche valutare quali informazioni
-possano uscire. Il percorso documentato minimizza il contenuto, sostituisce
-gli identificativi e riconcilia il risultato in locale. Non è una protezione
-da presumere disponibile per ogni funzione: il testo narrativo clinico resta
-bloccato finché non siano soddisfatti i controlli richiesti. Per i percorsi
-ordinari ChatGPT, report e installazione del sistema di oscuramento dei dati identificativi,
-se mancanti o incoerenti, impediscono l’invio, senza passaggi alternativi impliciti.
-
-Pseudonimizzare non significa anonimizzare. I dati riconducibili a una persona
-restano soggetti al GDPR; la presenza di un adapter non rende pronto all’uso
-clinico un servizio cloud.
-
-[Matrice dei runtime](./docs/ai-runtime-serving-matrix.md) ·
-[Decisione sul confine egress](./docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
+[Matrice delle funzioni AI](./docs/ai-runtime-serving-matrix.md) ·
+[Modelli ammessi e preferenze](./docs/adr/0129-function-model-catalog-preferences.md) ·
+[Controlli sull'invio dei dati](./docs/adr/0077-ai-provider-abstraction-and-egress-anonymization-boundary.md)
 
 </details>
 
 ## Dati sanitari e responsabilità
 
-Conservare le fonti, delimitare gli accessi e richiedere una revisione umana
-sono scelte del progetto. La valutazione di un impiego concreto deve però
-considerare anche finalità, ruoli, base giuridica, sicurezza e obblighi
-applicabili. Il funzionamento locale non dimostra da solo la conformità, e
-la supervisione umana non è una certificazione.
-
-[GDPR, AI Act e scelte di progetto](./docs/privacy-and-ai-governance.md).
+L'uso con dati sanitari richiede una valutazione di finalità, ruoli, base
+giuridica, sicurezza e obblighi applicabili. Il funzionamento locale e la
+revisione umana non costituiscono una certificazione di conformità.
+[Privacy, GDPR e governance AI](./docs/privacy-and-ai-governance.md).
 
 ## Dove stanno i dati
 
-Nella 0.8.6 il Mac conserva il database autorevole SQLite e ospita servizi e
-API; il browser su localhost è l’interfaccia di riferimento. L’app Mac resta
-uno sviluppo separato. Il principio locale va letto insieme ai percorsi
-espliciti di pairing, cache, esportazione e backup, non come promessa che
-ogni dato sia confinato per sempre a un solo dispositivo.
+Il computer che ospita MediFlow conserva il database SQLite e i servizi;
+il browser locale è l'interfaccia di riferimento. Collegamento ad altri
+dispositivi, cache, esportazioni e backup seguono percorsi espliciti.
 
-All'apertura su macOS e Linux, i file del database appartenenti all'utente
-sono resi accessibili solo a quell'utente. Se il controllo dei permessi fallisce,
-l'apertura si ferma e l'archivio va conservato per la verifica. Verifica e ripristino web ricevono
-il backup completo, inclusi originali e allegati paziente, senza il limite
-del proxy previsto per un singolo upload. Il JSON viene elaborato in memoria:
-la dimensione gestibile dipende dalle risorse del computer.
+La cifratura protegge i campi clinici sensibili secondo il contratto
+documentato, senza cifrare l'intero file database o tutti i metadati.
+Su macOS e Linux i file del database appartenenti all'utente sono accessibili
+solo a quell'utente; se il controllo dei permessi fallisce, l'apertura si ferma.
 
-```mermaid
-flowchart LR
-    web[Browser locale] --> host[Host MediFlow: servizi e API]
-    host --> db[(SQLite locale)]
-    mcp[MCP: capacità delimitate] --> broker[AIP e policy host]
-    broker --> host
-```
-
-
-Gli adapter non aprono direttamente SQLite. La cifratura protegge i campi
-clinici sensibili secondo il contratto documentato: non è una dichiarazione
-di cifratura integrale di ogni metadato o dell’intero file database.
-
-Preferenze e ricevute del lanciatore sono separate per cartella sorgente nella
-configurazione utente: `~/Library/Application Support/MediFlow/launcher` su
-macOS, `%APPDATA%\MediFlow\launcher` su Windows e
-`$XDG_CONFIG_HOME/mediflow/launcher` oppure `~/.config/mediflow/launcher` su Linux.
-Il lanciatore non le scrive nella cartella scelta con `MEDIFLOW_DATA_DIR`.
-Il primo avvio tollera soltanto le voci di servizio elencate nell'[ADR 0138](./docs/adr/0138-explicit-data-directory-bootstrap.md#emendamento-2026-10);
-altre voci senza database richiedono un recupero esplicito.
+Il backup completo include i documenti incorporati e gli allegati, ma non
+recupera originali esterni già mancanti. Verifica e ripristino Web non hanno
+il limite previsto per un singolo caricamento; elaborano il JSON in memoria,
+quindi la dimensione gestibile dipende dalle risorse del computer.
 
 [Topologia dei dati](./docs/topologia-dati-flussi.md) ·
 [Sicurezza](./SECURITY.md) · [Limiti noti](./docs/known-limitations.md)
 
 ## Provalo
 
-Per partire dai sorgenti servono Git, **Node.js 24.x** e le dipendenze del
-progetto. Per valutazione e sviluppo usa fixture sintetiche.
+Per il codice corrente servono Git e **Node.js 24.x**. Usa dati sintetici
+per valutazione e sviluppo.
 
 ```sh
 git clone https://github.com/Wulfgardr/mediflow
@@ -357,31 +261,32 @@ nvm use
 npm ci
 ```
 
+`nvm use` vale per chi usa nvm; con altri gestori seleziona Node 24.
+La dipendenza nativa `better-sqlite3` deve corrispondere alla versione di Node.
 
-`nvm use` serve soltanto con nvm; altrimenti seleziona Node 24 con il tuo
-gestore. `better-sqlite3` deve corrispondere all’ABI del Node attivo.
-
-| Sistema | Doppio clic nella cartella del progetto |
+| Sistema | Apri nella cartella del progetto |
 | --- | --- |
 | macOS | `MediFlow.command` |
 | Windows | `MediFlow.cmd` |
 | Linux | `MediFlow.sh` (eseguibile; l'apertura dipende dal file manager) |
 
-Il browser chiede come vuoi usare MediFlow: **Nel browser**, **Per un agente**
-oppure, su macOS, **App per Mac** se l'app è già costruita. La scelta si può
-ricordare. La prima volta per ogni versione MediFlow prepara la build di
-produzione e ne mostra l'avanzamento. Il terminale conserva i log: lascialo
-aperto; **Ctrl+C** o **Arresta** chiudono i processi di questo avvio. L'accesso per agenti mantiene i controlli e le autorizzazioni
-esistenti e riserva lo standard output al protocollo del client.
+Scegli **Nel browser**, **Per un agente** oppure, su macOS, **App per Mac**
+se l'app è già costruita. Il lanciatore prepara la build di produzione
+quando serve e mostra l'avanzamento; la prima preparazione può richiedere
+alcuni minuti. Il terminale conserva i log: lascialo aperto. **Ctrl+C** o
+**Arresta** chiudono i processi avviati dal lanciatore.
 
-Il lanciatore propone `npm ci` se mancano le dipendenze, chiedendo conferma
-prima di accedere al registro npm. Usa sempre la produzione: quando manca una
-build verificata della revisione corrente, esegue `npm run build`. La prima
-preparazione può richiedere diversi minuti. Con modifiche non committate,
-la produzione si ferma e si può scegliere esplicitamente **Apri per sviluppo**.
+Se mancano dipendenze, il lanciatore propone `npm ci` e chiede conferma
+prima di collegarsi al registro npm. La produzione richiede una cartella
+Git pulita; con modifiche non committate scegli **Apri per sviluppo**.
+**Ricorda la mia scelta** conserva la preferenza; **Cambia** riapre il menu.
 
-**Ricorda la mia scelta** evita di scegliere al prossimo avvio. **Cambia**
-nella pagina di attesa riapre le scelte; dal terminale usa:
+Questi ingressi appartengono al codice successivo alla 0.9.0. Per la versione
+pubblicata segui il [README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md).
+Il lanciatore non include Node e non attiva servizi AI o connettori opzionali.
+
+<details>
+<summary><strong>Avvio da terminale e configurazione</strong></summary>
 
 ```sh
 node scripts/mediflow.mjs --scegli
@@ -390,87 +295,63 @@ node scripts/mediflow.mjs --scelta web --senza-browser
 node scripts/mediflow.mjs install-desktop-entry
 ```
 
-Senza display o quando il browser non si apre, compare un menu nel terminale.
-Senza terminale interattivo usa `--scelta` e `--senza-browser`. Il server web
+Senza display o se il browser non si apre compare un menu nel terminale.
+Senza terminale interattivo usa `--scelta` e `--senza-browser`. Il server Web
 usa `http://127.0.0.1:3000` (oppure `PORT`); la pagina Avvio usa una porta libera.
-Il riuso richiede la ricevuta di questa cartella e il fingerprint del server.
-Un'altra istanza non viene arrestata né adottata. `main` si ferma se mancano
-aggiornamenti già noti a Git, senza scaricarli. Ollama, se installato, parte
-in background senza ritardare l'apertura.
+Una sessione già attiva viene riusata solo se appartiene alla stessa cartella
+e alla stessa revisione. Altre istanze non vengono adottate o arrestate.
+`main` si ferma se mancano aggiornamenti già noti a Git, senza scaricarli.
+Ollama, se installato, parte in background senza ritardare l'apertura.
 
-Questi ingressi appartengono al sorgente corrente; il tag `v0.9.0` conserva
-i suoi ingressi originali. Il lanciatore non attiva provider AI, servizio WHO
-o altri connettori opzionali. Non è un installer con Node incluso e non
-certifica la parità nativa su Windows e Linux. Le evidenze per piattaforma
-restano nello [stato del sistema](./docs/STATE_OF_THE_SYSTEM.md).
+Preferenze e ricevute del lanciatore sono separate per cartella sorgente
+nella configurazione utente, fuori da `MEDIFLOW_DATA_DIR`. Le condizioni
+per il primo avvio dell'archivio sono nell'[ADR 0138](./docs/adr/0138-explicit-data-directory-bootstrap.md#emendamento-2026-10).
 
-<details>
-<summary><strong>Apple: account gratuito, Xcode e distribuzione</strong></summary>
-
-Per compilare e testare le applicazioni Apple serve Xcode completo: le sole
-Command Line Tools non coprono SwiftUI e XCTest. Sono verifiche del seguito
-nativo, non condizioni di consegna della release sorgente 0.9.0.
-
-Un Apple Account gratuito consente sviluppo e prove personali entro i limiti
-del Personal Team; Developer ID e notarizzazione Mac richiedono l’Apple
-Developer Program. Non sono prerequisiti per pubblicare il codice sorgente.
-
+Per compilare le app Apple serve Xcode completo. Un Apple Account gratuito
+consente prove personali nei limiti del Personal Team; Developer ID e
+notarizzazione Mac richiedono l'Apple Developer Program.
 [Guida nativa](./docs/NATIVE.md) ·
-[Verifiche e limiti della candidata 0.8.6](./docs/analysis/2026-09-07-086-release-verification.md) ·
-[Confronto ufficiale Apple](https://developer.apple.com/support/compare-memberships/)
+[Confronto degli account Apple](https://developer.apple.com/support/compare-memberships/).
 
 </details>
 
 ## Per chi sviluppa
 
-La repository operativa è soltanto [`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow).
-Quella privata precedente è archiviata. Codice pubblicabile e documenti vivono
-qui, senza un passaggio di esportazione private-to-OSS; database, credenziali,
-fonti riservate e risultati clinici restano fuori da Git.
+Codice, issue, pull request e release sono nella repository pubblica
+[`Wulfgardr/mediflow`](https://github.com/Wulfgardr/mediflow).
+La precedente repository privata è archiviata. Database clinici, credenziali
+e fonti riservate restano fuori da Git.
 
-[Topologia repository](./docs/repository-topology.md) ·
-[Architettura](./ARCHITECTURE.md) · [Contribuire](./CONTRIBUTING.md)
+[Contribuire](./CONTRIBUTING.md) · [Architettura](./ARCHITECTURE.md) ·
+[Topologia della repository](./docs/repository-topology.md) ·
+[Specifica visiva](./docs/design/punto-inchiostro/01-specifica.md)
 
 <details>
-<summary><strong>Headless: cosa parte e cosa non autorizza</strong></summary>
+<summary><strong>Accesso per agenti (Headless)</strong></summary>
 
-**Mini e accesso headless sono percorsi distinti.** Mini è la versione a riga
-di comando prevista nella roadmap 1.0. L’accesso headless è invece il contratto
-con cui un client agente autorizzato può usare capacità nominate di MediFlow;
-Codex è mostrato soltanto come uno dei client possibili.
+Un client agente autorizzato usa comandi MediFlow con permessi delimitati.
+Gli strumenti non aprono direttamente SQLite. Il Supervisor avvia Web e MCP
+come processi distinti; MCP comunica tramite stdio e RPC AIP.
 
 ```sh
 npm run build -- --webpack
 npm run mcp:intelligent-host:production
 ```
 
+Le funzioni riferite a un paziente richiedono autenticazione, selezione e
+attivazione esplicita nell'interfaccia fidata. Revoca, logout, cambio di
+selezione o scadenza chiudono l'autorizzazione. Le scritture cliniche mantengono
+i controlli specifici del sistema. Il pianificatore semantico usa soltanto
+strumenti approvati. Mini, prevista nella roadmap 1.0, segue un percorso distinto.
 
-Usare MediFlow senza attraversare le schermate non significa aggirarne i
-controlli. Il Supervisor mantiene Web e MCP come processi figli separati sul
-Mac; MCP comunica tramite stdio. Per una funzione riferita al paziente servono
-autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
-Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
-*grant*, senza trasferirla all’agente.
+![Illustrazione dell'accesso per agenti con lista di lavoro, polifarmacia e fonti](./docs/images/getmediflow-086/headless-agent.png)
 
-![Illustrazione storica dell’accesso headless con worklist, polifarmacia e fonti nominate](./docs/images/getmediflow-086/headless-agent.png)
+*Illustrazione con dati di esempio del 21 settembre 2026: non è una sessione
+agente collegata. [Provenienza storica](./docs/images/getmediflow-086/manifest.json).*
 
-*Illustrazione sintetica del 21 settembre 2026, conservata con la sua
-[provenienza storica](./docs/images/getmediflow-086/manifest.json); non è una
-cattura dell’interfaccia attuale né una sessione Codex collegata.*
-
-La schermata racconta una richiesta che non si risolve consultando una singola
-pagina: il client verifica le capacità concesse, scandisce una worklist,
-incrocia polifarmacia, diario, misurazioni e documenti, quindi prepara una coda
-di revisione senza scrivere nella cartella. Su
-[Get MediFlow](https://getmediflow.dev/#cofano) l’animazione può essere messa in
-pausa, percorsa avanti e indietro o riavviata. È una dimostrazione con dati
-inventati: non è una sessione Codex collegata e non prova disponibilità nella
-release 0.8.6.
-
-Questo accesso non concede un diritto generale sul database o scritture
-cliniche fuori dai controlli applicabili. La 0.8.6 non richiede né qualifica
-un client agente specifico: si usano soltanto i comandi MediFlow nominati.
-Anche il pianificatore semantico resta limitato agli strumenti approvati.
+La [dimostrazione sul sito](https://getmediflow.dev/#cofano) mostra una lista
+di lavoro e una coda di revisione senza scrivere nella cartella.
+[Contratto Headless e Fabric](./docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md).
 
 </details>
 
@@ -478,57 +359,37 @@ Anche il pianificatore semantico resta limitato agli strumenti approvati.
 
 | Per… | Parti da… |
 | --- | --- |
-| Conoscere il progetto senza leggere il codice | [Get MediFlow](https://getmediflow.dev) |
-| Distinguere implementazione e prove ancora necessarie | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [verifiche della candidata 0.8.6](./docs/analysis/2026-09-07-086-release-verification.md) |
-| Individuare il documento di riferimento di un tema | [Mappa della documentazione](./docs/README.md) |
-| Capire ruoli delle piattaforme e parità | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
+| Conoscere il prodotto | [Get MediFlow](https://getmediflow.dev) e [Inizia qui](./docs/start-here.md) |
+| Consultare prove e limiti | [Stato del sistema](./docs/STATE_OF_THE_SYSTEM.md) e [release 0.9.0](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0) |
+| Trovare il riferimento di un tema | [Mappa della documentazione](./docs/README.md) |
+| Confrontare le piattaforme | [Guida nativa](./docs/NATIVE.md) e [matrice di parità](./docs/parity-matrix.md) |
 | Ricostruire una decisione tecnica | [ADR](./docs/adr/README.md) |
-| Capire come viene presentato il prodotto | [Get MediFlow e linea editoriale](./docs/getmediflow-editorial-proposal.md) |
 | Trovare un documento preciso | [Indice completo](./docs/markdown-index.md) |
-
-I percorsi SISS/FSE restano passaggi assistiti verso i canali ufficiali,
-indicati come handoff o `webapp-assisted`. L’export FHIR segue ADR0081;
-la parità FHIRv2 resta da verificare.
 
 ## Sviluppo assistito
 
-MediFlow è sviluppato con l’assistenza di **Codex e Claude Code** per
+MediFlow è sviluppato con l'assistenza di **Codex e Claude Code** per
 progettazione, implementazione, revisione e verifica. Direzione e
-responsabilità del progetto rimangono dell’autore.
+responsabilità del progetto rimangono dell'autore.
 
 <details>
-<summary><strong>Disclosure e storico dei token per provider, modello ed effort</strong></summary>
+<summary><strong>Strumenti e consumi dello sviluppo</strong></summary>
 
-![Storico dei token attribuiti a MediFlow, per provider e modello; effort su una serie Codex distinta e parziale](./screenshots/token-models.svg)
+![Storico dei token di MediFlow per provider e modello; effort Codex su una serie parziale distinta](./screenshots/token-models.svg)
 
-Lo storico include solo registrazioni associate alle **checkout verificate di
-MediFlow**, cache inclusa. Altri progetti e attribuzioni incerte sono esclusi:
-la copertura è parziale e i token non misurano costo o qualità del codice.
-Il provider è dedotto dall’identificatore del modello e resta distinto
-dall’ambiente che registra l’uso. L’effort compare solo dove è registrato,
-in una serie con copertura propria che non si somma ai totali storici.
+Lo storico include le registrazioni attribuite alle cartelle di lavoro
+verificate di MediFlow, cache inclusa. La copertura è parziale; i token non
+misurano costo o qualità del codice. Il provider è dedotto dall'identificatore
+del modello ed è distinto dall'ambiente che registra l'uso. L'effort compare
+solo dove registrato, in una serie separata dai totali storici.
 
-[Fonti, copertura, tabelle complete e dati riproducibili](./docs/development-usage.md)
-· [Crediti degli strumenti](./CREDITS.md#sviluppo-assistito).
+[Fonti, copertura e dati riproducibili](./docs/development-usage.md) ·
+[Crediti degli strumenti](./CREDITS.md#sviluppo-assistito).
 
 </details>
 
 ## Licenza e contributi
 
-Il codice è pubblicato sotto [licenza MIT](./LICENSE), perché sia possibile
-esaminarlo e contribuire al suo sviluppo. Dataset, terminologie, modelli e
-fonti esterne conservano le rispettive condizioni d’uso: la licenza di
-MediFlow non le sostituisce. [Crediti e attribuzioni](./CREDITS.md).
-
-
-Il repertorio protesica supporta fonti personali distinte, originali locali e
-snapshot di provenienza nelle nuove prescrizioni scelte dal catalogo. Importa
-CSV UTF-8 con virgola o punto e virgola e mappatura colonne; per XLSX occorre
-prima esportare in CSV. Catalogo, originali e snapshot di provenienza sono in
-chiaro nel database locale. Vedi [manuale](docs/MANUALE.md#fonti-personali-della-protesica).
-
-Il [catalogo ICD-11 incorporato](docs/icd-who-setup.md) cerca categorie per codice
-o titolo inglese in SQLite. Dati WHO CC BY-ND 3.0 IGO, separati dalla licenza MIT:
-nessun sinonimo o postcoordinazione dell’API, nessuna scrittura clinica automatica.
-Il bundle include l’archivio WHO ufficiale non modificato e il manifest verificato:
-35.664 categorie con codice. Il primo uso lo importa nel DB di repertorio dedicato.
+Il codice è pubblicato con [licenza MIT](./LICENSE). Dataset, terminologie,
+modelli e fonti esterne conservano le rispettive condizioni d'uso.
+[Crediti e attribuzioni](./CREDITS.md).
