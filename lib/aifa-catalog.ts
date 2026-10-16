@@ -1,3 +1,5 @@
+export const AIFA_DOWNLOAD_URL = 'https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv';
+export const AIFA_DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024;
 /* @Codex */
 
 export const AIFA_CATALOG_MANIFEST_SETTING_KEY = 'aifaCatalogManifest';
@@ -5,7 +7,31 @@ export const AIFA_CATALOG_SOURCE = 'Agenzia Italiana del Farmaco (AIFA)';
 export const AIFA_CATALOG_DEFAULT_SOURCE_URL = 'https://www.aifa.gov.it/open-data';
 export const AIFA_REUSE_TERMS_URL = 'https://www.aifa.gov.it/copyright';
 
-export type AifaCatalogManifestInput = {
+export type AifaSourceMetadata = {
+    etag?: string;
+    lastModified?: string;
+    contentLength?: number;
+};
+
+export function aifaSourceMetadata(headers: Headers): AifaSourceMetadata {
+    const etag = headers.get('etag');
+    const modified = headers.get('last-modified');
+    const length = headers.get('content-length');
+    return {
+        ...(etag && /^(?:W\/)?"[\x21\x23-\x7e]{1,500}"$/.test(etag) ? { etag } : {}),
+        ...(modified && Number.isFinite(Date.parse(modified)) && new Date(modified).toUTCString() === modified ? { lastModified: new Date(modified).toUTCString() } : {}),
+        ...(length && /^\d+$/.test(length) && Number.isSafeInteger(Number(length)) ? { contentLength: Number(length) } : {}),
+    };
+}
+
+export function aifaConditionalHeaders(metadata: AifaSourceMetadata): Record<string, string> {
+    return {
+        ...(metadata.etag ? { 'If-None-Match': metadata.etag } : {}),
+        ...(metadata.lastModified ? { 'If-Modified-Since': metadata.lastModified } : {}),
+    };
+}
+
+export type AifaCatalogManifestInput = AifaSourceMetadata & {
     sourceUrl: string;
     downloadedAt: string;
     version: string;
@@ -128,7 +154,7 @@ function parsePrice(value: string | null): number | null {
     return Number.isFinite(amount) ? Math.round(amount * 100) : null;
 }
 
-export function parseAifaCsv(text: string): AifaCsvParseResult {
+export function parseAifaCsv(text: string, requirePromisedColumns = false): AifaCsvParseResult {
     const firstLine = text.split(/\r?\n/, 1)[0] || '';
     const delimiter = firstLine.includes(';') ? ';' : ',';
     const records = parseCsvRecords(text, delimiter);
@@ -140,8 +166,8 @@ export function parseAifaCsv(text: string): AifaCsvParseResult {
         name: resolveColumn(headers, HEADER_ALIASES.name, true),
         packaging: resolveColumn(headers, HEADER_ALIASES.packaging),
         company: resolveColumn(headers, HEADER_ALIASES.company),
-        atc: resolveColumn(headers, HEADER_ALIASES.atc),
-        activePrinciple: resolveColumn(headers, HEADER_ALIASES.activePrinciple),
+        atc: resolveColumn(headers, HEADER_ALIASES.atc, requirePromisedColumns),
+        activePrinciple: resolveColumn(headers, HEADER_ALIASES.activePrinciple, requirePromisedColumns),
         drugClass: resolveColumn(headers, HEADER_ALIASES.drugClass),
         price: resolveColumn(headers, HEADER_ALIASES.price),
     };
@@ -201,7 +227,12 @@ export function validateAifaManifestInput(input: AifaCatalogManifestInput): Aifa
         throw new Error('Data di scarico AIFA non valida');
     }
     if (!version || version.length > 120) throw new Error('Versione dataset AIFA non valida');
-    return { sourceUrl: sourceUrl.toString(), downloadedAt, version };
+    const metadata = aifaSourceMetadata(new Headers({
+        ...(input.etag ? { etag: input.etag } : {}),
+        ...(input.lastModified ? { 'last-modified': input.lastModified } : {}),
+        ...(input.contentLength !== undefined ? { 'content-length': String(input.contentLength) } : {}),
+    }));
+    return { sourceUrl: sourceUrl.toString(), downloadedAt, version, ...metadata };
 }
 
 export function buildAifaCatalogManifest(
@@ -239,13 +270,12 @@ export function parseStoredAifaCatalogManifest(value: string | null | undefined)
             || typeof parsed.sourceUrl !== 'string'
             || typeof parsed.downloadedAt !== 'string'
             || typeof parsed.version !== 'string') return null;
-        buildAifaCatalogManifest(parsed as AifaCatalogManifestInput, {
+        return buildAifaCatalogManifest(parsed as AifaCatalogManifestInput, {
             sha256: parsed.sha256,
             fileName: parsed.fileName,
             rowCount: parsed.rowCount,
             importedAt: parsed.importedAt,
         });
-        return parsed as AifaCatalogManifest;
     } catch {
         return null;
     }

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
 import * as owner from '../../security/web-auth-lifecycle-owner-adapter';
-import { createLocalProviderOnboardingService } from './local-provider-onboarding-service';
+import { createLocalProviderOnboardingService, LocalProviderOnboardingError } from './local-provider-onboarding-service';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { OllamaLocalityError, attestLocalOllamaModel } from '../ollama-locality';
 import { buildFunctionStatus } from '../../function-status';
@@ -83,7 +83,7 @@ test('missing settings and unsupported local port cannot choose a fallback or co
 });
 
 test('ordinary network/model failure leaves lifecycle missing and redacts transport details', async () => {
-    for (const [error, code] of [[new Error('private transport detail'), 'provider_unreachable'], [new OllamaLocalityError('model_not_local'), 'model_absent_or_not_local']] as const) {
+    for (const [error, code] of [[new Error('private transport detail'), 'provider_unreachable'], [new OllamaLocalityError('model_not_local'), 'model_absent_or_not_local'], [new OllamaLocalityError('provider_unready'), 'provider_unready']] as const) {
         const f = fixture(async () => { throw error; });
         await assert.rejects(f.service.activate((await f.service.inspect()).revision), new RegExp(code));
         assert.equal(f.lifecycle.service.read().status, 'denied');
@@ -138,7 +138,7 @@ test('timeout is bounded even if an ordinary transport finishes late; no lifecyc
     assert.equal(f.lifecycle.service.read().status, 'denied');
 });
 
-test('canonical attestor keeps version, tags, show, preload and running digest checks on synthetic metadata', async context => {
+for (const serverVersion of ['0.33.3', '0.40.4']) test(`canonical attestor ${serverVersion} keeps version, tags, show, preload and running digest checks on synthetic metadata`, async context => {
     const seen: string[] = [];
     const model = { name: 'synthetic-local', model: 'synthetic-local', size: 4096, digest: 'b'.repeat(64) };
     context.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
@@ -148,7 +148,7 @@ test('canonical attestor keeps version, tags, show, preload and running digest c
             assert.deepEqual(JSON.parse(init!.body as string), { model: 'synthetic-local', keep_alive: '30m' });
             return Response.json({ model: 'synthetic-local', done: true });
         }
-        if (url.pathname === '/api/version') return Response.json({ version: '0.33.3' });
+        if (url.pathname === '/api/version') return Response.json({ version: serverVersion });
         if (url.pathname === '/api/tags' || url.pathname === '/api/ps') return Response.json({ models: [model] });
         if (url.pathname === '/api/show') return Response.json({ details: { family: 'synthetic' } });
         throw new Error('Unexpected metadata operation');
@@ -299,4 +299,21 @@ test('revocation between cancellation and resumed read remains terminal and does
     f.lifecycle.control.revoke({ expectedVersion: admitted.version });
     const reread = await f.service.inspect(); assert.equal(reread.state, 'revoked'); assert.equal(reread.canActivate, false);
     await assert.rejects(f.service.activate(reread.revision), /revoked/); assert.equal(f.calls(), 2);
+});
+
+test('versione non ammessa conserva i dettagli e non ammette il provider', async context => {
+    const paths: string[] = [];
+    context.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+        paths.push(new URL(String(input)).pathname);
+        return Response.json({ version: '0.41.0' });
+    });
+    const f = fixture(attestLocalOllamaModel);
+    await assert.rejects(f.service.activate((await f.service.inspect()).revision), error => {
+        assert.ok(error instanceof LocalProviderOnboardingError);
+        assert.equal(error.code, 'provider_version_unsupported');
+        assert.deepEqual(error.versionMismatch, { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' });
+        return true;
+    });
+    assert.deepEqual(paths, ['/api/version']);
+    assert.equal(f.lifecycle.service.read().status, 'denied');
 });
