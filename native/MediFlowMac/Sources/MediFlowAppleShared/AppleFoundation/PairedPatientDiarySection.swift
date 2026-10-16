@@ -217,7 +217,7 @@ struct PairedPatientDiarySection: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("entry-content-locked-\(entry.id)")
                         } else {
-                            Text(ClinicalContentRendering.attributedString(from: entry.content))
+                            ClinicalContentText(entry.content)
                                 .chartProse()
                                 .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
                         }

@@ -1,5 +1,9 @@
 import XCTest
 @testable import MediFlowAppleShared
+#if canImport(AppKit)
+import AppKit
+import SwiftUI
+#endif
 
 /* @Codex */
 final class ClinicalContentRenderingTests: XCTestCase {
@@ -22,6 +26,107 @@ final class ClinicalContentRenderingTests: XCTestCase {
         let rendered = ClinicalContentRendering.attributedString(from: malformed)
         XCTAssertEqual(String(rendered.characters), malformed)
     }
+
+    #if canImport(AppKit)
+    @MainActor
+    func testSwiftUIContentDrawsNestedMarkersAtDifferentIndents() throws {
+        let content = ClinicalContentText("<ol><li>Prima voce<ol><li>Seconda voce</li></ol></li></ol>")
+            .frame(width: 400, height: 120, alignment: .topLeading)
+        let host = NSHostingView(rootView: content)
+        host.frame = NSRect(x: 0, y: 0, width: 400, height: 120)
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let background = try XCTUnwrap(bitmap.colorAt(x: bitmap.pixelsWide - 1, y: bitmap.pixelsHigh - 1)?.usingColorSpace(.deviceRGB))
+        var lineStarts: [Int] = []
+        var bandStart: Int?
+        for y in 0..<bitmap.pixelsHigh {
+            var rowStart: Int?
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                let difference = abs(color.redComponent - background.redComponent)
+                    + abs(color.greenComponent - background.greenComponent)
+                    + abs(color.blueComponent - background.blueComponent)
+                    + abs(color.alphaComponent - background.alphaComponent)
+                if difference > 0.5 { rowStart = x; break }
+            }
+            if let rowStart {
+                bandStart = min(bandStart ?? rowStart, rowStart)
+            } else if let start = bandStart {
+                lineStarts.append(start)
+                bandStart = nil
+            }
+        }
+        if let bandStart { lineStarts.append(bandStart) }
+        XCTAssertEqual(lineStarts.count, 2, "Expected two readable list lines: \(lineStarts)")
+        guard lineStarts.count == 2 else { return }
+        XCTAssertGreaterThan(lineStarts[1], lineStarts[0] + 20)
+    }
+
+    @MainActor
+    func testNestedOrderedListRetainsItsVisualIndentation() throws {
+        let html = "<ol><li>Primo controllo sintetico<ol><li>Dettaglio sintetico subordinato</li></ol></li><li>Secondo controllo</li></ol>"
+        let view = ClinicalContentNativeTextView()
+        view.setContent(ClinicalContentRendering.nativeAttributedString(from: html))
+        _ = view.fittingSize(for: 400)
+
+        let parent = try glyphRect("Primo", in: view)
+        let child = try glyphRect("Dettaglio", in: view)
+        let sibling = try glyphRect("Secondo", in: view)
+        XCTAssertGreaterThan(child.minX, parent.minX + 20)
+        XCTAssertEqual(sibling.minX, parent.minX, accuracy: 0.5)
+        XCTAssertGreaterThan(child.minY, parent.minY)
+        XCTAssertTrue(view.string.contains("2\tSecondo"))
+        XCTAssertFalse(view.isEditable)
+        XCTAssertTrue(view.isSelectable)
+    }
+
+    @MainActor
+    func testNestedQuotesAndListWrappingRetainTheirParagraphLayout() throws {
+        let html = "<p>Prosa sintetica</p><blockquote><p>Citazione sintetica</p><blockquote><p>Interna sintetica</p></blockquote></blockquote><ol><li>Voce sintetica<ol><li>Annidata sintetica con una descrizione sufficientemente lunga per andare a capo e mantenere il rientro fino alla parola finale</li></ol></li></ol>"
+        let view = ClinicalContentNativeTextView()
+        view.setContent(ClinicalContentRendering.nativeAttributedString(from: html))
+        let narrow = view.fittingSize(for: 220)
+        let prose = try glyphRect("Prosa", in: view)
+        let quote = try glyphRect("Citazione", in: view)
+        let nestedQuote = try glyphRect("Interna", in: view)
+        XCTAssertGreaterThan(quote.minX, prose.minX)
+        XCTAssertGreaterThan(nestedQuote.minX, quote.minX)
+
+        let first = try glyphRect("Annidata", in: view)
+        let wrapped = try glyphRect("finale", in: view)
+        XCTAssertGreaterThan(wrapped.minY, first.minY)
+        let manager = try XCTUnwrap(view.layoutManager)
+        let range = (view.string as NSString).range(of: "finale")
+        let glyph = manager.glyphIndexForCharacter(at: range.location)
+        XCTAssertEqual(manager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil).minX, first.minX, accuracy: 0.5)
+        XCTAssertGreaterThan(narrow.height, view.fittingSize(for: 600).height)
+    }
+
+    @MainActor
+    func testNativeContentKeepsInlineMarksLinksAndFont() throws {
+        let rendered = ClinicalContentRendering.nativeAttributedString(from: "<p><strong>Grassetto</strong> <em>Corsivo</em> <u>Sottolineato</u> <s>Barrato</s> <a href=\"https://example.invalid/nota\">Fonte</a></p>")
+        func attributes(_ text: String) -> [NSAttributedString.Key: Any] {
+            rendered.attributes(at: (rendered.string as NSString).range(of: text).location, effectiveRange: nil)
+        }
+        XCTAssertTrue(try XCTUnwrap(attributes("Grassetto")[.font] as? NSFont).fontDescriptor.symbolicTraits.contains(.bold))
+        XCTAssertTrue(try XCTUnwrap(attributes("Corsivo")[.font] as? NSFont).fontDescriptor.symbolicTraits.contains(.italic))
+        XCTAssertEqual(attributes("Sottolineato")[.underlineStyle] as? Int, 1)
+        XCTAssertEqual(attributes("Barrato")[.strikethroughStyle] as? Int, 1)
+        XCTAssertEqual((attributes("Fonte")[.link] as? URL)?.absoluteString, "https://example.invalid/nota")
+        XCTAssertEqual(try XCTUnwrap(attributes("Fonte")[.font] as? NSFont).pointSize, 13.5)
+    }
+
+    @MainActor
+    private func glyphRect(_ text: String, in view: ClinicalContentNativeTextView) throws -> CGRect {
+        let manager = try XCTUnwrap(view.layoutManager)
+        let container = try XCTUnwrap(view.textContainer)
+        let range = (view.string as NSString).range(of: text)
+        XCTAssertNotEqual(range.location, NSNotFound)
+        let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        return manager.boundingRect(forGlyphRange: glyphs, in: container)
+    }
+    #endif
 
     /// The template inserts structure, never prose.
     ///
