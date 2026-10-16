@@ -1678,6 +1678,18 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             guard current() else { throw CancellationError() }
             return try await client.createPatient(payload: payload, credentials: credentials,
                 sessionCookie: cookie, ambulatoryId: scope)
+        }, didFinish: { [weak self] in
+            guard let self, current() else { return }
+            do {
+                let patients = try await client.fetchPatients(credentials: credentials, sessionCookie: cookie,
+                    ambulatoryId: scope, includeDiagnoses: true)
+                guard current() else { return }
+                self.patients = patients.map { PatientFieldCrypto.decryptSummary($0, masterKey: self.masterKey) }
+            } catch {
+                guard current() else { return }
+                self.invalidateCacheAfterReadFailure(error)
+                self.applyPatientLoadFailure(error)
+            }
         })
     }
 
