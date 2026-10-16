@@ -1,4 +1,4 @@
-/* @Codex: shared behavioral oracle for real routes and negative fixture controls. */
+/* shared behavioral oracle for real routes and negative fixture controls. */
 import assert from 'node:assert/strict';
 
 function independentWalConnections(h) {

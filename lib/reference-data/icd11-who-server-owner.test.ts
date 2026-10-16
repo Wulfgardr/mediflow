@@ -1,4 +1,4 @@
-/* @Codex */
+import { hasSideEffectImport } from '../../scripts/test-support/source-structure.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -37,7 +37,7 @@ function isOwnerError(code: string) {
 
 test('server-only singleton facade constructs exactly one fixed process owner', () => {
     const source = readFileSync(new URL('./icd11-who-server-owner.ts', import.meta.url), 'utf8');
-    assert.match(source, /^\/\* @Codex \*\/\nimport 'server-only';/u);
+    assert.equal(hasSideEffectImport(source, 'server-only'), true);
     assert.equal(source.match(/\bcreateIcd11WhoServerProcessOwner\s*\(/gu)?.length, 1);
     assert.doesNotMatch(source, /process\.env|globalThis|\bfetch\b|endpoint|proxy|client|secret|token/iu);
 });

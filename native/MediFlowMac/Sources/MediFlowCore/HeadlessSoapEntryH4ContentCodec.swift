@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 
 extension HeadlessSoapEntryH4Codec {

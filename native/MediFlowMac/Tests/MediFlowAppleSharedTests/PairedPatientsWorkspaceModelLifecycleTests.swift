@@ -3,7 +3,6 @@ import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     private let masterKey = SymmetricKey(data: Data(repeating: 7, count: 32))
 
@@ -24,7 +23,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         let vectors: Vectors
     }
 
-    /* @Codex: DOB is a nullable civil day, not an implicit default date. */
+    /* DOB is a nullable civil day, not an implicit default date. */
     func testPatientBirthDateUntouchedOmitsAbsentAndExistingValues() async throws {
         for original in [nil, ISO8601DateFormatter().date(from: "1980-02-29T16:30:00Z")] {
             let patient = detail(id: "p1", archived: false, version: 4, birthDate: original)
@@ -130,7 +129,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(payload)) as? [String: Any])
     }
 
-    /* @Codex */
     func testActiveListLoadRequestsAndDecryptsDiagnosisProjection() async throws {
         let raw = #"[{"code":"E11.9","description":"Diabete tipo 2"},{"code":"I10","description":"Ipertensione"}]"#
         let sealed = try XCTUnwrap(CryptoService.encryptField(raw, masterKey: masterKey))
@@ -151,7 +149,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(projectionRequests, [true])
     }
 
-    /* @Codex */
     func testPatientArchiveUsesOneSealedVersionedProfileUpdate() async throws {
         for reason in ["assigned_mmg", "deceased", "other"] {
             let active = detail(id: "p1", archived: false, version: 4)
@@ -383,7 +380,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(patients.first?.deletionReason, "doppione")
     }
 
-    /* @Codex: non-cooperative completions at both create suspension points. */
+    /* non-cooperative completions at both create suspension points. */
     func testCreatePatientRejectsLatePublicationAfterLifecycleChanges() async throws {
         for stage in ["create", "create-list"] {
             for transition in ["lock", "relogin", "cancel", "reopen", "dismiss", "task-cancel"] {
@@ -488,7 +485,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertNotNil(state.2)
     }
 
-    /* @Codex */
     func testCreatePatientRefreshFailureClosesOnlyTheSavedDraft() async throws {
         for editDuringRefresh in [false, true] {
             let gate = LifecycleLoadGate(["create-list"])
@@ -557,7 +553,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(projectionRequests, [true])
     }
 
-    /* @Codex */
     func testLockedPatientFieldsStayEmptyAndAreOmittedFromUpdate() async throws {
         let locked = try XCTUnwrap(CryptoService.encryptField(
             CryptoService.jsonEncode("dato protetto")!, masterKey: SymmetricKey(size: .bits256)))
@@ -669,7 +664,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertFalse(locked.2); XCTAssertTrue(locked.3)
     }
 
-    /* @Codex */
     func testNativeConfigurationConnectionNeedsLoginButNotPatientReadAndClearsOnLock() async {
         let source = LifecycleMockDataSource(loginResult: HomeBaseLoginResult(
             sessionCookie: "mediflow_session=synthetic-native", encryptedMasterKey: nil, salt: nil, id: "synthetic-admin"))
@@ -688,7 +682,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         await MainActor.run { XCTAssertNil(model.nativeOperatorConnection) }
     }
 
-    /* @Codex */
     func testActiveNativeSessionRetiresWhenAuthorityBindingChanges() async {
         for binding in ["serverURL", "tlsPin", "pairedClientId", "pairedClientToken"] {
             let source = LifecycleMockDataSource()
@@ -728,7 +721,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testLateLoginAfterPairingClearCannotRestoreOperatorState() async {
         let gate = LifecycleLoadGate(["login:1"])
         let source = LifecycleMockDataSource(
@@ -755,7 +747,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertNil(state.2)
     }
 
-    /* @Codex */
     func testLateLoginAfterConnectionChangeCannotInstallOperatorState() async {
         let gate = LifecycleLoadGate(["login:1"])
         let source = LifecycleMockDataSource(
@@ -781,7 +772,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertNil(state.1)
     }
 
-    /* @Codex */
     func testOlderLoginCannotReplaceNewerOperatorState() async {
         let gate = LifecycleLoadGate(["login:1"])
         let source = LifecycleMockDataSource(
@@ -808,7 +798,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(identity?.userId, "new-user")
     }
 
-    /* @Codex */
     func testStaleLoginFailuresCannotClearNewerState() async throws {
         let pin = String(repeating: "1", count: 4)
         let key = SymmetricKey(data: Data(repeating: 3, count: 32))
@@ -842,7 +831,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         }
     }
 
-    /* @Codex */
     func testCurrentLogin401StillClearsAuthState() async {
         let source = LifecycleMockDataSource(loginErrors: [.httpStatus(401, "current")])
         let model = await makeModel(source: source)
@@ -934,7 +922,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(state.0, 2); XCTAssertEqual(state.1, "b"); XCTAssertEqual(state.2, "Home-base aggiornato, dati ricaricati.")
     }
 
-    /* @Codex */
     func testForegroundRevisionDoesNotSupersedeActivePatientLoad() async {
         let b = detail(id: "b", archived: false, version: 1)
         let gate = LifecycleLoadGate(["patient:1"])
@@ -1016,7 +1003,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         try await assertGoldenFixtureUnlockAndRotation(version: 2)
     }
 
-    // @Codex: ADR 0106 retires local clinical authority after confirmed rotation.
+    // ADR 0106 retires local clinical authority after confirmed rotation.
     func testChangePinSuccessClearsSessionPresentationAndRequiresExplicitLogin() async {
         let source = LifecycleMockDataSource()
         let patient = detail(id: "p1", archived: false, version: 4)
@@ -1071,7 +1058,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         )
     }
 
-    // @Codex: a 409 can follow the credential CAS when retirement is unconfirmed.
+    // a 409 can follow the credential CAS when retirement is unconfirmed.
     func testChangePinAmbiguousOutcomesClearSessionAndDraftsWithoutRetry() async {
         let errors: [HomeBaseClientError] = [
             .transport(.timeout), .transport(.unreachable), .contract,
@@ -1283,7 +1270,7 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         XCTAssertEqual(rotatedSalt.count, 16)
         XCTAssertEqual(rotatedBytes, data(hex: fixture.inputs.rawMasterKeyHex))
 
-        // @Codex: cryptographic bytes are preserved on the host; local access is
+        // cryptographic bytes are preserved on the host; local access is
         // retired and a second mutation requires a new explicit login (ADR 0106).
         await model.changePin(currentPin: "2468", newPin: "8642")
         let callsAfterSuccess = await source.pinChangeCalls
@@ -1360,7 +1347,6 @@ final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
         )
     }
 
-    /* @Codex */
     private func detail(
         id: String,
         archived: Bool,
@@ -1408,7 +1394,6 @@ private final class Counter {
     var value = 0
 }
 
-/* @Codex */
 private actor LifecycleLoadGate {
     private let keys: Set<String>
     private var reached: Set<String> = []
@@ -1468,12 +1453,12 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     private var revisionFetchCount = 0
     private let loginResults: [HomeBaseLoginResult]
     private let pinChangeError: HomeBaseClientError?
-    private let pinChangeCancelled: Bool // @Codex
+    private let pinChangeCancelled: Bool
     private let loginErrors: [HomeBaseClientError?]
     private let logoutError: HomeBaseClientError?
-    private let updateError: HomeBaseClientError? // @Codex
-    private let createError: HomeBaseClientError? // @Codex
-    private let createListError: HomeBaseClientError? // @Codex
+    private let updateError: HomeBaseClientError?
+    private let createError: HomeBaseClientError?
+    private let createListError: HomeBaseClientError?
     private(set) var lastUpdate: UpdateCall?
     private(set) var lastCreate: HomeBasePatientCreatePayload?
     private(set) var lastSoftDelete: DeleteCall?
@@ -1492,11 +1477,11 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         loginResults: [HomeBaseLoginResult] = [],
         loginErrors: [HomeBaseClientError?] = [],
         pinChangeError: HomeBaseClientError? = nil,
-        pinChangeCancelled: Bool = false, // @Codex
+        pinChangeCancelled: Bool = false,
         logoutError: HomeBaseClientError? = nil,
-        updateError: HomeBaseClientError? = nil, // @Codex
-        createError: HomeBaseClientError? = nil, // @Codex
-        createListError: HomeBaseClientError? = nil, // @Codex
+        updateError: HomeBaseClientError? = nil,
+        createError: HomeBaseClientError? = nil,
+        createListError: HomeBaseClientError? = nil,
         loadGate: LifecycleLoadGate? = nil,
         entriesByPatient: [String: [HomeBaseEntrySummary]] = [:],
         entryErrorsByPatient: [String: HomeBaseClientError] = [:],
@@ -1509,11 +1494,11 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         self.loginResults = loginResults.isEmpty ? [loginResult] : loginResults
         self.loginErrors = loginErrors
         self.pinChangeError = pinChangeError
-        self.pinChangeCancelled = pinChangeCancelled // @Codex
+        self.pinChangeCancelled = pinChangeCancelled
         self.logoutError = logoutError
-        self.updateError = updateError // @Codex
-        self.createError = createError // @Codex
-        self.createListError = createListError // @Codex
+        self.updateError = updateError
+        self.createError = createError
+        self.createListError = createListError
         self.loadGate = loadGate
         self.entriesByPatient = entriesByPatient
         self.entryErrorsByPatient = entryErrorsByPatient
@@ -1557,7 +1542,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
             salt: salt
         ))
         await loadGate?.pause("pin:\(pinChangeCalls.count)")
-        if pinChangeCancelled { throw CancellationError() } // @Codex
+        if pinChangeCancelled { throw CancellationError() }
         if let pinChangeError { throw pinChangeError }
         return HomeBaseMutationAcknowledgement(success: true)
     }
@@ -1622,8 +1607,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary] {
         includeDiagnosesRequests.append(includeDiagnoses)
-        await loadGate?.pause("create-list") // @Codex
-        if let createListError { throw createListError } // @Codex
+        await loadGate?.pause("create-list")
+        if let createListError { throw createListError }
         return try await fetchPatients(
             credentials: credentials, sessionCookie: sessionCookie,
             ambulatoryId: ambulatoryId, includeDeleted: false)
@@ -1700,7 +1685,7 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
     }
 
     func setDetail(_ detail: HomeBasePatientDetail) { details[detail.id] = detail }
-    func storedDetail(_ id: String) -> HomeBasePatientDetail? { details[id] } // @Codex
+    func storedDetail(_ id: String) -> HomeBasePatientDetail? { details[id] }
 
     func updatePatient(
         patientId: String,
@@ -1710,10 +1695,10 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement {
         lastUpdate = UpdateCall(patientId: patientId, payload: payload)
-        await loadGate?.pause("update") // @Codex
+        await loadGate?.pause("update")
         if let updateError { throw updateError }
         guard let current = details[patientId] else { throw HomeBaseClientError.httpStatus(404, "Not found") }
-        let birthDate: Date? // @Codex
+        let birthDate: Date?
         switch payload.birthDate {
         case .omit: birthDate = current.birthDate
         case .null: birthDate = nil
@@ -1781,8 +1766,8 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource {
         lastCreate = payload
-        await loadGate?.pause("create") // @Codex
-        if let createError { throw createError } // @Codex
+        await loadGate?.pause("create")
+        if let createError { throw createError }
         return HomeBaseCreatedResource(id: "created", version: 1)
     }
 

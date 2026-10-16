@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 export const PATIENT_OPEN_LOOPS_READ_OPERATION_V1 = 'mediflow.patient.open_loops.read.v1' as const;

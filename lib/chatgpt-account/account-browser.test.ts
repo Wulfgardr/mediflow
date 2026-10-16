@@ -1,4 +1,4 @@
-/* @Codex: browser state only, with an abort-ignoring synthetic fetcher. */
+/* browser state only, with an abort-ignoring synthetic fetcher. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdirSync } from 'node:fs';

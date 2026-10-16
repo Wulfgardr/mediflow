@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createProviderSecretBrokerV2, ProviderSecretBrokerV2Error } from './provider-secret-broker.ts';

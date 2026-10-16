@@ -1,4 +1,4 @@
-/* @Codex — fixed source provenance and structural projection validation, never an issuer. */
+/* fixed source provenance and structural projection validation, never an issuer. */
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync } from 'node:fs';

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { acquireOrdinaryApplicationContext } from './ordinary-application-context';

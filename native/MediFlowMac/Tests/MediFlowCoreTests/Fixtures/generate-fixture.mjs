@@ -67,7 +67,7 @@ const Database = require(join(process.cwd(), 'node_modules/better-sqlite3'));
 const db = new Database(dbPath);
 
 // Real web schema for patients (verbatim from the live medical.db).
-// @Codex: consume the existing nullable archive columns; old vectors stay unchanged.
+// consume the existing nullable archive columns; old vectors stay unchanged.
 db.exec(`CREATE TABLE "patients" (
     \`id\` text PRIMARY KEY NOT NULL,
     \`first_name\` text NOT NULL,

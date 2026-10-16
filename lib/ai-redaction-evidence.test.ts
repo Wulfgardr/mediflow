@@ -1,4 +1,4 @@
-/* @Codex — synthetic evidence diagnostics, never an installed-model admission. */
+/* synthetic evidence diagnostics, never an installed-model admission. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { evidenceHash, evaluateRedactionRuntimeEvidence, parseRedactionRuntimeIdentity, redactionIdentityDigest } from './ai-redaction-evidence';

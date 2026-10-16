@@ -12,9 +12,7 @@ import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import { activePatients } from '@/lib/patient-lifecycle';
 import { v4 as uuidv4 } from 'uuid';
 import type { PatientSummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
-/* @Codex */
 import {
     auditContextFromRequest,
     listChangedFields,
@@ -58,7 +56,6 @@ export async function GET(request: Request) {
             taxCode: patient.taxCode,
             isAdi: patient.isAdi ?? null,
             isArchived: patient.isArchived ?? null,
-            /* @Codex */
             version: patient.version,
             updatedAt: toIsoString(patient.updatedAt)
         }));
@@ -95,7 +92,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        /* @Codex: resolve the host actor before entering the synchronous transaction. */
+        /* resolve the host actor before entering the synchronous transaction. */
         const auditContext = auditContextFromRequest(request, actorSession);
         const requestId = requestIdFromRequest(request);
 

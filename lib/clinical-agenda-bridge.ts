@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';

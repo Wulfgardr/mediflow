@@ -1,4 +1,3 @@
-/* @Codex */
 import { performance } from 'node:perf_hooks';
 import { normalizeOllamaBaseUrl } from './ollama-base-url.ts';
 

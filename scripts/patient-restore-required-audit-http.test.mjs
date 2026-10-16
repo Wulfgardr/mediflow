@@ -1,4 +1,4 @@
-/* @Codex: C05 synthetic real HTTP admin restore; no auth seam or production DB. */
+/* C05 synthetic real HTTP admin restore; no auth seam or production DB. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';

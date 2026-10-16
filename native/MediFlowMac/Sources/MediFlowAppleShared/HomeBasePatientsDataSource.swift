@@ -1,6 +1,5 @@
 import Foundation
 
-/* @Codex */
 public enum HomeBaseClinicalListLimit {
     public static let boundaryMaximum = 100
 
@@ -42,7 +41,6 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDeleted: Bool
     ) async throws -> [HomeBasePatientSummary]
 
-    /* @Codex */
     func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary]
@@ -71,36 +69,31 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String
     ) async throws -> HomeBaseAmbulatoryMutationResponse
 
-    /* @Codex */
     func searchDrugs(
         query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseDrugSummary]
 
-    /* @Codex */
     func searchExemptions(
         query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseExemptionSummary]
 
-    /* @Codex: WHO is an explicit service, never a generic ICD fallback. */
+    /* WHO is an explicit service, never a generic ICD fallback. */
     func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse
     func readWHOReadiness(credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOReadiness
     func checkWHOCode(code: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOCodeCheckResponse
 
-    /* @Codex */
     func searchTerminology(
         system: String, query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseTerminologyItem]
 
-    /* @Codex */
     func resolveTerminology(
         system: String, code: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseTerminologyItem
 
-    /* @Codex */
     func fetchTerminologySystems(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseTerminologyRegistryEntry]
@@ -193,13 +186,11 @@ public protocol HomeBasePatientsDataSource: Sendable {
         ambulatoryId: String?, limit: Int
     ) async throws -> [HomeBaseCheckupSummary]
 
-    /* @Codex */
     func fetchScopedCheckups(
         dateFrom: Date?, dateTo: Date?, status: [String], limit: Int?,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseCheckupSummary]
 
-    /* @Codex */
     func fetchScopedEntries(
         type: String?, dateFrom: Date?, dateTo: Date?, limit: Int?,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -230,95 +221,78 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement
 
-    /* @Codex */
     func fetchServicePrescriptions(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseServicePrescriptionSummary]
 
-    /* @Codex */
     func createServicePrescription(
         payload: HomeBaseServicePrescriptionCreatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource
 
-    /* @Codex */
     func updateServicePrescription(
         prescriptionId: String, payload: HomeBaseServicePrescriptionUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement
 
-    /* @Codex */
     func fetchServicePrescriptionItems(
         patientId: String?, prescriptionId: String?,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseServicePrescriptionItemSummary]
 
-    /* @Codex */
     func createServicePrescriptionItem(
         payload: HomeBaseServicePrescriptionItemCreatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource
 
-    /* @Codex */
     func updateServicePrescriptionItem(
         itemId: String, payload: HomeBaseServicePrescriptionItemUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement
 
-    /* @Codex */
     func fetchServiceCatalog(
         query: String?, code: String?, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseServiceCatalogEntrySummary]
 
-    /* @Codex */
     func fetchServiceCatalogCount(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseCatalogCountResponse
 
-    /* @Codex */
     func fetchProstheticPrescriptions(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseProstheticPrescriptionSummary]
 
-    /* @Codex */
     func createProstheticPrescription(
         payload: HomeBaseProstheticPrescriptionCreatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseCreatedResource
 
-    /* @Codex */
     func updateProstheticPrescription(
         prescriptionId: String, payload: HomeBaseProstheticPrescriptionUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement
 
-    /* @Codex */
     func fetchNetworkCapabilities(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkCapabilitiesResponse
 
-    /* @Codex */
     func fetchNetworkIdentity(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkIdentitySummary
 
-    /* @Codex */
     func fetchNetworkNode(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkNodeSummary
 
-    /* @Codex */
     func fetchNetworkRevision(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkRevisionSummary
 
-    /* @Codex */
     func fetchFseValidatePatient(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseValidatePatientExportResponse
 
-    /* @Codex */
     func validateFseDocument(
         payload: HomeBaseFseDocumentValidationPayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -328,7 +302,7 @@ public protocol HomeBasePatientsDataSource: Sendable {
 // Restore the clinical-list boundary default the call sites rely on (the concrete
 // client keeps its own default; this covers calls made through the existential).
 public extension HomeBasePatientsDataSource {
-    /* @Codex: preserves existing/local conformers without claiming WHO support. */
+    /* preserves existing/local conformers without claiming WHO support. */
     func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse {
         throw HomeBaseWHOError.unsupported
     }
@@ -379,7 +353,6 @@ public extension HomeBasePatientsDataSource {
                                     limit: HomeBaseClinicalListLimit.boundaryMaximum)
     }
 
-    /* @Codex */
     func searchDrugs(
         query: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -389,7 +362,6 @@ public extension HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     func searchExemptions(
         query: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -399,7 +371,6 @@ public extension HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     func searchTerminology(
         system: String,
         query: String,
@@ -410,7 +381,6 @@ public extension HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     func fetchServiceCatalog(
         query: String? = nil,
         code: String? = nil,
@@ -421,7 +391,6 @@ public extension HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     func fetchServiceCatalog(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseServiceCatalogEntrySummary] {

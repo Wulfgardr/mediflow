@@ -1,4 +1,4 @@
-/* @Codex: source-boundary tests only; not mounted React/browser acceptance. */
+/* source-boundary tests only; not mounted React/browser acceptance. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';

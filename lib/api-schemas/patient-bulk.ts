@@ -1,4 +1,3 @@
-/* @Codex */
 import { z } from 'zod';
 
 const idSchema = z.string().trim().min(1);

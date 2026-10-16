@@ -4,12 +4,10 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
 import { asc, eq, desc, type SQL } from 'drizzle-orm';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
-/* @Codex */
 import { createWebAttachment } from '@/lib/attachment-web-create';
 
 // Only plaintext columns are sortable (name/path/data are ENC:). size/type are
@@ -48,7 +46,6 @@ const ATTACHMENT_RESPONSE_COLUMNS = {
     data: attachments.data,
 } as const;
 
-/* @Codex */
 function serializeAttachment<T extends { id: string; name: string; path: string }>(row: T): T {
     return {
         ...row,
@@ -57,7 +54,6 @@ function serializeAttachment<T extends { id: string; name: string; path: string 
 }
 
 export async function GET(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -100,7 +96,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     const archiveDenial = archiveWriteRequestDenial(request, session);
     if (archiveDenial) return archiveDenial;

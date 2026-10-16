@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import { snapshotSmartImportProjectionAttachment, type SmartImportProjectionAttachment } from '../smart-import-projection';
@@ -66,7 +65,6 @@ function bind(attachment: SmartImportProjectionAttachment, context: SmartImportS
     return Object.freeze(result);
 }
 
-/* @Codex */
 export function createSmartImportProjectionAttachmentBrowserNormalizer(sources: Sources = {}) {
     let nextSourceRevision = 1;
     const capture = (value: unknown, confirmed: true): SmartImportProjectionAttachment => {

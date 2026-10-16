@@ -1,12 +1,10 @@
 import type { DocumentInsight } from '../../db';
 
-/* @Codex */
 export type DedupedDocumentInsightsResult = {
     insights: DocumentInsight[];
     omittedCount: number;
 };
 
-/* @Codex */
 function normalizeDocumentContextText(value: string | null | undefined): string {
     return (value || '')
         .toLowerCase()
@@ -15,14 +13,12 @@ function normalizeDocumentContextText(value: string | null | undefined): string 
         .trim();
 }
 
-/* @Codex */
 function buildDateKey(value: unknown): string {
     const parsed = value instanceof Date ? value : new Date(value as string | number | Date);
     if (Number.isNaN(parsed.getTime())) return 'unknown-day';
     return parsed.toISOString().slice(0, 10);
 }
 
-/* @Codex */
 function buildSummaryAnchor(value: string | null | undefined): string {
     const normalized = normalizeDocumentContextText(value);
     if (!normalized) return '';
@@ -33,7 +29,6 @@ function buildSummaryAnchor(value: string | null | undefined): string {
         .join(' ');
 }
 
-/* @Codex */
 function deriveInsightKind(insight: DocumentInsight): string {
     const signal = normalizeDocumentContextText([
         insight.fileName,
@@ -49,7 +44,6 @@ function deriveInsightKind(insight: DocumentInsight): string {
     return 'generic';
 }
 
-/* @Codex */
 function buildInsightAnchor(insight: DocumentInsight): string {
     const firstDiagnosis = insight.extractedData?.diagnoses?.[0];
     if (firstDiagnosis?.code?.trim()) {
@@ -63,7 +57,6 @@ function buildInsightAnchor(insight: DocumentInsight): string {
     return `file:${buildSummaryAnchor(insight.fileName) || 'generic-document'}`;
 }
 
-/* @Codex */
 function scoreInsightForContext(insight: DocumentInsight): number {
     const medications = insight.extractedData?.medications?.length || 0;
     const diagnoses = insight.extractedData?.diagnoses?.length || 0;
@@ -98,12 +91,10 @@ function scoreInsightForContext(insight: DocumentInsight): number {
     return total;
 }
 
-/* @Codex */
 function buildDedupKey(insight: DocumentInsight): string {
     return `${buildDateKey(insight.date)}|${buildInsightAnchor(insight)}`;
 }
 
-/* @Codex */
 export function dedupeDocumentInsightsForContext(insights: DocumentInsight[]): DedupedDocumentInsightsResult {
     const buckets = new Map<string, { insight: DocumentInsight; score: number }>();
 

@@ -1,4 +1,3 @@
-/* @Codex */
 
 import crypto from 'node:crypto';
 import { types } from 'node:util';
@@ -113,7 +112,6 @@ function denyPrepared(binding: AttemptBinding | undefined, activation: Activatio
 }
 
 /** Starts one owner-generated login/setup operation; no caller metadata enters P2. */
-/* @Codex */
 export function beginWebAuth(kind: unknown): WebAuthAttempt | null {
     if (!enter()) return null;
     let binding: AttemptBinding | null = null; let attempt: WebAuthAttempt | null = null;
@@ -136,7 +134,6 @@ export function beginWebAuth(kind: unknown): WebAuthAttempt | null {
 }
 
 /** Prepares one exact owner ticket for a trusted future P3 activation seam. */
-/* @Codex */
 export function prepareWebAuthActivation(attempt: unknown, exactSessionId: unknown): WebAuthActivation | null {
     if (!enter()) return null;
     let binding: AttemptBinding | undefined; let raw: AuthControlTicket | null = null; let capability: WebAuthActivation | null = null;
@@ -159,7 +156,6 @@ export function prepareWebAuthActivation(attempt: unknown, exactSessionId: unkno
 }
 
 /** Burns a prepared ticket, then performs the exact pending cancellation when still applicable. */
-/* @Codex */
 export function cancelWebAuth(attempt: unknown): boolean {
     if (!enter()) return false;
     try {
@@ -178,7 +174,6 @@ export function cancelWebAuth(attempt: unknown): boolean {
 }
 
 /** Atomically splices one exact owner ticket into its pre-armed P3 Web cell. */
-/* @Codex */
 export function activatePreparedWebAuthSession(attempt: unknown, activated: unknown, armedPort: unknown): boolean {
     if (!enter()) return false;
     let binding: AttemptBinding | undefined; let activation: ActivationBinding | undefined;

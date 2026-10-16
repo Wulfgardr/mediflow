@@ -1,6 +1,5 @@
 import Foundation
 
-/* @Codex */
 public enum FHIRBundleDTOAdapter {
     public static func input(
         patient: HomeBasePatientDetail,
@@ -20,7 +19,7 @@ public enum FHIRBundleDTOAdapter {
                 birthDate: patient.birthDate.map(isoDate),
                 address: patient.address,
                 phone: patient.phone,
-                // @Codex Preserve lifecycle semantics in the export projection.
+                // Preserve lifecycle semantics in the export projection.
                 isArchived: patient.isArchived,
                 caregiver: patient.caregiver,
                 exemptions: decodeStringArray(patient.exemptions),
@@ -42,7 +41,7 @@ public enum FHIRBundleDTOAdapter {
                     title: $0.title,
                     content: $0.content,
                     metadata: decodeEntryMetadata($0.metadata),
-                    // @Codex Preserve the recorded care setting.
+                    // Preserve the recorded care setting.
                     setting: $0.setting
                 )
             },

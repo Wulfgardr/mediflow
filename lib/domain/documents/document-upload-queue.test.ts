@@ -1,4 +1,4 @@
-/* @Codex: sequencing-only tests. Test callbacks are not a database or host qualification. */
+/* sequencing-only tests. Test callbacks are not a database or host qualification. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDocumentUploadQueue, readDocumentDataUrl } from './document-upload-queue.ts';

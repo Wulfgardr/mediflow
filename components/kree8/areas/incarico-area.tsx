@@ -35,7 +35,6 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
 
-/* @Codex */
 
 function IncaricoArea({
   patients,
@@ -101,14 +100,14 @@ function IncaricoArea({
 
   const selected = visible.find((p) => p.id === selectedPatientId) ?? visible[0] ?? null;
 
-  /* @Codex: a filtered directory can display its first visible record while
+  /* a filtered directory can display its first visible record while
      the cockpit still retains an archived/nonmatching patient. Keep actions
      and the visible record aligned in the proposal. This changes view state. */
   useEffect(() => {
     if (proposal && selected && selected.id !== selectedPatientId) onAlignPatient(selected.id);
   }, [proposal, selected, selectedPatientId, onAlignPatient]);
 
-  /* @Codex WUL-560 L6A: the disclosure owns focus and closes when its patient
+  /* WUL-560 L6A: the disclosure owns focus and closes when its patient
      context changes. The four existing actions keep their original handlers. */
   useEffect(() => {
     setIsActionsOpen(false);
@@ -185,8 +184,8 @@ function IncaricoArea({
   ] : [];
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
-  const rowFocusRequest = useRef(0); // @Codex
-  const rowFocusFrame = useRef<number | null>(null); // @Codex
+  const rowFocusRequest = useRef(0);
+  const rowFocusFrame = useRef<number | null>(null);
   useEffect(() => () => {
     rowFocusRequest.current += 1;
     if (rowFocusFrame.current !== null) window.cancelAnimationFrame(rowFocusFrame.current);
@@ -200,7 +199,7 @@ function IncaricoArea({
   });
   useEffect(() => { patientRowVirtualizer.measure(); }, [proposal, patientRowVirtualizer]);
 
-  /* @Codex: il focus segue l'indice completo, non il sottoinsieme DOM prodotto
+  /* il focus segue l'indice completo, non il sottoinsieme DOM prodotto
      dalla virtualizzazione. Dopo lo scroll attende il nuovo render e porta il
      focus sulla riga corrispondente. */
   const focusRowAtIndex = useCallback((requestedIndex: number) => {
@@ -208,7 +207,7 @@ function IncaricoArea({
     const index = Math.min(visible.length - 1, Math.max(0, requestedIndex));
     const patient = visible[index];
     if (!patient) return;
-    // @Codex: virtualisation may defer focus. A later key command, focus outside
+    // virtualisation may defer focus. A later key command, focus outside
     // the list or unmount owns the destination before this frame can run.
     const request = ++rowFocusRequest.current;
     const origin = document.activeElement;
@@ -280,7 +279,7 @@ function IncaricoArea({
     else openRecord(patient);
   };
 
-  /* @Codex: scorciatoie contestuali, disattivate nei campi editabili. */
+  /* scorciatoie contestuali, disattivate nei campi editabili. */
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -334,7 +333,6 @@ function IncaricoArea({
           </header>
           <div className={patientStyles.columnHeadings} aria-hidden="true"><span>Paziente</span><span>Età</span><span>Problema principale</span><span>Aggiornato</span><span>Stato</span></div>
           <div style={{ marginTop: 8 }}>
-            {/* @Codex */}
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
               <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
                 <div className="mf-skeleton h-12" />
@@ -343,7 +341,7 @@ function IncaricoArea({
               </div>
             ) : patientStatus === 'error' ? (
               <div className={styles.emptyState} role="alert">
-                {/* @Codex WUL-UIUX: l'errore dichiara cosa è successo e offre
+                {/* WUL-UIUX: l'errore dichiara cosa è successo e offre
                     l'azione di recupero, come chiede il contratto PRODUCT.md. */}
                 <p>Lista pazienti non disponibile. Verifica sessione e servizi locali.</p>
                 {onRetryPatients ? (
@@ -441,7 +439,7 @@ function IncaricoArea({
                 <span>{selected.pathway}</span>
               </p>
             </header>
-            {/* @Codex: codice e descrizione restano contenuto naturale delle voci. */}
+            {/* codice e descrizione restano contenuto naturale delle voci. */}
             <ul
               className={patientStyles.caseLensDiagnoses}
               aria-label={`Diagnosi codificate di ${selected.name}`}

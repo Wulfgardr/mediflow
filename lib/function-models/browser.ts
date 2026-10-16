@@ -1,4 +1,4 @@
-/* @Codex: browser projection of ADR0129; the server remains the catalog authority. */
+/* browser projection of ADR0129; the server remains the catalog authority. */
 import type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption } from '../ai-providers/fabric/function-model-preferences';
 export type { FunctionModelPreferences, FunctionModelCommand, FunctionModelId, FunctionModelChoice, FunctionModelOption, FunctionPreferenceRow, LegacyFunctionModelOption };
 export const names: Record<FunctionModelId, string> = { patient_insight: 'Quadro paziente', smart_import: 'Importazione assistita', document_synthesis: 'Sintesi dei documenti', treatment_reasoning: 'Ragionamento terapeutico' };

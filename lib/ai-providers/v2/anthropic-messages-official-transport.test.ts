@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { AnthropicMessagesV2Error, executeAnthropicMessagesV2 } from './anthropic-messages-adapter.ts';

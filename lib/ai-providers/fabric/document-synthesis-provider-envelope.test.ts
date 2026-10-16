@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -83,7 +82,6 @@ test('uses captured parser and token intrinsics after poisoning without getter, 
     await new Promise<void>((resolve) => setImmediate(resolve)); assert.equal(reads, 0); assert.equal(result!.status, 'available');
 });
 
-/* @Codex */
 test('requires the explicit v2 envelope without a legacy or unknown version fallback', () => {
     const parsed = parseDocumentSynthesisProviderEnvelope(response());
     assert.equal(parsed.status, 'available');

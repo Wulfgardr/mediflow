@@ -1,4 +1,3 @@
-/* @Codex */
 export const SMART_IMPORT_PROPOSAL_WIRE_LIMITS = Object.freeze({ text: 220, reference: 80, explicitCode: 32, priority: 16,
     diagnoses: 5, therapies: 10, services: 10, items: 20 });
 

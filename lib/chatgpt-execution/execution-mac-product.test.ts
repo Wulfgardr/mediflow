@@ -1,4 +1,4 @@
-/* @Codex — synthetic issuer failures exercise resource ownership, not admission. */
+/* synthetic issuer failures exercise resource ownership, not admission. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';

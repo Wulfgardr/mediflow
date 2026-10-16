@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 type LocatorGeneration = object;

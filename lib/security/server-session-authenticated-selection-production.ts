@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { acquireAuthenticatedWebSessionProjectionOwner } from './server-auth';

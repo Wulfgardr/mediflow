@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-/* @Codex */
 import { DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA } from './document-synthesis-json-schema.ts';
 import { normalizeOllamaBaseUrl, resolveOllamaBaseUrl } from './base-url.ts';
 import { buildOllamaChatPayload, OllamaProviderAdapter, toOllamaMessages } from './ollama.ts';
 
-/* @Codex */
 test('normalizza URL Ollama e applica l euristica anti-8080', () => {
     assert.equal(normalizeOllamaBaseUrl('http://127.0.0.1:11434/v1/'), 'http://127.0.0.1:11434');
     assert.equal(normalizeOllamaBaseUrl('http://127.0.0.1:11434/v/'), 'http://127.0.0.1:11434');
@@ -84,7 +82,7 @@ for (const serverVersion of ['0.32.5', '0.40.4']) test(`attesta ${serverVersion}
         model: 'qwen-local',
         chatTimeoutMs: 1000,
     });
-    /* @Codex — inspect the serialized request at the fake transport boundary. */
+    /* inspect the serialized request at the fake transport boundary. */
     const result = await adapter.chat([{ role: 'user', content: 'fixture sintetica' }], undefined, 1400, { responseFormat: 'document_synthesis_v2' });
 
     const payload = JSON.parse(String(calls.find(({ url }) => url.endsWith('/api/chat'))?.init?.body));
@@ -144,7 +142,6 @@ test('distingue il timeout dall annullamento utente', async (t) => {
     await assert.rejects(request, /annullamento utente/);
 });
 
-/* @Codex */
 test('only the internal DS name selects a static schema independent of message content', () => {
     const first = buildOllamaChatPayload('qwen', [{ role: 'user', content: 'synthetic one' }], 1400, { responseFormat: 'document_synthesis_v2' });
     const second = buildOllamaChatPayload('qwen', [{ role: 'user', content: 'synthetic two' }], 1400, { responseFormat: 'document_synthesis_v2' });

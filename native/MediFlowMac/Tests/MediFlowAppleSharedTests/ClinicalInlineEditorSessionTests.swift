@@ -2,7 +2,7 @@ import SwiftUI
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex: Native text storage + actual document binding; no app, DB or simulator. */
+/* Native text storage + actual document binding; no app, DB or simulator. */
 @MainActor
 final class ClinicalInlineEditorSessionTests: XCTestCase {
     #if os(macOS)

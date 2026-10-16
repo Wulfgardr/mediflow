@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import * as owner from '../../security/web-auth-lifecycle-owner-adapter';
 import { ExecutionError, type SynthesisCatalog, type SynthesisRequest, type SynthesisResult } from '../../chatgpt-execution/execution-contract';

@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 import {
     OPENAI_RESPONSES_V2_TARGET,

@@ -1,4 +1,3 @@
-// @Codex
 // LumeKit: opaque clinical surfaces and platform-native transient chrome for
 // the universal Apple app.
 import Foundation
@@ -452,7 +451,6 @@ public struct RigaLista<Content: View>: View {
     }
 }
 
-/* @Codex */
 struct LumeRigaListaModifier: ViewModifier {
     let isSelected: Bool
 

@@ -136,7 +136,7 @@ test('a mirror whose .dark alias points at the wrong register fails closed', () 
   assert.throws(() => verifyCssMirror(loadTokens(), css), /alias --lume-ink in \.dark\/grafite/);
 });
 
-// @Codex WUL-515
+// WUL-515
 test('committed global CSS pins the listed semantic, scrim and shadow source recipes', () => {
   const summary = verifyGlobalStyles(loadGlobalStyles());
   assert.deepEqual(summary, { recipes: 11, semanticRecipes: 7, scrimRecipes: 2, shadowRecipes: 2 });

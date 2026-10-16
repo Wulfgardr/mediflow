@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { type CSSProperties, type SVGProps, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
 type LumeFiloTone = 'accent' | 'critical' | 'muted';
@@ -58,7 +57,7 @@ function filoColor(tone: LumeFiloTone): string {
     return tone === 'muted' ? 'var(--lume-ink-muted)' : 'var(--lume-accent)';
 }
 
-/* @Codex: il nodo appartiene alla stessa geometria SVG del Filo. */
+/* il nodo appartiene alla stessa geometria SVG del Filo. */
 export function LumeFiloNodo({
     className,
     fillTone = 'field',
@@ -90,7 +89,7 @@ export function LumeFiloNodo({
     );
 }
 
-/* @Codex: un solo primitivo SVG per la continuita temporale e la provenienza. */
+/* un solo primitivo SVG per la continuita temporale e la provenienza. */
 export function LumeFilo(props: LumeFiloProps) {
     const tone = props.tone ?? 'accent';
 

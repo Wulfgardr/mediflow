@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSmartImportContextProposalBrowserAdapter } from './smart-import-patient-context-browser-adapter.ts';

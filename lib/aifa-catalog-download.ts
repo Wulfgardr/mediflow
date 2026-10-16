@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { aifaConditionalHeaders, aifaSourceMetadata, type AifaCatalogManifestInput, type AifaSourceMetadata } from './aifa-catalog';
 import { acquireAifaCatalogOperation, AifaUpdateError } from './aifa-catalog-lock';

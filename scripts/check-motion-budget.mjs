@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @Codex: Lume motion budget guard. Dependency-free and fail-closed.
+// Lume motion budget guard. Dependency-free and fail-closed.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';

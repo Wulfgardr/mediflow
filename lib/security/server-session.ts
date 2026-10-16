@@ -1,4 +1,4 @@
-/* @Codex: stateless adapter; native/system state lives in the single physical owner. */
+/* stateless adapter; native/system state lives in the single physical owner. */
 import 'server-only';
 import { serverSessions } from './web-auth-lifecycle-owner-adapter';
 export type {

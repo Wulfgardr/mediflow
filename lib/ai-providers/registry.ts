@@ -1,4 +1,3 @@
-/* @Codex */
 import { OllamaProviderAdapter } from './ollama';
 import {
     assertLocalOllamaModelReference,

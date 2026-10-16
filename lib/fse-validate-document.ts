@@ -1,16 +1,13 @@
-/* @Codex */
 import 'server-only';
 
 import { validateProfileDocument } from './fse-validation';
 
-/* @Codex */
 function asNonEmptyString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
 }
 
-/* @Codex */
 export async function validateFseDocumentPayload(
     body: unknown
 ): Promise<{ status: 200 | 400; value: Record<string, unknown> }> {

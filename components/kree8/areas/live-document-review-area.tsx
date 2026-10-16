@@ -13,7 +13,7 @@ import type { AreaId } from '../cockpit-shared';
 import type { Kree8Patient, Kree8PatientWorkspace } from '@/lib/patient-workspace';
 import styles from '../kree8-clinical-cockpit-document-review.module.css';
 
-/* @Codex Issue 109, riferimento 68 */
+/* Issue 109, riferimento 68 */
 function LiveDocumentReviewArea({
   patient,
   workspace,

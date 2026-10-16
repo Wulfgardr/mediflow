@@ -1,4 +1,3 @@
-// @Codex
 import Foundation
 
 /// Presentation of already-read patient data. This is not a server aggregate,

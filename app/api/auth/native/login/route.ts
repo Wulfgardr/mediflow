@@ -1,11 +1,8 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse, NATIVE_BOOTSTRAP_JSON_MAX_BYTES } from '@/lib/native-network-json-body';
-/* @Codex */
 import { admitNativeBootstrapRouteRequest } from '@/lib/security/native-bootstrap-request-adapter';
 import { nativeLoginDeniedResponse, nativeLoginHttp } from '@/lib/security/native-login-http';
 
 /** Native pairing admission precedes the only body fields this route accepts. */
-/* @Codex */
 export async function POST(request: Request) {
     let admission: object | null = null;
     try {
@@ -16,7 +13,6 @@ export async function POST(request: Request) {
         const password = typeof body?.password === 'string' ? body.password : '';
         return nativeLoginHttp(request, admission, { username, password });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         return admission ? nativeLoginHttp(request, admission, Object.create(null)) : nativeLoginDeniedResponse();

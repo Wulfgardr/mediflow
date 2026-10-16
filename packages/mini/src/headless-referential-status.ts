@@ -1,6 +1,5 @@
 import { APPLICATION_OPERATION_DESCRIPTORS } from '../../../lib/headless/application-operation-registry';
 
-/* @Codex */
 export type MiniHeadlessReferentialStatus = Readonly<{
   schema: 'mediflow.mini.headless-referential-status.v1';
   miniCommandId: string;

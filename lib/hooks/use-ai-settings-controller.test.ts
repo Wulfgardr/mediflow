@@ -1,4 +1,4 @@
-/* @Codex: synthetic persistence regression for the ordinary clinical-functions save. */
+/* synthetic persistence regression for the ordinary clinical-functions save. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ test('il salvataggio ordinario persiste il provider Ollama esplicito richiesto d
     database.exec('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)');
     const control = owner.bootstrapControl()!;
     const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: `settings-${path.basename(root)}` })!;
-    // @Codex: use the run-specific synthetic identity, as in the canonical onboarding fixture.
+    // use the run-specific synthetic identity, as in the canonical onboarding fixture.
     const issued = owner.issue(attempt, { id: 'synthetic-operator', username: path.basename(root), role: 'user' })!;
     const active = owner.resolve(issued.sessionId, control.controlId);
     assert.equal(active.status, 'active');

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mapCheckupsForKree8, type Kree8CheckupSource, type Kree8Patient } from './patient-workspace';
 
-/* @Codex The agenda keyed its rows on `time + title`, and the row type did not
+/* The agenda keyed its rows on `time + title`, and the row type did not
    carry the checkup id at all. Two patients seen at the same hour for the same
    reason — an ordinary morning in a clinic — produced one key, and React's
    documented behaviour for duplicate keys is that children may be duplicated or

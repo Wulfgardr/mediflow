@@ -2,24 +2,20 @@ import { and, or, sql, type SQL } from 'drizzle-orm';
 import { normalizeAifaSearchText } from '@/lib/aifa-catalog';
 import { drugs } from '@/lib/schema';
 
-/* @Codex */
 function normalizeDrugSearchTokens(value: string): string[] {
     return [...new Set(value.normalize('NFKC').trim().split(/\s+/).filter(Boolean))];
 }
 
-/* @Codex */
 export function normalizeDrugSearchQuery(value: string): string {
     return normalizeAifaSearchText(value).slice(0, 120);
 }
 
-/* @Codex */
 export function parseDrugSearchLimit(value: string | null, defaultLimit = 30, maximum = 50): number {
     if (!value) return defaultLimit;
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), maximum) : defaultLimit;
 }
 
-/* @Codex */
 export function buildDrugPrefixSearchPredicate(normalizedQuery: string): SQL {
     const prefixEnd = `${normalizedQuery}\uffff`;
     return or(
@@ -29,7 +25,6 @@ export function buildDrugPrefixSearchPredicate(normalizedQuery: string): SQL {
     )!;
 }
 
-/* @Codex */
 export function buildDrugPrefixSearchOrder(normalizedQuery: string): SQL {
     return sql`CASE
         WHEN ${drugs.aicSearch} = ${normalizedQuery} THEN 0
@@ -41,12 +36,10 @@ export function buildDrugPrefixSearchOrder(normalizedQuery: string): SQL {
     END`;
 }
 
-/* @Codex */
 function escapeDrugSearchLikeToken(value: string): string {
     return value.replace(/[\\%_]/g, '\\$&');
 }
 
-/* @Codex */
 export function buildDrugSearchPredicate(value: string): SQL {
     const escapedTokens = JSON.stringify(
         normalizeDrugSearchTokens(value).map(escapeDrugSearchLikeToken),

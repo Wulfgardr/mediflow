@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex — explicit local measurement / explicit existing-governance decision.
+/* explicit local measurement / explicit existing-governance decision.
  * Never starts a cloud process, enables cloud settings, or grants clinical use. */
 import fs from 'node:fs';
 import path from 'node:path';

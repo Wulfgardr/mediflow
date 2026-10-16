@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { types } from 'node:util';
@@ -123,7 +122,6 @@ const productionSources: WebAuthApplicationLockSources = Object.freeze({
 });
 
 /** Advances the exact control fence and retires its ACTIVE projection when one is present. */
-/* @Codex */
 export async function completeExactWebP3ApplicationLock(
     cookie: unknown,
     mutation: unknown,

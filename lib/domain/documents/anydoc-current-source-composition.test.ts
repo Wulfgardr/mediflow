@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -348,7 +347,7 @@ test('admits the complete local OCR continuation before page work and releases i
     assert.match(source, /finally \{ activeLocalOcrDocument = false; \}/u);
 });
 
-/* @Codex: production SQLite/migrations + unchanged security primitives + real AnyDoc worker.
+/* production SQLite/migrations + unchanged security primitives + real AnyDoc worker.
  * These tests require the canonical Node24 dependency tree; the delivery harness does not replace this gate. */
 
 async function seedEncrypted(bytes: Buffer = RTF) {

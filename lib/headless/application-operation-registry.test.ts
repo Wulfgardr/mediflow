@@ -10,7 +10,6 @@ import {
   resolveHeadlessCanonicalCapability,
 } from './canonical-capability-catalog';
 
-/* @Codex */
 const expected = [
   ['anchor:web:web-01-anagrafica-paziente-lista-ricerca-view-create-update@1e35733c0218', 'patient search'],
   ['anchor:web:web-01-anagrafica-paziente-lista-ricerca-view-create-update@1e35733c0218', 'patient show'],

@@ -1,4 +1,4 @@
-/* @Codex: UI-only sequencing. Persistence is the existing attachment writer. */
+/* UI-only sequencing. Persistence is the existing attachment writer. */
 export type DocumentUploadResult = Readonly<{
     saved: number;
     unconfirmed: readonly string[];

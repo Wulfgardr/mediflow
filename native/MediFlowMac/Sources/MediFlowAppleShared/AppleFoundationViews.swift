@@ -1,7 +1,6 @@
 // Codex: created 2026-04-17
-// @Codex
 import SwiftUI
-import MediFlowCore // @Codex
+import MediFlowCore
 #if os(macOS)
 import AppKit
 #else
@@ -9,7 +8,6 @@ import UIKit
 #endif
 
 #if os(iOS)
-/* @Codex */
 private struct TabBarAccessibilityIdentifierBridge: UIViewRepresentable {
     let identifiersByTitle: [String: String]
     let selection: String
@@ -281,13 +279,13 @@ public struct AppleFoundationMobileRootView: View {
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /* @Codex #142: keep the project sidebar out of the iPad patient split. */
+    /* #142: keep the project sidebar out of the iPad patient split. */
     @State private var projectColumnVisibility: NavigationSplitViewVisibility = .detailOnly
     #endif
     @State private var section: ClinicalWorkspaceSection
     @State private var showsProjectSurfaces = false
     @State private var selectedOtherSection: ClinicalWorkspaceSection?
-    // @Codex: URL intents and project paths belong to this window, never to defaults.
+    // URL intents and project paths belong to this window, never to defaults.
     @State private var projectNavigationPath: [ClinicalWorkspaceSection] = []
     @StateObject private var navigationRouter = ClinicalNavigationRouter()
     @StateObject private var workspaceModel = PairedPatientsWorkspaceModel()
@@ -317,7 +315,7 @@ public struct AppleFoundationMobileRootView: View {
                         .inkWorkspaceTitle(section.title)
                 }
                 #else
-                // @Codex #142: the project sidebar overlays iPad detail instead of
+                // #142: the project sidebar overlays iPad detail instead of
                 // creating a third simultaneous column beside the patient workspace.
                 NavigationSplitView(columnVisibility: $projectColumnVisibility) {
                     List {
@@ -328,7 +326,7 @@ public struct AppleFoundationMobileRootView: View {
                     .navigationTitle("MediFlow")
                     .accessibilityIdentifier("clinical-workspace-project-sidebar")
                 } detail: {
-                    // @Codex: A narrow iPad workspace uses the same chart push
+                    // A narrow iPad workspace uses the same chart push
                     // as iPhone while the project sidebar keeps its own selection.
                     NavigationStack {
                         detailView(for: section)
@@ -446,7 +444,7 @@ public struct AppleFoundationMobileRootView: View {
         Button {
             selectSection(item)
             #if os(iOS)
-            // @Codex #142: preserve the patient list/detail width after a destination change.
+            // #142: preserve the patient list/detail width after a destination change.
             projectColumnVisibility = .detailOnly
             #endif
         } label: {
@@ -484,7 +482,7 @@ public struct AppleFoundationMobileRootView: View {
         }
     }
 
-    // @Codex: Manual navigation cancels an in-flight link. Programmatic navigation
+    // Manual navigation cancels an in-flight link. Programmatic navigation
     // uses the same section values, without replacing the workspace or its drafts.
     private func selectSection(_ item: ClinicalWorkspaceSection) {
         navigationRouter.cancel()

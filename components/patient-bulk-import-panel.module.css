@@ -1,4 +1,4 @@
-/* @Codex: Lume tokens, bounded wrapping, native controls and visible keyboard focus. */
+/* Lume tokens, bounded wrapping, native controls and visible keyboard focus. */
 .panel {
     color: var(--lume-ink);
     display: grid;

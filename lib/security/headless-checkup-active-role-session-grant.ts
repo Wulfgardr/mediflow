@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { types } from 'node:util';
@@ -182,7 +181,7 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     if (!same(before, after)) return fail('projection_stale');
     return after;
   };
-  /* @Codex: never execute projection or downstream lifecycle code while the
+  /* never execute projection or downstream lifecycle code while the
      external P3 owner holds its resource-binding critical section. */
   const confirmResource = (record: Pick<RecordState, 'active' | 'port' | 'snapshot'>): boolean => {
     const port = record.port; if (!record.active || !port) return fail('grant_unavailable');
@@ -207,7 +206,7 @@ export function createHeadlessCheckupActiveRoleSessionGrantOwner(sources: Headle
     }
     if (presented) {
       try {
-        /* @Codex: server auth reconstructs the authentic projection per request;
+        /* server auth reconstructs the authentic projection per request;
            the stable owner re-proves its opaque P3 and selection scope. */
         if (presented.owner !== record.snapshot.owner
           || !sameAuthenticatedScope(stable(presented), record.snapshot)) return fail('projection_stale');

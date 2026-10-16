@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import { parseLocalProviderSetupArgs, runLocalProviderSetup, LocalProviderSetupError } from './local-provider-setup.ts';
 try {
     const result = await runLocalProviderSetup(parseLocalProviderSetupArgs(process.argv.slice(2)));

@@ -1,4 +1,4 @@
-/* @Codex: one ordinary observation create/update authority; no generic clinical CRUD or headless path. */
+/* one ordinary observation create/update authority; no generic clinical CRUD or headless path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
 import { activePatients } from './patient-lifecycle';
@@ -38,7 +38,7 @@ function webLinkError(tx: Tx, patientId: string, servicePrescriptionItemId: stri
         value: { error: 'Service prescription item not found or does not belong to observation patient' } };
 }
 
-/* @Codex: IMMEDIATE serializes the admission, duplicate check, row insert and required audit. */
+/* IMMEDIATE serializes the admission, duplicate check, row insert and required audit. */
 export function createObservationOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
         const admitted = input.mode === 'network'
@@ -67,7 +67,7 @@ export function createObservationOperation(input: CreateInput): Result {
     }, { behavior: 'immediate' });
 }
 
-/* @Codex: a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
+/* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
 export function updateObservationOperation(input: UpdateInput): Result {
     return dbServer.transaction((tx): Result => {
         const existing = input.mode === 'network'

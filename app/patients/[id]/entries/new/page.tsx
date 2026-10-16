@@ -8,24 +8,22 @@ import { useDropzone } from 'react-dropzone';
 import { v4 as uuidv4 } from 'uuid';
 import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDown, ClipboardList, Clock, FileCheck2, FileText, Home, Loader2, Mic, MicOff, Paperclip, Pause, Play, RotateCcw, Save, Square, Stethoscope, Upload, Video, Wand2, X } from 'lucide-react';
 
-/* @Codex */
 import { InkState } from '@/components/ui/ink-state';
 import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { db, type Attachment, type ClinicalEntry, type Therapy } from '@/lib/db';
-/* @Codex */
 import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
 import type { VisitMedicationCandidate, VisitSessionEvent, VisitSessionState } from '@/lib/visit-transcript-draft';
-/* @Codex WUL-676: one clinical form, with a prototype presentation. */
+/* WUL-676: one clinical form, with a prototype presentation. */
 import { useRuntimeTwinDesign, useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import PrivacyBlur from '@/components/privacy-blur';
 import composerStyles from './entry-composer.module.css';
 
-/* @Codex WUL-420 */
+/* WUL-420 */
 const VISIT_DRAFT_PLACEHOLDER = [
     'S: motivo della visita, sintomi riferiti, contesto funzionale',
     'O: parametri, esame obiettivo, elementi documentali',
@@ -33,7 +31,7 @@ const VISIT_DRAFT_PLACEHOLDER = [
     'P: piano, follow-up, indicazioni condivise',
 ].join('\n');
 
-/* @Codex WUL-420 */
+/* WUL-420 */
 function escapeClinicalDraftText(value: string): string {
     return value
         .replace(/&/g, '&amp;')
@@ -43,7 +41,7 @@ function escapeClinicalDraftText(value: string): string {
         .replace(/'/g, '&#39;');
 }
 
-/* @Codex WUL-420 */
+/* WUL-420 */
 function formatVisitDraftAsClinicalHtml(value: string): string {
     return value
         .trim()
@@ -52,7 +50,7 @@ function formatVisitDraftAsClinicalHtml(value: string): string {
         .join('');
 }
 
-/* @Codex WUL-420 */
+/* WUL-420 */
 function formatEntryDate(value: Date | string | number | null | undefined): string {
     if (!value) return 'data non disponibile';
     const date = value instanceof Date ? value : new Date(value);
@@ -64,7 +62,7 @@ function formatEntryDate(value: Date | string | number | null | undefined): stri
     }).format(date);
 }
 
-/* @Codex WUL-421 */
+/* WUL-421 */
 type VisitSessionUiState = VisitSessionState | 'processing' | 'processed';
 
 export default function NewEntryPage() {
@@ -85,10 +83,10 @@ export default function NewEntryPage() {
     const [files, setFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const [dictatedDraft, setDictatedDraft] = useState('');
     const [isDictatedDraftReviewed, setIsDictatedDraftReviewed] = useState(false);
-    /* @Codex WUL-421 */
+    /* WUL-421 */
     const [visitSessionState, setVisitSessionState] = useState<VisitSessionUiState>('idle');
     const [visitSessionStartedAt, setVisitSessionStartedAt] = useState<number | null>(null);
     const [visitSessionEvents, setVisitSessionEvents] = useState<VisitSessionEvent[]>([]);
@@ -103,18 +101,17 @@ export default function NewEntryPage() {
         || dictatedDraft.trim().length > 0
         || visitSessionEvents.length > 0;
 
-    /* @Codex WUL-676: keep the workspace guard active during pending saves. */
+    /* WUL-676: keep the workspace guard active during pending saves. */
     useRuntimeTwinPendingForm(hasUnsavedChanges);
-    /* @Codex */
     const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const patientEntries = useLiveQuery<ClinicalEntry[], ClinicalEntry[]>(
         async () => db.entries.query({ patientId: id }).toArray(),
         [id],
         [],
         ['entries'],
     ) ?? [];
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const patientAttachments = useLiveQuery<Attachment[], Attachment[]>(
         async () => db.attachments.query({ patientId: id }).toArray(),
         [id],
@@ -122,7 +119,7 @@ export default function NewEntryPage() {
         ['attachments'],
     ) ?? [];
 
-    /* @Codex WUL-676: on-demand consultation; no clinical writes or auto-insert. */
+    /* WUL-676: on-demand consultation; no clinical writes or auto-insert. */
     const activeTherapies = useLiveQueryState<Therapy[]>(
         async () => proposal && isContextOpen
             ? (await db.therapies.query({ patientId: id }).toArray())
@@ -143,7 +140,7 @@ export default function NewEntryPage() {
         setFiles((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
     };
 
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const handleDictatedDraftChange = (value: string) => {
         setDictatedDraft(value);
         setIsDictatedDraftReviewed(false);
@@ -151,7 +148,7 @@ export default function NewEntryPage() {
         setVisitDraftError('');
     };
 
-    /* @Codex WUL-421 */
+    /* WUL-421 */
     const getVisitEventAtMs = useCallback(() => {
         if (visitSessionStartedAt === null) return 0;
         return Math.max(0, Math.round(performance.now() - visitSessionStartedAt));
@@ -229,7 +226,7 @@ export default function NewEntryPage() {
         }
     };
 
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const insertReviewedDraft = () => {
         if (!dictatedDraft.trim() || !isDictatedDraftReviewed) return;
 
@@ -244,7 +241,6 @@ export default function NewEntryPage() {
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        /* @Codex */
         const normalizedContent = sanitizeClinicalRichTextHtml(content);
 
         if (isClinicalRichTextBlank(normalizedContent)) {
@@ -304,7 +300,7 @@ export default function NewEntryPage() {
                 updatedAt: new Date(),
             });
 
-            /* @Codex WUL-676: successful programmatic navigation is not
+            /* WUL-676: successful programmatic navigation is not
                intercepted by the workspace's link guard. */
             router.push(`/patients/${id}/modules`);
         } catch (error) {
@@ -320,22 +316,22 @@ export default function NewEntryPage() {
         { id: 'remote', label: 'Remoto', icon: Video },
         { id: 'note', label: 'Nota', icon: FileText },
     ];
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const recentEntries = useMemo(() => {
         return [...patientEntries]
             .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
             .slice(0, 3);
     }, [patientEntries]);
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const visitEntryCount = useMemo(() => {
         return patientEntries.filter((entry) => entry.type === 'visit').length;
     }, [patientEntries]);
-    /* @Codex WUL-420 */
+    /* WUL-420 */
     const sourceCount = (patient?.documentInsights?.length ?? 0) + patientAttachments.length + files.length;
     const hasDictatedDraft = dictatedDraft.trim().length > 0;
     const canInsertReviewedDraft = type === 'visit' && hasDictatedDraft && isDictatedDraftReviewed;
     const acceptedNoteHasContent = !isClinicalRichTextBlank(content);
-    /* @Codex WUL-421 */
+    /* WUL-421 */
     const visitSessionStatusLabel: Record<VisitSessionUiState, string> = {
         idle: proposal ? 'Da avviare' : 'Pronta locale',
         recording: proposal ? 'Sessione avviata' : 'In registrazione',
@@ -348,7 +344,6 @@ export default function NewEntryPage() {
         && hasDictatedDraft
         && visitSessionState !== 'recording'
         && visitSessionState !== 'processing';
-    /* @Codex */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#dati', label: 'Dati', meta: setting === 'home' ? 'domicilio' : 'ambulatorio' },
         ...(type === 'visit' ? [{ href: '#sessione-visita', label: 'Sessione', meta: visitSessionStatusLabel[visitSessionState].toLowerCase() }] : []),
@@ -357,7 +352,7 @@ export default function NewEntryPage() {
         { href: '#contesto', label: 'Contesto', meta: String(sourceCount) },
     ];
 
-    /* @Codex WUL-676: reuse each field/editor/tool and its handlers. The
+    /* WUL-676: reuse each field/editor/tool and its handlers. The
        comparison changes wrappers/order, never creates another form state. */
     const metadataFields = proposal ? (
         <div id="dati" className={composerStyles.metadata}>

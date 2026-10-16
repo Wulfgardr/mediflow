@@ -1,4 +1,3 @@
-/* @Codex */
 import Crypto
 import Foundation
 public struct VisitRecordingBinding: Equatable, Sendable {

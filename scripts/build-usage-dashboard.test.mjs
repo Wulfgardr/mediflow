@@ -1,4 +1,3 @@
-// @Codex
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chartSeries, renderSvg, renderTables, replaceBlock, validate } from './build-usage-dashboard.mjs';

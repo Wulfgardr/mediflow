@@ -1,4 +1,3 @@
-/* @Codex */
 import { z } from 'zod';
 import { types } from 'node:util';
 import {
@@ -38,7 +37,7 @@ export const attachmentUpdateSchema = attachmentDeleteSchema.extend({
     ocrQueueState: ocrQueueStateSchema,
 });
 
-/* @Codex: capture the parser's mutable intrinsics before request-side poisoning. */
+/* capture the parser's mutable intrinsics before request-side poisoning. */
 const OBJECT_PROTOTYPE = Object.prototype;
 const objectCreate = Object.create;
 const objectGetPrototypeOf = Object.getPrototypeOf;

@@ -1,4 +1,4 @@
-/* @Codex — fresh paired HTTP reads; the key is read only from the current unlocked client. */
+/* fresh paired HTTP reads; the key is read only from the current unlocked client. */
 #if os(macOS)
 import Foundation
 import MediFlowCore

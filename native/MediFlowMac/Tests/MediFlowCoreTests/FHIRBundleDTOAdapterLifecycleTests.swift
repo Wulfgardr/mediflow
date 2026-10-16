@@ -1,4 +1,4 @@
-// @Codex - Regression tests for lifecycle and care-setting export fidelity.
+// Regression tests for lifecycle and care-setting export fidelity.
 import XCTest
 @testable import MediFlowCore
 
@@ -77,7 +77,7 @@ final class FHIRBundleDTOAdapterLifecycleTests: XCTestCase {
         XCTAssertTrue(input(archived: false, setting: "home", deleted: true).entries.isEmpty)
     }
 
-    // @Codex Missing values keep the v1 compatibility behavior. This does not
+    // Missing values keep the v1 compatibility behavior. This does not
     // authorize the missing-setting fallback for the future v2 contract.
     func testAbsentArchiveFlagIsNotInventedByAdapter() throws {
         let value = input(archived: nil, setting: "ambulatory")

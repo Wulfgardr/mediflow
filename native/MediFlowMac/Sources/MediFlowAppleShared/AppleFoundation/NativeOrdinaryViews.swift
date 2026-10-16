@@ -1,4 +1,4 @@
-/* @Codex — original function surfaces, no settings copy or apply action. */
+/* original function surfaces, no settings copy or apply action. */
 #if os(macOS)
 import SwiftUI
 

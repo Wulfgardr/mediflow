@@ -1,4 +1,4 @@
-/* @Codex: ordinary Web journey with SQLite audit failure and authoritative readback. */
+/* ordinary Web journey with SQLite audit failure and authoritative readback. */
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';

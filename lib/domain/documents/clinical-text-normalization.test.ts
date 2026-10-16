@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { extractClinicalDosageNeedles, normalizeClinicalText } from './clinical-text-normalization';

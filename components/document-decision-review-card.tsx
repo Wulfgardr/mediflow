@@ -1,8 +1,5 @@
-/* @Codex */
 import { AlertTriangle, CheckCircle2, FileSearch, ShieldAlert, UserRound } from 'lucide-react';
-/* @Codex */
 import type { DocumentDecision } from '../lib/domain/documents/document-decision';
-/* @Codex */
 import { buildDocumentDecisionReviewViewModel, type DocumentDecisionReviewActionView } from '../lib/domain/documents/document-decision-review-view-model';
 import { confidenceLabel } from '../lib/ai-labels';
 
@@ -50,7 +47,6 @@ function ActionList({
     );
 }
 
-/* @Codex */
 export default function DocumentDecisionReviewCard({ decision }: { decision: DocumentDecision }) {
     const view = buildDocumentDecisionReviewViewModel(decision);
 

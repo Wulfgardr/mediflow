@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -64,7 +63,6 @@ export default function ScalesLibraryPage() {
         : SCALE_NAV_BASE;
     const navItems = proposal ? originalNavItems.map(({ href, label }) => ({ href, label })) : originalNavItems;
 
-    /* @Codex */
     const patients = useLiveQuery(
         () => {
             if (!selectedScaleDefinition) return Promise.resolve([]);

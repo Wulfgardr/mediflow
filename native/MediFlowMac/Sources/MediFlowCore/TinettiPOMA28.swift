@@ -1,4 +1,4 @@
-// @Codex MF085-002: NHS FPS 006 V1 (2012-07); see ADR 0118. Local unvalidated Italian rendering.
+// MF085-002: NHS FPS 006 V1 (2012-07); see ADR 0118. Local unvalidated Italian rendering.
 import Foundation
 
 public extension ClinicalScales {
@@ -44,7 +44,7 @@ public extension ClinicalScales {
         instrument: tinettiPOMA28Instrument,
         interpret: { _ in tinettiNonclassification }
     )
-    // @Codex: these labels annotate history; they do not change its clinical content.
+    // these labels annotate history; they do not change its clinical content.
     static let legacyTinettiNotice = "Tinetti storica o senza provenienza verificabile: punteggio e interpretazione riportati come registrati, non rivalutati con POMA-28 v1."
     static let sourceBoundTinettiNotice = "POMA-28 v1 · NHS FPS 006 V1 (2012). Resa italiana locale non validata; nessuna classificazione automatica del rischio."
 

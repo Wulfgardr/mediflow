@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -179,7 +178,7 @@ test('keeps an idle controller available across the initial patient selection', 
     assert.equal(current.acquisitions(), 1);
 });
 
-// @Codex: auth retirement must not dispose the never-bound login control plane.
+// auth retirement must not dispose the never-bound login control plane.
 test('keeps login available across repeated lock and logout before capture acquisition', async () => {
     const current = fixture();
     for (const reason of ['application_lock', 'application_lock', 'logout', 'reselection'] as const) {
@@ -197,7 +196,7 @@ test('keeps login available across repeated lock and logout before capture acqui
     assert.equal(current.revocations(), 1);
 });
 
-// @Codex: explicit disposal remains terminal even before any capture exists.
+// explicit disposal remains terminal even before any capture exists.
 test('idle explicit close is terminal and a fresh controller is required to reopen', async () => {
     const closed = fixture();
     assert.equal(await closed.controller.retire('explicit'), false);
@@ -264,7 +263,7 @@ test('coalesces explicit retirement and orders local revocation before bridge IP
     assert.equal(current.revocations(), 1);
 });
 
-// @Codex: both auth terminals must cut an acquisition already in progress.
+// both auth terminals must cut an acquisition already in progress.
 for (const reason of ['logout', 'application_lock'] as const) {
     test(`cuts ${reason} during owner acquisition and revokes a late owner only locally`, async () => {
         const current = fixture({ acquire: 'deferred' });
@@ -306,7 +305,7 @@ test('propagates revoke timeout only after disconnect and never retries', async 
     assert.equal(current.revocations(), 1);
 });
 
-// @Codex: an activation ACK cannot revive a controller locked after acquisition.
+// an activation ACK cannot revive a controller locked after acquisition.
 test('lock during bridge activation rejects the late ACK and keeps dependent authority denied', async () => {
     const current = fixture({ activation: 'deferred' });
     const activating = current.controller.activateCurrentSelection(INPUT);

@@ -1,4 +1,4 @@
-/* @Codex: synthetic-only; no network, installer, model download or clinical DB. */
+/* synthetic-only; no network, installer, model download or clinical DB. */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import fs from 'node:fs';
@@ -106,7 +106,7 @@ test('stderr is discarded and bounded; errors never include the raw process outp
 });
 test('controlled execution deadline kills the child and awaits close before releasing the slot', async t => {
     const f = fixture(t); await f.admit();
-    // @Codex: isolate the child-termination transition from real filesystem latency.
+    // isolate the child-termination transition from real filesystem latency.
     // Real provisioning still runs; separate tests retain real acquisition deadlines.
     t.mock.timers.enable({ apis: ['setTimeout'] });
     let kills = 0; let launched!: () => void;
@@ -152,7 +152,7 @@ test('request cancellation and revocation terminate pending local work', async t
 });
 test('unconfirmed termination poisons single flight until the actual close event', async t => {
     const f = fixture(t); await f.admit(); const child = fakeChild(null, false);
-    // @Codex: cancel after dispatch; filesystem preparation is not the condition under test.
+    // cancel after dispatch; filesystem preparation is not the condition under test.
     const controller = new AbortController();
     child.stdin.once('finish', () => controller.abort());
     const runtime = createTreatmentReasoningPortableRuntime({ provisioning: f.service, terminationGraceMs: 30, spawn: () => child });

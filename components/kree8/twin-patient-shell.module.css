@@ -1,11 +1,11 @@
-/* @Codex WUL-676: the patient workspace replaces the old nested card shell. */
+/* WUL-676: the patient workspace replaces the old nested card shell. */
 .patientShell { min-height: 100%; background: var(--lume-surface-focal); color: var(--lume-ink); }
 .patientHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 28px; }
 .identity { min-width: 0; }
 .identity h1 { margin: 0; letter-spacing: 0; font: var(--type-person); }
 .identity p { margin-top: 6px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
-/* @Codex: same command geometry for every action in the patient header. */
+/* same command geometry for every action in the patient header. */
 .actions > :is(a, button) { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 44px); padding: 10px 14px; border-radius: var(--lume-control-radius, 12px); font-size: 0.875rem; font-weight: 600; line-height: 1.5; }
 .primary { padding: 9px 13px; background: var(--lume-ink-fresh); color: var(--lume-surface-focal); }
 .patientBody { padding: 28px; }

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import type { AccountLimitWindow, AccountModel, AccountNotice } from './account-contract';
 

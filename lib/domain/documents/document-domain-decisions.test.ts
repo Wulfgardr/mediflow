@@ -1,15 +1,11 @@
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,
     createDocumentDecisionEvidenceRef,
     validateDocumentDecision,
 } from './document-decision';
-/* @Codex */
 import {
     buildReviewableDocumentDecisionDomains,
     createDiagnosticQuestionArtifact,

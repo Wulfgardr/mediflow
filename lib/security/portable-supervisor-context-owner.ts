@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { createHash } from 'node:crypto';
@@ -270,7 +269,7 @@ export function createPortableSupervisorWebCaptureOwnerProcessV1(sources: Source
             ownerSlot = state; spent = true; state.published = true;
             const published = state;
             return record({ readCapture: () => read(published),
-                /* @Codex: bind a dependent operation to the exact H1a session and
+                /* bind a dependent operation to the exact H1a session and
                    projection owner without exporting either identity. */
                 matchesCurrentContext: (value: unknown) => {
                     const candidate = canonicalAuthenticatedContext(value);

@@ -1,4 +1,3 @@
-/* @Codex */
 import { createClinicalProposal, declareUncertainty, type ClinicalProposal } from '../../ai-providers/fabric/clinical-interaction';
 import { getFabricCapabilityDescriptor } from '../../ai-providers/fabric/catalog';
 import { routeCandidateCapability, type CandidateRoutingDecision } from '../../ai-providers/fabric/candidate-router';

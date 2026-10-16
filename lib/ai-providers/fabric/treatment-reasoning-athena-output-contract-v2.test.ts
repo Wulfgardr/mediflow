@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -20,7 +19,6 @@ const output = (extra: Record<string, unknown> = {}) => ({
 const contract = () => createTreatmentReasoningAthenaOutputContractV2({ allowedEvidenceRefs: refs(), attestation: attestation() });
 const denied = (value: unknown) => assert.deepEqual(contract().normalize(value), { status: 'denied', code: 'output_invalid', value: null, sourceBindings: null, attestation: null, writesPerformed: 0, applyPolicy: 'none' });
 
-/* @Codex */
 const remoteOutput = () => {
     const value = output();
     value.data.trace.mode = 'chatgpt_subscription';

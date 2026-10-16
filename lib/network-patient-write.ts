@@ -1,6 +1,4 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
-/* @Codex */
-/* @Codex */
 import {
     classifyPatientMutationEvent,
     listChangedFields,
@@ -9,24 +7,15 @@ import {
     type AuditEventType,
     type AuditRedactedMetadata,
 } from './security/audit';
-/* @Codex */
 import { isSealedValue } from './network-patient-lifecycle';
-/* @Codex */
 import { parseExpectedVersion } from './patient-concurrency';
-/* @Codex */
 import { updatePatientOperation } from './patient-update-operation';
-/* @Codex */
 import { normalizePatientUpdateInput } from './patient-write-normalization';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
-/* @Codex */
-/* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
-/* @Codex */
 import type { ServerSession } from './security/server-session';
 
-/* @Codex */
 export const NETWORK_PATIENT_WRITE_CAPABILITY = 'network.replica.write-patient-profile';
-/* @Codex */
 export const NETWORK_FORBIDDEN_PATIENT_WRITE_FIELDS = new Set([
     'aiSummary', 'aiSummaryGeneratedAt', 'aiSummaryContextHash', 'documentInsights',
 ]);
@@ -107,7 +96,6 @@ function validateNetworkPatientMutationBoundary(
     return null;
 }
 
-/* @Codex */
 export async function writeNetworkPatientAuditEvent(input: {
     context: NetworkPatientMutationContext;
     eventType: AuditEventType;
@@ -138,7 +126,6 @@ export async function writeNetworkPatientAuditEvent(input: {
     }
 }
 
-/* @Codex */
 export async function updateNetworkScopedPatient(
     context: NetworkPatientMutationContext,
     body: Record<string, unknown>

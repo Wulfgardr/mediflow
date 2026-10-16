@@ -1,4 +1,4 @@
-/* @Codex — SYNTHETIC TEST FIXTURES ONLY. Never imported by the production CLI.
+/* SYNTHETIC TEST FIXTURES ONLY. Never imported by the production CLI.
  * Tiny wheels exercise real Python/venv/pip, NOT GLiNER or Mac qualification. */
 import fs from 'node:fs';
 import os from 'node:os';

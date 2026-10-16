@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import Link from 'next/link';
 import { Download, FileText, MoreHorizontal, Pencil, Share2 } from 'lucide-react';

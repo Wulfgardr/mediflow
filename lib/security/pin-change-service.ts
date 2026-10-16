@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
@@ -6,14 +5,12 @@ import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { createHash } from 'node:crypto';
 import { and, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 
-/* @Codex */
 import {
     auditContextFromSession,
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/security/audit';
-/* @Codex */
 import {
     PASSPHRASE_ADOPTION_CONFLICT_CODE,
     PASSPHRASE_ADOPTION_INVALID_PIN_CODE,
@@ -28,11 +25,8 @@ import {
 import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseCredentials, PassphraseRecoveryPayload } from '@/lib/security/passphrase-adoption-validation';
 import { verifyHostCredentials, verifyRecoveryCredentials, verifyUnlockCredentials, type HostCredentialVerification } from '@/lib/security/host-credential-verification';
 import { retirePinEraResidues, type PinEraResidues } from '@/lib/security/pin-era-residues';
-/* @Codex */
 import { users } from '@/lib/schema';
-/* @Codex */
 import type { dbServer as dbServerType } from '@/lib/db-server';
-/* @Codex */
 import {
     abortNativeLegacyUserRetirement,
     commitNativeLegacyUserRetirement,
@@ -40,7 +34,6 @@ import {
     preparePairedNativePinRetirement,
 } from '@/lib/security/server-session';
 import { requirePairedNativeSession, type PairedNativeSession } from '@/lib/security/paired-native-session';
-/* @Codex */
 import {
     abortUserRetirement,
     commitUserRetirement,
@@ -52,10 +45,8 @@ import {
 
 type PinChangeDatabase = typeof dbServerType;
 
-/* @Codex */
 export const PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED_CODE = 'PIN_CHANGE_AUTHORITY_RETIREMENT_UNCONFIRMED';
 
-/* @Codex */
 export type PinChangeServiceDependencies = {
     db?: PinChangeDatabase;
     writeAuditEvent?: typeof writeAuditEvent;
@@ -75,7 +66,6 @@ export type PinChangeServiceDependencies = {
     retirePinEraResidues?: (userId: string, db: PinChangeDatabase) => PinEraResidues;
 };
 
-/* @Codex */
 export type PinChangeServiceInput = {
     session: WebSessionProjection | PairedNativeSession;
     request: Request;
@@ -238,7 +228,7 @@ export async function changePin(
         };
     }
 
-    /* @Codex: after the credential CAS, retire Web and native authority through separate exact owners. */
+    /* after the credential CAS, retire Web and native authority through separate exact owners. */
     let webRetirementOutcome: 'completed' | 'failed' | 'denied' = 'failed';
     try {
         webRetirementOutcome = commitWebRetirement(webRetirement).outcome;

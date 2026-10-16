@@ -1,11 +1,9 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex baseline, Claude A18: paired ambulatory scope list */
+/* baseline, Claude A18: paired ambulatory scope list */
 import { NextResponse } from 'next/server';
 import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server';
 import { getNetworkModeGateResponse } from '@/lib/network-write-context';
 import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { requireAccountSession } from '@/lib/security/paired-native-session';
 import { listAmbulatorySummaries } from '@/lib/ambulatory-read';
 import { createNetworkAmbulatory, NETWORK_AMBULATORY_WRITE_CAPABILITY } from '@/lib/network-ambulatory-write';
@@ -46,7 +44,6 @@ export async function POST(request: Request) {
         const result = await createNetworkAmbulatory(resolved.context, await readNativeNetworkJson(request) as Record<string, unknown>);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/ambulatories error:', error);

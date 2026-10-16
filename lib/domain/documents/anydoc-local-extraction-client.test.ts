@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -129,7 +128,6 @@ test('interruption while reading the response body cannot publish the completed 
     assert.equal(await pending, null);
 });
 
-/* @Codex */
 test('accepts Tesseract provenance without treating an unknown engine as desktop OCR', async () => {
     const valid = extracted('attachment.synthetic.desktop', 'Testo OCR sintetico.', true);
     valid.receipt.ocrProvenance!.engine = 'tesseract_wasm';

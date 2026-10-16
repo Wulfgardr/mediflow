@@ -18,7 +18,7 @@ import type { QuadroAction, QuadroDiagnosis, QuadroMetric, QuadroRow, QuadroTher
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
-/* @Codex #98, #68 */
+/* #98, #68 */
 const REVIEW_DIAGNOSES: QuadroDiagnosis[] = [
   { code: 'I10', description: 'Ipertensione essenziale' },
   { code: 'E78.5', description: 'Dislipidemia' },
@@ -61,7 +61,7 @@ function SchedaArea({
   onOpenArea,
 }: { patient?: Kree8Patient | null; isReview: boolean; onOpenArea: (area: AreaId) => void }) {
   if (!isReview && patient) {
-    // @Codex: the cockpit owns this navigation, including its summary intent.
+    // the cockpit owns this navigation, including its summary intent.
     return null;
   }
 

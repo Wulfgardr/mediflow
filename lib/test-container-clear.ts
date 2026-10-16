@@ -95,7 +95,7 @@ export function clearTestContainerByMembership(
             .set(buildPatientTombstoneValues(patient.version, TEST_CONTAINER_CLEAR_REASON, now))
             .where(and(eq(patients.id, patient.id), eq(patients.version, patient.version), activePatients()))
             .run();
-        // @Codex: an ignored write after admission must abort the containing transaction.
+        // an ignored write after admission must abort the containing transaction.
         if (tombstone.changes !== 1) throw new Error('Test-container patient tombstone did not update exactly one row');
         clearedPatients.push({ id: patient.id, version: patient.version });
     }
@@ -114,7 +114,7 @@ export function clearTestContainerByMembership(
         .where(eq(patientsToAmbulatories.ambulatoryId, ambulatoryId))
         .run()
         .changes;
-    // @Codex: membership rows are unique by patient and container.
+    // membership rows are unique by patient and container.
     if (removedMembershipRows !== memberIds.length) {
         throw new Error('Test-container membership removal did not delete every selected row');
     }

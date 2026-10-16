@@ -1,4 +1,4 @@
-/* @Codex — passive wire data, never session or clinical authority. */
+/* passive wire data, never session or clinical authority. */
 import Foundation
 
 public enum NativeOrdinaryContractError: Error, LocalizedError {
@@ -181,7 +181,7 @@ public struct NativeOrdinaryPreparation: Codable, Equatable, Sendable {
         try c.encode(input, forKey: .init("input"))
     }
 }
-/* @Codex — descriptive selector plan. No key, plaintext or source authority is encoded here. */
+/* descriptive selector plan. No key, plaintext or source authority is encoded here. */
 public struct NativeOrdinaryProjectionSelector: Codable, Equatable, Sendable {
     public let entity, id: String
     public let fields: [String]

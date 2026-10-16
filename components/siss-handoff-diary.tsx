@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { type FormEvent, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, LoaderCircle, Plus, Trash2 } from 'lucide-react';
 import { db, captureSissHandoffWritePrecondition, resolveSissHandoffDraftPrecondition, type SissHandoffWritePrecondition, type SissHandoffEvent, type SissHandoffOutcome } from '@/lib/db';
@@ -79,7 +78,6 @@ export default function SissHandoffDiary({ patientId, embedded = false }: Props)
     const [closureNextAction, setClosureNextAction] = useState('');
     const [closureOutcome, setClosureOutcome] = useState<SissHandoffOutcome>('completed');
 
-    /* @Codex */
     const handoffs = useLiveQuery(
         async () => {
             const items = await db.sissHandoffs

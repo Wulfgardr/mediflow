@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: synthetic real-SQLite candidate oracle for eight ordinary observation mutations. */
+/* synthetic real-SQLite candidate oracle for eight ordinary observation mutations. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -191,7 +191,7 @@ function operations(surface: Surface): Operation[] {
     return surface === 'network' ? ['POST', 'PUT'] : ['POST', 'PUT', 'DELETE'];
 }
 
-/* @Codex: the fault is on the real audit table, after the real route reaches its mutation. */
+/* the fault is on the real audit table, after the real route reaches its mutation. */
 test('all eight observation writes roll back on audit FAIL and IGNORE', async () => {
     for (const surface of surfaces) for (const operation of operations(surface)) {
         for (const fault of ['FAIL', 'IGNORE'] as const) {
@@ -307,7 +307,7 @@ test('Web-only service result link stays same-patient, nullable and transaction-
     assert.equal(omitted.status, 200);
     assert.equal((omitted.after.observation as Record<string, unknown>).service_prescription_item_id,
         (omitted.before.observation as Record<string, unknown>).service_prescription_item_id);
-    // @Codex: v1/network do not gain the Web-only result-link capability, even for an absent item.
+    // v1/network do not gain the Web-only result-link capability, even for an absent item.
     for (const surface of ['v1', 'network'] as const) {
         for (const operation of ['POST', 'PUT'] as const) {
             const result = await capture(`${surface}-${operation}-link-not-exposed`, surface, operation,

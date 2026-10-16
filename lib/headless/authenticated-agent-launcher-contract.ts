@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 export const SOURCE_KEYS = ['now', 'nextRef', 'hashRef', 'writeAudit', 'commitTerminalAudit', 'readHostContext',

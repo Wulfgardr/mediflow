@@ -28,20 +28,20 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     const [isLoading, setIsLoading] = useState(false);
     const [catalogState, setCatalogState] = useState<DrugAutocompleteCatalogState>('ready');
     const [searchFailed, setSearchFailed] = useState(false);
-    /* @Codex WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
+    /* WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
     const [activeIndex, setActiveIndex] = useState(-1);
     const listboxId = useId();
     const optionId = (index: number) => `${listboxId}-opt-${index}`;
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const [drugSearch] = useState(() => createDrugAutocompleteSearch()); // @Codex WUL-488
-    /* @Codex WUL-UIUX: in modifica il campo parte con defaultValue (nome farmaco):
+    const [drugSearch] = useState(() => createDrugAutocompleteSearch()); // WUL-488
+    /* WUL-UIUX: in modifica il campo parte con defaultValue (nome farmaco):
        non deve far partire una ricerca ne aprire il popover finche il medico non
        digita davvero. */
     const hasUserTyped = useRef(false);
 
     // Debounce search
     useEffect(() => {
-        drugSearch.abort(); // @Codex WUL-488
+        drugSearch.abort(); // WUL-488
         if (!hasUserTyped.current) return () => drugSearch.abort();
         const timer = setTimeout(async () => {
             const tokens = query.trim().split(/\s+/).filter(t => t.length > 0);
@@ -49,7 +49,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
             if (tokens.length > 0 && tokens[0].length > 2) {
                 setIsLoading(true);
                 try {
-                    const result = await drugSearch.run(query.trim()); // @Codex WUL-488
+                    const result = await drugSearch.run(query.trim()); // WUL-488
                     if (result === null) return;
                     setResults(result.items);
                     setCatalogState(result.catalogState);
@@ -93,7 +93,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     }, [wrapperRef]);
 
     const handleSelect = (drug: AifaDrug) => {
-        commitDrugAutocompleteQueryChange(drugSearch, setQuery, drug.name, () => setIsLoading(false)); // @Codex WUL-488
+        commitDrugAutocompleteQueryChange(drugSearch, setQuery, drug.name, () => setIsLoading(false)); // WUL-488
         setIsOpen(false);
         setActiveIndex(-1);
         onSelect(drug);
@@ -125,7 +125,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
     };
 
     return (
-        // @Codex WUL-229: drug autocomplete now uses mf-input + mf-popover (vitreous tier)
+        // WUL-229: drug autocomplete now uses mf-input + mf-popover (vitreous tier)
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} />
@@ -139,7 +139,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                     value={query}
                     onChange={(e) => {
                         hasUserTyped.current = true;
-                        commitDrugAutocompleteQueryChange(drugSearch, setQuery, e.target.value); // @Codex WUL-488
+                        commitDrugAutocompleteQueryChange(drugSearch, setQuery, e.target.value); // WUL-488
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
@@ -156,7 +156,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                 {!isLoading && query && (
                     <button
                         type="button"
-                        onClick={() => commitDrugAutocompleteQueryChange(drugSearch, setQuery, '')} // @Codex WUL-488
+                        onClick={() => commitDrugAutocompleteQueryChange(drugSearch, setQuery, '')} // WUL-488
                         className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[color:var(--lume-ink-muted)] transition-colors hover:bg-[color:var(--lume-surface-focal)] hover:text-[color:var(--lume-ink)]"
                         style={{ color: 'var(--lume-ink-muted)' }}
                         title="Cancella ricerca"

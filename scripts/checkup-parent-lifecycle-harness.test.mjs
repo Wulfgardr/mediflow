@@ -1,4 +1,4 @@
-/* @Codex: regression for the private loader and current transactional fixture seams. */
+/* regression for the private loader and current transactional fixture seams. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';

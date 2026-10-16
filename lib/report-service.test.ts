@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import Module from 'node:module';
@@ -253,7 +252,7 @@ test('generatePatientReport renders ICD, therapy, diary, observations and scales
     assert.ok(doc.autoTableCalls[2].body.every((row) => row[1] !== 'SCALE'));
     assert.equal(doc.autoTableCalls[3].body[0][2], '8480-6');
     assert.equal(doc.autoTableCalls[4].body[0][1], 'MMSE');
-    // @Codex: P2 records the existing PDF subset, including the 30-entry cap.
+    // P2 records the existing PDF subset, including the 30-entry cap.
     assert.ok(doc.texts.includes(patient.taxCode));
     assert.ok(doc.texts.includes(patient.address));
     assert.ok(doc.texts.includes(patient.phone));
@@ -293,7 +292,7 @@ test('generatePatientReport renders explicit empty states when data is missing',
 }
 );
 
-/* @Codex WUL-327: lo zero è un punteggio valido e non deve degradare a '-'. */
+/* WUL-327: lo zero è un punteggio valido e non deve degradare a '-'. */
 test('generatePatientReport rende lo zero valido e conserva il segnaposto per i punteggi assenti', async () => {
     FakeJsPDF.pageHeight = 220;
 

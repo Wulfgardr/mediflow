@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 
 #if os(macOS)

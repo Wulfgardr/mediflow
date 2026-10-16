@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-/* @Codex */
 import fs from 'fs';
 import path from 'path';
 import os from 'node:os';
@@ -7,7 +6,6 @@ import { resolveDataPath } from '@/lib/data-dir';
 import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
 import { parseWrappedMasterKey } from '@/lib/security/security';
 import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
-/* @Codex */
 import {
     bootstrapWebAuthControl,
     resolveWebAuthControlSession,
@@ -18,10 +16,8 @@ import {
     type WebAuthControlBootstrap,
 } from '@/lib/security/web-auth-control-transport';
 
-/* @Codex */
 export const dynamic = 'force-dynamic';
 
-/* @Codex */
 const getDbHealth = () => {
     const dbPath = resolveDataPath('medical.db');
     const legacyDbPath = path.join(process.cwd(), 'medical.db');
@@ -49,7 +45,6 @@ const getDbHealth = () => {
     };
 };
 
-/* @Codex */
 function buildPublicDbState(
     state: 'ready' | 'missing' | 'schema-missing' | 'unavailable'
 ) {
@@ -68,7 +63,6 @@ function unlockParameters(accounts: { encryptedMasterKey: string; salt: string; 
     };
 }
 
-/* @Codex */
 function finalizeControlResponse(
     response: NextResponse,
     request: Request,
@@ -109,7 +103,6 @@ export async function GET(request: Request) {
         return response;
     }
 
-    /* @Codex */
     let dbHealth: ReturnType<typeof getDbHealth> | null = null;
     /* WUL-547. Qui passava `error.message` grezzo: percorsi del filesystem e
        internals SQLite finivano nella risposta. Il ramo generico piu' sotto usava
@@ -122,11 +115,9 @@ export async function GET(request: Request) {
         dbHealthClassification = classifyAuthHealthError(error);
         console.error('[auth-check]', dbHealthClassification.code, dbHealthClassification.message);
     }
-    /* @Codex */
     const sessionId = webAuthSessionIdFromRequest(request);
     const resolution = sessionId ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
     const hasSession = resolution?.status === 'active';
-    /* @Codex */
     if (!dbHealth) {
         const response = NextResponse.json({
             status: 'error',
@@ -146,7 +137,6 @@ export async function GET(request: Request) {
         return finalizeControlResponse(response, request, presentedControlId, control);
     }
 
-    /* @Codex */
     if (!dbHealth.dbExists && !dbHealth.legacyExists && !dbHealth.firstInstallation) {
         const response = NextResponse.json({
             status: 'error',
@@ -164,7 +154,6 @@ export async function GET(request: Request) {
     }
 
     try {
-        /* @Codex */
         const [{ dbServer }, { users }] = await Promise.all([
             import('@/lib/db-server'),
             import('@/lib/schema'),
@@ -173,7 +162,6 @@ export async function GET(request: Request) {
             encryptedMasterKey: users.encryptedMasterKey, salt: users.salt, unlockVerifierHash: users.unlockVerifierHash,
         }).from(users).limit(2);
         const response = NextResponse.json({
-            /* @Codex */
             status: 'ok',
             archiveGeneration: currentArchiveGeneration(),
             archiveMaintenance: process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT
@@ -181,12 +169,10 @@ export async function GET(request: Request) {
             isSetup: accounts.length > 0,
             hasSession,
             ...(accounts.length > 0 ? { unlock: unlockParameters(accounts) } : {}),
-            /* @Codex */
             db: buildPublicDbState('ready')
         });
         return finalizeControlResponse(response, request, presentedControlId, control);
     } catch (error) {
-        /* @Codex */
         const classification = classifyAuthHealthError(error);
         console.error('[auth-check]', classification.code, classification.message);
         const response = NextResponse.json({

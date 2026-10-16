@@ -1,4 +1,4 @@
-/* @Codex: WUL-673. Pure paired delivery fence; production supplies canonical authority. */
+/* WUL-673. Pure paired delivery fence; production supplies canonical authority. */
 import type { NetworkWriteContext } from '../network-write-context';
 import type { Icd11WhoLocalRuntime } from './icd11-who-local-runtime';
 import { ICD11_WHO_BINDING, Icd11WhoServiceError } from './icd11-who-service';

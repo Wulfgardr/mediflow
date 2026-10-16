@@ -1,5 +1,5 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
-/* @Codex: paired therapy boundary remains specific to this capability and routes. */
+/* paired therapy boundary remains specific to this capability and routes. */
 import { v4 as uuidv4 } from 'uuid';
 import { normalizeTherapyCreateInput, normalizeTherapyUpdateInput } from './api-v1-clinical-write-normalization';
 import { createTherapyOperation, updateTherapyOperation } from './therapy-write-operation';
@@ -79,7 +79,6 @@ function networkAuditContext(context: NetworkTherapyMutationContext) {
     };
 }
 
-/* @Codex */
 export async function createNetworkScopedTherapy(
     context: NetworkTherapyMutationContext,
     body: Record<string, unknown>
@@ -99,7 +98,6 @@ export async function createNetworkScopedTherapy(
     }) as NetworkTherapyMutationResponse;
 }
 
-/* @Codex */
 export async function updateNetworkScopedTherapy(
     context: NetworkTherapyUpdateContext,
     body: Record<string, unknown>

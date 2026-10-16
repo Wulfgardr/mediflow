@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { PROSTHETICS_MAX_BYTES } from './prosthetics-catalog-contract';
 import { z } from 'zod';

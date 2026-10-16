@@ -1,4 +1,4 @@
-/* @Codex — synthetic passive DTO fixtures; no server authority, provider or OS qualification. */
+/* synthetic passive DTO fixtures; no server authority, provider or OS qualification. */
 import Foundation
 import XCTest
 #if canImport(MediFlowAppleShared)
@@ -14,7 +14,7 @@ enum NativeOrdinaryTestFixtures {
     static let output = String(repeating: "c", count: 64)
     static func authenticationURL(scheme: String = "https", host: String = "auth.openai.com",
                                   port: Int? = nil, user: String? = nil, path: String = "/synthetic") -> String {
-        // @Codex: construct explicit synthetic login endpoints without runtime URL literals.
+        // construct explicit synthetic login endpoints without runtime URL literals.
         var components = URLComponents()
         components.scheme = scheme
         components.host = host
@@ -130,7 +130,7 @@ final class NativeOrdinaryDTOTests: XCTestCase {
         let unicode = NativeOrdinaryJSON.object(["testo": .string("È sintetico: 🩺")])
         XCTAssertEqual(try JSONDecoder().decode(NativeOrdinaryJSON.self, from: JSONEncoder().encode(unicode)), unicode)
     }
-    // @Codex — the request type has no representable clinical content or authority fields.
+    // the request type has no representable clinical content or authority fields.
     func testFourClosedSelectorPreparationsRoundTrip() throws {
         let inputs: [NativeOrdinaryInput] = [.patientInsight, .smartImport, .documentSynthesis(attachmentId: "synthetic-attachment"), .treatmentReasoning]
         for input in inputs {

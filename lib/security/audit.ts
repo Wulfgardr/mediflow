@@ -10,10 +10,8 @@ import type { ServerSession } from './server-session';
 import { archiveGenerationForSession } from './archive-session-generation';
 import { assertArchiveGeneration } from '../archive-generation';
 
-/* @Codex */
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 
-/* @Codex */
 export const AUDIT_EVENT_TYPES = [
     'auth.login.succeeded',
     'auth.login.failed',
@@ -40,7 +38,7 @@ export const AUDIT_EVENT_TYPES = [
     'observation.created',
     'observation.updated',
     'observation.deleted',
-    /* @Codex: WUL-194 W5 S1, paired document domain boundary. */
+    /* WUL-194 W5 S1, paired document domain boundary. */
     'attachment.created',
     'attachment.updated',
     'attachment.deleted',
@@ -65,13 +63,13 @@ export const AUDIT_EVENT_TYPES = [
     'ambulatory.cleared',
     'ai.review.accepted',
     'ai.review.rejected',
-    /* @Codex: terminal PHI-safe outcome for the fixed synthetic cloud-provider probe. */
+    /* terminal PHI-safe outcome for the fixed synthetic cloud-provider probe. */
     'ai.provider_probe.executed',
-    /* @Codex: terminal PHI-safe audit for the bounded semantic-query operation. */
+    /* terminal PHI-safe audit for the bounded semantic-query operation. */
     'agent.semantic_query.executed',
-    /* @Codex: non-terminal PHI-safe attempt emitted by generic AIP ports. */
+    /* non-terminal PHI-safe attempt emitted by generic AIP ports. */
     'agent.operation.attempted',
-    /* @Codex: PHI-safe receipt for the host-owned WHO reference-data boundary. */
+    /* PHI-safe receipt for the host-owned WHO reference-data boundary. */
     'reference_data.icd11.search',
     'reference_data.icd11.code_check',
 ] as const;
@@ -91,7 +89,6 @@ export type AuditContext = {
     archiveGeneration?: string;
 };
 
-/* @Codex */
 export const AUDIT_SOURCE_SURFACE_HEADER = 'x-mediflow-source-surface';
 
 export type AifaAuditChange = {
@@ -124,13 +121,12 @@ type AuditWriteInput = {
     redactedMetadata?: AuditRedactedMetadata | null;
 };
 
-/* @Codex: host-derived identity/correlation only; the patient core owns event and subject. */
+/* host-derived identity/correlation only; the patient core owns event and subject. */
 export type RequiredAuditContext = Pick<AuditWriteInput, 'actorType' | 'actorRef' | 'sourceSurface' | 'requestId'> & {
     flags: string[];
     archiveGeneration: string | undefined;
 };
 
-/* @Codex */
 export type AuditRequestWriteInput = {
     eventType: AuditEventType;
     outcome?: AuditOutcome;
@@ -174,7 +170,6 @@ export type AuditSummary = {
     isTruncated: boolean;
 };
 
-/* @Codex */
 export function auditSourceSurfaceFromRequest(
     request: Request | null | undefined,
     fallback: AuditSourceSurface
@@ -191,7 +186,6 @@ export function auditSourceSurfaceFromRequest(
     }
 }
 
-/* @Codex */
 export function auditContextFromSession(session: ServerSession | null | undefined): AuditContext {
     if (session?.authChannel === 'native') {
         return {
@@ -222,7 +216,6 @@ export function auditContextFromSession(session: ServerSession | null | undefine
     };
 }
 
-/* @Codex */
 export function auditContextFromRequest(
     request: Request,
     session: ServerSession | null | undefined
@@ -250,7 +243,6 @@ export function auditContextFromRequest(
     return auditContextFromSession(session);
 }
 
-/* @Codex */
 export function withAuditContextMetadata(
     context: AuditContext,
     metadata: AuditRedactedMetadata | null | undefined
@@ -261,20 +253,17 @@ export function withAuditContextMetadata(
     });
 }
 
-/* @Codex */
 export function hashAuditRef(value: string): string {
     const normalized = value.trim().toLowerCase();
     const digest = crypto.createHash('sha256').update(normalized).digest('hex');
     return `sha256:${digest.slice(0, 16)}`;
 }
 
-/* @Codex */
 export function requestIdFromRequest(request: Request): string | null {
     const value = request.headers.get('x-request-id')?.trim();
     return normalizeToken(value);
 }
 
-/* @Codex */
 export function buildAuditWriteInputFromRequest(
     request: Request,
     session: ServerSession | null | undefined,
@@ -294,7 +283,6 @@ export function buildAuditWriteInputFromRequest(
     };
 }
 
-/* @Codex */
 export async function safeWriteAuditEventFromRequest(
     request: Request,
     session: ServerSession | null | undefined,
@@ -308,7 +296,6 @@ export async function safeWriteAuditEventFromRequest(
     }
 }
 
-/* @Codex */
 export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | undefined): AuditRedactedMetadata | null {
     if (!value) return null;
 
@@ -337,7 +324,6 @@ export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | unde
     return Object.keys(sanitized).length > 0 ? sanitized : null;
 }
 
-/* @Codex */
 export function listChangedFields(body: Record<string, unknown>, excluded: string[] = []): string[] {
     const excludedKeys = new Set(excluded);
     return sanitizeTokenList(
@@ -347,7 +333,6 @@ export function listChangedFields(body: Record<string, unknown>, excluded: strin
     );
 }
 
-/* @Codex */
 export function classifyPatientMutationEvent(previousIsArchived: boolean | null, nextIsArchived: boolean | undefined): AuditEventType {
     if (previousIsArchived === true && nextIsArchived === false) {
         return 'patient.restored';
@@ -355,7 +340,6 @@ export function classifyPatientMutationEvent(previousIsArchived: boolean | null,
     return 'patient.updated';
 }
 
-/* @Codex */
 function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferInsert {
     const eventId = uuidv4();
     const occurredAt = input.occurredAt ?? new Date();
@@ -377,7 +361,7 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
     };
 }
 
-/* @Codex: mandatory clinical audit insert on the caller's authoritative SQLite transaction. */
+/* mandatory clinical audit insert on the caller's authoritative SQLite transaction. */
 export function writeAuditEventInTransaction(
     tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
     input: AuditWriteInput,
@@ -392,7 +376,6 @@ export function writeAuditEventInTransaction(
     return row.eventId;
 }
 
-/* @Codex */
 export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
     const { dbServer } = await import('../db-server');
     const row = buildAuditEventRow(input);
@@ -400,7 +383,6 @@ export async function writeAuditEvent(input: AuditWriteInput): Promise<string> {
     return row.eventId;
 }
 
-/* @Codex */
 export async function listAuditEvents(filters: AuditListFilters = {}): Promise<AuditRecord[]> {
     const { dbServer } = await import('../db-server');
     const limit = normalizeLimit(filters.limit);
@@ -434,7 +416,6 @@ export async function listAuditEvents(filters: AuditListFilters = {}): Promise<A
     }));
 }
 
-/* @Codex */
 export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false): AuditSummary {
     const outcomes: Record<AuditOutcome, number> = {
         success: 0,

@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { snapshotProviderLifecycleV2, type ProviderBindingV2 } from './provider-lifecycle';
 

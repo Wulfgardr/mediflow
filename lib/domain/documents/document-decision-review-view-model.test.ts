@@ -1,14 +1,10 @@
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,
     createDocumentDecisionEvidenceRef,
 } from './document-decision';
-/* @Codex */
 import { buildDocumentDecisionReviewViewModel } from './document-decision-review-view-model';
 
 const baseSource = {

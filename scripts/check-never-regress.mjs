@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import fs from 'fs';
 import path from 'path';
@@ -55,7 +54,6 @@ function main() {
     reportAndExit();
 }
 
-/* @Codex */
 export function validateIcd11WhoRouteSource(source) {
     const issues = new Set();
     const sourceFile = ts.createSourceFile(
@@ -138,7 +136,6 @@ function isCanonicalIcdGetHandler(node, sourceFile) {
     ].join('');
 }
 
-/* @Codex */
 export function validateLegacyOcrRetirementSource(source) {
     const issues = new Set();
     const sourceFile = ts.createSourceFile(
@@ -174,7 +171,6 @@ export function validateLegacyOcrRetirementSource(source) {
     return [...issues];
 }
 
-/* @Codex */
 export function validateLegacyPdfRetirementSource(source) {
     const issues = new Set();
     const sourceFile = ts.createSourceFile('app/api/pdf-extract/route.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -489,7 +485,6 @@ function runExternalUrlChecks(runtimeFiles) {
     }
 }
 
-/* @Codex */
 export function isExternalUrlLiteralAllowed(relativePath, rawUrl, sourceLine = rawUrl) {
     let parsed;
     try {

@@ -1,4 +1,4 @@
-/* @Codex */
+import { hasSourceDirective } from '../../../scripts/test-support/source-structure.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -338,7 +338,7 @@ test('revalidates host-owned facts before ingest and preview dispatch', async ()
 
 test('keeps the controller browser-only, manual, and free of persistence, apply, legacy, or refresh paths', () => {
     const source = readFileSync(new URL('./treatment-reasoning-browser-controller.ts', import.meta.url), 'utf8');
-    assert.match(source, /^\/\* @Codex \*\/[\s\S]*?'use client';/u);
+    assert.equal(hasSourceDirective(source, 'use client'), true);
     assert.doesNotMatch(source, /server-only|node:|localStorage|sessionStorage|indexedDB|setInterval|setTimeout|\.apply\(|\/api\/context|\/api\/system\/treatment-reasoning|generatePatientTreatmentReasoningDraft|generic.{0,20}(invoke|prompt)/u);
     assert.deepEqual(Object.keys(createTreatmentReasoningBrowserController({ fetch: async () => response({}) })), ['reset', 'readProposal', 'run']);
 });

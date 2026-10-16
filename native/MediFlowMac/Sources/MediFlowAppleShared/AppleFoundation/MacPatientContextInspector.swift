@@ -2,7 +2,6 @@
 import AppKit
 import SwiftUI
 
-/* @Codex */
 enum MacInspectorPresentationMode: Equatable {
     case nativeInspector
     case sheetFallback
@@ -16,13 +15,11 @@ enum MacInspectorPresentationMode: Equatable {
     }
 }
 
-/* @Codex */
 enum MacClinicalContentSurfaceStyle {
     static var backgroundColor: NSColor { .controlBackgroundColor }
     static var separatorColor: NSColor { .separatorColor }
 }
 
-/* @Codex */
 struct MacPatientInspectorSnapshot: Equatable {
     let displayName: String
     let taxCode: String
@@ -41,7 +38,6 @@ struct MacPatientInspectorSnapshot: Equatable {
     }
 }
 
-/* @Codex */
 struct MacPatientInspectorContent: View {
     let snapshot: MacPatientInspectorSnapshot
 
@@ -86,7 +82,6 @@ struct MacPatientInspectorContent: View {
     }
 }
 
-/* @Codex */
 struct MacPatientInspectorPresentationModifier: ViewModifier {
     let workspaceModel: PairedPatientsWorkspaceModel?
     @Binding var isPresented: Bool

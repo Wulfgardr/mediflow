@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-672: local Search only; provisioning and activation are host-owned. */
+/* WUL-672: local Search only; provisioning and activation are host-owned. */
 import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';

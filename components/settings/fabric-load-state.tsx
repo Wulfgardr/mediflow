@@ -1,4 +1,3 @@
-/* @Codex */
 import { SETTINGS_CARD_CLASS } from './settings-ui';
 import styles from './settings-lume.module.css';
 

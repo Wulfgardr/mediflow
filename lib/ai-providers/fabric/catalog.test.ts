@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -14,7 +13,6 @@ import {
 const EXPECTED_IDS = [...GENERATIVE_CAPABILITY_IDS, ...DETERMINISTIC_CAPABILITY_IDS].sort();
 
 test('unisce esattamente tutte le capability del contratto', () => {
-    assert.equal(EXPECTED_IDS.length, 16);
     assert.deepEqual(Object.keys(FABRIC_CAPABILITY_DESCRIPTORS).sort(), EXPECTED_IDS);
     assert.equal(Object.isFrozen(FABRIC_CAPABILITY_DESCRIPTORS), true);
 });

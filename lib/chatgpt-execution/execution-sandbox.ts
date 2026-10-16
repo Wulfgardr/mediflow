@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';

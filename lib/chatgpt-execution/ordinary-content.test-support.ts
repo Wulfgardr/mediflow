@@ -1,4 +1,3 @@
-/* @Codex */
 /* Synthetic ordinary-content fixtures. No runtime account or clinical data. */
 import assert from 'node:assert/strict';
 import { createPatientInsightOrdinaryTaskProfile, createSmartImportOrdinaryTaskProfile, createDocumentSynthesisOrdinaryTaskProfile, createTreatmentReasoningOrdinaryTaskProfile } from './ordinary-task-profile';

@@ -1,4 +1,4 @@
-// @Codex: WUL-673. WHO-only DTOs; no transport, persistence or patient mutation.
+// WUL-673. WHO-only DTOs; no transport, persistence or patient mutation.
 import Foundation
 
 public enum HomeBaseWHOError: Error, LocalizedError, Equatable, Sendable {

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -142,7 +141,7 @@ test('run-strip-types can exclude files from glob expansion', () => {
   }
 });
 
-/* @Codex: every subprocess uses synthetic HOME and/or an explicit fixture. */
+/* every subprocess uses synthetic HOME and/or an explicit fixture. */
 function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-runner-preflight-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

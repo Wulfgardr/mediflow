@@ -2,7 +2,6 @@ import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 
 import { NextResponse } from 'next/server';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import {
     assertLocalOllamaResponse,
@@ -16,7 +15,6 @@ import { ollamaLocalityErrorResponse } from '@/lib/ai-providers/ollama-locality-
  * Addresses CORS and Mixed Content issues by routing requests through Next.js server.
  */
 export async function POST(req: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(req, session);

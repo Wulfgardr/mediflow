@@ -1,6 +1,4 @@
-/* @Codex */
 import { timingSafeEqual } from 'node:crypto';
-/* @Codex */
 import {
     hashNetworkPairedClientToken,
     NETWORK_PAIRED_CLIENT_ID_HEADER,
@@ -29,7 +27,6 @@ function safeEqualHex(left: string, right: string): boolean {
     return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
-/* @Codex */
 export function authenticatePairedClientRequest(
     request: Request,
     clients: StoredNetworkPairedClient[]

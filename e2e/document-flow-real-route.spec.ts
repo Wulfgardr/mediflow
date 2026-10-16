@@ -1,4 +1,4 @@
-/* @Codex: full application and authenticated routes, isolated synthetic data only. */
+/* full application and authenticated routes, isolated synthetic data only. */
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 import { assertDocumentFlowRealRoutes } from './document-flow-real-route.acceptance';

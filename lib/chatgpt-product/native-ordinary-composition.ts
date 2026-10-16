@@ -1,4 +1,4 @@
-/* @Codex — fixed native application composition, never a request-defined callback. */
+/* fixed native application composition, never a request-defined callback. */
 import 'server-only';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';

@@ -1,4 +1,4 @@
-/* @Codex ADR 0123: production UI acceptance on an explicitly marked synthetic node. */
+/* ADR 0123: production UI acceptance on an explicitly marked synthetic node. */
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';

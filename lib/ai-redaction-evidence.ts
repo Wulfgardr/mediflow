@@ -1,4 +1,4 @@
-/* @Codex — strict diagnostics over evidence. A positive return is NOT an egress grant. */
+/* strict diagnostics over evidence. A positive return is NOT an egress grant. */
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { REDACTION_RUNTIME_ADAPTER, REDACTION_RUNTIME_FILES, REDACTION_RUNTIME_MODEL, REDACTION_RUNTIME_PACKAGES,

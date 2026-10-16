@@ -1,5 +1,4 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { and, asc, inArray, isNull, not, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
@@ -136,7 +135,7 @@ export async function POST(request: Request) {
         const body = await request.json();
         const archiveDenial = archiveWriteRequestDenial(request, session);
         if (archiveDenial) return archiveDenial;
-        /* @Codex: full imports must use the reviewed atomic protocol (ADR 0127). */
+        /* full imports must use the reviewed atomic protocol (ADR 0127). */
         if (Array.isArray(body)) {
             return NextResponse.json({ error: 'EXEMPTION_IMPORT_PREVIEW_REQUIRED', message: 'Usa l’anteprima import in Repertori esenzioni.' }, { status: 400 });
         }

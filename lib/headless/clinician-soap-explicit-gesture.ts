@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type ClinicianSoapExplicitGestureDenialCode =
     | 'field_set_unavailable'

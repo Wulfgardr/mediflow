@@ -1,4 +1,4 @@
-/* @Codex: presentation only; readiness strings never grant installation or activation. */
+/* presentation only; readiness strings never grant installation or activation. */
 export function whoSetupGuideStatus(status?: string): string {
     switch (status) {
         case 'loading': return 'Lettura dello stato WHO…';

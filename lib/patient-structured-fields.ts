@@ -15,14 +15,12 @@ function parseArrayField(value: unknown): unknown[] | undefined {
     return Array.isArray(parsed) ? parsed : undefined;
 }
 
-/* @Codex */
 export function parsePatientExemptions(value: unknown): string[] {
     const parsed = parseArrayField(value);
     if (!parsed) return [];
     return parsed.filter((code): code is string => typeof code === 'string');
 }
 
-/* @Codex */
 export function parsePatientDatedRecords<T extends object>(value: unknown): Array<T & { date: Date }> {
     const parsed = parseArrayField(value);
     if (!parsed) return [];
@@ -35,7 +33,6 @@ export function parsePatientDatedRecords<T extends object>(value: unknown): Arra
         } as T & { date: Date }));
 }
 
-/* @Codex */
 export function revivePatientStructuredFields<T extends object>(item: T): T {
     const record = item as T & {
         exemptions?: unknown;

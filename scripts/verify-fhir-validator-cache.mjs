@@ -1,4 +1,3 @@
-/* @Codex */
 // Offline research tooling. Byte identity is not resource/profile conformance.
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';

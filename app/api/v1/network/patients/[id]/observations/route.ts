@@ -1,18 +1,13 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_OBSERVATION_READ_CAPABILITY,
     listNetworkScopedObservations,
 } from '@/lib/network-observation-read';
-/* @Codex */
 import {
     NETWORK_OBSERVATION_WRITE_CAPABILITY,
     createNetworkScopedObservation,
 } from '@/lib/network-observation-write';
-/* @Codex */
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
 
 function parseLimit(value: string | null): number | null {
@@ -28,7 +23,6 @@ function parseDateParam(value: string | null): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/* @Codex */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -50,7 +44,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-/* @Codex */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -71,7 +64,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/patients/[id]/observations error:', error);

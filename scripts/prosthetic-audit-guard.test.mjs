@@ -1,4 +1,4 @@
-/* @Codex: source mutations check the bounded guard; SQLite tests establish behavior. */
+/* source mutations check the bounded guard; SQLite tests establish behavior. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -34,7 +34,7 @@ for (const [handler, mode, operation, route] of cases) {
     });
 }
 
-/* @Codex: review reproduced both bypasses against the initial guard. */
+/* review reproduced both bypasses against the initial guard. */
 test('prosthetic create rejects an unaudited write and success before the approved transaction', () => {
     const spec = prostheticAuditContract('POST', 'host', 'create');
     const coreSource = source.replace('    return dbServer.transaction((tx): MutationResponse => {',

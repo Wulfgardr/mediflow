@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX (Fase 4): Foglio clinico sinottico. Sostituisce la strip di
+/* WUL-UIUX (Fase 4): Foglio clinico sinottico. Sostituisce la strip di
    conteggi (PatientClinicalSignals) in cima alla Scheda. Un foglio unico e
    delicato: il medico legge il paziente in pochi secondi (problema guida,
    terapie attive CON posologia, ultima misura con variazione, prossimo
@@ -27,7 +27,7 @@ export interface SynopticTherapyLine {
 export interface SynopticDelta {
     direction: 'up' | 'down' | 'flat';
     label: string;
-    /* @Codex WUL-UIUX: data della misura precedente ("dal 12 gen"), cosi la
+    /* WUL-UIUX: data della misura precedente ("dal 12 gen"), cosi la
        variazione non nasconde un salto temporale lungo (es. -10 kg dopo 6 mesi). */
     sinceLabel?: string;
 }
@@ -48,14 +48,14 @@ export interface SynopticSignal {
 }
 
 export interface PatientSynopticSheetProps {
-    /* @Codex WUL-678: clinical proposals live inside the actual summary destination. */
+    /* WUL-678: clinical proposals live inside the actual summary destination. */
     clinicalSupport?: ReactNode;
     notes?: string;
     leadDiagnosis?: Diagnosis;
     otherProblemsCount: number;
     signals: SynopticSignal[];
     therapies?: SynopticTherapyLine[];
-    /* @Codex WUL-UIUX Fase 7: undefined finche la pipeline workspace non e
+    /* WUL-UIUX Fase 7: undefined finche la pipeline workspace non e
        pronta, cosi il totale non mostra zeri finti durante il caricamento. */
     therapiesTotal?: number;
     latestMeasure?: SynopticMeasure | null;
@@ -105,7 +105,7 @@ export function PatientSynopticSheet({
     const visibleTherapies = therapies ? therapies.slice(0, THERAPY_CAP) : [];
     const extraTherapies = therapiesTotal !== undefined ? therapiesTotal - visibleTherapies.length : 0;
 
-    /* @Codex: a selective reading surface uses only supplied records. Absent
+    /* a selective reading surface uses only supplied records. Absent
        secondary modules stay in navigation; no empty specialist cards. */
     if (proposal) return (
       <section id="quadro" aria-label="Riepilogo clinico" className={reading.sheet} data-layout={composition}>
@@ -194,7 +194,7 @@ export function PatientSynopticSheet({
             <hr className="my-4 border-0 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_8%,transparent)]" />
 
             <div className={styles.synopticDetails}>
-                {/* @Codex: keep medication, dose and count within one readable group. */}
+                {/* keep medication, dose and count within one readable group. */}
                 <div className={styles.synopticDetail}>
                     <a href="#terapie" className={styles.synopticDetailHeading}>
                         <MicroLabel>Terapie attive</MicroLabel>

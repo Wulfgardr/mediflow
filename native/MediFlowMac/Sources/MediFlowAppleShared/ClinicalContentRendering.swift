@@ -5,7 +5,6 @@ import AppKit
 import UIKit
 #endif
 
-/* @Codex */
 public enum ClinicalContentRendering {
     private static let supportedHTMLMarkers = [
         "<p", "</p", "<br", "<strong", "</strong", "<b", "</b", "<em", "</em",
@@ -64,7 +63,6 @@ public enum ClinicalContentRendering {
     }
 }
 
-/* @Codex */
 /// The four S/O/A/P headings, and nothing else.
 ///
 /// This used to insert a gloss beside each letter — "S: motivo della visita,

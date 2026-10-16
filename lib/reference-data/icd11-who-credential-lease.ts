@@ -1,4 +1,3 @@
-/* @Codex */
 import { types as nodeUtilTypes } from 'node:util';
 export const ICD11_WHO_SECRET_REFERENCE = Object.freeze({ scheme: 'host_secret' as const,
     name: 'mediflow.who.icd-api.oauth-client.v1' as const });

@@ -224,7 +224,7 @@ function DocumentSynthesisFabricReviewCardSession({
 
             {phase === 'terminal' && publication && providerBindingReceipt && (
                 <div className="mt-4 grid min-w-0 gap-4" data-testid="document-synthesis-fabric-result">
-                    {/* @Codex: summary, sources and receipt share the document reading plane. */}
+                    {/* summary, sources and receipt share the document reading plane. */}
                     <div className={styles.proposalRow}>
                         <p className="font-semibold text-[color:var(--lume-ink)]">Riepilogo da rivedere</p>
                         <p className="mt-2 break-words text-[color:var(--lume-ink)]">

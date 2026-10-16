@@ -1,4 +1,3 @@
-/* @Codex */
 import { z } from 'zod';
 
 export const WORK_PROFILE_SETTING_KEY = 'onboarding.workProfile';

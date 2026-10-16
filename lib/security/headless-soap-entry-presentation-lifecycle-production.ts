@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import * as internal from './headless-soap-entry-presentation-lifecycle-production-internal';

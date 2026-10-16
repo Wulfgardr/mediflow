@@ -1,6 +1,5 @@
 import type { Icd11WhoCatalogRuntime } from './icd11-catalog-runtime';
 import { parseWhoEmbeddedReadiness } from './icd11-embedded-contract';
-/* @Codex */
 import { ICD11_WHO_BINDING, Icd11WhoServiceError } from './icd11-who-service.ts';
 import type { Icd11WhoProductionRuntime } from './icd11-who-production-runtime.ts';
 import type { Icd11WhoLocalRuntime } from './icd11-who-local-runtime.ts';

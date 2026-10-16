@@ -1,13 +1,8 @@
-/* @Codex */
 import { SECURITY_CONFIG, wrapMasterKeyVersioned } from './security';
 
-/* @Codex */
 export const PIN_CHANGE_INVALID_CURRENT_PIN_CODE = 'PIN_CHANGE_INVALID_CURRENT_PIN';
-/* @Codex */
 export const PIN_CHANGE_INVALID_NEW_PIN_CODE = 'PIN_CHANGE_INVALID_NEW_PIN';
-/* @Codex */
 export const PIN_CHANGE_REUSE_NOT_ALLOWED_CODE = 'PIN_CHANGE_REUSE_NOT_ALLOWED';
-/* @Codex */
 export const PIN_CHANGE_CONFLICT_CODE = 'PIN_CHANGE_CONFLICT';
 /** ADR 0143: on an account with a passphrase the PIN wraps nothing, so it cannot replace the wrapping. */
 export const PIN_CHANGE_PASSPHRASE_ACCOUNT_CODE = 'PIN_CHANGE_PASSPHRASE_ACCOUNT';
@@ -16,14 +11,12 @@ export const PASSPHRASE_ADOPTION_INVALID_PIN_CODE = 'PASSPHRASE_ADOPTION_INVALID
 export const PASSPHRASE_ALREADY_ADOPTED_CODE = 'PASSPHRASE_ALREADY_ADOPTED';
 export const PASSPHRASE_ADOPTION_CONFLICT_CODE = 'PASSPHRASE_ADOPTION_CONFLICT';
 
-/* @Codex */
 export type PinChangeFailurePayload = {
     error?: string;
     code?: string;
     message?: string;
 };
 
-/* @Codex */
 function getCryptoApi(): Crypto {
     if (!globalThis.crypto) {
         throw new Error('Web Crypto API unavailable');
@@ -31,12 +24,10 @@ function getCryptoApi(): Crypto {
     return globalThis.crypto;
 }
 
-/* @Codex */
 function bytesToBase64(bytes: Uint8Array): string {
     return btoa(String.fromCharCode(...bytes));
 }
 
-/* @Codex */
 export function validatePinChangeInput(currentPin: string, newPin: string): string | null {
     if (!currentPin) {
         return 'Inserisci il PIN attuale.';
@@ -53,7 +44,6 @@ export function validatePinChangeInput(currentPin: string, newPin: string): stri
     return null;
 }
 
-/* @Codex */
 export async function createPinRotationBundle(masterKey: CryptoKey, newPin: string): Promise<{ encryptedMasterKey: string; salt: string }> {
     const salt = getCryptoApi().getRandomValues(new Uint8Array(16));
     // Always re-wrap at the current KDF version (v2, 600k) on PIN change.
@@ -65,7 +55,6 @@ export async function createPinRotationBundle(masterKey: CryptoKey, newPin: stri
     };
 }
 
-/* @Codex */
 export function formatPinChangeFailure(payload: PinChangeFailurePayload | null, status: number): string {
     if (payload?.code === PIN_CHANGE_INVALID_CURRENT_PIN_CODE) {
         return payload.message || 'Il PIN attuale non è corretto.';
