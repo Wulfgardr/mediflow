@@ -1374,54 +1374,7 @@ test('coerceInsightToReadable rejects a mismatched envelope nested as object in 
 });
 
 /* @Codex */
-test('document analysis rejects an envelope with a mismatched task', async () => {
-    const restoreHarness = await withHarness();
-    const { AIService } = await import('./ai-service');
-    const { db } = await import('./db');
-    const { analyzeDocumentContent } = await import('./domain/documents/document-synthesis-service');
-    const original = { getSetting: db.settings.get, createAi: AIService.create };
 
-    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
-    AIService.create = (async () => ({
-        getModelInfo: () => ({
-            provider: 'ollama',
-            model: 'synthetic',
-            baseUrl: 'http://127.0.0.1:11434',
-            receipt: {
-                schemaVersion: 'mediflow.ai.provider-selection.v1',
-                authorityPlane: 'clinical_application',
-                task: 'reasoning',
-                provider: 'ollama',
-                model: 'synthetic',
-                execution: 'local',
-                endpointClass: 'loopback',
-                egress: 'none',
-                runtimeReadiness: 'required',
-                fallbackCount: 0,
-            },
-        }),
-        getHealth: async () => ({ status: 'ok' as const, message: 'synthetic', models: [] }),
-        generate: async () => JSON.stringify({
-            schemaVersion: 'mediflow.ai.extract.v1',
-            task: 'smart_import',
-            summary: 'Task errato per la sintesi',
-            data: {},
-        }),
-    })) as unknown as typeof AIService.create;
-
-    try {
-        await assert.rejects(
-            analyzeDocumentContent('Referto sintetico di prova'),
-            /risposta non valida per l'analisi del documento/i,
-        );
-    } finally {
-        db.settings.get = original.getSetting;
-        AIService.create = original.createAi;
-        restoreHarness();
-    }
-});
-
-/* @Codex */
 test('coerceInsightToReadable rejects a broken declared envelope that embeds markdown', async () => {
     const restore = await withHarness();
     try {
@@ -2105,74 +2058,5 @@ test('resolver: distributed candidate budget exhaustion never becomes structured
         assert.notEqual(coerceInsightToReadable(DISTRIBUTED_CANDIDATE_INSIGHT).kind, 'structured');
     } finally {
         restore();
-    }
-});
-
-/* @Codex */
-test('smart import generation rejects an envelope with a mismatched task', async () => {
-    const restoreHarness = await withHarness();
-    const { AIService } = await import('./ai-service');
-    const { db } = await import('./db');
-    const { generatePatientSmartImportAnalysis } = await import('./domain/documents/patient-smart-import-service');
-    const original = {
-        getSetting: db.settings.get,
-        getPatient: db.patients.get,
-        filterEntries: db.entries.filter,
-        filterAttachments: db.attachments.filter,
-        filterTherapies: db.therapies.filter,
-        createAi: AIService.create,
-    };
-
-    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
-    db.patients.get = (async () => ({
-        id: 'patient-1',
-        firstName: 'Paziente',
-        lastName: 'Sintetico',
-        diagnoses: [],
-        version: 1,
-    })) as unknown as typeof db.patients.get;
-    db.entries.filter = (() => ({
-        toArray: async () => [{
-            id: 'entry-1',
-            patientId: 'patient-1',
-            type: 'note',
-            title: 'Nota clinica',
-            content: 'Contenuto clinico sintetico sufficiente come sorgente smart import.',
-            date: new Date('2026-01-01T10:00:00Z'),
-        }],
-    })) as unknown as typeof db.entries.filter;
-    db.attachments.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.attachments.filter;
-    db.therapies.filter = (() => ({ toArray: async () => [] })) as unknown as typeof db.therapies.filter;
-    AIService.create = (async () => ({
-        getModelInfo: () => ({
-            provider: 'ollama', model: 'synthetic', baseUrl: 'http://127.0.0.1:11434',
-            receipt: {
-                schemaVersion: 'mediflow.ai.provider-selection.v1', authorityPlane: 'clinical_application',
-                task: 'clinical', provider: 'ollama', model: 'synthetic', execution: 'local',
-                endpointClass: 'loopback', egress: 'none', runtimeReadiness: 'required', fallbackCount: 0,
-            },
-        }),
-        getHealth: async () => ({ status: 'ok', message: 'synthetic', models: ['synthetic'] }),
-        generate: async () => JSON.stringify({
-            schemaVersion: 'mediflow.ai.extract.v1',
-            task: 'patient_insight',
-            summary: 'Task errato per lo smart import',
-            data: {},
-        }),
-    })) as unknown as typeof AIService.create;
-
-    try {
-        await assert.rejects(
-            generatePatientSmartImportAnalysis('patient-1'),
-            /risposta non valida per lo smart import/i,
-        );
-    } finally {
-        db.settings.get = original.getSetting;
-        db.patients.get = original.getPatient;
-        db.entries.filter = original.filterEntries;
-        db.attachments.filter = original.filterAttachments;
-        db.therapies.filter = original.filterTherapies;
-        AIService.create = original.createAi;
-        restoreHarness();
     }
 });

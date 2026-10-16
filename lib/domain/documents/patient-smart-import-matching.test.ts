@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { db, type AifaDrug, type Patient, type Therapy } from '../../db';
-import { applyPatientSmartImportSelection, type PatientSmartImportAnalysis } from './patient-smart-import-service';
+import type { AifaDrug, Therapy } from '../../db';
 import {
     buildDiagnosisSearchQueries,
     classifyExtractedTherapyState,
@@ -27,108 +26,6 @@ test('smart import diagnosis search queries keep explicit code first and add tex
     });
 
     assert.deepEqual(queries, ['5A11', 'type 2 diabetes mellitus', 'Diabete mellito tipo 2']);
-});
-
-test('smart import apply does not duplicate a therapy matching operator-reviewed fields', async () => {
-    const existingTherapy: Therapy = {
-        id: 'therapy-existing',
-        patientId: 'patient-1',
-        drugName: 'Bisoprololo corretto',
-        aic: 'AIC-BISO-125',
-        atc: 'C07AB07',
-        activePrinciple: 'Bisoprololo corretto',
-        dosage: '1,25 mg 1 cp',
-        motivation: 'Terapia esistente',
-        status: 'active',
-        startDate: new Date('2026-07-01T00:00:00Z'),
-        createdAt: new Date('2026-07-01T00:00:00Z'),
-        updatedAt: new Date('2026-07-01T00:00:00Z'),
-    };
-    const analysis: PatientSmartImportAnalysis = {
-        generatedAt: '2026-07-01T00:00:00Z',
-        contract: { validJson: true, validTask: true, legacyContract: false },
-        model: { provider: 'local', model: 'test' },
-        sourceSummary: { notes: 0, entries: 0, documentInsights: 0, attachmentSummaries: 0 },
-        diagnoses: [],
-        therapies: [{
-            id: 'therapy-reviewed',
-            drugMention: 'Bisoprololo da correggere',
-            drugQuery: 'Bisoprololo',
-            activePrinciple: 'Bisoprololo da correggere',
-            dosage: '5 mg 1 cp',
-            therapyState: 'active',
-            confidence: 'high',
-            evidence: { sourceKind: 'patient-notes', sourceId: 'note-1', label: 'Nota', excerpt: 'Bisoprololo' },
-            matchType: 'catalog',
-            match: { aic: 'AIC-BISO-125', name: 'Bisoprololo catalogo', activePrinciple: 'Bisoprololo catalogo', atc: 'C07AB07' },
-            canApply: true,
-            review: { state: 'new', summary: 'Nuova terapia' },
-            resolver: { searchTerms: [], candidates: [] },
-            reviewedDrugName: 'Bisoprololo corretto',
-            reviewedActivePrinciple: 'Bisoprololo corretto',
-            reviewedDosage: '1,25 mg 1 cp',
-        }],
-    };
-    const original = {
-        getSetting: db.settings.get,
-        getPatient: db.patients.get,
-        filterTherapies: db.therapies.filter,
-        addTherapy: db.therapies.add,
-    };
-    let inserts = 0;
-
-    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
-    db.patients.get = (async () => ({ id: 'patient-1', diagnoses: [], version: 1 } as unknown as Patient)) as typeof db.patients.get;
-    db.therapies.filter = (() => ({ toArray: async () => [existingTherapy] })) as unknown as typeof db.therapies.filter;
-    db.therapies.add = (async () => {
-        inserts += 1;
-        return 'unexpected-insert';
-    }) as typeof db.therapies.add;
-
-    try {
-        const result = await applyPatientSmartImportSelection('patient-1', analysis, {
-            diagnosisIds: [],
-            therapyIds: ['therapy-reviewed'],
-        });
-
-        assert.equal(inserts, 0);
-        assert.equal(result.therapiesApplied, 0);
-        assert.deepEqual(result.appliedTherapyIds, []);
-    } finally {
-        db.settings.get = original.getSetting;
-        db.patients.get = original.getPatient;
-        db.therapies.filter = original.filterTherapies;
-        db.therapies.add = original.addTherapy;
-    }
-});
-
-/* @Codex */
-test('smart import refuses an analysis whose JSON is valid but task contract is invalid', async () => {
-    const original = {
-        getSetting: db.settings.get,
-        getPatient: db.patients.get,
-    };
-    const analysis: PatientSmartImportAnalysis = {
-        generatedAt: '2026-07-01T00:00:00Z',
-        contract: { validJson: true, validTask: false, legacyContract: false },
-        model: { provider: 'local', model: 'test' },
-        sourceSummary: { notes: 0, entries: 0, documentInsights: 0, attachmentSummaries: 0 },
-        diagnoses: [],
-        therapies: [],
-    };
-
-    db.settings.get = (async () => ({ value: 'enabled' })) as typeof db.settings.get;
-    db.patients.get = (async () => ({ id: 'patient-1', version: 1 } as unknown as Patient)) as typeof db.patients.get;
-
-    try {
-        await assert.rejects(
-            applyPatientSmartImportSelection('patient-1', analysis, { diagnosisIds: [], therapyIds: [] }),
-            /analisi AI non e valida/i,
-        );
-    } finally {
-        db.settings.get = original.getSetting;
-        db.patients.get = original.getPatient;
-    }
 });
 
 test('smart import catalog match prefers AIFA candidate whose packaging matches extracted dosage', () => {

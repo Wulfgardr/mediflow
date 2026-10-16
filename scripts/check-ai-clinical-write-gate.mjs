@@ -1,36 +1,10 @@
 #!/usr/bin/env node
 /* @Codex */
 
-// Nessuna scrittura clinica sul percorso AI senza revisione umana esplicita.
-//
-// È la traduzione eseguibile di ADR 0084 e ADR 0086, oggi affidate alla sola disciplina.
-// I due ADR dicono la stessa cosa da due angoli: la sintesi documentale non tocca
-// `patients.diagnoses` (0084), e `aiSummary` è una proiezione derivata che non modifica
-// diagnosi, terapie o altri record clinici strutturati (0086 §3). ADR 0086 chiude con una
-// regola generale: diagnosi, prescrizioni e identità paziente non sono auto-applicabili.
-//
-// MediFlow è local-first: nel candidato 0.8.5 i quattro smart path attraversano route
-// autenticate, ma la route resta un adapter. Il punto di enforcement è il production
-// root e il writer del servizio; un gate limitato ai nomi delle route passerebbe a vuoto.
-//
-// Il confine reale ha due lati, e il gate controlla entrambi:
-//
-//   1. il percorso AI scrive solo proiezioni derivate — mai un campo clinico strutturato;
-//   2. la lane che *può* scrivere dati clinici (Smart Import) non importa il percorso AI.
-//
-// Il secondo lato è quello che rende la revisione umana una proprietà strutturale invece
-// che una convenzione: proporre e applicare sono due percorsi separati, e l'operatore che
-// seleziona i candidati sta in mezzo. Se `commitPatientSmartImport` potesse chiamare un
-// modello per riempire `diagnoses`, la selezione esplicita diventerebbe decorativa senza
-// che nessun test lo noti.
-//
-// L'allowlist dei campi è chiusa e verificata contro lo schema: un campo nuovo su
-// `patients` è vietato al percorso AI per default, e va ammesso solo dichiarandolo come
-// proiezione derivata. Fail-closed sulla crescita dello schema.
-//
-// Come `check:schema-writers`, l'allowlist è stale-sensitive nelle due direzioni: un
-// contratto che non descrive più una scrittura reale fa fallire il gate tanto quanto una
-// scrittura non dichiarata. Un writer rimosso deve togliere la propria voce.
+// ADR 0084 e 0086: il percorso AI non scrive record clinici strutturati.
+// Le preview Fabric documentali sono proposal-only; i backend legacy senza
+// caller runtime sono ritirati. Le proiezioni e gli stati di review persistiti
+// restano dichiarati qui, con allowlist chiusa e contratti stale-sensitive.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -107,16 +81,6 @@ const AI_PATH_WRITE_CONTRACTS = [
         reference: 'docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md',
     },
     {
-        module: 'lib/domain/documents/document-synthesis-service.ts',
-        lane: 'document-synthesis',
-        policy: 'derived-projection',
-        table: 'patients',
-        allowedFields: ['documentInsights', 'version', 'updatedAt'],
-        reason: 'La sintesi documentale conserva summary, evidenza e diagnosi proposte in '
-            + '`documentInsights`. Non aggiunge né aggiorna `patients.diagnoses`.',
-        reference: 'docs/adr/0084-document-diagnoses-review-only.md',
-    },
-    {
         module: 'lib/ai-insight-settings.ts',
         lane: 'ai-settings',
         policy: 'non-clinical',
@@ -147,24 +111,6 @@ const AI_PATH_WRITE_CONTRACTS = [
         table: 'durableReviewCommandStates',
         reason: 'La transazione registra solo stato review terminale, replay idempotente e audit PHI-safe; non scrive record clinici strutturati né espone apply.',
         reference: 'docs/adr/0095-broker-projection-e-servizi-host-per-capability.md',
-    },
-    {
-        module: 'lib/patient-smart-import-apply.ts',
-        lane: 'smart-import',
-        policy: 'operator-confirmed',
-        table: 'patients',
-        entryPoint: 'commitPatientSmartImport',
-        concurrencyField: 'expectedVersion',
-        selectionEntryPoint: {
-            module: 'lib/domain/documents/patient-smart-import-service.ts',
-            name: 'applyPatientSmartImportSelection',
-            parameter: 'selection',
-        },
-        reason: 'Unica lane autorizzata a scrivere dati clinici da un percorso AI. La '
-            + 'scrittura avviene solo sui candidati selezionati esplicitamente '
-            + 'dall\'operatore, con versione concorrente attesa e audit. Il writer non '
-            + 'importa il percorso AI: proporre e applicare restano separati.',
-        reference: 'docs/adr/0086-intelligent-scaffold-and-graded-automation-boundary.md',
     },
 ];
 
@@ -307,27 +253,6 @@ function drizzleSetKeys(updateCall) {
     return null;
 }
 
-function importedModules(sourceFile) {
-    return sourceFile.statements.flatMap((statement) => {
-        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
-        if (statement.importClause?.isTypeOnly) return [];
-        return [statement.moduleSpecifier.text];
-    });
-}
-
-// Risolve uno specifier relativo o con alias `@/` a un percorso repo-relative.
-function resolveSpecifier(fromModule, specifier) {
-    const base = specifier.startsWith('@/')
-        ? specifier.slice(2)
-        : specifier.startsWith('.')
-            ? path.posix.normalize(path.posix.join(path.posix.dirname(fromModule), specifier))
-            : null;
-    if (!base) return null;
-    for (const candidate of [`${base}.ts`, `${base}.tsx`, path.posix.join(base, 'index.ts')]) {
-        if (exists(candidate)) return candidate;
-    }
-    return null;
-}
 
 // I simboli tabella esportati da lib/schema.ts. Servono a distinguere una scrittura
 // drizzle (`tx.delete(patients)`) da un'omonimia innocua (`inflight.delete(patientId)`):
@@ -442,65 +367,6 @@ function checkAllowlistIntegrity(findings, patientFields) {
     }
 }
 
-// 5 + 6. La lane autorizzata resta disaccoppiata dal percorso AI e conserva il gesto
-// esplicito: selezione dell'operatore e versione concorrente attesa.
-function checkOperatorConfirmedLane(findings, aiPath) {
-    const aiPathSet = new Set(aiPath);
-    for (const contract of AI_PATH_WRITE_CONTRACTS) {
-        if (contract.policy !== 'operator-confirmed') continue;
-        if (!exists(contract.module)) continue;
-        const sourceFile = parse(contract.module, read(contract.module));
-
-        for (const specifier of importedModules(sourceFile)) {
-            const resolved = resolveSpecifier(contract.module, specifier);
-            if (!resolved || resolved === contract.module || !aiPathSet.has(resolved)) continue;
-            addFinding(findings, 'AI_WRITE_LANE_COUPLING',
-                `${contract.module} importa il percorso AI (${resolved}): proporre e applicare devono restare separati`, {
-                    module: contract.module, lane: contract.lane, imported: resolved,
-                    hint: 'La revisione umana è garantita dalla separazione fra la proposta e '
-                        + 'l\'applicazione. Un writer che invoca il modello la annulla.',
-                });
-        }
-
-        const entry = sourceFile.statements.find((statement) => ts.isFunctionDeclaration(statement)
-            && statement.name?.text === contract.entryPoint);
-        if (!entry) {
-            addFinding(findings, 'AI_WRITE_ENTRY_MISSING',
-                `Entry point assente o rinominato: ${contract.entryPoint} in ${contract.module}`,
-                { module: contract.module, lane: contract.lane });
-        } else if (!read(contract.module).includes(`${contract.concurrencyField}`)) {
-            addFinding(findings, 'AI_WRITE_NO_CONCURRENCY',
-                `${contract.entryPoint} non usa \`${contract.concurrencyField}\`: la scrittura confermata perde la versione concorrente`,
-                { module: contract.module, lane: contract.lane });
-        }
-
-        const selection = contract.selectionEntryPoint;
-        if (!selection || !exists(selection.module)) {
-            addFinding(findings, 'AI_WRITE_SELECTION_MISSING',
-                `Modulo di selezione assente per la lane ${contract.lane}`, { lane: contract.lane });
-            continue;
-        }
-        const selectionSource = parse(selection.module, read(selection.module));
-        const selectionEntry = selectionSource.statements.find((statement) =>
-            ts.isFunctionDeclaration(statement) && statement.name?.text === selection.name);
-        if (!selectionEntry) {
-            addFinding(findings, 'AI_WRITE_SELECTION_MISSING',
-                `Entry point di selezione assente o rinominato: ${selection.name} in ${selection.module}`,
-                { module: selection.module, lane: contract.lane });
-            continue;
-        }
-        const hasSelectionParameter = selectionEntry.parameters.some((parameter) =>
-            ts.isIdentifier(parameter.name) && parameter.name.text === selection.parameter);
-        if (!hasSelectionParameter) {
-            addFinding(findings, 'AI_WRITE_SELECTION_IMPLICIT',
-                `${selection.name} non riceve più un parametro \`${selection.parameter}\`: l'applicazione non è più vincolata a una scelta esplicita`, {
-                    module: selection.module, lane: contract.lane,
-                    hint: 'ADR 0086: la scrittura avviene solo dopo selezione esplicita nel flusso Smart Import.',
-                });
-        }
-    }
-}
-
 // 7. Le write policy di Atena restano un insieme chiuso, senza auto-applicazione.
 function checkWritePolicyClosedSet(findings) {
     if (!exists(TREATMENT_REASONING_CONTRACT)) {
@@ -544,7 +410,6 @@ function main() {
     const observed = checkDeclaredWrites(findings, files, schemaTableSymbols());
     checkDerivedProjections(findings, observed);
     checkAllowlistIntegrity(findings, schemaPatientFields());
-    checkOperatorConfirmedLane(findings, files);
     checkWritePolicyClosedSet(findings);
 
     const report = {
@@ -672,4 +537,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     else main();
 }
 
-export { findWrites, literalKeys, resolveSpecifier, AI_PATH_WRITE_CONTRACTS };
+export { findWrites, literalKeys, AI_PATH_WRITE_CONTRACTS };
