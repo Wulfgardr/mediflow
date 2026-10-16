@@ -29,7 +29,7 @@ plugin MediFlow per Codex sono due integrazioni distinte.
 **ChatGPT dentro MediFlow.** Il percorso di esecuzione è predisposto solo sul
 Mac che supera i controlli previsti per sistema, processo e configurazione.
 Windows e Linux non hanno un'esecuzione locale ChatGPT verificata. La
-[PR #541](https://github.com/Wulfgardr/mediflow/pull/541), aggiunge il
+[PR #541](https://github.com/Wulfgardr/mediflow/pull/541), integrata, aggiunge il
 collegamento dei client iPhone e iPad all'host Mac: l'elaborazione resta
 sull'host, senza eseguire ChatGPT sul dispositivo mobile. Le prove descritte
 nella PR non attestano generazioni o uso su dispositivi fisici.
@@ -271,6 +271,15 @@ ESLint. Un singolo smoke sintetico sul percorso di produzione con modello BF16
 locale ha completato in 10,6 secondi, producendo 64 token e 211 caratteri senza
 registrare il raw output. Questa prova non dimostra disponibilità su un'altra
 macchina, qualità clinica, stabilità, capacità o readiness universale.
+
+Il 16 ottobre 2026, la preview HTTP di Ragionamento Terapeutico sul candidato
+`c3ee6f5f10e83664994e98c02ec25b532df84670`, con l'artefatto locale configurato
+come ATHENA Q4, è stata
+rifiutata con `provider_invalid`; nessuna scrittura clinica. Le successive
+prove reali hanno restituito testo non conforme al formato richiesto, anche
+con il profilo canonico MLX-LM 0.29.1. Il flusso non è quindi verificato come
+funzionante su quella configurazione. Dettagli nella
+[matrice corrente](./parity-matrix.md#ragionamento-terapeutico-prova-locale-athena).
 
 ## Estrazione allegati e OCR
 

@@ -33,14 +33,14 @@ non prova Windows 11 x64; un simulatore non prova un dispositivo fisico.
 | Accesso v3 nei client Apple abbinati | [PR #539](https://github.com/Wulfgardr/mediflow/pull/539) integrata in `main` a `4c69e4daa` | La prova UI Mac sul precedente candidato `65da737353e8b02d84e476299e5c4088d38aedab` ha completato accesso v3 e creazione di un paziente inventato, con indirizzo decifrato. Il client iPhone in simulatore ha poi eseguito accesso v3 e letto la stessa cartella e lo stesso indirizzo. Non copre tutte le interazioni native. |
 | Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Anteprima, conferma ed esiti per riga presenti; 129 test Swift e tre prove HTTP reali su archivio sintetico riusciti. Selettore CSV sul candidato integrato ancora da verificare. |
 | Documenti multipli e quattro viste AI su iPhone/iPad | [PR #541](https://github.com/Wulfgardr/mediflow/pull/541) integrata in `main` a `65898d6a6ed1296a89850e19ce123791d37bb026` | Invii sequenziali con esiti per file e interruzione sulle risposte incerte. 113 test Node e 57 Swift riusciti; correzione dei tre hash CI inclusa nel contributo integrato. L'esistenza delle viste non prova una generazione o l'uso su dispositivi fisici. |
-| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) aperta: delta `44cb68a5cc2f9f66bd170cd5be6f313990aa9d97`, head `91b0a6979f79693c3dd98307dbe55510ec3374ef`, base `main` | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora da completare. |
+| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) integrata in `main` a `6bebafe9ac5d279313e15b3c746b2b41e5768caf` | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora da completare. |
 | Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | 55 test Swift, sette test Web e build Mac/iOS riusciti. Corretti i casi di raggruppamento e numerazione segnalati dalla review indipendente; review finale senza rilievi. Interazione e rilettura dall'host ancora da provare. |
 
 Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce
 accesso, CSV, documenti multipli e allegati del diario: build Mac completa, build iOS Simulator e verifica rigorosa
 della firma riuscite. Il successivo candidato
-`74266b111ef6709ab0ac8d510f5c7a94fdcf2ccf` ha superato build, firma e
-controllo della revisione del server. L'interazione sul nuovo candidato
+`9028b0772d0b5415e749e22f730e31cfcc3bf6fa` comprende anche l'editor annidato
+e ha superato build, firma e controllo della revisione del server. L'interazione sul nuovo candidato
 resta da verificare. Questi esiti non attestano distribuzione,
 notarizzazione, tutte le interazioni o hardware mobile fisico.
 
@@ -63,7 +63,7 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 | Documenti e OCR | Caricamento, estrazione locale e revisione da provare; Apple Vision sul Mac | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload multiplo integrato con #541; OCR e revisione derivata sull'host | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
 | Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
-| Conflitti, lock, backup e recupero | Conflitto, riavvio e ripristino completo sintetico da provare | Lifecycle riuscito; avvio completo del Supervisor Headless ancora in analisi | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
+| Conflitti, lock, backup e recupero | Conflitto, riavvio e ripristino completo sintetico da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
 annidati e citazioni multiblocco. Restano da verificarne uso nell'app e
@@ -88,7 +88,8 @@ non ancora integrati sono descritti nelle PR sopra, non attribuiti alla base.
 | Ambiente e revisione | Risultato osservato | Ancora aperto |
 | --- | --- | --- |
 | Omarchy/Arch ARM, Node 24.21.0, base `a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e` | Sei prove dell'harness ufficiale e tre prove di accesso riuscite; Supervisor Headless con cinque operazioni riuscito | Non è Ubuntu; non copre l'interazione completa, i nuovi contributi Apple o la generazione ChatGPT |
-| Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo e risposta HTTP 503 ancora senza causa stabilita; trasporto di prova intermittente. Supervisor Headless completo non verificato; attese e pulizia del test corrette nella [PR #546](https://github.com/Wulfgardr/mediflow/pull/546) |
+| Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo senza causa stabilita; trasporto di prova intermittente. Il successivo difetto di attivazione e la sua correzione sono descritti sotto. |
+| Windows 11 ARM con Node 24.21.0 Windows x64, candidato `b720ccfe7a30c88badd57e4f99830bed487347b2` | Attivazione HTTP 200 in 3,287 secondi; prova completa del Supervisor in 75,504 secondi: due processi isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura | Nessuna strumentazione nel prodotto; harness originale ripristinato e nessun processo Node residuo osservato. Non prova interazione UI o Windows 11 x64 nativo. |
 
 Le prove guest non attestano un installer nativo, Windows x64 o Ubuntu.
 Su una nuova fixture Windows, il primo avvio canonico ha completato la
@@ -97,12 +98,19 @@ readiness di autenticazione in 8,197 secondi e la migrazione dello schema da
 codice sorgente. Questa prova non ha riprodotto il primo `DB_QUERY_FAILED`
 e non ne spiega la causa. L'errore iniziale resta registrato insieme ai
 successi successivi. La precedente attesa Headless di 15 secondi non aveva
-raggiunto la readiness: il Supervisor completo non è ancora un PASS. La
-risposta HTTP 503 e l'intermittenza del trasporto restano osservazioni aperte;
-non è dimostrato che abbiano la stessa causa né che il solo trasporto spieghi
-il rifiuto applicativo. Il log della successiva esecuzione diagnostica, recuperato
-il 16 ottobre, mostra un arresto precedente all’attivazione: uno dei due
-Supervisor concorrenti non ha pubblicato l’indirizzo entro l’attesa del test.
+raggiunto la readiness; attese e pulizia del test sono corrette nella
+[PR #546](https://github.com/Wulfgardr/mediflow/pull/546).
+
+Una prova successiva con un solo Supervisor ha isolato il rifiuto di
+attivazione HTTP 503: l'orologio del parent risultava avanti di 5 millisecondi
+rispetto al processo Web, e il confronto fra timestamp assoluti negava la
+risposta. La [PR #550](https://github.com/Wulfgardr/mediflow/pull/550)
+verifica la durata della risposta con i timestamp del parent e l'attesa
+locale con quelli del Web. Scadenza di cinque secondi, revoca e divieto di
+riuso restano invariati. Sul candidato corretto sono riuscite sia
+l'attivazione singola sia la prova completa, senza strumentazione aggiunta.
+Questo risultato non spiega il primo errore del database né l'intermittenza
+del trasporto di prova.
 
 ### Tre funzioni Ollama: prove reali e limiti
 
@@ -131,8 +139,36 @@ L'attivazione Web a freddo si è fermata al limite host di 30 secondi con
 `verification_interrupted` (circa 31,2 secondi nella finestra del client).
 Dopo un precaricamento tecnico esplicito, la nuova attivazione a caldo è
 riuscita in circa 2,6 secondi. Il precaricamento manuale non dimostra un
-percorso utente a freddo riuscito. La pagina consente di rileggere lo stato
-e confermare un nuovo tentativo; non esegue retry automatici.
+percorso utente a freddo riuscito.
+
+La [PR #549](https://github.com/Wulfgardr/mediflow/pull/549) porta l'attesa
+host a 60 secondi e quella della pagina a 70, mantenendo annullamento,
+scadenze della sessione e ricontrollo dell'autorizzazione. Sul candidato
+integrato `68d5e688985be8278c5709b5a3db19adc1e89427`, una nuova prova
+è partita senza modello in memoria: una sola richiesta del percorso canonico,
+nessun precaricamento manuale, attivazione riuscita in 30,3 secondi e digest
+invariato. La verifica server è durata circa 27 secondi: la prova non misura
+l'effetto dell'attesa aggiunta oltre 30 secondi. I test coprono successo a 55
+secondi, scadenza a 60 e revoca durante l'attesa. Nessun tentativo automatico.
+
+### Ragionamento Terapeutico: prova locale ATHENA
+
+Sul candidato `c3ee6f5f10e83664994e98c02ec25b532df84670`, con l'artefatto
+locale configurato come ATHENA Q4 e runner MLX, la preview HTTP è terminata con
+`503 provider_invalid` dopo circa 31,4 secondi. Le 39 tabelle dell'archivio
+sintetico erano invariate prima e dopo la preview. Non è stata prodotta una
+proposta utilizzabile.
+
+Le nuove esecuzioni diagnostiche hanno restituito testo non conforme al JSON
+richiesto. Aggiungere lo schema al prompt ha prodotto più oggetti concatenati,
+ancora rifiutati dal parser. Il confronto fra MLX-LM 0.31.3 e il profilo
+canonico 0.29.1 con Transformers 4.56.2 non ha risolto il problema.
+Sono risposte nuove: non ricostruiscono i byte della prima risposta HTTP,
+che non erano stati conservati. L'esperimento sul prompt non è stato
+integrato; validazione e divieto di applicazione automatica restano invariati.
+La presenza del modello e del runner non attesta un flusso funzionante.
+Per il Q4 provato manca inoltre una ricevuta di conversione che ne dimostri
+la derivazione dai pesi ATHENA; il digest identifica soltanto i byte locali.
 
 ### ChatGPT come provider e plugin MediFlow
 
@@ -197,10 +233,11 @@ Restano da completare:
 
 - UI del candidato Apple integrato: CSV, caricamenti multipli, diario, editor,
   cambio paziente, revoca del contesto e conservazione degli esiti parziali;
-- cause del primo errore Windows e del 503, trasporto intermittente e prova
-  completa del Supervisor Headless;
+- causa del primo errore database Windows, intermittenza del trasporto di
+  prova e interazione nel guest;
 - percorsi su Ubuntu e interazioni sui dispositivi iPhone/iPad fisici;
-- causa del primo rifiuto Patient Insight e attivazione Ollama a freddo;
+- causa del primo rifiuto Patient Insight e risposta ATHENA valida nel flusso
+  Ragionamento Terapeutico;
 - generazioni ChatGPT, revisione e annullamento durante una generazione,
   quando il provider e la quota lo consentono;
 - conflitti, errore parziale, riavvio, ripristino sintetico completo e limiti
