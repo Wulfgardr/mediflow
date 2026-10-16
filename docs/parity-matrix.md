@@ -31,18 +31,37 @@ non prova Windows 11 x64; un simulatore non prova un dispositivo fisico.
 | Contributo | Stato e revisione | Limite della prova |
 | --- | --- | --- |
 | Accesso v3 nei client Apple abbinati | [PR #539](https://github.com/Wulfgardr/mediflow/pull/539) integrata in `main` a `4c69e4daa` | La prova UI Mac sul precedente candidato `65da737353e8b02d84e476299e5c4088d38aedab` ha completato accesso v3 e creazione di un paziente inventato, con indirizzo decifrato. Il client iPhone in simulatore ha poi eseguito accesso v3 e letto la stessa cartella e lo stesso indirizzo. Non copre tutte le interazioni native. |
-| Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Anteprima, conferma ed esiti per riga presenti; 129 test Swift e tre prove HTTP reali su archivio sintetico riusciti. Selettore CSV sul candidato integrato ancora da verificare. |
+| Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Sul Mac, candidato `9028b0772`, selettore, anteprima e conferma hanno creato due schede inventate ed escluso un duplicato. La lista non si è aggiornata subito: correzione nella [PR #552](https://github.com/Wulfgardr/mediflow/pull/552). |
 | Documenti multipli e quattro viste AI su iPhone/iPad | [PR #541](https://github.com/Wulfgardr/mediflow/pull/541) integrata in `main` a `65898d6a6ed1296a89850e19ce123791d37bb026` | Invii sequenziali con esiti per file e interruzione sulle risposte incerte. 113 test Node e 57 Swift riusciti; correzione dei tre hash CI inclusa nel contributo integrato. L'esistenza delle viste non prova una generazione o l'uso su dispositivi fisici. |
-| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) integrata in `main` a `6bebafe9ac5d279313e15b3c746b2b41e5768caf` | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora da completare. |
-| Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | 55 test Swift, sette test Web e build Mac/iOS riusciti. Corretti i casi di raggruppamento e numerazione segnalati dalla review indipendente; review finale senza rilievi. Interazione e rilettura dall'host ancora da provare. |
+| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) integrata in `main` a `6bebafe9ac5d279313e15b3c746b2b41e5768caf` | Sul Mac, candidato `9028b0772`, caricati due file dal compositore senza perdere la bozza; voce registrata e riletta dall'host con entrambi gli allegati. |
+| Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | Sul Mac, candidato `9028b0772`, scritto e riletto un elenco annidato. Il contenuto salvato conserva la struttura; la vista di lettura perde il rientro. Aprendo lo stesso diario su iPad simulato, arresto dell'app durante la conversione HTML. Correzione nella [PR #553](https://github.com/Wulfgardr/mediflow/pull/553). |
 
 Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce
 accesso, CSV, documenti multipli e allegati del diario: build Mac completa, build iOS Simulator e verifica rigorosa
 della firma riuscite. Il successivo candidato
 `9028b0772d0b5415e749e22f730e31cfcc3bf6fa` comprende anche l'editor annidato
-e ha superato build, firma e controllo della revisione del server. L'interazione sul nuovo candidato
-resta da verificare. Questi esiti non attestano distribuzione,
+e ha superato build, firma e controllo della revisione del server. Su questo
+candidato, Mac e iPad simulato hanno completato l'accesso v3 e letto la stessa
+cartella, con indirizzo decifrato. Sul Mac sono riusciti i flussi CSV, upload
+di due documenti e diario con due allegati descritti sopra. L'apertura della
+sezione Documenti ha richiesto un cambio di sezione per aggiornare i permessi
+mostrati: anche questo difetto è seguito nella PR #552. La prova di upload
+non attesta OCR o estrazione del contenuto. Questi esiti non attestano distribuzione,
 notarizzazione, tutte le interazioni o hardware mobile fisico.
+
+Il successivo candidato locale `b8eb2ed6731459b57e335204c25af5a46dfb1a61`
+riunisce le PR #552 e #553 sulla base `9538e4cecbccd462e4c82be6d00951b785d0b68f`:
+build Mac e iOS Simulator e verifica rigorosa della firma Mac riuscite.
+La PR #552 è stata poi integrata a `6236148dd28fe896460d2a84c68185be56bc73e4`,
+con tutti i controlli CI riusciti al primo tentativo.
+La correzione del diario sposta la conversione HTML fuori dal disegno della
+vista e conserva i rientri nella lettura. La verifica UI del nuovo candidato
+resta pendente: il Mac si è bloccato durante le prove. La PR #553 non viene
+integrata prima di ripetere il percorso che ha causato l'arresto.
+
+I dispositivi iPhone e iPad sono presenti, ma la firma di sviluppo disponibile
+è scaduta e la modalità sviluppatore dell'iPad è disattivata. Le prove fisiche
+restano da completare dopo il ripristino di questi prerequisiti.
 
 Nella prova Mac precedente mancavano tre permessi di lettura nella fixture.
 Il ripristino canonico dei permessi della fixture ha consentito di proseguire:
@@ -57,17 +76,18 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 
 | Funzione | Web macOS | Web Windows 11 ARM | Web Ubuntu | Nativo macOS | iPhone / iPad |
 | --- | --- | --- | --- | --- | --- |
-| Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Integrato con #539; accesso v3 UI riuscito sul candidato `65da73735` | Integrato con #539; accesso e lettura della stessa cartella riusciti nel simulatore iPhone sul candidato `65da73735`; hardware fisico da provare |
-| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati sul candidato `65da73735`; CSV integrato con #542, ancora da provare nella UI integrata | Lettura paired della cartella e dell'indirizzo riuscita in simulatore iPhone; CSV integrato con #542; touch, tastiera iPad e rilettura dopo riavvio da provare |
-| Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Upload dal compositore in #543; rientro, elenchi annidati e citazioni multiblocco integrati con #544; interazione da provare | Contributi #543 e #544 presenti; editor e round-trip da provare; scritture offline escluse dal contratto |
-| Documenti e OCR | Caricamento, estrazione locale e revisione da provare; Apple Vision sul Mac | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload multiplo integrato con #541; OCR e revisione derivata sull'host | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
+| Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Accesso v3 UI riuscito sui candidati `65da73735` e `9028b0772` | Accesso e cartella riusciti su iPhone simulato `65da73735` e iPad simulato `9028b0772`; hardware fisico da provare |
+| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati su `65da73735`; CSV con due schede e un duplicato escluso su `9028b0772`, aggiornamento lista seguito in #552 | Cartella e indirizzo letti nei simulatori iPhone e iPad; iPad legge anche le schede importate dal Mac. Importazione CSV dal dispositivo e riavvio da provare |
+| Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Diario con due nuovi allegati e struttura annidata salvato e riletto su `9028b0772`; rientro in lettura seguito in #553 | iPad `9028b0772`: arresto aprendo Diario, seguito in #553. Editor e salvataggio da mobile da provare; niente scritture offline |
+| Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772` dopo aggiornamento della sezione; difetto UI seguito in #552. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
 | Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
-| Conflitti, lock, backup e recupero | Conflitto, riavvio e ripristino completo sintetico da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
+| Conflitti, lock, backup e recupero | Ripristino sintetico locale provato su `b8eb2ed67`; conflitto, riavvio e recupero dal file tramite UI da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
-annidati e citazioni multiblocco. Restano da verificarne uso nell'app e
-rilettura, senza dedurre una generica assenza di «azioni in blocco».
+annidati e citazioni multiblocco. La prova Mac conferma il salvataggio e la
+rilettura della struttura annidata; visualizzazione e stabilità iPad richiedono
+le correzioni indicate sopra. Le citazioni multiblocco restano da provare nella UI.
 H1 è un contenuto legacy
 conservato in sola lettura; non è un comando disponibile nell'editor Web.
 La scheda AI non conferisce accesso a un account né autorizza un invio.
@@ -88,6 +108,7 @@ non ancora integrati sono descritti nelle PR sopra, non attribuiti alla base.
 | Ambiente e revisione | Risultato osservato | Ancora aperto |
 | --- | --- | --- |
 | Omarchy/Arch ARM, Node 24.21.0, base `a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e` | Sei prove dell'harness ufficiale e tre prove di accesso riuscite; Supervisor Headless con cinque operazioni riuscito | Non è Ubuntu; non copre l'interazione completa, i nuovi contributi Apple o la generazione ChatGPT |
+| Omarchy/Arch ARM, Node 24.21.0, `main` a `35412087c50cf98df7cb7afa4b10a7b4641be6e7` | Nuova build e prova completa del Supervisor riuscite: due backend isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura. Cinque letture HTTP della revisione hanno confermato il candidato pulito. | Include la correzione #550; non prova UI, Ubuntu o Linux x86_64. Dati temporanei rimossi e porte liberate. |
 | Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo senza causa stabilita; trasporto di prova intermittente. Il successivo difetto di attivazione e la sua correzione sono descritti sotto. |
 | Windows 11 ARM con Node 24.21.0 Windows x64, candidato `b720ccfe7a30c88badd57e4f99830bed487347b2` | Attivazione HTTP 200 in 3,287 secondi; prova completa del Supervisor in 75,504 secondi: due processi isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura | Nessuna strumentazione nel prodotto; harness originale ripristinato e nessun processo Node residuo osservato. Non prova interazione UI o Windows 11 x64 nativo. |
 
@@ -111,6 +132,34 @@ riuso restano invariati. Sul candidato corretto sono riuscite sia
 l'attivazione singola sia la prova completa, senza strumentazione aggiunta.
 Questo risultato non spiega il primo errore del database né l'intermittenza
 del trasporto di prova.
+
+### OCR locale: PDF scansionato e Apple Vision
+
+Sul candidato `b8eb2ed6731459b57e335204c25af5a46dfb1a61`, con Node 24.21.0
+e Xcode 26.6, è riuscita in 21,1 secondi la prova della composizione locale:
+PDF sintetico contenente solo un'immagine, allegato cifrato, AnyDoc,
+rendering della pagina e riconoscimento Apple Vision reale. Il testo atteso
+è stato riconosciuto, con provenienza OCR su una pagina di una; l'allegato
+persistito è rimasto invariato. Nessun provider cloud o modello scaricato.
+
+La prova non passa da HTTP o UI e non attesta il bundle installato,
+Windows/Linux o l'accuratezza generale del riconoscimento. All'uscita il
+processo ha segnalato `SQLite lease release unverified`; le directory
+temporanee risultavano rimosse. L'ordine di pulizia del test è una possibile
+causa dell'avviso, non una chiusura del lease verificata.
+
+### Recupero completo su archivio sintetico
+
+Sul candidato `b8eb2ed6731459b57e335204c25af5a46dfb1a61` è riuscita in
+1,6 secondi la prova del backup cifrato completo e del ripristino in un
+archivio vuoto. Le primitive reali hanno conservato account, tabelle e
+storico, recuperato la chiave e decifrato la nota inventata. La prova ha
+verificato inoltre audit append-only, replay senza duplicazioni e
+invalidazione delle vecchie sessioni e degli abbinamenti.
+
+L'account usa un hash password sintetico: non è una prova di login. Il backup
+resta in memoria durante il test; salvataggio e lettura del file, UI e
+riavvio completo dell'app restano da verificare.
 
 ### Tre funzioni Ollama: prove reali e limiti
 
@@ -231,8 +280,9 @@ Le prossime ricevute devono indicare SHA completa, revisione runtime letta da
 Build, prova HTTP, interazione UI e tecnologia assistiva sono risultati diversi.
 Restano da completare:
 
-- UI del candidato Apple integrato: CSV, caricamenti multipli, diario, editor,
-  cambio paziente, revoca del contesto e conservazione degli esiti parziali;
+- verifica UI delle nuove build Apple dopo #552 e #553: aggiornamento della lista e dei permessi,
+  lettura del diario senza arresti e con rientri corretti; percorsi mobile,
+  cambio paziente, revoca e conservazione degli esiti parziali;
 - causa del primo errore database Windows, intermittenza del trasporto di
   prova e interazione nel guest;
 - percorsi su Ubuntu e interazioni sui dispositivi iPhone/iPad fisici;
@@ -240,8 +290,8 @@ Restano da completare:
   Ragionamento Terapeutico;
 - generazioni ChatGPT, revisione e annullamento durante una generazione,
   quando il provider e la quota lo consentono;
-- conflitti, errore parziale, riavvio, ripristino sintetico completo e limiti
-  della cache mobile, senza introdurre scritture offline.
+- conflitti, errore parziale, riavvio e ripristino dal file backup tramite
+  l'applicazione; limiti della cache mobile, senza introdurre scritture offline.
 
 Le prove VoiceOver e i gate 0.8 riportati sotto valgono per le rispettive
 revisioni storiche; non sono prove delle nuove UI né nuovi divieti generici.
