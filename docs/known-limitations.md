@@ -20,6 +20,41 @@ stessa SHA, firma, tag, GitHub Release, distribuzione o installazione su un host
 esterno. Per questi esiti occorrono i controlli e le ricevute di chiusura
 pertinenti. Lo storico delle versioni è nel [CHANGELOG](../CHANGELOG.md).
 
+## Avvio unificato, aggiornamento 15 ottobre 2026
+
+Gli ingressi del sorgente corrente richiedono Node 24 installato; non sono
+installer. Linux può richiedere il permesso eseguibile e un file manager che
+avvii gli script nel terminale; il comando `install-desktop-entry` aggiunge
+un ingresso nel menu. La voce App per Mac richiede un bundle locale costruito
+con Xcode per la stessa revisione. Non compila implicitamente l'app nativa.
+
+Le modifiche non committate impediscono la build di produzione e richiedono
+la scelta esplicita per sviluppo. Il riuso di un processo richiede la ricevuta
+del lanciatore per quella cartella e il fingerprint corretto; un server
+avviato manualmente o da un altro ingresso non viene adottato.
+
+L'accesso per agenti richiede un client sul protocollo standard input/output;
+la scelta nel browser non crea una sessione clinica autorizzata. La nuova
+pagina Avvio non aggiunge una prova di VoiceOver o di doppio clic nei tre
+sistemi. La CI del lanciatore Node non sostituisce quelle verifiche manuali.
+
+Preferenze e lock del lanciatore seguono la configurazione utente, distinta
+per cartella sorgente. La migrazione automatica sposta soltanto i file esatti
+del lanciatore; file sconosciuti e collegamenti restano intatti. Un vecchio
+lanciatore ancora attivo deve essere arrestato prima della migrazione.
+Su macOS la configurazione è nella sottocartella `launcher` della radice
+predefinita di MediFlow. Il primo avvio riconosce quella posizione e le sole
+voci di servizio dell'[ADR 0138](./adr/0138-explicit-data-directory-bootstrap.md#emendamento-2026-10).
+Backup, residui SQLite e altre voci senza database restano bloccanti.
+
+La build non inizializza PM2 né risolve il percorso del token locale.
+La lunghezza dei socket PM2 resta un limite del servizio MLX al suo utilizzo:
+un percorso dati lungo può richiedere un percorso locale più corto per MLX.
+Questo limite non deve impedire la build né l'uso senza quel servizio opzionale.
+I test dei percorsi di configurazione non attestano da soli il doppio clic
+reale o l'avvio su Linux. Su Windows la configurazione eredita la ACL del
+profilo utente.
+
 ## AIFA: controllo remoto nel sorgente successivo alla 0.9.0
 
 Il controllo dei metadati AIFA richiede il consenso Internet dedicato e

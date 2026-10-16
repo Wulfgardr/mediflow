@@ -29,25 +29,6 @@ const PM2_PATH_OVERRIDE_KEYS = [
     'PM2_BUILTIN_NPM_PATH',
 ] as const;
 
-for (const key of PM2_PATH_OVERRIDE_KEYS) delete process.env[key];
-
-process.env.PM2_NO_INTERACTION = 'true';
-// Keep MediFlow out of a pre-existing global PM2 daemon: it may be linked to an
-// external PM2 service or manage unrelated applications. Both values must be
-// fixed before CommonJS initialization because PM2 snapshots them at load time.
-const mediflowPM2Home = path.resolve(resolveDataPath('pm2'));
-const longestSocketPath = path.join(mediflowPM2Home, 'interactor.sock');
-const unixSocketLimit = process.platform === 'darwin' ? 103 : 107;
-
-if (process.platform !== 'win32' && Buffer.byteLength(longestSocketPath) > unixSocketLimit) {
-    throw new Error(
-        `PM2 non avviato: il percorso socket MediFlow supera ${unixSocketLimit} byte. `
-        + 'Configura MEDIFLOW_DATA_DIR con un percorso locale più corto.',
-    );
-}
-
-process.env.PM2_HOME = mediflowPM2Home;
-
 type IsolatedPM2 = Omit<typeof import('pm2'), 'disconnect'> & {
     pm2_home?: string;
     Client?: {
@@ -58,20 +39,46 @@ type IsolatedPM2 = Omit<typeof import('pm2'), 'disconnect'> & {
     disconnect(callback?: (error?: Error | null) => void): void;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pm2 = require('pm2') as IsolatedPM2;
+let isolatedPM2: IsolatedPM2 | undefined;
 
-const effectivePaths = [pm2.pm2_home, pm2.Client?.pm2_home];
-if (process.platform !== 'win32') {
-    effectivePaths.push(pm2.Client?.rpc_socket_file, pm2.Client?.pub_socket_file);
-}
+function getPM2(): IsolatedPM2 {
+    if (isolatedPM2) return isolatedPM2;
+    for (const key of PM2_PATH_OVERRIDE_KEYS) delete process.env[key];
 
-for (const effectivePath of effectivePaths) {
-    if (!effectivePath) throw new Error('PM2 non avviato: configurazione di isolamento incompleta.');
-    const relativePath = path.relative(mediflowPM2Home, effectivePath);
-    if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
-        throw new Error('PM2 non avviato: un percorso runtime esce dalla home MediFlow isolata.');
+    process.env.PM2_NO_INTERACTION = 'true';
+    // Keep MediFlow out of a pre-existing global PM2 daemon: it may be linked to an
+    // external PM2 service or manage unrelated applications. Both values must be
+    // fixed before CommonJS initialization because PM2 snapshots them at load time.
+    const mediflowPM2Home = path.resolve(resolveDataPath('pm2'));
+    const longestSocketPath = path.join(mediflowPM2Home, 'interactor.sock');
+    const unixSocketLimit = process.platform === 'darwin' ? 103 : 107;
+
+    if (process.platform !== 'win32' && Buffer.byteLength(longestSocketPath) > unixSocketLimit) {
+        throw new Error(
+            `PM2 non avviato: il percorso socket MediFlow supera ${unixSocketLimit} byte. `
+            + 'Configura MEDIFLOW_DATA_DIR con un percorso locale più corto.',
+        );
     }
+
+    process.env.PM2_HOME = mediflowPM2Home;
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pm2 = require('pm2') as IsolatedPM2;
+
+    const effectivePaths = [pm2.pm2_home, pm2.Client?.pm2_home];
+    if (process.platform !== 'win32') {
+        effectivePaths.push(pm2.Client?.rpc_socket_file, pm2.Client?.pub_socket_file);
+    }
+
+    for (const effectivePath of effectivePaths) {
+        if (!effectivePath) throw new Error('PM2 non avviato: configurazione di isolamento incompleta.');
+        const relativePath = path.relative(mediflowPM2Home, effectivePath);
+        if (relativePath === '..' || relativePath.startsWith(`..${path.sep}`) || path.isAbsolute(relativePath)) {
+            throw new Error('PM2 non avviato: un percorso runtime esce dalla home MediFlow isolata.');
+        }
+    }
+    isolatedPM2 = pm2;
+    return pm2;
 }
 
 const PROCESS_NAME = 'mlx-inference-server';
@@ -91,7 +98,7 @@ function withConnectionLock<T>(operation: () => Promise<T>): Promise<T> {
 
 function disconnectPM2(): Promise<void> {
     return new Promise((resolve, reject) => {
-        pm2.disconnect((error) => {
+        getPM2().disconnect((error) => {
             if (error) reject(error);
             else resolve();
         });
@@ -140,7 +147,7 @@ export class PM2Manager {
         return withConnectionLock(async () => {
             try {
                 await new Promise<void>((resolve, reject) => {
-                    pm2.connect((err) => {
+                    getPM2().connect((err) => {
                         if (err) reject(err);
                         else resolve();
                     });
@@ -167,7 +174,7 @@ export class PM2Manager {
 
     static async getStatus(): Promise<ProcessStatus> {
         return new Promise((resolve, reject) => {
-            pm2.describe(PROCESS_NAME, (err, description) => {
+            getPM2().describe(PROCESS_NAME, (err, description) => {
                 if (err) {
                     // If error is just "process not found" (can happen if never started), treat as stopped
                     // PM2 describe might return empty array if not found?
@@ -184,7 +191,7 @@ export class PM2Manager {
                 const proc = description[0];
                 return resolve({
                     name: proc.name || PROCESS_NAME,
-                    status: (proc.pm2_env?.status as any) || 'unknown',
+                    status: (proc.pm2_env?.status as ProcessStatus['status']) || 'unknown',
                     uptime: proc.pm2_env?.pm_uptime,
                     cpu: proc.monit?.cpu,
                     memory: proc.monit?.memory
@@ -222,7 +229,7 @@ export class PM2Manager {
             const cwd = process.cwd();
             const ecosystemPath = path.join(cwd, 'ecosystem.config.js');
 
-            pm2.start(ecosystemPath, (err) => {
+            getPM2().start(ecosystemPath, (err) => {
                 if (err) reject(err);
                 else resolve();
             });
@@ -231,7 +238,7 @@ export class PM2Manager {
 
     static async stop(): Promise<void> {
         return new Promise((resolve, reject) => {
-            pm2.stop(PROCESS_NAME, (err) => {
+            getPM2().stop(PROCESS_NAME, (err) => {
                 // Ignore error if process not found to stop
                 const message = err instanceof Error ? err.message : String(err || '');
                 if (err && /process(?: or namespace)? not found/i.test(message)) {

@@ -11,8 +11,8 @@ test('complete backup is encrypted in the browser and verification never claims 
     expect((await page.request.post('/api/system/recovery-backup', { data: {} })).status()).toBe(401);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
-    await page.getByLabel('Nome e Cognome', { exact: true }).fill('Medico Sintetico Recupero');
-    await page.getByLabel('Nome Ambulatorio', { exact: true }).fill('Studio Sintetico Recupero');
+    await page.getByLabel('Nome e cognome', { exact: true }).fill('Medico Sintetico Recupero');
+    await page.getByLabel('Nome dell’ambulatorio', { exact: true }).fill('Studio Sintetico Recupero');
     await page.getByRole('button', { name: 'Avanti', exact: true }).click();
     await page.getByLabel('Passphrase di accesso', { exact: true }).fill(phrase);
     await page.getByLabel('Conferma passphrase', { exact: true }).fill(phrase);

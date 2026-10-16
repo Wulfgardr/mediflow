@@ -632,7 +632,7 @@ worktree provoca un solo reload soft.
 
 I tre launcher mostrano versione, checkout e impronta e riusano la porta
 `3000` solo quando `/api/system/revision` identifica gli stessi sorgenti.
-`Start_MediFlow.command` ripulisce inoltre `.next` al cambio di sorgente.
+`scripts/mediflow.mjs` costruisce la produzione quando manca una build verificata della revisione corrente. Con modifiche non committate richiede la scelta esplicita per sviluppo.
 Il controllo evita di scambiare un server già attivo per quello che si
 intende verificare.
 
@@ -683,8 +683,8 @@ release sorgente 0.8.6.
 
 ### Avvio rapido
 
-- Web + servizi: `./Start_MediFlow.command`
-- Native: `./scripts/Launch_MediFlowMac.command`
+- Avvio: `MediFlow.command`, `MediFlow.cmd` o `MediFlow.sh`, poi **Nel browser**
+- Client Mac: **App per Mac** in Avvio, con bundle già costruito
 
 ---
 
@@ -754,9 +754,9 @@ La sequenza seguente riguarda l’ambiente di sviluppo web/native e non un
 installer pubblicato. ICD-11 è facoltativo e richiede autorizzazione;
 l’avvio del client nativo segue il proprio percorso di verifica.
 
-1) Avvia `npm run dev` (o `Start_MediFlow.command`)  
+1) Avvia `npm run dev` (o la scelta **Apri per sviluppo**)
 2) Configura ICD-11 WHO solo se autorizzato, seguendo `docs/icd-who-setup.md`
-3) Avvia TLS proxy (`scripts/native-setup.sh` o `Launch_MediFlowMac.command`)  
+3) Avvia TLS proxy (`scripts/native-setup.sh`, per la preparazione di sviluppo)
 4) Apri web app e completa il setup PIN  
 5) Avvia app macOS e fai login con PIN
 
