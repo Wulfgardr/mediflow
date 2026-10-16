@@ -48,7 +48,7 @@ test('costruisce il payload con think:false solo per task testuali', () => {
     assert.equal('num_ctx' in ocrPayload.options, false);
 });
 
-for (const serverVersion of ['0.32.5', '0.40.4']) test(`attesta ${serverVersion} e invoca la chat sullo stesso loopback canonico`, async (t) => {
+for (const serverVersion of ['0.32.5', '0.40.4', '0.40.5']) test(`attesta ${serverVersion} e invoca la chat sullo stesso loopback canonico`, async (t) => {
     const originalFetch = globalThis.fetch;
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     const localModel = {

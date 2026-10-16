@@ -69,3 +69,29 @@ Fixture sintetiche per servizio, route e componente montato: prima attivazione,
 idempotenza, recupero, modello assente, errore rete, binding/versione cambiati,
 owner bloccato e revoca. Lint e typecheck; nessuna build o inferenza live richiesta.
 La promozione resta soggetta alla verifica del parent sul tree integrato.
+
+
+## Compatibilità locale Ollama 0.40.5 — WUL-694, 16 ottobre 2026
+
+La versione 0.40.5 è ammessa puntualmente, conservando le versioni precedenti.
+Le versioni vicine non esaminate, le anteprime e i suffissi build restano negate.
+La [release ufficiale](https://github.com/ollama/ollama/releases/tag/v0.40.5)
+e il [delta da 0.40.4](https://github.com/ollama/ollama/compare/v0.40.4...v0.40.5)
+introducono aggiornamenti dei motori e cambiamenti dei percorsi cloud e
+OpenAI-compatible. Il delta non modifica i tipi API usati dall'attestor né
+i relativi handler locali; ciò non prova da solo il funzionamento del modello.
+
+Sul Mac, client e daemon installati dichiarano entrambi 0.40.5. Il binario
+osservato ha SHA-256 `3501c7c3d9885269fb5b3d141a0a3789e868f6ad15150d4a07b195965be33a5d`
+e firma Developer ID valida di Infra Technologies, Inc. Con il modello già
+installato `qwen3.5:35b-a3b`, la verifica reale di versione, tags, show,
+precaricamento senza prompt e processi caricati ha osservato il medesimo digest
+`3460ffeede5453ead027dbd2f821b12ad0aa3de54630971993babdb2165221f7`
+e assenza dei marker remoti previsti dal contratto. Non sono stati scaricati modelli.
+
+Restano obbligatori endpoint loopback, riferimento non cloud, località delle
+risposte, digest del modello caricato e controlli per operazione. I test coprono
+anche marker remoti nei diversi stadi e digest discordante. Questa ammissione
+non cambia `available_unqualified` o `observed_not_causal` di
+[ADR 0092](./0092-limite-digest-bound-readiness-ai-locale.md), non attribuisce
+una garanzia causale al digest e non attesta UI, qualità o ammissione clinica.
