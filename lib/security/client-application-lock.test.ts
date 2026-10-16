@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
+import ts from 'typescript';
 
 import {
     APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION,
@@ -444,6 +446,69 @@ test('security provider clears stale persisted authority and fences stale auth p
     assert.doesNotMatch(authApiSource, /export function isExactApplicationLockReceipt/);
     assert.match(authApiSource, /forbiddenLockObjectPrototypeKeys = Object\.freeze\(\['then', 'value', 'schemaVersion', 'state'\]/);
     assert.match(authApiSource, /hasUnchangedObjectPrototype\(\)/);
+});
+
+test('restored PIN authority reconciles a concurrent recovery check without bypassing a later lock', async () => {
+    const source = readFileSync(new URL('../../components/security-provider.tsx', import.meta.url), 'utf8');
+    const parsed = ts.createSourceFile('security-provider.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const declarations: string[] = [];
+    function visit(node: ts.Node) {
+        if (ts.isVariableDeclaration(node) && ['restoreSession', 'checkAuthStatus'].includes(node.name.getText(parsed))) {
+            declarations.push(`const ${node.getText(parsed)};`);
+        }
+        ts.forEachChild(node, visit);
+    }
+    visit(parsed);
+    assert.equal(declarations.length, 2);
+    const output = ts.transpileModule(`${declarations.join('\n')}\n({ restoreSession, checkAuthStatus });`, {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
+    }).outputText;
+
+    for (const outcome of ['restored', 'locked', 'missing', 'passphrase'] as const) {
+        const state = { authenticated: false, locked: true, user: null as { id: string } | null };
+        const authorityAttemptGenerationRef = { current: 0 };
+        const authRecoveryStateRef = { current: 'ready' };
+        const masterKeyRef = { current: null as object | null };
+        let release!: (session: { key: object; userData: { id: string } } | null) => void;
+        const restored = new Promise<{ key: object; userData: { id: string } } | null>(resolve => { release = resolve; });
+        const callbacks = runInNewContext(output, {
+            authorityAttemptGenerationRef, authRecoveryStateRef, masterKeyRef,
+            askUnlockParameters: async () => ({ credential: outcome === 'passphrase' ? 'passphrase' : 'pin' }),
+            restoreSecuritySession: () => restored,
+            clearSecuritySession: () => undefined,
+            setActiveMasterKey: (key: object) => { masterKeyRef.current = key; },
+            setUser: (user: { id: string }) => { state.user = user; },
+            setIsAuthenticated: (value: boolean) => { state.authenticated = value; },
+            setIsLocked: (value: boolean) => { state.locked = value; },
+            updateAuthRecoveryState: (value: string) => { authRecoveryStateRef.current = value; },
+            checkAuthHealthRequest: async () => ({ response: { ok: true }, controlState: 'accepted',
+                payload: { status: 'ok', isSetup: true, hasSession: true, unlock: { credential: 'pin' } } }),
+            readUnlockParameters: (value: unknown) => value,
+            showUnlockCredential: () => undefined,
+            setAuthHealth: () => undefined,
+            setRequiresSetup: () => undefined,
+            console: { error: (...args: unknown[]) => { assert.fail(String(args)); } },
+        }) as { restoreSession(): Promise<boolean>; checkAuthStatus(): Promise<void> };
+        const restoring = callbacks.restoreSession();
+        await callbacks.checkAuthStatus();
+        assert.equal(authRecoveryStateRef.current, 'required');
+        if (outcome === 'locked') {
+            authorityAttemptGenerationRef.current += 1;
+            authRecoveryStateRef.current = 'pending';
+        }
+        const key = {};
+        release(outcome === 'missing' ? null : { key, userData: { id: 'synthetic-operator' } });
+        assert.equal(await restoring, outcome === 'restored');
+        if (outcome === 'restored') {
+            assert.deepEqual(state, { authenticated: true, locked: false, user: { id: 'synthetic-operator' } });
+            assert.equal(masterKeyRef.current, key);
+            assert.equal(authRecoveryStateRef.current, 'ready');
+        } else {
+            assert.deepEqual(state, { authenticated: false, locked: true, user: null });
+            assert.equal(masterKeyRef.current, null);
+            assert.equal(authRecoveryStateRef.current, outcome === 'locked' ? 'pending' : 'required');
+        }
+    }
 });
 
 

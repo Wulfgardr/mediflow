@@ -33,6 +33,21 @@ async function openSibling(page: Page) {
   return { sibling, mutations, errors };
 }
 
+test('a restored PIN session can open and reload patient import without another login', async ({ page }) => {
+  await bootstrapUnlockedSession(page, pin);
+  const authMutations: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && authPath(request).startsWith('/api/auth/')) authMutations.push(authPath(request));
+  });
+  await page.goto('/patients/import');
+  await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
+  await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
+  await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
+  expect(authMutations).toEqual([]);
+});
+
 test('an active session without the tab key needs explicit renewal and waits for its real lock receipt', async ({ page }) => {
   const { sibling, mutations, errors } = await openSibling(page);
   const consoleErrors: string[] = [];
