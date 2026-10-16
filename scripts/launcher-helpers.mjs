@@ -124,10 +124,10 @@ export function hashWorktreeStatus(status) {
 }
 
 /* @Codex */
-function readGitValue(args, cwd, fallback = 'unknown') {
+function readGitValue(args, cwd, fallback = 'unknown', whenEmpty = fallback) {
     const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
     if (result.status !== 0) return fallback;
-    return result.stdout.trim() || fallback;
+    return result.stdout.trim() || whenEmpty;
 }
 
 /** A local main checkout must contain the updates already known by Git. No fetch or implicit update. */
@@ -149,8 +149,8 @@ export function readProductIdentity(cwd = process.cwd()) {
     }
 
     const revision = readGitValue(['rev-parse', '--short=12', 'HEAD'], checkoutPath);
-    // Same fallback as scripts/source-runtime.mjs, so a detached checkout matches its own build.
-    const branch = readGitValue(['branch', '--show-current'], checkoutPath, 'detached');
+    // A detached checkout is "detached", as in scripts/source-runtime.mjs; a failing git stays "unknown".
+    const branch = readGitValue(['branch', '--show-current'], checkoutPath, 'unknown', 'detached');
     const status = readGitValue(['status', '--porcelain=v1'], checkoutPath, '');
     const worktreeHash = hashWorktreeStatus(status);
     const sourceFingerprint = `${branch}@${revision}:${worktreeHash}`;
