@@ -122,10 +122,9 @@
 
 /* Row commands inside a register table: quiet text, a border only on hover; the bin stays an icon. */
 .rowControls { flex-wrap: nowrap; gap: 2px; }
-.rowControls > :is(button,a) { min-height: 36px; padding: 6px 8px; border-color: transparent; color: var(--lume-ink); }
+.rowControls > :is(button,a) { min-height: var(--lume-control-height, 44px); padding: 6px 8px; border-color: transparent; color: var(--lume-ink); }
 .rowControls > button:not([aria-label]) svg { display: none; }
 .rowControls > button[aria-label] { color: var(--lume-ink-muted); }
-.rowControls > :is(button,a) { white-space: nowrap; overflow-wrap: normal; }
 @media (min-width: 701px) { .therapyTable :is(th,td):last-child { width: 19rem; } }
 .reasoningActions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; min-width: 0; }
 .reasoningActions > [data-testid^='model-picker'] { margin-block: 0; flex: 1 1 18rem; }
@@ -133,3 +132,4 @@
 .sectionHead:has(.sectionHeadAction) { justify-content: flex-start; align-items: center; }
 .sectionHeadAction { margin-left: auto; }
 .register > section:first-child > .sectionHead { margin-top: 0; }
+@media (pointer: fine) and (min-width: 701px) { .rowControls > :is(button,a) { white-space: nowrap; overflow-wrap: normal; } }

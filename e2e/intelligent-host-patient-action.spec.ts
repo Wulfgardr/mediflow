@@ -118,8 +118,7 @@ test('checkup host creates the fresh selection once and revokes A before selecti
     const open = action.getByRole('button', { name: 'Gestisci checkup' });
     await expect(open).toBeEnabled();
     const target = await open.boundingBox();
-    // Con il mouse i controlli misurano 40 px (--lume-control-height); 44 resta per touch e schermi stretti.
-    expect(Math.min(target?.width ?? 0, target?.height ?? 0)).toBeGreaterThanOrEqual(40);
+    expect(Math.min(target?.width ?? 0, target?.height ?? 0)).toBeGreaterThanOrEqual(44);
     await open.click();
     await action.getByLabel('Reinserisci il PIN per autorizzare').fill(pin);
     await action.getByRole('button', { name: 'Abilita gestione checkup' }).click();

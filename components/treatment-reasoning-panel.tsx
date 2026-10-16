@@ -245,7 +245,7 @@ export default function TreatmentReasoningPanel({
                             onClick={loadProposal}
                             disabled={!canPrepare}
                             aria-describedby="treatment-reasoning-boundary-note"
-                            className={`${styles.control} ${styles.primary} shrink-0 whitespace-nowrap`}
+                            className={`${styles.control} ${styles.primary} shrink-0 lg:whitespace-nowrap`}
                         >
                             {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
                             {publication ? 'Aggiorna bozza' : 'Genera bozza'}

@@ -562,7 +562,6 @@
   min-width: var(--lume-control-height);
   min-height: var(--lume-control-height);
   padding: 8px 14px;
-  white-space: nowrap;
   border-radius: var(--lume-control-radius);
   font-size: 0.875rem;
   font-weight: 600;
@@ -842,3 +841,4 @@
 .pill.pill { border: 0; border-radius: 0; padding: 0; background: transparent; font-size: 0.8125rem; letter-spacing: 0; }
 .pillWarning::before, .pillCritical::before { content: '▲'; flex-shrink: 0; font-size: 0.75rem; }
 .pillPlum { color: var(--lume-ink-pencil); text-decoration: underline dashed; text-underline-offset: 4px; }
+@media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) :is(.primaryBtn, .ghostBtn, .ghostBtnSm) { white-space: nowrap; } }

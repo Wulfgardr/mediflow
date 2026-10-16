@@ -8,7 +8,7 @@
 .row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
 .actions { display:flex; flex-wrap:wrap; gap:var(--lume-control-gap,8px); }
 .panel button,.picker button { min-height:var(--lume-control-height,44px); white-space:normal; }
-.picker button { white-space:nowrap; }
+@media (pointer: fine) and (min-width: 701px) { .picker button { white-space:nowrap; } }
 .panel label,.picker label { display:grid; gap:6px; min-width:0; font-size:0.875rem; }
 .panel select,.picker select { width:100%; min-width:0; min-height:var(--lume-control-height,44px); border-radius:var(--lume-control-radius,12px); padding:8px 12px; background:var(--lume-surface-focal); color:var(--lume-ink); border:1px solid var(--lume-border-color); }
 .panel summary { min-height:var(--lume-control-height,44px); display:list-item; align-content:center; cursor:pointer; }

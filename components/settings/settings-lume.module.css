@@ -828,7 +828,6 @@
     min-height: var(--lume-control-height);
     padding: 8px 14px;
     border-radius: var(--lume-control-radius);
-    white-space: nowrap;
     gap: var(--lume-control-gap);
     font-size: 0.875rem;
     line-height: 1.5;
@@ -925,3 +924,4 @@
 .siteActions button { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:6px 10px; border:1px solid var(--lume-rule-strong); border-radius:var(--lume-radius-control); color:var(--lume-ink); background:transparent; font:600 0.75rem/1.5 var(--lume-font-sans); }
 .siteActions button:disabled { color:var(--lume-ink-muted); border-color:transparent; }
 @media(max-width:1000px) { .siteRow { grid-template-columns:minmax(0,1fr); gap:12px; } }
+@media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) { white-space: nowrap; } }

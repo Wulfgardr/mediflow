@@ -887,7 +887,7 @@
 :global(html[data-runtime-twin-design='proposal']) .eyebrow,
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 :global(.section-kicker) { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .headerPrimaryAction,
-:global(html[data-runtime-twin-design='proposal']) .headerActionButton { box-sizing: border-box; min-height: var(--lume-control-height); padding: 8px 14px; white-space: nowrap; font-size: 0.875rem; line-height: 1.5; gap: 8px; border-radius: var(--lume-control-radius); }
+:global(html[data-runtime-twin-design='proposal']) .headerActionButton { box-sizing: border-box; min-height: var(--lume-control-height); padding: 8px 14px; font-size: 0.875rem; line-height: 1.5; gap: 8px; border-radius: var(--lume-control-radius); }
 :global(html[data-runtime-twin-design='proposal']) .headerPrimaryAction { background: var(--lume-accent); border-color: var(--lume-accent); }
 :global(html[data-runtime-twin-design='proposal']) .clinicalCanvas .sectionRail {
   grid-column: 1;
@@ -1123,3 +1123,4 @@
 @media (max-width: 360px) {
   :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail { column-gap: 8px; }
 }
+@media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) .headerActionButton { white-space: nowrap; } }
