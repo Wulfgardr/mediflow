@@ -133,3 +133,4 @@
 .sectionHeadAction { margin-left: auto; }
 .register > section:first-child > .sectionHead { margin-top: 0; }
 @media (pointer: fine) and (min-width: 701px) { .rowControls > :is(button,a) { white-space: nowrap; overflow-wrap: normal; } }
+@media (pointer: fine) and (min-width: 701px) { .reasoningAction { white-space: nowrap; } }
