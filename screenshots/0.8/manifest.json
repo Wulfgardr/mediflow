@@ -47,7 +47,7 @@
         "optimization": "sips -Z 1600"
       },
       "original": {
-        "file": "original/macos-clinical-workspace.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/macos-clinical-workspace.png",
         "dimensions": "3200x1800",
         "sha256": "edaaa0abe3bfff378b612c9b7a502d0c149c92dacb0dc830332193c5d47d9a12"
       },
@@ -64,7 +64,7 @@
       "orientation": "portrait",
       "dynamicType": "default",
       "original": {
-        "file": "original/ios-iphone-worklist.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/ios-iphone-worklist.png",
         "dimensions": "1206x2622",
         "sha256": "a987607e52e4108e10a29d9f4a1f6ad377f27eeab4787e17ca2a257aa8a0c961"
       },
@@ -81,7 +81,7 @@
       "orientation": "portrait",
       "dynamicType": "default",
       "original": {
-        "file": "original/ios-iphone-detail.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/ios-iphone-detail.png",
         "dimensions": "1206x2622",
         "sha256": "2f0fea3c60d450239b358ef145ad1e835192c16e82b705a235251d695dcd0058"
       },
@@ -98,7 +98,7 @@
       "orientation": "portrait",
       "dynamicType": "default",
       "original": {
-        "file": "original/ios-iphone-therapies.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/ios-iphone-therapies.png",
         "dimensions": "1206x2622",
         "sha256": "3058fefa95072b3fd970fb40d9b27a2c61d1c109b28f53ebc9e33189e82c23c5"
       },
@@ -116,7 +116,7 @@
       "dynamicType": "default",
       "transform": "lossless 90-degree orientation normalization",
       "original": {
-        "file": "original/ipados-workspace.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/ipados-workspace.png",
         "dimensions": "2752x2064",
         "sha256": "d5a1e8914c0d396f0dcc5d37310ad1f3054bac939f42d431896da4614aba63c0"
       },
@@ -138,7 +138,7 @@
       ],
       "transform": "pixel-lossless 270-degree orientation normalization",
       "original": {
-        "file": "original/ipados-detail.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/ipados-detail.png",
         "dimensions": "2752x2064",
         "sha256": "bb27b666c3e3ec6889286b7f8b05f9cb3b3358ab00db6c1675774e72cf9145eb"
       },
@@ -161,7 +161,7 @@
       ],
       "transform": "lossless 180-degree orientation normalization",
       "original": {
-        "file": "original/ipados-scale.png",
+        "file": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/screenshots/0.8/original/ipados-scale.png",
         "dimensions": "2064x2752",
         "sha256": "5f1341e359dc471639e688364da4dad6d854cf266cb60ff7b4637f80a6919fff"
       },

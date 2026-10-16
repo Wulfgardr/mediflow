@@ -1,5 +1,5 @@
 ---
-summary: "Run record della wave PK-1: adozione Fabric su patient insight, emendamento etichette provenance, quattro round writer/verifica, verdetto GO — VERIFIED, HOLD_REMOTE_PROMOTION invariato."
+summary: "Run record della wave PK-1: adozione Fabric su patient insight, emendamento etichette provenance, quattro round writer/verifica, verdetto GO: VERIFIED, HOLD_REMOTE_PROMOTION invariato."
 read_when:
   - "Si riprende, verifica o estende l'adozione Fabric di patient insight (PK-1)."
   - "Si prepara la slice PK-2 Smart Import o un packet successivo del DAG post-Horizon."
@@ -16,7 +16,7 @@ Data: 2026-08-06
 ## 1. Mandato e selezione
 
 Ingresso: `NEXT_PERMITTED_ACTION` del verbale Horizon
-(`2026-07-30-intelligence-fabric-horizon-run.md`, §13). Ricognizione in sola lettura:
+([verbale Horizon](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/analysis/2026-07-30-intelligence-fabric-horizon-run.md), §13). Ricognizione in sola lettura:
 
 - identita' verificata (base `ad54655ed`, runtime `aa3de4c46` antenato);
 - branch `codex/WUL-522-if-provider-admission` e `codex/WUL-522-if-status-projection`
@@ -43,7 +43,7 @@ Ownership esclusiva: `lib/ai-summary-fabric.ts` (nuovo),
 | W3 | `fdbf7c7e5` | Validazione integrale `ProviderSelectionReceipt`; identita' referenziale decision/resolution; `runtimeReadiness='required'` confermato dal registry. |
 | V3 | HOLD_FIX | P2 finale: receipt root non snapshotted (getter stateful oltre l'ammissione; `egressProfile` null -> TypeError). |
 | W4 | `88744fd86` | Snapshot strutturale unico (una lettura per campo, copia congelata); decision/resolution/provenance ricostruite attorno allo snapshot (raw mai nel metadato); shape malformate -> denial, mai throw.  |
-| V4 | **GO — VERIFIED** | Probe indipendente 6/6 (prima-lettura coerente, conteggio 1 per campo, denial su divergenza/shape); regressione falsificatori 12/12; gate verdi. |
+| V4 | **GO: VERIFIED** | Probe indipendente 6/6 (prima-lettura coerente, conteggio 1 per campo, denial su divergenza/shape); regressione falsificatori 12/12; gate verdi. |
 
 ## 3. Gate finali (V4 su `88744fd86`)
 

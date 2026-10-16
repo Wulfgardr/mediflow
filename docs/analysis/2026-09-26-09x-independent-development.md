@@ -172,7 +172,7 @@ Non sono stati raccolti tempi o giudizi clinici. Prima di farli osservare:
 
 ### Collegamento al percorso comune e differenze da risolvere
 
-Il raccordo concordato con il task «MediFlow — Chief of Staff» è:
+Il raccordo concordato con il task «MediFlow: Chief of Staff» è:
 fonte → revisione/bozza → conferma umana → operazione condizionale con
 versione/audit → rilettura/recupero. Questa tranche esercita i primi due
 passaggi. Non simula una conferma autenticata o una ricevuta di commit.
@@ -193,7 +193,7 @@ riconcilierà eventuali voci concorrenti quando sarà richiesta l'integrazione.
 | Filone | Fonte esistente da riusare | Da non duplicare / prova necessaria |
 | --- | --- | --- |
 | Diritti e correzioni | `lib/schema.ts`, `lib/network-patient-write.ts`, `lib/security/audit-db.ts`, `lib/backup-artifact.ts` | Versione del paziente distinta da quella della fonte; nessun nuovo registro, purge o audit alternativo. |
-| Terapie e review | `components/treatment-reasoning-panel.tsx`, `components/patient-smart-import-panel.tsx`, DESIGN | Comparatore/state model minimo dopo WUL-587; nessun nuovo database di terapie o design system. |
+| Terapie e review | `components/treatment-reasoning-panel.tsx`, [components/patient-smart-import-panel.tsx](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/components/patient-smart-import-panel.tsx), DESIGN | Comparatore/state model minimo dopo WUL-587; nessun nuovo database di terapie o design system. |
 | Follow-up e coorti | `lib/patient-followup-projection.ts`, `packages/aip/src/patient-open-loops-contract.ts`, `servicePrescriptionItems`, `checkups` | Stato esame/referto non equivale a revisione o chiusura professionale; definire mapping al servizio accettato. |
 | Packet/FHIR | `lib/fhir/bundle-mapper.ts`, ADR 0081, lock validator v1 | Mapper attuale e contratto futuro non sono la stessa prova. Nessun adattamento runtime anticipato. |
 | Mini | `packages/mini/src/session.ts`, `scripts/run-mini-desktop-acceptance.mjs`, Supervisor | Conservare gli harness; adattare al confine WUL-710. IPC connesso non equivale a capacità autorizzata; prove vecchie non qualificano nuovi pacchetti. |
