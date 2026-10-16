@@ -99,7 +99,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                     {installedModels.map(model => <option key={model} value={model}>{model}</option>)}
                 </select>
                 <button type="button" onClick={checkInstalled} disabled={loading || !targetUrl}
-                    className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-self-start')}>
                     <RefreshCw aria-hidden="true" className="h-4 w-4" />
                     {loading ? 'Lettura modelli…' : 'Aggiorna modelli installati'}
                 </button>
@@ -173,7 +173,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                         <button
                             type="button"
                             onClick={() => setShowCustom(true)}
-                            className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-center border-dashed')}
+                            className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-self-start border-dashed')}
                         >
                             Usa un modello personalizzato
                         </button>

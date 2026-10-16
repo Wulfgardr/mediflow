@@ -240,7 +240,8 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
 
   const networkValue = page.getByTestId('settings-network-mode-value');
   const networkAction = page.getByTestId('settings-network-mode-action');
-  expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  // Controlli a 40 px con il mouse, 44 su touch o schermo stretto (--lume-control-height).
+  expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(viewCase.viewport === 'narrow' ? 44 : 40);
   // @Codex: wait for the real network overview to resolve. The disabled control
   // is the observable loading state; no fixture or response is substituted.
   await expect(networkAction).toBeEnabled();
