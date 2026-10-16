@@ -170,7 +170,6 @@
 .entry[data-lume-entry-state='draft'] .entryTitle,
 .entry[data-lume-entry-state='draft'] .preview {
   color: var(--lume-ink-fresh);
-  font-weight: 600;
 }
 
 .entry[data-lume-entry-state='deleted'] .stateLabel {

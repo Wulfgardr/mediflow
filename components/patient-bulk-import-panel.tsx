@@ -128,7 +128,13 @@ function createImportBinding(operatorId: string, initialAmbulatoryCookie: string
 export default function PatientBulkImportPanel({ initialAmbulatoryCookie }: { initialAmbulatoryCookie: string | null }) {
     const { isAuthenticated, isLocked, user, authRecoveryState } = useSecurity();
     if (!isAuthenticated || isLocked || !user?.id || authRecoveryState !== 'ready') {
-        return <p role="status">Sblocca l’accesso per preparare una nuova anteprima.</p>;
+        return (
+            <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa elenco"
+                subtitle="Aggiungi più schede da un CSV, dopo averle controllate."
+                backHref="/?area=incarico" backLabel="Torna alla lista">
+                <p role="status" className={styles.muted}>Sblocca MediFlow per preparare un’anteprima.</p>
+            </Kree8WorkspaceShell>
+        );
     }
     return <ActivePatientBulkImport key={JSON.stringify([user.id, initialAmbulatoryCookie])}
         operatorId={user.id} initialAmbulatoryCookie={initialAmbulatoryCookie} />;
