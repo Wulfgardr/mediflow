@@ -146,7 +146,8 @@ function buildLiveCatalogState(
   return {
     status: 'ready',
     rows,
-    indexedCount: drugCount + exemptionCount + (prosthetics?.count ?? 0),
+    indexedCount: drugCount + exemptionCount + (prosthetics?.count ?? 0)
+      + (icdCatalog?.state === 'ready' ? icdCatalog.manifest?.categories ?? 0 : 0),
   };
 }
 
@@ -201,7 +202,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
       <header className={styles.areaHeader}>
         <div>
           <h1 className={styles.areaTitle}>Repertori<span aria-hidden="true">.</span></h1>
-          <p className={styles.areaSubtitle}>{isLoading ? 'Lettura locale…' : `${availableCatalogs} di ${catalogs.length} cataloghi disponibili · ${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} record indicizzati`}</p>
+          <p className={styles.areaSubtitle}>{isLoading ? 'Lettura locale…' : `${availableCatalogs} di ${catalogs.length} cataloghi disponibili · ${(catalogState?.indexedCount ?? 0).toLocaleString('it-IT')} voci indicizzate`}</p>
         </div>
         <div className={styles.headerActions}><Link href="/settings/repertori" className={styles.ghostBtn}><Database size={14} />Gestisci repertori</Link></div>
       </header>
