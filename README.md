@@ -25,11 +25,14 @@ che restano da seguire. Diario, terapie, misure e dati strutturati sono il punto
 di partenza. Le funzioni intelligenti si possono aggiungere quando servano;
 non sono la condizione per usare il gestionale.
 
-![MediFlow: elenco pazienti](./docs/images/getmediflow-086/worklist.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/pazienti-dark.png">
+  <img src="./docs/images/getmediflow-090/pazienti-light.png" alt="MediFlow: elenco pazienti con diagnosi principale, età e stato, e il riquadro della persona selezionata">
+</picture>
 
-*La lista pazienti nell’interfaccia web 0.8.6: un punto da cui riprendere la
-cartella e il lavoro da seguire. La schermata è stata acquisita dal candidato
-`ddff0a929` e contiene esclusivamente dati sintetici.*
+*La lista pazienti: un punto da cui riprendere la cartella e il lavoro da
+seguire. Schermata del runtime Web locale acquisita il 16 ottobre 2026, con
+persone inventate; segue il tema chiaro o scuro del tuo GitHub.*
 
 > **MediFlow 0.9.0: release sorgente per runtime locale Web e Headless.**
 >
@@ -38,6 +41,12 @@ cartella e il lavoro da seguire. La schermata è stata acquisita dal candidato
 > Le [note 0.9.0](./CHANGELOG.md#090---2026-10-15) distinguono prove accettate,
 > quarantene temporanee e limiti. La [pagina GitHub della release](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
 > riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna.
+>
+> Dopo il tag sono entrati su `main`, e usciranno con la prossima versione:
+> un solo lanciatore per macOS, Windows e Linux; ICD-11 con il catalogo WHO
+> incluso, senza Docker; controllo e aggiornamento del catalogo AIFA con un
+> clic; protesica con fonti e documenti propri; Ollama 0.40.4; una sola voce
+> tipografica nell’interfaccia. Il dettaglio è nel [CHANGELOG](./CHANGELOG.md#non-ancora-rilasciato).
 >
 > La consegna dei sorgenti non autorizza l'uso con dati clinici reali.
 > L'ammissione dell'installazione e dei flussi resta una decisione separata
@@ -65,7 +74,10 @@ Ogni verifica conserva la revisione su cui è stata eseguita.
 <details>
 <summary><strong>Le terapie, da vicino</strong></summary>
 
-![Terapie di Elena Moretti, paziente fittizia, con Ramipril 5 mg e ATC C09AA05](./docs/images/getmediflow-086/record.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/terapie-dark.png">
+  <img src="./docs/images/getmediflow-090/terapie-light.png" alt="Terapie di Elena Moretti, paziente fittizia, con Ramipril 5 mg e Metformina, codici ATC e azioni di registro">
+</picture>
 
 Una schermata dell’interfaccia reale, con dati interamente sintetici, mostra
 come le terapie restino consultabili nel contesto della cartella. Ramipril
@@ -116,10 +128,55 @@ ogni sistema. La parità FHIRv2 resta da verificare.
 | Ricostruire la storia | Diario, diagnosi, terapie, misure e contesto amministrativo | Le modifiche sono versionate; un conflitto richiede riesame. |
 | Ritrovare l’evidenza | Documenti collegati alla cartella e alle fonti | L’estrazione è locale per i formati supportati; gli errori restano espliciti. |
 | Preparare il seguito | Checkup, appuntamenti e attese aperte | Proporre un follow-up non significa averlo eseguito. |
-| Dare struttura alle parole | Ricerca terminologica e cataloghi | Catalogo WHO MMS 2026-01 inglese offline dopo acquisizione confermata; servizio Docker opzionale. |
+| Dare struttura alle parole | Ricerca terminologica e cataloghi | Catalogo WHO MMS 2026-01 in inglese incluso nell’applicazione; AIFA da file o con **Aggiorna ora**. |
 | Registrare una misura | Scale con risposte esplicite | Zero e risposta mancante restano distinti; fonte e versione si conservano nello storico. |
 | Riesaminare informazioni complesse | Quattro percorsi Intelligence Fabric | I risultati sono proposte da rivedere, senza scrittura clinica automatica. |
 | Accedere alle funzioni senza passare da ogni schermata | Supervisor, AIP e MCP | I permessi sono delimitati; gli adapter non accedono direttamente al database. |
+
+<details>
+<summary><strong>Guarda le altre schermate</strong></summary>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/scheda-dark.png">
+  <img src="./docs/images/getmediflow-090/scheda-light.png" alt="Scheda di Elena Moretti: quadro clinico, terapie attive e diario">
+</picture>
+
+La scheda tiene insieme quadro clinico, terapie e diario della stessa persona.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/diario-dark.png">
+  <img src="./docs/images/getmediflow-090/diario-light.png" alt="Diario di tutti i pazienti in ordine di data, con fonte e azioni di riga">
+</picture>
+
+Il diario raccoglie le voci di tutti i pazienti, con fonte e stato di ciascuna.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/agenda-dark.png">
+  <img src="./docs/images/getmediflow-090/agenda-light.png" alt="Agenda con quattro controlli di oggi e i prossimi">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/repertori-dark.png">
+  <img src="./docs/images/getmediflow-090/repertori-light.png" alt="Repertori: AIFA con 160.128 confezioni, esenzioni e protesica da importare, ICD-11 pronto">
+</picture>
+
+I repertori dicono cosa è disponibile in locale e cosa manca: qui il catalogo
+AIFA è stato importato dal sito dell’agenzia, ICD-11 è incluso.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/analisi-dark.png">
+  <img src="./docs/images/getmediflow-090/analisi-light.png" alt="Analisi della popolazione: fasce d’età e diagnosi più ricorrenti">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/modelli-locali-dark.png">
+  <img src="./docs/images/getmediflow-090/modelli-locali-light.png" alt="Impostazioni dei modelli locali: indirizzo di Ollama e verifica della connessione">
+</picture>
+
+Collegare Ollama è un passaggio esplicito: la verifica legge l’elenco dei
+modelli e non genera testo. Tutte le schermate usano persone inventate.
+
+</details>
 
 <details>
 <summary><strong>Guarda la revisione documentale</strong></summary>

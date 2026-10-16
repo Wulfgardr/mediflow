@@ -5,32 +5,77 @@ This file collects MediFlow's relevant changes.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Non ancora rilasciato]
+
+Cambiamenti già su `main`, che usciranno con la prossima versione.
+
+### Avvio
+
+- Un solo lanciatore per macOS, Windows e Linux: `MediFlow.command`,
+  `MediFlow.cmd` e `MediFlow.sh` chiedono come vuoi usare MediFlow e avviano
+  sempre la build di produzione. La configurazione sta nella cartella utente
+  del sistema, fuori dall'archivio clinico. I vecchi `Start_MediFlow.command`
+  e `Start-MediFlow.ps1` non esistono più
+  ([#529](https://github.com/Wulfgardr/mediflow/pull/529)).
+
+### Repertori
+
+- ICD-11: ricerca, verifica e salvataggio dei codici con il catalogo WHO MMS
+  2026-01 in inglese incluso nell'applicazione, senza Docker, credenziali o
+  rete ([#527](https://github.com/Wulfgardr/mediflow/pull/527)).
+- AIFA: con il consenso alla rete MediFlow controlla al massimo una volta al
+  giorno se esiste una nuova versione del catalogo; l'aggiornamento parte solo
+  con **Aggiorna ora** e chiede conferma se il catalogo si riduce
+  ([#525](https://github.com/Wulfgardr/mediflow/pull/525)).
+- Protesica: fonti proprie, documenti originali conservati nell'archivio e
+  provenienza riportata nella prescrizione; i documenti tornano con il backup
+  completo ([#528](https://github.com/Wulfgardr/mediflow/pull/528)).
+
+### Intelligence Fabric
+
+- Ollama 0.40.4 è ammesso per le funzioni locali; una versione non supportata
+  viene indicata come tale, non come servizio irraggiungibile
+  ([#524](https://github.com/Wulfgardr/mediflow/pull/524)).
+
+### Interfaccia
+
+- Una sola voce tipografica: Newsreader per titoli e persone, il carattere di
+  sistema a quattro misure per tutto il resto, il monospaziato solo per i
+  codici. Pulsanti a un'altezza sola, 40 px con il mouse e 44 su touch, e
+  azioni di riga senza cornice nel diario e nella scheda
+  ([#530](https://github.com/Wulfgardr/mediflow/pull/530)).
+
+### Pulizia
+
+- Tolti codice non più usato e materiale storico superato: circa 8.000 righe
+  in meno, con i rimandi storici portati al tag `v0.9.0`
+  ([#531](https://github.com/Wulfgardr/mediflow/pull/531)).
+- [Riflessione sulle prestazioni](./docs/analysis/2026-10-15-riflessione-prestazioni.md)
+  della 0.9.0, con le misure da cui partire
+  ([#526](https://github.com/Wulfgardr/mediflow/pull/526)).
+
 ## [0.9.0] - 2026-10-15
 
-MediFlow 0.9.0 è una release sorgente per runtime locale Web e Headless.
-La [pagina della release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
-riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna.
-Le prove storiche conservano la revisione su cui sono state eseguite;
-le decisioni di accettazione sono in [WUL-735](https://linear.app/wulfgardr/issue/WUL-735).
+La 0.9.0 non aggiunge funzioni cliniche: rende più solide quelle che ci sono.
+Il dettaglio per chi lavora in ambulatorio, i limiti e le verifiche della
+consegna sono nella [pagina della release](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0).
 
-- Consolidamento delle scritture cliniche con validazione, conflitti e audit;
-  protezione locale con passphrase v3 e recupero completo distinto dall'export clinico.
-- Avvio Web e Headless con Node 24, controllo dell'identità del runtime e archivi
-  sintetici separati; interfaccia, documenti e percorsi ordinari rivisti.
-- Profili sorgente: macOS ARM, Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM
-  su Parallels. Le prove delegate sostitutive C15/C20 sono state accettate per
-  questa consegna: non attestano una prova personale né ammissione clinica.
-- Le quarantene `native-filechooser-timeout` e `chromium-no-store-response-abort`
-  sono accettate fino al 23 ottobre 2026 alle 00:00 UTC. I test continuano a
-  eseguire; le cause non sono dichiarate risolte e gli altri errori restano bloccanti.
+- Diario, terapie, misure, prescrizioni e schede si salvano in un'unica
+  transazione con il loro audit.
+- Se due sessioni modificano la stessa voce, la seconda non sovrascrive in
+  silenzio.
+- La passphrase apre l'archivio; il PIN resta per confermare le operazioni
+  delicate.
+- Il backup cifrato contiene l'intero archivio, si verifica dall'interfaccia e
+  si ripristina in modo atomico.
+- All'avvio MediFlow verifica di essere la versione scaricata.
+- Su un computer nuovo l'archivio si prepara da solo.
 
-GitHub fornisce ZIP e TAR.GZ dei sorgenti. L’avvio qualificato richiede un
-checkout Git pulito del tag `v0.9.0` con Node 24; gli archivi privi di `.git`
-non costituiscono un profilo di avvio qualificato.
-App e installer nativi restano fuori da questa release e mantengono i propri
-metadati. AI facoltativa, provider esterni spenti per impostazione predefinita
-e revisione umana restano invariati. La pubblicazione non autorizza l'uso di
-archivi clinici reali: l'ammissione dell'installazione resta una decisione separata.
+Release sorgente con Node 24, provata su macOS (Apple Silicon), Windows 11 ARM
+e Arch Linux ARM; si parte da un checkout Git del tag `v0.9.0`. App native e
+installer firmati non fanno parte di questa release. La pubblicazione non
+autorizza l'uso con dati clinici reali. Due test instabili sono in quarantena
+fino al 23 ottobre 2026: continuano a girare, le cause non sono risolte.
 
 ## [0.8.6] - 2026-09-07
 
@@ -159,11 +204,11 @@ production-signed installer claim is made.
 
 ### F6/F7 scope outcomes
 
-- **F6 — integrated local fallback**: AnyDoc remains the first pass; only
+- **F6: integrated local fallback**: AnyDoc remains the first pass; only
   `needsOcr` PDF pages may use local Apple Vision with current-source
   recomposition. DeepSeek-OCR 2/CUDA, qualification benchmarks, and universal
   readiness have status `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`.
-- **F7 — `INTEGRATED / DEFAULT_OFF`**: the provider v2 contract, secret broker,
+- **F7: `INTEGRATED / DEFAULT_OFF`**: the provider v2 contract, secret broker,
   official adapters, and review-only administrative probe are present. No
   credential or live-network evidence belongs to the `0.8.5` scope.
 
@@ -297,7 +342,7 @@ production-signed installer claim is made.
   da `rgb(247,246,246)` (caldo) a trasparente; la banda resta distinguibile per
   testata, spaziatura e il bordo già presente.
   **Limite**: era un token **di segnale** (`--lume-signal-warning`) usato come
-  tinta di superficie su un pannello grande — un errore di categoria, non un
+  tinta di superficie su un pannello grande: un errore di categoria, non un
   valore fuori posto. Non è stato introdotto un token di superficie sostitutivo:
   quello avrebbe riprodotto lo stesso errore a livello di token.
 
@@ -330,7 +375,7 @@ production-signed installer claim is made.
   848 occorrenze che bypassano i token del sistema visivo. Questa release ne
   chiude una parte nelle impostazioni; il resto è un programma di migrazione,
   non una rifinitura, e il censimento non dichiara i propri limiti di
-  completezza — va trattato come pista, non come inventario verificato.
+  completezza: va trattato come pista, non come inventario verificato.
 
 ## [0.8.0] - 2026-07-29
 
