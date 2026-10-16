@@ -29,13 +29,13 @@ export function WhoCodeCheck({ code, release = '2026-01' }: { code: string; rele
         {state.kind === 'done' && <div role="status" className="space-y-1">
             <p className="font-medium">{state.result.status === 'found'
                 ? `${state.result.code} riconosciuto da WHO · MMS 2026-01`
-                : `${state.result.code} non trovato in MMS 2026-01`}</p>
+                : `${state.result.code} non trovato${state.result.receipt.source === 'embedded' ? ' nel catalogo incorporato MMS 2026-01' : ' in MMS 2026-01'}`}</p>
             {state.result.entry && <p>{/[&/]/u.test(code) ? 'Codice base: ' : ''}{state.result.entry.stemTitle}
                 {/[&/]/u.test(code) ? ` (${state.result.entry.stemCode}). Il titolo si riferisce al codice base.` : ''}</p>}
             <p className="text-[color:var(--lume-ink-muted)]">Verifica della codifica in inglese, senza modifiche alla cartella.</p>
             <details className="pt-1 text-sm">
                 <summary className="cursor-pointer">Fonte e data della verifica</summary>
-                <p>Servizio WHO locale · {new Date(state.result.receipt.checkedAt).toLocaleString('it-IT')}</p>
+                <p>{state.result.receipt.source === 'embedded' ? 'Catalogo WHO incorporato, release 2026-01' : 'Servizio WHO locale'} · {new Date(state.result.receipt.checkedAt).toLocaleString('it-IT')}</p>
                 {state.result.entry && <p className="break-all">{state.result.entry.canonicalUri}</p>}
                 <p className="break-all">Dataset: {state.result.receipt.datasetSnapshotId}</p>
             </details>

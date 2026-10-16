@@ -2,7 +2,7 @@
 import { NETWORK_CATALOG_READ_CAPABILITY } from '@/lib/network-catalog-read';
 import { requireNetworkCapabilityContext } from '@/lib/network-write-context';
 import { peekSession } from '@/lib/security/server-session';
-import { getIcd11WhoProductionRuntime } from '@/lib/reference-data/icd11-who-production';
+import { getIcd11WhoSidecarRuntime } from '@/lib/reference-data/icd11-who-production';
 import { createIcd11WhoNetworkRoute } from '@/lib/reference-data/icd11-who-network-route';
 
 export const runtime = 'nodejs';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const handle = createIcd11WhoNetworkRoute('code-check', {
     resolveContext: request => requireNetworkCapabilityContext(request, NETWORK_CATALOG_READ_CAPABILITY),
     isSessionCurrent: context => peekSession(context.session.id) === context.session,
-    getRuntime: getIcd11WhoProductionRuntime,
+    getRuntime: getIcd11WhoSidecarRuntime,
 });
 
 export async function GET(request: Request): Promise<Response> {
