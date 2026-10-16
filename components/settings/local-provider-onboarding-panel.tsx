@@ -6,7 +6,7 @@ import { SETTINGS_CARD_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_
 
 const messages: Record<string, string> = {
     reading_configuration: 'Lettura della configurazione salvata e dello stato locale. Nessuna attivazione in corso.',
-    verifying: 'Verifica locale e possibile caricamento del modello in memoria in corso. La verifica host ha un limite di 30 secondi.',
+    verifying: 'Verifica locale e possibile caricamento del modello in memoria in corso. La verifica host ha un limite di 60 secondi.',
     reading_result: 'Rilettura dello stato del collegamento prima di mostrare l’esito.',
     reading_functions: 'Lettura delle abilitazioni delle funzioni. Non viene eseguita una generazione.',
     missing: 'Collegamento locale da attivare. Controlla i passaggi preparatori, poi avvia la verifica.',

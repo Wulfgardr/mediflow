@@ -16,10 +16,10 @@ export const INITIAL_LOCAL_ONBOARDING_VIEW: LocalOnboardingView = Object.freeze(
     phase: 'reading_configuration', status: null, functions: null, messageCode: 'reading_configuration', busy: true,
 });
 
-// Browser waiting budgets only. These do NOT extend the canonical host's 30 s
+// Browser waiting budgets only. These do NOT extend the canonical host's 60 s
 // activation budget (or the route's 5 s body budget), and never trigger a retry.
 const READ_WAIT_MS = 10_000;
-const ACTIVATION_WAIT_MS = 40_000;
+const ACTIVATION_WAIT_MS = 70_000;
 const endpoint = '/api/ai/local-provider/onboarding';
 const functionsEndpoint = '/api/system/function-status';
 const activatableStates = new Set(['missing', 'degraded', 'available_unqualified']);
