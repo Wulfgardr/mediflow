@@ -237,6 +237,7 @@ enum LockReadFixture {
         case patient: return try encoder.encode(OfflineCacheFixture.detail(notes: "Nota sintetica"))
         case patient + "/entries", "/api/v1/network/entries": return try encoder.encode([entry])
         case logout: return Data("{\"success\":true}".utf8)
+        case "/api/auth/check": return Data(#"{"status":"ok","isSetup":true,"unlock":{"credential":"pin"}}"#.utf8)
         case "/api/auth/native/login": return Data("{\"id\":\"new-operator-fixture\"}".utf8)
         case patient + "/checkups", "/api/v1/network/checkups":
             return try encoder.encode([HomeBaseCheckupSummary(id: "checkup-fixture", patientId: "p1", date: Date(), title: "Controllo sintetico", notes: nil, status: "pending", source: "manual", version: 1, createdAt: nil, updatedAt: nil, deletedAt: nil, deletionReason: nil)])

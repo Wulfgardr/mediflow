@@ -102,27 +102,67 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent("auth")
             .appendingPathComponent("native")
             .appendingPathComponent("login")
-        let body = try JSONEncoder().encode(AuthLoginRequest(username: username, password: password))
+        let checkURL = try configuration.serverURL().appendingPathComponent("api/auth/check")
+        let (checkData, _) = try await send(to: checkURL,
+            headers: ["Cache-Control": "no-store"], includesSourceSurface: false)
+        let check = try decode(AuthUnlockCheck.self, from: checkData)
+        guard check.status == "ok", check.isSetup, let parameters = check.unlock else { throw HomeBaseClientError.contract }
+        let material: CryptoService.UnlockMaterial?
+        let body: Data
+        switch parameters.credential {
+        case "passphrase":
+            guard parameters.kdfVersion == CryptoService.unlockKdfVersion,
+                  let salt = parameters.salt.flatMap({ Data(base64Encoded: $0) }),
+                  let derived = CryptoService.deriveUnlockMaterial(passphrase: password, salt: salt),
+                  check.archiveGeneration != nil else { throw HomeBaseClientError.contract }
+            material = derived
+            body = try JSONEncoder().encode(AuthLoginRequest(username: username, verifier: derived.verifier))
+        case "pin":
+            guard CryptoService.normalizedPassphrase(password) == nil, password.unicodeScalars.count < 15 else {
+                throw HomeBaseClientError.httpStatus(409, "L’account indica un PIN precedente. Verifica l’accesso dal browser prima di inviare questo testo.")
+            }
+            material = nil
+            body = try JSONEncoder().encode(AuthLoginRequest(username: username, password: password))
+        default: throw HomeBaseClientError.contract
+        }
+        try Task.checkCancellation()
         let (data, response) = try await send(
             to: url,
             method: "POST",
-            headers: pairedLoginHeaders(credentials: credentials),
+            headers: pairedLoginHeaders(credentials: credentials).merging(["Cache-Control": "no-store"]) { _, new in new },
             body: body,
             includesSourceSurface: false
         )
         let sessionCookie = try Self.extractSessionCookie(from: response, url: url)
-        // The login body carries the wrapped master key + PBKDF2 salt (same as the
-        // web client). We keep them so the PIN can unwrap the field-crypto key.
-        let payload = try? decode(AuthLoginResponse.self, from: data)
+        let payload: AuthLoginResponse
+        var unlockedMasterKey: SymmetricKey?
+        do {
+            payload = try decode(AuthLoginResponse.self, from: data)
+            if let material {
+                guard payload.success == true, payload.id?.isEmpty == false,
+                      payload.salt == parameters.salt, payload.archiveGeneration == check.archiveGeneration,
+                      let wrapped = payload.encryptedMasterKey,
+                      CryptoService.kdfVersion(of: wrapped) == CryptoService.unlockKdfVersion,
+                      let key = CryptoService.unwrapMasterKey(wrappedBase64: CryptoService.parseWrappedMasterKey(wrapped).base64,
+                                                             kek: material.kek), key.bitCount == 256 else { throw HomeBaseClientError.contract }
+                unlockedMasterKey = key
+            } else if let wrapped = payload.encryptedMasterKey, CryptoService.kdfVersion(of: wrapped) > 2 {
+                throw HomeBaseClientError.contract
+            }
+        } catch {
+            _ = try? await logout(credentials: credentials, sessionCookie: sessionCookie)
+            throw error
+        }
         return HomeBaseLoginResult(
             sessionCookie: sessionCookie,
-            encryptedMasterKey: payload?.encryptedMasterKey,
-            salt: payload?.salt,
-            id: payload?.id,
-            username: payload?.username,
-            displayName: payload?.displayName,
-            ambulatoryName: payload?.ambulatoryName,
-            role: payload?.role
+            encryptedMasterKey: payload.encryptedMasterKey,
+            salt: payload.salt,
+            id: payload.id,
+            username: payload.username,
+            displayName: payload.displayName,
+            ambulatoryName: payload.ambulatoryName,
+            role: payload.role,
+            masterKey: unlockedMasterKey
         )
     }
 
@@ -1600,12 +1640,27 @@ private final class HomeBaseTLSSessionDelegate: NSObject, URLSessionDelegate {
 
 private struct AuthLoginRequest: Encodable {
     let username: String?
-    let password: String
+    var password: String? = nil
+    var verifier: String? = nil
+}
+
+private struct AuthUnlockCheck: Decodable {
+    let status: String
+    let isSetup: Bool
+    let archiveGeneration: String?
+    let unlock: Parameters?
+    struct Parameters: Decodable {
+        let credential: String
+        let kdfVersion: Int?
+        let salt: String?
+    }
 }
 
 // The /api/auth/login body carries the operator's wrapped master key + PBKDF2
 // salt (base64), exactly as the web client consumes them.
 private struct AuthLoginResponse: Decodable {
+    let success: Bool?
+    let archiveGeneration: String?
     let encryptedMasterKey: String?
     let salt: String?
     let id: String?
@@ -1616,6 +1671,7 @@ private struct AuthLoginResponse: Decodable {
 }
 
 public struct HomeBaseLoginResult: Sendable {
+    public let masterKey: SymmetricKey?
     public let sessionCookie: String
     public let encryptedMasterKey: String?
     public let salt: String?
@@ -1633,7 +1689,8 @@ public struct HomeBaseLoginResult: Sendable {
         username: String? = nil,
         displayName: String? = nil,
         ambulatoryName: String? = nil,
-        role: String? = nil
+        role: String? = nil,
+        masterKey: SymmetricKey? = nil
     ) {
         self.sessionCookie = sessionCookie
         self.encryptedMasterKey = encryptedMasterKey
@@ -1643,6 +1700,7 @@ public struct HomeBaseLoginResult: Sendable {
         self.displayName = displayName
         self.ambulatoryName = ambulatoryName
         self.role = role
+        self.masterKey = masterKey
     }
 }
 
