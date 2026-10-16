@@ -567,10 +567,21 @@
   font-weight: 600;
   line-height: 1.5;
   gap: 8px;
+  border: 1px solid transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+:global(html[data-runtime-twin-design='proposal']) :is(.ghostBtn, .ghostBtnSm) {
+  border-color: var(--line-strong);
 }
 
 /* related actions and state controls follow the same spacing scale. */
-:global(html[data-runtime-twin-design='proposal']) :is(.headerActions, .panelActions, .identityChips, .dockActions, .segmented) {
+:global(html[data-runtime-twin-design='proposal']) :is(.headerActions, .panelActions, .dockActions) {
+  gap: 12px;
+}
+
+:global(html[data-runtime-twin-design='proposal']) :is(.identityChips, .segmented) {
   gap: var(--lume-control-gap);
 }
 :global(html[data-runtime-twin-design='proposal']) .segItem {

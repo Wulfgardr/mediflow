@@ -1,177 +1,394 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "synthetic": true,
-  "capture": "Runtime Web locale di produzione (build standalone) con dodici persone inventate e il catalogo AIFA pubblico importato. Viewport 1440x900 a densita 2x, compressione PNG con pngquant, nessun ritocco dei pixel. Le funzioni AI risultano spente: nessuna esecuzione AI e nessuna parita nativa sono implicate.",
+  "sourceKind": "development-revision-after-v0.9.0",
+  "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+  "capture": "Runtime Web standalone di produzione. Diciannove schermate con dodici persone inventate; due schermate TR con fixture canonica dedicata, proposta fittizia intercettata e nessuna inferenza. Dimensioni CSS e bitmap indicate per file; nessun ritocco o compressione aggiuntiva. Nella fixture showcase ICD-11 è incluso; AIFA, esenzioni e protesica non sono importate.",
+  "releaseBoundary": "Development revision after immutable v0.9.0; screenshots do not describe the distributed release archives or prove native parity, inference or clinical qualification.",
+  "pixelEdits": false,
+  "inferenceRun": false,
   "files": [
     {
       "file": "agenda-dark.png",
-      "sha256": "5311bfc056ebb57d203f697ec97288be4251e62f6ecfe00e7087d5e6a6cd8ae9",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Agenda",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=turno",
+      "captureMode": "production-runtime",
+      "sha256": "8486cb4874eea63448ff21ffa82655cfefdde63ec2bb7ed1e7cb4d889b2207a4",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:53.356Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "agenda-light.png",
-      "sha256": "1a0dc6e4d27059abae55e6166a14f9e37a805f82fae75e1c3a0518aea23c6854",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Agenda",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=turno",
+      "captureMode": "production-runtime",
+      "sha256": "8f65b41ca985c3ded255a4471641b1d089171c449dbf64106be5ec912d87154c",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:46.823Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "analisi-dark.png",
-      "sha256": "3ae97aedeaa57e68d6f9d36f02949398adcf8b2ccb374d4bf465ca3d0b79bad1",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Analisi",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/analytics",
+      "captureMode": "production-runtime",
+      "sha256": "fed98cf72e68436e5ba2c81d5d4577981486fad11f9be978562d07a9ad7d89b7",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:54.060Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "analisi-light.png",
-      "sha256": "9dd39f40a8f68516450e6148394f6af12c433e69d1e948eed9a04bae7f67218a",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Analisi",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/analytics",
+      "captureMode": "production-runtime",
+      "sha256": "33886fc3b358f8e2d84678deedddc43f879a23af04033bb4f6b2e7b142f9384e",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:47.527Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "diario-dark.png",
-      "sha256": "8189dd42c6e57fe82a2f6611b1a5c1e905425561b5d3dc7680cdcc3771d4a44b",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Diario",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=diario",
+      "captureMode": "production-runtime",
+      "sha256": "07cf74b52f97228ec554dfb773ba47f64fa048155e44a3431e2f9f3ca0935e6b",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:50.866Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "diario-light.png",
-      "sha256": "28cdf1de3cda11ac6baa6317b3fa9df95a46dcfe381fbbb0d49bb1bcc072f38b",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Diario",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=diario",
+      "captureMode": "production-runtime",
+      "sha256": "34eeafd894499cd8044b9869a9be667596ff44d3a7885ec973ba3e140ad805eb",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:44.299Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
+    },
+    {
+      "file": "documents-dark.png",
+      "width": 2880,
+      "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
+      "title": "Documenti",
+      "theme": "grafite",
+      "route": "/patients/perf-patient-000000/modules#documenti",
+      "captureMode": "production-runtime",
+      "sha256": "b8eecc62a47d2e270199f049240faca499c7cb601214073574f65ea7845e3677",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:50.123Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
+    },
+    {
+      "file": "documents-light.png",
+      "width": 2880,
+      "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
+      "title": "Documenti",
+      "theme": "giorno",
+      "route": "/patients/perf-patient-000000/modules#documenti",
+      "captureMode": "production-runtime",
+      "sha256": "d2d513eba0eda78de2733746b7862ee770318bcf5062e52d937b9490bf184272",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:43.553Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "modelli-locali-dark.png",
-      "sha256": "d801960eedbd72940c6e4a8caed46bed5d16aa39e60b7cf0dafc9794dadd388b",
       "width": 2880,
-      "height": 1800,
+      "height": 6210,
+      "viewport": {
+        "width": 1440,
+        "height": 3105
+      },
+      "deviceScaleFactor": 2,
       "title": "Modelli locali",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/settings/ai/modelli",
+      "captureMode": "production-runtime",
+      "sha256": "83e16689b124dc23d07def12be0c0aafbe1d2eb916221c811239e803b4a3527f",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:52.650Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "modelli-locali-light.png",
-      "sha256": "a5a1c83e5232020aadd434b4b6d28371464c5c6492414456036a35430e869018",
       "width": 2880,
-      "height": 1800,
+      "height": 6210,
+      "viewport": {
+        "width": 1440,
+        "height": 3105
+      },
+      "deviceScaleFactor": 2,
       "title": "Modelli locali",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/settings/ai/modelli",
+      "captureMode": "production-runtime",
+      "sha256": "1a378f92865a33de643dec3a16934cd89ca7c0d54d07e2787dcb7dd9691fa60c",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:46.097Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "pazienti-dark.png",
-      "sha256": "d187b596a965376c767a6c7bbf2b8baac22638fa8c1688b09a900f35fc5d709b",
       "width": 2880,
       "height": 1800,
-      "title": "Elenco pazienti",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
+      "title": "Pazienti",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=incarico",
+      "captureMode": "production-runtime",
+      "sha256": "2bf1ae01b4c9dd924a65bfd397dac562ee49d3b3abc685622a050444fcdc251a",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:48.997Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "pazienti-light.png",
-      "sha256": "18dc25f83ed4df2c70e8829e0ee8441ac2f427c352dfa10d8c442fdcac2f8a21",
       "width": 2880,
       "height": 1800,
-      "title": "Elenco pazienti",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
+      "title": "Pazienti",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=incarico",
+      "captureMode": "production-runtime",
+      "sha256": "d36505eda02a496ee60f5afd8d6260da20829ca1e96586348d7ecfa0cb3bc921",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:42.415Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "primo-avvio-light.png",
-      "sha256": "9862c12438a078ed2eb37cc83d962fdcb77769a33325531b90f32753139f3add",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Primo avvio",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/",
+      "captureMode": "production-runtime",
+      "sha256": "4e4744b395a3ba3568688b66ce62cdf1a9249396ef69fcd4132ea15d50ddc9be",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:41.612Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
+    },
+    {
+      "file": "ragionamento-terapeutico-dark.png",
+      "width": 2880,
+      "height": 3600,
+      "viewport": {
+        "width": 1440,
+        "height": 1800
+      },
+      "deviceScaleFactor": 2,
+      "title": "Ragionamento terapeutico · proposta sintetica",
+      "theme": "grafite",
+      "route": "/patients/<synthetic-fixture-id>/modules#terapie",
+      "captureMode": "production-ui-synthetic-intercepted-proposal-no-inference",
+      "sha256": "30b3b203dc00174e0d9089c22fe52944f27d73fe1d0e09aae3540d4e137c6f2b",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:28:40.907348+00:00",
+      "fixture": "e2e/treatment-reasoning-fabric-review.spec.ts",
+      "fixtureSha256": "73ceae7e1c5d0eb2ba831da6f2399d75e69b8093c60f5b276d6b7f239b9c7b12",
+      "composition": "Entire treatment panel visible at a taller viewport, reached by normal scrollIntoViewIfNeeded. Browser PNG, no pixel crop."
+    },
+    {
+      "file": "ragionamento-terapeutico-light.png",
+      "width": 2880,
+      "height": 3600,
+      "viewport": {
+        "width": 1440,
+        "height": 1800
+      },
+      "deviceScaleFactor": 2,
+      "title": "Ragionamento terapeutico · proposta sintetica",
+      "theme": "giorno",
+      "route": "/patients/<synthetic-fixture-id>/modules#terapie",
+      "captureMode": "production-ui-synthetic-intercepted-proposal-no-inference",
+      "sha256": "ac3175b4a74decfa1509a3a5ba1c6559020a39090be438f771b2a9ff9b5fecf2",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:28:40.524456+00:00",
+      "fixture": "e2e/treatment-reasoning-fabric-review.spec.ts",
+      "fixtureSha256": "73ceae7e1c5d0eb2ba831da6f2399d75e69b8093c60f5b276d6b7f239b9c7b12",
+      "composition": "Entire treatment panel visible at a taller viewport, reached by normal scrollIntoViewIfNeeded. Browser PNG, no pixel crop."
     },
     {
       "file": "repertori-dark.png",
-      "sha256": "19dd78bb65e57efd55f10dc7d0261a290bd1ba185cb9f635d76e4bd202a270aa",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Repertori",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=repertori",
+      "captureMode": "production-runtime",
+      "sha256": "519e31cdd6b9e089b59e652b5690ed93ae0eb6d8e990dcec3d9a15666a1f3b82",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:51.583Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "repertori-light.png",
-      "sha256": "e1810f77b0697daa41121da9c0fcb9cd6620b8d0490c1f0552ba2fa42032e93f",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Repertori",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/?area=repertori",
+      "captureMode": "production-runtime",
+      "sha256": "29ddbe0cb276b2e907ab9ca2434925d25cc9a29cf5d32eed9a07890eddf6c26a",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:45.016Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "scheda-dark.png",
-      "sha256": "437c10cf9c128b7e3bd5f1218f23b3c0b2190b496ca2656e153d2bcc4395da33",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Scheda paziente",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/patients/perf-patient-000000/modules",
+      "captureMode": "production-runtime",
+      "sha256": "6d6540d39ba787828c930c70cfef4eb83bc24a7e5efe0994104a403f2e20eacd",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:49.800Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "scheda-light.png",
-      "sha256": "02d77a29a962a5e0ed86539fd1a09e274b1e0e66044790b7a164e959e79d53dd",
       "width": 2880,
       "height": 1800,
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "deviceScaleFactor": 2,
       "title": "Scheda paziente",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/patients/perf-patient-000000/modules",
+      "captureMode": "production-runtime",
+      "sha256": "c310723bb43fb884f309d6276b64cd87842ce72cc09d214f468aec65f8640cdb",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:43.223Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "terapie-dark.png",
-      "sha256": "68217054d7761ad4c32fb02dd60e8c10b108632bf9524230c1af68122d1b9260",
       "width": 2880,
-      "height": 1800,
+      "height": 2400,
+      "viewport": {
+        "width": 1440,
+        "height": 1200
+      },
+      "deviceScaleFactor": 2,
       "title": "Registro terapie",
       "theme": "grafite",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/patients/perf-patient-000000/modules#terapie",
+      "captureMode": "production-runtime",
+      "sha256": "b0abc3940a9b3d56930445d4e7e9472703675adbf2b6ec753fbfe8ac5d01fa7a",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:49.978Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     },
     {
       "file": "terapie-light.png",
-      "sha256": "dfc2b43df454f8ad28523ae156ab774ed0891a6f4f3b4c5338b88bc7cecec3ea",
       "width": 2880,
-      "height": 1800,
+      "height": 2400,
+      "viewport": {
+        "width": 1440,
+        "height": 1200
+      },
+      "deviceScaleFactor": 2,
       "title": "Registro terapie",
       "theme": "giorno",
-      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
-      "capturedAt": "2026-10-16"
+      "route": "/patients/perf-patient-000000/modules#terapie",
+      "captureMode": "production-runtime",
+      "sha256": "f2ca5aa40a5540c79d62bcd5b2147750011de833f370703732e6e7906eaf4096",
+      "sourceCommit": "31d7a3268ff7f38aebad40afc707f6b0b74762b1",
+      "capturedAt": "2026-10-16T10:31:43.410Z",
+      "composition": "Browser viewport, no pixel crop; normal application scroll. Taller viewport for complete groups where recorded."
     }
   ]
 }

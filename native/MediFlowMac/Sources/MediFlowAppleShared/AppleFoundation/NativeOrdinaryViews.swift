@@ -45,8 +45,17 @@ private struct NativeOrdinaryExperience: View {
         }))
     }
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("\(function.title) con OpenAI").font(.headline)
+        VStack(alignment: .leading, spacing: function == .treatmentReasoning ? 16 : 10) {
+            if function == .treatmentReasoning {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Proposte").chartGroupHeading()
+                    Text(function.title).inkRegister(weight: .semibold)
+                    Text("Supporto alle terapie · solo revisione. Nessuna modifica alla cartella.").chartMetadata()
+                    Text("OpenAI · abbonamento ChatGPT · consenso per ogni proposta").chartMetadata()
+                }.padding(.bottom, 18)
+            } else {
+                Text("\(function.title) con OpenAI").font(.headline)
+            }
             Text(model.message).font(.callout).fixedSize(horizontal: false, vertical: true).accessibilityFocused($statusFocused)
                 .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-status")
             if model.isWorking { ProgressView(model.phase == .generating ? "Elaborazione e chiusura…" : "Verifica in corso…") }
@@ -54,16 +63,21 @@ private struct NativeOrdinaryExperience: View {
                 Text("Autorizzi l’invio a OpenAI dei contenuti preparati e oscurati per questa sola proposta. Si applicano le condizioni del servizio ChatGPT; la proposta non modifica la cartella.")
                 Text("Funzione: \(function.title). L’autorizzazione scade con questa operazione; un nuovo contenuto richiede un nuovo consenso.")
                     .font(.caption).foregroundStyle(.secondary)
+                if function == .treatmentReasoning {
+                    Text("Destinazioni: auth.openai.com e chatgpt.com").chartMetadata()
+                }
                 DisclosureGroup("Dettagli dell’invio") {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Dimensione: \(disclosure.payloadBytes) byte")
                         Text("Impronta dei contenuti: \(disclosure.sourceSha256)")
                         Text("Impronta dell’invio: \(disclosure.payloadSha256)")
-                        Text("Destinazioni: auth.openai.com e chatgpt.com")
+                        if function != .treatmentReasoning { Text("Destinazioni: auth.openai.com e chatgpt.com") }
                     }.font(.caption).textSelection(.enabled)
                 }
-                Button("Autorizza questi contenuti") { model.consent() }.disabled(model.isWorking)
-                    .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-consent")
+                primaryAction {
+                    Button("Autorizza questi contenuti") { model.consent() }.disabled(model.isWorking)
+                        .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-consent")
+                }
             }
             if let challenge = model.challenge, let url = challenge.safeURL {
                 Text("Codice di accesso: \(challenge.userCode)").textSelection(.enabled)
@@ -71,38 +85,32 @@ private struct NativeOrdinaryExperience: View {
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-login-link")
             }
             if let catalog = model.catalog {
-                Picker("Modello e ragionamento", selection: $model.selectedOptionId) {
+                Picker(function == .treatmentReasoning ? "Modello per la proposta" : "Modello e ragionamento", selection: $model.selectedOptionId) {
                     Text("Scegli dal catalogo dell’operazione").tag("")
                     ForEach(catalog.choices) { choice in Text(choice.label).tag(choice.optionId) }
                 }.disabled(model.isWorking).accessibilityIdentifier("clinical-workspace-\(function.rawValue)-model")
             }
-            HStack {
-                switch model.phase {
-                case .idle, .completed:
-                    Button(model.phase == .completed ? "Prepara una nuova proposta" : "Prepara proposta") { model.prepare() }
-                        .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-prepare")
-                case .consented:
-                    Button("Accedi a OpenAI per questa proposta") { model.startLogin() }
-                case .awaitingLogin:
-                    Button("Ho completato l’accesso: verifica") { model.completeLogin() }
-                case .connected:
-                    Button("Leggi i modelli disponibili") { model.loadModels() }
-                case .ready:
-                    Button("Genera proposta") { model.generate() }.disabled(model.selectedOptionId.isEmpty)
-                        .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-generate")
-                    Button("Aggiorna catalogo") { model.loadModels() }
-                case .blocked:
-                    Button("Verifica la chiusura") { model.verifyClosure() }
-                default: EmptyView()
-                }
-            }.disabled(model.isWorking)
+            if function == .treatmentReasoning {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { phaseActions }
+                    VStack(alignment: .leading, spacing: 12) { phaseActions }
+                }.padding(.vertical, 8).disabled(model.isWorking)
+            } else {
+                HStack { phaseActions }.disabled(model.isWorking)
+            }
             if ![.idle, .completed, .closing, .blocked].contains(model.phase) {
                 Button("Annulla e chiudi") { model.cancel() }
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-cancel")
             }
             if let proposal = model.proposal {
                 Divider()
-                NativeOrdinaryProposalView(function: function, result: proposal)
+                Group {
+                    if function == .treatmentReasoning {
+                        TreatmentReasoningProposalView(result: proposal)
+                    } else {
+                        NativeOrdinaryProposalView(function: function, result: proposal)
+                    }
+                }
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-proposal")
                 Text("Da verificare sulle fonti. Nessuna applicazione automatica né salvataggio clinico da questa vista.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -115,6 +123,36 @@ private struct NativeOrdinaryExperience: View {
         .onDisappear { model.invalidate() }
         .onChange(of: model.phase) { _ in statusFocused = true }
     }
+    @ViewBuilder private func primaryAction<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        if function == .treatmentReasoning { content().buttonStyle(.borderedProminent) }
+        else { content() }
+    }
+
+    @ViewBuilder private var phaseActions: some View {
+        switch model.phase {
+        case .idle, .completed:
+            primaryAction {
+                Button(model.phase == .completed ? "Prepara una nuova proposta" : "Prepara proposta") { model.prepare() }
+                    .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-prepare")
+            }
+        case .consented:
+            primaryAction { Button("Accedi a OpenAI per questa proposta") { model.startLogin() } }
+        case .awaitingLogin:
+            primaryAction { Button("Ho completato l’accesso: verifica") { model.completeLogin() } }
+        case .connected:
+            primaryAction { Button("Leggi i modelli disponibili") { model.loadModels() } }
+        case .ready:
+            primaryAction {
+                Button("Genera proposta") { model.generate() }.disabled(model.selectedOptionId.isEmpty)
+                    .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-generate")
+            }
+            Button("Aggiorna catalogo") { model.loadModels() }
+        case .blocked:
+            primaryAction { Button("Verifica la chiusura") { model.verifyClosure() } }
+        default: EmptyView()
+        }
+    }
+
 }
 private struct NativeOrdinaryProposalView: View {
     let function: NativeOrdinaryFunction
@@ -137,14 +175,7 @@ private struct NativeOrdinaryProposalView: View {
                 candidates("Terapie candidate", proposal["therapies"], label: "drugMention")
                 candidates("Prestazioni candidate", proposal["servicePrescriptions"], label: "serviceName")
             case .treatmentReasoning:
-                let value = result["value"], data = value["data"]
-                paragraph(value["summary"]); paragraph(data["recommendation"])
-                lines("Elementi a sostegno", data["keyEvidence"])
-                lines("Ragionamento", data["reasoning"])
-                lines("Limiti", data["caveats"])
-                lines("Sicurezza", data["safetyFlags"])
-                lines("Azioni da valutare", data["suggestedActions"])
-                lines("Limiti dichiarati", data["trace"]["limitations"])
+                TreatmentReasoningProposalView(result: result)
             case .documentSynthesis:
                 let publication = result["publication"]
                 paragraph(publication["output"]["summary"])

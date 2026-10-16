@@ -697,8 +697,11 @@ function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
 }
 
 function Toolbar({
+  activeArea,
   onSearchRequest,
   onOpenCommand,
+  commandsInWorkspace = false,
+  searchAcrossAreas = false,
   operatorName,
 }: {
   activeArea: AreaId;
@@ -707,20 +710,22 @@ function Toolbar({
   onOpenArea: (area: AreaId) => void;
   onSearchRequest: () => void;
   onOpenCommand: () => void;
+  commandsInWorkspace?: boolean;
+  searchAcrossAreas?: boolean;
   operatorName: string;
 }) {
   const operatorInitials = buildOperatorInitials(operatorName);
 
   return (
-    <div className={shellStyles.toolbar}>
-      <button
+    <div className={shellStyles.toolbar} data-mobile-commands={commandsInWorkspace ? 'workspace' : undefined}>
+      {(activeArea === 'incarico' || searchAcrossAreas) && <button
         type="button"
         className={shellStyles.search}
         onClick={onSearchRequest}
       >
         <Search size={14} />
         <span>Cerca nella lista pazienti</span>
-      </button>
+      </button>}
       {/* scorciatoia esplicita per la palette read-only di navigazione e aiuto. */}
       <button
         type="button"

@@ -4,8 +4,8 @@
    unlocked React session. The SecurityProvider unmounts this frame on lock. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Activity, BookOpen, CalendarDays, ChevronDown, ClipboardList, FolderOpen, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Activity, BookOpen, CalendarDays, ChevronDown, CircleHelp, ClipboardList, FolderOpen, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
@@ -39,6 +39,17 @@ export function useRuntimeWorkspaceArea(area: string | null) {
   }, [area, publish]);
 }
 
+type CommandHandler = (() => void) | null;
+const WorkspaceCommandContext = createContext<((handler: CommandHandler) => void) | null>(null);
+export function useRuntimeWorkspaceCommand(handler: CommandHandler) {
+  const publish = useContext(WorkspaceCommandContext);
+  useEffect(() => {
+    publish?.(handler);
+    return () => publish?.(null);
+  }, [handler, publish]);
+  return publish !== null && handler !== null;
+}
+
 export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const { enabled, proposal, composition, pendingForms } = useRuntimeTwinDesign();
   const confirm = useConfirm();
@@ -47,6 +58,16 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
   const [opened, setOpened] = useState<string[]>([]);
   const [area, setArea] = useState<string | null>(null);
+  const [openCommands, setOpenCommands] = useState<CommandHandler>(null);
+  const registerCommand = useCallback((handler: CommandHandler) => setOpenCommands(() => handler), []);
+  const destinationIsActive = (href: string) => href.includes('?area=')
+    ? ((pathname === '/' || pathname === '/diary') && href.endsWith(`=${pathname === '/diary' ? 'diario' : area}`))
+      || (href.endsWith('=incarico') && pathname.startsWith('/patients/'))
+    : pathname.startsWith(href);
+  const activeDestination = destinations.find(({ href }) => destinationIsActive(href))
+    ?? (pathname.startsWith('/settings') || (pathname === '/' && area === 'governance')
+      ? { href: '/settings', label: 'Impostazioni' }
+      : destinations[0]);
   const directoryReturn = useRef<DirectoryReturn | null>(null);
   const [railOpen, setRailOpen] = useState(true);
   /* one confirmation boundary for the new route shortcuts. Replay the
@@ -88,16 +109,21 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
 
   return (
     <WorkspaceAreaContext.Provider value={setArea}>
+    <WorkspaceCommandContext.Provider value={proposal ? registerCommand : null}>
     <DirectoryReturnContext.Provider value={directoryReturn}>
     <div className={styles.workspace} data-twin-workspace data-active={proposal} data-composition={composition} data-rail-open={railOpen}>
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
         <nav aria-label="Navigazione principale" className={styles.navigation}>
-          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={(href.includes('?area=') ? (pathname === '/' && href.endsWith(`=${area}`)) || (href.endsWith('=incarico') && pathname.startsWith('/patients/')) : pathname.startsWith(href)) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={destinationIsActive(href) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
           <details className={styles.mobileMore} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
             <summary><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
             <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
               {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
+              {openCommands && <button type="button" onClick={event => {
+                event.currentTarget.closest('details')?.querySelector('summary')?.focus();
+                openCommands();
+              }}><CircleHelp size={18} aria-hidden /><span>Comandi e aiuto</span></button>}
               <Link href="/settings"><Settings2 size={18} aria-hidden /><span>Impostazioni</span></Link>
               <button type="button" onClick={lock}><LockKeyhole size={18} aria-hidden /><span>Blocca</span></button>
             </div>
@@ -114,7 +140,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
             {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
           </button>
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
-            <Link className={styles.directoryTab} href="/?area=incarico" aria-current={pathname === '/' ? 'page' : undefined}>Pazienti</Link>
+            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
               <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></Link>
               {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
@@ -127,6 +153,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       </div>
     </div>
     </DirectoryReturnContext.Provider>
+    </WorkspaceCommandContext.Provider>
     </WorkspaceAreaContext.Provider>
   );
 }
