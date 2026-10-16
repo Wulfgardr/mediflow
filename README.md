@@ -39,8 +39,12 @@ non sono la condizione per usare il gestionale.
 </picture>
 
 *La lista pazienti: un punto da cui riprendere la cartella e il lavoro da
-seguire. Schermata del runtime Web locale acquisita il 16 ottobre 2026, con
-persone inventate; segue il tema chiaro o scuro del tuo GitHub.*
+seguire. Le schermate attuali provengono dal runtime Web di produzione della
+[revisione di sviluppo `31d7a3268ff7`](https://github.com/Wulfgardr/mediflow/tree/31d7a3268ff7f38aebad40afc707f6b0b74762b1),
+acquisito il 16 ottobre 2026 con dodici persone inventate. Questa revisione
+è successiva al tag `v0.9.0`: le immagini non descrivono gli archivi della
+release distribuita. Seguono il tema chiaro o scuro del tuo GitHub; dimensioni
+e provenienza sono nel [manifest](./docs/images/getmediflow-090/manifest.json).*
 
 > **MediFlow 0.9.0: release sorgente per runtime locale Web e Headless.**
 >
@@ -165,11 +169,11 @@ Il diario raccoglie le voci di tutti i pazienti, con fonte e stato di ciascuna.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/repertori-dark.png">
-  <img src="./docs/images/getmediflow-090/repertori-light.png" alt="Repertori: AIFA con 160.128 confezioni, esenzioni e protesica da importare, ICD-11 pronto">
+  <img src="./docs/images/getmediflow-090/repertori-light.png" alt="Repertori: ICD-11 incluso; AIFA, esenzioni e protesica ancora da importare nella fixture isolata">
 </picture>
 
-I repertori dicono cosa è disponibile in locale e cosa manca: qui il catalogo
-AIFA è stato importato dal sito dell’agenzia, ICD-11 è incluso.
+I repertori dicono cosa è disponibile in locale e cosa manca: in questa
+fixture ICD-11 è incluso; AIFA, esenzioni e protesica restano da importare.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/analisi-dark.png">
@@ -189,7 +193,10 @@ modelli e non genera testo. Tutte le schermate usano persone inventate.
 <details>
 <summary><strong>Guarda la revisione documentale</strong></summary>
 
-![Documenti, provenienza e passaggi da rivedere](./docs/images/getmediflow-086/documents.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/documents-dark.png">
+  <img src="./docs/images/getmediflow-090/documents-light.png" alt="Documenti della persona inventata, con originale e revisione separati">
+</picture>
 
 Le fonti restano vicine alle informazioni da riesaminare. Anche qui i dati
 sono sintetici: la schermata documentale non dimostra che siano stati eseguiti
@@ -225,17 +232,23 @@ un’autorizzazione a scegliere liberamente provider, endpoint o modalità d’i
 Ollama può servire i primi tre percorsi, mentre ATHENA/MLX è opzionale e
 riservata a Treatment Reasoning, con configurazione e verifiche locali proprie.
 
-![Pannello Treatment Reasoning con ATHENA MLX locale, fonti e bozza finale da rivedere](./docs/images/getmediflow-086/athena-flow.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/ragionamento-terapeutico-dark.png">
+  <img src="./docs/images/getmediflow-090/ragionamento-terapeutico-light.png" alt="Ragionamento terapeutico: proposta da rivedere, cautele, elementi a sostegno e fonti vicine alle affermazioni">
+</picture>
 
-La riproduzione riprende il pannello MediFlow nello stato riuscito e usa un
-caso interamente sintetico con sei terapie e relativi codici ATC. Il percorso
-interattivo completo su [Get MediFlow](https://getmediflow.dev/#fabric)
-permette di fermarsi su modello, fonti, bozza, preparazione e revisione.
-Treatment Intelligence rende leggibili raccomandazione, dati mancanti,
-evidenze, cautele, provenienza e tre percorsi proposti: follow-up
-dell’ACE-inibitore, riconciliazione terapeutica e rivalutazione del sintomo.
-ATHENA prepara soltanto il testo della revisione; il medico può usarlo,
-correggerlo o scartarlo, mentre terapie, percorsi e cartella restano invariati.
+UI reale della stessa revisione di sviluppo, acquisita sul bundle Web di
+produzione con la fixture E2E canonica: una persona e una terapia inventate,
+proposta fittizia intercettata, nessuna inferenza. Il viewport più alto mostra
+il gruppo completo senza ritagliare controlli; dimensioni e hash sono nel
+[manifest](./docs/images/getmediflow-090/manifest.json).
+
+Il risultato è una **Proposta**: indicazione da valutare, cautele, elementi a
+sostegno e azioni restano distinti. Le fonti sono vicine alle affermazioni;
+traccia e dettagli sono espandibili. La scelta del modello precede la
+conferma di paziente e ambulatorio. Il percorso illustrato su
+[Get MediFlow](https://getmediflow.dev/#fabric) usa dati inventati e non
+esegue inferenza. Nessuna proposta applica modifiche alla cartella.
 
 L’integrazione ChatGPT resta opzionale e spenta per impostazione predefinita.
 Il percorso esterno richiede configurazione, consenso e controlli pertinenti
@@ -439,7 +452,11 @@ autenticazione, selezione e attivazione esplicita nell’interfaccia fidata.
 Revoca, logout, cambio di selezione o scadenza chiudono l’autorizzazione, il
 *grant*, senza trasferirla all’agente.
 
-![Demo dell’accesso headless con worklist, polifarmacia e fonti nominate](./docs/images/getmediflow-086/headless-agent.png)
+![Illustrazione storica dell’accesso headless con worklist, polifarmacia e fonti nominate](./docs/images/getmediflow-086/headless-agent.png)
+
+*Illustrazione sintetica del 21 settembre 2026, conservata con la sua
+[provenienza storica](./docs/images/getmediflow-086/manifest.json); non è una
+cattura dell’interfaccia attuale né una sessione Codex collegata.*
 
 La schermata racconta una richiesta che non si risolve consultando una singola
 pagina: il client verifica le capacità concesse, scandisce una worklist,
