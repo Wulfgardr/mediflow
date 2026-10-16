@@ -1869,3 +1869,8 @@ textarea.input-field {
   .lume-point { forced-color-adjust: auto; }
   :focus-visible { outline-color: Highlight; }
 }
+
+/* A heading focused programmatically for screen readers after navigation shows no ring;
+   keyboard focus elsewhere keeps the visible outline. */
+h1[tabindex='-1']:focus:not(:focus-visible),
+h1[tabindex='-1']:focus { outline: none; }

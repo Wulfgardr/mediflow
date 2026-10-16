@@ -37,7 +37,7 @@ const registro = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'MediFlow - Personal Medical Record',
+  title: 'MediFlow',
   description: 'Secure, local-first medical record for district doctors.',
 };
 

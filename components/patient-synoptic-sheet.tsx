@@ -112,7 +112,7 @@ export function PatientSynopticSheet({
         <div className={reading.main}>
           <div className={reading.problem}>
             <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#clinica">Diagnosi</a></div>
-            {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount > 0 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
+            {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount === 1 ? 'un’altra diagnosi' : otherProblemsCount > 1 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
               : <p className={reading.muted}>Diagnosi non registrata. <a href="#clinica">Consulta le diagnosi</a></p>}
             {notes?.trim() ? <div className={reading.notes}><h3>Note in cartella</h3><p>{notes.length > 320 ? `${notes.slice(0, 320).trimEnd()}…` : notes}</p>{notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p>{notes}</p></details> : null}</div> : null}
           </div>
