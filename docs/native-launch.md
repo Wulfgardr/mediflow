@@ -47,6 +47,32 @@ bash scripts/build-apple-macos-app.sh
 
 In assenza di queste variabili, lo script produce un bundle locale non firmato. La notarizzazione richiede una Developer ID reale e un passaggio separato di distribuzione: lo script non la esegue automaticamente.
 
+## Compilazione su GitHub
+
+Il workflow **Apple Native** conserva per sette giorni la build macOS ARM64
+quando compilazione e test del relativo job riescono. L'artefatto
+`mediflow-macos-native-arm64-<commit>` contiene il client Debug non firmato,
+con una ricevuta che identifica sorgenti, configurazione e hash dell'archivio.
+È un componente per il confezionamento, non un installer.
+
+Scarica l'artefatto da una run verificata della repository e usa un checkout
+pulito dello stesso commit. Il builder può completare il pacchetto sul Mac
+senza Xcode completo:
+
+```bash
+MEDIFLOW_MAC_PREBUILT_ARCHIVE="/percorso/MediFlow-native.zip" \
+MEDIFLOW_CODESIGN_IDENTITY="-" \
+bash scripts/build-apple-macos-app.sh
+```
+
+La ricevuta `.receipt.json` deve rimanere accanto allo ZIP. Servono Node 24,
+le dipendenze del progetto, gli strumenti a riga di comando Apple e i quattro
+ingressi pubblici fissati per il payload ChatGPT descritti nel builder.
+Il runtime Web viene costruito dagli stessi sorgenti; i controlli del
+pacchetto e la firma finale restano invariati. Una ricevuta coerente verifica
+l'integrità del download, ma la provenienza va verificata nella run GitHub.
+La firma locale non equivale a notarizzazione o distribuzione pubblica.
+
 ## Avvio manuale
 
 ```bash

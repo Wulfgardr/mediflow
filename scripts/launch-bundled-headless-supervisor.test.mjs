@@ -71,6 +71,26 @@ test('physical extracted layout passes the real guard (not runtime smoke)', asyn
   await f.verify();
   assert.deepEqual(physicalFiles(f.contents).map(name => [name, physicalRecord(path.join(f.contents, name))]), before);
 });
+test('launcher supplies the verified bundle identity to Supervisor composition despite forged caller identity', t => {
+  const f = fixture(t), dataDir = path.join(f.directory, 'synthetic-data');
+  fs.mkdirSync(dataDir);
+  const supervisor = 'Resources/WebRuntime/HeadlessRuntime/scripts/mediflow-headless-supervisor.mjs';
+  write(path.join(f.contents, supervisor), `export async function runHeadlessSupervisorV1(options) {
+    process.stdout.write(JSON.stringify({ options, revision: process.env.MEDIFLOW_APP_REVISION,
+      sourceFingerprint: process.env.MEDIFLOW_APP_SOURCE_FINGERPRINT }));
+  }\n`);
+  f.repinFile(supervisor);
+  const loader = 'Resources/WebRuntime/HeadlessRuntime/scripts/headless-source-loader.mjs';
+  write(path.join(f.contents, loader), 'export {};\n'); f.repinFile(loader);
+  const result = f.run([], { env: { MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_APP_REVISION: 'forged-revision',
+    MEDIFLOW_APP_BRANCH: 'forged-branch', MEDIFLOW_APP_WORKTREE_HASH: 'forged-worktree',
+    MEDIFLOW_APP_SOURCE_FINGERPRINT: 'forged-fingerprint', MEDIFLOW_APP_FINGERPRINT: 'forged-fingerprint' } });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    options: { webDirectory: f.web, webTargetPath: path.join(f.web, 'server.js'), webBuildIdentity: f.roster.identity },
+    revision: f.roster.identity.revision, sourceFingerprint: f.roster.identity.sourceFingerprint,
+  });
+});
 for (const args of [['--mini'], ['--mcp', 'extra'], ['--app', '/tmp/elsewhere'], ['--check'], ['--mcp', '--mini']]) {
   test(`MCP-only CLI rejects ${args.join(' ')}`, t => { denied(fixture(t).run(args)); });
 }

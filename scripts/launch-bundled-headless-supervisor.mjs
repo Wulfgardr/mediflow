@@ -150,7 +150,7 @@ export function verifyHeadlessBundle() {
   sameRecord(roster.node, process.execPath);
   if (fs.readFileSync(path.join(RUNTIME, '.nvmrc'), 'utf8').trim().replace(/^v/u, '') !== '24'
     || JSON.parse(fs.readFileSync(path.join(RUNTIME, 'package.json'), 'utf8')).engines?.node !== '>=24 <25') fail();
-  return { entries, environment };
+  return { entries, environment, identity };
 }
 let loaderInstalled = false;
 export async function installHeadlessLoader() {
@@ -179,7 +179,7 @@ async function main() {
     && !(process.argv.length === 3 && process.argv[2] === '--mcp')) || process.execArgv.length
     || ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']
       .some(key => process.env[key] !== undefined)) fail();
-  const { environment } = verifyHeadlessBundle();
+  const { environment, identity } = verifyHeadlessBundle();
   const dataDir = process.env.MEDIFLOW_DATA_DIR
     ?? path.join(os.userInfo().homedir, 'Library', 'Application Support', 'MediFlow');
   // Deliberately require provisioning of the data directory, never write the app.
@@ -194,7 +194,7 @@ async function main() {
   process.argv = [process.execPath, SELF];
   const { runHeadlessSupervisorV1 } = await import(pathToFileURL(target).href);
   // No wrapper child: lifecycle, signals, leases and revocation stay in the real Supervisor.
-  await runHeadlessSupervisorV1({ webDirectory: WEB, webTargetPath: path.join(WEB, 'server.js') });
+  await runHeadlessSupervisorV1({ webDirectory: WEB, webTargetPath: path.join(WEB, 'server.js'), webBuildIdentity: identity });
 }
 // realpath is used ONLY to recognize direct invocation; main still rejects an alias.
 if (process.argv[1] && fs.existsSync(process.argv[1]) && fs.realpathSync(process.argv[1]) === SELF) {
