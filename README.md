@@ -31,7 +31,7 @@ non sono la condizione per usare il gestionale.
 cartella e il lavoro da seguire. La schermata è stata acquisita dal candidato
 `ddff0a929` e contiene esclusivamente dati sintetici.*
 
-> **MediFlow 0.9.0 — release sorgente per runtime locale Web e Headless.**
+> **MediFlow 0.9.0: release sorgente per runtime locale Web e Headless.**
 >
 > Comprende il runtime Web locale e Headless con Node 24, per macOS ARM,
 > Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM su Parallels.
@@ -100,7 +100,9 @@ un significato condiviso alle informazioni, purché restino riconoscibili la
 fonte e la versione utilizzata. Il catalogo AIFA si può importare da file
 locale o aggiornare con **Aggiorna ora**. Con il consenso Internet AIFA,
 l’apertura di Repertori verifica soltanto i metadati, al massimo ogni 24 ore;
-l’applicazione resta esplicita. Vedi il [manuale](./docs/MANUALE.md#catalogo-farmaci-aifa); il servizio WHO ICD-11 richiede una configurazione esplicita.
+l’applicazione resta esplicita. Vedi il [manuale](./docs/MANUALE.md#catalogo-farmaci-aifa).
+ICD-11 usa il catalogo WHO MMS 2026-01 incluso nell’applicazione, in inglese,
+senza Docker, credenziali o rete.
 
 Anche l’esportazione ha un confine preciso: FHIR segue il contratto
 dell’[ADR 0081](./docs/adr/0081-fhir-r4-export-v0-contract.md). Un formato
@@ -114,7 +116,7 @@ ogni sistema. La parità FHIRv2 resta da verificare.
 | Ricostruire la storia | Diario, diagnosi, terapie, misure e contesto amministrativo | Le modifiche sono versionate; un conflitto richiede riesame. |
 | Ritrovare l’evidenza | Documenti collegati alla cartella e alle fonti | L’estrazione è locale per i formati supportati; gli errori restano espliciti. |
 | Preparare il seguito | Checkup, appuntamenti e attese aperte | Proporre un follow-up non significa averlo eseguito. |
-| Dare struttura alle parole | Ricerca terminologica e cataloghi | Il servizio WHO ICD-11 è opzionale e va configurato esplicitamente. |
+| Dare struttura alle parole | Ricerca terminologica e cataloghi | Catalogo WHO MMS 2026-01 inglese offline dopo acquisizione confermata; servizio Docker opzionale. |
 | Registrare una misura | Scale con risposte esplicite | Zero e risposta mancante restano distinti; fonte e versione si conservano nello storico. |
 | Riesaminare informazioni complesse | Quattro percorsi Intelligence Fabric | I risultati sono proposte da rivedere, senza scrittura clinica automatica. |
 | Accedere alle funzioni senza passare da ogni schermata | Supervisor, AIP e MCP | I permessi sono delimitati; gli adapter non accedono direttamente al database. |
@@ -395,3 +397,9 @@ Il codice è pubblicato sotto [licenza MIT](./LICENSE), perché sia possibile
 esaminarlo e contribuire al suo sviluppo. Dataset, terminologie, modelli e
 fonti esterne conservano le rispettive condizioni d’uso: la licenza di
 MediFlow non le sostituisce. [Crediti e attribuzioni](./CREDITS.md).
+
+Il [catalogo ICD-11 incorporato](docs/icd-who-setup.md) cerca categorie per codice
+o titolo inglese in SQLite. Dati WHO CC BY-ND 3.0 IGO, separati dalla licenza MIT:
+nessun sinonimo o postcoordinazione dell’API, nessuna scrittura clinica automatica.
+Il bundle include l’archivio WHO ufficiale non modificato e il manifest verificato:
+35.664 categorie con codice. Il primo uso lo importa nel DB di repertorio dedicato.

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "mediflow.icd11-catalog-manifest.v1",
+  "sourceUrl": "https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip",
+  "releaseId": "2026-01",
+  "language": "en",
+  "license": "CC BY-ND 3.0 IGO",
+  "attribution": "World Health Organization (WHO)",
+  "sha256": "f1356588f40953a83e3af2b662deab47c5e269f944d1ea4ed0cfeb2007c7cd39",
+  "bytes": 4214980,
+  "rows": 37052,
+  "categories": 35664,
+  "withoutCode": 1388,
+  "blocks": 1360,
+  "chapters": 28,
+  "versionDate": "2026-01-17T05:30:00.000Z",
+  "tabulationFile": "SimpleTabulation-ICD-11-MMS-en.txt",
+  "ignoredFiles": [
+    "SimpleTabulation-ICD-11-MMS-en.xlsx",
+    "readme.txt"
+  ]
+}

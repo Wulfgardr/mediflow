@@ -437,3 +437,19 @@ test('schema-shaped reordered diagnosis keys do not prepend a patient write to a
     assert.deepEqual(memory.calls, [{ kind: 'update', id: 'synthetic-checkup-a', version: 5, changes: { version: 5, title: 'Reviewed' } }]);
     assert.equal(memory.patient.version, 3); assert.equal(memory.applied, 0);
 });
+
+test('embedded WHO reference survives form projection and a later unrelated edit without invented sidecar metadata', async () => {
+    const { WHO_EMBEDDED_BINDING } = await import('./reference-data/icd11-embedded-contract');
+    const record = fixture();
+    record.diagnoses = [{ code: 'AA00', description: 'Synthetic amber condition', system: 'ICD-11', date: new Date('2026-01-01'),
+        canonicalUri: 'http:' + '//id.who.int/icd/release/11/2026-01/mms/1000000001',
+        reference: { releaseId: '2026-01', language: 'en', bindingId: WHO_EMBEDDED_BINDING, datasetSnapshotId: `sha256:${'a'.repeat(64)}` } }];
+    const memory = store(record), session = new PatientEditSession(record);
+    const draft = session.getDefaultValues();
+    assert.deepEqual(draft.diagnoses[0].reference, record.diagnoses[0].reference);
+    assert.equal('imageDigest' in draft.diagnoses[0].reference!, false);
+    draft.firstName = 'Sintetico aggiornato';
+    await session.submit(draft, memory.port, newId);
+    assert.deepEqual(memory.calls[0].changes, { version: 3, firstName: 'Sintetico aggiornato' });
+    assert.deepEqual(memory.patient.diagnoses, record.diagnoses);
+});

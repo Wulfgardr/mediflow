@@ -15,6 +15,18 @@ codice o dati di terzi, salvo dove indicato.
 
 ---
 
+## Dataset ICD-11 WHO incluso
+
+International Classification of Diseases, Eleventh Revision (ICD-11).
+World Health Organization (WHO), 2019. <https://icd.who.int/browse11>.
+Il catalogo SimpleTabulation MMS 2026-01 inglese è incluso come archivio
+ufficiale integrale e non modificato, sotto
+[CC BY-ND 3.0 IGO](https://creativecommons.org/licenses/by-nd/3.0/igo/).
+I dati WHO restano separati dalla licenza MIT di MediFlow. L'attribuzione non
+implica approvazione del prodotto da parte della WHO.
+[Provenienza e integrità](assets/reference-data/icd11/README.md),
+[attribuzione e condizioni](licenses/who-icd11/NOTICE.md).
+
 ## Ispirazione
 
 Questi riferimenti hanno suggerito una forma o un metodo, senza che ne sia

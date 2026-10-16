@@ -1,8 +1,79 @@
+# ICD-11 MMS senza Docker
+
+La ricerca usa il catalogo WHO incorporato verificato: nessuna credenziale,
+connessione o servizio Docker è necessario durante la consultazione. La release
+supportata è MMS **2026-01, solo inglese**. La versione italiana non è inclusa.
+Il bundle include l’archivio WHO ufficiale non modificato e il manifest:
+35.664 categorie con codice, 1.360 blocchi e 28 capitoli verificati. Al primo uso
+il servizio importa le categorie nel DB dedicato, senza scaricare dati.
+Un bundle assente, alterato o disabilitato non viene attivato.
+
+## Aggiornamento e uso offline
+
+In **Impostazioni, Repertori, Terminologia WHO**:
+
+1. Leggere stato, release, lingua e attribuzione.
+2. Scegliere **Aggiorna dalla WHO** e confermare il download dal solo URL fisso
+   `https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip`.
+   Non vengono inviati dati clinici o termini cercati.
+3. Controllare anteprima, conteggi e impronta SHA-256, poi confermare
+   **Attiva catalogo verificato**. Prima di questo gesto il catalogo non cambia.
+4. Cercare una categoria per codice o titolo inglese e selezionarla nella diagnosi.
+   Il salvataggio della cartella rimane un'azione esplicita del medico.
+
+Il catalogo, l'archivio originale e lo storico delle attivazioni sono in
+`icd11-catalog.sqlite`, nella directory dati MediFlow. L'app non legge il DB
+clinico per costruire il repertorio. Un errore o un conflitto conserva la versione
+in uso; **Ripristina catalogo precedente** permette di tornare alla versione
+conservata. Il backup clinico attuale non comprende questo database pubblico:
+per trasferirlo, ad app arrestata copiare il file con gli eventuali file WAL/SHM,
+oppure acquisire di nuovo lo stesso archivio autorizzato. Non copiare un DB in uso.
+
+L’archivio originale è incluso in
+`assets/reference-data/icd11/catalog.zip` con `manifest.json`, secondo il
+[contratto degli asset](../assets/reference-data/icd11/README.md). Il primo uso
+nel processo verifica hash, dimensioni, schema e conteggi; non sovrascrive un
+catalogo attivo. Il bundle è incluso nel tracciamento standalone.
+`MEDIFLOW_ICD_EMBEDDED_DISABLED=1` disabilita ricerca e aggiornamento incorporati;
+il servizio locale opzionale ha il proprio interruttore già esistente.
+
+## Copertura e licenza
+
+Solo categorie con codice della SimpleTabulation, URI MMS, titolo, capitolo e
+indicatori foglia/residuale. FTS5 cerca token letterali nei titoli e dà precedenza
+al codice esatto; massimo 25 risultati, con segnalazione dei risultati parziali.
+Con SQLite privo di FTS5 viene usato LIKE normalizzato. Non comprende sinonimi,
+ricerca italiana o postcoordinazione dell'API WHO. La verifica codice attesta
+presenza nel catalogo, non appropriatezza o correttezza clinica. Una combinazione
+postcoordinata non viene validata usando il solo codice base.
+
+Il parser accetta **tab-separated UTF-8 con intestazioni riconosciute**, anche
+in ZIP: viene selezionato il solo TXT SimpleTabulation inglese, ignorando
+readme e XLSX gemello. Sono supportati BOM, campi quotati e note multilinea;
+XLSX da solo e formati diversi vengono rifiutati esplicitamente. Hash e conteggi garantiscono coerenza con il manifest,
+non costituiscono una firma WHO.
+
+**ICD-11, World Health Organization (WHO), CC BY-ND 3.0 IGO.** I dati WHO non
+sono MIT. L'archivio originale resta non modificato; la proiezione SQLite serve
+alla ricerca. [Licenza](https://creativecommons.org/licenses/by-nd/3.0/igo/).
+
+I client Apple paired devono ancora essere adattati al contratto incorporato;
+la prova web non ne certifica la compatibilità. Le route v1 paired conservano
+il contratto sidecar precedente. Nessun impatto sul contratto OpenAPI v1.
+
+## Opzionale: servizio locale WHO
+
+`Setup_WHO.command`, sidecar e qualificazione restano disponibili. Servono alle
+capacità della API locale, non alla ricerca tabellare incorporata. Se il catalogo
+è pronto ha precedenza; un risultato vuoto non attiva altri servizi. Un catalogo
+non verificato fallisce chiuso. Le istruzioni seguenti conservano il percorso
+storico e i suoi limiti di qualificazione, limitatamente al servizio opzionale.
+
 # WHO locale: candidato Mac 0.8.6, follow-up 4
 
 **Il perimetro attuale comprende Mac, localhost sul Mac e backend condiviso/Headless sullo stesso Mac.** I percorsi Windows, Linux, Mini e iOS/iPadOS sono rinviati alla 1.0: conservarne sorgenti e test di portabilità non equivale a qualificarne il rilascio. Anche la prova Linux r3 allegata serve a diagnosticare F-WHO4, non a provare il funzionamento sul Mac.
 
-**PROPOSTA, non contratto accettato:** prima di procedere occorre leggere [WHO-TRIOS, emendamento D9–D11](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/proposals/WHO-TRIOS-ADR.md). Restano invariati gli ADR accettati, le route applicative, il motore di ricerca e il launcher base. Le sezioni storiche spiegano i passaggi precedenti, ma le loro istruzioni su pubblicazione Docker, v3 e tre OS NON costituiscono la procedura Mac corrente, per la quale prevalgono questo capitolo e D9–D11.
+**PROPOSTA, non contratto accettato:** prima di procedere occorre leggere [WHO-TRIOS, emendamento D9-D11](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/proposals/WHO-TRIOS-ADR.md). Restano invariati gli ADR accettati, le route applicative, il motore di ricerca e il launcher base. Le sezioni storiche spiegano i passaggi precedenti, ma le loro istruzioni su pubblicazione Docker, v3 e tre OS NON costituiscono la procedura Mac corrente, per la quale prevalgono questo capitolo e D9-D11.
 
 ## Correzioni e gate
 
@@ -218,7 +289,7 @@ Le registrazioni ordinarie v1 restano leggibili, ma status non le promuove e sta
 
 ### Disponibilità nell'interfaccia
 
-La guida separa i passaggi necessari a ottenere il servizio (prerequisiti, evidenza dell'immagine, download e qualifica) dalla configurazione salvata e dalla risposta diretta osservata. La scelta dell'OS riguarda quindi il server, non il browser: copiare un comando o selezionare un checkbox non installa WHO né lo rende disponibile. Anche `ready` della CLI attesta una qualifica salvata, non il DTO `available` della sessione applicativa.
+La guida separa i passaggi necessari a ottenere il servizio: prerequisiti, evidenza dell'immagine, download e qualifica: dalla configurazione salvata e dalla risposta diretta osservata. La scelta dell'OS riguarda quindi il server, non il browser: copiare un comando o selezionare un checkbox non installa WHO né lo rende disponibile. Anche `ready` della CLI attesta una qualifica salvata, non il DTO `available` della sessione applicativa.
 Per verificare quest'ultima in MediFlow occorrono **Rileggi configurazione** e una **Verifica con termine di esempio** esplicita, distinguendo un risultato in cache da una risposta diretta. Il percorso non introduce nuove route privilegiate, accessi al DB o scritture cliniche.
 
 ## Accettazione su macchina pulita: NOT_RUN per tutti e tre gli OS
@@ -348,7 +419,7 @@ RUN_ID: 989f06de3f2341be87d202cc2ee55652. **PROPOSED; qualifica reale Mac non es
 ## Stato di partenza e significato delle evidenze
 
 La capsula parent riporta Node 24.19/Mac, **222 PASS/0 FAIL/3 SKIP** nella suite precedente e quattro scenari di trasporto PASS sull'immagine ARM64 pinnata. Il successivo setup WHO, pur con ACCETTO reale, è fallito: nel log pre-cleanup compare un errore di caricamento di `icd11_2026-01-17_release-icf-mms_en.pbf.gz`, seguito dalla terminazione con codice 134 del processo WHO, con OOM=false. Il relay con codice 137 contemporaneo non basta a diagnosticare un timeout incompatibile.
-La causa sottostante (acquisizione esterna, proxy/DNS/TLS, distribuzione del catalogo, caricamento/compatibilità del servizio o altro) **non è dimostrata**, e il diff privo di file dataset non prova un guasto di rete. Il container posseduto è fermo e WHO deve restare disabilitato; il servizio estraneo sulla porta 8888 non è un'alternativa né una risorsa da modificare. Questi esiti parent descrivono il punto di partenza, non risultati del candidato F5.
+La causa sottostante: acquisizione esterna, proxy/DNS/TLS, distribuzione del catalogo, caricamento/compatibilità del servizio o altro: **non è dimostrata**, e il diff privo di file dataset non prova un guasto di rete. Il container posseduto è fermo e WHO deve restare disabilitato; il servizio estraneo sulla porta 8888 non è un'alternativa né una risorsa da modificare. Questi esiti parent descrivono il punto di partenza, non risultati del candidato F5.
 
 ## A. Integrare senza sostituire la base
 
@@ -420,3 +491,18 @@ bash Setup_WHO.command serve
 ```
 
 Mantenere aperto il processo proprietario del ponte ed eseguire realmente Search e controllo codice dal backend, verificando cancel/chiusura e indisponibilità dopo la chiusura del ponte. La disponibilità non si deduce da who.env o da status: le prove appMac/Xcode/browser restano a carico del parent. Qualsiasi gate mancante, nuovo exit, hash difforme, egress, identità discordante o risposta incompleta impedisce la promozione. Il candidato F5 non ha eseguito questi test Mac reali.
+## Contratto web del catalogo incorporato
+
+`GET /api/icd/catalog` richiede una sessione web locale corrente e restituisce
+stato, manifest, revisione CAS, presenza della versione precedente e motore
+`fts5` o `like`. Nessun download avviene con GET.
+
+`POST /api/icd/catalog` accetta solo JSON entro 1024 byte, senza parametri URL,
+con sessione web, generazione archivio e autorità corrente. Ogni azione richiede
+`confirmed: true`. `action: preview` acquisisce l'archivio fisso e restituisce
+`previewId`, `expectedRevision` e manifest. `action: activate` richiede gli stessi
+`previewId` ed `expectedRevision`; `action: rollback` richiede la revisione
+corrente. Campi aggiuntivi, URL, credenziali o file dal chiamante sono rifiutati.
+Un conflitto risponde 409 e richiede rilettura, senza sostituzione del catalogo.
+Le route web Search e code-check riusano autenticazione e controllo corrente
+esistenti; le risposte incorporate sono distinte dalle ricevute del sidecar.
