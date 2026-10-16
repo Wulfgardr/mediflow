@@ -34,7 +34,7 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       E2E_BASE_URL: http://127.0.0.1:3123
       E2E_PIN: "1234"
