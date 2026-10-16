@@ -1,7 +1,7 @@
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
-import { ExecutionError } from './execution-contract';
+import { ExecutionError, isSupportedChatGptPlan } from './execution-contract';
 import { reportExecutionDiagnostic, type ExecutionDiagnostic } from './execution-transport';
 import { readPreparedOrdinaryProfile, closePreparedOrdinaryProfile, type PreparedOrdinaryProfile, type PreparedOrdinaryRead } from './ordinary-preparation';
 import { assertOrdinaryProductConsent, ordinaryConsentIsCurrent, closeOrdinaryProductConsent, type OrdinaryProductConsent } from '../chatgpt-product/product-consent';
@@ -166,7 +166,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             if (revision !== accountRevision) throw new ExecutionError('revoked');
             if (response.account === null || response.account === undefined) throw new ExecutionError('not_connected');
             const value = record(response.account);
-            if (value.type !== 'chatgpt' || (value.planType !== 'plus' && value.planType !== 'pro')) throw new ExecutionError('unsupported_account');
+            if (value.type !== 'chatgpt' || !isSupportedChatGptPlan(value.planType)) throw new ExecutionError('unsupported_account');
             // Codex 0.153.4 Account.chatgpt exposes email: string | null.
             // Null is protocol-valid but cannot qualify this identity-bound execution.
             if (!boundedText(value.email, 320) || !/^[^\s@]+@[^\s@]+$/u.test(value.email)) throw new ExecutionError(accountFingerprint ? 'revoked' : 'unsupported_account');
@@ -230,7 +230,7 @@ function createTaskExecutionService<Result extends object>(options: ExecutionAut
             const notice = record(raw);
             // This protocol notice has no account ID. Matching plan/auth alone cannot
             // authorize a silent account switch: require a fresh matching private hash.
-            if (shutdown || notice.authMode !== 'chatgpt' || (notice.planType !== 'plus' && notice.planType !== 'pro') || !accountFingerprint) invalidate('revoked');
+            if (shutdown || notice.authMode !== 'chatgpt' || !isSupportedChatGptPlan(notice.planType) || !accountFingerprint) invalidate('revoked');
             else accountRevision++;
             return;
         }

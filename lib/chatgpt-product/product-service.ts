@@ -6,7 +6,7 @@ import { bindChatGptSyntheticSynthesis } from '../ai-providers/fabric/chatgpt-sy
 import type { QualifiedExecutionHost } from '../chatgpt-execution/execution-host';
 import type { ProductExecutionPlatform } from '../chatgpt-execution/execution-platform';
 import { createExecutionLogin, readExecutionLimits } from '../chatgpt-execution/execution-login';
-import { ExecutionError, type SynthesisCatalog, type SynthesisRequest, type SynthesisResult, type ExecutionTransport } from '../chatgpt-execution/execution-contract';
+import { ExecutionError, type SynthesisCatalog, type SynthesisRequest, type SynthesisResult, type ExecutionTransport, type SupportedChatGptPlan } from '../chatgpt-execution/execution-contract';
 import { createProductConsent } from './product-consent';
 import { emptyReceipt, parseProductRequest, ProductError, type ConsentRequest, type ProductCode, type ProductOperation,
     type ProductRequest, type ProductResponse, type ProductSnapshot, type ProductState, type ProductReceipt, type ProductLimits } from './product-contract';
@@ -35,7 +35,7 @@ export function createProductService(options: {
     let binding: ReturnType<typeof bindChatGptSyntheticSynthesis> | undefined;
     let catalog: SynthesisCatalog | null = null;
     let result: SynthesisResult | null = null;
-    let plan: 'plus' | 'pro' | null = null;
+    let plan: SupportedChatGptPlan | null = null;
     let limits: ProductLimits | null = null;
     let receipt = emptyReceipt();
     let controller = new AbortController();

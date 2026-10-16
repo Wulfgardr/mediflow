@@ -8,6 +8,19 @@ const { createExecutionLogin, assertExecutionConfig, expectedExecutionConfig, ex
 const { ExecutionError } = await import('./execution-contract.ts');
 const { ProductError } = await import('../chatgpt-product/product-contract.ts');
 const denied = (error: unknown) => error instanceof ExecutionError || error instanceof ProductError;
+for (const plan of ['prolite', 'free', 'unknown', 'self_serve_business_prolite']) test(`dedicated login preserves or rejects exact plan ${plan}`, async t => {
+    const transport = new SyntheticProductTransport(join(process.env.MEDIFLOW_DATA_DIR!, `login-${plan}`, 'work'));
+    transport.plan = plan;
+    const login = createExecutionLogin(transport, () => {}, () => {}, error => assert.fail(error.code), transport.cwd);
+    t.after(() => login.dispose());
+    await login.start(); transport.login();
+    if (plan === 'prolite') {
+        assert.equal(await login.complete(), plan);
+        assert.equal(await login.read(), plan);
+        transport.identity = 'changed@example.invalid';
+        await assert.rejects(login.read(), error => error instanceof ExecutionError && error.code === 'revoked');
+    } else await assert.rejects(login.complete(), error => error instanceof ExecutionError && error.code === 'unsupported_account');
+});
 for (const mutation of ['missing-restriction', 'external-provider', 'mcp', 'unknown-enabled-feature', 'hooks', 'instructions', 'unknown-null-root', 'unknown-nested', 'unknown-disabled-feature'] as const) test(`config/read rejects ${mutation}`, () => {
     const config = structuredClone(expectedExecutionConfig()) as Record<string, unknown>;
     if (mutation === 'missing-restriction') delete config.features;

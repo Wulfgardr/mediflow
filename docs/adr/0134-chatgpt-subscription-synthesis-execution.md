@@ -571,3 +571,36 @@ non si promette secure erasure dell'intero processo. Nessuna persistenza o log
 di plaintext. Client precedenti rifiutano la nuova fase senza invio provider;
 nessun retry o fallback implicito. C2, OS, PIN, drain, packaging, writer,
 auto-apply e ammissione WUL-688 rimangono fuori scope.
+
+## Riqualifica del substrato e piano `prolite` — WUL-778
+
+Data: 16 ottobre 2026. Il substrato candidato passa da macOS `26B5086k`
+a `26B5112a`. Il bundle delle sole CA pubbliche incluse in Node `24.21.0`
+ha digest `8403bc9ed3ae3e71b4af96a4d37c23999d7ba8c2fc9411fc6d6feb5e7ee8c4f7`;
+il pin precedente corrispondeva alle CA di Node `24.18.0`/`24.19.0`.
+Binario Codex, profilo `dyld-support.sb`, custode, protocollo, limiti e
+destinazioni di rete restano quelli verificati sopra. Nessun trust dal
+portachiavi personale o certificato aggiuntivo viene introdotto.
+
+La qualifica concreta sul nuovo substrato osserva probe OS, 24 digest di
+protocollo corrispondenti, initialize, readback con layer e custodia corrente.
+La chiusura finale attesta cessazione dell'albero posseduto, rimozione dei
+temporanei e nessuna risorsa trattenuta. Una ricevuta chiusa resta prova
+storica del run e non abilita un processo successivo.
+
+Un nuovo login ufficiale ha inoltre restituito `account.type: chatgpt` e
+`planType: prolite`. Il
+[sorgente ufficiale della revisione fissata](https://github.com/openai/codex/blob/3d2ee51ca2d5db578f328aa75e20aa22c0197c9a/codex-rs/protocol/src/account.rs#L12)
+definisce `PlanType::ProLite`, serializzato `prolite`, distinto da `Pro`.
+Il contratto MediFlow ammette esplicitamente `plus`, `pro` e `prolite`, senza
+rimappare il piano o dedurne modelli, quote o condizioni commerciali. Login,
+lettura account, notifiche di cambio account e DTO browser usano la stessa
+allowlist; autenticazione API, piano sconosciuto, `free` e varianti business
+non previste continuano a essere rifiutati. Identità corrente, catalogo,
+limiti, consenso e condizioni di uscita restano verifiche indipendenti.
+
+Il login e il catalogo sono stati osservati con il processo confinato reale.
+La richiesta di un modello assente dal catalogo ha fermato l'harness prima
+del turno, senza selezionare un'alternativa. Queste prove non attestano ancora
+generazione, quattro percorsi ordinari, installazione del delta o ammissione
+clinica. I test con trasporto simulato restano distinti dalle prove reali.
