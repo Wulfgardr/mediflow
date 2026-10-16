@@ -52,6 +52,8 @@ notarizzazione, tutte le interazioni o hardware mobile fisico.
 Il successivo candidato locale `b8eb2ed6731459b57e335204c25af5a46dfb1a61`
 riunisce le PR #552 e #553 sulla base `9538e4cecbccd462e4c82be6d00951b785d0b68f`:
 build Mac e iOS Simulator e verifica rigorosa della firma Mac riuscite.
+La PR #552 è stata poi integrata a `6236148dd28fe896460d2a84c68185be56bc73e4`,
+con tutti i controlli CI riusciti al primo tentativo.
 La correzione del diario sposta la conversione HTML fuori dal disegno della
 vista e conserva i rientri nella lettura. La verifica UI del nuovo candidato
 resta pendente: il Mac si è bloccato durante le prove. La PR #553 non viene
@@ -80,7 +82,7 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 | Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772` dopo aggiornamento della sezione; difetto UI seguito in #552. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
 | Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
-| Conflitti, lock, backup e recupero | Conflitto, riavvio e ripristino completo sintetico da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
+| Conflitti, lock, backup e recupero | Ripristino sintetico locale provato su `b8eb2ed67`; conflitto, riavvio e recupero dal file tramite UI da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
 annidati e citazioni multiblocco. La prova Mac conferma il salvataggio e la
@@ -145,6 +147,19 @@ Windows/Linux o l'accuratezza generale del riconoscimento. All'uscita il
 processo ha segnalato `SQLite lease release unverified`; le directory
 temporanee risultavano rimosse. L'ordine di pulizia del test è una possibile
 causa dell'avviso, non una chiusura del lease verificata.
+
+### Recupero completo su archivio sintetico
+
+Sul candidato `b8eb2ed6731459b57e335204c25af5a46dfb1a61` è riuscita in
+1,6 secondi la prova del backup cifrato completo e del ripristino in un
+archivio vuoto. Le primitive reali hanno conservato account, tabelle e
+storico, recuperato la chiave e decifrato la nota inventata. La prova ha
+verificato inoltre audit append-only, replay senza duplicazioni e
+invalidazione delle vecchie sessioni e degli abbinamenti.
+
+L'account usa un hash password sintetico: non è una prova di login. Il backup
+resta in memoria durante il test; salvataggio e lettura del file, UI e
+riavvio completo dell'app restano da verificare.
 
 ### Tre funzioni Ollama: prove reali e limiti
 
@@ -275,8 +290,8 @@ Restano da completare:
   Ragionamento Terapeutico;
 - generazioni ChatGPT, revisione e annullamento durante una generazione,
   quando il provider e la quota lo consentono;
-- conflitti, errore parziale, riavvio, ripristino sintetico completo e limiti
-  della cache mobile, senza introdurre scritture offline.
+- conflitti, errore parziale, riavvio e ripristino dal file backup tramite
+  l'applicazione; limiti della cache mobile, senza introdurre scritture offline.
 
 Le prove VoiceOver e i gate 0.8 riportati sotto valgono per le rispettive
 revisioni storiche; non sono prove delle nuove UI né nuovi divieti generici.
