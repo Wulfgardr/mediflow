@@ -310,7 +310,7 @@ test('versione non ammessa conserva i dettagli e non ammette il provider', async
     await assert.rejects(f.service.activate((await f.service.inspect()).revision), error => {
         assert.ok(error instanceof LocalProviderOnboardingError);
         assert.equal(error.code, 'provider_version_unsupported');
-        assert.deepEqual(error.versionMismatch, { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' });
+        assert.deepEqual(error.versionMismatch, { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5' });
         return true;
     });
     assert.deepEqual(paths, ['/api/version']);
