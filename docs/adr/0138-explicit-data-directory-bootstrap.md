@@ -57,10 +57,9 @@ nella configurazione utente, con una chiave derivata dal percorso reale:
 - Linux: `$XDG_CONFIG_HOME/mediflow/launcher`, oppure
   `~/.config/mediflow/launcher`.
 
-Le directory sono riservate al proprietario: modo `0700` su POSIX e ACL del
-solo utente corrente su Windows; i file nuovi hanno modo `0600` su POSIX e
-su Windows ereditano la ACL della directory. Se non può proteggere la
-configurazione, il lanciatore si ferma.
+Su POSIX le directory hanno modo `0700` e i file nuovi `0600`. Su Windows la
+configurazione sta nel profilo utente (`%APPDATA%`) e ne eredita la ACL, già
+riservata all'utente: il lanciatore non la riscrive.
 La risoluzione della configurazione non crea la cartella selezionata con
 `MEDIFLOW_DATA_DIR`. Il lanciatore non vi salva più preferenze o lock.
 Su macOS il percorso richiesto resta sotto la stessa radice predefinita di

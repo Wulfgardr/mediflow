@@ -421,10 +421,11 @@ test('migration preserves both preferences when a newer configuration already ex
 test('overlapping configuration and archive paths fail before creating either directory', t => {
     const { home, options } = launcherStateFixture(t);
     const config = path.join(home, 'overlap');
-    const overlapping = { ...options, platform: 'linux', env: { XDG_CONFIG_HOME: config, MEDIFLOW_DATA_DIR: config } };
+    const platform = process.platform === 'win32' ? 'win32' : 'linux';
+    const overlapping = { ...options, platform, env: platform === 'win32' ? { APPDATA: config, MEDIFLOW_DATA_DIR: config } : { XDG_CONFIG_HOME: config, MEDIFLOW_DATA_DIR: config } };
     assert.throws(() => prepareLauncherState(repoRoot, overlapping), /si sovrappone/u);
     assert.equal(existsSync(config), false);
-    overlapping.env.MEDIFLOW_DATA_DIR = path.join(config, 'mediflow/launcher/clinical');
+    overlapping.env.MEDIFLOW_DATA_DIR = path.join(config, platform === 'win32' ? 'MediFlow/launcher/clinical' : 'mediflow/launcher/clinical');
     assert.throws(() => prepareLauncherState(repoRoot, overlapping), /si sovrappone/u);
     assert.equal(existsSync(config), false);
 });

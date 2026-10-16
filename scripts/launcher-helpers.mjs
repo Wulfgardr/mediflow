@@ -149,7 +149,8 @@ export function readProductIdentity(cwd = process.cwd()) {
     }
 
     const revision = readGitValue(['rev-parse', '--short=12', 'HEAD'], checkoutPath);
-    const branch = readGitValue(['branch', '--show-current'], checkoutPath);
+    // Same fallback as scripts/source-runtime.mjs, so a detached checkout matches its own build.
+    const branch = readGitValue(['branch', '--show-current'], checkoutPath, 'detached');
     const status = readGitValue(['status', '--porcelain=v1'], checkoutPath, '');
     const worktreeHash = hashWorktreeStatus(status);
     const sourceFingerprint = `${branch}@${revision}:${worktreeHash}`;
