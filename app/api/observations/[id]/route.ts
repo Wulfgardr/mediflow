@@ -1,6 +1,6 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex: ordinary Web observation mutation adapters; the synchronous operation owns the write and audit. */
+/* ordinary Web observation mutation adapters; the synchronous operation owns the write and audit. */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
@@ -23,7 +23,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
         const expectedVersion = safeObservationExpectedVersion(parsed.body.version);
         if (expectedVersion === null) return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        // @Codex: preserve legacy 404-before-domain-validation; this read is not write authority.
+        // preserve legacy 404-before-domain-validation; this read is not write authority.
         const existing = dbServer.select({ id: observations.id }).from(observations).where(eq(observations.id, id)).get();
         if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         const shape = validateObservationInput(parsed.body, 'web', 'update');

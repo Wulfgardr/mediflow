@@ -1,5 +1,3 @@
-/* @Codex */
-
 .backdrop { position: fixed; inset: 0; z-index: 1300; display: grid; place-items: start center; padding: min(12vh, 96px) 16px 16px; background: color-mix(in srgb, var(--lume-ink) 62%, transparent); }
 
 .dialog { width: min(600px, 100%); max-height: min(720px, 76vh); overflow: hidden auto; border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent); border-radius: var(--lume-radius-panel); background: var(--lume-surface-focal); color: var(--lume-ink); box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent); }

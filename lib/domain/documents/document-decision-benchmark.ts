@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-/* @Codex */
 import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,
@@ -10,7 +9,6 @@ import {
     type DocumentDecisionForbiddenReason,
 } from './document-decision';
 
-/* @Codex */
 export const DOCUMENT_DECISION_FAILURE_COUNTERS = [
     'doctor_cf_as_patient',
     'service_to_drug_upcast',
@@ -22,10 +20,8 @@ export const DOCUMENT_DECISION_FAILURE_COUNTERS = [
     'partial_prosthetic_force_structured',
 ] as const;
 
-/* @Codex */
 export type DocumentDecisionFailureCounter = typeof DOCUMENT_DECISION_FAILURE_COUNTERS[number];
 
-/* @Codex */
 export interface DocumentDecisionFailureCounterCase {
     id: string;
     counter: DocumentDecisionFailureCounter;
@@ -33,7 +29,6 @@ export interface DocumentDecisionFailureCounterCase {
     decision: DocumentDecision;
 }
 
-/* @Codex */
 export interface DocumentDecisionFailureCounterResult {
     id: string;
     counter: DocumentDecisionFailureCounter;
@@ -43,7 +38,6 @@ export interface DocumentDecisionFailureCounterResult {
     forbiddenActionCount: number;
 }
 
-/* @Codex */
 export interface DocumentDecisionFailureCounterReport {
     generatedAt: string;
     schemaVersion: 'mediflow.document_decision_failure_counter.v1';
@@ -273,7 +267,6 @@ function scoreCase(testCase: DocumentDecisionFailureCounterCase): DocumentDecisi
     };
 }
 
-/* @Codex */
 export function runDocumentDecisionFailureCounterBenchmark(): DocumentDecisionFailureCounterReport {
     const results = buildCases().map(scoreCase);
     const counters = Object.fromEntries(

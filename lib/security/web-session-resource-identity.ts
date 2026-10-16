@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import * as owner from './web-auth-lifecycle-owner-adapter';
 

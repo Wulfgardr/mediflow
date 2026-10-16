@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useId, useRef, useState } from 'react';
 import { Bold, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
 
@@ -8,7 +7,7 @@ import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { cn } from '@/lib/utils';
 
 /*
- * @Codex WUL-UIUX: document.execCommand e deprecato e incoerente cross-browser.
+ * WUL-UIUX: document.execCommand e deprecato e incoerente cross-browser.
  * Finche non si migra a un editor controllato (Lexical/TipTap), almeno si fa
  * feature-detection, si controlla il valore di ritorno e si protegge da eccezioni.
  */
@@ -58,7 +57,7 @@ interface ClinicalRichTextEditorProps {
     value: string;
 }
 
-/* @Codex #75: toolbar e canvas usano solo superfici Lume opache. */
+/* #75: toolbar e canvas usano solo superfici Lume opache. */
 const TOOLBAR_BUTTON_CLASS = 'inline-flex h-10 items-center gap-2 rounded-[var(--lume-radius-control)] border border-transparent px-3 text-sm font-medium text-[color:var(--lume-ink)] transition-[background-color,border-color,color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)] hover:border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] focus-visible:outline-none focus-visible:shadow-[var(--lume-focus-ring)]';
 const TOOLBAR_ICON_BUTTON_CLASS = 'inline-flex h-10 items-center justify-center rounded-[var(--lume-radius-control)] px-3 text-[color:var(--lume-ink-muted)] transition-[background-color,color] duration-[var(--lume-dur-riga)] ease-[var(--lume-ease)] hover:bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] hover:text-[color:var(--lume-ink)] focus-visible:outline-none focus-visible:shadow-[var(--lume-focus-ring)]';
 
@@ -81,7 +80,6 @@ export function ClinicalRichTextEditor({
     const editorId = useId();
     const [isFocused, setIsFocused] = useState(false);
 
-    /* @Codex */
     useEffect(() => {
         execCommandSafe('defaultParagraphSeparator', 'p', true);
     }, []);
@@ -131,7 +129,7 @@ export function ClinicalRichTextEditor({
                 className,
             )}
         >
-            {/* @Codex #75 */}
+            {/* #75 */}
             <div
                 role="group"
                 aria-controls={editorId}
@@ -191,7 +189,7 @@ export function ClinicalRichTextEditor({
                 </div>
             </div>
 
-            {/* @Codex #75 */}
+            {/* #75 */}
             <div
                 data-lume-editor-surface="canvas"
                 className={cn(

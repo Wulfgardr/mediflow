@@ -1,7 +1,5 @@
-/* @Codex */
 export type AIInsightMode = 'full_auto' | 'balanced' | 'complete' | 'manual';
 
-/* @Codex */
 export interface AIInsightManualConfig {
     maxDocuments: number;
     maxDocumentSummaryChars: number;
@@ -9,27 +7,23 @@ export interface AIInsightManualConfig {
     outputMaxTokens: number;
 }
 
-/* @Codex */
 export interface AIInsightStoredSettings {
     mode: AIInsightMode;
     manualConfig: AIInsightManualConfig;
     hardwareProfile: 'low' | 'medium' | 'high' | 'custom';
 }
 
-/* @Codex */
 export interface AIInsightRuntimeSettings extends AIInsightManualConfig {
     mode: AIInsightMode;
     resolvedProfile: 'light' | 'balanced' | 'complete' | 'manual';
 }
 
-/* @Codex */
 export interface AIInsightComplexityInput {
     diagnoses: number;
     entries: number;
     documents: number;
 }
 
-/* @Codex */
 export const AI_INSIGHT_MODE_OPTIONS: Array<{
     value: AIInsightMode;
     title: string;
@@ -57,7 +51,6 @@ export const AI_INSIGHT_MODE_OPTIONS: Array<{
     },
 ];
 
-/* @Codex */
 export const DEFAULT_AI_INSIGHT_MANUAL_CONFIG: AIInsightManualConfig = {
     maxDocuments: 6,
     maxDocumentSummaryChars: 260,
@@ -143,7 +136,6 @@ function resolveAutoProfile(
     return 'balanced';
 }
 
-/* @Codex */
 export function sanitizeAIInsightManualConfig(value: unknown): AIInsightManualConfig {
     const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
 
@@ -155,12 +147,10 @@ export function sanitizeAIInsightManualConfig(value: unknown): AIInsightManualCo
     };
 }
 
-/* @Codex */
 export function estimateAIInsightComplexityScore(input: AIInsightComplexityInput): number {
     return input.diagnoses + input.entries + (input.documents * 2);
 }
 
-/* @Codex */
 export function resolveAIInsightRuntimeSettings(input: AIInsightStoredSettings & {
     patientComplexityScore?: number;
 }): AIInsightRuntimeSettings {
@@ -196,7 +186,6 @@ export function resolveAIInsightRuntimeSettings(input: AIInsightStoredSettings &
     };
 }
 
-/* @Codex */
 export async function loadAIInsightStoredSettings(): Promise<AIInsightStoredSettings> {
     const { db } = await import('./db');
     const [modeSetting, manualConfigSetting, hardwareSetting] = await Promise.all([
@@ -212,7 +201,6 @@ export async function loadAIInsightStoredSettings(): Promise<AIInsightStoredSett
     };
 }
 
-/* @Codex */
 export async function getAIInsightRuntimeSettings(options: {
     patientComplexityScore?: number;
 } = {}): Promise<AIInsightRuntimeSettings> {
@@ -223,7 +211,6 @@ export async function getAIInsightRuntimeSettings(options: {
     });
 }
 
-/* @Codex */
 export async function saveAIInsightStoredSettings(settings: {
     mode: AIInsightMode;
     manualConfig: AIInsightManualConfig;

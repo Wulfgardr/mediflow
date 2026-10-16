@@ -3,12 +3,12 @@
 import { useState, useRef, useEffect, useId } from 'react';
 import { icdClientErrorMessage, searchICDHybrid } from '@/lib/icd-service';
 import type { ICDSearchResult } from '@/lib/icd-service';
-import { createLatestRequestGuard } from '@/lib/latest-request-guard'; // @Codex
+import { createLatestRequestGuard } from '@/lib/latest-request-guard';
 import { Search, X, Server } from 'lucide-react';
 import { WHO_EMBEDDED_BINDING, WHO_EMBEDDED_LABEL } from '@/lib/reference-data/icd11-embedded-contract';
-import { WHO_LOCAL_ATTRIBUTION } from '@/lib/reference-data/icd11-who-local-contract'; // @Codex
+import { WHO_LOCAL_ATTRIBUTION } from '@/lib/reference-data/icd11-who-local-contract';
 
-/* @Codex: optional provenance is additive at the selection callback boundary. */
+/* optional provenance is additive at the selection callback boundary. */
 type ICDSelection = { code: string; description: string; system: string;
     canonicalUri?: string; reference?: ICDSearchResult['reference'] };
 
@@ -25,15 +25,14 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<ICDSearchResult[]>([]);
     const [isOpen, setIsOpen] = useState(false);
-    /* @Codex */
     const [searchError, setSearchError] = useState<string | null>(null);
-    /* @Codex WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
+    /* WUL-UIUX (Fase 5): pattern combobox ARIA + navigazione da tastiera. */
     const [activeIndex, setActiveIndex] = useState(-1);
     const listboxId = useId();
     const optionId = (index: number) => `${listboxId}-opt-${index}`;
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // @Codex
-    const latestSearchRef = useRef(createLatestRequestGuard()); // @Codex
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const latestSearchRef = useRef(createLatestRequestGuard());
 
     // Initial value population
     useEffect(() => {
@@ -60,7 +59,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [wrapperRef]);
 
-    // @Codex WUL-311 - prevent delayed ICD lookups from updating an unmounted autocomplete.
+    // WUL-311 - prevent delayed ICD lookups from updating an unmounted autocomplete.
     useEffect(() => {
         const latestSearch = latestSearchRef.current;
         return () => {
@@ -77,43 +76,43 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
         const val = e.target.value;
         setQuery(val);
 
-        if (debounceRef.current) { // @Codex
-            clearTimeout(debounceRef.current); // @Codex
-            debounceRef.current = null; // @Codex
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
         }
 
         if (val.length > 1) {
-            const requestId = latestSearchRef.current.issue(); // @Codex
-            setSearchError(null); // @Codex
+            const requestId = latestSearchRef.current.issue();
+            setSearchError(null);
             setIsLoading(true);
-            debounceRef.current = setTimeout(() => { // @Codex
-                searchICDHybrid(val) // @Codex
-                    .then((matches) => { // @Codex
-                        if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
-                        setSearchError(null); // @Codex
-                        setResults(matches); // @Codex
-                        setActiveIndex(-1); // @Codex WUL-UIUX
-                        setIsOpen(true); // @Codex
-                    }) // @Codex
-                    .catch((error) => { // @Codex
-                        if (!latestSearchRef.current.isLatest(requestId)) return; // @Codex
-                        setSearchError(icdClientErrorMessage(error, 'search')); // @Codex
-                        setResults([]); // @Codex
-                        setIsOpen(true); // @Codex
-                    }) // @Codex
-                    .finally(() => { // @Codex
-                        if (latestSearchRef.current.isLatest(requestId)) { // @Codex
-                            setIsLoading(false); // @Codex
-                        } // @Codex
-                    }); // @Codex
-            }, 225); // @Codex
+            debounceRef.current = setTimeout(() => {
+                searchICDHybrid(val)
+                    .then((matches) => {
+                        if (!latestSearchRef.current.isLatest(requestId)) return;
+                        setSearchError(null);
+                        setResults(matches);
+                        setActiveIndex(-1); // WUL-UIUX
+                        setIsOpen(true);
+                    })
+                    .catch((error) => {
+                        if (!latestSearchRef.current.isLatest(requestId)) return;
+                        setSearchError(icdClientErrorMessage(error, 'search'));
+                        setResults([]);
+                        setIsOpen(true);
+                    })
+                    .finally(() => {
+                        if (latestSearchRef.current.isLatest(requestId)) {
+                            setIsLoading(false);
+                        }
+                    });
+            }, 225);
         } else {
-            latestSearchRef.current.discard(); // @Codex
-            setSearchError(null); // @Codex
+            latestSearchRef.current.discard();
+            setSearchError(null);
             setResults([]);
-            setActiveIndex(-1); // @Codex WUL-UIUX
+            setActiveIndex(-1); // WUL-UIUX
             setIsOpen(false);
-            setIsLoading(false); // @Codex
+            setIsLoading(false);
         }
 
         // Propagate free text
@@ -123,10 +122,10 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     };
 
     const handleSelect = (item: ICDSearchResult) => {
-        latestSearchRef.current.discard(); // @Codex
-        if (debounceRef.current) { // @Codex
-            clearTimeout(debounceRef.current); // @Codex
-            debounceRef.current = null; // @Codex
+        latestSearchRef.current.discard();
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
         }
         setIsLoading(false); // selecting while a search is pending must not leave the spinner stuck
         // Mode 1: Standard onChange
@@ -135,13 +134,13 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 code: item.code,
                 description: item.description,
                 system: item.system as 'ICD-9' | 'ICD-10' | 'ICD-11',
-                ...(item.canonicalUri ? { canonicalUri: item.canonicalUri, reference: item.reference } : {}), // @Codex
+                ...(item.canonicalUri ? { canonicalUri: item.canonicalUri, reference: item.reference } : {}),
             });
         }
         // Mode 2: Simple onSelect
         if (onSelect) {
             onSelect(item.code, item.description, { code: item.code, description: item.description,
-                system: item.system, canonicalUri: item.canonicalUri, reference: item.reference }); // @Codex
+                system: item.system, canonicalUri: item.canonicalUri, reference: item.reference });
         }
 
         setQuery(`${item.code} - ${item.description}`);
@@ -175,7 +174,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
     };
 
     return (
-        // @Codex WUL-229: ICD autocomplete shares mf-input + mf-popover language with drug picker
+        // WUL-229: ICD autocomplete shares mf-input + mf-popover language with drug picker
         <div ref={wrapperRef} className="relative w-full">
             <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--lume-ink-muted)' }} aria-hidden="true" />
@@ -204,16 +203,16 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                     <button
                         type="button"
                         onClick={() => {
-                            latestSearchRef.current.discard(); // @Codex
-                            if (debounceRef.current) { // @Codex
-                                clearTimeout(debounceRef.current); // @Codex
-                                debounceRef.current = null; // @Codex
+                            latestSearchRef.current.discard();
+                            if (debounceRef.current) {
+                                clearTimeout(debounceRef.current);
+                                debounceRef.current = null;
                             }
                             setQuery("");
-                            setSearchError(null); // @Codex
-                            setResults([]); // @Codex
-                            setIsOpen(false); // @Codex
-                            setIsLoading(false); // @Codex
+                            setSearchError(null);
+                            setResults([]);
+                            setIsOpen(false);
+                            setIsLoading(false);
                             if (onChange) onChange({ code: '', description: '', system: 'ICD-11' });
                             if (onSelect) onSelect('', '');
                         }}
@@ -226,7 +225,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                 )}
             </div>
 
-            {/* @Codex: source identifiers are text, never followed in the background. */}
+            {/* source identifiers are text, never followed in the background. */}
             {isOpen && results.some(item => item.canonicalUri) && <details className="mt-2 text-xs break-words">
                 <summary>Fonte e riferimenti WHO</summary>
                 <p>{WHO_LOCAL_ATTRIBUTION}</p>

@@ -1,9 +1,7 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLatestRequestGuard } from './latest-request-guard';
 
-/* @Codex */
 test('createLatestRequestGuard discards stale out-of-order responses', async () => {
     const guard = createLatestRequestGuard();
     const applied: string[] = [];
@@ -38,7 +36,6 @@ test('createLatestRequestGuard discards stale out-of-order responses', async () 
     assert.deepEqual(applied, ['fresh']);
 });
 
-/* @Codex */
 test('createLatestRequestGuard discard invalidates pending requests', () => {
     const guard = createLatestRequestGuard();
     const requestId = guard.issue();

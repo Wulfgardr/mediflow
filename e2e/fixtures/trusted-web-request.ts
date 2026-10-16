@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-/* @Codex: APIRequestContext does not synthesize browser Fetch Metadata. */
+/* APIRequestContext does not synthesize browser Fetch Metadata. */
 export function trustedWebRequestHeaders(baseURL: string | undefined): Record<string, string> {
   if (!baseURL) throw new Error('A base URL is required for trusted Web test requests.');
   const url = new URL(baseURL);

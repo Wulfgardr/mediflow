@@ -1,4 +1,3 @@
-/* @Codex */
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -118,7 +117,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
   const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(options.athenaMlxGenerateBin);
   const nodePath = requireAbsoluteFile(options.nodePath ?? process.execPath, 'node');
   const loaderPath = requireAbsoluteFile(options.loaderPath ?? LOADER, 'loader', ROOT_REAL);
-  // @Codex Node interprets Windows drive letters as URL schemes for --import unless encoded as file URLs.
+  // Node interprets Windows drive letters as URL schemes for --import unless encoded as file URLs.
   const loaderUrl = pathToFileURL(loaderPath).href;
   const mcpTargetPath = agentKind === 'mini'
     ? requireAbsoluteFile(MINI_TARGET, 'mini', ROOT_REAL)

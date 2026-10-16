@@ -1,7 +1,5 @@
-/* @Codex */
 const CLINICAL_DOSAGE_NEEDLE_REGEX = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u)\b/gi;
 
-/* @Codex */
 export function normalizeClinicalText(value: string | undefined): string {
     return (value || '')
         .normalize('NFKD')
@@ -11,7 +9,6 @@ export function normalizeClinicalText(value: string | undefined): string {
         .trim();
 }
 
-/* @Codex */
 export function extractClinicalDosageNeedles(value: string | undefined): string[] {
     if (!value?.trim()) return [];
 

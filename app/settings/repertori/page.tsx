@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex: each guided surface owns its UI lifecycle; no installation is triggered here. */
+/* each guided surface owns its UI lifecycle; no installation is triggered here. */
 import AifaCatalogManager from '@/components/settings/aifa-catalog-manager';
 import ExemptionDbManager from '@/components/settings/exemption-db-manager';
 import ProstheticsCatalogManager from '@/components/prosthetics-catalog-manager';

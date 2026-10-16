@@ -1,4 +1,4 @@
-/* @Codex — DTO evidence is descriptive, never execution authority. */
+/* DTO evidence is descriptive, never execution authority. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryFunction } from './ordinary-wire';

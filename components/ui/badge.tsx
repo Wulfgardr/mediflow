@@ -1,4 +1,4 @@
-/* @Codex WUL-UIUX (STREAM E): pillola di stato condivisa. Consolida le decine di
+/* WUL-UIUX (STREAM E): pillola di stato condivisa. Consolida le decine di
    varianti className scritte a mano (rounded-full border px-.. text-xs
    font-semibold + tinte semantiche) in un'unica API a toni. Le ricette dei toni
    derivano da status-glyph.tsx, che era la resa canonica del vocabolario
@@ -33,7 +33,7 @@ function resolveBadgeTone(tone: BadgeTone): SemanticSignal {
     return resolveSemanticSignal(tone);
 }
 
-/* @Codex: compatibilita nominale per i consumatori legacy. I nomi della palette
+/* compatibilita nominale per i consumatori legacy. I nomi della palette
    restano stabili, ma la resa converge sui ruoli Lume: warning, critical,
    accento minerale informativo, success e neutri d'inchiostro. */
 export type BadgePalette =

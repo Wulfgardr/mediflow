@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-/* @Codex */
 import { requireSessionOrLocalToken } from '@/lib/security/server-auth';
 
 /**
@@ -8,7 +7,6 @@ import { requireSessionOrLocalToken } from '@/lib/security/server-auth';
  * Legacy OCR execution route retirement boundary.
  */
 export async function POST(request: NextRequest) {
-    /* @Codex */
     const session = await requireSessionOrLocalToken(request);
     if (!session) {
         return NextResponse.json({
@@ -28,7 +26,6 @@ export async function POST(request: NextRequest) {
  * Legacy OCR diagnostic route retirement boundary.
  */
 export async function GET(request: NextRequest) {
-    /* @Codex */
     const session = await requireSessionOrLocalToken(request);
     if (!session) {
         return NextResponse.json({

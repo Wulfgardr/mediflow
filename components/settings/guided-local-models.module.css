@@ -1,4 +1,4 @@
-/* @Codex: bounded local settings controls, R12 / 44px commands / 32px status. */
+/* bounded local settings controls, R12 / 44px commands / 32px status. */
 .surface, .selector { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 0.875rem; }
 .selector { border-radius: 12px; padding: 16px; }
 .surface { display: grid; gap: 16px; }
@@ -32,7 +32,7 @@
 .recommendation { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 160px; text-align: left; }
 .commands { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8125rem; line-height: 1.5; }
 
-/* @Codex: roles and draft actions stay readable when the preset grid wraps. */
+/* roles and draft actions stay readable when the preset grid wraps. */
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px; }
 .roles > div { min-width: 0; display: grid; align-content: start; gap: 8px; }
 .presetAction { font-size: 0.8125rem; line-height: 1.5; }

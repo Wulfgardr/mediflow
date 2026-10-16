@@ -14,7 +14,6 @@ interface ExemptionSelectorProps {
     onChange: (codes: string[]) => void;
 }
 
-/* @Codex */
 export default function ExemptionSelector({ value, onChange }: ExemptionSelectorProps) {
     const rootRef = useRef<HTMLDivElement>(null);
 
@@ -23,11 +22,10 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [detailsByCode, setDetailsByCode] = useState<Record<string, ExemptionOption>>({});
-    /* @Codex WUL-UIUX (Fase 6-7): pattern combobox ARIA + navigazione da tastiera. */
+    /* WUL-UIUX (Fase 6-7): pattern combobox ARIA + navigazione da tastiera. */
     const [activeIndex, setActiveIndex] = useState(-1);
     const listboxId = useId();
     const optionId = (index: number) => `${listboxId}-opt-${index}`;
-    /* @Codex */
     const [catalogCount, setCatalogCount] = useState<number | null>(null);
 
     useEffect(() => {
@@ -179,7 +177,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
                     onFocus={() => setIsOpen(results.length > 0)}
                     placeholder="Cerca codice o descrizione esenzione (min 2 caratteri)"
                     className="mf-input"
-                    /* @Codex WUL-UIUX: .mf-input ha padding shorthand unlayered che
+                    /* WUL-UIUX: .mf-input ha padding shorthand unlayered che
                        batte la utility pl-*, quindi forziamo lo spazio per l'icona qui. */
                     style={{ paddingLeft: '2.5rem' }}
                 />

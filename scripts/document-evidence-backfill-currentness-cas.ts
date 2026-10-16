@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type BackfillCurrentnessCandidate = Readonly<{
     attachmentId: string;

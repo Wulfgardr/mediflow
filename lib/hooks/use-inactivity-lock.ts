@@ -11,7 +11,6 @@ type UseInactivityLockOptions = {
     timeoutMs?: number;
 };
 
-/* @Codex */
 export function useInactivityLock({
     enabled,
     onTimeout,

@@ -1,4 +1,4 @@
-/* @Codex: PROPOSED, host-only bounded HTTP. No URL, credentials, image tools or global agent. */
+/* PROPOSED, host-only bounded HTTP. No URL, credentials, image tools or global agent. */
 import http from 'node:http';
 import { checkCancelled } from './who-local-platform.mjs';
 
@@ -6,7 +6,7 @@ export const PROBE_TIMEOUT_MS = 5000;
 export const PROBE_MAX_BYTES = 65536;
 export const PROBE_TERMS = Object.freeze({ acquisition: 'cholera', offline_restart: 'measles', restored: 'rubella', original_recovered: 'tetanus' });
 const entityUri = /^http:\/\/id\.who\.int\/icd\/release\/11\/2026-01\/mms\/[1-9][0-9]{0,19}(?:\/(?:other|unspecified))?$/u;
-// @Codex: qualification-only contract: exact observed separators, no trimming or URL normalization.
+// qualification-only contract: exact observed separators, no trimming or URL normalization.
 // The code remains at most 32 characters; at most 16 nonempty components fit that contract.
 export const PROBE_MAX_ID_COMPONENTS = 16;
 export const PROBE_MAX_ID_LENGTH = 1536;

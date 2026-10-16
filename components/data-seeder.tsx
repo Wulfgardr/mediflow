@@ -6,7 +6,6 @@ import { Database, Trash2, Plus, Settings2, FileText, Pill, Stethoscope } from '
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-/* @Codex */
 import { RangeInput } from '@/components/range-input';
 
 const PANEL_CLASS = 'seeder-panel p-5';

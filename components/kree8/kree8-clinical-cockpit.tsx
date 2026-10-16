@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 /* WUL-272 live Kree8-inspired MediFlow cockpit.
    Renders as the root local web entry in live mode and remains available under
    /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
@@ -19,7 +18,7 @@ import {
   type ClinicalEntry,
   type Patient,
 } from '@/lib/db';
-/* @Codex WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
+/* WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
 import {
   buildPatientWorkspace,
   countPlannedCheckups,
@@ -71,7 +70,6 @@ import styles from './kree8-clinical-cockpit-shell.module.css';
 export { AREA_ID_VALUES };
 export type { AreaId };
 
-/* @Codex */
 function revealFocusedRailControl(event: FocusEvent<HTMLElement>): void {
   const rail = event.currentTarget;
   const target = event.target;
@@ -244,10 +242,10 @@ export function Kree8ClinicalCockpit({
     isReview ? REVIEW_PATIENT_LIST[0]?.id : initialPatientId
   ));
 
-  /* @Codex: Next keeps the cockpit mounted when only the query changes. */
+  /* Next keeps the cockpit mounted when only the query changes. */
   useEffect(() => {
     if (!isReview && previousRouteArea.current !== initialArea) {
-      // @Codex: Our own URL reflection already changed area and placed focus.
+      // Our own URL reflection already changed area and placed focus.
       // Only navigation to another area schedules a new heading focus request.
       if (area !== initialArea) {
         setArea(initialArea);
@@ -260,7 +258,7 @@ export function Kree8ClinicalCockpit({
     if (!isReview && initialPatientId) setSelectedPatientId(initialPatientId);
   }, [initialPatientId, isReview, proposal]);
 
-  /* @Codex: only an explicit command writes the URL. Deriving a default or
+  /* only an explicit command writes the URL. Deriving a default or
      filtered selection from a late read must not cancel a pending Next link.
      Patch only the command's field so batched selection + navigation compose. */
   const updateLocation = useCallback((change: { area?: AreaId; patientId?: string }) => {
@@ -275,28 +273,28 @@ export function Kree8ClinicalCockpit({
     updateLocation({ patientId });
   }, [updateLocation]);
 
-  /* @Codex: ogni CTA interna termina sul titolo semantico della nuova area.
+  /* ogni CTA interna termina sul titolo semantico della nuova area.
      La ricerca conserva invece il proprio target di focus dedicato. */
   const openArea = useCallback((nextArea: AreaId, focusDestination = true) => {
     setArea(nextArea);
-    // @Codex: preserve the originating area for Back from the patient folder.
+    // preserve the originating area for Back from the patient folder.
     if (!(proposal && !isReview && nextArea === 'scheda')) updateLocation({ area: nextArea });
     if (focusDestination) setAreaFocusRequest((current) => current + 1);
   }, [isReview, proposal, updateLocation]);
 
-  /* @Codex: il contatore rende osservabile anche una richiesta verso l'area
+  /* il contatore rende osservabile anche una richiesta verso l'area
      gia attiva; requestAnimationFrame lascia completare render e cleanup di
      eventuali dialog prima di spostare focus e viewport. */
   useEffect(() => {
     if (areaFocusRequest === 0) return;
     const animationFrame = window.requestAnimationFrame(() => {
-      // @Codex: A modal may open after navigation scheduled this frame. Its
+      // A modal may open after navigation scheduled this frame. Its
       // focus owns keyboard input until close, including Escape and Tab.
       const visibleModal = Array.from(document.querySelectorAll<HTMLElement>(
         '[role="dialog"][aria-modal="true"]',
       )).some((dialog) => dialog.getClientRects().length > 0);
       if (visibleModal) return;
-      // @Codex: Typing or the search shortcut may take focus before this
+      // Typing or the search shortcut may take focus before this
       // deferred navigation frame. Preserve that newer editing intent.
       const active = document.activeElement;
       if (active instanceof HTMLElement && (
@@ -316,7 +314,7 @@ export function Kree8ClinicalCockpit({
     return () => window.cancelAnimationFrame(animationFrame);
   }, [areaFocusRequest]);
 
-  /* @Codex: owner unico dei soli comandi globali della shell. K1 conserva / e
+  /* owner unico dei soli comandi globali della shell. K1 conserva / e
      j/k nella worklist; i target editabili e modificatori non standard restano
      fuori da questa scorciatoia per non intercettare input dell'utente. */
   useEffect(() => {
@@ -350,7 +348,7 @@ export function Kree8ClinicalCockpit({
     [initialPatientId, isReview, patientState.patients, selectedPatientId],
   );
 
-  /* @Codex: a single owner resolves batched patient selection + Apri quadro.
+  /* a single owner resolves batched patient selection + Apri quadro.
      A child redirect must not replace the explicit hash with a generic folder.
      The original comparison keeps its existing replace navigation. */
   const folderPatientId = selectedPatientId ?? selectedPatient?.id;
@@ -363,7 +361,6 @@ export function Kree8ClinicalCockpit({
     else router.replace(liveSchedaHref);
   }, [liveSchedaHref, proposal, router]);
 
-  /* @Codex */
   const {
     data: livePatientRows,
     error: livePatientError,
@@ -376,7 +373,6 @@ export function Kree8ClinicalCockpit({
     ['patients', 'patients_to_ambulatories'],
   );
 
-  /* @Codex */
   const liveCheckupRows = useLiveQuery<Checkup[]>(
     async () => (isReview ? [] : db.checkups.toArray()),
     [isReview],
@@ -384,7 +380,6 @@ export function Kree8ClinicalCockpit({
     ['checkups'],
   );
 
-  /* @Codex */
   const liveDiaryRows = useLiveQuery<ClinicalEntry[]>(
     async () => (isReview ? [] : db.entries.query({ orderBy: 'date', orderDir: 'desc', limit: 50 }).toArray()),
     [isReview],
@@ -392,7 +387,6 @@ export function Kree8ClinicalCockpit({
     ['entries'],
   );
 
-  /* @Codex */
   const diaryState = useMemo<Kree8DiaryClientState>(() => {
     if (isReview) return REVIEW_DIARY_STATE;
     if (!liveDiaryRows || patientState.status !== 'ready') {
@@ -406,7 +400,6 @@ export function Kree8ClinicalCockpit({
     return buildGlobalDiaryState(liveDiaryRows, patientState.patients);
   }, [isReview, liveDiaryRows, patientState.patients, patientState.status]);
 
-  /* @Codex */
   const patientWorkspace = useLiveQuery<Kree8PatientWorkspace | null>(
     async () => {
       if (isReview || !selectedPatient) return null;
@@ -473,7 +466,7 @@ export function Kree8ClinicalCockpit({
       return;
     }
 
-    /* @Codex WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
+    /* WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
        createdAt) cosi la lista pazienti non esce in ordine di inserimento
        IndexedDB e lo scanning "recenti" e possibile. */
     const patients = [...(livePatientRows ?? [])]
@@ -542,7 +535,7 @@ export function Kree8ClinicalCockpit({
             <span className={styles.brandThemeToggle}>
               <ThemeToggle />
             </span>
-            {/* @Codex WUL-UIUX: campanella rimossa: sembrava un centro notifiche
+            {/* WUL-UIUX: campanella rimossa: sembrava un centro notifiche
                 ma non faceva nulla. Torna quando esistera un centro notifiche reale. */}
           </span>
         </div>
@@ -573,7 +566,7 @@ export function Kree8ClinicalCockpit({
         })}
 
         <div className={styles.railFooter}>
-          {/* @Codex WUL-UIUX: un solo ThemeToggle (qui rimosso): era renderizzato
+          {/* WUL-UIUX: un solo ThemeToggle (qui rimosso): era renderizzato
               due volte, nel brand e a piè rail, con lo stesso stato. */}
           <span className={styles.railTag}>
             <span className={styles.railDot} />
@@ -614,7 +607,7 @@ export function Kree8ClinicalCockpit({
             data-testid="lume-frame-focus"
             data-lume-frame-element="focus"
           >
-            {/* @Codex WUL-UIUX: where-am-i persistente nelle sotto-aree paziente
+            {/* WUL-UIUX: where-am-i persistente nelle sotto-aree paziente
                 (il rail le colora come Pazienti): tab Quadro / Documenti / SISS con
                 aria-current e nome del paziente attivo. */}
             {(area === 'scheda' || area === 'revisione' || area === 'handoff') ? (

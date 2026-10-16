@@ -1,10 +1,9 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
-/* @Codex: ordinary UI smoke observes every console error and uncaught page error. */
+/* ordinary UI smoke observes every console error and uncaught page error. */
 type ObservedConsoleError = Readonly<{ text: string; url: string }>;
 const errorsByPage = new WeakMap<Page, ObservedConsoleError[]>();
 const authLockReceiptsByPage = new WeakMap<Page, Array<Promise<{
@@ -29,7 +28,7 @@ test.beforeEach(async ({ page }) => {
   });
   page.on('response', response => {
     if (new URL(response.url()).pathname !== '/api/auth/lock') return;
-    // @Codex: retain only the control-fence facts needed to prove the one
+    // retain only the control-fence facts needed to prove the one
     // permitted stale-fence retry; no credential or response payload is kept.
     authLockReceipts.push(response.text().then((text) => {
       let state: string | null = null;
@@ -83,7 +82,7 @@ test.afterEach(async ({ page }, testInfo) => {
   }).length;
   const authLockConflicts = authLockReceipts.filter(receipt => receipt.status === 409).length;
   const errors = errorsByPage.get(page) ?? [];
-  // @Codex: Chromium reports a handled fetch 409 as a console error. Admit it
+  // Chromium reports a handled fetch 409 as a console error. Admit it
   // only after the immediately chained, ETag-matched lock retry is confirmed.
   const pageOrigin = new URL(page.url()).origin;
   const isReconciledAuthLockConsole = (error: ObservedConsoleError) => {
@@ -104,7 +103,7 @@ test.afterEach(async ({ page }, testInfo) => {
 test('web smoke: unlock/setup + patients filters + settings navigation', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
 
-  // @Codex WUL-55: the locked surface stays terse while retaining an accessible field name.
+  // WUL-55: the locked surface stays terse while retaining an accessible field name.
   await page.goto('/');
   const lockScreen = page.getByLabel('MediFlow lock screen');
   await expect(lockScreen).toBeVisible();
@@ -172,7 +171,7 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   expect(stored.status()).toBe(200);
   expect(await stored.json()).toMatchObject({ firstName: 'Modificato', taxCode: patient.taxCode, version: 2 });
 
-  // @Codex ADR 0123: the ordinary settings link owns the canonical /settings route.
+  // ADR 0123: the ordinary settings link owns the canonical /settings route.
   const settingsNav = page.getByRole('link', { name: 'Impostazioni', exact: true });
   await expect(settingsNav).toBeVisible();
   await expect(settingsNav).toHaveAttribute('href', '/settings');
@@ -191,7 +190,7 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(page.getByTestId('ui-style-runtime-notice')).toBeVisible();
   await expect(page.getByTestId('ui-accessibility-controls')).toBeVisible();
 
-  // @Codex ADR 0123: the persistent primary navigation owns the return to patients.
+  // ADR 0123: the persistent primary navigation owns the return to patients.
   const returnToPatients = page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
     .getByRole('link', { name: 'Pazienti', exact: true });
   await expect(returnToPatients).toHaveAttribute('href', '/?area=incarico');
@@ -203,7 +202,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await expect(patientsSearch).toBeVisible();
 });
 
-/* @Codex */
 test('web smoke: Rivedi agenda focuses its controlled heading without leaving turno', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.goto('/?area=turno');
@@ -225,7 +223,7 @@ test('web smoke: Rivedi agenda focuses its controlled heading without leaving tu
   await expect(page).toHaveURL(/[?&]area=turno(?:&|$)/);
 });
 
-/* @Codex ADR 0123: exercise the declared live destinations with API-created
+/* ADR 0123: exercise the declared live destinations with API-created
    identities; the standalone review's AI queue and hidden lens are not product controls. */
 test('web smoke: live decision CTAs always open their declared patient context', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');

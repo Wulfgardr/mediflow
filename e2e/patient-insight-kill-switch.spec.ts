@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 

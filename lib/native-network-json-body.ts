@@ -1,4 +1,3 @@
-/* @Codex */
 import { readBoundedJsonBody, type BoundedJsonReadControl } from './bounded-request-body';
 import { resolveMaxAttachmentBytes } from './attachment-payload';
 
@@ -44,7 +43,6 @@ export function emptyJsonUnlessTooLarge(error: unknown): Record<string, never> {
     return {};
 }
 
-/* @Codex */
 export const NETWORK_ATTACHMENT_MAX_IN_FLIGHT = 1;
 export const NETWORK_ATTACHMENT_READ_TIMEOUT_MS = 30_000;
 let attachmentOperations = 0;

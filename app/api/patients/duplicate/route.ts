@@ -5,11 +5,8 @@ import { ambulatories, patients, patientsToAmbulatories, patientDuplicateIntents
 import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { patientDuplicateSchema } from '@/lib/api-schemas/patient-bulk';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
@@ -20,7 +17,6 @@ import { buildPatientVersionConflictPayload } from '@/lib/patient-concurrency';
 const DUPLICATE_JSON_MAX_BYTES = 262_144;
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -83,7 +79,6 @@ export async function POST(request: Request) {
                 const inserted = tx.insert(patients).values({
                     id: newId,
                     ...data,
-                    /* @Codex */
                     firstName: p.firstName,
                     createdAt: new Date(),
                     updatedAt: new Date(),

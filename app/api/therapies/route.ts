@@ -4,17 +4,12 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { therapies } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
-/* @Codex */
 import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { apiInternalError } from '@/lib/api-error-response';
 import { createTherapyOperation } from '@/lib/therapy-write-operation';
@@ -29,7 +24,6 @@ const THERAPY_SORT_COLUMNS = {
 } as const;
 
 export async function GET(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 

@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 export const HEADLESS_CHECKUP_STATUS_OPERATION_V1 = 'mediflow.patient.checkup.status.transition.v1' as const;

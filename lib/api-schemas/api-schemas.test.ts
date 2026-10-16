@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { z } from 'zod';
@@ -164,7 +163,6 @@ test('service prescription and SISS schemas validate enum/date boundaries with 4
     });
 });
 
-/* @Codex */
 test('patient bulk schemas normalize IDs and reject malformed payloads', async () => {
     assert.deepEqual(await expectValid(patientAssignSchema, {
         patientIds: [' patient-1 ', 'patient-1', 'patient-2'],
@@ -194,7 +192,6 @@ test('patient bulk schemas normalize IDs and reject malformed payloads', async (
     });
 });
 
-/* @Codex */
 test('patient move requires one positive expected version per requested patient', async () => {
     assert.deepEqual(await expectValid(patientMoveSchema, {
         patientIds: [' patient-1 ', 'patient-2'],

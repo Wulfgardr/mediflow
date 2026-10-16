@@ -7,10 +7,8 @@ import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { prepareEntryCreate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { createEntryOperation } from '@/lib/entry-write-operation';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
@@ -26,12 +24,10 @@ function parseLimit(value: string | null): number | null {
     return Math.min(parsed, 100);
 }
 
-/* @Codex */
 function parseIncludeDeleted(value: string | null): boolean {
     return value === 'true' || value === '1';
 }
 
-/* @Codex */
 function parseDateParam(value: string | null): Date | null {
     if (!value) return null;
     const parsed = new Date(value);
@@ -94,7 +90,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     try {
         const auditSession = await requireLocalApiActorSession(request);
-        /* @Codex */
         const { id } = await params;
         const parsed = await readEntryJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });

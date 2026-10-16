@@ -1,4 +1,3 @@
-/* @Codex */
 export function parseApiV1Limit(value: string | null, fallback: number, max: number): number {
     if (!value) return fallback;
     const parsed = Number.parseInt(value, 10);
@@ -6,7 +5,6 @@ export function parseApiV1Limit(value: string | null, fallback: number, max: num
     return Math.min(parsed, max);
 }
 
-/* @Codex */
 export function parseApiV1NullableDate(value: unknown): Date | null {
     if (!value) return null;
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -14,7 +12,6 @@ export function parseApiV1NullableDate(value: unknown): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/* @Codex */
 export function toApiV1IsoString(value: unknown): string | null {
     const parsed = parseApiV1NullableDate(value);
     return parsed ? parsed.toISOString() : null;

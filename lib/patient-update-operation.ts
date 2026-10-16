@@ -1,4 +1,4 @@
-/* @Codex: WUL-718 one authoritative patient-profile update and membership commit. */
+/* WUL-718 one authoritative patient-profile update and membership commit. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
 import { buildPatientVersionConflictPayload } from './patient-concurrency';
@@ -30,7 +30,6 @@ export type PatientUpdateOperationResult =
     | { status: 404 | 409; value: Record<string, unknown> }
     | NetworkPatientCommitDenial;
 
-/* @Codex */
 export function updatePatientOperation(input: PatientUpdateOperationInput): PatientUpdateOperationResult {
     // better-sqlite3/Drizzle callback stays synchronous. Patient, membership and
     // required audit either commit together or all roll back; no second writer.

@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 
 import { createTreatmentReasoningAthenaAdmission } from './treatment-reasoning-athena-admission';

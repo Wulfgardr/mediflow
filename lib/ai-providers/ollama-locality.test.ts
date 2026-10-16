@@ -10,7 +10,6 @@ import {
     strictOllamaLoopbackBaseUrl,
 } from './ollama-locality.ts';
 
-/* @Codex */
 const LOCAL_MODEL = {
     name: 'qwen-local:latest',
     model: 'qwen-local:latest',

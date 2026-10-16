@@ -1,6 +1,5 @@
 import Foundation
 
-/* @Codex */
 public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
     public let id: String
     public let date: Date
@@ -32,7 +31,6 @@ public struct ScaleHistoryItem: Identifiable, Equatable, Sendable {
     }
 }
 
-/* @Codex */
 public enum ScaleHistoryPresentation {
     public static func items(from entries: [HomeBaseEntrySummary]) -> [ScaleHistoryItem] {
         entries
@@ -80,7 +78,7 @@ public enum ScaleHistoryPresentation {
         else {
             return "\(score)"
         }
-        // @Codex: do not attach the corrected denominator to legacy/unbound data.
+        // do not attach the corrected denominator to legacy/unbound data.
         if scaleId == ClinicalScales.tinettiPOMA28ID,
            metadata.instrument != ClinicalScales.tinettiPOMA28Instrument {
             return "\(score)"

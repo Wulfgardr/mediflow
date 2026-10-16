@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# @Codex
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PACKAGE_DIR="$ROOT_DIR/native/MediFlowMac"
 
@@ -13,7 +12,6 @@ if [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! xcrun --sdk
   done
 fi
 
-# @Codex
 RUNNER="${MEDIFLOW_NATIVE_TEST_RUNNER:-swift}" # swift | xcode | both
 DERIVED_DATA_DIR="${MEDIFLOW_DERIVED_DATA_DIR:-$ROOT_DIR/tmp-native-derived-data}"
 # Package aggregate carries both library test targets after app executables retired.

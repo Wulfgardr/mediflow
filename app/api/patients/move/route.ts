@@ -5,15 +5,11 @@ import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { patientMoveSchema } from '@/lib/api-schemas/patient-bulk';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
-/* @Codex */
 import { buildPatientVersionConflictPayload } from '@/lib/patient-concurrency';
 // WUL-306 (ADR 0066): bulk reads treat soft-deleted patients as missing
 import { activePatients } from '@/lib/patient-lifecycle';
@@ -21,7 +17,6 @@ import { activePatients } from '@/lib/patient-lifecycle';
 const MOVE_JSON_MAX_BYTES = 262_144;
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -41,7 +36,6 @@ export async function POST(request: Request) {
         // WUL-268 (STREAM A): membership delete + insert + primary-ownership update
         // must land atomically. better-sqlite3 transactions are synchronous, so no
         // awaits inside the callback (see app/api/system/backup-restore).
-        /* @Codex */
         const result = dbServer.transaction((tx): { status: 200 | 404 | 409; value: Record<string, unknown> } => {
             const target = tx
                 .select({ id: ambulatories.id })
@@ -84,7 +78,6 @@ export async function POST(request: Request) {
                     value: buildPatientVersionConflictPayload(patientVersions[patient.id], patient.id, patient) };
             }
 
-            /* @Codex */
             if (sourceAmbulatoryId) {
                 tx.delete(patientsToAmbulatories)
                     .where(and(
@@ -94,7 +87,6 @@ export async function POST(request: Request) {
                     .run();
             }
 
-            /* @Codex */
             tx.insert(patientsToAmbulatories)
                 .values(patientIds.map((patientId: string) => ({
                     patientId,

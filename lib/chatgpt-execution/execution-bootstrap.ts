@@ -1,4 +1,4 @@
-/* @Codex — host bootstrap expectations; contracts remain runtime-independent. */
+/* host bootstrap expectations; contracts remain runtime-independent. */
 import { dirname, isAbsolute, join, normalize } from 'node:path';
 import { ExecutionError } from './execution-contract';
 /** Pure bootstrap validation shared by login and the concrete issuer.
@@ -11,7 +11,7 @@ const object = (value: unknown): Record<string, unknown> => {
 };
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && value.length > 0 && value.length <= max && !/[\x00-\x1f\x7f]/u.test(value);
 
-/* @Codex: current binary expectation, separate from the historical C1 receipt.
+/* current binary expectation, separate from the historical C1 receipt.
  * This declaration grants no authority. The Mac issuer verifies the actual
  * binary, version and all 24 freshly generated schema digests before initialize;
  * exact readback and privately owned, current custody are still required.

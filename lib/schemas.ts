@@ -1,6 +1,5 @@
 import { parseWhoReference, type WhoReference } from './reference-data/icd11-reference';
 import * as z from 'zod';
-/* @Codex */
 import { isWhoCanonicalMmsUri } from './reference-data/icd11-who-local-contract';
 
 export const diagnosisSchema = z.object({
@@ -8,11 +7,11 @@ export const diagnosisSchema = z.object({
     description: z.string().min(1, "Descrizione richiesta"),
     system: z.enum(['ICD-9', 'ICD-10', 'ICD-11']),
     date: z.string().or(z.date()).transform(d => new Date(d)),
-    /* @Codex: preserve the selected WHO identity inside the existing encrypted JSON field. */
+    /* preserve the selected WHO identity inside the existing encrypted JSON field. */
     canonicalUri: z.string().refine(isWhoCanonicalMmsUri, 'URI WHO non valido').optional(),
     reference: z.custom<WhoReference>(value => parseWhoReference(value) !== null, 'Riferimento WHO non valido').optional(),
 }).superRefine((row, context) => {
-    /* @Codex: never accept a half-linked or non-ICD-11 WHO selection. */
+    /* never accept a half-linked or non-ICD-11 WHO selection. */
     if ((row.canonicalUri !== undefined) !== (row.reference !== undefined)
         || (row.canonicalUri !== undefined && row.system !== 'ICD-11')) {
         context.addIssue({ code: 'custom', path: ['canonicalUri'], message: 'Selezione WHO incompleta: ripetere la ricerca.' });
@@ -36,7 +35,6 @@ export const patientSchema = z.object({
     address: z.string().optional(),
     phone: z.string().optional(),
     caregiver: z.string().optional(),
-    /* @Codex */
     exemptions: z.array(z.string().min(1)).optional().default([]),
     notes: z.string().optional(),
     isAdi: z.boolean().default(false),

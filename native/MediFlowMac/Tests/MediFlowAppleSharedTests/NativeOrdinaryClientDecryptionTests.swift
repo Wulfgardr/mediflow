@@ -1,4 +1,4 @@
-/* @Codex — real repository crypto + real HomeBasePatientsClient/URLSession path + Node host parser.
+/* real repository crypto + real HomeBasePatientsClient/URLSession path + Node host parser.
  * Run on macOS with an offline-resolved repository and Node 24. Not socket/TLS, issuer,
  * actual attempt, provider or AnyDoc-worker qualification. Never send key/PIN to the bridge.
  */

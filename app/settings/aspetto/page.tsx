@@ -2,7 +2,6 @@
 
 // WUL-297 Aspetto: moved from the monolithic settings page.
 
-/* @Codex */
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
@@ -16,7 +15,6 @@ export default function SettingsAppearancePage() {
         setReduceMotion,
     } = useUIAccessibility();
     const { isPrivacyMode, togglePrivacyMode } = usePrivacy();
-    /* @Codex */
     const { enabled, proposal, composition, setComposition, setProposal } = useRuntimeTwinDesign();
 
     return (

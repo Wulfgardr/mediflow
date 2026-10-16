@@ -60,7 +60,7 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         || source.includes('requireNetworkCapabilityContext(')
         || source.includes('requireNetworkWriteContext(')
         || source.includes('requireNetworkDiscoveryAuth(');
-    // @Codex: ADR0135 delegates to one named native authority, not a Web adapter.
+    // ADR0135 delegates to one named native authority, not a Web adapter.
     const nativeConfigurationRoutes = new Set([
         'app/api/v1/network/ai/functions/route.ts',
         'app/api/v1/network/ai/functions/preview/route.ts',

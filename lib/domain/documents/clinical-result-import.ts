@@ -1,4 +1,3 @@
-/* @Codex */
 export const CLINICAL_RESULT_IMPORT_SCHEMA = 'mediflow.clinical_result_import.v1' as const;
 
 export type ImportLane = 'deterministic' | 'local' | 'cloud';

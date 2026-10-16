@@ -1,4 +1,4 @@
-/* @Codex WUL-421 */
+/* WUL-421 */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -56,7 +55,6 @@ test('parseSystemRedactionRequest rejects invalid payloads and accepts minimal e
 });
 
 test('parseSystemRedactionRequest preserves leading whitespace for upstream offsets', () => {
-    /* @Codex */
     const parsed = parseSystemRedactionRequest({
         action: 'extract',
         text: '  Mario Rossi',
@@ -128,7 +126,6 @@ test('buildOpenMedUpstreamCall and normalizeOpenMedResponse keep a stable redact
 });
 
 test('normalizeOpenMedResponse preserves padded redacted text and original-space offsets', () => {
-    /* @Codex */
     const config = resolveOpenMedRedactionConfig({});
     const request = {
         action: 'deidentify' as const,

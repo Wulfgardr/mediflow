@@ -1,5 +1,4 @@
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
-/* @Codex */
 
 export const DOCUMENT_SYNTHESIS_PREVIEW_WIRE_SCHEMA_VERSION = 'mediflow.document-synthesis.preview-wire.v1' as const;
 

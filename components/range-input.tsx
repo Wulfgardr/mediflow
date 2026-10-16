@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-676: keep native range semantics, steps and keyboard handling. */
+/* WUL-676: keep native range semantics, steps and keyboard handling. */
 import type { ComponentProps, CSSProperties } from 'react';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './range-input.module.css';

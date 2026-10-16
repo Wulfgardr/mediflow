@@ -7,14 +7,13 @@ import { patients, ambulatories, patientRetiredIds, patientsToAmbulatories } fro
 import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 // WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
 import { activePatients } from '@/lib/patient-lifecycle';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
 import { parseListParams } from '@/lib/list-query-params';
 
-/* @Codex: opt-in fenced create; all legacy read/write contracts remain separate. */
+/* opt-in fenced create; all legacy read/write contracts remain separate. */
 import * as patientCreateOwner from '@/lib/security/web-auth-lifecycle-owner-adapter';
 import { patientCreateContexts, readPatientCreateLane } from '@/lib/security/patient-create-context';
 import { createPatientAtPreviewDestination, PatientCreateFenceError, PatientCreateConflictError, PatientCreateDestinationNotFoundError } from '@/lib/patient-create-service';
@@ -28,9 +27,7 @@ const PATIENT_SORT_COLUMNS = {
     firstName: patients.firstName,
     birthDate: patients.birthDate,
 } as const;
-/* @Codex */
 import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
-/* @Codex */
 import {
     auditContextFromSession,
     listChangedFields,
@@ -40,7 +37,6 @@ import {
 } from '@/lib/security/audit';
 
 export async function GET(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -103,7 +99,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -137,7 +132,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        /* @Codex: host-derived audit identity is resolved before synchronous SQLite work. */
+        /* host-derived audit identity is resolved before synchronous SQLite work. */
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const writeCreateAudit = (tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
@@ -180,7 +175,6 @@ export async function POST(request: Request) {
                     || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()) throw new PatientCreateConflictError();
                 tx.insert(patients).values(normalized.values).run();
 
-                /* @Codex */
                 if (normalized.values.ambulatoryId) {
                     tx.insert(patientsToAmbulatories)
                         .values({ patientId: normalized.values.id, ambulatoryId: normalized.values.ambulatoryId })

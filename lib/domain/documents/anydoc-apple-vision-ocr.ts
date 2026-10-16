@@ -1,4 +1,3 @@
-/* @Codex */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
@@ -96,13 +95,13 @@ function resolveOwnedScriptFromPackageRoot(packageRoot: string): string | null {
     } catch { return null; }
 }
 
-// @Codex: standalone chunks can bake a source import.meta URL. The launcher CWD is the
+// standalone chunks can bake a source import.meta URL. The launcher CWD is the
 // package root of the staged runtime, so it is the only authority for the owned script.
 function resolveOwnedScript(): string | null {
     return resolveOwnedScriptFromPackageRoot(process.cwd());
 }
 
-/* @Codex: test-only seam; production resolution accepts no caller-provided path. */
+/* test-only seam; production resolution accepts no caller-provided path. */
 export const ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM = Object.freeze({
     resolveOwnedScriptFromPackageRoot,
 });

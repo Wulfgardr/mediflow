@@ -1,4 +1,4 @@
-// @Codex MF085-002: presentation only. Never recalculate or enrich historical answers.
+// MF085-002: presentation only. Never recalculate or enrich historical answers.
 import { TINETTI_POMA28_ID, TINETTI_POMA28_INSTRUMENT } from './scales/tinetti-poma28-v1';
 
 export const LEGACY_TINETTI_NOTICE = 'Tinetti storica o senza provenienza verificabile: punteggio e interpretazione riportati come registrati, non rivalutati con POMA-28 v1.';

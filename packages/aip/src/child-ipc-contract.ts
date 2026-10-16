@@ -1,4 +1,3 @@
-/* @Codex */
 export const AIP_BOOTSTRAP_ENV_KEY_V1 = 'MEDIFLOW_AIP_BOOTSTRAP_REF' as const;
 export const AIP_BOOTSTRAP_BIND_SCHEMA_V1 = 'mediflow.aip.bootstrap.bind.v1' as const;
 export const AIP_BOOTSTRAP_BIND_MAX_FRAME_BYTES_V1 = 4 * 1024;

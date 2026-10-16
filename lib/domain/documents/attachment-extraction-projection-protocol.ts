@@ -1,4 +1,3 @@
-/* @Codex */
 /** Wire metadata is descriptive. Only the server's live locator grants source access. */
 export const ATTACHMENT_EXTRACTION_PROJECTION_SCHEMA = 'mediflow.attachment_extraction_projection.v1' as const;
 export const ATTACHMENT_EXTRACTION_ACTION_HEADER = 'X-MediFlow-Extraction-Action';

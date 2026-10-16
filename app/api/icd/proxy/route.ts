@@ -1,4 +1,3 @@
-/* @Codex */
 import type { NextRequest } from 'next/server';
 
 import { createIcd11WhoHttpRoute } from '@/lib/reference-data/icd11-who-http-route';

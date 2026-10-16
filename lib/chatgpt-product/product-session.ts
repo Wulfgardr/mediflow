@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import * as owner from '../security/web-auth-lifecycle-owner-adapter';
 import { acquireWebSessionResourceIdentity } from '../security/web-session-resource-identity';

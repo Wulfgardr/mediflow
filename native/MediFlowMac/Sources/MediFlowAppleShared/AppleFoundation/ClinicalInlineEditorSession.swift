@@ -6,7 +6,7 @@ import AppKit
 import UIKit
 #endif
 
-/* @Codex: The coordinator owns selection/typing only. The bound document owns text. */
+/* The coordinator owns selection/typing only. The bound document owns text. */
 @MainActor
 final class ClinicalInlineEditorController: ObservableObject {
     @Published private(set) var focusedBlockID: UUID?
@@ -32,7 +32,6 @@ final class ClinicalInlineEditorController: ObservableObject {
     func toggle(_ style: ClinicalInlineStyle) { action?(style) }
 }
 
-/* @Codex */
 @MainActor
 protocol ClinicalInlineEditingSurface: AnyObject {
     var attributedContent: NSAttributedString { get set }
@@ -46,7 +45,6 @@ protocol ClinicalInlineEditingSurface: AnyObject {
     func invalidateEditorSize()
 }
 
-/* @Codex */
 @MainActor
 enum ClinicalInlineAttributedText {
     private static func key(_ style: ClinicalInlineStyle) -> NSAttributedString.Key {
@@ -120,7 +118,6 @@ enum ClinicalInlineAttributedText {
     }
 }
 
-/* @Codex */
 @MainActor
 final class ClinicalInlineEditorSession {
     private var document: Binding<ClinicalRichTextEditorDocument>

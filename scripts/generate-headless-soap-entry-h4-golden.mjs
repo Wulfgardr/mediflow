@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash, webcrypto } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -180,7 +179,7 @@ test('unallowlisted method is rejected locally', async t => {
     assert.deepEqual(await transport.request('initialize'), { ok: true });
 });
 
-/* @Codex: in-memory ChildProcess double; these cases spawn/probe no OS processes. */
+/* in-memory ChildProcess double; these cases spawn/probe no OS processes. */
 function groupFixture(options: TransportOptions = {}, leaderAlreadyExited = false) {
     const emitter = new EventEmitter();
     const rawChild = Object.assign(emitter, { pid: 4242, exitCode: leaderAlreadyExited ? 0 : null as number | null,
@@ -240,7 +239,7 @@ test('owned-group: spontaneous leader exit still drains before cleanup', async (
     assert.equal(observed, 1); assert.equal(f.cleanup(), 1); assert.deepEqual(f.signals, []);
 });
 
-/* @Codex: receipt observations are evidence of this owned transport only. */
+/* receipt observations are evidence of this owned transport only. */
 test('drain observation distinguishes pending group evidence from leader exit', async () => {
     let resolveGroup!: (value: boolean) => void;
     const group = new Promise<boolean>(resolve => { resolveGroup = resolve; });
@@ -263,7 +262,7 @@ test('drain observation cannot upgrade a timed-out group to confirmed from late 
     assert.equal(f.cleanup(), 0);
 });
 
-/* @Codex — same privacy sentinels as the stdio fixtures above. */
+/* same privacy sentinels as the stdio fixtures above. */
 test('diagnostic projection drops raw fields, numeric channels and accessors', () => {
     const events: unknown[] = []; let accessed = 0;
     const observe = (event: import('./execution-transport').ExecutionDiagnostic) => { events.push(event); };
@@ -297,7 +296,7 @@ test('transport failure stays distinct and observer rejection does not affect dr
         httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false }]);
 });
 
-/* @Codex — phase evidence is closed and cannot retain hostile local failure detail. */
+/* phase evidence is closed and cannot retain hostile local failure detail. */
 test('preparation diagnostic keeps only an allowlisted local stage', () => {
     const events: unknown[] = [];
     const observe = (event: import('./execution-transport').ExecutionDiagnostic) => { events.push(event); };

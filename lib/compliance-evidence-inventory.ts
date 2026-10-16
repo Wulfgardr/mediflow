@@ -1,4 +1,3 @@
-/* @Codex */
 export const COMPLIANCE_EVIDENCE_SCHEMA_VERSION = 'mediflow.compliance-evidence.v1' as const;
 
 export type ComplianceEvidenceStatus =

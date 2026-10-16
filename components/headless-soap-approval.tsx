@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
     createClinicianSoapExplicitGestureOwner,

@@ -5,7 +5,6 @@
 import DiagnosticHub from '@/components/diagnostic-hub';
 import Link from 'next/link';
 import ServiceArchitecturePanel from '@/components/service-architecture-panel';
-/* @Codex */
 import UpdateAwarenessPanel from '@/components/settings/update-awareness-panel';
 import { SETTINGS_SECONDARY_BUTTON_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';
 

@@ -1,4 +1,4 @@
-/* @Codex: diary-only input boundary; existing clinical normalizers remain shared and unchanged. */
+/* diary-only input boundary; existing clinical normalizers remain shared and unchanged. */
 import { v4 as uuidv4 } from 'uuid';
 import { readBoundedJsonBody } from './bounded-request-body';
 import { normalizeEntryCreateInput, normalizeEntryUpdateInput } from './api-v1-clinical-write-normalization';
@@ -14,7 +14,7 @@ const UPDATE_FIELDS = new Set(['version', 'type', 'title', 'date', 'content', 's
 const DELETE_FIELDS = new Set(['version', 'deletedAt', 'deletionReason']);
 const LOCAL_ENTRY_JSON_MAX_BYTES = 4_194_304;
 
-/* @Codex: request-json compatibility, including duplicate-key behavior, without treating arrays as objects. */
+/* request-json compatibility, including duplicate-key behavior, without treating arrays as objects. */
 export function entryJsonObject(value: unknown): Record<string, unknown> | null {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
         ? value as Record<string, unknown> : null;
@@ -87,7 +87,7 @@ export function prepareEntryUpdate(body: Record<string, unknown>, surface: Entry
     return { ok: true as const, expectedVersion, values: normalized.values, changedFields };
 }
 
-/* @Codex: DELETE keeps the legacy empty-body default, then validates only its own three fields. */
+/* DELETE keeps the legacy empty-body default, then validates only its own three fields. */
 export async function parseEntryDeleteInput(request: Request, defaultReason: string) {
     const parsed = await readEntryJsonObject(request);
     if (!parsed.ok) return parsed;

@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX (STREAM E): shell modale condivisa, costruita su useDialogA11y
+/* WUL-UIUX (STREAM E): shell modale condivisa, costruita su useDialogA11y
    e visivamente allineata a confirm-dialog.tsx (backdrop mf-modal-backdrop, shell
    mf-modal-shell, barra d'accento in cima, titolo + sottotitolo, bottone chiudi).
    Sostituisce i dialoghi role="dialog" scritti a mano che ripetevano lo stesso

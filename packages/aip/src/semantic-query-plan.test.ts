@@ -5,7 +5,6 @@ import {
   createSemanticQueryPlanValidatorV1,
 } from './semantic-query-plan';
 
-/* @Codex */
 const freeze = <T extends object>(value: T): Readonly<T> => Object.freeze(Object.assign(Object.create(null), value));
 const current = () => freeze({ purposeCode: 'care_coordination', scope: 'selected_patient', generation: 7,
   revocationGeneration: 2, selectionEpoch: 11, maxSteps: 2, maxDurationMs: 500, maxOutputBytes: 4096 });

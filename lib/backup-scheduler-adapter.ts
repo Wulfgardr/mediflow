@@ -1,4 +1,3 @@
-/* @Codex */
 // Cross-platform backup scheduling. The nightly backup runner
 // (scripts/run-scheduled-backup.mjs) is already OS-agnostic; this module
 // abstracts ONLY the OS-specific registration of a recurring job behind a

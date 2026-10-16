@@ -1,4 +1,4 @@
-/* @Codex — bounded in-memory streams, real root and owner; no HTTP listener. */
+/* bounded in-memory streams, real root and owner; no HTTP listener. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 const { createProductFixture, deferred, tick } = await import('./product-production.test.ts');

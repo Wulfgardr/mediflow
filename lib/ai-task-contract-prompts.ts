@@ -1,4 +1,3 @@
-/* @Codex */
 import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPlan } from './chatgpt-execution/ordinary-emission-plan';
 export const AI_TASK_EXTRACTION_SCHEMA_VERSION = 'mediflow.ai.extract.v1';
 

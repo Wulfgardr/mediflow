@@ -1,11 +1,9 @@
-/* @Codex */
 import type {
     DocumentDecision,
     DocumentDecisionAction,
     DocumentDecisionHumanRequirement,
 } from './document-decision';
 
-/* @Codex */
 export interface DocumentDecisionReviewActionView {
     id: string;
     label: string;
@@ -15,7 +13,6 @@ export interface DocumentDecisionReviewActionView {
     blockedReason?: string;
 }
 
-/* @Codex */
 export interface DocumentDecisionReviewViewModel {
     title: string;
     documentType: string;
@@ -127,7 +124,6 @@ function buildNonWriteSummary(decision: DocumentDecision): string[] {
     return summary;
 }
 
-/* @Codex */
 export function buildDocumentDecisionReviewViewModel(decision: DocumentDecision): DocumentDecisionReviewViewModel {
     return {
         title: 'Review decisione documento',

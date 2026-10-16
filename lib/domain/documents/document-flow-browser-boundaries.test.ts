@@ -1,4 +1,4 @@
-/* @Codex: real browser adapters, wholly synthetic HTTP fixtures. Not live-route/host qualification. */
+/* real browser adapters, wholly synthetic HTTP fixtures. Not live-route/host qualification. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -84,7 +83,6 @@ test('reset during facade decryption discards bytes and never posts ingest', asy
     assert.deepEqual(calls, ['/api/ai/document-synthesis/capture']);
 });
 
-/* @Codex */
 test('preserves session unavailability without continuing to ingest or inference', async () => {
     let calls = 0;
     const orchestrator = createDocumentSynthesisBrowserOrchestrator({ fetch: async () => {

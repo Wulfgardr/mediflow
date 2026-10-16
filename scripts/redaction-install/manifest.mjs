@@ -1,4 +1,4 @@
-/* @Codex — local manifest is byte integrity, NOT provenance or model qualification. */
+/* local manifest is byte integrity, NOT provenance or model qualification. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { absolute, demand, exactKeys, relative, equal, checkFile, pathGuard, closedTree, strictJson } from './guards.mjs';

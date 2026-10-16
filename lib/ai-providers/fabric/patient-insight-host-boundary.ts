@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 export type PatientInsightProjection = Readonly<{ schemaVersion: 'mediflow.patient-insight.projection.v1'; clinicalFocus: string; activeConditions: readonly string[]; currentTherapies: readonly string[]; recentClinicalEvents: readonly string[] }>;

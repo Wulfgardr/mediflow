@@ -1,4 +1,4 @@
-/* @Codex: HTTP-only synthetic ChatGPT transport for the four real clinical cards. */
+/* HTTP-only synthetic ChatGPT transport for the four real clinical cards. */
 import { expect, type Locator, type Page } from '@playwright/test';
 import { ORDINARY_FLOW_SCHEMA, ORDINARY_SELECTION_SCHEMA, type OrdinaryFunction } from '../lib/chatgpt-product/ordinary-wire';
 

@@ -1,7 +1,6 @@
 import { types } from 'node:util';
 import type { ValidatedSemanticQueryPlanV1 } from './semantic-query-plan';
 
-/* @Codex */
 export type SemanticQueryExecutionV1ErrorCode = 'plan_denied' | 'policy_unavailable' | 'currentness_denied'
   | 'service_denied' | 'output_denied' | 'authorization_denied' | 'audit_failed' | 'timeout' | 'cancelled'
   | 'restart_forbidden';

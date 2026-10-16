@@ -1,4 +1,4 @@
-/* @Codex WUL-676: square segments are visual references, not discrete steps. */
+/* WUL-676: square segments are visual references, not discrete steps. */
 .track { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .root {
     position: relative;

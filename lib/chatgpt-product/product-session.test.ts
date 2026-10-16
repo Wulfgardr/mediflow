@@ -1,4 +1,4 @@
-/* @Codex — genuine owner 0.8.7; no public IDs used as capabilities. */
+/* genuine owner 0.8.7; no public IDs used as capabilities. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';

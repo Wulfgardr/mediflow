@@ -14,7 +14,7 @@ import type { PatientFormValues } from '@/lib/schemas';
 import PatientForm from '@/components/patient-form';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
-/* @Codex: reuse the existing encryption, session and versioned-write facade. */
+/* reuse the existing encryption, session and versioned-write facade. */
 const editPort: PatientEditPort = {
     updatePatient: (id, changes) => db.patients.update(id, changes),
     updateCheckup: (id, changes) => db.checkups.update(id, changes),

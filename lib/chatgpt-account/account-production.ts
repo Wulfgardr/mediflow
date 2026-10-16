@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { requireSession } from '../security/server-auth';
 import { createAccountHost } from './account-host';

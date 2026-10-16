@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -572,7 +571,6 @@ async function cleanupPatient(patientId) {
     assert.equal(deletion.response.status, 200);
 }
 
-/* @Codex */
 function purgePatientEntriesFromTestDb(patientId) {
     const dataDir = process.env.MEDIFLOW_DATA_DIR;
     if (!dataDir) return;

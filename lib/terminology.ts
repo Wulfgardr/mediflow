@@ -1,7 +1,5 @@
-/* @Codex */
 export type TerminologySystemCode = 'AIC' | 'ATC' | 'ICD-11' | 'LOINC' | 'UCUM' | 'SNOMED-CT' | 'CND';
 
-/* @Codex */
 export type TerminologySystemDescriptor = {
     code: TerminologySystemCode;
     display: string;
@@ -10,7 +8,6 @@ export type TerminologySystemDescriptor = {
     notes?: string;
 };
 
-/* @Codex */
 export type TerminologyItem = {
     system: TerminologySystemCode;
     code: string;
@@ -23,7 +20,6 @@ export type TerminologyItem = {
     source: string;
 };
 
-/* @Codex */
 type StaticCatalogItem = {
     code: string;
     display: string;
@@ -34,7 +30,6 @@ type StaticCatalogItem = {
     version?: string;
 };
 
-/* @Codex */
 const SYSTEMS: TerminologySystemDescriptor[] = [
     { code: 'ICD-11', display: 'ICD-11', source: 'WHO local API proxy', status: 'active' },
     { code: 'AIC', display: 'AIC', source: 'AIFA local catalog', status: 'active' },
@@ -45,7 +40,6 @@ const SYSTEMS: TerminologySystemDescriptor[] = [
     { code: 'CND', display: 'CND', source: 'Not integrated yet', status: 'planned' },
 ];
 
-/* @Codex */
 const LOINC_PILOT: StaticCatalogItem[] = [
     { code: '8480-6', display: 'Systolic blood pressure', displayIt: 'Pressione arteriosa sistolica', defaultUnit: 'mm[Hg]', version: '2.78' },
     { code: '8462-4', display: 'Diastolic blood pressure', displayIt: 'Pressione arteriosa diastolica', defaultUnit: 'mm[Hg]', version: '2.78' },
@@ -55,7 +49,7 @@ const LOINC_PILOT: StaticCatalogItem[] = [
     { code: '29463-7', display: 'Body weight', displayIt: 'Peso corporeo', defaultUnit: 'kg', version: '2.78' },
     { code: '2339-0', display: 'Glucose [Mass/volume] in Blood', displayIt: 'Glicemia', defaultUnit: 'mg/dL', version: '2.78' },
 
-    /* @Codex WUL-UIUX: subset ematologia/chimica clinica. Solo voci con codice
+    /* WUL-UIUX: subset ematologia/chimica clinica. Solo voci con codice
        LOINC e unita UCUM standard e non ambigui clinicamente (concordi tra
        revisione multi-agente e Codex 5.5). Le unita composte (10*3/uL, 10*6/uL)
        usano l'operatore asterisco UCUM e restano solo metadata: observation-range
@@ -93,7 +87,7 @@ const LOINC_PILOT: StaticCatalogItem[] = [
 ];
 
 /*
- * @Codex WUL-UIUX: voci LOINC con ambiguita CLINICA che NON vanno spedite senza
+ * WUL-UIUX: voci LOINC con ambiguita CLINICA che NON vanno spedite senza
  * la validazione del responsabile della terminologia clinica (scelta di
  * unita/formula/metodo con impatto sul valore letto dal medico). NON incluse
  * in staticCatalogFor: promuovere in
@@ -114,7 +108,6 @@ export const LOINC_PENDING_VALIDATION: (StaticCatalogItem & { note: string })[] 
     { code: '1988-5', display: 'C reactive protein [Mass/volume] in Serum or Plasma', displayIt: 'Proteina C reattiva (PCR)', defaultUnit: 'mg/L', note: 'mg/L vs mg/dL (fattore 10); hs-CRP e voce distinta (30522-7).' },
 ];
 
-/* @Codex */
 const UCUM_PILOT: StaticCatalogItem[] = [
     { code: 'mm[Hg]', display: 'millimeter of mercury', displayIt: 'mmHg', version: '2.1' },
     { code: '/min', display: 'per minute', displayIt: '/min', version: '2.1' },
@@ -122,7 +115,7 @@ const UCUM_PILOT: StaticCatalogItem[] = [
     { code: 'Cel', display: 'degree Celsius', displayIt: 'gradi C', version: '2.1' },
     { code: 'kg', display: 'kilogram', displayIt: 'kg', version: '2.1' },
     { code: 'mg/dL', display: 'milligram per deciliter', displayIt: 'mg/dL', version: '2.1' },
-    /* @Codex WUL-UIUX: unita per il subset ematologia/chimica. Le composte usano
+    /* WUL-UIUX: unita per il subset ematologia/chimica. Le composte usano
        l'operatore asterisco UCUM (10*3 = 10^3): stringa esatta come da UCUM. */
     { code: 'g/dL', display: 'gram per deciliter', displayIt: 'g/dL', version: '2.1' },
     { code: 'mmol/L', display: 'millimole per liter', displayIt: 'mmol/L', version: '2.1' },
@@ -133,12 +126,10 @@ const UCUM_PILOT: StaticCatalogItem[] = [
     { code: '10*6/uL', display: 'millions per microliter', displayIt: '10^6/uL', version: '2.1' },
 ];
 
-/* @Codex */
 export function listTerminologySystems(): TerminologySystemDescriptor[] {
     return SYSTEMS;
 }
 
-/* @Codex */
 export function normalizeTerminologySystem(value: unknown): TerminologySystemCode | null {
     if (typeof value !== 'string') return null;
     const normalized = value.trim().toUpperCase();
@@ -152,14 +143,12 @@ export function normalizeTerminologySystem(value: unknown): TerminologySystemCod
     return null;
 }
 
-/* @Codex */
 function staticCatalogFor(system: TerminologySystemCode): StaticCatalogItem[] | null {
     if (system === 'LOINC') return LOINC_PILOT;
     if (system === 'UCUM') return UCUM_PILOT;
     return null;
 }
 
-/* @Codex */
 export function searchStaticTerminology(system: TerminologySystemCode, query: string, limit: number): TerminologyItem[] {
     const catalog = staticCatalogFor(system);
     if (!catalog) return [];
@@ -183,7 +172,6 @@ export function searchStaticTerminology(system: TerminologySystemCode, query: st
     }));
 }
 
-/* @Codex */
 export function resolveStaticTerminology(system: TerminologySystemCode, code: string): TerminologyItem | null {
     const catalog = staticCatalogFor(system);
     if (!catalog) return null;
@@ -200,14 +188,12 @@ export function resolveStaticTerminology(system: TerminologySystemCode, code: st
     };
 }
 
-/* @Codex */
 export type FseValidationIssue = {
     field: string;
     code: string;
     message: string;
 };
 
-/* @Codex */
 export type FseValidationResponse = {
     ok: boolean;
     profile: string;
@@ -215,7 +201,6 @@ export type FseValidationResponse = {
     warnings: FseValidationIssue[];
 };
 
-/* @Codex */
 export function buildValidationResponse(profile: string, errors: FseValidationIssue[], warnings: FseValidationIssue[]): FseValidationResponse {
     return {
         ok: errors.length === 0,

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import { readdir, stat } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';

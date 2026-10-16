@@ -6,7 +6,6 @@
  * official regional web applications currently reachable from MediFlow. It does
  * not implement a certified SISS backend integration.
  */
-/* @Codex */
 import { SISS_URLS } from './siss-urls';
 import { copyToClipboard } from './clipboard';
 
@@ -59,7 +58,6 @@ function navigateSissPortalWindow(popupWindow: Window, handoffUrl: string): bool
     }
 }
 
-/* @Codex */
 export function prepareSissPortalWindow(): SissPortalWindow {
     return tryOpenSissPortalWindow();
 }
@@ -131,7 +129,6 @@ export async function completeSissPortalHandoff(input: SissPortalHandoffInput): 
  * @param codiceFiscale - The patient's Codice Fiscale
  * @returns Result object with success status and user-friendly message
  */
-/* @Codex */
 export async function openSissPrescrizione(codiceFiscale: string): Promise<OpenSissResult> {
     return await completeSissPortalHandoff({
         handoffUrl: SISS_URLS.PRESCRITTIVO_REGIONALE,

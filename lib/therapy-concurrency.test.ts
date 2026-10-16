@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import { buildTherapyVersionConflictPayload, parseTherapyExpectedVersion } from './therapy-concurrency.ts';
 
 test('parseTherapyExpectedVersion requires a positive integer', () => {

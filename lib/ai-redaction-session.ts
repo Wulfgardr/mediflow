@@ -1,4 +1,3 @@
-/* @Codex */
 import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { evaluateEgress } from './ai-egress-gate';

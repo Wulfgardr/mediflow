@@ -15,7 +15,7 @@
 #                                 (fine for a local run of a locally built app).
 set -euo pipefail
 
-# @Codex: reject an explicitly requested but invalid QA identity before any build.
+# reject an explicitly requested but invalid QA identity before any build.
 MAC_QA_NAMESPACE="${MEDIFLOW_MAC_QA_NAMESPACE-}"
 if [[ "${MEDIFLOW_MAC_QA_NAMESPACE+x}" == x && ! "$MAC_QA_NAMESPACE" =~ ^[0-9a-f]{32}$ ]]; then
   echo "MEDIFLOW_MAC_QA_NAMESPACE deve contenere esattamente 32 caratteri esadecimali minuscoli." >&2
@@ -34,7 +34,7 @@ APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 IDENTITY_HELPER="$ROOT_DIR/scripts/launcher-helpers.mjs"
 BUILD_IDENTITY_FILE="$STANDALONE_DIR/mediflow-build-identity.json"
 
-# @Codex: use the shared launcher identity rather than a packaging-specific Git
+# use the shared launcher identity rather than a packaging-specific Git
 # formula, then make the exact source visible to the bundled standalone server.
 CURRENT_APP_REVISION=""
 CURRENT_APP_BRANCH=""
@@ -59,7 +59,7 @@ INITIAL_APP_BRANCH="$CURRENT_APP_BRANCH"
 INITIAL_APP_WORKTREE_HASH="$CURRENT_APP_WORKTREE_HASH"
 INITIAL_APP_SOURCE_FINGERPRINT="$CURRENT_APP_SOURCE_FINGERPRINT"
 
-# @Codex: skipped Web builds may reuse only a payload sealed by this script's
+# skipped Web builds may reuse only a payload sealed by this script's
 # full-build path. This is provenance for local packaging, not a content digest.
 write_build_identity() {
 node - "$BUILD_IDENTITY_FILE" "$ROOT_DIR/$NEXT_DIST_DIR/BUILD_ID" "$STANDALONE_DIR/.next/BUILD_ID" \
@@ -123,7 +123,7 @@ assert_checkout_unchanged() {
   fi
 }
 
-# @Codex: reject path aliases and a sealed previous output before Xcode or rm/cp.
+# reject path aliases and a sealed previous output before Xcode or rm/cp.
 preflight_app_destination() {
 node - "$APP" <<'NODE'
 const fs = require('node:fs'), path = require('node:path');
@@ -166,7 +166,7 @@ NODE
 preflight_app_destination
 
 # xcodebuild needs a full Xcode (the Liquid Glass code needs the 26 SDK).
-# @Codex: an explicit per-command toolchain must win over global selection.
+# an explicit per-command toolchain must win over global selection.
 if [[ -z "${DEVELOPER_DIR:-}" ]] && { [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! command -v xcodebuild >/dev/null 2>&1; }; then
   for dev in /Applications/Xcode.app/Contents/Developer /Applications/Xcode-beta.app/Contents/Developer; do
     [[ -d "$dev" ]] && export DEVELOPER_DIR="$dev" && break
@@ -176,7 +176,7 @@ fi
 # 1. Web runtime (Next.js standalone)
 if [[ "${MEDIFLOW_SKIP_WEB_BUILD:-0}" != "1" ]]; then
   echo "Building web runtime (next build, standalone)..."
-  # @Codex: webpack supports the repository's sibling-worktree node_modules
+  # webpack supports the repository's sibling-worktree node_modules
   # layout; Turbopack rejects dependencies resolved outside the worktree root.
   ( cd "$ROOT_DIR" && MEDIFLOW_APP_REVISION="$INITIAL_APP_REVISION" MEDIFLOW_APP_BRANCH="$INITIAL_APP_BRANCH" \
     MEDIFLOW_APP_WORKTREE_HASH="$INITIAL_APP_WORKTREE_HASH" MEDIFLOW_APP_SOURCE_FINGERPRINT="$INITIAL_APP_SOURCE_FINGERPRINT" \
@@ -190,7 +190,7 @@ if [[ ! -f "$STANDALONE_DIR/server.js" ]]; then
   exit 1
 fi
 
-# @Codex: a caller must provide every public staging input explicitly. Without
+# a caller must provide every public staging input explicitly. Without
 # them an already-staged standalone payload must be complete and is reused unchanged.
 EXECUTION_MAC_STAGE_VARS=(
   MEDIFLOW_CHATGPT_EXECUTION_BINARY
@@ -212,11 +212,11 @@ if (( EXECUTION_MAC_STAGE_COUNT == ${#EXECUTION_MAC_STAGE_VARS[@]} )); then
     --schema-directory "$MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY" \
     --c1-receipt "$MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT"
 fi
-# @Codex: absence is a packaging error, not a successful app with a HELD helper.
+# absence is a packaging error, not a successful app with a HELD helper.
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$STANDALONE_DIR"
 
-# @Codex: better-sqlite3 is architecture-specific, so the app executable must
+# better-sqlite3 is architecture-specific, so the app executable must
 # match the WebRuntime built by the active Node process.
 case "$(node -p 'process.arch')" in
   arm64) XCODE_ARCH="arm64" ;;
@@ -234,15 +234,15 @@ xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
 
 [[ -d "$APP" ]] || { echo "Build failed: $APP not found" >&2; exit 1; }
 
-# @Codex: do not place the initial identity in an app whose checkout changed
+# do not place the initial identity in an app whose checkout changed
 # while Web/Xcode build was running.
 assert_checkout_unchanged
 
-# @Codex: preserve any Xcode-provided launch variables while placing the
+# preserve any Xcode-provided launch variables while placing the
 # canonical build identity in the app process environment before signing.
 PLIST="$APP/Contents/Info.plist"
 [[ -f "$PLIST" && ! -L "$PLIST" ]] || { echo "Info.plist del bundle mancante o non fisico." >&2; exit 1; }
-# @Codex: the persistent QA selection and separate app identity precede every seal.
+# the persistent QA selection and separate app identity precede every seal.
 if [[ -n "$MAC_QA_NAMESPACE" ]]; then
   for qa_key in MediFlowQAStorageNamespace CFBundleIdentifier CFBundleName CFBundleDisplayName; do
     case "$qa_key" in
@@ -292,9 +292,9 @@ echo "Injecting WebRuntime into the app bundle..."
 rm -rf "$WEB"
 mkdir -p "$WEB"
 cp -R "$STANDALONE_DIR/." "$WEB/"
-# @Codex: verify the copied scheduler before native relocation changes its dependencies.
+# verify the copied scheduler before native relocation changes its dependencies.
 node "$ROOT_DIR/scripts/scheduled-backup-runtime-contract.mjs" --runtime-root "$WEB"
-# @Codex: native startup reserves a fresh database before it creates log/PID files.
+# native startup reserves a fresh database before it creates log/PID files.
 # The helper has a direct-Node packaged mode, so no source tree or TS loader ships.
 # `preflight_app_destination` above and here reject a pre-existing symlink before this copy.
 preflight_app_destination
@@ -307,9 +307,9 @@ cp "$ROOT_DIR/scripts/native-first-install.mjs" "$WEB/native-first-install.mjs"
 cmp -s "$ROOT_DIR/scripts/native-first-install.mjs" "$WEB/native-first-install.mjs" || {
   echo "Native first-install helper was not copied intact into WebRuntime." >&2; exit 1;
 }
-# @Codex: copied overlay roots must be physical before mkdir/cp can write through them.
+# copied overlay roots must be physical before mkdir/cp can write through them.
 preflight_app_destination
-# @Codex: merge contents when a reused standalone already includes these assets.
+# merge contents when a reused standalone already includes these assets.
 mkdir -p "$WEB/.next/static"
 cp -R "$ROOT_DIR/$NEXT_DIST_DIR/static/." "$WEB/.next/static/"
 if [[ -d "$ROOT_DIR/public" ]]; then
@@ -317,7 +317,7 @@ if [[ -d "$ROOT_DIR/public" ]]; then
   cp -R "$ROOT_DIR/public/." "$WEB/public/"
 fi
 cp "$ROOT_DIR/scripts/local-api-tls-proxy.mjs" "$RES/local-api-tls-proxy.mjs"
-# @Codex: split the copied standalone payload before the strict Resources guard.
+# split the copied standalone payload before the strict Resources guard.
 # The original standalone stays usable. No symlink and no native bytes change.
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --relocate-bundle --installation-root "$WEB"
@@ -331,7 +331,7 @@ lipo "$EXECUTION_MAC_HELPER" -verify_arch "$XCODE_ARCH"
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$WEB"
 
-# @Codex: staging must not hide a checkout change before the outer seal.
+# staging must not hide a checkout change before the outer seal.
 assert_checkout_unchanged
 
 # 4. Optional codesign (so the injected runtime is covered for distribution)
@@ -342,7 +342,7 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   else
     SIGN_ARGS=(--force --options runtime --timestamp --sign "$MEDIFLOW_CODESIGN_IDENTITY")
   fi
-  # @Codex: sign only the six rewritten Web dependencies. The independently
+  # sign only the six rewritten Web dependencies. The independently
   # signed, pinned Codex helper is already verified and MUST NOT be re-signed.
   # --deep is verification-only. No mutation follows the OUTER app seal below.
   for native_code in "${WEB_NATIVE_TARGETS[@]}"; do
@@ -351,7 +351,7 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   done
 fi
 
-# @Codex WUL-697: exact file closure only; consume final inner-signature bytes.
+# WUL-697: exact file closure only; consume final inner-signature bytes.
 # The roster/launcher are committed before the outer seal and never repaired after it.
 node "$ROOT_DIR/scripts/stage-headless-runtime.mjs" --stage --app "$APP"
 assert_checkout_unchanged
@@ -360,14 +360,14 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   codesign --verify --deep --strict "$APP"
 fi
 
-# @Codex: read-only final acceptance, including AFTER optional outer signing.
+# read-only final acceptance, including AFTER optional outer signing.
 # These checks do not write Resources/Helpers or assert runtime qualification.
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$WEB"
 codesign --verify --strict "$EXECUTION_MAC_HELPER"
 "$ROOT_DIR/scripts/check-macos-web-runtime-native-payload.sh" --web-runtime "$WEB" --frameworks "$FRAMEWORKS"
 node "$ROOT_DIR/scripts/stage-headless-runtime.mjs" --check --app "$APP"
-# @Codex: read-back only; never repair QA metadata after signing.
+# read-back only; never repair QA metadata after signing.
 if [[ -n "$MAC_QA_NAMESPACE" ]]; then
   [[ "$(plutil -extract MediFlowQAStorageNamespace raw "$PLIST")" == "$MAC_QA_NAMESPACE" \
     && "$(plutil -extract CFBundleIdentifier raw "$PLIST")" == "com.mediflow.qa.$MAC_QA_NAMESPACE" ]] \

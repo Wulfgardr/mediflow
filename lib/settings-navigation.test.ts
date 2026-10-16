@@ -54,14 +54,12 @@ test('searching "backup" surfaces backup & restore first', () => {
     assert.equal(matches[0].item.id, 'backup');
 });
 
-/* @Codex */
 test('terminology and catalog searches lead to Repertori rather than Fabric', () => {
     for (const query of ['AIFA', 'esenzioni', 'WHO', 'OMS', 'ICD-11', 'codifiche']) {
         assert.equal(searchSettingsNav(query)[0]?.item.href, '/settings/repertori', query);
     }
 });
 
-/* @Codex */
 test('searching "conformita" surfaces the evidence inventory first', () => {
     const matches = searchSettingsNav('conformita');
     assert.ok(matches.length > 0);
@@ -91,7 +89,6 @@ test('empty query lists sections up to the limit, nonsense yields nothing', () =
     assert.equal(searchSettingsNav('zzzqqqxxx').length, 0);
 });
 
-/* @Codex */
 test('overview is searchable and only the exact settings page is current', () => {
     const items = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
     assert.equal(searchSettingsNav('panoramica')[0].item.href, '/settings');
@@ -108,7 +105,7 @@ test('overview is searchable and only the exact settings page is current', () =>
     }
 });
 
-/* @Codex: the explicit OpenAI demo is a peer, not an account or local-model alias. */
+/* the explicit OpenAI demo is a peer, not an account or local-model alias. */
 test('OpenAI demo is reachable and searchable under Intelligenza', () => {
     const group = SETTINGS_NAV_GROUPS.find((entry) => entry.id === 'ai');
     assert.equal(group?.label, 'Intelligenza');
@@ -123,7 +120,6 @@ test('OpenAI demo is reachable and searchable under Intelligenza', () => {
     }
 });
 
-/* @Codex */
 test('OpenAI has one exact active entry, independent of Fabric and local models', () => {
     const items = SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
     assert.deepEqual(items.filter((item) => isSettingsItemActive(item, '/settings/ai/chatgpt')).map((item) => item.id), ['ai-chatgpt']);

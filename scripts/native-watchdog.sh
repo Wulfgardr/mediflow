@@ -1,5 +1,4 @@
 #!/bin/bash
-# @Codex
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,7 +18,6 @@ while true; do
         saw_running=1
     else
         if [ "$saw_running" -eq 1 ]; then
-            # @Codex
             response=$(osascript -e "button returned of (display dialog \"L'app nativa MediFlow si e chiusa. Vuoi riaprirla?\" buttons {\"Non ora\", \"Riapri\"} default button \"Riapri\" with icon note)")
             if [ "$response" = "Riapri" ]; then
                 if [ -d "$APP_PATH" ]; then

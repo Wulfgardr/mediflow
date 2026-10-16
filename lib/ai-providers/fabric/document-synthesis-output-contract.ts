@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 
 export const DOCUMENT_SYNTHESIS_OUTPUT_SCHEMA_VERSION = 'mediflow.ai.extract.v1' as const;

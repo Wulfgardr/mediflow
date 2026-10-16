@@ -1,4 +1,4 @@
-/* @Codex: shared Lume surface, radius, spacing and action classes. */
+/* shared Lume surface, radius, spacing and action classes. */
 .card { display: grid; gap: 1rem; min-width: 0; color: var(--lume-ink); }
 .header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 1rem; }
 .identity { min-width: 0; display: flex; align-items: center; gap: .75rem; }
@@ -25,7 +25,7 @@
 .error { color: var(--lume-signal-critical); }
 @media (max-width: 480px) { .header { gap: .75rem; } }
 
-/* @Codex WUL-684: one enclosing account card; the boundary is a readable
+/* WUL-684: one enclosing account card; the boundary is a readable
    group separated by a rule, not another rounded enclosure. */
 .boundary { display: grid; gap: .75rem; min-width: 0; padding-top: 1rem; border-top: 1px solid var(--lume-border-color); }
 .boundary strong { font-size: 0.875rem; }

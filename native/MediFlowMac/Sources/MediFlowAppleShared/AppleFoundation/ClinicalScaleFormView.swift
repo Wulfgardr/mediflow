@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// @Codex MF085-003: unanswered is nil, not the first option or a false toggle.
+/// MF085-003: unanswered is nil, not the first option or a false toggle.
 struct ClinicalScaleFormView: View {
     let definition: ClinicalScaleDefinition
     let onSubmit: ([String: Int]) -> Void

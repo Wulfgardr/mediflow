@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -17,7 +16,7 @@ async function freshStack(label: string) {
     const sessionSource = readFileSync(new URL('./server-session.ts', import.meta.url), 'utf8')
         .replace("import 'server-only';", '')
         .replaceAll("from './web-auth-lifecycle-owner-adapter';", "from './native-test-owner.mjs';");
-    // @Codex: each historical test stack owns an isolated native/system closure.
+    // each historical test stack owns an isolated native/system closure.
     const implementation = fileURLToPath(new URL('../../packages/web-auth-lifecycle-owner/internal/native-session.cjs', import.meta.url));
     writeFileSync(join(directory, 'native-test-owner.mjs'),
         `import owner from ${JSON.stringify(pathToFileURL(implementation).href)}; export const serverSessions = owner.createServerSessionOwner().api;`);

@@ -1,4 +1,4 @@
-/* @Codex — generated in-memory PNGs, no fixtures/patient data/dependency installs. */
+/* generated in-memory PNGs, no fixtures/patient data/dependency installs. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deflateSync } from 'node:zlib';

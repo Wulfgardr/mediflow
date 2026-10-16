@@ -1,4 +1,4 @@
-/* @Codex: packaged native first-install preserves non-empty directories. */
+/* packaged native first-install preserves non-empty directories. */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';

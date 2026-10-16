@@ -1,12 +1,8 @@
-/* @Codex */
 import { and, desc, eq } from 'drizzle-orm';
 // WUL-306 (ADR 0066): network replicas never see soft-deleted patients
 import { activePatients } from './patient-lifecycle';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { patients, patientsToAmbulatories } from './schema';
-/* @Codex */
 import type { PatientDetail, PatientSummary } from './api/v1/types';
 
 function toIsoString(value: unknown): string | null {
@@ -64,7 +60,6 @@ function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
     };
 }
 
-/* @Codex */
 export async function listNetworkScopedPatients(
     scopeAmbulatoryId: string,
     options: { includeDeleted?: boolean; includeDiagnoses?: boolean } = {}
@@ -84,7 +79,6 @@ export async function listNetworkScopedPatients(
     return rows.map((row) => toPatientSummary(row.patient, options.includeDiagnoses));
 }
 
-/* @Codex */
 export async function getNetworkScopedPatientDetail(
     patientId: string,
     scopeAmbulatoryId: string

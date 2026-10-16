@@ -1,10 +1,8 @@
-/* @Codex */
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { bootstrapUnlockedSession } from './utils';
 
-/* @Codex */
 async function expectAreaHeadingFocused(
   page: Page,
   area: string,

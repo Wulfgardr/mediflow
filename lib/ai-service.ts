@@ -30,7 +30,6 @@ export type {
 
 const TEXT_CHAT_TIMEOUT_MS = 300_000;
 
-/* @Codex */
 export class AIService {
     public provider: AIProvider;
     private readonly adapter: ProviderAdapter;

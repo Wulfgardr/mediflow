@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     EGRESS_PROFILE_LABELS,
     summarizeEgressProfiles,

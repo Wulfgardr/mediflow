@@ -1,4 +1,3 @@
-# @Codex
 import importlib.util
 import json
 from pathlib import Path
@@ -83,7 +82,7 @@ class PrivateXctestrunTests(unittest.TestCase):
                 self.assertEqual(target['OnlyTestIdentifiers'], [f'MediFlowMobileAppUITests/{module.PHASE_METHODS[phase]}'])
                 self.assertEqual(target['UITargetAppEnvironmentVariables'], {'OS_ACTIVITY_MODE': 'disable'})
 
-    # @Codex: A CAS case describes a previously observed UI-created entry; it
+    # A CAS case describes a previously observed UI-created entry; it
     # cannot opt an ordinary run into pairing or alter the application's state.
     def cas_case(self):
         return {'schemaVersion': 1, 'synthetic': True, 'fixtureId': 'unit-fixture',

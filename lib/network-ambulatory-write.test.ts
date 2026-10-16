@@ -73,7 +73,7 @@ async function seed(modules: LoadedModules, id: string, isDefault: boolean, vers
     modules.dbServer.insert(modules.schema.ambulatories).values({ id, name: id, isDefault, version, type, createdAt: new Date() }).run();
 }
 
-/* @Codex: direct writer fixtures now pass an admitted synthetic host context. */
+/* direct writer fixtures now pass an admitted synthetic host context. */
 test('ambulatory writes return a version conflict and prohibit direct default removal', async () => {
     const modules = await loadModules();
     await resetDatabase(modules);

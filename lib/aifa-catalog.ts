@@ -1,6 +1,5 @@
 export const AIFA_DOWNLOAD_URL = 'https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv';
 export const AIFA_DOWNLOAD_MAX_BYTES = 100 * 1024 * 1024;
-/* @Codex */
 
 export const AIFA_CATALOG_MANIFEST_SETTING_KEY = 'aifaCatalogManifest';
 export const AIFA_CATALOG_SOURCE = 'Agenzia Italiana del Farmaco (AIFA)';

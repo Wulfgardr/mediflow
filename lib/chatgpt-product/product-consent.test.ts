@@ -1,4 +1,4 @@
-/* @Codex — deterministic local clock tests, no cross-process clock comparison. */
+/* deterministic local clock tests, no cross-process clock comparison. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 const { createProductConsent } = await import('./product-consent.ts');

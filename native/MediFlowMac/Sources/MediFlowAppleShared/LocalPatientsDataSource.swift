@@ -39,7 +39,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             includeDeleted: includeDeleted)
     }
 
-    /* @Codex */
     public func fetchPatient(
         id: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
@@ -128,7 +127,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
         throw HomeBaseClientError.localAuthorityUnsupported("Pulizia ambulatorio")
     }
 
-    /* @Codex */
     public func fetchPatients(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?, includeDiagnoses: Bool
     ) async throws -> [HomeBasePatientSummary] {
@@ -137,7 +135,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             includeDiagnoses: includeDiagnoses)
     }
 
-    /* @Codex */
     public func fetchScopedCheckups(
         dateFrom: Date?, dateTo: Date?, status: [String], limit: Int?,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -147,7 +144,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchScopedEntries(
         type: String?, dateFrom: Date?, dateTo: Date?, limit: Int?,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -157,7 +153,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func searchDrugs(
         query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -167,7 +162,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func searchExemptions(
         query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -177,7 +171,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func searchTerminology(
         system: String, query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -187,7 +180,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func resolveTerminology(
         system: String, code: String,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -197,7 +189,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchTerminologySystems(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseTerminologyRegistryEntry] {
@@ -541,7 +532,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             id: observationId, patientId: patientId, scopeAmbulatoryId: scope, payload: payload, masterKey: masterKey))
     }
 
-    /* @Codex */
     public func fetchServicePrescriptions(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseServicePrescriptionSummary] {
@@ -549,7 +539,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func createServicePrescription(
         payload: HomeBaseServicePrescriptionCreatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -558,7 +547,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func updateServicePrescription(
         prescriptionId: String, payload: HomeBaseServicePrescriptionUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -568,7 +556,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchServicePrescriptionItems(
         patientId: String?, prescriptionId: String?,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -578,7 +565,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func createServicePrescriptionItem(
         payload: HomeBaseServicePrescriptionItemCreatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -587,7 +573,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func updateServicePrescriptionItem(
         itemId: String, payload: HomeBaseServicePrescriptionItemUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -597,7 +582,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchServiceCatalog(
         query: String?, code: String?, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -607,7 +591,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchServiceCatalogCount(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseCatalogCountResponse {
@@ -615,7 +598,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchProstheticPrescriptions(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> [HomeBaseProstheticPrescriptionSummary] {
@@ -623,7 +605,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func createProstheticPrescription(
         payload: HomeBaseProstheticPrescriptionCreatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -632,7 +613,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             payload: payload, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func updateProstheticPrescription(
         prescriptionId: String, payload: HomeBaseProstheticPrescriptionUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
@@ -642,7 +622,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchNetworkCapabilities(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkCapabilitiesResponse {
@@ -650,7 +629,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchNetworkIdentity(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkIdentitySummary {
@@ -658,7 +636,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchNetworkNode(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkNodeSummary {
@@ -666,7 +643,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchNetworkRevision(
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> NetworkRevisionSummary {
@@ -674,7 +650,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func fetchFseValidatePatient(
         patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseValidatePatientExportResponse {
@@ -682,7 +657,6 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             patientId: patientId, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    /* @Codex */
     public func validateFseDocument(
         payload: HomeBaseFseDocumentValidationPayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?

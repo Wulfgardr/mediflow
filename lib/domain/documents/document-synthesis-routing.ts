@@ -1,19 +1,14 @@
-/* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
-/* @Codex */
 import { routeDocumentClass } from './document-class-router';
-/* @Codex */
 import {
     getRememberedPdfDocumentMetadata,
     type PdfDocumentMetadata,
 } from '../../pdf-document-metadata';
 
-/* @Codex */
 export interface DocumentSynthesisRoutingOptions {
     pdfMetadata?: PdfDocumentMetadata;
 }
 
-/* @Codex */
 export function routeDocumentClassForSynthesis(
     rawMarkdown: string,
     fileName: string,

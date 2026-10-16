@@ -1,4 +1,4 @@
-/* @Codex — concrete Mac issuer. No issuer registration API, receipt import,
+/* concrete Mac issuer. No issuer registration API, receipt import,
  * injected OS observer, helper binary, success callback or environment switch. */
 import 'server-only';
 import { randomBytes } from 'node:crypto';

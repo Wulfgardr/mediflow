@@ -1,4 +1,3 @@
-/* @Codex */
 import AVFAudio
 import Darwin
 import Foundation

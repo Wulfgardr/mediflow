@@ -1,4 +1,3 @@
-/* @Codex */
 import { REDACTION_SCHEMA_VERSION, type RedactionEntity, type RedactionEntityType } from '../lib/redaction-contracts.ts';
 
 type BenchmarkCorpusEntry = {
@@ -359,7 +358,6 @@ async function fetchJson(url: string, init: RequestInit, timeoutMs: number) {
     return payload;
 }
 
-/* @Codex */
 export function createAdapter(): RedactionAdapter {
     const baseUrl = normalizeBaseUrl(process.env.MEDIFLOW_OPENMED_BASE_URL);
     const modelName = (process.env.MEDIFLOW_OPENMED_PII_MODEL || DEFAULT_MODEL_NAME).trim();

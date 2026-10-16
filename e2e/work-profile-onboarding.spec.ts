@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test } from '@playwright/test';
 import { completeOnboardingIfNeeded, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
@@ -108,7 +107,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Cambia profilo di lavoro' }).click();
     await panel.getByRole('button', { name: 'Scegli manualmente' }).click();
     await expect(panel.getByText(/Percorso manuale:/)).toBeVisible();
-    // @Codex: failure before persistence must discard the optimistic radio on reread,
+    // failure before persistence must discard the optimistic radio on reread,
     // even when the server revision did not advance.
     const beforeFailedSave = await read();
     expectedLostResponse = true;

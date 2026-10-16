@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import { buildObservationVersionConflictPayload, parseObservationExpectedVersion } from './observation-concurrency.ts';
 
 test('parseObservationExpectedVersion requires a positive integer', () => {

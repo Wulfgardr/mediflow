@@ -102,19 +102,19 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                                             reference: watch(`diagnoses.${index}.reference`),
                                         }}
                                         onChange={(val) => {
-                                            // @Codex: user edits must update the unsaved-navigation guard.
+                                            // user edits must update the unsaved-navigation guard.
                                             setValue(`diagnoses.${index}.code`, val.code, { shouldDirty: true });
                                             setValue(`diagnoses.${index}.description`, val.description, { shouldDirty: true });
                                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             setValue(`diagnoses.${index}.system`, val.system as any, { shouldDirty: true });
-                                            // @Codex: replacement/free text also clears an old WHO association.
+                                            // replacement/free text also clears an old WHO association.
                                             setValue(`diagnoses.${index}.canonicalUri`, val.canonicalUri, { shouldDirty: true });
                                             setValue(`diagnoses.${index}.reference`, val.reference, { shouldDirty: true });
                                         }}
                                     />
                                     <input type="hidden" {...register(`diagnoses.${index}.description`)} />
                                 </div>
-                                {/* @Codex: persisted URI remains inspectable after a fresh read. */}
+                                {/* persisted URI remains inspectable after a fresh read. */}
                                 {watch(`diagnoses.${index}.canonicalUri`) && <details className="mt-2 text-xs break-words">
                                     <summary>Riferimento della selezione WHO</summary>
                                     <p>{watch(`diagnoses.${index}.canonicalUri`)}</p>
@@ -133,7 +133,7 @@ function DiagnosesFieldArray({ control, register, errors, setValue, watch }: { c
                             </div>
                         </div>
 
-                        {/* @Codex: existing diagnosis dates belong to the displayed snapshot. */}
+                        {/* existing diagnosis dates belong to the displayed snapshot. */}
                         <input type="hidden" {...register(`diagnoses.${index}.date`)} />
                     </div>
                 ))}
@@ -155,7 +155,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
     const { fields, append, remove: removeField } = useFieldArray({
         control,
         name: "checkups",
-        /* @Codex: RHF row keys must not shadow persisted checkup IDs. */
+        /* RHF row keys must not shadow persisted checkup IDs. */
         keyName: "formKey",
     });
 
@@ -235,7 +235,7 @@ function CheckupsFieldArray({ control, register, errors }: { control: Control<Pa
 }
 
 export default function PatientForm({ defaultValues, onSubmit, isSubmitting = false, isEditMode = false, disabled = false }: PatientFormProps) {
-    /* @Codex: useForm caches defaults; its comparison baseline must share that lifetime. */
+    /* useForm caches defaults; its comparison baseline must share that lifetime. */
     const [formattedDefaults] = useState(() => patientFormDefaults(defaultValues));
     const submittingRef = useRef(false);
     const { register, control, handleSubmit, setValue, watch, formState: { errors, isDirty, isSubmitting: formSubmitting } } = useForm<PatientFormValues>({
@@ -264,7 +264,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
 
     return (
         <form onSubmit={handleSubmit(submitOnce)} className={`${styles.register} ${styles.review} ${styles.patientForm}`}>
-            {/* @Codex: freeze a pending/partial plan instead of accepting ignored edits. */}
+            {/* freeze a pending/partial plan instead of accepting ignored edits. */}
             <fieldset disabled={disabled || submitting} className="min-w-0">
             <div className={styles.patientFormLayout}><div className={styles.patientFields}>
 
@@ -403,7 +403,7 @@ export default function PatientForm({ defaultValues, onSubmit, isSubmitting = fa
             </div>
 
             {/* Pianificazione operativa */}
-            {/* @Codex WUL-678: stable anchor for the existing follow-up planner. */}
+            {/* WUL-678: stable anchor for the existing follow-up planner. */}
             <div id="pianificazione" className={FORM_SECTION_CLASS}>
                 <div className="flex items-center gap-4 graphite-divider pt-3 pb-5 mb-2">
 

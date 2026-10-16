@@ -1,4 +1,4 @@
-/* @Codex — remote content, ORIGINAL source-set lease and final owner CAS. */
+/* remote content, ORIGINAL source-set lease and final owner CAS. */
 import 'server-only';
 import { createDocumentSynthesisSourceSetLease } from './document-synthesis-source-set-lease';
 import { digestDocumentSynthesisClaimCitations } from './document-synthesis-claim-citations-digest';

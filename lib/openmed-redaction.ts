@@ -1,4 +1,3 @@
-/* @Codex */
 export const REDACTION_VERSION = 'redaction.v1' as const;
 export const OPENMED_REDACTION_SETTINGS_KEYS = [
     'openmedUrl',
@@ -95,7 +94,6 @@ export function parseSystemRedactionRequest(input: unknown): { ok: true; value: 
         return { ok: false, error: 'Invalid action. Use extract or deidentify.' };
     }
 
-    /* @Codex */
     const text = typeof body.text === 'string' ? body.text : '';
     if (!text.trim()) {
         return { ok: false, error: 'Text is required.' };
@@ -246,7 +244,6 @@ function normalizeString(value: unknown): string | null {
     return normalized.length > 0 ? normalized : null;
 }
 
-/* @Codex */
 function normalizePossiblyPaddedString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     return value.trim().length > 0 ? value : null;

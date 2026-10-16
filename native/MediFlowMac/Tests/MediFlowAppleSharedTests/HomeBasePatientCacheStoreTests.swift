@@ -1,10 +1,8 @@
-// @Codex
 import CryptoKit
 import Foundation
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class HomeBasePatientCacheStoreTests: XCTestCase {
     private var directory: URL!
     private let instant = Date(timeIntervalSince1970: 1_775_000_000)
@@ -177,7 +175,6 @@ final class HomeBasePatientCacheStoreTests: XCTestCase {
     }
 }
 
-/* @Codex */
 enum OfflineCacheFixture {
     static let key = SymmetricKey(data: Data(repeating: 7, count: 32))
     static func context(server: String = "https://localhost:3443", scope: String? = "scope-a",

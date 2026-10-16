@@ -1,4 +1,4 @@
-/* @Codex — explicit public inputs; all writes precede the outer app signature. */
+/* explicit public inputs; all writes precede the outer app signature. */
 import { chmodSync, constants, copyFileSync, lstatSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import {

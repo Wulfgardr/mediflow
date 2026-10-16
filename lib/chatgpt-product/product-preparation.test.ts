@@ -1,4 +1,4 @@
-/* @Codex — actual Web owner, registry, HTTP and service; synthetic substrate only. */
+/* actual Web owner, registry, HTTP and service; synthetic substrate only. */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';

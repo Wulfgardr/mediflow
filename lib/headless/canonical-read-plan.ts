@@ -1,4 +1,3 @@
-/* @Codex */
 import { HEADLESS_CANONICAL_CAPABILITY_DESCRIPTORS } from './canonical-capability-catalog';
 
 export type HeadlessNetworkReadEvidenceCandidate = Readonly<{

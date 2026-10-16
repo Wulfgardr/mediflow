@@ -1,4 +1,4 @@
-/* @Codex WUL-684: one frame per function; provider details use spacing and a divider. */
+/* WUL-684: one frame per function; provider details use spacing and a divider. */
 .panel { display: grid; gap: 24px; min-width: 0; color: var(--lume-ink); }
 .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .header h2 { margin: 0; font-size: 0.9375rem; line-height: 1.4; font-weight: 600; }
@@ -27,7 +27,7 @@
 .advancedSummary::before { content: '+'; margin-right: 12px; }
 details[open] > .advancedSummary::before { content: '−'; }
 .advancedSummary:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; border-radius: var(--lume-control-radius); }
-/* @Codex: retain the existing preference controls with a shared readable geometry. */
+/* retain the existing preference controls with a shared readable geometry. */
 .functionSettings [data-testid$='-kill-switch-card'],
 .functionSettings [data-testid='ocr-unavailable-card'],
 .functionSettings [data-testid='document-router-control-flow-card'] {

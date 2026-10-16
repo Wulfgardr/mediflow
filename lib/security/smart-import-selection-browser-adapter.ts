@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 export type SmartImportSelectionLease = Readonly<{ sessionRef: string; selectionEpoch: number; patientRef: string;
@@ -58,7 +57,6 @@ function lease(value: unknown): SmartImportSelectionLease | null {
         leaseRef: record.leaseRef as string, expiresAt: record.expiresAt as number });
 }
 
-/* @Codex */
 export function createSmartImportSelectionBrowserAdapter(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;
     let generation = 0; let selectionOperation = 0; let stateFence = 0; let currentEpoch: number | null = null; let currentLease: SmartImportSelectionLease | null = null;

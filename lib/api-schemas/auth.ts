@@ -1,4 +1,3 @@
-/* @Codex */
 import { z } from 'zod';
 import { optionalTextSchema, requiredTextSchema } from './common';
 import { validatePassphraseSetupCredentials } from '@/lib/security/passphrase-adoption-validation';

@@ -1,4 +1,4 @@
-/* @Codex — browser-safe. No host, account secret or caller corpus in these DTOs. */
+/* browser-safe. No host, account secret or caller corpus in these DTOs. */
 import type { SynthesisCatalog, SynthesisRequest, SynthesisResult, SynthesisSource, ExecutionCode } from '../chatgpt-execution/execution-contract';
 export const PRODUCT_NAMESPACE = '/api/settings/ai/chatgpt/synthesis/' as const;
 export const PRODUCT_OPERATION = 'synthetic_synthesis' as const;

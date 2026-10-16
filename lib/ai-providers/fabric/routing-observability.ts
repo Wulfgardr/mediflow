@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     FABRIC_VENUES,
     FabricPolicyError,
@@ -98,7 +97,7 @@ export function observeVenue(
     return Object.freeze({ venue, state, reason });
 }
 
-/* @Codex WUL-674: an enabled mode is configuration, not a network observation. */
+/* WUL-674: an enabled mode is configuration, not a network observation. */
 export function observeHomeBaseConfiguration(enabled: boolean): VenueObservation {
     return enabled ? observeVenue('home_base', 'unknown', 'not_probed')
         : observeVenue('home_base', 'offline', 'mode_disabled');

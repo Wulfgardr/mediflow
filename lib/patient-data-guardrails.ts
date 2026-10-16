@@ -1,4 +1,3 @@
-/* @Codex */
 export interface PatientIdentityLike {
     firstName: string;
     lastName: string;
@@ -19,7 +18,6 @@ const NON_NAME_ACTION_TOKENS = new Set([
     'verificare',
 ]);
 
-/* @Codex */
 export function normalizePersonToken(value: string): string {
     return value
         .normalize('NFD')
@@ -29,7 +27,6 @@ export function normalizePersonToken(value: string): string {
         .trim();
 }
 
-/* @Codex */
 function splitPatientNameTokens(value: string): string[] {
     return normalizePersonToken(value)
         .split(/\s+/)
@@ -37,7 +34,6 @@ function splitPatientNameTokens(value: string): string[] {
         .filter(Boolean);
 }
 
-/* @Codex */
 export function detectSuspiciousPersonNames(text: string | null | undefined, patient: PatientIdentityLike): string[] {
     if (!text || !text.trim()) return [];
 

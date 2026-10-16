@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-/* @Codex */
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
@@ -256,7 +255,6 @@ async function disposeRunnerClient() {
     client?.close();
 }
 
-/* @Codex */
 export function createAdapter() {
     return {
         name: 'humadex_italian_medical_ner',

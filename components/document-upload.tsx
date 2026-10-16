@@ -158,7 +158,6 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
         }
     };
 
-    /* @Codex: extraction-only lifecycle; upload/delete/synthesis ownership is unchanged. */
     const extractionSessionSignal = db.getSessionReadSignal();
     const retireExtraction = useCallback(() => {
         activeExtraction.current?.controller.abort(); activeExtraction.current = null;

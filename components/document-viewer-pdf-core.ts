@@ -1,4 +1,4 @@
-/* @Codex — testable lifecycle, without importing a runtime engine into unit tests. */
+/* testable lifecycle, without importing a runtime engine into unit tests. */
 import { assertSourceSize, clearPreviewCanvas, PREVIEW_LIMITS, PreviewError, previewCanvasSize } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
 import { checkPdfOperators, type PreviewImageOps, type PreviewOperatorList } from './document-viewer-pdf-resources.ts';

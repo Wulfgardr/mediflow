@@ -1,4 +1,4 @@
-/* @Codex — inspect compressed raster headers before invoking a browser decoder. */
+/* inspect compressed raster headers before invoking a browser decoder. */
 import { assertImageSize, PreviewError } from './document-viewer-policy.ts';
 
 export type RasterMime = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' | 'image/bmp';

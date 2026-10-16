@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import { createSmartImportSelectionBrowserAdapter } from '../../security/smart-import-selection-browser-adapter';

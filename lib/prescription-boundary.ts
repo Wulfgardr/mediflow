@@ -1,4 +1,3 @@
-/* @Codex */
 export interface PrescriptionBoundaryCandidate {
     drugMention?: string;
     drugQuery?: string;
@@ -9,10 +8,8 @@ export interface PrescriptionBoundaryCandidate {
     evidence?: string;
 }
 
-/* @Codex */
 const SERVICE_IDENTITY_REGEX = /\b(?:visita|prestazion(?:e|i)|specialistic(?:a|he|o|i)|consulenza|consulto|controllo\s+specialistic(?:o|a)|esame|accertamento|prelievo|ecografia|eco(?:grafia|color\s*doppler|colordoppler|doppler)?|color\s*doppler|colordoppler|doppler|radiografia|rx|tc|tac|rm|risonanza|ecg|elettrocardiogramma|spirometria|otorinolaringoiatric(?:a|o|he|i)|orl|cardiologic(?:a|o|he|i)|endocrinologic(?:a|o|he|i)|neurologic(?:a|o|he|i)|dermatologic(?:a|o|he|i)|oculistic(?:a|o|he|i)|fisiatric(?:a|o|he|i)|ortopedic(?:a|o|he|i)|gastroenterologic(?:a|o|he|i)|urologic(?:a|o|he|i)|pneumologic(?:a|o|he|i)|angiologic(?:a|o|he|i)|vascolar(?:e|i)|fisioterapi(?:a|e|co|ca|ci|che)|riabilitazion(?:e|i)|riabilitativ(?:a|o|he|i)|emocromo|hba1c|emoglobina\s+glic(?:ata|osilata))\b/i;
 
-/* @Codex */
 function normalizeText(value: string | undefined): string {
     return (value || '')
         .normalize('NFKD')
@@ -22,7 +19,6 @@ function normalizeText(value: string | undefined): string {
         .trim();
 }
 
-/* @Codex */
 // La decisione dipende solo dall'identità del candidato: `drugMention`, `drugQuery` e
 // `activePrinciple`. `dosage`, `motivation`, `reviewNote` ed `evidence` sono dichiarati
 // da `PrescriptionBoundaryCandidate` ma non influenzano il risultato.
@@ -51,7 +47,6 @@ export function isServicePrescriptionLikeTherapy(candidate: PrescriptionBoundary
         || /\bvisita\b|\bprestazione\b|\besame\b|\bconsulenza\b/.test(normalizeText(identityText));
 }
 
-/* @Codex */
 export function filterServicePrescriptionTherapyCandidates<TCandidate extends PrescriptionBoundaryCandidate>(
     candidates: TCandidate[],
 ): TCandidate[] {

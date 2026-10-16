@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
@@ -517,7 +516,7 @@ test('account change during readback is ambiguous and never retried', async () =
     assert.equal(transport.calls.filter(call => call.method === 'account/read').length, 2);
 });
 
-/* @Codex: ordinary malformed-readback regression, no real account or transport. */
+/* ordinary malformed-readback regression, no real account or transport. */
 for (const email of [undefined, null, '', '   ', 12, 'not-an-address', 'a@b\n', 'a b@example.invalid', 'x'.repeat(321) + '@example.invalid']) test('initial identity must be valid before catalog or turn', async () => {
     const { service, transport } = setup();
     transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType: 'plus', email } } : undefined;
@@ -600,7 +599,7 @@ test('publication witness never re-enters the caller owner callback', async () =
     } finally { await service.dispose(); }
 });
 
-/* @Codex — statuses are diagnostics, not an alternative result or retry path. */
+/* statuses are diagnostics, not an alternative result or retry path. */
 for (const phase of ['start', 'completed-early', 'completed-late'] as const) test(`failed ${phase} emits only bounded diagnostics; throwing observer preserves failure/cleanup`, async () => {
     const events: import('./execution-transport').ExecutionDiagnostic[] = [];
     const { service, transport } = setup({ diagnostic(event) { events.push(event); throw new Error('PRIVATE_PROVIDER_SENTINEL'); } });

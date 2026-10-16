@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 import { createIcd11WhoHostComposition } from './icd11-who-host-composition.ts';

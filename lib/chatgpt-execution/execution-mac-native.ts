@@ -1,4 +1,4 @@
-/* @Codex — real native build/launch only; no injected issuer transport or helper pin. */
+/* real native build/launch only; no injected issuer transport or helper pin. */
 import 'server-only';
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { chmodSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';

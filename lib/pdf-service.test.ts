@@ -20,7 +20,6 @@ test('pdf-service has no retired OCR execution or rendering fallback', () => {
     assert.doesNotMatch(source, /\/api\/ocr\/extract|\bcallOcr\b|\brenderPdfToImages\b|\bfileToBase64\b|DeepSeek|Apple Vision/u);
 });
 
-/* @Codex */
 function assertUnsupportedLocalExtraction(
     error: unknown,
     detail: 'image_or_scan' | 'resource_limit' | 'malformed_document' | 'encrypted_document',
@@ -81,7 +80,6 @@ test('extractTextFromPdf does not expose partial mixed-document text', async () 
     }
 });
 
-/* @Codex */
 test('image inputs require review without invoking the retired OCR route', async () => {
     const originalFetch = globalThis.fetch;
     const calls: string[] = [];
@@ -106,7 +104,6 @@ test('image inputs require review without invoking the retired OCR route', async
     }
 });
 
-/* @Codex */
 test('scanned PDF fails closed after text-layer inspection without OCR fallback', async () => {
     const originalFetch = globalThis.fetch;
     const calls: string[] = [];

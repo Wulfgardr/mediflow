@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getAiRolloutReadinessArtifactPaths } from '../lib/ai-rollout-readiness-storage.ts';

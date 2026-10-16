@@ -1,4 +1,4 @@
-/* @Codex WUL-UIUX (STREAM E): bottone condiviso sopra le classi css esistenti
+/* WUL-UIUX (STREAM E): bottone condiviso sopra le classi css esistenti
    (.ui-btn-primary, .mf-btn-secondary) piu i toni ghost/destructive derivati dai
    pattern ricorrenti. Non ridisegna: la resa e quella gia in uso. Le CTA primarie
    nel codice usano `ui-btn-primary px-5 py-2.5`; qui il padding di default e
@@ -33,7 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     { variant = 'primary', className, children, type = 'button', style, onPointerDown, ...rest },
     ref,
 ) {
-    // @Codex: the anello is only a transient response to the direct gesture.
+    // the anello is only a transient response to the direct gesture.
     const { anello, onLumePointerDown } = useLumeAnello();
     const destructiveStyle =
         variant === 'destructive' ? { background: 'var(--lume-signal-critical)', ...style } : style;

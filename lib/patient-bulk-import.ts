@@ -1,4 +1,4 @@
-/* @Codex: bounded, dependency-free CSV validation. No I/O or writes. */
+/* bounded, dependency-free CSV validation. No I/O or writes. */
 export const PATIENT_CSV_HEADERS = [
     'nome', 'cognome', 'codice_fiscale', 'data_nascita', 'indirizzo', 'telefono',
 ] as const;

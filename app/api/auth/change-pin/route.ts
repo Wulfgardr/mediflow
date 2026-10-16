@@ -3,13 +3,10 @@ import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request'
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
 
-/* @Codex */
 import { changePin } from '@/lib/security/pin-change-service';
-/* @Codex */
 import { unauthorizedResponse } from '@/lib/security/server-auth';
 import { requireAccountSession } from '@/lib/security/paired-native-session';
 
-/* @Codex */
 function failureResponse(status: number, code: string, message: string) {
     const response = NextResponse.json({ error: message, code, message }, { status });
     response.headers.set('Cache-Control', 'no-store');

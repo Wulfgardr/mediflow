@@ -1,4 +1,4 @@
-/* @Codex — portable strict DTO tests. Synthetic only; no crypto/OS qualification. */
+/* portable strict DTO tests. Synthetic only; no crypto/OS qualification. */
 import Foundation
 import XCTest
 #if canImport(MediFlowAppleShared)

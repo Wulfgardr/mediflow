@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex: offline development-corpus validation; never runs a model or clinical runtime. */
+/* offline development-corpus validation; never runs a model or clinical runtime. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { validateDocumentQualityDevelopmentCorpus } from '../lib/domain/documents/document-quality-corpus.mjs';

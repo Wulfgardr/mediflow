@@ -1,4 +1,3 @@
-/* @Codex */
 import { Buffer } from 'node:buffer';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import fs from 'node:fs';

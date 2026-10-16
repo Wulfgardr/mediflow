@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type VirtualListNavigationKey =
   | 'ArrowDown'

@@ -1,4 +1,4 @@
-/* @Codex — selectors only; no caller text, projection, capability or authority. */
+/* selectors only; no caller text, projection, capability or authority. */
 import { types } from 'node:util';
 import { ProductError } from './product-contract';
 export const NATIVE_ORDINARY_SCHEMA = 'mediflow.native-ordinary.v1' as const;

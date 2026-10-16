@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 import { scanJsonObject } from '../../ai-json-lexical';
 

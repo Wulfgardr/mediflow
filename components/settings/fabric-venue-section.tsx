@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     FABRIC_VENUE_COPY,
     VENUE_OBSERVATION_STATE_LABELS,

@@ -1,4 +1,4 @@
-/* @Codex — real pinned PDF.js render with synthetic standard-font and image pages. */
+/* real pinned PDF.js render with synthetic standard-font and image pages. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';

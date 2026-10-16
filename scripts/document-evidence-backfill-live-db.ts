@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { openAdmittedSqlite, runWithSqliteMaintenance } from '../lib/sqlite-maintenance-admission.mjs';
 
-/* @Codex */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

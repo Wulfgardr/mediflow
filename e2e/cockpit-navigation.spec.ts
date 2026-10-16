@@ -1,4 +1,4 @@
-/* @Codex: delay real successful reads; no replacement patient or route payload. */
+/* delay real successful reads; no replacement patient or route payload. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
@@ -130,7 +130,7 @@ test('deferred row focus yields to a newer focus outside the list', async ({ pag
   }
 });
 
-/* @Codex: hold the real folder response while the loaded cockpit can still
+/* hold the real folder response while the loaded cockpit can still
    render its child. Both the summary intent and the return destination matter. */
 test('Apri quadro has one destination while folder navigation is pending', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');

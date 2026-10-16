@@ -1,4 +1,3 @@
-/* @Codex */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -423,7 +422,6 @@ export const ANYDOC_PDF_CHILD_PROCESS_INTERNAL_TEST_SEAM = Object.freeze({
     },
 });
 
-/* @Codex */
 export const ANYDOC_TESSERACT_ARTIFACT_SET_SHA256 = '0fb4ed952127bafe84e97f3f3cb43f6f53d5d60984117eed6a550d73508c6978';
 function inspectTesseractArtifacts() {
     const base = { engine: 'tesseract_wasm' as const, qualification: 'pending_target_benchmark' as const,
@@ -448,9 +446,9 @@ function inspectTesseractArtifacts() {
     return Object.freeze({ ...base, status: 'artifacts_verified' as const, reason: null });
 }
 
-/* @Codex: checks pinned OCR artifacts and renderer prerequisites without loading native code. */
+/* checks pinned OCR artifacts and renderer prerequisites without loading native code. */
 export function inspectAnyDocDesktopOcrCapability(options: Readonly<{ developmentSmoke?: boolean }> = {}) {
-    // @Codex: the signed/relocated macOS product uses Vision, never this raw-artifact probe.
+    // the signed/relocated macOS product uses Vision, never this raw-artifact probe.
     if (process.platform === 'darwin' && !options.developmentSmoke) {
         return Object.freeze({ engine: 'tesseract_wasm' as const, status: 'not_applicable' as const,
             reason: 'macos_uses_apple_vision', selectedHostEngine: 'apple_vision' as const,

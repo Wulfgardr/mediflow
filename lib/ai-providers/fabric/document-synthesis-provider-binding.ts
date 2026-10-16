@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { functionModelBindingSettings, captureFunctionModelTransportGuard } from './function-model-dispatch';
 
@@ -166,7 +165,7 @@ function sealResolution(snapshot: ResolutionSnapshot): LocalProviderResolution |
 }
 
 async function readProductionSettings(): Promise<unknown> {
-    // @Codex: importing a binding/token contract must not open a production database.
+    // importing a binding/token contract must not open a production database.
     const { dbServer } = await import('@/lib/db-server');
     const rows = await dbServer.select({ key: settings.key, value: settings.value }).from(settings).where(inArray(settings.key, [...SETTING_KEYS]));
     return functionModelBindingSettings(Object.fromEntries(rows.map(({ key, value }) => [key, value])), 'reasoning');
