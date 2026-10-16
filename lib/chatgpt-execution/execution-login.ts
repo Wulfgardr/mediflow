@@ -1,7 +1,7 @@
 /* source candidate; gated by exact protocol/config/OS qualification. */
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { ExecutionError, type ExecutionTransport } from './execution-contract';
+import { ExecutionError, isSupportedChatGptPlan, type ExecutionTransport, type SupportedChatGptPlan } from './execution-contract';
 import { assertExecutionInitialization, executionInitializationParams, expectedExecutionEnvironment, executionConfigFromToml } from './execution-bootstrap';
 import { takeMacLoginTransport } from './execution-mac-qualification';
 import { EXECUTION_CONFIG, EXECUTION_SUBSTRATE } from './execution-sandbox';
@@ -104,7 +104,7 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
     let starting = false, acceptingEarlyCompletion = false, matched = false, retired = false;
     let early: Record<string, unknown> | undefined;
     let fingerprint: string | undefined;
-    let plan: 'plus' | 'pro' | undefined;
+    let plan: SupportedChatGptPlan | undefined;
     const check = () => { guard(); if (retired) throw new ProductError('revoked'); };
     async function rpc(method: Parameters<ExecutionTransport['request']>[0], params?: unknown) {
         check(); const response = await activeTransport.request(method, params); check(); return response;
@@ -149,7 +149,7 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
         }
         if (response.account == null) throw new ExecutionError('not_connected');
         const value = object(response.account);
-        if (value.type !== 'chatgpt' || (value.planType !== 'plus' && value.planType !== 'pro') || !text(value.email, 320) || !/^[^\s@]+@[^\s@]+$/u.test(value.email)) throw new ExecutionError('unsupported_account');
+        if (value.type !== 'chatgpt' || !isSupportedChatGptPlan(value.planType) || !text(value.email, 320) || !/^[^\s@]+@[^\s@]+$/u.test(value.email)) throw new ExecutionError('unsupported_account');
         const current = createHash('sha256').update(JSON.stringify([value.email, value.planType])).digest('hex');
         if (fingerprint && fingerprint !== current) throw new ExecutionError('revoked');
         fingerprint = current; plan = value.planType;
@@ -193,12 +193,12 @@ export function createExecutionLogin(transport: ExecutionTransport, guard: () =>
             check();
             return Object.freeze({ verificationUrl: url.href, userCode: response.userCode });
         },
-        async complete(): Promise<'plus' | 'pro'> {
+        async complete(): Promise<SupportedChatGptPlan> {
             check(); if (!matched) throw new ProductError('login_pending');
             await config();
             await account(false); check(); return plan!;
         },
-        async read(): Promise<'plus' | 'pro'> {
+        async read(): Promise<SupportedChatGptPlan> {
             check(); if (!fingerprint || !matched) throw new ProductError('invalid_state');
             await account(false); check(); return plan!;
         },

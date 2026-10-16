@@ -1,5 +1,5 @@
 /* browser-safe. No host, account secret or caller corpus in these DTOs. */
-import type { SynthesisCatalog, SynthesisRequest, SynthesisResult, SynthesisSource, ExecutionCode } from '../chatgpt-execution/execution-contract';
+import type { SynthesisCatalog, SynthesisRequest, SynthesisResult, SynthesisSource, ExecutionCode, SupportedChatGptPlan } from '../chatgpt-execution/execution-contract';
 export const PRODUCT_NAMESPACE = '/api/settings/ai/chatgpt/synthesis/' as const;
 export const PRODUCT_OPERATION = 'synthetic_synthesis' as const;
 export const PRODUCT_DATA_CLASS = 'synthetic_fixture' as const;
@@ -45,7 +45,7 @@ export type ProductSnapshot = Readonly<{
     preparation: ProductPreparation;
     contextRevision: string; qualification: QualificationSnapshot; disclosure: ProductDisclosure;
     authenticatedProcess: 'none' | 'dedicated_execution'; accountControlAdmitsExecution: false;
-    plan: 'plus' | 'pro' | null; consentExpiresAt: number | null; loginExpiresAt: number | null;
+    plan: SupportedChatGptPlan | null; consentExpiresAt: number | null; loginExpiresAt: number | null;
     catalog: SynthesisCatalog | null; limits: ProductLimits | null; result: SynthesisResult | null;
     receipt: ProductReceipt; clinicalAdmission: 'held'; manualGenerationOnly: true;
 }>;

@@ -5,6 +5,10 @@ export type ExecutionCode = 'unqualified_boundary' | 'session_expired' | 'not_co
 export class ExecutionError extends Error {
     constructor(readonly code: ExecutionCode) { super(code); this.name = 'ExecutionError'; }
 }
+export type SupportedChatGptPlan = 'plus' | 'pro' | 'prolite';
+export function isSupportedChatGptPlan(value: unknown): value is SupportedChatGptPlan {
+    return value === 'plus' || value === 'pro' || value === 'prolite';
+}
 export const EXECUTION_METHODS = ['initialize', 'account/login/start', 'account/login/cancel', 'account/read',
     'account/logout', 'model/list', 'account/rateLimits/read', 'config/read', 'thread/start', 'turn/start', 'turn/interrupt'] as const;
 export type ExecutionMethod = typeof EXECUTION_METHODS[number];
