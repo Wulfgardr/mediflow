@@ -599,8 +599,22 @@ allowlist; autenticazione API, piano sconosciuto, `free` e varianti business
 non previste continuano a essere rifiutati. Identità corrente, catalogo,
 limiti, consenso e condizioni di uscita restano verifiche indipendenti.
 
-Il login e il catalogo sono stati osservati con il processo confinato reale.
-La richiesta di un modello assente dal catalogo ha fermato l'harness prima
-del turno, senza selezionare un'alternativa. Queste prove non attestano ancora
-generazione, quattro percorsi ordinari, installazione del delta o ammissione
-clinica. I test con trasporto simulato restano distinti dalle prove reali.
+Sul processo confinato reale sono stati verificati un nuovo accesso ufficiale,
+il catalogo e l'annullamento del tentativo di accesso attraverso il controller
+del prodotto. L'annullamento ha ritirato l'autorizzazione locale, chiuso il
+processo e rimosso i temporanei senza pubblicare un risultato. Non è una prova di interruzione di
+una generazione in corso. La richiesta di un modello assente dal catalogo si
+è fermata prima del turno, senza selezionare un'alternativa.
+
+Le quattro generazioni ordinarie non sono state eseguite. Il tentativo Patient
+Insight è scaduto aspettando la passkey, prima del catalogo e della generazione;
+la chiusura e la rimozione dei temporanei sono confermate. Ogni operazione
+richiede un nuovo accesso nel proprio processo isolato: la passkey può essere
+richiesta nuovamente. Non vengono condivise credenziali fra operazioni o con
+l'ambiente Codex di sviluppo.
+
+Queste prove non attestano il percorso UI completo, l'installazione del delta
+o l'ammissione all'uso clinico. I test con risposte simulate restano distinti
+dalle prove sul servizio reale. I limiti per piattaforma e la distinzione dal
+plugin con esempi inventati sono nelle
+[limitazioni note](../known-limitations.md#chatgpt-e-plugin-stato-delle-prove).

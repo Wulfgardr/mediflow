@@ -1,24 +1,62 @@
 ---
-summary: "Known limitations and evidence boundaries for MediFlow 0.8.5."
+summary: "Limiti della baseline MediFlow 0.8.5 e note successive sulle prove disponibili."
 read_when:
   - "Evaluating MediFlow 0.8.5 or its claim ceiling."
   - "Preparing public notes, a tag, an App Store claim, or a conformance statement."
 ---
 
-# Limitazioni note di MediFlow 0.8.5
+# Limitazioni note di MediFlow
 
 Stato documento: `CANONICAL`
 
-Ultimo aggiornamento: 2026-09-04
+Ultimo aggiornamento: 2026-10-16
 
 ## Stato ed evidenze
 
-Questa pagina conserva i limiti e le evidenze della versione `0.8.5`, secondo
-la data riportata sopra; non trasferisce quelle prove alle versioni successive.
+Questa pagina conserva i limiti della versione `0.8.5` al 4 settembre 2026 e
+le note successive datate. Ogni prova vale per la revisione e l'ambiente
+osservati; non viene trasferita automaticamente alle versioni successive.
 Il tree definisce il contenuto sorgente, ma non dimostra da solo CI remota sulla
 stessa SHA, firma, tag, GitHub Release, distribuzione o installazione su un host
 esterno. Per questi esiti occorrono i controlli e le ricevute di chiusura
 pertinenti. Lo storico delle versioni è nel [CHANGELOG](../CHANGELOG.md).
+
+## ChatGPT e plugin: stato delle prove
+
+Aggiornamento del 16 ottobre 2026. Il canale ChatGPT dentro MediFlow e il
+plugin MediFlow per Codex sono due integrazioni distinte.
+
+**ChatGPT dentro MediFlow.** Il percorso di esecuzione è predisposto solo sul
+Mac che supera i controlli previsti per sistema, processo e configurazione.
+Windows e Linux non hanno un'esecuzione locale ChatGPT verificata. La
+[PR #541](https://github.com/Wulfgardr/mediflow/pull/541), aperta, aggiunge il
+collegamento dei client iPhone e iPad all'host Mac: l'elaborazione resta
+sull'host, senza eseguire ChatGPT sul dispositivo mobile. Le prove descritte
+nella PR non attestano generazioni o uso su dispositivi fisici.
+
+Sul Mac sono stati osservati un nuovo accesso ufficiale, il catalogo reale e
+l'annullamento del tentativo di accesso, con chiusura del processo e rimozione
+dei temporanei. Un modello assente dal catalogo è stato rifiutato senza sostituzioni.
+Le quattro generazioni ordinarie non sono state eseguite: le prove UI con
+risposte simulate non dimostrano che il servizio abbia generato una proposta.
+Non è stata concessa l'ammissione all'uso clinico. Dettagli e riferimenti sono
+nella [nota WUL-778](./adr/0134-chatgpt-subscription-synthesis-execution.md#riqualifica-del-substrato-e-piano-prolite--wul-778).
+
+Ogni operazione apre un processo isolato e richiede un nuovo accesso. La
+passkey può essere richiesta di nuovo per ciascuna operazione. Il tentativo
+Patient Insight è scaduto aspettando quel gesto: nessun risultato prodotto,
+autorizzazione ritirata e temporanei rimossi. Il processo non riusa le
+credenziali di un altro tentativo o dell'ambiente Codex di sviluppo.
+
+**Plugin MediFlow per Codex.** `mediflow-synthetic` restituisce due esempi
+fissi inventati. Non legge cartelle cliniche e non modifica l'archivio.
+Una prova con Codex reale ha osservato le due chiamate dell'agente dopo una
+selezione esplicita del plugin. In Codex reale non sono stati verificati il
+riconoscimento automatico del plugin, i pannelli dell'app desktop o l'aggiunta
+del testo al contesto tramite l'interfaccia. I risultati dei tool arrivano
+comunque al contesto dell'agente; il server locale non garantisce che il modello
+elabori i dati localmente. Non è una prova di funzionamento in ChatGPT classico.
+Vedi la [prova Codex del prototipo](../plugins/mediflow-synthetic/README.md#prova-opzionale-dellagente-codex-reale).
 
 ## Nota successiva: tipografia web, ottobre 2026
 
