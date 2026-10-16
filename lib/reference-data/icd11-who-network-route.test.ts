@@ -259,12 +259,12 @@ test('errors are closed, query-free and do not call every 503 an oversized respo
     }
 });
 
-test('three production routes bind actual paired authority, original session and canonical runtime', () => {
+test('three production routes preserve the sidecar contract until paired clients support the embedded catalog', () => {
     for (const op of ['search', 'readiness', 'code-check']) {
         const source = readFileSync(new URL(`../../app/api/v1/network/terminology/who/${op}/route.ts`, import.meta.url), 'utf8');
         assert.match(source, /requireNetworkCapabilityContext\(request, NETWORK_CATALOG_READ_CAPABILITY\)/u);
         assert.match(source, /peekSession\(context\.session\.id\) === context\.session/u);
-        assert.match(source, /getRuntime: getIcd11WhoProductionRuntime/u);
+        assert.match(source, /getRuntime: getIcd11WhoSidecarRuntime/u);
         assert.doesNotMatch(source, /create.*Runtime\(|fetch\(|requireSession\(|console\./u);
     }
 });
