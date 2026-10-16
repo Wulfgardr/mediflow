@@ -156,8 +156,6 @@ const nextConfig: NextConfig = {
       "./**/site-packages/**",
       "./**/__pycache__/**",
       "./**/.env*",
-      // @Codex ADR 0123: synthetic fixture tools never belong to the product bundle.
-      "./tools/runtime-twin-086/**/*",
       "./*.db",
       "./*.sqlite",
       "./*.sqlite3",

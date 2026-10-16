@@ -16,7 +16,7 @@ const roots = [
   'docs/topologia-dati-flussi.md', 'docs/design',
   'docs/adr/0006-terminology-plugin-and-fse-profiles.md',
   'docs/adr/0065-intended-purpose-and-claims-guard.md',
-  'app', 'components', 'native', 'oss-assets', 'whitepaper',
+  'app', 'components', 'native', 'oss-assets',
 ];
 const extensions = new Set(['.md', '.mdx', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.html', '.swift']);
 const skipped = ['.git', '.next', 'node_modules', 'e2e', 'coverage', 'dist', 'out']

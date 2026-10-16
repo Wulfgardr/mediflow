@@ -20,8 +20,8 @@ const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
 // @Codex ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
 // Aliases and owner delivery stay guarded independently of standalone tracing additions.
-// Reviewed 2026-10-16: proxyClientMaxBodySize for 25 MiB prosthetic originals and three traced modules.
-const NEXT_RESOLVER_AST_SHA256 = '9bd4c2c16f127175f2d0f204500ec73d7120a83c3c24033faa07e59550977bfb';
+// Reviewed 2026-10-16: 25 MiB prosthetic originals, three traced modules, runtime-twin-086 tool removed.
+const NEXT_RESOLVER_AST_SHA256 = '4c5cfae31adbff3a00ac0af7a7dd674deeb806227e126d1e6c9bfad76c324ffc';
 const REVIEWED_TRACE_FILES = {
     'scripts/anydoc-desktop-renderer-trace.mjs': '786ff72eaa6d8e35cf108e58fd23a675cba4e40b28dd5d2343ab831a41782723',
     'scripts/anydoc-pdf-renderer-profiles.json': 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf',
