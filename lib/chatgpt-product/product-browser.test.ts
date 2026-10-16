@@ -10,6 +10,15 @@ async function ready(f: ReturnType<typeof createProductFixture>) {
     await f.browser.run('login/complete'); await f.browser.run('models');
     assert.equal(f.browser.snapshot().snapshot?.state, 'ready', JSON.stringify(f.browser.snapshot()));
 }
+test('browser preserves a supported prolite account through catalog and proposal review', async t => {
+    const f = createProductFixture(t); f.transport.plan = 'prolite'; await ready(f);
+    assert.equal(f.browser.snapshot().snapshot?.plan, 'prolite');
+    const choice = f.browser.snapshot().snapshot!.catalog!.choices[0];
+    await f.browser.select(choice.optionId); await f.browser.run('generate');
+    const snapshot = f.browser.snapshot().snapshot!;
+    assert.equal(snapshot.state, 'completed'); assert.equal(snapshot.plan, 'prolite');
+    assert.equal(snapshot.result?.clinicalWrites, 0); assert.equal(snapshot.result?.proposalOnly, true);
+});
 test('full browser chain uses dedicated real routes and never auto-selects or auto-generates', async t => {
     const f = createProductFixture(t); await ready(f);
     assert.equal(f.browser.snapshot().selection, null); assert.equal(f.browser.snapshot().login, null);
