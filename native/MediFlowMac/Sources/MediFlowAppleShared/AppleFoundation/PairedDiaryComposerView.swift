@@ -236,6 +236,10 @@ struct PairedDiaryComposerView: View {
                 )
                 .disabled(model.isWorking)
             }
+            if capabilities.hasCapability("network.replica.write-documents"),
+               capabilities.hasCapability("network.replica.readonly-documents") {
+                PairedDiaryAttachmentUploadView(model: model)
+            }
             if capabilities.hasCapability("network.compute.visit-draft") {
                 Divider()
                 // Opening is one-way for this mounted composer: collapsing the
