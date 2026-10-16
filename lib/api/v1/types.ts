@@ -1,5 +1,6 @@
 // Codex: created 2026-02-01
 
+/* @Codex */
 import type { DocumentOcrQueueReason, DocumentOcrQueueState } from '../../domain/documents/document-ocr-queue';
 
 export type PatientSummary = {
@@ -10,10 +11,14 @@ export type PatientSummary = {
     taxCode: string;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
     deletedAt?: string | null;
+    /* @Codex */
     deletionReason?: string | null;
+    /* @Codex */
     version: number;
     updatedAt: string | null;
+    /* @Codex */
     diagnoses?: string | null;
 };
 
@@ -26,21 +31,34 @@ export type PatientDetail = {
     address: string | null;
     phone: string | null;
     caregiver: string | null;
+    /* @Codex */
     exemptions: string | null;
+    /* @Codex */
     diagnoses: string | null;
+    /* @Codex */
     monitoringProfile: string | null;
+    /* @Codex */
     statusReason: string | null;
+    /* @Codex */
     archiveReason: string | null;
+    /* @Codex */
     archiveNote: string | null;
     notes: string | null;
+    /* @Codex */
     aiSummary: string | null;
+    /* @Codex */
     aiSummaryGeneratedAt: string | null;
+    /* @Codex */
     aiSummaryContextHash: string | null;
+    /* @Codex */
     documentInsights: string | null;
     isAdi: boolean | null;
     isArchived: boolean | null;
+    /* @Codex */
     deletedAt?: string | null;
+    /* @Codex */
     deletionReason?: string | null;
+    /* @Codex */
     version: number;
     ambulatoryId: string | null;
     createdAt: string | null;
@@ -63,16 +81,24 @@ export type EntrySummary = {
     id: string;
     patientId: string;
     type: string;
+    /* @Codex */
     title: string;
     date: string;
     content: string;
+    /* @Codex */
     setting: string | null;
+    /* @Codex */
     metadata: string | null;
+    /* @Codex */
     attachments: string | null;
+    /* @Codex */
     deletedAt: string | null;
+    /* @Codex */
     deletionReason: string | null;
+    /* @Codex */
     version: number;
     createdAt: string | null;
+    /* @Codex */
     updatedAt: string | null;
 };
 
@@ -80,7 +106,9 @@ export type TherapySummary = {
     id: string;
     patientId: string;
     drugName: string;
+    /* @Codex */
     aic: string | null;
+    /* @Codex */
     atc: string | null;
     activePrinciple: string | null;
     dosage: string;
@@ -90,10 +118,14 @@ export type TherapySummary = {
     status: string;
     startDate: string;
     endDate: string | null;
+    /* @Codex */
     version: number;
     createdAt: string | null;
+    /* @Codex */
     updatedAt: string | null;
+    /* @Codex */
     deletedAt: string | null;
+    /* @Codex */
     deletionReason: string | null;
 };
 
@@ -105,13 +137,18 @@ export type CheckupSummary = {
     notes: string | null;
     status: string;
     source: string | null;
+    /* @Codex */
     version: number;
     createdAt: string | null;
+    /* @Codex */
     updatedAt: string | null;
+    /* @Codex */
     deletedAt: string | null;
+    /* @Codex */
     deletionReason: string | null;
 };
 
+/* @Codex */
 export type ObservationSummary = {
     id: string;
     patientId: string;
@@ -122,18 +159,26 @@ export type ObservationSummary = {
     unitCode: string;
     value: string;
     notes: string | null;
+    /* @Codex */
     refLow: string | null;
+    /* @Codex */
     refHigh: string | null;
+    /* @Codex */
     refText: string | null;
     observedAt: string;
     source: string | null;
+    /* @Codex */
     version: number;
     createdAt: string | null;
+    /* @Codex */
     updatedAt: string | null;
+    /* @Codex */
     deletedAt: string | null;
+    /* @Codex */
     deletionReason: string | null;
 };
 
+/* @Codex */
 export type AttachmentSummary = {
     id: string;
     patientId: string;
@@ -150,10 +195,12 @@ export type AttachmentSummary = {
     createdAt: string | null;
 };
 
+/* @Codex */
 export type AttachmentDetail = AttachmentSummary & {
     data: string | null;
 };
 
+/* @Codex */
 export type DrugSummary = {
     aic: string;
     name: string;
@@ -165,6 +212,7 @@ export type DrugSummary = {
     atc: string | null;
 };
 
+/* @Codex */
 export type ExemptionSummary = {
     code: string;
     description: string;
@@ -178,6 +226,7 @@ export type ExemptionSummary = {
     updatedAt: string | null;
 };
 
+/* @Codex */
 export type ServicePrescriptionSummary = {
     id: string;
     patientId: string;
@@ -203,6 +252,7 @@ export type ServicePrescriptionSummary = {
     updatedAt: string | null;
 };
 
+/* @Codex */
 export type ServicePrescriptionItemSummary = {
     id: string;
     patientId: string;
@@ -228,6 +278,7 @@ export type ServicePrescriptionItemSummary = {
     updatedAt: string | null;
 };
 
+/* @Codex */
 export type ProstheticPrescriptionSummary = {
     id: string;
     patientId: string;
@@ -250,6 +301,7 @@ export type ProstheticPrescriptionSummary = {
     updatedAt: string | null;
 };
 
+/* @Codex */
 export type ServiceCatalogEntrySummary = {
     id: string;
     codeSystem: string;
@@ -265,14 +317,17 @@ export type ServiceCatalogEntrySummary = {
     updatedAt: string | null;
 };
 
+/* @Codex */
 export type NetworkOperatingMode = 'local-only' | 'network-home-base';
 
+/* @Codex */
 export type NetworkSessionState =
     | 'local-only'
     | 'network-unpaired'
     | 'network-paired-online'
     | 'network-paired-offline-degraded';
 
+/* @Codex */
 export type NetworkReplicaState =
     | 'local-only'
     | 'unpaired'
@@ -280,14 +335,17 @@ export type NetworkReplicaState =
     | 'offline-deferred'
     | 'conflict-review';
 
+/* @Codex */
 export type NetworkReplicaAuthority = 'local-device' | 'paired-home-base';
 
+/* @Codex */
 export type NetworkReplicaPendingAction =
     | 'none'
     | 'pairing-required'
     | 'queue-snapshot'
     | 'manual-review';
 
+/* @Codex */
 export type NetworkReplicaSummary = {
     strategy: 'encrypted-snapshot-mirror';
     state: NetworkReplicaState;
@@ -299,14 +357,19 @@ export type NetworkReplicaSummary = {
     lastReconciledAt: string | null;
 };
 
+/* @Codex */
 export type NetworkIdentityCredentialState = 'session-bound' | 'node-credentials-required';
 
+/* @Codex */
 export type NetworkIdentityLoginMode = 'single-local-user-default' | 'explicit-username-required';
 
+/* @Codex */
 export type NetworkIdentityAuthChannel = 'web' | 'native' | 'system' | 'none';
 
+/* @Codex */
 export type NetworkIdentityScopeSource = 'session-context' | 'node-default' | 'none';
 
+/* @Codex */
 export type NetworkIdentityOperatorSummary = {
     userId: string | null;
     username: string | null;
@@ -315,6 +378,7 @@ export type NetworkIdentityOperatorSummary = {
     authChannel: NetworkIdentityAuthChannel;
 };
 
+/* @Codex */
 export type NetworkIdentityScopeSummary = {
     policy: 'session-context-else-node-default';
     effectiveAmbulatoryId: string | null;
@@ -324,11 +388,13 @@ export type NetworkIdentityScopeSummary = {
     source: NetworkIdentityScopeSource;
 };
 
+/* @Codex */
 export type NetworkIdentityAuditSummary = {
     actorType: 'user' | 'system';
     actorBinding: 'session-user' | 'token-only';
 };
 
+/* @Codex */
 export type NetworkIdentitySummary = {
     identityModel: 'paired-device-plus-node-credentials';
     pairingBoundary: 'device-pairing-separate-from-operator-login';
@@ -342,23 +408,29 @@ export type NetworkIdentitySummary = {
     limitations: string[];
 };
 
+/* @Codex */
 export type NetworkAiRuntimeMode =
     | 'local-ai'
     | 'centralized-available'
     | 'centralized-unavailable';
 
+/* @Codex */
 export type NetworkAiRuntimeLocalState = 'configured' | 'misconfigured';
 
+/* @Codex */
 export type NetworkAiRuntimeCentralState = 'disabled' | 'available' | 'unavailable';
 
+/* @Codex */
 export type NetworkAiRuntimeHardwareProfile = 'low' | 'medium' | 'high' | 'custom' | 'unknown';
 
+/* @Codex */
 export type NetworkAiRuntimeSurface =
     | 'patient-insight'
     | 'smart-import'
     | 'document-synthesis'
     | 'treatment-reasoning';
 
+/* @Codex */
 export type NetworkAiRuntimeKillSwitches = {
     patientInsight: 'enabled' | 'disabled';
     documentSynthesis: 'enabled' | 'disabled';
@@ -366,6 +438,7 @@ export type NetworkAiRuntimeKillSwitches = {
     treatmentReasoning: 'enabled' | 'disabled';
 };
 
+/* @Codex */
 export type NetworkAiRuntimeFabricProjection = {
     schemaVersion: 'mediflow.ai.network-fabric-status.v1';
     contractVersion: 'mediflow.ai.fabric.v1';
@@ -382,6 +455,7 @@ export type NetworkAiRuntimeFabricProjection = {
     };
 };
 
+/* @Codex */
 export type NetworkAiRuntimeSummary = {
     plane: 'ai-plane-separate-from-data-plane';
     mode: NetworkAiRuntimeMode;
@@ -410,32 +484,55 @@ export type NetworkAiRuntimeSummary = {
     guardrails: string[];
 };
 
+/* @Codex */
 export type NetworkCapabilityStatus = 'available' | 'disabled' | 'planned' | 'unavailable';
 
+/* @Codex */
 export type NetworkCapabilityKey =
     | 'network.pairing.bootstrap'
     | 'network.ambulatories.write'
     | 'network.replica.readonly-patients'
+    /* @Codex */
     | 'network.replica.readonly-clinical-diary'
+    /* @Codex */
     | 'network.replica.write-patient-profile'
+    /* @Codex */
     | 'network.replica.write-patient-lifecycle'
+    /* @Codex */
     | 'network.replica.write-clinical-diary'
+    /* @Codex */
     | 'network.replica.readonly-therapies'
+    /* @Codex */
     | 'network.replica.write-therapies'
+    /* @Codex */
     | 'network.replica.readonly-checkups'
+    /* @Codex */
     | 'network.replica.readonly-agenda'
+    /* @Codex */
     | 'network.replica.readonly-clinical-diary-global'
+    /* @Codex */
     | 'network.replica.write-checkups'
+    /* @Codex */
     | 'network.replica.readonly-observations'
+    /* @Codex */
     | 'network.replica.write-observations'
+    /* @Codex */
     | 'network.replica.readonly-service-prescriptions'
+    /* @Codex */
     | 'network.replica.write-service-prescriptions'
+    /* @Codex */
     | 'network.replica.readonly-prosthetic-prescriptions'
+    /* @Codex */
     | 'network.replica.write-prosthetic-prescriptions'
+    /* @Codex */
     | 'network.fse.validate'
+    /* @Codex */
     | 'network.catalogs.readonly'
+    /* @Codex */
     | 'network.replica.readonly-documents'
+    /* @Codex */
     | 'network.replica.write-documents'
+    /* @Codex */
     | 'network.compute.visit-draft'
     | 'network.replica.sync'
     | 'network.ai.central-runtime'
@@ -443,6 +540,7 @@ export type NetworkCapabilityKey =
     | 'local.backup.artifact.v1'
     | 'local.backup.scheduler.macos';
 
+/* @Codex */
 export type NetworkNodeSummary = {
     nodeId: string;
     displayName: string;
@@ -456,6 +554,7 @@ export type NetworkNodeSummary = {
     };
 };
 
+/* @Codex */
 export type NetworkSessionSummary = {
     nodeId: string;
     operatingMode: NetworkOperatingMode;
@@ -468,6 +567,7 @@ export type NetworkSessionSummary = {
     replica: NetworkReplicaSummary;
 };
 
+/* @Codex */
 export type NetworkCapability = {
     key: NetworkCapabilityKey;
     status: NetworkCapabilityStatus;
@@ -475,6 +575,7 @@ export type NetworkCapability = {
     description: string;
 };
 
+/* @Codex */
 export type NetworkCapabilitiesResponse = {
     nodeId: string;
     operatingMode: NetworkOperatingMode;
@@ -482,6 +583,7 @@ export type NetworkCapabilitiesResponse = {
     capabilities: NetworkCapability[];
 };
 
+/* @Codex */
 export type NetworkPairingIntentRequest = {
     deviceName: string;
     clientPlatform: 'macos' | 'ios' | 'ipados';
@@ -489,6 +591,7 @@ export type NetworkPairingIntentRequest = {
     requestedCapabilities?: string[];
 };
 
+/* @Codex */
 export type NetworkPairingIntentResponse = {
     intentId: string;
     status: 'pending-home-base-confirmation';
@@ -505,6 +608,7 @@ export type NetworkPairingIntentResponse = {
     requestedCapabilities: string[];
 };
 
+/* @Codex */
 export type NetworkPairedClientSummary = {
     clientId: string;
     deviceName: string;
@@ -515,6 +619,7 @@ export type NetworkPairedClientSummary = {
     lastSeenAt: string | null;
 };
 
+/* @Codex */
 export type NetworkPairingConfirmationResponse = {
     intentId: string;
     status: 'paired';
@@ -531,6 +636,7 @@ export type NetworkPairingConfirmationResponse = {
     };
 };
 
+/* @Codex */
 export type NetworkErrorResponse = {
     error: 'Bad Request' | 'Conflict' | 'Not Found';
     code:
