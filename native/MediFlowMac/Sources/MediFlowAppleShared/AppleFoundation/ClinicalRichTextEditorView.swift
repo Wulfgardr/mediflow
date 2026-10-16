@@ -70,6 +70,8 @@ struct ClinicalRichTextEditorView: View {
                         styleToggle(.italic, symbol: "italic", label: "Corsivo", block: block)
                         styleToggle(.underline, symbol: "underline", label: "Sottolineato", block: block)
                         styleToggle(.strikethrough, symbol: "strikethrough", label: "Barrato", block: block)
+                        indentButton(increase: false, block: block)
+                        indentButton(increase: true, block: block)
                         Button(role: .destructive) {
                             document.removeBlock(id: block.id)
                         } label: {
@@ -90,6 +92,9 @@ struct ClinicalRichTextEditorView: View {
             .frame(minHeight: 44)
         }
         .padding(10)
+        .padding(.leading, CGFloat(min(block.containers.filter {
+            switch $0 { case .blockquote, .list: true; case .listItem: false }
+        }.count, 5)) * 12)
         .background(
             RoundedRectangle(cornerRadius: ClinicalChartMetrics.fieldRadius, style: .continuous)
                 .fill(PlatformColors.cardBackground)
@@ -147,6 +152,25 @@ struct ClinicalRichTextEditorView: View {
         .accessibilityValue(inlineEditor.styles.contains(style) ? "Attivo" : "Non uniforme o disattivo")
         .accessibilityHint("Applica alla selezione o al testo che scriverai.")
         .accessibilityIdentifier("\(accessibilityPrefix)-\(style.rawValue)-\(block.id.uuidString)")
+    }
+
+    func changeIndent(for blockID: UUID, increase: Bool) {
+        if increase { document.increaseIndent(id: blockID) }
+        else { document.decreaseIndent(id: blockID) }
+    }
+
+    private func indentButton(increase: Bool, block: ClinicalRichTextEditorBlock) -> some View {
+        Button {
+            changeIndent(for: block.id, increase: increase)
+        } label: {
+            Image(systemName: increase ? "increase.indent" : "decrease.indent")
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .disabled(increase ? !document.canIncreaseIndent(id: block.id) : !document.canDecreaseIndent(id: block.id))
+        .accessibilityLabel(increase ? "Aumenta rientro" : "Riduci rientro")
+        .accessibilityHint("Applica al blocco corrente e alle sue eventuali sottovoci.")
+        .accessibilityIdentifier("\(accessibilityPrefix)-\(increase ? "indent" : "outdent")-\(block.id.uuidString)")
     }
 
     private var addBlockToolbar: some View {

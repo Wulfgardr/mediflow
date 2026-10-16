@@ -87,6 +87,21 @@ final class ClinicalRichTextEditorBindingTests: XCTestCase {
         XCTAssertEqual(retainedBinding.wrappedValue, "")
     }
 
+    func testIndentControlsKeepRetainedInputBoundToTheSameNestedItem() {
+        let loaded = ClinicalRichTextEditorDocument.load(html: "<ul><li>A</li><li><strong>B [1]</strong></li><li>C</li></ul>")
+        let box = DocumentBox(blocks: loaded.blocks)
+        let editor = ClinicalRichTextEditorView(document: box.binding, accessibilityPrefix: "binding-test")
+        let id = box.document.blocks[1].id
+        let retainedBinding = editor.textBinding(for: id)
+        editor.changeIndent(for: id, increase: true)
+        retainedBinding.wrappedValue = "B rivisto [1]"
+        XCTAssertEqual(box.document.renderedHTML, "<ul><li>A<ul><li><strong>B rivisto [1]</strong></li></ul></li><li>C</li></ul>")
+        editor.changeIndent(for: id, increase: false)
+        XCTAssertEqual(retainedBinding.wrappedValue, "B rivisto [1]")
+        XCTAssertEqual(box.document.renderedHTML, "<ul><li>A</li><li><strong>B rivisto [1]</strong></li><li>C</li></ul>")
+        XCTAssertEqual(box.document.blocks.map(\.id), loaded.blocks.map(\.id))
+    }
+
     private final class DocumentBox {
         var document: ClinicalRichTextEditorDocument
 
