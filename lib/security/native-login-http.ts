@@ -16,7 +16,7 @@ import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport
 import { bindSessionToArchive, currentArchiveGeneration } from './archive-session-generation';
 import { retireServerSessionForLogout } from './server-session';
 
-type Credentials = Readonly<{ username: string; password: string }>;
+type Credentials = Readonly<{ username: string; pin: string } | { username: string; verifier: string }>;
 type Verification = Awaited<ReturnType<typeof verifyUnlockCredentials>>;
 type Account = Extract<Verification, { kind: 'verified' }>['account'];
 type Consume = (value: unknown) => Promise<NativeBootstrapRouteBinding | null>;
@@ -50,11 +50,13 @@ function credentials(value: unknown): Credentials | null {
     try {
         if (!value || typeof value !== 'object' || isProxy(value) || Object.getPrototypeOf(value) !== Object.prototype) return null;
         const fields = Object.getOwnPropertyDescriptors(value);
-        if (Reflect.ownKeys(fields).length !== 2 || !fields.username || !fields.password) return null;
-        const username = fields.username; const password = fields.password;
-        if (username.get || username.set || password.get || password.set || !username.enumerable || !password.enumerable) return null;
-        if (typeof username.value !== 'string' || typeof password.value !== 'string' || !password.value) return null;
-        return Object.freeze({ username: username.value.trim(), password: password.value });
+        const kind = Object.hasOwn(fields, 'verifier') ? 'verifier' : 'password';
+        if (Reflect.ownKeys(fields).length !== 2 || !Object.hasOwn(fields, 'username') || !Object.hasOwn(fields, kind)) return null;
+        const username = fields.username; const secret = fields[kind];
+        if (username.get || username.set || secret.get || secret.set || !username.enumerable || !secret.enumerable) return null;
+        if (typeof username.value !== 'string' || typeof secret.value !== 'string' || !secret.value) return null;
+        return Object.freeze(kind === 'verifier' ? { username: username.value.trim(), verifier: secret.value }
+            : { username: username.value.trim(), pin: secret.value });
     } catch { return null; }
 }
 
@@ -66,9 +68,8 @@ async function auditSuccess(request: Request, user: Account, session: ReturnType
     });
 }
 
-/** The sole native login seam: admission is burned on every path and only rechecked after PIN verification. */
+/** The sole native login seam: admission is burned on every path and rechecked after credential verification. */
 export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDependencies = {}) {
-    // An account with a passphrase refuses the PIN here until the native clients send the verifier (ADR 0143).
     const verify = dependencies.verify ?? verifyUnlockCredentials;
     const consume = dependencies.consume ?? consumeNativeAdmission;
     const createNativeSession = dependencies.createNativeSession ?? createNativeServerSession;
@@ -81,7 +82,7 @@ export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDepend
             if (!parsed) return nativeLoginDeniedResponse();
             const loginFence = captureNativeLoginSessionFence();
             const generation = currentArchiveGeneration();
-            const verification = await verify({ username: parsed.username, pin: parsed.password });
+            const verification = await verify(parsed);
             if (verification.kind === 'denied') return authFailure(verification.body, verification.status);
             const paired = await consume(admission); consumed = true;
             if (!paired) return nativeLoginDeniedResponse();
@@ -92,7 +93,7 @@ export function createNativeLoginHttpHandler(dependencies: NativeLoginHttpDepend
             );
             try { bindSessionToArchive(session, generation); }
             catch { retireServerSessionForLogout(session.id); return nativeLoginDeniedResponse(); }
-            const response = NextResponse.json({ success: true, id: verification.account.id, username: verification.account.username, displayName: verification.account.displayName, ambulatoryName: verification.account.ambulatoryName, role: verification.account.role, encryptedMasterKey: verification.account.encryptedMasterKey, salt: verification.account.salt });
+            const response = NextResponse.json({ success: true, archiveGeneration: generation, id: verification.account.id, username: verification.account.username, displayName: verification.account.displayName, ambulatoryName: verification.account.ambulatoryName, role: verification.account.role, encryptedMasterKey: verification.account.encryptedMasterKey, salt: verification.account.salt });
             response.cookies.set(SESSION_COOKIE_NAME, session.id, sessionCookieOptionsForRequest(request));
             response.headers.set('Cache-Control', 'no-store');
             try { await audit(request, verification.account, session); } catch { /* authority already exists and audit is best-effort. */ }
