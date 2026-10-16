@@ -200,6 +200,11 @@ impostazione predefinita. Richiedono configurazione, consenso e controlli
 sui dati da inviare. Collegare un account ChatGPT non fornisce accesso alle
 API OpenAI e non attesta l'idoneità all'uso con dati clinici reali.
 
+Per ChatGPT sono stati verificati accesso, catalogo e annullamento del tentativo
+di accesso su un Mac controllato. Le quattro generazioni ordinarie non sono
+state eseguite. Windows e Linux non hanno un'esecuzione locale ChatGPT verificata.
+[Prove e limiti per piattaforma](./docs/known-limitations.md#chatgpt-e-plugin-stato-delle-prove).
+
 <details>
 <summary><strong>Fonti, permessi e invio a servizi esterni</strong></summary>
 
@@ -354,6 +359,10 @@ di lavoro e una coda di revisione senza scrivere nella cartella.
 [Contratto Headless e Fabric](./docs/adr/0117-headless-portable-agent-first-and-capability-first-fabric.md).
 
 </details>
+
+Il [plugin `mediflow-synthetic`](./plugins/mediflow-synthetic/README.md) per Codex
+mostra due esempi fissi inventati e non accede all'archivio clinico. È distinto
+dal canale ChatGPT usato dalle funzioni AI di MediFlow.
 
 ## Documentazione
 
