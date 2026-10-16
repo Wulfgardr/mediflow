@@ -18,9 +18,9 @@ export function AifaCatalogQuickUpdate() {
         guide.current = current;
         return () => { guide.current = null; current.dispose(); };
     }, []);
-    return <div className="space-y-2" style={{ gridColumn: '1 / -1', fontSize: 13 }}>
+    return <div className="type-meta space-y-2" style={{ gridColumn: '1 / -1' }}>
         <AifaRemoteNotice {...remote} />
-        {remote.status?.networkAllowed && <Button variant="secondary" style={{ minHeight: 44, fontSize: 13, fontWeight: 600 }}
+        {remote.status?.networkAllowed && <Button variant="secondary" className="type-strong" style={{ minHeight: 44 }}
             disabled={busy || remote.checking || state.reconciliationRequired}
             onClick={() => void guide.current?.update(async message => (await confirm({
                 title: 'Confermare la riduzione del catalogo?', message,
