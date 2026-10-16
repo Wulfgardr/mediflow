@@ -118,6 +118,22 @@ final class ClinicalContentRenderingTests: XCTestCase {
     }
 
     @MainActor
+    func testSecondaryContentUsesSemanticColorWithoutChangingTextOrFont() throws {
+        for content in ["Nota sintetica eliminata", "<p><strong>Nota sintetica</strong> eliminata</p>"] {
+            let primary = ClinicalContentRendering.nativeAttributedString(from: content)
+            let secondary = ClinicalContentRendering.nativeAttributedString(from: content, foregroundStyle: .secondary)
+            XCTAssertEqual(primary.string, secondary.string)
+            let range = NSRange(location: 0, length: secondary.length)
+            secondary.enumerateAttributes(in: range) { attributes, range, _ in
+                XCTAssertEqual(attributes[.foregroundColor] as? NSColor, .secondaryLabelColor)
+                XCTAssertEqual(primary.attribute(.foregroundColor, at: range.location, effectiveRange: nil) as? NSColor, .labelColor)
+                XCTAssertEqual(attributes[.font] as? NSFont, primary.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont)
+                XCTAssertEqual(attributes[.paragraphStyle] as? NSParagraphStyle, primary.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle)
+            }
+        }
+    }
+
+    @MainActor
     private func glyphRect(_ text: String, in view: ClinicalContentNativeTextView) throws -> CGRect {
         let manager = try XCTUnwrap(view.layoutManager)
         let container = try XCTUnwrap(view.textContainer)
