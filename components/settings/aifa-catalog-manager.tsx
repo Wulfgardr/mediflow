@@ -14,7 +14,7 @@ import type { AifaDownloadProgress } from '@/lib/aifa-catalog-download';
 import { SETTINGS_CARD_CLASS } from './settings-ui';
 
 const AIFA_PANEL_STYLE = { minWidth: 0, border: '1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent)', borderRadius: 'var(--lume-radius-panel)', background: 'var(--lume-surface-focal)', padding: 24 };
-const AIFA_COMMAND_STYLE = { minHeight: 44, minWidth: 44, borderRadius: 12, fontWeight: 600, gap: 8 };
+const AIFA_COMMAND_STYLE = { minHeight: 'var(--lume-control-height, 44px)', minWidth: 'var(--lume-control-height, 44px)', borderRadius: 'var(--lume-control-radius, 10px)', fontWeight: 600, gap: 8 };
 const AIFA_ICON_STYLE = { background: 'color-mix(in srgb, var(--lume-accent) 12%, var(--lume-surface-field))', color: 'var(--lume-accent)' };
 const AIFA_STAT_STYLE = { borderColor: 'color-mix(in srgb, var(--lume-ink) 14%, transparent)', background: 'var(--lume-surface-field)' };
 const AIFA_UPLOAD_STYLE = { ...AIFA_COMMAND_STYLE, borderColor: 'color-mix(in srgb, var(--lume-ink) 18%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink-muted)' };

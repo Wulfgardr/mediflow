@@ -5,7 +5,7 @@ import { ProstheticsOriginalLinks, type SourceWithDocuments } from './prosthetic
 import { prostheticsRequest } from '@/lib/reference-data/prosthetics-catalog-client';
 import { prostheticsSelection, type ProstheticsEntry, type ProstheticsSelection } from '@/lib/reference-data/prosthetics-catalog-contract';
 
-const control = { minHeight: 44, borderRadius: 12 };
+const control = { minHeight: 'var(--lume-control-height, 44px)', borderRadius: 'var(--lume-control-radius, 10px)' };
 /** The callback receives description + namespaced view data, never a prescription patch. */
 export function ProstheticsCatalogLookup({ onCopyDescription, onSelect }: {
     onSelect?: (entry: ProstheticsEntry, revision: string) => void;
@@ -59,13 +59,13 @@ export function ProstheticsCatalogLookup({ onCopyDescription, onSelect }: {
         {result && <>
             <p className="text-sm">{result.entries.length} {result.entries.length === 1 ? 'risultato' : 'risultati'}{result.truncated ? ' mostrati. Affina la ricerca per vedere gli altri.' : '.'}</p>
             <ul className="space-y-3">
-                {result.entries.map(row => <li key={row.id} className="space-y-2 border p-4 text-sm leading-6" style={{ borderRadius: 12, overflowWrap: 'anywhere' }}>
+                {result.entries.map(row => <li key={row.id} className="space-y-2 border p-4 text-sm leading-6" style={{ borderRadius: 'var(--lume-control-radius, 10px)', overflowWrap: 'anywhere' }}>
                     <p className="font-semibold">{row.description}</p>
                     <p>Codifica: {row.codeSystem} · Codice: {row.code}</p>
                     <p>Fonte: {row.source} · Versione: {row.version} · Ambito: {row.scope}</p>
                     {(row.startDate || row.endDate) && <p>Date dichiarate: {row.startDate ?? 'inizio non indicato'} / {row.endDate ?? 'fine non indicata'}</p>}
                     <ProstheticsOriginalLinks documents={sources.find(source => source.id === row.sourceId)?.documents ?? []} />
-                    <details><summary className="cursor-pointer" style={{ minHeight: 44, alignContent: 'center' }}>Provenienza del file</summary><p>Importato: {row.importedAt}</p><p className="break-all">SHA-256: {row.sourceSha256}</p></details>
+                    <details><summary className="cursor-pointer" style={{ minHeight: 'var(--lume-control-height, 44px)', alignContent: 'center' }}>Provenienza del file</summary><p>Importato: {row.importedAt}</p><p className="break-all">SHA-256: {row.sourceSha256}</p></details>
                     <button type="button" className="border px-4 font-semibold" style={control} onClick={() => void copy(row)}>{onSelect ? 'Usa voce nella bozza' : onCopyDescription ? 'Usa descrizione nella bozza' : 'Copia solo descrizione'}</button>
                 </li>)}
             </ul>
