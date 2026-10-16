@@ -29,7 +29,7 @@ interface AIPatientInsightProps {
 type AvailablePreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
 
 /* @Codex: scoped control geometry overrides the legacy shared button chrome. */
-const actionStyle = { borderRadius: 'var(--lume-control-radius, 12px)', fontSize: '0.875rem', minHeight: 44 };
+const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize: '0.875rem', minHeight: 'var(--lume-control-height, 44px)' };
 
 function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
     if (preview.code === 'kill_switch_disabled') {

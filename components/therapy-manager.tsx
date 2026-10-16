@@ -363,11 +363,12 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
         }));
     };
 
+    const hasTherapyGroups = visibleTherapies.length > 0;
     const newButton = !isAdding ? (
         <button
             onClick={startAdding}
             disabled={!!deleteRecovery}
-            className="ui-btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm font-semibold"
+            className="ui-btn-primary"
         >
             <Plus className="w-4 h-4" />
             Nuova terapia
@@ -377,7 +378,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     return (
         <section className={styles.register} data-clinical-register="therapies">
             {embedded ? (
-                newButton ? <div className="mb-4 flex justify-end">{newButton}</div> : null
+                newButton && !hasTherapyGroups ? <div className="mb-4 flex justify-end">{newButton}</div> : null
             ) : (
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -635,8 +636,8 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                     { title: 'Terapie attive', rows: activeTherapies, status: 'active' },
                     { title: 'Terapie sospese', rows: suspendedTherapies, status: 'suspended' },
                     { title: 'Terapie concluse', rows: endedTherapies, status: 'completed' },
-                ].filter(group => group.rows.length > 0).map(group => <section key={group.status}>
-                    <header className={styles.sectionHead}><h3>{group.title}</h3><span>{group.rows.length}</span></header>
+                ].filter(group => group.rows.length > 0).map((group, index) => <section key={group.status}>
+                    <header className={styles.sectionHead}><h3>{group.title}</h3><span>{group.rows.length}</span>{embedded && index === 0 && newButton ? <div className={styles.sectionHeadAction}>{newButton}</div> : null}</header>
                     <table className={`${styles.table} ${styles.therapyTable}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th className={styles.secondaryColumn}>Periodo</th><th className={styles.secondaryColumn}>Codici</th><th>Azioni</th></tr></thead><tbody>
                         {group.rows.map(t => <tr key={t.id}>
                             <td><strong>{t.drugName}</strong>{t.activePrinciple && <small>{t.activePrinciple}</small>}

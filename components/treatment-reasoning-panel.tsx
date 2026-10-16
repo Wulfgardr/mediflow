@@ -227,7 +227,7 @@ export default function TreatmentReasoningPanel({
     return (
         <div className={`${styles.register} ${styles.review}`} data-testid="treatment-reasoning-panel">
             <div className={styles.toolbar}>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                         <h3 className="flex items-center gap-2 text-[color:var(--lume-ink)]" style={{ font: 'var(--type-strong)' }}>
                             <BrainCircuit className="h-4 w-4 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
@@ -238,7 +238,7 @@ export default function TreatmentReasoningPanel({
                         </p>
                     </div>
 
-                    <div className="flex min-w-0 flex-wrap items-start gap-2 lg:flex-nowrap [&>[data-testid^=model-picker]]:my-0 [&>[data-testid^=model-picker]]:min-w-[18rem]">
+                    <div className={styles.reasoningActions}>
                         <FunctionModelPicker picker={picker} />
                         <button
                             type="button"
@@ -257,7 +257,7 @@ export default function TreatmentReasoningPanel({
                 </div>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 py-4">
                 {!treatmentReasoningEnabled ? (
                     <div className="rounded-[12px] border border-[color:var(--lume-rule)] bg-[color:var(--lume-surface-field)] p-4 text-sm text-[color:var(--lume-ink-muted)]">
                         <p className="font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico spento</p>
