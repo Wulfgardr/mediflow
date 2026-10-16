@@ -242,7 +242,7 @@ revisione verificata.
 | Fabric 0.8.5 | `docs/adr/0094-intelligence-fabric-headless-contract-085.md`, `lib/ai-providers/fabric/generative-catalog.ts` |
 | Receipt, provenienza e UI | `docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json` |
 | Stato paired `status_only` | `lib/network-ai-runtime-model.ts`, `native/MediFlowMac/Sources/MediFlowCore/HomeBaseModels.swift` |
-| Run record | `docs/analysis/2026-07-29-intelligence-fabric-run.md` |
+| Run record | [docs/analysis/2026-07-29-intelligence-fabric-run.md](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/analysis/2026-07-29-intelligence-fabric-run.md) |
 
 ## 8. Decisioni aperte
 

@@ -304,6 +304,15 @@ La `0.8.5` non consegna:
 - invocazione AI dai client paired;
 - app complete Windows o Linux.
 
+## Materiali storici
+
+Il whitepaper, gli strumenti del gemello 0.8.6, sei verbali di luglio, quattro
+proposte superate e gli originali PNG 0.8 sono conservati nello storico Git
+e nel [tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
+Non sono inclusi nell’albero corrente. Restano le immagini ottimizzate e il
+manifest con hash, dimensioni e collegamenti agli originali. Le prove
+storiche non attestano il funzionamento della versione corrente.
+
 
 ## Fonti personali protesica
 

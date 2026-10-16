@@ -2,7 +2,6 @@ import type { WhoCatalogStatus } from './reference-data/icd11-embedded-store';
 import { parseWhoEmbeddedReadiness, parseWhoEmbeddedSearchResponse, type WhoEmbeddedReadiness, type WhoEmbeddedReceipt } from './reference-data/icd11-embedded-contract';
 import type { WhoReference } from './reference-data/icd11-reference';
 /* @Codex */
-import type { ICDCode } from './icd-codes';
 import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
     type WhoLocalReadiness, type WhoLocalReceipt } from './reference-data/icd11-who-local-contract';
 
@@ -19,6 +18,12 @@ const RECEIPT_KEYS = [
     'resultCount', 'latencyMs', 'completedAt',
 ] as const;
 const READINESS_KEYS = ['schemaVersion', 'status', 'releaseId', 'language'] as const;
+
+export interface ICDCode {
+    code: string;
+    description: string;
+    system: string;
+}
 
 export interface ICDSearchResult extends ICDCode {
     isLegacy: false;

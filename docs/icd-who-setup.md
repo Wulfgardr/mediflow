@@ -73,7 +73,7 @@ storico e i suoi limiti di qualificazione, limitatamente al servizio opzionale.
 
 **Il perimetro attuale comprende Mac, localhost sul Mac e backend condiviso/Headless sullo stesso Mac.** I percorsi Windows, Linux, Mini e iOS/iPadOS sono rinviati alla 1.0: conservarne sorgenti e test di portabilità non equivale a qualificarne il rilascio. Anche la prova Linux r3 allegata serve a diagnosticare F-WHO4, non a provare il funzionamento sul Mac.
 
-**PROPOSTA, non contratto accettato:** prima di procedere occorre leggere [WHO-TRIOS, emendamento D9-D11](../proposals/WHO-TRIOS-ADR.md). Restano invariati gli ADR accettati, le route applicative, il motore di ricerca e il launcher base. Le sezioni storiche spiegano i passaggi precedenti, ma le loro istruzioni su pubblicazione Docker, v3 e tre OS NON costituiscono la procedura Mac corrente, per la quale prevalgono questo capitolo e D9-D11.
+**PROPOSTA, non contratto accettato:** prima di procedere occorre leggere [WHO-TRIOS, emendamento D9-D11](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/proposals/WHO-TRIOS-ADR.md). Restano invariati gli ADR accettati, le route applicative, il motore di ricerca e il launcher base. Le sezioni storiche spiegano i passaggi precedenti, ma le loro istruzioni su pubblicazione Docker, v3 e tre OS NON costituiscono la procedura Mac corrente, per la quale prevalgono questo capitolo e D9-D11.
 
 ## Correzioni e gate
 
@@ -145,7 +145,7 @@ Il candidato qui descritto non è stato eseguito su Mac né dentro Docker/WHO. I
 
 Nei candidati precedenti la scelta era il sidecar WHO locale, dietro l'Application Service server-only di [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md). Il vecchio container MediFlow e la porta `8888` restavano ritirati, senza ripiego su ICD-9, JSON WHO grezzo o servizio WHO remoto e senza credenziali OAuth. Il candidato comprendeva Search, stato e procedura guidata con installer locale a comandi fissi; il server Web non eseguiva Docker.
 
-Il [manifesto](./who-local-sidecar.manifest.json) distribuito lascia non valorizzati i lock obbligatori, che ogni installazione deve registrare fuori Git. La documentazione congelata riporta una prova ARM64 del 7 settembre 2026 con acquisizione, Search, riavvio offline e ripristino completati dopo l'accettazione esplicita dell'operatore. Quell'esito non accetta termini per altri utenti né attiva servizi nelle loro installazioni; viene conservato come prova storica, non ripetuto o attestato nuovamente. La revisione tri-OS rimane una [proposta di contratto WHO-TRIOS](../proposals/WHO-TRIOS-ADR.md), non un ADR accettato.
+Il [manifesto](./who-local-sidecar.manifest.json) distribuito lascia non valorizzati i lock obbligatori, che ogni installazione deve registrare fuori Git. La documentazione congelata riporta una prova ARM64 del 7 settembre 2026 con acquisizione, Search, riavvio offline e ripristino completati dopo l'accettazione esplicita dell'operatore. Quell'esito non accetta termini per altri utenti né attiva servizi nelle loro installazioni; viene conservato come prova storica, non ripetuto o attestato nuovamente. La revisione tri-OS rimane una [proposta di contratto WHO-TRIOS](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/proposals/WHO-TRIOS-ADR.md), non un ADR accettato.
 
 ## Configurazione server e stato
 

@@ -169,7 +169,7 @@ disposizione per classe di larghezza.
 | Ascolto della visita | assente | `VisitRecordingLumeShell` | Pannello dentro la voce viva | uguale |
 | Terapie | `therapy-manager.tsx`, `treatment-reasoning-panel.tsx` | `PairedPatientTherapiesSection` | Tabella con comandi di riga, concluse, proposte | Nome e posologia, comandi nel dettaglio |
 | Misure | `observation-manager.tsx` | `PairedPatientClinicalSections` | Tabella e andamento della misura scelta | Tabella, poi andamento |
-| Documenti e proposte | `document-viewer.tsx`, `patient-smart-import-panel.tsx`, `document-insights-panel.tsx` | `PairedPatientDocumentsSection`, `PairedAttachmentDetailView` | Elenco e proposte a sinistra, originale a destra | Elenco, poi originale |
+| Documenti e proposte | `document-viewer.tsx`, `patient-smart-import-fabric-preview-card.tsx`, `document-insights-panel.tsx` | `PairedPatientDocumentsSection`, `PairedAttachmentDetailView` | Elenco e proposte a sinistra, originale a destra | Elenco, poi originale |
 | Agenda | `app/page.tsx` (area turno) | n.d. | Gruppi per urgenza: scaduti, da prenotare, prossimi | uguale, una colonna |
 | Diario | `app/diary` | `PairedPatientDiarySection` | Voci di tutti i pazienti, ricerca e filtri | uguale |
 | Repertori | `app/page.tsx` (area repertori), `icd-autocomplete.tsx`, `drug-autocomplete.tsx` | `RepertoriWorkspaceView` | Segmenti per catalogo, risultati, fonte e data | uguale |
