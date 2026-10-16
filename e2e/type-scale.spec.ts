@@ -89,8 +89,24 @@ async function assertType(page: Page, label: string, info: TestInfo, minimum = 1
 }
 
 async function expandDetails(page: Page) {
-  for (const detail of await page.locator('main details:not([open]), [data-testid="settings-subroute-content"] details:not([open])').all()) {
+  for (const detail of await page.locator('main details:not(nav details):not([open]), [data-testid="settings-subroute-content"] details:not(nav details):not([open])').all()) {
     if (await detail.isVisible()) await detail.locator('summary').first().click();
+  }
+}
+
+async function assertDetailMenus(page: Page, label: string, info: TestInfo) {
+  const menus = page.locator('main nav details, [data-testid="settings-subroute-content"] nav details');
+  for (const [index, menu] of (await menus.all()).entries()) {
+    if (!await menu.isVisible()) continue;
+    const summary = menu.locator(':scope > summary');
+    try {
+      if (await menu.getAttribute('open') === null) await summary.click();
+      await expect(menu).toHaveAttribute('open', '');
+      await assertType(page, `${label}-menu-${index}`, info, 0);
+    } finally {
+      if (await menu.getAttribute('open') !== null) await summary.click();
+      await expect(menu).not.toHaveAttribute('open', '');
+    }
   }
 }
 
@@ -184,6 +200,8 @@ for (const routePattern of ROUTES) {
           }
           if (route === '/settings/ai/modelli') await expect(page.getByRole('button', { name: 'Salva Configurazione', exact: true })).toBeEnabled();
           await assertType(page, route, info);
+          await assertDetailMenus(page, route, info);
+          if (route === '/patients/import') await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
           if (route === '/analytics') await screenshot(page, 'analisi', theme);
           if (route === '/settings/ai/modelli') await screenshot(page, 'modelli', theme);
           if (route.endsWith('/modules')) {
@@ -263,4 +281,18 @@ test('il misuratore intercetta ereditarietà serif, controlli, stili inline e te
   expect(measured.samples.filter(sample => sample.issue).map(sample => sample.text).sort())
     .toEqual(['Campo errato', 'Comando serif', 'Corpo errato', 'Peso errato']);
   expect(measured.samples.some(sample => sample.text === 'Non visibile')).toBe(false);
+});
+
+test('i menu a comparsa vengono misurati e richiusi prima di espandere i dettagli', async ({ page }, info) => {
+  await page.setContent(`<style>body { font:400 14px system-ui }</style><main>
+    <nav><details><summary>Altre sezioni</summary><div style="position:fixed;inset:0;top:40px">Voce del menu</div></details></nav>
+    <details id="clinical"><summary>Proposte dalle fonti cliniche · Smart Import</summary><p>Dettaglio clinico</p></details>
+    </main>`);
+  await assertDetailMenus(page, 'fixture', info);
+  const evidence = JSON.parse(info.attachments.at(-1)!.body!.toString()) as { samples: { text: string }[] };
+  expect(evidence.samples.some(sample => sample.text === 'Voce del menu')).toBe(true);
+  await expandDetails(page);
+  await expect(page.locator('nav details')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#clinical')).toHaveAttribute('open', '');
+  await expect(page.getByText('Dettaglio clinico', { exact: true })).toBeVisible();
 });
