@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 function privateDirectory(directory) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -11,22 +10,8 @@ function privateDirectory(directory) {
     || (process.getuid && stat.uid !== process.getuid())) {
     throw new Error('Cartella di configurazione del lanciatore non valida.');
   }
+  // On Windows the folder lives in the user profile (%APPDATA%), whose inherited ACL is already user-only.
   if (process.platform !== 'win32') fs.chmodSync(directory, 0o700);
-  else {
-    const encodedPath = Buffer.from(directory, 'utf8').toString('base64');
-    const script = `$ErrorActionPreference = 'Stop'
-      $directory = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedPath}'))
-      $owner = [Security.Principal.WindowsIdentity]::GetCurrent().User
-      $acl = New-Object Security.AccessControl.DirectorySecurity
-      $acl.SetOwner($owner)
-      $acl.SetAccessRuleProtection($true, $false)
-      $rule = New-Object Security.AccessControl.FileSystemAccessRule($owner, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
-      $acl.AddAccessRule($rule)
-      Set-Acl -LiteralPath $directory -AclObject $acl`;
-    const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
-      Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true, stdio: 'ignore', timeout: 10000 });
-    if (result.status !== 0) throw new Error('Impossibile proteggere la cartella di configurazione del lanciatore.');
-  }
 }
 
 function regularJson(file) {
