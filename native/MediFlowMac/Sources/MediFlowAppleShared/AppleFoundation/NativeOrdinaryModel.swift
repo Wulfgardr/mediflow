@@ -184,12 +184,14 @@ final class NativeOrdinaryModel: ObservableObject {
         expiryTask = Task { try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)); if !Task.isCancelled { invalidate() } }
     }
     func invalidate() {
+        let hadActivity = phase != .idle || original != nil || attemptId != nil || pendingProjection != nil || proposal != nil
         proposal = nil
         guard phase != .closing else { return }
         generation &+= 1; task?.cancel(); expiryTask?.cancel(); challenge = nil; catalog = nil; disclosure = nil
         guard let source = original, phase != .completed, phase != .idle else {
             original = nil; attemptId = nil; pendingProjection = nil; phase = .idle; isWorking = false
-            message = "Il contesto è cambiato. Prepara una nuova proposta."; return
+            if hadActivity { message = "Il contesto è cambiato. Prepara una nuova proposta." }
+            return
         }
         close(source: source)
     }
