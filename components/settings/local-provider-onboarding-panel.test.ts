@@ -23,7 +23,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         define: { 'process.env.NODE_ENV': '"test"' }, tsconfig: path.resolve('tsconfig.json') }).outputFiles[0].text;
     let status = { provider: 'ollama', credentialClass: 'local_model', model: 'synthetic-local', state: 'missing', revision: 'a'.repeat(64),
         version: 0, receipt: null as string | null, canActivate: true, inference: 'not_run', qualification: 'not_assessed' };
-    let posts = 0; let functions = 0; let fail = false;
+    let posts = 0; let functions = 0; let fail: false | 'unreachable' | 'version' = false;
     let releaseFirstPost!: () => void;
     const firstPost = new Promise<void>(resolve => { releaseFirstPost = resolve; });
     const server = createServer(async (req, res) => {
@@ -37,7 +37,12 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
                 assert.deepEqual(JSON.parse(body), { intent: 'verify_and_activate', expectedRevision: status.revision });
                 // Keep the first request pending until the UI's in-flight state has been observed.
                 if (posts === 1) await firstPost;
-                if (fail) { res.statusCode = 503; res.end(JSON.stringify({ error: 'provider_unreachable' })); return; }
+                if (fail) {
+                    res.statusCode = fail === 'version' ? 409 : 503;
+                    res.end(JSON.stringify(fail === 'version'
+                        ? { error: 'provider_version_unsupported', versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' } }
+                        : { error: 'provider_unreachable' })); return;
+                }
                 status = { ...status, state: 'available_unqualified', version: status.version + 1, receipt: 'receipt_' + 'a'.repeat(32) };
             }
             res.end(JSON.stringify(status)); return;
@@ -63,17 +68,23 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         assert.equal(posts, 1); assert.equal(functions, 1);
         await expect(page.getByText('Quadro paziente: Da provare', { exact: true })).toBeVisible();
         await expect(page.getByText('Ricevuta del collegamento · versione 1')).toBeVisible();
-        status = { ...status, state: 'degraded' }; fail = true;
+        status = { ...status, state: 'degraded' }; fail = 'unreachable';
         await page.getByRole('button', { name: 'Aggiorna stato' }).click();
         await page.getByRole('button', { name: 'Verifica e recupera locale' }).click();
         await expect(page.getByRole('status')).toContainText('Apri Ollama');
         await expect(page.getByRole('button', { name: 'Verifica e attiva locale', exact: true })).toBeDisabled();
         await page.getByRole('button', { name: 'Riprendi dalla lettura dello stato' }).click();
         await expect(page.getByRole('button', { name: 'Verifica e recupera locale' })).toBeEnabled(); assert.equal(posts, 2);
+        fail = 'version';
+        await page.getByRole('button', { name: 'Verifica e recupera locale' }).click();
+        await expect(page.getByRole('status')).toContainText('Versione di Ollama trovata: 0.41.0');
+        await expect(page.getByRole('status')).toContainText('Versioni ammesse: 0.32.x, 0.33.3, 0.34.2, 0.40.4');
+        await expect(page.getByRole('status')).toContainText('Aggiorna MediFlow o installa una versione di Ollama ammessa');
+        await expect(page.getByRole('status')).not.toContainText('non è raggiungibile');
         fail = false; status = { ...status, state: 'revoked', canActivate: false };
-        await page.getByRole('button', { name: 'Aggiorna stato' }).click();
+        await page.getByRole('button', { name: 'Riprendi dalla lettura dello stato' }).click();
         await expect(page.getByRole('status')).toContainText('non può riattivarlo');
-        await expect(activate).toBeDisabled(); assert.equal(posts, 2);
+        await expect(activate).toBeDisabled(); assert.equal(posts, 3);
     } finally { releaseFirstPost(); await browser?.close(); server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });
 
