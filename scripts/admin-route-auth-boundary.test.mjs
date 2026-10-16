@@ -57,11 +57,13 @@ test('admin system routes require a web admin session instead of local-token adm
 
 test('backup restore rejects cross-port and text/plain transport before preflight, fence, or database mutation, and reports a blocked restore as blocked', () => {
     const routeUrl = pathToFileURL(path.join(ROOT, 'app/api/system/backup-restore/route.ts')).href;
+    const verifyUrl = pathToFileURL(path.join(ROOT, 'app/api/system/backup-restore/verify/route.ts')).href;
     const transportUrl = pathToFileURL(path.join(ROOT, 'lib/security/request-transport.ts')).href;
     const toDataModule = (source) => `data:text/javascript,${encodeURIComponent(source)}`;
     const program = `
         import { registerHooks } from 'node:module';
         const routeUrl = ${JSON.stringify(routeUrl)};
+        const verifyUrl = ${JSON.stringify(verifyUrl)};
         const modules = new Map([
             ['next/server', ${JSON.stringify(toDataModule("export const NextResponse = Response;"))}],
             ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
@@ -71,15 +73,16 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
                 'durableReviewOperations', 'durableReviewPatientLinks', 'durableReviewRecords', 'drugs', 'entries',
                 'exemptions', 'exemptionImportReceipts', 'headlessSoapActiveRoleAttestations', 'headlessSoapEntryCommits', 'messages',
                 'observations', 'patients', 'patientsToAmbulatories', 'physicianReviewAttestations',
-                'prostheticPrescriptions', 'prostheticsCatalogEntries', 'prostheticsCatalogReceipts',
+                'prostheticPrescriptions', 'prostheticsCatalogEntries', 'prostheticsCatalogReceipts', 'prostheticsCatalogSources', 'prostheticsCatalogDocuments',
                 'serviceCatalogEntries', 'servicePrescriptionItems',
                 'servicePrescriptions', 'sissHandoffEvents', 'therapies',
             ].map((name) => `${name} = Object.freeze({})`).join(', ')};`))}],
-            ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
+            ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; if (globalThis.sessionMode === 'anonymous') return null; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: globalThis.sessionMode ?? 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
             ['@/lib/security/archive-session-generation', ${JSON.stringify(toDataModule("export function archiveGenerationForSession() { return 'synthetic-generation'; }"))}],
             ['@/lib/archive-generation', ${JSON.stringify(toDataModule("export function assertArchiveGeneration() {}"))}],
             ['@/lib/security/archive-write-request', ${JSON.stringify(toDataModule("export function archiveWriteRequestDenial() { return null; }"))}],
-            ['@/lib/security/server-auth-policy', ${JSON.stringify(toDataModule("export function isWebAdminSession() { globalThis.adminCalls = (globalThis.adminCalls ?? 0) + 1; return true; }"))}],
+            ['@/lib/security/server-auth-policy', ${JSON.stringify(toDataModule("export function isWebAdminSession(session) { globalThis.adminCalls = (globalThis.adminCalls ?? 0) + 1; return session.role === 'admin'; }"))}],
+            ['@/lib/reference-data/prosthetics-catalog-backup', ${JSON.stringify(toDataModule("export function serializeProstheticsDocument(row) { return row; }"))}],
             ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export async function serializeBackupArtifact() { return '{}'; }"))}],
             ['@/lib/backup-patient-ambulatory-links', ${JSON.stringify(toDataModule("export function enrichBackupPatientsWithAmbulatoryLinks(rows) { return rows; }"))}],
             ['@/lib/backup-restore-preflight', ${JSON.stringify(toDataModule("export async function runBackupRestorePreflight() { globalThis.preflightCalls = (globalThis.preflightCalls ?? 0) + 1; return { artifact: { format: 'mediflow-backup', version: 1, manifest: { recordCounts: {} } }, result: { ok: true } }; }"))}],
@@ -89,7 +92,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/security/request-transport', ${JSON.stringify(toDataModule(`export { isTrustedWebMutationRequest } from ${JSON.stringify(transportUrl)};`))}],
         ]);
         registerHooks({ resolve(specifier, context, nextResolve) {
-            if (context.parentURL === routeUrl && modules.has(specifier)) {
+            if ((context.parentURL === routeUrl || context.parentURL === verifyUrl) && modules.has(specifier)) {
                 return { shortCircuit: true, url: modules.get(specifier), format: 'module' };
             }
             return nextResolve(specifier, context);
@@ -127,6 +130,23 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const blockedExpected = { status: 409, cacheControl: 'no-store', body: { success: false, code: 'restore_blocked',
             reason: 'durable_review_commands', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' } };
         if (JSON.stringify(blockedObserved) !== JSON.stringify(blockedExpected)) throw new Error(JSON.stringify(blockedObserved));
+        const { POST: VERIFY } = await import(verifyUrl);
+        for (const handler of [POST, VERIFY]) {
+            for (const [mode, headers, expected] of [
+                ['anonymous', {}, 401],
+                ['reader', {}, 403],
+                ['admin', { origin: 'http://other.invalid', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' }, 403],
+                ['admin', { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' }, 403],
+                ['admin', { origin: 'http://127.0.0.1:3000', 'sec-fetch-site': 'same-origin', 'content-type': 'text/plain' }, 403],
+            ]) {
+                globalThis.sessionMode = mode;
+                const request = new Request('http://127.0.0.1:3000/api/system/backup-restore', { method: 'POST', headers, body: '{}' });
+                const before = globalThis.preflightCalls ?? 0;
+                const response = await handler(request);
+                if (response.status !== expected || request.bodyUsed || (globalThis.preflightCalls ?? 0) !== before)
+                    throw new Error('Backup route consumed or admitted a denied request');
+            }
+        }
     `;
     const child = spawnSync(process.execPath, [
         '--experimental-strip-types', '--input-type=module', '--eval', program,

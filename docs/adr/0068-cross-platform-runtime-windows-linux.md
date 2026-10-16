@@ -101,3 +101,48 @@ Adottiamo l'opzione 3.
 2. `SchedulerAdapter` con refactor macOS invariato, poi Windows e Linux.
 3. CI matrix windows/ubuntu/macos su install, build, boot.
 4. Matrice di supporto per piattaforma nel README.
+
+## Emendamento 2026-10: avvio unico
+
+Decisione del 15 ottobre 2026. Gli ingressi utente diventano
+`MediFlow.command`, `MediFlow.cmd` e `MediFlow.sh` nella radice. Selezionano
+Node 24 senza richiedere dipendenze già presenti; il controllo ABI avviene
+nel lanciatore condiviso `scripts/mediflow.mjs`. I precedenti tre ingressi
+vengono rimossi. `Launch_MediFlowMac.command` resta uno strumento interno
+per la preparazione nativa, senza compilazione implicita dal nuovo ingresso.
+
+Il lanciatore serve Avvio solo su `127.0.0.1`, su porta libera, con un segreto
+casuale nel percorso. Host e Origin sono verificati; solo POST JSON dalla
+stessa origine può avviare, installare dipendenze o arrestare. La pagina non
+legge dati clinici, non rimuove autenticazione, grant, audit o kill switch.
+Lo standard output dell'accesso per agenti resta riservato al protocollo.
+
+La produzione usa `verifySourceRuntime`: ledger, Node/ABI, piattaforma,
+architettura e identità della build restano obbligatori. Una build mancante
+o di altra revisione richiede `npm run build`; il lanciatore non ritenta una
+build fallita nella stessa sessione. Con sorgenti modificati non costruisce
+la produzione, ma offre sviluppo come scelta esplicita, mai ricordata.
+Non aggiorna Git né scarica servizi opzionali. Solo `npm ci`, confermato
+dall'operatore, può scaricare le dipendenze dal registro configurato.
+
+La preferenza (solo scelta e versione dello schema) viene sostituita
+atomicamente in `launcher-preferences.json` nella cartella dati; il fallback
+è `~/.mediflow-launcher.json` quando la destinazione predefinita non è
+scrivibile. Un override dati esplicito non risolvibile blocca l'avvio.
+Una directory di possesso esclusivo per percorso sorgente contiene PID,
+cartella e indirizzo del lanciatore. Un secondo avvio riusa questa ricevuta
+solo con proprietario vivo e fingerprint corretto. Un listener privo di
+ricevuta non viene adottato. Non si arrestano PID trovati sulla rete.
+
+Arresta e Ctrl+C chiudono i figli posseduti e la pagina Avvio. Il runtime
+sorgente accetta anche un messaggio di arresto sul canale IPC del proprio
+padre; questo permette il drain del Supervisor su Windows prima dell'eventuale
+terminazione forzata. Non aggiunge un endpoint clinico o un'autorità agente.
+Ollama, facoltativo e condiviso, mantiene il ciclo di vita indipendente.
+
+Senza display o browser si usa un menu testuale; senza TTY serve `--scelta`.
+Su Linux un comando esplicito installa `mediflow.desktop` con percorso e
+icona locali. Il lanciatore non distribuisce Node, installer o nuove app
+native Windows/Linux. La CI su tre sistemi prova il lanciatore Node, la prima
+build, il fingerprint HTTP, il riuso della cartella e l'arresto. Il doppio clic
+nei file manager e le tecnologie assistive richiedono prove proprie.

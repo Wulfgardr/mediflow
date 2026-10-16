@@ -37,6 +37,10 @@ export function collectAdditionalInventorySelections(root) {
     try { const value = collect(); out[id] = { ...value, files: filesExist(root, value.files), errors: [], mode, conditional: mode === 'conditional' }; }
     catch (error) { out[id] = { files: [], errors: [error.message], mode }; }
   }
+  add('ci:unified-launcher', 'ordinary', 'scripts/ci-start-smoke.mjs', () => ({
+    files: ['scripts/ci-start-smoke.mjs'],
+    binding: collectLiteralCiBinding(root, { workflow: '.github/workflows/cross-platform.yml', job: 'build-start', ciCall: 'node scripts/ci-start-smoke.mjs' }),
+  }));
   add('npm:test:clinical-http', 'ordinary', 'scripts/run-clinical-http-suite.mjs', () => ({
     files: CLINICAL_HTTP_TEST_FILES,
     binding: collectNpmScriptBinding(root, { script: 'test:clinical-http', workflow: '.github/workflows/web-core.yml', job: 'web-core' }, 'node scripts/run-clinical-http-suite.mjs'),

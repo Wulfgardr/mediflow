@@ -330,3 +330,20 @@
 .settingsProfile .actions { gap: 12px; }
 .settingsProfile :is(.option, .confirmation, .rollback, .disclosure) { border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; padding: 12px 0; background: transparent; box-shadow: none; }
 .settingsProfile .options { display: grid; grid-template-columns: minmax(0,1fr); gap: 0; }
+
+.brandLine {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-block-end: 1rem;
+}
+
+.brand {
+    color: var(--lume-ink);
+    font: 500 1.3125rem/1 var(--lume-font-voice);
+}
+
+.brand b {
+    color: var(--lume-accent);
+    font-weight: inherit;
+}

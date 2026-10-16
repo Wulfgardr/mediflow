@@ -1,3 +1,5 @@
+import { createProstheticsCatalog, ProstheticsCatalogError } from './reference-data/prosthetics-catalog-service';
+import type { ProstheticsCatalogSelection } from './reference-data/prosthetics-catalog-contract';
 /* @Codex */
 import { and, desc, eq } from 'drizzle-orm';
 /* @Codex */
@@ -51,7 +53,7 @@ export const NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY = 'network.replica
 type MutationResponse =
     | { status: 200; value: { success: true } }
     | { status: 201; value: { id: string; version: number } }
-    | { status: 400 | 403 | 404 | 409; value: Record<string, unknown> };
+    | { status: 400 | 403 | 404 | 409 | 412; value: Record<string, unknown> };
 
 type HostContext = {
     request: Request;
@@ -176,6 +178,16 @@ function normalizeUpdate(
     return { ok: true, values: updateData };
 }
 
+function applyCatalogSelection(values: Partial<typeof prostheticPrescriptions.$inferInsert>, selection: ProstheticsCatalogSelection | null | undefined): MutationResponse | null {
+    if (selection === undefined) return null;
+    if (selection === null) { values.catalogSnapshot = null; return null; }
+    try { values.catalogSnapshot = createProstheticsCatalog(dbServer.$client).snapshot(selection); return null; }
+    catch (error) {
+        if (error instanceof ProstheticsCatalogError) return { status: 412, value: { error: error.message, code: error.code } };
+        throw error;
+    }
+}
+
 function selectConflictSnapshot(tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0], id: string) {
     return tx.select({
         id: prostheticPrescriptions.id,
@@ -244,6 +256,8 @@ export async function createHostProstheticPrescription(context: HostContext, raw
             .where(eq(prostheticPrescriptions.id, normalized.values.id)).get()) {
             return { status: 409, value: { error: 'Prescription ID already exists' } };
         }
+        const selectionError = applyCatalogSelection(normalized.values, parsed.data.catalogSelection);
+        if (selectionError) return selectionError;
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'host', 'prosthetic.prescription.created', normalized.values.id, {
@@ -283,6 +297,8 @@ async function updateProstheticPrescription(
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload(
             'prosthetic_prescription', expectedVersion, context.id, selectConflictSnapshot(tx, context.id)) };
 
+        const selectionError = applyCatalogSelection(normalized.values, body.catalogSelection);
+        if (selectionError) return selectionError;
         const updateResult = tx.update(prostheticPrescriptions)
             .set({ ...normalized.values, version: expectedVersion + 1 })
             .where(and(eq(prostheticPrescriptions.id, context.id), eq(prostheticPrescriptions.version, expectedVersion)))
@@ -329,6 +345,8 @@ export async function createNetworkScopedProstheticPrescription(context: Network
             .where(eq(prostheticPrescriptions.id, normalized.values.id)).get()) {
             return { status: 409, value: { error: 'Prescription ID already exists' } };
         }
+        const selectionError = applyCatalogSelection(normalized.values, parsed.data.catalogSelection);
+        if (selectionError) return selectionError;
         const inserted = tx.insert(prostheticPrescriptions).values(normalized.values).run();
         if (inserted.changes !== 1) throw new Error('Prosthetic prescription create did not write exactly one row');
         writeAuditEventInTransaction(tx, prostheticAuditInput(context, 'network', 'prosthetic.prescription.created', normalized.values.id,

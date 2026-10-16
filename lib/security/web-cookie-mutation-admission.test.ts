@@ -1,6 +1,12 @@
 /* @Codex */
+import 'next/dist/server/node-environment.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { IncomingMessage } from 'node:http';
+import { Socket } from 'node:net';
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server.js';
+import { getCloneableBody } from 'next/dist/server/body-streams.js';
+import nextConfig from '@/next.config.ts';
 
 import { NextRequest } from 'next/server';
 
@@ -32,8 +38,31 @@ function trustedHeaders(contentType?: string): Record<string, string> {
     };
 }
 
-test('central admission covers the complete API route plane', () => {
-    assert.deepEqual(config.matcher, ['/api/:path*']);
+test('central admission covers APIs except the exact backup routes with their own transport admission', () => {
+    for (const url of ['/api/patients', '/api/attachments', '/api/prosthetics/catalog/documents', '/api/system/backup-restore/verify-other', '/api/system/backup-restore-other']) {
+        assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig, url }), true, url);
+    }
+    for (const url of ['/api/system/backup-restore', '/api/system/backup-restore/', '/api/system/backup-restore?source=local', '/api/system/backup-restore/verify', '/api/system/backup-restore/verify/']) {
+        assert.equal(unstable_doesMiddlewareMatch({ config, nextConfig, url }), false, url);
+    }
+});
+
+test('Next route dispatch preserves JSON backup bodies above 35 MiB after proxy finalization', async () => {
+    const body = Buffer.from(JSON.stringify({ attachment: 'x'.repeat(36 * 1024 * 1024) }));
+    for (const url of ['/api/system/backup-restore', '/api/system/backup-restore/verify']) {
+        const incoming = new IncomingMessage(new Socket());
+        incoming.url = url;
+        const clone = getCloneableBody(incoming, nextConfig.experimental!.proxyClientMaxBodySize as number);
+        if (unstable_doesMiddlewareMatch({ config, nextConfig, url: incoming.url })) clone.cloneBodyStream().resume();
+        for (let offset = 0; offset < body.length; offset += 64 * 1024) incoming.push(body.subarray(offset, offset + 64 * 1024));
+        incoming.push(null);
+        await clone.finalize();
+        const chunks: Buffer[] = [];
+        for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
+        const received = Buffer.concat(chunks);
+        assert.equal(received.length, body.length);
+        assert.deepEqual(JSON.parse(received.toString()), JSON.parse(body.toString()));
+    }
 });
 
 test('rejects every Web-cookie mutation method on hostile transport before body consumption', async () => {

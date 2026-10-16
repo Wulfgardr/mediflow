@@ -1,8 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkTestSelection, discoverTestFiles } from './check-test-selection.mjs';
+import { checkTestSelection, discoverTestFiles, readCheckoutSource } from './check-test-selection.mjs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 const exclusion = (path) => ({ path, reason: 'synthetic helper', owner: '@synthetic' });
+
+test('pending source deletions do not crash discovery and deleted selected tests still fail', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'mediflow-selection-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(path.join(root, 'retired.command'), 'echo example');
+  rmSync(path.join(root, 'retired.command'));
+  const discovered = discoverTestFiles(['retired.command', 'removed.test.mjs'], file => readCheckoutSource(root, file));
+  assert.deepEqual(discovered, ['removed.test.mjs']);
+  assert.ok(checkTestSelection(discovered, {}, []).errors.includes('TEST_NOT_SELECTED: removed.test.mjs'));
+});
 
 test('a test is found by its name or by the framework it loads, nothing else is', () => {
   const sources = {

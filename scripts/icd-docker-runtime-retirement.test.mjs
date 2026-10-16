@@ -8,7 +8,7 @@ const source = (path) => readFileSync(new URL(path, root), 'utf8');
 const retiredPattern = /127\.0\.0\.1:8888|optional-docker-icd|Docker\s*\/\s*ICD|docker compose up -d icd-api|mediflow-icd/iu;
 
 test('macOS launcher never starts or manages the retired ICD container', () => {
-    const launcher = source('Start_MediFlow.command');
+    const launcher = source('scripts/mediflow.mjs');
     assert.doesNotMatch(launcher, retiredPattern);
     assert.doesNotMatch(launcher, /command -v docker|docker-compose|ICD-11 API \(Docker\)/iu);
 });

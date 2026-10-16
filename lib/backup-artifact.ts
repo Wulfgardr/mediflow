@@ -27,6 +27,8 @@ export const BACKUP_COLLECTIONS = [
     'exemptionImportReceipts',
     'prostheticsCatalogEntries',
     'prostheticsCatalogReceipts',
+    'prostheticsCatalogSources',
+    'prostheticsCatalogDocuments',
     'messages',
     'observations',
     'patients',
@@ -45,7 +47,7 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
+type AdditiveBackupCollection = 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts' | 'durableReviewCommandStates' | 'durableReviewCommandOperations' | 'headlessSoapEntryCommits';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -105,10 +107,15 @@ const AUDIT_ERA_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[
         collection => collection !== 'prostheticsCatalogEntries' && collection !== 'prostheticsCatalogReceipts')),
 ];
 const PRE_AUDIT_COLLECTIONS = BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents');
-const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+const LEGACY_WITH_SOURCE_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...AUDIT_ERA_LEGACY_COLLECTION_SETS,
     ...[BACKUP_COLLECTIONS, ...AUDIT_ERA_LEGACY_COLLECTION_SETS]
         .map(collections => collections.filter(collection => collection !== 'auditEvents')),
+];
+const LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
+    ...LEGACY_WITH_SOURCE_COLLECTION_SETS,
+    ...[BACKUP_COLLECTIONS, ...LEGACY_WITH_SOURCE_COLLECTION_SETS].map(collections => collections.filter(
+        collection => collection !== 'prostheticsCatalogSources' && collection !== 'prostheticsCatalogDocuments')),
 ];
 
 const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
@@ -770,7 +777,7 @@ async function assertCollectionReferences(
     try { assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Exemption import receipts are invalid or unsupported.'); }
     /* @Codex */
-    try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? []); }
+    try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
     await assertDurableReviewLedger(payload);
     assertDurableReviewAuthorityRows(payload, durableReviewIds, patientIds);

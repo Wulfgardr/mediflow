@@ -10,9 +10,10 @@ import { upgradeObservationTimestampDefault, upgradeReviewPatientReferenceDefaul
 import { readSqliteArchiveGeneration } from './archive-generation';
 
 // 1: the first versioned schema (C09). 2: ADR 0143 credentials. 3: archive generation (ADR 0144).
+// 4: fonti protesica, originali e snapshot di provenienza.
 // A version is validated without DDL at every start: any change to the canonical
 // schema needs a new number, or the archives already stamped are refused.
-export const CURRENT_SQLITE_SCHEMA_VERSION = 3;
+export const CURRENT_SQLITE_SCHEMA_VERSION = 4;
 // Same values as scripts/native-first-install-contract.json, which the native
 // helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
 const reservation = { applicationId: 1296451154, userVersion: 0 };
@@ -26,6 +27,27 @@ export class SqliteSchemaRecoveryRequiredError extends Error {
 }
 
 function deny(reason: string): never { throw new SqliteSchemaRecoveryRequiredError(reason); }
+
+// POSIX close() releases every lock this process holds on the inode, SQLite's included,
+// so permissions are fixed by path (chmod opens nothing) and verified with lstat around it.
+// The data directory is already owner-only, so no other user can swap the file in between.
+function ensurePrivateArchiveFiles(databasePath: string): void {
+    if (process.platform === 'win32') return;
+    for (const file of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
+        let before: fs.Stats;
+        try { before = fs.lstatSync(file); }
+        catch (error) {
+            if (file !== databasePath && (error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+            throw error;
+        }
+        if (!before.isFile() || before.uid !== process.getuid?.()) deny('archive file is not a regular owner-owned file');
+        if ((before.mode & 0o7777) === 0o600) continue;
+        fs.chmodSync(file, 0o600);
+        const after = fs.lstatSync(file);
+        if (!after.isFile() || after.dev !== before.dev || after.ino !== before.ino || (after.mode & 0o7777) !== 0o600)
+            deny('archive file changed during permission admission');
+    }
+}
 
 function assertIntegrity(connection: Database.Database): void {
     const integrity = connection.pragma('integrity_check') as { integrity_check: string }[];
@@ -84,6 +106,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
         if (before.size === 0) deny('empty file has no first-install reservation');
     }
 
+    ensurePrivateArchiveFiles(databasePath);
     const connection = openConnection(databasePath);
     let snapshot: string | undefined;
     try {
@@ -136,6 +159,7 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
         }).immediate();
         readSqliteArchiveGeneration(connection);
         initSqlitePragmas(connection);
+        ensurePrivateArchiveFiles(databasePath);
         return connection;
     } catch (error) {
         // After a rollback the archive is still the original: keeping one more

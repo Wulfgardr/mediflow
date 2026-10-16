@@ -60,16 +60,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
     return (
         <div className={`${styles.experience} ${styles.setup}`} data-testid="onboarding-setup" aria-busy={isSubmitting}>
-            <p className={styles.progress} aria-label="Avanzamento setup">Passo {step} di 2</p>
+            <p className={styles.brandLine}><span className={styles.brand}>MediFlow<b>.</b></span><span className={styles.progress} aria-label="Avanzamento della configurazione">Passo {step} di 2</span></p>
             {step === 1 && (
                 <div className={styles.stack}>
                     <header className={styles.heading}>
                         <h2>Chi sei?</h2>
-                        <p>I tuoi dati per intestare referti e cartelle. Puoi iniziare senza AI.</p>
+                        <p>Il tuo nome e quello dell’ambulatorio compaiono nelle cartelle e nei documenti.</p>
                     </header>
                     <div className={styles.fields}>
                         <div className={styles.field}>
-                            <label htmlFor="setup-display-name">Nome e Cognome</label>
+                            <label htmlFor="setup-display-name">Nome e cognome</label>
                             <input
                                 type="text"
                                 id="setup-display-name"
@@ -81,7 +81,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                             />
                         </div>
                         <div className={styles.field}>
-                            <label htmlFor="setup-ambulatory-name">Nome Ambulatorio</label>
+                            <label htmlFor="setup-ambulatory-name">Nome dell’ambulatorio</label>
                             <input
                                 type="text"
                                 id="setup-ambulatory-name"
@@ -107,7 +107,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {step === 2 && (
                 <div className={styles.stack}>
                     <header className={styles.heading}>
-                        <h2>Sicurezza</h2>
+                        <h2>Proteggi l’accesso</h2>
                         <p id="setup-pin-help">La passphrase apre l’archivio: usa da 15 a 128 caratteri. Il PIN separato, da 4 a 64 caratteri, serve solo per le conferme di revisione e di ruolo.</p>
                     </header>
                     <div className={styles.fields}>
