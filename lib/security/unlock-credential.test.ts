@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createDecipheriv, createHash, hkdfSync, pbkdf2Sync } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { deriveKeyFromPin, generateMasterKey, KDF_ITERATIONS, unwrapMasterKeyVersioned, wrapMasterKeyVersioned } from './security';
@@ -21,6 +22,14 @@ import {
 const FAST = 1_000;
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
 const newSalt = () => globalThis.crypto.getRandomValues(new Uint8Array(16));
+
+test('the Apple v3 golden vector remains identical to the canonical WebCrypto derivation and wrapping', async () => {
+    const vector = JSON.parse(readFileSync(new URL('../../native/contracts/crypto-golden-vectors.v3.json', import.meta.url), 'utf8'));
+    const material = await deriveUnlockMaterial(vector.passphrase, new Uint8Array(Buffer.from(vector.salt, 'base64')));
+    assert.equal(material.verifier, vector.verifier);
+    const key = await openUnlockWrapping(vector.wrappedMasterKey, material.kek);
+    assert.equal(await rawKey(key), vector.rawMasterKeyHex);
+});
 const bytes = (base64: string) => new Uint8Array(Buffer.from(base64, 'base64'));
 
 async function rawKey(key: CryptoKey): Promise<string> {

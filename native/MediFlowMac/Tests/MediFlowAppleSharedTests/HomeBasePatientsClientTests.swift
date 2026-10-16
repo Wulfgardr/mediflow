@@ -70,6 +70,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
     func testLoginUsesPairedNativeRouteWithoutSourceSurfaceAuthority() async throws {
         let client = makeClient { request in
+            if request.url?.path == "/api/auth/check" { return try self.legacyUnlockCheck(request) }
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
             XCTAssertNil(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"))
@@ -122,6 +123,103 @@ final class HomeBasePatientsClientTests: XCTestCase {
         } catch {
             XCTAssertEqual(error as? HomeBaseClientError, .contract)
         }
+    }
+
+    func testV3LoginSendsVerifierAndUnlocksWebCryptoMasterKey() async throws {
+        let vector = try v3Vector()
+        var paths: [String] = []
+        let client = makeClient { request in
+            let path = try XCTUnwrap(request.url?.path); paths.append(path)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: path.hasSuffix("login") ? ["Set-Cookie": "mediflow_session=v3-session; Path=/; HttpOnly"] : nil)!
+            if path == "/api/auth/check" {
+                XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+                return (response, try JSONSerialization.data(withJSONObject: ["status": "ok", "isSetup": true,
+                    "archiveGeneration": "synthetic-generation", "unlock": ["credential": "passphrase", "kdfVersion": 3, "salt": vector["salt"]!]]))
+            }
+            let input = try self.requestObject(request)
+            XCTAssertEqual(Set(input.keys), ["username", "verifier"])
+            XCTAssertEqual(input["verifier"] as? String, vector["verifier"])
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cache-Control"), "no-store")
+            XCTAssertFalse(String(data: try self.readRequestBody(from: request), encoding: .utf8)!.contains(vector["passphrase"]!))
+            return (response, try JSONSerialization.data(withJSONObject: ["success": true, "id": "synthetic-v3-user",
+                "archiveGeneration": "synthetic-generation", "encryptedMasterKey": vector["wrappedMasterKey"]!, "salt": vector["salt"]!]))
+        }
+        let result = try await client.login(username: "doctor", password: vector["passphrase"]!, credentials: creds)
+        XCTAssertEqual(result.masterKey?.withUnsafeBytes { Data($0).map { String(format: "%02x", $0) }.joined() }, vector["rawMasterKeyHex"])
+        XCTAssertEqual(paths, ["/api/auth/check", "/api/auth/native/login"])
+    }
+
+    func testV3RejectsMissingUnknownParametersAndPassphraseOnLegacyWithoutPostingSecret() async throws {
+        let replies: [[String: Any]] = [
+            ["status": "ok", "isSetup": true],
+            ["status": "ok", "isSetup": true, "unlock": ["credential": "passphrase", "kdfVersion": 4, "salt": "AAECAwQFBgcICQoLDA0ODw=="]],
+            ["status": "ok", "isSetup": true, "unlock": ["credential": "passphrase", "kdfVersion": 3, "salt": "invalid"]],
+            ["status": "ok", "isSetup": true, "unlock": ["credential": "pin"]],
+        ]
+        for reply in replies {
+            var requests = 0
+            let client = makeClient { request in
+                requests += 1; XCTAssertEqual(request.url?.path, "/api/auth/check")
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                        try JSONSerialization.data(withJSONObject: reply))
+            }
+            do { _ = try await client.login(username: "doctor", password: "Synthetic strong passphrase", credentials: creds); XCTFail("Must fail closed") }
+            catch { XCTAssertEqual(requests, 1) }
+        }
+    }
+
+    func testV3CorruptWrappingRetiresReturnedSessionWithoutLegacyRetry() async throws {
+        let vector = try v3Vector()
+        var paths: [String] = []
+        let client = makeClient { request in
+            let path = request.url!.path; paths.append(path)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                headerFields: path.hasSuffix("login") ? ["Set-Cookie": "mediflow_session=v3-rejected; Path=/; HttpOnly"] : nil)!
+            if path == "/api/auth/check" {
+                return (response, try JSONSerialization.data(withJSONObject: ["status": "ok", "isSetup": true, "archiveGeneration": "synthetic-generation",
+                    "unlock": ["credential": "passphrase", "kdfVersion": 3, "salt": vector["salt"]!]]))
+            }
+            if path.hasSuffix("logout") {
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=v3-rejected")
+                return (response, Data(#"{"success":true}"#.utf8))
+            }
+            return (response, try JSONSerialization.data(withJSONObject: ["success": true, "id": "synthetic-v3-user",
+                "archiveGeneration": "synthetic-generation", "encryptedMasterKey": "v3:corrupt", "salt": vector["salt"]!]))
+        }
+        do { _ = try await client.login(username: "doctor", password: vector["passphrase"]!, credentials: creds); XCTFail("Must deny corrupt wrapping") }
+        catch { XCTAssertEqual(error as? HomeBaseClientError, .contract) }
+        XCTAssertEqual(paths, ["/api/auth/check", "/api/auth/native/login", "/api/auth/native/logout"])
+    }
+
+    private func v3Vector() throws -> [String: String] {
+        let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let value = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: native.appendingPathComponent("contracts/crypto-golden-vectors.v3.json"))) as? [String: Any])
+        return value.compactMapValues { $0 as? String }
+    }
+
+    func testRealV3HTTPSLoginAndLogout() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let url = environment["MEDIFLOW_NATIVE_AUTH_SMOKE_URL"],
+              let pin = environment["MEDIFLOW_NATIVE_AUTH_SMOKE_TLS_PIN"] else {
+            throw XCTSkip("Run the isolated native-v3-login integration harness for real HTTPS host/client coverage")
+        }
+        let vector = try v3Vector()
+        let username = ["synthetic", "v3", "user"].joined(separator: "-")
+        let client = HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: url, tlsPin: pin))
+        let paired = HomeBasePairedCredentials(clientId: "synthetic-v3-client", clientToken: "synthetic-v3-token")
+        do {
+            _ = try await client.login(username: username, password: vector["passphrase"]! + "wrong", credentials: paired)
+            XCTFail("Wrong passphrase must not create a session")
+        } catch {
+            guard case .httpStatus(401, _) = error as? HomeBaseClientError else { return XCTFail("Expected credential denial: \(error)") }
+        }
+        let result = try await client.login(username: username, password: vector["passphrase"]!, credentials: paired)
+        XCTAssertEqual(result.masterKey?.withUnsafeBytes { Data($0).map { String(format: "%02x", $0) }.joined() }, vector["rawMasterKeyHex"])
+        XCTAssertEqual(result.id, "synthetic-v3-user")
+        let logout = try await client.logout(credentials: paired, sessionCookie: result.sessionCookie)
+        XCTAssertTrue(logout.success)
     }
 
     func testLogoutAcceptsExactEmpty204AcknowledgementWithoutRetry() async throws {
@@ -230,6 +328,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
     func testLocalDataSourceForwardsPairedLoginCredentialsUnchanged() async throws {
         let client = makeClient { request in
+            if request.url?.path == "/api/auth/check" { return try self.legacyUnlockCheck(request) }
             XCTAssertEqual(request.url?.path, "/api/auth/native/login")
             XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
             XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
@@ -248,6 +347,14 @@ final class HomeBasePatientsClientTests: XCTestCase {
         let result = try await source.login(username: "doctor", password: "1992", credentials: creds)
 
         XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
+    }
+
+    private func legacyUnlockCheck(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+        XCTAssertNil(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"))
+        let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return (response, Data(#"{"status":"ok","isSetup":true,"unlock":{"credential":"pin"}}"#.utf8))
     }
 
     func testFetchPatientsUsesPairedHeadersAndAmbulatoryCookie() async throws {

@@ -11,6 +11,32 @@ import MediFlowCore
 /// upgrade, so paired clients stay in lockstep with the web.
 final class CryptoGoldenVectorsV2Tests: XCTestCase {
 
+    func testV3PolicyCountsNormalizedScalarsAndDoesNotTruncateUTF8At72Bytes() throws {
+        XCTAssertNotNil(CryptoService.normalizedPassphrase(String(repeating: "😀", count: 15)))
+        XCTAssertNil(CryptoService.normalizedPassphrase(String(repeating: "😀", count: 14)))
+        let shared = String(repeating: "é", count: 50)
+        let salt = Data(repeating: 5, count: 16)
+        let first = try XCTUnwrap(CryptoService.deriveUnlockMaterial(passphrase: shared + "A", salt: salt))
+        let second = try XCTUnwrap(CryptoService.deriveUnlockMaterial(passphrase: shared + "B", salt: salt))
+        XCTAssertNotEqual(first.verifier, second.verifier)
+    }
+
+    func testV3WebCryptoVerifierAndUnwrapMatchWithNFKC() throws {
+        struct V3: Decodable { let version: Int; let passphrase: String; let salt: String; let verifier: String; let rawMasterKeyHex: String; let wrappedMasterKey: String }
+        let native = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let vector = try JSONDecoder().decode(V3.self, from: Data(contentsOf: native.appendingPathComponent("contracts/crypto-golden-vectors.v3.json")))
+        let salt = try XCTUnwrap(Data(base64Encoded: vector.salt))
+        let material = try XCTUnwrap(CryptoService.deriveUnlockMaterial(passphrase: vector.passphrase, salt: salt))
+        XCTAssertEqual(material.verifier, vector.verifier)
+        let key = try XCTUnwrap(CryptoService.unwrapMasterKeyVersioned(blob: vector.wrappedMasterKey, pin: vector.passphrase, salt: salt))
+        XCTAssertEqual(key.hexString, vector.rawMasterKeyHex)
+        XCTAssertNil(CryptoService.unwrapMasterKeyVersioned(blob: vector.wrappedMasterKey, pin: vector.passphrase + "wrong", salt: salt))
+        XCTAssertNil(CryptoService.deriveUnlockMaterial(passphrase: vector.passphrase, salt: Data(repeating: 0, count: 15)))
+        XCTAssertNil(CryptoService.deriveUnlockMaterial(passphrase: "short", salt: salt))
+        XCTAssertNil(CryptoService.unwrapMasterKeyVersioned(blob: "v4:unknown", pin: vector.passphrase, salt: salt))
+    }
+
     private struct Fixture: Decodable {
         let version: Int
         let inputs: Inputs
