@@ -203,8 +203,9 @@ fuori dalle prove dichiarate.
 
 `AppRevisionGuard` e `/api/system/revision` impediscono che una tab usi in modo
 silenzioso una revisione superata dopo un cambio di branch o worktree.
-`Start_MediFlow.command` può ricostruire `.next` quando cambia l’impronta dei
-sorgenti locali. Il cockpit Kree8 resta la root su `main`; nuove sperimentazioni
+`scripts/mediflow.mjs` prepara la produzione solo da sorgenti Git puliti e
+riusa soltanto la build verificata della revisione corrente. Con modifiche
+non committate richiede la scelta esplicita per sviluppo. Il cockpit Kree8 resta la root su `main`; nuove sperimentazioni
 non diventano selettori persistiti nelle impostazioni.
 
 Il selettore Fabric riguarda i binding delle funzioni, non la shell. Discovery

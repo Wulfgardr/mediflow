@@ -209,7 +209,7 @@ test('first setup exposes all four real steps without resetting the populated tw
         await setup.getByPlaceholder('es. operatore.demo').fill('demo086');
         await setup.getByPlaceholder('Password sicura').fill('prototipo-sintetico-086');
         await setup.getByRole('button', { name: 'Avanti', exact: true }).click();
-        await expect(setup.getByRole('heading', { name: 'Sicurezza', exact: true })).toBeVisible();
+        await expect(setup.getByRole('heading', { name: 'Proteggi l’accesso', exact: true })).toBeVisible();
         await expect(setup.getByRole('button', { name: 'Concludi Setup' })).toBeVisible();
         await setup.reload();
         await expect(setup.getByRole('heading', { name: 'Chi sei?' })).toBeVisible();

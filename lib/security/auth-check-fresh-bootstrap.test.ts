@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 
 // Each first request owns a new process and directory: no DB module, fixture
 // seed or preliminary API request can initialize the database before auth.
-for (const scenario of ['empty', 'missing-existing', 'unknown-schema', 'native-empty', 'native-missing-existing'] as const) {
+for (const scenario of ['empty', 'service-only', 'service-with-unknown', 'backup', 'sqlite-sidecar', 'unknown-directory', 'launcher-unknown-location', 'service-symlink', 'service-wrong-type', 'missing-existing', 'unknown-schema', 'native-empty', 'native-missing-existing', ...(process.platform === 'darwin' ? ['default-launcher'] : [])] as const) {
     test(`first auth check: ${scenario}`, () => {
         const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-first-auth-'));
         try {
@@ -17,10 +17,33 @@ for (const scenario of ['empty', 'missing-existing', 'unknown-schema', 'native-e
                 import assert from 'node:assert/strict';
                 import fs from 'node:fs';
                 import path from 'node:path';
-                const directory = process.env.MEDIFLOW_DATA_DIR;
-                const database = path.join(directory, 'medical.db');
+                let directory = process.env.MEDIFLOW_DATA_DIR;
                 const scenario = ${JSON.stringify(scenario)};
+                if (scenario === 'default-launcher') {
+                    process.env.HOME = directory;
+                    const { prepareLauncherState } = await import('./scripts/launcher-state.mjs');
+                    prepareLauncherState(process.cwd(), { home: directory, env: {} });
+                    directory = path.join(directory, 'Library/Application Support/MediFlow');
+                    process.env.MEDIFLOW_DATA_DIR = directory;
+                }
+                const database = path.join(directory, 'medical.db');
                 if (scenario === 'missing-existing' || scenario === 'native-missing-existing') fs.writeFileSync(path.join(directory, 'existing-workspace.txt'), 'synthetic');
+                if (scenario === 'service-only' || scenario === 'service-with-unknown') {
+                    fs.mkdirSync(path.join(directory, 'pm2'));
+                    fs.writeFileSync(path.join(directory, 'pm2', 'pm2.log'), 'synthetic');
+                    for (const file of ['local-api-token', 'local-web-backend.pid', 'local-api-tls-proxy.pid', 'runtime-status.json']) {
+                        fs.writeFileSync(path.join(directory, file), 'synthetic');
+                    }
+                    if (scenario === 'service-with-unknown') fs.writeFileSync(path.join(directory, 'unknown.txt'), 'synthetic');
+                }
+                if (scenario === 'backup') fs.writeFileSync(path.join(directory, 'backup.zip'), 'synthetic');
+                if (scenario === 'sqlite-sidecar') fs.writeFileSync(path.join(directory, 'medical.db-wal'), 'synthetic');
+                if (scenario === 'launcher-unknown-location') fs.mkdirSync(path.join(directory, 'launcher'));
+                if (scenario === 'unknown-directory') fs.mkdirSync(path.join(directory, 'unknown'));
+                if (scenario === 'service-wrong-type') fs.writeFileSync(path.join(directory, 'pm2'), 'synthetic');
+                if (scenario === 'service-symlink') {
+                    fs.symlinkSync(directory, path.join(directory, 'pm2'), 'dir');
+                }
                 if (scenario === 'unknown-schema') {
                     const { default: Database } = await import('better-sqlite3');
                     const db = new Database(database);
@@ -44,7 +67,7 @@ for (const scenario of ['empty', 'missing-existing', 'unknown-schema', 'native-e
                 const { GET } = await import('./app/api/auth/check/route.ts');
                 const response = await GET(new Request('http://127.0.0.1/api/auth/check'));
                 const body = await response.json();
-                if (scenario === 'empty' || scenario === 'native-empty') {
+                if (scenario === 'empty' || scenario === 'service-only' || scenario === 'default-launcher' || scenario === 'native-empty') {
                     assert.equal(body.status, 'ok');
                     assert.equal(body.isSetup, false);
                     assert.equal(body.hasSession, false);
@@ -52,7 +75,7 @@ for (const scenario of ['empty', 'missing-existing', 'unknown-schema', 'native-e
                     assert.ok(fs.existsSync(database));
                     const second = await GET(new Request('http://127.0.0.1/api/auth/check'));
                     assert.equal((await second.json()).status, 'ok');
-                } else if (scenario === 'missing-existing' || scenario === 'native-missing-existing') {
+                } else if (scenario !== 'unknown-schema') {
                     assert.equal(body.error.code, 'DB_MISSING');
                     assert.equal(fs.existsSync(database), false);
                 } else {

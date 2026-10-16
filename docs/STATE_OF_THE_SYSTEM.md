@@ -16,6 +16,21 @@ read_when:
 > repository è definita da [CONTRIBUTING.md](../CONTRIBUTING.md) e
 > [docs/repository-topology.md](./repository-topology.md).
 
+## Avvio unificato, sorgente corrente del 15 ottobre 2026
+
+Tre ingressi nella radice (`MediFlow.command`, `MediFlow.cmd`, `MediFlow.sh`)
+eseguono `scripts/mediflow.mjs`. Avvio offre browser locale, app Mac già
+costruita e accesso per agenti. Node 24 resta un prerequisito esterno.
+La produzione richiede Git pulito e una build verificata della stessa
+revisione; lo sviluppo è una scelta esplicita. Il doppio clic, la build
+nativa e la consegna di un installer richiedono evidenze distinte.
+La CI di avvio su macOS, Windows e Linux usa il lanciatore condiviso con
+`--scelta web --senza-browser`, archivio sintetico e verifica del fingerprint.
+Questa descrizione non trasferisce alle nuove modifiche le prove storiche
+di release riportate nelle sezioni successive.
+Vedi [README](../README.md), [manuale](MANUALE.md) e
+[ADR 0068](adr/0068-cross-platform-runtime-windows-linux.md).
+
 ## Supporto, capacità e protezione correnti
 
 Matrice generale aggiornata il 15 ottobre 2026; le fonti collegate mantengono i contratti del proprio confine.

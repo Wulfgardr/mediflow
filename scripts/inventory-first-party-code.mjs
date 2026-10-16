@@ -28,8 +28,9 @@ const SCOPE_ROOTS = new Set([
 
 const ROOT_TOOLING_FILES = new Set([
   'Dockerfile',
-  'Start-MediFlow.ps1',
-  'Start_MediFlow.command',
+  'MediFlow.cmd',
+  'MediFlow.command',
+  'MediFlow.sh',
   'ecosystem.config.js',
   'eslint.config.mjs',
   'next.config.ts',
@@ -44,6 +45,7 @@ const SOURCE_EXTENSIONS = new Set([
   '.c',
   '.cjs',
   '.command',
+  '.cmd',
   '.h',
   '.js',
   '.jsx',
