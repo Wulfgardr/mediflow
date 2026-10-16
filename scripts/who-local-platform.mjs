@@ -262,12 +262,9 @@ export function assertOutsideSource(directory) {
     if (!relative || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))) deny('private_state_invalid');
 }
 export function appLaunchSpec(platform, sourceRoot = root) {
-    switch (platform) {
-        case 'darwin': return { executable: '/bin/bash', args: [path.join(sourceRoot, 'Start_MediFlow.command')] };
-        case 'linux': return { executable: '/bin/bash', args: [path.join(sourceRoot, 'scripts', 'start-mediflow.sh')] };
-        case 'win32': return { executable: 'powershell.exe', args: ['-NoLogo', '-NoProfile', '-File', path.win32.join(sourceRoot, 'Start-MediFlow.ps1')] };
-        default: deny('host_unsupported');
-    }
+    if (!['darwin', 'linux', 'win32'].includes(platform)) deny('host_unsupported');
+    const paths = platform === 'win32' ? path.win32 : path;
+    return { executable: process.execPath, args: [paths.join(sourceRoot, 'scripts', 'mediflow.mjs')] };
 }
 export function ownedLauncher(platform, sourceRoot = root) {
     if (/[\r\n\0]/u.test(sourceRoot)) deny('private_state_invalid');

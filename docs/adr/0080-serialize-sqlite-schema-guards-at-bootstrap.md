@@ -168,3 +168,30 @@ normale onboarding. Il throughput runtime dopo il bootstrap non cambia.
    al reopen.
 3. Aggiungere una regressione multiprocesso sullo stesso database sintetico e
    verificare tre build standard consecutive piu il bundle macOS Release.
+
+## Emendamento 2026-10: permessi dei file dell'archivio
+
+Su sistemi POSIX l'apertura canonica in `lib/sqlite-schema-open.ts` porta a
+`0600` il database e i sidecar `-wal` e `-shm` presenti, anche per archivi creati
+da versioni o script precedenti. Il controllo precede la connessione SQLite
+e si ripete dopo l'inizializzazione WAL per includere i sidecar appena creati.
+Opera solo su file regolari appartenenti all'utente corrente: apertura senza
+seguire symlink, verifica di identità e proprietario sul descrittore e
+`fchmod` sullo stesso descrittore. File non propri, symlink e altri tipi di file
+sono rifiutati senza cambiarne i permessi. I sidecar assenti sono ammessi.
+
+La verifica iniziale usa `lstat` senza aprire descrittori. Quando occorre
+correggere i permessi, apertura, verifica e `fchmod` avvengono in un processo
+Node locale separato, senza shell, con timeout di cinque secondi e identità
+attesa dei file. Errore, timeout o identità discordante bloccano l'apertura.
+I file già a `0600` non richiedono il processo aggiuntivo. Non si aprono e
+chiudono descrittori ausiliari nel processo che possiede connessioni SQLite:
+su POSIX quella chiusura rilascia i lock del processo sull'inode e può consentire
+a un'altra connessione di eliminare il WAL ancora in uso. La regressione
+multiprocesso verifica persistenza, identità del WAL e visibilità dei trigger.
+
+La build resta in memoria e non normalizza archivi persistenti. Non cambia la
+scelta della cartella dati: una cartella esplicitamente configurata conserva
+i permessi decisi dall'operatore. Il controllo owner-only del servizio degli
+originali resta una difesa aggiuntiva, anche per tale cartella. Su Windows
+questa normalizzazione POSIX non viene eseguita e non attesta gli ACL.
