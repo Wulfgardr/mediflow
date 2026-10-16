@@ -980,6 +980,11 @@ struct PairedPatientCreateView: View {
                 Text("Crea la cartella nell’archivio attivo. I campi protetti vengono cifrati sul dispositivo.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                if let error = model.errorMessage {
+                    Text(error)
+                        .foregroundStyle(LumePalette.critical)
+                        .accessibilityIdentifier("new-patient-error")
+                }
             }
             .navigationTitle("Nuovo paziente")
             .toolbar {

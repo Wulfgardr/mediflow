@@ -1836,6 +1836,8 @@ public enum HomeBaseClientError: LocalizedError, Equatable {
             return "La login non ha restituito una sessione operatore valida."
         case .transport(let issue):
             return issue.localizedDescription
+        case .httpStatus(403, let message) where message == nil || message == "Forbidden":
+            return "Operazione non autorizzata. Verifica i permessi del dispositivo."
         case .httpStatus(_, let message):
             return message ?? "La richiesta verso l'home-base non e andata a buon fine."
         case .pinChangeConflict(let message):
