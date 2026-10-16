@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex: disclosure and fresh UI acknowledgement only. Installation/consent records remain host-owned. */
+/* disclosure and fresh UI acknowledgement only. Installation/consent records remain host-owned. */
 import { useEffect, useRef, useState } from 'react';
 import sidecarManifest from '@/docs/who-local-sidecar.manifest.json';
 import releaseLock from '@/docs/who-local-release-lock.json';

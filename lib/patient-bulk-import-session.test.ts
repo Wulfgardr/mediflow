@@ -1,4 +1,4 @@
-/* @Codex: controller ports below are declared synthetic doubles, NOT auth/API evidence. */
+/* controller ports below are declared synthetic doubles, NOT auth/API evidence. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PATIENT_CSV_HEADERS, PATIENT_CSV_LIMITS } from './patient-bulk-import.ts';

@@ -1,10 +1,8 @@
-// @Codex
 import CryptoKit
 import Foundation
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class PairedPatientsWorkspaceOfflineCacheTests: XCTestCase {
     @MainActor func testOnlineReadPersistsOnlyProfileAndNetworkLossRestoresReadOnlyWithoutRequests() async throws {
         let (model, store, transport, context, _) = try harness()
@@ -241,7 +239,6 @@ final class PairedPatientsWorkspaceOfflineCacheTests: XCTestCase {
     }
 }
 
-/* @Codex */
 private final class OfflineCacheClock: @unchecked Sendable {
     private let lock = NSLock()
     private var date = Date()
@@ -249,7 +246,6 @@ private final class OfflineCacheClock: @unchecked Sendable {
     func advance(_ seconds: TimeInterval) { lock.withLock { date = date.addingTimeInterval(seconds) } }
 }
 
-/* @Codex */
 private final class OfflineCacheTransport: @unchecked Sendable {
     enum Mode { case online, unreachable, status(Int), scopeDenied(Int) }
     private let lock = NSLock()
@@ -278,7 +274,7 @@ private final class OfflineCacheTransport: @unchecked Sendable {
         if !shouldHold { respond(request) }
     }
     private func respond(_ request: OfflineCacheURLProtocol) {
-        let mode = lock.withLock { self.mode } // @Codex: Explicit property avoids initializer shadowing.
+        let mode = lock.withLock { self.mode } // Explicit property avoids initializer shadowing.
         switch mode {
         case .unreachable: request.client?.urlProtocol(request, didFailWithError: URLError(.notConnectedToInternet))
         case .status(let status): request.complete(status: status, data: Data())
@@ -304,7 +300,6 @@ private final class OfflineCacheTransport: @unchecked Sendable {
     }
 }
 
-/* @Codex */
 private final class OfflineCacheURLProtocol: URLProtocol {
     private static let registryLock = NSLock()
     private static var transports: [String: OfflineCacheTransport] = [:]
@@ -326,7 +321,6 @@ private final class OfflineCacheURLProtocol: URLProtocol {
     }
 }
 
-/* @Codex */
 private final class OfflineCacheDeleteFailureFileManager: FileManager, @unchecked Sendable {
     override func removeItem(at URL: URL) throws { throw CocoaError(.fileWriteNoPermission) }
 }

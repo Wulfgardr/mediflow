@@ -73,7 +73,6 @@
     "test:api-schemas": "node scripts/run-strip-types.mjs --test lib/api-schemas/api-schemas.test.ts",
     "test:document-input-normalization": "node scripts/run-strip-types.mjs --test lib/domain/documents/document-input-normalization.test.ts",
     "test:ocr-service:date": "node scripts/run-strip-types.mjs --test lib/domain/documents/ocr-service-date.test.ts",
-    "test:ollama-pull-stream": "node scripts/run-strip-types.mjs --test lib/ollama-pull-stream.test.ts",
     "test:backup-restore:preflight": "node scripts/run-strip-types.mjs --test lib/backup-artifact.test.ts lib/backup-restore-preflight.test.ts lib/scheduled-backup-membership-roundtrip.test.ts",
     "test:backup-restore:roundtrip": "node scripts/run-strip-types.mjs --test lib/backup-total-roundtrip.test.ts",
     "test:backup-restore:date-fields": "node --test scripts/backup-restore-date-fields.test.mjs",

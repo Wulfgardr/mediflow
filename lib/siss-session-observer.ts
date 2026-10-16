@@ -1,15 +1,9 @@
-/* @Codex */
 import 'server-only';
 
-/* @Codex */
 import fs from 'fs';
-/* @Codex */
 import os from 'os';
-/* @Codex */
 import path from 'path';
-/* @Codex */
 import Database from 'better-sqlite3';
-/* @Codex */
 import {
     SISS_SESSION_OBSERVED_MODULE_LABELS,
     type SissSessionCheckpoint,
@@ -37,7 +31,6 @@ const ATLAS_HISTORY_ROOTS = [
 
 const SISS_SESSION_RECENT_WINDOW_MS = 1000 * 60 * 60 * 8;
 
-/* @Codex */
 export function resolveSissObservedModuleFromUrl(url: string): SissSessionObservedModule | null {
     const normalized = url.trim().toLowerCase();
     if (!normalized) return null;
@@ -66,7 +59,6 @@ function pickLatestObservation(rows: AtlasHistoryRow[], predicate: (row: AtlasHi
     return null;
 }
 
-/* @Codex */
 export function buildSissSessionStatusFromHistory(
     rows: AtlasHistoryRow[],
     options: {
@@ -248,7 +240,6 @@ function readRelevantAtlasHistoryRows(): AtlasHistorySource {
     }
 }
 
-/* @Codex */
 export function readSissSessionStatusFromAtlasHistory(): SissSessionStatusResponse {
     const source = readRelevantAtlasHistoryRows();
     return buildSissSessionStatusFromHistory(source.rows, {

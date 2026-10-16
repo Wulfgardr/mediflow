@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { readAuthenticatedWebSession } from './server-auth';

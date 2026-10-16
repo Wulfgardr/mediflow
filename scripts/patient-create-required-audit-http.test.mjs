@@ -1,4 +1,4 @@
-/* @Codex: C05 synthetic real HTTP qualification, separate from route auth/cookie seams. */
+/* C05 synthetic real HTTP qualification, separate from route auth/cookie seams. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';

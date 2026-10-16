@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -6,7 +5,6 @@ import {
     isServicePrescriptionLikeTherapy,
 } from './prescription-boundary';
 
-/* @Codex */
 test('prescription boundary excludes service identities and retains a drug with specialist-visit evidence', () => {
     const servicePrescription = {
         drugMention: 'Visita cardiologica',
@@ -26,7 +24,6 @@ test('prescription boundary excludes service identities and retains a drug with 
     );
 });
 
-/* @Codex */
 // Fissa il contratto reale: la decisione guarda solo l'identità. Se un giorno dosaggio,
 // motivazione, nota di revisione o evidenza dovranno pesare, è questo test a doversi
 // rompere per primo — e la domanda aperta annotata in prescription-boundary.ts a dover

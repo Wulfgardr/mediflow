@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     try {
         const parsed = await readAmbulatoryJsonObject(request);
         if (!parsed.ok) return parsed.response;
-        /* @Codex: writer derives its required audit actor from this admitted session. */
+        /* writer derives its required audit actor from this admitted session. */
         const result = createAmbulatory({ request, session }, parsed.body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {

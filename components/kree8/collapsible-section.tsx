@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX: progressive disclosure per la Scheda. I gestori operativi
+/* WUL-UIUX: progressive disclosure per la Scheda. I gestori operativi
    pesanti si aprono su richiesta, cosi su pazienti complessi la pagina si apre
    corta e prioritizzata invece di una catena di pannelli sempre espansi.
    Stile invariato (superficie, radius, colori): cambia solo la disposizione. */
@@ -20,7 +20,7 @@ interface CollapsibleSectionProps {
        utile (cosa c'e dentro), non meta-testo. */
     summary?: string;
     defaultOpen?: boolean;
-    /* @Codex WUL-UIUX: mantiene i figli montati anche da chiusi (solo nascosti).
+    /* WUL-UIUX: mantiene i figli montati anche da chiusi (solo nascosti).
        Va usato per i gestori con form, cosi una compilazione a meta non si perde
        quando la sezione viene collassata. Per default i figli si smontano da
        chiusi (lazy mount) per tenere la pagina leggera. */
@@ -53,7 +53,7 @@ export function CollapsibleSection({
     const [visited, setVisited] = useState(false);
     if (folderActive && !visited) setVisited(true);
 
-    /* @Codex WUL-UIUX: defaultOpen puo diventare true dopo il caricamento dati
+    /* WUL-UIUX: defaultOpen puo diventare true dopo il caricamento dati
        (es. attentionCount 0 -> N): useState lo legge solo al mount. Apriamo sul
        fronte false->true col pattern React "adjust state during render" (niente
        effetto), senza richiudere cio che l'utente ha aperto ne riaprire cio che
@@ -81,7 +81,7 @@ export function CollapsibleSection({
     const HeadingControl = folderActive ? 'div' : 'button';
     return (
         <section id={id} data-folder-pane={id} data-folder-active={folderActive} className={`${surfaceClassName} scroll-mt-28`}>
-            {/* @Codex WUL-UIUX: il titolo è un heading che contiene il controllo
+            {/* WUL-UIUX: il titolo è un heading che contiene il controllo
                 di disclosure — pattern W3C APG. Gli screen reader possono saltare
                 di sezione in sezione per livello, non solo per anchor. */}
             <h3 className="m-0">

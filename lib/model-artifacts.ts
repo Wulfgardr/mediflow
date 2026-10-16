@@ -1,4 +1,3 @@
-/* @Codex */
 export function stripModelArtifacts(content: string): string {
     return content
         .replace(/<unused94>[\s\S]*?(<unused95>|$)/g, '')

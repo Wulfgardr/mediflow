@@ -3,7 +3,6 @@ import path from 'path';
 
 import { resolveDataPath } from '@/lib/data-dir';
 
-/* @Codex */
 const PM2_PATH_OVERRIDE_KEYS = [
     'OVER_HOME',
     'PM2_ROOT_PATH',
@@ -105,7 +104,6 @@ function disconnectPM2(): Promise<void> {
     });
 }
 
-/* @Codex */
 export function assertLoopbackPortAvailable(port: number): Promise<void> {
     return new Promise((resolve, reject) => {
         const probe = net.createServer();
@@ -210,7 +208,6 @@ export class PM2Manager {
     }
 
     private static async startOnce(): Promise<void> {
-        // @Codex
         // The MLX inference server (ecosystem.config.js -> bash start-mlx.sh) only
         // runs on macOS Apple Silicon. Fail fast with a clear message elsewhere
         // instead of letting PM2 try to load a bash interpreter on Windows.

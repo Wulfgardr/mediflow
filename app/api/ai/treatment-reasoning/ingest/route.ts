@@ -1,5 +1,4 @@
 import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
-/* @Codex */
 import { createTreatmentReasoningIngestHttpHandler } from '@/lib/ai-providers/fabric/treatment-reasoning-production-http';
 import { acquireTreatmentReasoningIngest } from '@/lib/ai-providers/fabric/treatment-reasoning-production-root';
 

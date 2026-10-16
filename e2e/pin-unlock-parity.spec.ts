@@ -1,4 +1,4 @@
-/* @Codex WUL-675: real UI + isolated server; no auth mocks or credential overrides. */
+/* WUL-675: real UI + isolated server; no auth mocks or credential overrides. */
 import { randomUUID } from 'node:crypto';
 import type { Page, Response } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
@@ -118,7 +118,7 @@ for (const { name, pin } of [
   });
 }
 
-/* @Codex: Chromium test-only response gate. The real server has already responded.
+/* Chromium test-only response gate. The real server has already responded.
    CDP pauses delivery, then continues the UNMODIFIED response. No route(), fulfill(),
    Fetch.fulfillRequest, API replacement, cookie injection or successful-login stub.
    This makes pending/loading checks deterministic without sleeps or timeout changes. */

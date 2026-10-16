@@ -1,4 +1,3 @@
-/* @Codex */
 export type AIProvider = 'ollama';
 
 export type AiLane =

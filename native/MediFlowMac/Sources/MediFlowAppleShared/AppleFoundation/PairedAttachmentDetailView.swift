@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 /// Mounted by the workspace so diary and archive share the same presentation.
 struct PairedAttachmentDetailView: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel

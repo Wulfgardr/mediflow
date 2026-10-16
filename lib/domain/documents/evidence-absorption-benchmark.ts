@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,
     serializeDocumentParseEvidenceArtifact,
@@ -12,10 +11,8 @@ import {
     type EvidenceQueueRenderableClaim,
 } from './evidence-queue-contract';
 
-/* @Codex */
 export const EVIDENCE_ABSORPTION_BENCHMARK_SCHEMA_VERSION = 'mediflow.evidence_absorption_benchmark.v2';
 
-/* @Codex */
 export interface EvidenceAbsorptionBenchmarkCase {
     id: string;
     description: string;
@@ -52,7 +49,6 @@ export interface EvidenceAbsorptionBenchmarkCase {
     };
 }
 
-/* @Codex */
 export interface EvidenceAbsorptionBenchmarkCaseResult {
     id: string;
     relevantSourceRecall: number;
@@ -68,7 +64,6 @@ export interface EvidenceAbsorptionBenchmarkCaseResult {
     findings: string[];
 }
 
-/* @Codex */
 export interface EvidenceAbsorptionBenchmarkReport {
     schemaVersion: typeof EVIDENCE_ABSORPTION_BENCHMARK_SCHEMA_VERSION;
     generatedAt: string;
@@ -230,7 +225,6 @@ function leakageRatio(found: number, possible: number): number {
     return found / possible;
 }
 
-/* @Codex */
 export function runEvidenceAbsorptionBenchmark(
     cases: EvidenceAbsorptionBenchmarkCase[],
 ): EvidenceAbsorptionBenchmarkReport {

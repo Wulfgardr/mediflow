@@ -4,11 +4,8 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { entries } from '@/lib/schema';
 import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
-/* @Codex */
 import { prepareEntryCreate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { createEntryOperation } from '@/lib/entry-write-operation';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
@@ -22,7 +19,6 @@ const ENTRY_SORT_COLUMNS = {
 } as const;
 
 export async function GET(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -62,7 +58,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);

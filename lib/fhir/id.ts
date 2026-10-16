@@ -1,4 +1,3 @@
-/* @Codex */
 function shortHash(value: string): string {
     let hash = 0x811c9dc5;
     for (let index = 0; index < value.length; index += 1) {
@@ -8,7 +7,6 @@ function shortHash(value: string): string {
     return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-/* @Codex */
 export function toFhirDerivedId(
     prefix: string,
     parts: readonly string[],
@@ -18,7 +16,6 @@ export function toFhirDerivedId(
     return toFhirId(`${prefix}-${shortHash(canonicalValue)}-${orderedPosition}`, prefix);
 }
 
-/* @Codex */
 export function toFhirId(value: string, fallbackPrefix: string): string {
     const normalized = value
         .trim()
@@ -34,7 +31,6 @@ export function toFhirId(value: string, fallbackPrefix: string): string {
     return `${normalized.slice(0, 64 - suffix.length)}${suffix}`;
 }
 
-/* @Codex */
 export function toFhirFullUrl(resourceType: string, id: string): string {
     return `urn:mediflow:fhir:${resourceType}:${id}`;
 }

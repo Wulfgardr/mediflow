@@ -1,4 +1,3 @@
-// @Codex
 import CryptoKit
 import Foundation
 import XCTest
@@ -254,7 +253,7 @@ final class LockReadTransport: @unchecked Sendable {
     private let lock = NSLock()
     private var held: [String: LockReadURLProtocol] = [:]
     private var expectations: [String: XCTestExpectation] = [:]
-    private var paths: [String] = [] // @Codex: request metadata only, never headers or bodies.
+    private var paths: [String] = [] // request metadata only, never headers or bodies.
     var requestPaths: [String] { lock.withLock { paths } }
     private var patientsFail = false
     var failPatients: Bool {

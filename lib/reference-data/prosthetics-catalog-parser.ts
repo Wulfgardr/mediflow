@@ -1,5 +1,4 @@
 import { normalizeProstheticsImportOptions } from './prosthetics-import-options';
-/* @Codex */
 import { createHash } from 'node:crypto';
 import {
     PROSTHETICS_COLUMNS, PROSTHETICS_CONTRACT, PROSTHETICS_MAX_BYTES, PROSTHETICS_MAX_ROWS,

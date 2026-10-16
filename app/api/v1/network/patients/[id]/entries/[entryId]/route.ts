@@ -1,22 +1,16 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { entryJsonObject } from '@/lib/entry-write-input';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_ENTRY_READ_CAPABILITY,
     getNetworkScopedEntry,
 } from '@/lib/network-entry-read';
-/* @Codex */
 import {
     NETWORK_ENTRY_WRITE_CAPABILITY,
     updateNetworkScopedEntry,
 } from '@/lib/network-entry-write';
-/* @Codex */
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
 
-/* @Codex */
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -38,7 +32,6 @@ export async function GET(
     }
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -56,7 +49,6 @@ export async function PUT(
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         if (error instanceof SyntaxError) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });

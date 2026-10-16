@@ -1,4 +1,4 @@
-/* @Codex: journal rows prioritize prose, keeping state and provenance explicit. */
+/* journal rows prioritize prose, keeping state and provenance explicit. */
 .diary { display: grid; padding-bottom: 24px; }
 .entry { padding: 24px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); }
 .entry:first-child { padding-top: 0; }

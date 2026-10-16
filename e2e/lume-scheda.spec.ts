@@ -1,4 +1,4 @@
-/* @Codex LUME-104/68 */
+/* LUME-104/68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
@@ -71,7 +71,7 @@ async function prepareStableInsightHydration(page: Page): Promise<{ loaded: Prom
   return { loaded: patientInsightLoaded.then(() => undefined) };
 }
 
-/* @Codex ADR 0123: the canonical folder owns thirteen destinations. The
+/* ADR 0123: the canonical folder owns thirteen destinations. The
    record tab preserves identity while the reading pane scrolls. */
 async function expectInViewport(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible();
@@ -189,7 +189,7 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   await expectCurrentSection(page, 'follow-up');
 });
 
-/* @Codex WUL-678: prove the folder action reaches the existing planner. */
+/* WUL-678: prove the folder action reaches the existing planner. */
 test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -246,7 +246,7 @@ for (const schedaCase of CASES) {
     await expectInViewport(header);
 
     await page.getByRole('navigation', { name: 'Sezioni della vista' }).getByRole('link', { name: 'Riepilogo', exact: true }).click();
-    // @Codex: the hash precedes the asynchronous folder visibility update.
+    // the hash precedes the asynchronous folder visibility update.
     await expect(page).toHaveURL(new URL(`/patients/${patient.id}/modules#quadro`, page.url()).href);
     await expectCurrentSection(page, 'quadro');
     const note = page.getByText('Leggi la nota completa', { exact: true });

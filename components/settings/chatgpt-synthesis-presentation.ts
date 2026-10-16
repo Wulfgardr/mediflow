@@ -1,4 +1,4 @@
-/* @Codex — pure display copy, never an admission or action policy. */
+/* pure display copy, never an admission or action policy. */
 import type { ProductCode, ProductOperation, ProductSnapshot, ProductState, QualificationSnapshot } from '../../lib/chatgpt-product/product-contract';
 
 type StatusCopy = Readonly<{ title: string; next: string }>;

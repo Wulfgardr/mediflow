@@ -1,7 +1,6 @@
 import type { WhoCatalogStatus } from './reference-data/icd11-embedded-store';
 import { parseWhoEmbeddedReadiness, parseWhoEmbeddedSearchResponse, type WhoEmbeddedReadiness, type WhoEmbeddedReceipt } from './reference-data/icd11-embedded-contract';
 import type { WhoReference } from './reference-data/icd11-reference';
-/* @Codex */
 import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
     type WhoLocalReadiness, type WhoLocalReceipt } from './reference-data/icd11-who-local-contract';
 
@@ -230,7 +229,7 @@ export async function checkApiStatus(client: ICDReferenceDataClient = browserCli
 
 export function icdClientErrorMessage(error: unknown, context: 'status' | 'search' = 'status'): string {
     if (!(error instanceof ICDClientError)) return 'Il servizio WHO ICD-11 non è disponibile.';
-    // @Codex: a rejected search does not establish that the local service is down.
+    // a rejected search does not establish that the local service is down.
     if (context === 'search' && ['service_unavailable', 'upstream_response_invalid', 'response_invalid'].includes(error.code)) {
         return 'Ricerca WHO non riuscita. Prova termini più specifici; se l’errore persiste, verifica il servizio locale.';
     }

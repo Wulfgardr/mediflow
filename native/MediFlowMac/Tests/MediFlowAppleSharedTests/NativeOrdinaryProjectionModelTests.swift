@@ -1,4 +1,4 @@
-/* @Codex — Mac lifecycle reconciliation; synthetic transport only, no provider/authority claim. */
+/* Mac lifecycle reconciliation; synthetic transport only, no provider/authority claim. */
 #if os(macOS)
 import Foundation
 import CryptoKit

@@ -1,4 +1,4 @@
-/* @Codex — deterministic synthetic layout/pin checks; no native readiness claim. */
+/* deterministic synthetic layout/pin checks; no native readiness claim. */
 import assert from 'node:assert/strict';
 import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

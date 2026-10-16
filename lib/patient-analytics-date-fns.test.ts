@@ -1,4 +1,3 @@
-/* @Codex */
 // Integration with the SAME date-fns function used by app/analytics/page.tsx.
 // Requires the repository's locked dependencies and supported Node 24 runtime.
 import assert from 'node:assert/strict';

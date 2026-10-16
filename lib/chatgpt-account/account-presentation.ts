@@ -1,4 +1,4 @@
-/* @Codex: presentation of ADR0126/0134 only, never an admission decision. */
+/* presentation of ADR0126/0134 only, never an admission decision. */
 import type { AccountBrowserView } from './account-browser';
 import type { AccountNotice, AccountState } from './account-contract';
 
@@ -38,7 +38,7 @@ export function presentAccount(view: AccountBrowserView, active: boolean) {
         operation,
         planLabel: !locked && !view.error && view.status?.state === 'connected'
             ? planLabels[view.status.plan ?? 'unknown'] ?? 'Non disponibile' : null,
-        // @Codex WUL-684: this card is informational, not the ordinary execution
+        // WUL-684: this card is informational, not the ordinary execution
         // session or an admission decision. Account/plan/demo never grant use.
         executionLabel: 'Account informativo · non abilita le funzioni',
         showDetails: !locked && view.status?.state === 'connected',

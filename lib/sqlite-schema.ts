@@ -8,7 +8,6 @@ import { ensureProstheticsCatalogSchema } from '@/lib/reference-data/prosthetics
 
 const ATTACHMENTS_PATIENT_INDEX_DEFINITION = 'attachments_patient_idx ON attachments(patient_id)';
 
-/* @Codex */
 const PHYSICIAN_REVIEW_ATTESTATIONS_DDL = `
     CREATE TABLE physician_review_attestations (
         actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id) CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
@@ -26,7 +25,6 @@ const PHYSICIAN_REVIEW_ATTESTATIONS_DDL = `
         )
     )
 `;
-/* @Codex */
 const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL = `
     CREATE TABLE physician_review_attestations (
         actor_ref TEXT PRIMARY KEY NOT NULL REFERENCES users(id) CHECK (length(actor_ref) BETWEEN 1 AND 256 AND trim(actor_ref) = actor_ref),
@@ -47,7 +45,6 @@ const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL = `
 const normalizeSchemaSql = (value: string) => value.toLowerCase().replace(/if\s+not\s+exists/gu, '').replace(/[\s`"']/gu, '');
 const PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_DDL);
 const PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA = normalizeSchemaSql(PHYSICIAN_REVIEW_ATTESTATIONS_P2A_DDL);
-/* @Codex */
 const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
     CREATE TABLE headless_soap_active_role_attestations (
         attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
@@ -74,7 +71,6 @@ const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
     )
 `;
 const HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_DDL);
-/* @Codex */
 const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
     CREATE TABLE headless_checkup_active_role_attestations (
         attestation_ref TEXT PRIMARY KEY NOT NULL CHECK (length(attestation_ref) BETWEEN 1 AND 256 AND trim(attestation_ref) = attestation_ref),
@@ -103,14 +99,12 @@ const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL = `
 `;
 const HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA = normalizeSchemaSql(HEADLESS_CHECKUP_ACTIVE_ROLE_ATTESTATIONS_DDL);
 export type HeadlessSoapActiveRoleAttestationSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
-/* @Codex */
 export class HeadlessSoapActiveRoleAttestationSchemaError extends Error {
     constructor(readonly code: HeadlessSoapActiveRoleAttestationSchemaErrorCode) {
         super(`Headless SOAP active-role attestation schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
         this.name = 'HeadlessSoapActiveRoleAttestationSchemaError';
     }
 }
-/* @Codex */
 const HEADLESS_SOAP_ENTRY_COMMITS_DDL = `
     CREATE TABLE headless_soap_entry_commits (
         idempotency_key TEXT PRIMARY KEY NOT NULL,
@@ -138,14 +132,12 @@ const HEADLESS_SOAP_ENTRY_COMMITS_UNIQUE_INDEXES = [
     ['headless_soap_entry_commits_receipt_ref_unique', 'receipt_ref'],
 ] as const;
 export type HeadlessSoapEntryCommitSchemaErrorCode = 'schema_incompatible' | 'schema_unavailable';
-/* @Codex */
 export class HeadlessSoapEntryCommitSchemaError extends Error {
     constructor(readonly code: HeadlessSoapEntryCommitSchemaErrorCode) {
         super(`Headless SOAP entry commit schema ${code === 'schema_incompatible' ? 'is incompatible' : 'is unavailable'}.`);
         this.name = 'HeadlessSoapEntryCommitSchemaError';
     }
 }
-/* @Codex */
 const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
     CREATE TABLE IF NOT EXISTS durable_review_patient_links (
         review_id TEXT PRIMARY KEY NOT NULL REFERENCES durable_review_records(review_id),
@@ -155,16 +147,13 @@ const DURABLE_REVIEW_PATIENT_LINKS_DDL = `
     )
 `;
 const DURABLE_REVIEW_PATIENT_LINKS_SCHEMA = normalizeSchemaSql(DURABLE_REVIEW_PATIENT_LINKS_DDL);
-/* @Codex */
 function physicianReviewAttestationSchemaEquals(sqlite: Database.Database, expected: string): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'physician_review_attestations'").get() as { sql?: unknown } | undefined;
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === expected;
 }
-/* @Codex */
 export function checkHasCanonicalPhysicianReviewAttestationSchema(sqlite: Database.Database): boolean {
     return physicianReviewAttestationSchemaEquals(sqlite, PHYSICIAN_REVIEW_ATTESTATIONS_SCHEMA);
 }
-/* @Codex */
 function headlessSoapActiveRoleAttestationSchemaEquals(sqlite: Database.Database, expected: string): boolean {
     try {
         const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get('headless_soap_active_role_attestations') as { sql?: unknown } | undefined;
@@ -173,7 +162,6 @@ function headlessSoapActiveRoleAttestationSchemaEquals(sqlite: Database.Database
         return false;
     }
 }
-/* @Codex */
 function hasNoHeadlessSoapActiveRoleAttestationOrphans(sqlite: Database.Database): boolean {
     try {
         const orphan = sqlite.prepare(`
@@ -186,12 +174,10 @@ function hasNoHeadlessSoapActiveRoleAttestationOrphans(sqlite: Database.Database
         return false;
     }
 }
-/* @Codex */
 export function checkHasCanonicalHeadlessSoapActiveRoleAttestationSchema(sqlite: Database.Database): boolean {
     return headlessSoapActiveRoleAttestationSchemaEquals(sqlite, HEADLESS_SOAP_ACTIVE_ROLE_ATTESTATIONS_SCHEMA)
         && hasNoHeadlessSoapActiveRoleAttestationOrphans(sqlite);
 }
-/* @Codex */
 export function checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema(sqlite: Database.Database): boolean {
     try {
         const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -202,7 +188,6 @@ export function checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema(sqli
         return !orphan;
     } catch { return false; }
 }
-/* @Codex */
 function ensureHeadlessCheckupActiveRoleAttestationSchema(sqlite: Database.Database): void {
     try {
         const exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -214,7 +199,6 @@ function ensureHeadlessCheckupActiveRoleAttestationSchema(sqlite: Database.Datab
         throw new Error('Headless checkup active-role attestation schema is incompatible.');
     }
 }
-/* @Codex */
 function ensureHeadlessSoapActiveRoleAttestationSchema(sqlite: Database.Database): void {
     let exists: boolean;
     try {
@@ -227,7 +211,6 @@ function ensureHeadlessSoapActiveRoleAttestationSchema(sqlite: Database.Database
         throw new HeadlessSoapActiveRoleAttestationSchemaError('schema_incompatible');
     }
 }
-/* @Codex */
 export function checkHasCanonicalHeadlessSoapEntryCommitSchema(sqlite: Database.Database): boolean {
     try {
         const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -244,7 +227,6 @@ export function checkHasCanonicalHeadlessSoapEntryCommitSchema(sqlite: Database.
         return false;
     }
 }
-/* @Codex */
 function ensureHeadlessSoapEntryCommitSchema(sqlite: Database.Database): void {
     try {
         const exists = Boolean(sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -267,12 +249,10 @@ function ensureHeadlessSoapEntryCommitSchema(sqlite: Database.Database): void {
     }
     if (!checkHasCanonicalHeadlessSoapEntryCommitSchema(sqlite)) throw new HeadlessSoapEntryCommitSchemaError('schema_incompatible');
 }
-/* @Codex */
 export function checkHasCanonicalDurableReviewPatientLinkSchema(sqlite: Database.Database): boolean {
     const row = sqlite.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'durable_review_patient_links'").get() as { sql?: unknown } | undefined;
     return typeof row?.sql === 'string' && normalizeSchemaSql(row.sql) === DURABLE_REVIEW_PATIENT_LINKS_SCHEMA;
 }
-/* @Codex */
 function migrateP2aPhysicianReviewAttestationSchema(sqlite: Database.Database): void {
     if (!physicianReviewAttestationSchemaEquals(sqlite, PHYSICIAN_REVIEW_ATTESTATIONS_P2A_SCHEMA)) return;
     sqlite.transaction(() => {
@@ -285,9 +265,7 @@ function migrateP2aPhysicianReviewAttestationSchema(sqlite: Database.Database): 
         sqlite.exec('DROP TABLE physician_review_attestations_p2a');
     }).immediate();
 }
-/* @Codex */
 type TableInfoRow = { name: string };
-/* @Codex */
 function ensureColumn(sqlite: Database.Database, table: string, columnName: string, columnSql: string) {
     const columns = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as TableInfoRow[]).map((col) => col.name);
     if (!columns.includes(columnName)) {
@@ -295,7 +273,6 @@ function ensureColumn(sqlite: Database.Database, table: string, columnName: stri
     }
 }
 
-/* @Codex */
 const ATTACHMENT_CURRENTNESS_LEGACY_DDL = `
     CREATE TABLE attachments (
         id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
@@ -307,7 +284,6 @@ const ATTACHMENT_CURRENTNESS_LEGACY_DDL = `
         FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
     )
 `;
-/* @Codex */
 const ATTACHMENT_CURRENTNESS_CANONICAL_DDL = `
     CREATE TABLE attachments (
         id TEXT PRIMARY KEY NOT NULL, patient_id TEXT NOT NULL, name TEXT NOT NULL,
@@ -328,7 +304,6 @@ const ATTACHMENT_CURRENTNESS_CANONICAL_DDL = `
         FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
     )
 `;
-/* @Codex */
 // Installed currentness schema before the safe-integer constraints. Preserve
 // existing identities and counters when upgrading this exact fingerprint.
 const ATTACHMENT_CURRENTNESS_HISTORICAL_DDL = `
@@ -351,11 +326,8 @@ const ATTACHMENT_CURRENTNESS_HISTORICAL_DDL = `
         FOREIGN KEY (patient_id) REFERENCES patients(id) ON UPDATE NO ACTION ON DELETE NO ACTION
     )
 `;
-/* @Codex */
 const ATTACHMENT_CURRENTNESS_LEGACY_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_LEGACY_DDL);
-/* @Codex */
 const ATTACHMENT_CURRENTNESS_CANONICAL_SCHEMA = normalizeSchemaSql(ATTACHMENT_CURRENTNESS_CANONICAL_DDL);
-/* @Codex */
 const ATTACHMENT_CURRENTNESS_COLUMNS = [
     ['id', 'TEXT', 1, null, 1], ['patient_id', 'TEXT', 1, null, 0], ['name', 'TEXT', 1, null, 0],
     ['type', 'TEXT', 1, null, 0], ['size', 'INTEGER', 1, null, 0], ['path', 'TEXT', 1, null, 0],
@@ -364,14 +336,11 @@ const ATTACHMENT_CURRENTNESS_COLUMNS = [
     ['ocr_queue_state', 'TEXT', 0, null, 0], ['ocr_queue_reason', 'TEXT', 0, null, 0],
     ['ocr_queue_updated_at', 'INTEGER', 0, null, 0], ['ocr_replay_artifact_snapshot', 'TEXT', 0, null, 0],
 ] as const;
-/* @Codex */
 const ATTACHMENT_CURRENTNESS_ERROR = 'ATTACHMENT_CURRENTNESS_MIGRATION_UNSUPPORTED';
 
-/* @Codex */
 function denyAttachmentCurrentnessMigration(): never {
     throw new Error(ATTACHMENT_CURRENTNESS_ERROR);
 }
-/* @Codex */
 function attachmentCurrentnessSchemaMatches(sqlite: Database.Database, expected: string, canonical: boolean, historical = false): boolean {
     const table = sqlite.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND lower(name) = 'attachments'").get() as { name?: unknown; sql?: unknown } | undefined;
     const columns = sqlite.prepare('PRAGMA table_xinfo(attachments)').all() as Array<{ name?: unknown; type?: unknown; notnull?: unknown; dflt_value?: unknown; pk?: unknown; hidden?: unknown }>;
@@ -403,7 +372,6 @@ function attachmentCurrentnessSchemaMatches(sqlite: Database.Database, expected:
         && foreignKeys[0].on_update === 'NO ACTION' && foreignKeys[0].on_delete === 'NO ACTION' && foreignKeys[0].match === 'NONE'
         && hasExpectedIndexes;
 }
-/* @Codex */
 function upgradeLegacyAttachmentCurrentness(sqlite: Database.Database): void {
     try {
         const stale = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE lower(name) = 'attachments_currentness_legacy' LIMIT 1").get();
@@ -453,7 +421,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Ambulatories schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'users', 'failed_login_attempts', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
         ensureColumn(sqlite, 'users', 'first_failed_login_at', 'first_failed_login_at INTEGER');
@@ -467,7 +434,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Users schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         migrateP2aPhysicianReviewAttestationSchema(sqlite);
         sqlite.prepare(PHYSICIAN_REVIEW_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
@@ -475,14 +441,10 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Physician review attestation schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     ensureHeadlessSoapActiveRoleAttestationSchema(sqlite);
-    /* @Codex */
     ensureHeadlessCheckupActiveRoleAttestationSchema(sqlite);
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'attachments', 'summary_snapshot', 'summary_snapshot TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'attachments', 'parse_evidence_artifact_snapshot', 'parse_evidence_artifact_snapshot TEXT');
         // WUL-237: OCR-needed queue state, additive and idempotent
         ensureColumn(sqlite, 'attachments', 'ocr_queue_state', 'ocr_queue_state TEXT');
@@ -493,16 +455,11 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Attachments schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'patients', 'exemptions', 'exemptions TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'patients', 'diagnoses', 'diagnoses TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'patients', 'monitoring_profile', 'monitoring_profile TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'patients', 'status_reason', 'status_reason TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'patients', 'version', 'version INTEGER NOT NULL DEFAULT 1');
         // WUL-306 (ADR 0066): soft-delete tombstone columns, additive and idempotent
         ensureColumn(sqlite, 'patients', 'deleted_at', 'deleted_at INTEGER');
@@ -516,7 +473,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Patients schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'entries', 'title', "title TEXT NOT NULL DEFAULT 'Voce clinica'");
         ensureColumn(sqlite, 'entries', 'setting', 'setting TEXT');
@@ -530,45 +486,30 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Entries schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'checkups', 'notes', 'notes TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'checkups', 'source', 'source TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'checkups', 'version', 'version INTEGER NOT NULL DEFAULT 1');
-        /* @Codex */
         ensureColumn(sqlite, 'checkups', 'updated_at', 'updated_at INTEGER');
-        /* @Codex */
         ensureColumn(sqlite, 'checkups', 'deleted_at', 'deleted_at INTEGER');
-        /* @Codex */
         ensureColumn(sqlite, 'checkups', 'deletion_reason', 'deletion_reason TEXT');
     } catch (error) {
         console.warn('[MediFlow] Checkups schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'therapies', 'active_principle', 'active_principle TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'motivation', 'motivation TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'diagnosis_code', 'diagnosis_code TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'diagnosis_name', 'diagnosis_name TEXT');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'version', 'version INTEGER NOT NULL DEFAULT 1');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'updated_at', 'updated_at INTEGER');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'deleted_at', 'deleted_at INTEGER');
-        /* @Codex */
         ensureColumn(sqlite, 'therapies', 'deletion_reason', 'deletion_reason TEXT');
     } catch (error) {
         console.warn('[MediFlow] Therapies schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'drugs', 'aic_search', 'aic_search TEXT');
         ensureColumn(sqlite, 'drugs', 'name_search', 'name_search TEXT');
@@ -600,14 +541,12 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Drugs schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         ensureColumn(sqlite, 'conversations', 'is_deleted', 'is_deleted INTEGER NOT NULL DEFAULT 0');
     } catch (error) {
         console.warn('[MediFlow] Conversations schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         sqlite.prepare(`
             CREATE TABLE IF NOT EXISTS exemptions (
@@ -629,9 +568,8 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Exemptions schema check failed:', error);
         throw error;
     }
-    /* @Codex: fail closed on an unsupported import-receipt schema. */
+    /* fail closed on an unsupported import-receipt schema. */
     ensureExemptionImportSchema(sqlite);
-    /* @Codex */
     try {
         const therapyColumns = (sqlite.prepare("PRAGMA table_info(therapies)").all() as TableInfoRow[]).map((col) => col.name);
         if (!therapyColumns.includes('aic')) {
@@ -644,7 +582,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Therapies schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         sqlite.prepare(`
             CREATE TABLE IF NOT EXISTS observations (
@@ -687,7 +624,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Observations schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         sqlite.prepare(`
             CREATE TABLE IF NOT EXISTS prosthetic_prescriptions (
@@ -722,7 +658,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Prosthetic prescriptions schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         sqlite.prepare(`
             CREATE TABLE IF NOT EXISTS service_prescriptions (
@@ -861,7 +796,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Service prescriptions schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     try {
         sqlite.prepare(`
             CREATE TABLE IF NOT EXISTS siss_handoff_events (
@@ -893,7 +827,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] SISS handoff events schema check failed:', error);
         throw error;
     }
-    /* @Codex */
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS document_diagnosis_proposals (
             id TEXT PRIMARY KEY NOT NULL,
@@ -918,7 +851,6 @@ function applySchemaGuards(sqlite: Database.Database) {
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_idx ON document_diagnosis_proposals(patient_id)').run();
     sqlite.prepare('CREATE INDEX IF NOT EXISTS document_diagnosis_proposals_patient_status_idx ON document_diagnosis_proposals(patient_id, status)').run();
     sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS document_diagnosis_proposals_source_candidate_unique ON document_diagnosis_proposals(patient_id, source_document_key, candidate_key)').run();
-    /* @Codex */
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS durable_review_records (
             id TEXT PRIMARY KEY NOT NULL, patient_ref TEXT NOT NULL, review_id TEXT NOT NULL UNIQUE, review_revision INTEGER NOT NULL,
@@ -928,7 +860,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         )
     `).run();
     ensureColumn(sqlite, 'durable_review_records', 'patient_ref', "patient_ref TEXT NOT NULL DEFAULT ''");
-    /* @Codex */
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS durable_review_operations (
             id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL,
@@ -937,16 +868,13 @@ function applySchemaGuards(sqlite: Database.Database) {
         )
     `).run();
     sqlite.prepare('CREATE UNIQUE INDEX IF NOT EXISTS durable_review_operations_review_key_unique ON durable_review_operations(review_id, idempotency_key)').run();
-    /* @Codex */
     sqlite.prepare(DURABLE_REVIEW_PATIENT_LINKS_DDL).run();
-    /* @Codex */
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS durable_review_command_states (
             review_id TEXT PRIMARY KEY NOT NULL, review_state TEXT NOT NULL, revision INTEGER NOT NULL, action TEXT NOT NULL,
             created_at INTEGER DEFAULT (unixepoch())
         )
     `).run();
-    /* @Codex */
     sqlite.prepare(`
         CREATE TABLE IF NOT EXISTS durable_review_command_operations (
             id TEXT PRIMARY KEY NOT NULL, review_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, command_digest TEXT NOT NULL,
@@ -978,7 +906,6 @@ function applySchemaGuards(sqlite: Database.Database) {
         console.warn('[MediFlow] Core secondary index check failed:', error);
         throw error;
     }
-    /* @Codex */
     // Not best-effort: without the audit table and its append-only triggers the
     // store must not open, so a failure here aborts the schema transaction.
     ensureAuditSqliteSchema(sqlite);
@@ -997,11 +924,9 @@ function applySchemaGuards(sqlite: Database.Database) {
         retire.run(id);
         if (!retired.get(id)) throw new Error('Patient identity retirement backfill failed');
     }
-    /* @Codex */
     ensureHeadlessSoapEntryCommitSchema(sqlite);
 }
 
-/* @Codex */
 export function initializeSqliteSchema(sqlite: Database.Database): void {
     // Next.js production builds load server modules in multiple processes.
     // BEGIN IMMEDIATE lets SQLite arbitrate one schema writer while the other

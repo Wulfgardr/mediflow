@@ -4,13 +4,11 @@ import { DependencyList, useCallback, useEffect, useRef, useState } from 'react'
 import { createDbChangeBus } from './live-query-scope';
 import type { DbChangeScope } from './live-query-scope';
 
-/* @Codex */
 const dbChangeBus = createDbChangeBus();
 
-/* @Codex */
 export const notifyDbChange = dbChangeBus.notify;
 
-/* @Codex: Full document navigation does not unmount React before pending
+/* Full document navigation does not unmount React before pending
    fetches reject. Retire that document's reads at pagehide, including results,
    errors and loading updates. A bfcache restoration needs a new query; the
    previous generation must never become current again. beforeunload can be
@@ -44,7 +42,6 @@ function useLiveQueryDocument() {
     return { readDocument, documentRevision };
 }
 
-/* @Codex */
 export function useLiveQuery<T, TDefault = undefined>(
     querier: () => Promise<T> | T,
     deps?: DependencyList,
@@ -55,7 +52,6 @@ export function useLiveQuery<T, TDefault = undefined>(
     const [result, setResult] = useState<T | TDefault | undefined>(defaultResult);
     const [revision, setRevision] = useState(0);
     const { readDocument, documentRevision } = useLiveQueryDocument();
-    /* @Codex */
     const tablesRef = useRef(tables);
 
     useEffect(() => {
@@ -97,7 +93,7 @@ export function useLiveQuery<T, TDefault = undefined>(
     return result;
 }
 
-/* @Codex WUL-UIUX: variante che espone anche errore e stato di caricamento, cosi
+/* WUL-UIUX: variante che espone anche errore e stato di caricamento, cosi
    le superfici possono distinguere "in caricamento" da "errore" (useLiveQuery
    inghiotte gli errori e resta su undefined per sempre). Additiva: i chiamanti
    esistenti non cambiano. */
@@ -105,7 +101,7 @@ export type LiveQueryState<T, TDefault = undefined> = {
     data: T | TDefault | undefined;
     error: unknown;
     loading: boolean;
-    /* @Codex WUL-UIUX: riesegue la query adesso (es. azione «Riprova» su errore).
+    /* WUL-UIUX: riesegue la query adesso (es. azione «Riprova» su errore).
        Additivo: i chiamanti che non lo destrutturano non cambiano. */
     refresh: () => void;
 };
@@ -123,7 +119,6 @@ export function useLiveQueryState<T, TDefault = undefined>(
     const [revision, setRevision] = useState(0);
     const { readDocument, documentRevision } = useLiveQueryDocument();
     const refresh = useCallback(() => setRevision((previous) => previous + 1), []);
-    /* @Codex */
     const tablesRef = useRef(tables);
 
     useEffect(() => {

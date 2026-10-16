@@ -1,4 +1,4 @@
-/* @Codex: WUL-720 required network lifecycle audit on real synthetic SQLite. */
+/* WUL-720 required network lifecycle audit on real synthetic SQLite. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';

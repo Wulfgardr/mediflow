@@ -1,4 +1,4 @@
-/* @Codex: isolated component fixture; no product server, account login, or remote requests. */
+/* isolated component fixture; no product server, account login, or remote requests. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';

@@ -1,6 +1,5 @@
 import { parseExpectedVersion as parseCanonicalExpectedVersion } from './version-concurrency';
 
-/* @Codex */
 export type PatientConflictSnapshot = {
     id: string;
     version: number;
@@ -8,7 +7,6 @@ export type PatientConflictSnapshot = {
     isArchived: boolean | null;
 };
 
-/* @Codex */
 export type PatientVersionConflictPayload = {
     error: 'Conflict';
     code: 'VERSION_CONFLICT';
@@ -28,19 +26,16 @@ type PatientConflictSource = {
     isArchived: boolean | null;
 };
 
-/* @Codex */
 export function parseExpectedVersion(value: unknown): number | null {
     return parseCanonicalExpectedVersion(value);
 }
 
-/* @Codex */
 export function isPatientVersionConflictPayload(value: unknown): value is PatientVersionConflictPayload {
     if (!value || typeof value !== 'object') return false;
     const payload = value as Partial<PatientVersionConflictPayload>;
     return payload.code === 'VERSION_CONFLICT' && payload.entity === 'patient' && typeof payload.recordId === 'string';
 }
 
-/* @Codex */
 export function buildPatientVersionConflictPayload(
     expectedVersion: number,
     recordId: string,

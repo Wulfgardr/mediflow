@@ -1,6 +1,4 @@
-/* @Codex */
 import type { NetworkIdentitySummary } from './api/v1/types';
-/* @Codex */
 import type { ServerSession } from './security/server-session';
 
 export type NetworkIdentityUser = {

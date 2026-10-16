@@ -1,14 +1,10 @@
-/* @Codex */
 import { SISS_ACTIONS, type SissAction } from './siss-actions';
 
-/* @Codex */
 export const SISS_PATIENT_CONTEXT_ACTIONS = SISS_ACTIONS;
 export type SissPatientContextAction = SissAction;
 
-/* @Codex */
 export type SissPatientContextTransportMode = 'portal-handoff' | 'certified-api';
 
-/* @Codex */
 export type SissPatientContextHandoffResult = {
     status: 'handoff';
     action: SissPatientContextAction;
@@ -20,7 +16,6 @@ export type SissPatientContextHandoffResult = {
     message: string;
 };
 
-/* @Codex */
 export type SissPatientContextActionState = {
     action: SissPatientContextAction;
     requiresFiscalCode: boolean;
@@ -28,7 +23,6 @@ export type SissPatientContextActionState = {
     reason: string | null;
 };
 
-/* @Codex */
 export type SissPatientContextSummary = {
     transportMode: 'portal-handoff';
     browserSessionRequired: true;
@@ -41,17 +35,14 @@ function isPatientContextAction(value: string): value is SissPatientContextActio
     return SISS_PATIENT_CONTEXT_ACTIONS.includes(value as SissPatientContextAction);
 }
 
-/* @Codex */
 export function resolveSissPatientContextAction(value: unknown): SissPatientContextAction | null {
     return typeof value === 'string' && isPatientContextAction(value) ? value : null;
 }
 
-/* @Codex */
 export function requiresSissPatientFiscalCode(action: SissPatientContextAction): boolean {
     return action !== 'menu.open';
 }
 
-/* @Codex */
 export function normalizeSissPatientTaxCode(value: string | null | undefined): string | null {
     const normalized = value?.trim().toUpperCase() ?? '';
     if (!/^[A-Z0-9]{11,16}$/.test(normalized)) {
@@ -61,7 +52,6 @@ export function normalizeSissPatientTaxCode(value: string | null | undefined): s
     return normalized;
 }
 
-/* @Codex */
 export function buildSissPatientContextSummary(input: {
     patientTaxCode: string | null | undefined;
 }): SissPatientContextSummary {

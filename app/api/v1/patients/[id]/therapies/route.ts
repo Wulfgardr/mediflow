@@ -7,14 +7,11 @@ import { and, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { normalizeTherapyCreateInput } from '@/lib/api-v1-clinical-write-normalization';
-/* @Codex */
 import {
     normalizeTherapyStatus,
     therapyStatusFilterValues,
 } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 import { createTherapyOperation } from '@/lib/therapy-write-operation';
 import { readTherapyJsonObject, therapyChangedFields, therapyCreateId, validateTherapyInput } from '@/lib/therapy-write-input';
@@ -32,7 +29,6 @@ function parseLimit(value: string | null): number | null {
     return Math.min(parsed, 100);
 }
 
-/* @Codex */
 function parseDateParam(value: string | null): Date | null {
     if (!value) return null;
     const parsed = new Date(value);
@@ -53,7 +49,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { searchParams } = new URL(request.url);
         const limit = parseLimit(searchParams.get('limit'));
         const status = searchParams.get('status')?.trim();
-        /* @Codex */
         const statusFilterValues = status ? therapyStatusFilterValues(status) : null;
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
@@ -61,7 +56,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         const filters = [eq(therapies.patientId, id)];
         if (!includeDeleted) filters.push(isNull(therapies.deletedAt));
-        /* @Codex */
         if (statusFilterValues) filters.push(inArray(therapies.status, statusFilterValues));
         if (dateFrom) filters.push(gte(therapies.startDate, dateFrom));
         if (dateTo) filters.push(lte(therapies.startDate, dateTo));
@@ -75,9 +69,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             id: therapy.id,
             patientId: therapy.patientId,
             drugName: therapy.drugName,
-            /* @Codex */
             aic: therapy.aic ?? null,
-            /* @Codex */
             atc: therapy.atc ?? null,
             activePrinciple: therapy.activePrinciple ?? null,
             dosage: therapy.dosage,

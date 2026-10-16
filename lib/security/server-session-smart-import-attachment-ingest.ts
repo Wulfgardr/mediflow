@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import * as nativeLifetime from './native-inference-lifecycle';
 

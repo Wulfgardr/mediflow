@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import { buildEntryVersionConflictPayload, parseEntryExpectedVersion } from './entry-concurrency.ts';
 
 test('parseEntryExpectedVersion requires a positive integer', () => {

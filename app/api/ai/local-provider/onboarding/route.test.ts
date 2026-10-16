@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -77,7 +76,7 @@ test('network error reports practical code and preserves missing lifecycle', asy
     assert.equal((await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json()).state, 'missing');
 });
 
-/* @Codex: real NextRequest normalization, not a plain WHATWG Request fixture. */
+/* real NextRequest normalization, not a plain WHATWG Request fixture. */
 test('ordinary NextRequest preserves browser Host authority when loopback URL normalizes', async () => {
     const attest = fixture();
     const initial = await (await GET(new NextRequest('http://127.0.0.1:4396/api/ai/local-provider/onboarding'))).json();
@@ -93,7 +92,7 @@ test('ordinary NextRequest preserves browser Host authority when loopback URL no
     assert.equal(attest.mock.callCount(), 1);
 });
 
-/* @Codex: exact scheme/host/port remain required despite Next URL normalization. */
+/* exact scheme/host/port remain required despite Next URL normalization. */
 test('ordinary NextRequest rejects inconsistent browser transport without provider work', async () => {
     const attest = fixture();
     const initial = await (await GET(new NextRequest('http://127.0.0.1:4396/api/ai/local-provider/onboarding'))).json();
@@ -120,7 +119,7 @@ test('ordinary NextRequest rejects inconsistent browser transport without provid
     assert.equal(fs.existsSync(path.join(root, 'ai')), false);
 });
 
-/* @Codex: cancellation never creates an admission or a successful late response. */
+/* cancellation never creates an admission or a successful late response. */
 test('POST forwards ordinary request cancellation through the canonical service to attestation', async () => {
     const attest = fixture();
     const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();

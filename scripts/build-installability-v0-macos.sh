@@ -1,5 +1,4 @@
 #!/bin/bash
-# @Codex
 # Costruisce una proof macOS autosufficiente con Next standalone e Node 24.
 set -euo pipefail
 
@@ -71,7 +70,7 @@ if [[ "${MEDIFLOW_INSTALL_VALIDATE_OUTPUT_ONLY:-0}" == "1" ]]; then
   exit 0
 fi
 
-# @Codex: il bundle precedente contiene file TypeScript tracciati da Next. Va
+# il bundle precedente contiene file TypeScript tracciati da Next. Va
 # rimosso prima della nuova build, altrimenti entra nel perimetro del typecheck.
 rm -rf "$APP"
 
@@ -105,7 +104,7 @@ if [[ -d "$ROOT_DIR/public" ]]; then
   cp -R "$ROOT_DIR/public" "$APP/Contents/Resources/WebRuntime/public"
 fi
 
-# @Codex: a partial payload is a packaging error; no inputs reuse any standalone payload already copied.
+# a partial payload is a packaging error; no inputs reuse any standalone payload already copied.
 EXECUTION_MAC_STAGE_VARS=(
   MEDIFLOW_CHATGPT_EXECUTION_BINARY
   MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE

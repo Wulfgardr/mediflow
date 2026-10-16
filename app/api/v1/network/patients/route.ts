@@ -1,29 +1,20 @@
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-/* @Codex */
 import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex */
 import { cookies } from 'next/headers';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     authenticateNetworkPairedClient,
     getNetworkIdentitySummary,
 } from '@/lib/network-home-base-server';
-/* @Codex */
 import {
     createNetworkScopedPatient,
     NETWORK_PATIENT_LIFECYCLE_CAPABILITY,
 } from '@/lib/network-patient-lifecycle';
-/* @Codex */
 import { listNetworkScopedPatients } from '@/lib/network-patient-read';
 import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
-/* @Codex */
 import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { requireAccountSession } from '@/lib/security/paired-native-session';
 
-/* @Codex */
 export async function GET(request: Request) {
     const pairedClient = await authenticateNetworkPairedClient(request);
     if (!pairedClient) return unauthorizedResponse();
@@ -62,7 +53,6 @@ export async function GET(request: Request) {
     }
 }
 
-/* @Codex */
 export async function POST(request: Request) {
     try {
         const resolved = await requireNetworkCapabilityContext(request, NETWORK_PATIENT_LIFECYCLE_CAPABILITY);
@@ -74,7 +64,6 @@ export async function POST(request: Request) {
         const result = await createNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/patients error:', error);

@@ -383,8 +383,8 @@ struct SettingsWorkspaceView: View {
     @State private var pendingClear: NetworkAmbulatorySummary?
     @State private var showsDeletionConfirmation = false
     @State private var showsClearConfirmation = false
-    @State private var showsConnectionSetup = false // @Codex
-    @State private var confirmsClearingPairing = false // @Codex
+    @State private var showsConnectionSetup = false
+    @State private var confirmsClearingPairing = false
     @State private var selectedArea: SettingsArea = .connection
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -474,7 +474,6 @@ struct SettingsWorkspaceView: View {
         .task(id: workspaceModel.connectionState) {
             await aiFunctionsModel.load()
         }
-        /* @Codex */
         .sheet(isPresented: $showsConnectionSetup) {
             PairedHomeBaseCredentialsSheet(
                 model: workspaceModel,
@@ -606,7 +605,7 @@ struct SettingsWorkspaceView: View {
         } else {
             settingsMessage(accessModel.unavailableMessage(using: workspaceModel))
         }
-        // @Codex: a native operator can lock even before a patient read or key unwrap.
+        // a native operator can lock even before a patient read or key unwrap.
         if workspaceModel.nativeOperatorConnection != nil {
             Button("Blocca sessione adesso", role: .destructive) {
                 Task { await accessModel.lockSession(using: workspaceModel) }

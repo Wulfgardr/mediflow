@@ -1,6 +1,5 @@
 import { types } from 'node:util';
 
-/* @Codex */
 export type SemanticQueryPlanV1ErrorCode = 'invalid_plan' | 'policy_unavailable' | 'purpose_denied'
   | 'scope_denied' | 'budget_denied' | 'currentness_denied' | 'operation_denied'
   | 'input_denied' | 'invalid_handle';

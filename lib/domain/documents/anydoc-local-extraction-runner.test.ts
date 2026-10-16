@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFileSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -21,7 +20,6 @@ const NEXT_CONFIG_SOURCE = readFileSync(new URL('../../../next.config.ts', impor
 const WORKER_PATH = path.resolve(path.dirname(new URL('./anydoc-local-extraction-runner.ts', import.meta.url).pathname), '../../../scripts/anydoc-local-extraction-worker.mjs');
 const CHECKER_PATH = path.resolve(path.dirname(WORKER_PATH), 'check-standalone-runtime-bundle.mjs');
 
-/* @Codex */
 function syntheticPdf(pageKinds: readonly ('text' | 'scan')[]): Buffer {
     const pageIds = pageKinds.map((_, index) => 5 + index * 2);
     const objects: Buffer[] = [
@@ -197,7 +195,7 @@ test('ignores hostile caller cwd when locating the owned worker', async () => {
 });
 
 test('fails closed with sanitized io_failure for missing, symlinked, and tampered workers', async () => {
-    /* @Codex: this test must never mutate the shared checkout worker while other test files execute. */
+    /* this test must never mutate the shared checkout worker while other test files execute. */
     const packageRoot = path.resolve(path.dirname(WORKER_PATH), '..');
     const fixtureRoot = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'mediflow-anydoc-worker-fixture-')));
     const relativeWorker = 'scripts/anydoc-local-extraction-worker.mjs';
@@ -219,7 +217,7 @@ test('fails closed with sanitized io_failure for missing, symlinked, and tampere
             assert.deepEqual(readFileSync(destination), readFileSync(path.join(packageRoot, relativePath)));
         }
         symlinkSync(path.join(packageRoot, 'node_modules'), path.join(fixtureRoot, 'node_modules'), 'dir');
-        /* @Codex: a literal import in a synthetic child driver keeps the privacy import guard inspectable. */
+        /* a literal import in a synthetic child driver keeps the privacy import guard inspectable. */
         const fixtureDriver = path.join(fixtureRoot, 'driver.mjs');
         writeFileSync(fixtureDriver, `import { extractAnyDocLocalBytes } from './lib/domain/documents/anydoc-local-extraction-runner.ts';
 const chunks = [];

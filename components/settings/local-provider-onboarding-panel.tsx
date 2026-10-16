@@ -1,5 +1,4 @@
 'use client';
-/* @Codex */
 import { useEffect, useRef, useState } from 'react';
 import { FUNCTION_META, FUNCTION_STATE_LABELS } from '@/lib/function-status';
 import { createLocalProviderOnboardingWorkflow, INITIAL_LOCAL_ONBOARDING_VIEW } from './local-provider-onboarding-workflow';

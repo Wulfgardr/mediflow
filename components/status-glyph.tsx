@@ -53,7 +53,7 @@ const GLYPH_MAP: Record<
     },
     high: {
         icon: AlertTriangle,
-        /* @Codex WUL-UIUX: 'high' (critico) deve gridare, non avere la stessa
+        /* WUL-UIUX: 'high' (critico) deve gridare, non avere la stessa
            ricetta tenue di 'archived'. Bordo e fondo a piena forza + ombra. */
         label: 'Priorità alta',
         className: 'border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]',

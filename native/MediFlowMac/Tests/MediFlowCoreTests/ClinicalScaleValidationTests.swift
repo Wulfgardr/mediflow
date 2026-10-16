@@ -1,4 +1,4 @@
-// @Codex MF085-002/003: exact production scoring/write gate, shared synthetic vectors.
+// MF085-002/003: exact production scoring/write gate, shared synthetic vectors.
 import Foundation
 import XCTest
 @testable import MediFlowCore

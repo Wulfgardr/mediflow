@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 

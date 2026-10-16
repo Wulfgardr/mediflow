@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
-/* @Codex */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
-/* @Codex: run before runtime probes or target imports (ADR 0130). */
+/* run before runtime probes or target imports (ADR 0130). */
 const optionEnd = args.indexOf('--');
 const options = optionEnd === -1 ? args : args.slice(0, optionEnd);
 if (options.includes('--test') && !process.env.MEDIFLOW_DATA_DIR?.trim()) {

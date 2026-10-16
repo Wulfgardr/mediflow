@@ -1,4 +1,4 @@
-/* @Codex: synthetic real HTTP proof for Web-cookie and local-token diary admission. */
+/* synthetic real HTTP proof for Web-cookie and local-token diary admission. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';

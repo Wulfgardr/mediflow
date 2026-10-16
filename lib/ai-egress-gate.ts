@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type EgressGateStatus = 'allowed' | 'closed_pending_redaction_lane' | 'blocked_residual_entities';
 

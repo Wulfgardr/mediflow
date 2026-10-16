@@ -1,4 +1,3 @@
-/* @Codex */
 import { cookies } from 'next/headers';
 
 import { completeExactWebP3ApplicationLock } from '@/lib/security/web-auth-application-lock-server';

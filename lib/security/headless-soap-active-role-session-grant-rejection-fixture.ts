@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHeadlessSoapActiveRoleSessionGrantOwner } from './headless-soap-active-role-session-grant.ts';
 import { issueSyntheticWebSession, retireSyntheticWebSession } from './web-auth-lifecycle-owner-test-fixture.ts';

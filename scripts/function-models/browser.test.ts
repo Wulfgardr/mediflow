@@ -1,4 +1,4 @@
-/* @Codex: synthetic transport only; no production imports or model calls. */
+/* synthetic transport only; no production imports or model calls. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createPreferencesClient, parsePreferences, type FunctionModelPreferences, type FunctionModelCommand } from '../../lib/function-models/browser';

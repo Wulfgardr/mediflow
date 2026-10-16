@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { createHash } from 'node:crypto';
 import type { SynthesisInput } from './execution-contract';

@@ -1,4 +1,4 @@
-/* @Codex — browser protocol tests. HTTP and process peers are explicit doubles. */
+/* browser protocol tests. HTTP and process peers are explicit doubles. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createOrdinaryBrowser, parseOrdinaryBrowserSettings, parseOrdinaryCatalog } from './ordinary-browser';

@@ -1,14 +1,11 @@
-/* @Codex */
 import {
     validateDocumentDecision,
     type DocumentDecision,
     type DocumentDecisionActionKind,
 } from './document-decision';
 
-/* @Codex */
 export const DOCUMENT_DECISION_MODEL_GOVERNANCE_VERSION = 'mediflow.document_decision_model_governance.v1';
 
-/* @Codex */
 export type DocumentDecisionModelLane =
     | 'ocr'
     | 'classification'
@@ -17,7 +14,6 @@ export type DocumentDecisionModelLane =
     | 'write_plan'
     | 'benchmark_shadow_eval';
 
-/* @Codex */
 export type DocumentDecisionModelPolicyMode =
     | 'local_ocr_only'
     | 'deterministic_or_local_llm_bounded'
@@ -25,14 +21,12 @@ export type DocumentDecisionModelPolicyMode =
     | 'human_review_only'
     | 'shadow_eval_only';
 
-/* @Codex */
 export interface DocumentDecisionModelPolicy {
     lane: DocumentDecisionModelLane;
     mode: DocumentDecisionModelPolicyMode;
     rationale: string;
 }
 
-/* @Codex */
 export interface DocumentDecisionModelGovernanceResult {
     schemaVersion: typeof DOCUMENT_DECISION_MODEL_GOVERNANCE_VERSION;
     valid: boolean;
@@ -56,7 +50,6 @@ const STRUCTURED_WRITE_ACTIONS = new Set<DocumentDecisionActionKind>([
     'create_prosthetic_prescription_proposal',
 ]);
 
-/* @Codex */
 export function documentDecisionModelPolicies(): DocumentDecisionModelPolicy[] {
     return [
         {
@@ -92,7 +85,6 @@ export function documentDecisionModelPolicies(): DocumentDecisionModelPolicy[] {
     ];
 }
 
-/* @Codex */
 export function validateDocumentDecisionModelGovernance(
     decision: DocumentDecision,
 ): DocumentDecisionModelGovernanceResult {

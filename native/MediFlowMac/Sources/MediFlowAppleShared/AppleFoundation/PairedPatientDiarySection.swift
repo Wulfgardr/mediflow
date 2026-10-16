@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedPatientDiarySection: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
@@ -12,7 +11,7 @@ struct PairedPatientDiarySection: View {
     @Binding var presentingScale: ClinicalScaleDefinition?
     @Binding var attachmentDetailCandidate: HomeBaseAttachmentSummary?
 
-    /* @Codex: the final layout keeps labels visible at narrow and AX widths. */
+    /* the final layout keeps labels visible at narrow and AX widths. */
     @ViewBuilder
     private var diaryHeader: some View {
         if dynamicTypeSize.isAccessibilitySize {
@@ -98,7 +97,7 @@ struct PairedPatientDiarySection: View {
                 .modifier(PairedDiaryControlLabel())
         }
         .font(.subheadline)
-        // @Codex: The ordinary refresh closes the editor. Conflict recovery uses
+        // The ordinary refresh closes the editor. Conflict recovery uses
         // the dedicated comparison action in the composer, preserving its draft.
         .disabled(model.isWorking || model.selectedPatient == nil || model.isEditingEntry)
         .accessibilityIdentifier("homebase-refresh-entries-button")
@@ -171,9 +170,9 @@ struct PairedPatientDiarySection: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(filteredDiaryEntries) { entry in
                     VStack(alignment: .leading, spacing: 8) {
-                        /* @Codex: give chronology its own line, preserving the native Registro. */
+                        /* give chronology its own line, preserving the native Registro. */
                         #if os(iOS)
-                        // @Codex: A full year and named month make chronology readable.
+                        // A full year and named month make chronology readable.
                         Text(entry.date, format: .dateTime.day().month(.abbreviated).year().hour().minute())
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -231,7 +230,6 @@ struct PairedPatientDiarySection: View {
                         if !entryAttachments.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 ForEach(entryAttachments) { attachment in
-                                    /* @Codex */
                                     Button {
                                         attachmentDetailCandidate = attachment
                                         Task { await model.openAttachmentDetail(attachment) }
@@ -293,7 +291,7 @@ struct PairedPatientDiarySection: View {
                         }
                     }
                         #if os(iOS)
-                        // @Codex: Each dated entry is a readable document block.
+                        // Each dated entry is a readable document block.
                         .padding(.vertical, 20)
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -319,7 +317,6 @@ struct PairedPatientDiarySection: View {
         }
     }
 
-    /* @Codex */
 
     private var filteredDiaryEntries: [HomeBaseEntrySummary] {
         EntryFiltering.apply(
@@ -330,7 +327,6 @@ struct PairedPatientDiarySection: View {
     }
 }
 
-/* @Codex */
 struct PairedPatientScalesSection: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var presentingScale: ClinicalScaleDefinition?
@@ -349,5 +345,4 @@ struct PairedPatientScalesSection: View {
         )
     }
 
-    /* @Codex */
 }

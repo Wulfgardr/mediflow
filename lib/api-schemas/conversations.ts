@@ -1,4 +1,3 @@
-/* @Codex */
 import { z } from 'zod';
 import { optionalBooleanSchema, optionalIdSchema, requiredTextSchema } from './common';
 

@@ -1,7 +1,6 @@
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class MobilePairedStatusPresentationTests: XCTestCase {
     func testLoadingAndErrorTakePrecedenceOverConnectionState() {
         let loading = MobilePairedStatusPresentation.make(

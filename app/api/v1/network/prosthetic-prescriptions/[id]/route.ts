@@ -1,13 +1,9 @@
-/* @Codex */
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY,
     updateNetworkScopedProstheticPrescription,
 } from '@/lib/prosthetic-prescription-write';
-/* @Codex */
 import { requireNetworkWriteContext } from '@/lib/network-write-context';
 
 type RouteContext = { params: Promise<{ id: string }> };

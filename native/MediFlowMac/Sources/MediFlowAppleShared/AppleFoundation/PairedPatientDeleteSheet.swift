@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedPatientDeleteSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: PairedPatientsWorkspaceModel

@@ -2,32 +2,26 @@ import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request'
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { users } from '@/lib/schema';
-/* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import {
     abortNativeSystemAdminReset,
     commitNativeSystemAdminReset,
     prepareNativeSystemAdminReset,
     SESSION_COOKIE_NAME,
 } from '@/lib/security/server-session';
-/* @Codex */
 import {
     abortAdminReset,
     commitAdminReset,
     prepareAdminReset,
 } from '@/lib/security/web-auth-lifecycle-owner-adapter';
-/* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 
-/* @Codex */
 function resetFailure(status: 409 | 500, code: string, message: string) {
     const response = NextResponse.json({ success: false, error: message, code }, { status });
     response.headers.set('Cache-Control', 'no-store');
     return response;
 }
 
-/* @Codex */
 function abortPreparedReset(webCapability: object | null, nativeCapability: object | null): void {
     if (webCapability) {
         try { abortAdminReset(webCapability); } catch { /* no database mutation has occurred */ }
@@ -38,7 +32,6 @@ function abortPreparedReset(webCapability: object | null, nativeCapability: obje
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (session.role !== 'admin') return forbiddenResponse();

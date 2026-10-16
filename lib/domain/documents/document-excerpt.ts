@@ -1,8 +1,6 @@
-/* @Codex */
 const MAX_STORED_DOCUMENT_CHARS = 3000;
 const LONG_DOCUMENT_LINE_CHARS = 240;
 
-/* @Codex */
 const DOCUMENT_SIGNAL_KEYWORDS = [
     'anamnesi',
     'allerg',
@@ -70,7 +68,6 @@ function splitLongDocumentLine(line: string): string[] {
     return parts;
 }
 
-/* @Codex */
 export function splitDocumentIntoLines(text: string): string[] {
     return text
         .replace(/\r/g, '\n')
@@ -80,7 +77,6 @@ export function splitDocumentIntoLines(text: string): string[] {
         .filter(Boolean);
 }
 
-/* @Codex */
 function isSignalHeading(line: string): boolean {
     const normalized = line.toLowerCase().trim().replace(/[:;\-–]+$/, '');
     if (!normalized) return false;
@@ -93,7 +89,6 @@ function isSignalHeading(line: string): boolean {
         && DOCUMENT_SIGNAL_KEYWORDS.some((keyword) => normalized.includes(keyword));
 }
 
-/* @Codex */
 export function buildDocumentExcerpt(text: string, maxChars: number): string {
     if (!text) return '';
     if (text.length <= maxChars) return text;
@@ -162,7 +157,6 @@ export function buildDocumentExcerpt(text: string, maxChars: number): string {
         .join('\n');
 }
 
-/* @Codex */
 export function buildStoredDocumentExcerpt(text: string): string {
     return buildDocumentExcerpt(text, MAX_STORED_DOCUMENT_CHARS);
 }

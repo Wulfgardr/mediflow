@@ -1,4 +1,3 @@
-/* @Codex */
 import fs from 'node:fs';
 import { buildLocalAbsorptionTelemetryReportFromInputs } from '../lib/local-absorption-telemetry';
 import type { BuildEvidenceQueueInput } from '../lib/domain/documents/evidence-queue-contract';

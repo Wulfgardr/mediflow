@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -45,7 +44,6 @@ test('the three production routes bind only the authenticated host operation', a
     }
 });
 
-/* @Codex */
 test('DS confirmation binds patient identity and invalidates the controller on lock or identity changes', async () => {
     const card = await readFile(CARD, 'utf8'); const upload = await readFile(UPLOAD, 'utf8');
     assert.match(upload, /DocumentSynthesisFabricReviewCard\s+patientId=\{patientId\}/u);
@@ -58,7 +56,6 @@ test('DS confirmation binds patient identity and invalidates the controller on l
     assert.match(card, /useEffect\(\(\) => \(\) => \{[\s\S]*?controller.reset\(\)/u);
 });
 
-/* @Codex */
 test('DS ordinary confirmation shows human names, requires an explicit choice and uses shared action geometry', async () => {
     const card = await readFile(CARD, 'utf8'); const upload = await readFile(UPLOAD, 'utf8');
     assert.match(upload, /attachmentName=\{selectedAttachment.name\}/u);

@@ -1,5 +1,5 @@
 import { AifaReductionConfirmationRequired } from './aifa-importer';
-/* @Codex: UI-only operation lifetime; no authority, writer or HTTP contract is minted here. */
+/* UI-only operation lifetime; no authority, writer or HTTP contract is minted here. */
 import type { AifaCatalogClientStatus, AifaImportClientResult } from './aifa-importer';
 import type { AifaCatalogManifestInput } from './aifa-catalog';
 

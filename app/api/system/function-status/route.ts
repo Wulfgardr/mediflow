@@ -1,4 +1,4 @@
-/* @Codex WUL-674: reuse configuration owners, never invoke an inference here. */
+/* WUL-674: reuse configuration owners, never invoke an inference here. */
 import { inArray } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
             const result = createHostProviderLifecycleService({ provider }).service.read();
             return result.status === 'available' ? result.record.lifecycle.status : result.reason;
         };
-        // @Codex: report the persisted default, never an ephemeral request override.
+        // report the persisted default, never an ephemeral request override.
         let functionBindings: FunctionStatusSources['functionBindings'];
         try {
             const preferences = functionModelPreferencesService.read();

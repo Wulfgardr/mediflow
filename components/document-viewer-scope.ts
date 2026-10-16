@@ -1,4 +1,4 @@
-/* @Codex — bounded async ownership; timers do not preempt synchronous browser work. */
+/* bounded async ownership; timers do not preempt synchronous browser work. */
 import { PreviewError } from './document-viewer-policy.ts';
 
 export class PreviewScope {

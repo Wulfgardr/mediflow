@@ -86,7 +86,7 @@
   padding: 9px 12px;
 }
 
-/* @Codex WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
+/* WUL-UIUX: l'input azzera il proprio outline; l'indicatore di focus da
    tastiera vive sul contenitore, coerente con l'anello condiviso. */
 
 .patientSearchField:focus-within {
@@ -464,7 +464,7 @@
 
 }
 
-/* @Codex Compact localhost worklist preserves scan order and 44px touch targets. */
+/* Compact localhost worklist preserves scan order and 44px touch targets. */
 @media (max-width: 480px) {
   .worklistPanel { padding: 10px; }
 
@@ -552,7 +552,7 @@
   }
 }
 
-/* @Codex #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
+/* #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
 .quadroFocal {
   min-width: 0; padding: 10px; color: var(--lume-ink);
   display: flex; flex-direction: column; gap: 16px;
@@ -700,7 +700,7 @@
   .quadroPrimaryAction, .quadroQuietAction { transition-duration: 0.01ms; }
 }
 
-/* @Codex WUL-UIUX: su puntatore grossolano (iPad tra le visite) i controlli
+/* WUL-UIUX: su puntatore grossolano (iPad tra le visite) i controlli
    toccabili rispettano il minimo 44pt; il mouse conserva la densita. */
 @media (pointer: coarse) {
   .scopeChip,

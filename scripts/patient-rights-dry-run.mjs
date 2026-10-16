@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex: synthetic contract exploration only; no database, auth, export or clinical write. */
+/* synthetic contract exploration only; no database, auth, export or clinical write. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

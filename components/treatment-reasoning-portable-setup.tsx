@@ -1,5 +1,5 @@
 'use client';
-/* @Codex: a read-only host-state projection; never accepts paths or executes provisioning. */
+/* a read-only host-state projection; never accepts paths or executes provisioning. */
 type PortableOption = Readonly<{ provider: string; state: string; provisioningState?: string; prerequisites?: readonly string[] }>;
 const messages: Readonly<Record<string, string>> = Object.freeze({
     NEEDS_CONTEXT: 'Mancano runtime e pesi verificati: nessun motore portabile è attivo.',

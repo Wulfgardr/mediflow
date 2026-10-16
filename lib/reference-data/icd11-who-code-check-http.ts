@@ -1,4 +1,3 @@
-/* @Codex */
 import { isWhoCheckCode } from './icd11-who-code-check-contract';
 import { Icd11WhoServiceError } from './icd11-who-service';
 import type { Icd11WhoLocalRuntime } from './icd11-who-local-runtime';

@@ -1,7 +1,6 @@
 import SwiftUI
 import Charts
 
-/* @Codex */
 struct PairedPatientClinicalSections: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var checkupStatusFilter: CheckupStatusFilter
@@ -104,7 +103,6 @@ struct PairedPatientClinicalSections: View {
         }
     }
 
-    /* @Codex */
     private var observationsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             PairedPatientSectionHeader(model: model,
@@ -189,14 +187,12 @@ struct PairedPatientClinicalSections: View {
         }
     }
 
-    /* @Codex */
 
     private func checkupStatusColor(_ checkup: HomeBaseCheckupSummary) -> Color {
         if checkup.deletedAt != nil { return toneColor(.attention) }
         return toneColor(PairedCheckupStatus(rawValue: checkup.status)?.tone ?? .neutral)
     }
 
-    /* @Codex */
     private func toneColor(_ tone: LumeTone) -> Color {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         return LumePalette.tint(for: tone, using: palette)
@@ -252,7 +248,6 @@ struct PairedPatientClinicalSections: View {
         .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
-    /* @Codex */
     /// "LOINC 29463-7 · 15/06/2025" instead of "http://loinc.org 29463-7 - ...".
     ///
     /// `codeSystem` carries the FHIR system URI, which identifies the coding
@@ -414,7 +409,6 @@ struct PairedPatientClinicalSections: View {
         }
     }
 
-    /* @Codex */
     private func checkupForm(
         title: String,
         checkupTitle: Binding<String>,
@@ -464,7 +458,6 @@ struct PairedPatientClinicalSections: View {
         }
     }
 
-    /* @Codex */
     private func observationForm(
         title: String,
         display: Binding<String>,
@@ -546,7 +539,6 @@ struct PairedPatientClinicalSections: View {
         }
     }
 
-    /* @Codex */
     @ViewBuilder
     private func terminologyResultsList(
         title: String,
@@ -588,5 +580,4 @@ struct PairedPatientClinicalSections: View {
         }
     }
 
-    /* @Codex */
 }

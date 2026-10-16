@@ -1,5 +1,5 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
-/* @Codex: paired-network admission remains at the route; this export preserves its write boundary. */
+/* paired-network admission remains at the route; this export preserves its write boundary. */
 import { requestIdFromRequest } from './security/audit';
 import { entryExpectedVersion, prepareEntryCreate, prepareEntryUpdate } from './entry-write-input';
 import { createEntryOperation, updateEntryOperation } from './entry-write-operation';
@@ -48,7 +48,6 @@ function audit(context: Context) {
     };
 }
 
-/* @Codex */
 export async function createNetworkScopedEntry(context: Context, body: Record<string, unknown>): Promise<Result> {
     const boundary = networkBoundary(body, FORBIDDEN_CREATE);
     if (boundary) return boundary;
@@ -59,7 +58,6 @@ export async function createNetworkScopedEntry(context: Context, body: Record<st
         scopeAmbulatoryId: context.scopeAmbulatoryId, audit: audit(context) });
 }
 
-/* @Codex */
 export async function updateNetworkScopedEntry(context: UpdateContext, body: Record<string, unknown>): Promise<Result> {
     if (entryExpectedVersion(body.version) === null) {
         return { status: 400, value: { error: 'Version is required' } };

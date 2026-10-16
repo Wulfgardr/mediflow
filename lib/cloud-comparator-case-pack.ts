@@ -1,16 +1,11 @@
-/* @Codex */
 import type { TherapySuggestionState } from './ai-task-contracts';
 
-/* @Codex */
 export const CLOUD_COMPARATOR_CASE_PACK_SCHEMA_VERSION = 'mediflow.cloud_comparator_case_pack.v1';
 
-/* @Codex */
 export const CLOUD_COMPARATOR_STORAGE_MODES = ['private-shadow-vault'] as const;
 
-/* @Codex */
 export type CloudComparatorStorageMode = typeof CLOUD_COMPARATOR_STORAGE_MODES[number];
 
-/* @Codex */
 export const CLOUD_COMPARATOR_SOURCE_KINDS = [
     'single-document',
     'document-bundle',
@@ -20,13 +15,10 @@ export const CLOUD_COMPARATOR_SOURCE_KINDS = [
 
 const CLOUD_COMPARATOR_THERAPY_STATES = ['active', 'transition', 'uncertain', 'inactive'] as const;
 
-/* @Codex */
 export type CloudComparatorSourceKind = typeof CLOUD_COMPARATOR_SOURCE_KINDS[number];
 
-/* @Codex */
 export type ExpectedTokenMatcher = string[] | string[][];
 
-/* @Codex */
 export interface CloudComparatorOrigin {
     storage: CloudComparatorStorageMode;
     sourceKind: CloudComparatorSourceKind;
@@ -34,7 +26,6 @@ export interface CloudComparatorOrigin {
     operatorRef: string;
 }
 
-/* @Codex */
 export interface CloudComparatorPrivacyGate {
     directIdentifiersRemoved: boolean;
     quasiIdentifiersMinimized: boolean;
@@ -44,7 +35,6 @@ export interface CloudComparatorPrivacyGate {
     approvedAt?: string;
 }
 
-/* @Codex */
 export interface CloudComparatorPatientInsightExpected {
     currentStateAny?: ExpectedTokenMatcher[];
     alertsAny?: ExpectedTokenMatcher[];
@@ -56,27 +46,23 @@ export interface CloudComparatorPatientInsightExpected {
     maxIncompleteClaims?: number;
 }
 
-/* @Codex */
 export interface CloudComparatorPatientInsightCase {
     context: string;
     expected: CloudComparatorPatientInsightExpected;
     maxTokens?: number;
 }
 
-/* @Codex */
 export interface CloudComparatorExpectedDiagnosis {
     labelTokens: string[];
     icdQueryTokens?: string[];
 }
 
-/* @Codex */
 export interface CloudComparatorExpectedTherapy {
     drugTokens: string[];
     dosageTokens?: string[];
     therapyState?: TherapySuggestionState;
 }
 
-/* @Codex */
 export interface CloudComparatorSmartImportExpected {
     diagnoses?: CloudComparatorExpectedDiagnosis[];
     therapies?: CloudComparatorExpectedTherapy[];
@@ -84,14 +70,12 @@ export interface CloudComparatorSmartImportExpected {
     forbiddenTherapyTokens?: string[][];
 }
 
-/* @Codex */
 export interface CloudComparatorSmartImportCase {
     payload: Record<string, unknown>;
     expected: CloudComparatorSmartImportExpected;
     maxTokens?: number;
 }
 
-/* @Codex */
 export interface CloudComparatorDistillationPlan {
     syntheticArchetypeHints: string[];
     followupQuestions: string[];
@@ -99,7 +83,6 @@ export interface CloudComparatorDistillationPlan {
     hypothesisTags?: string[];
 }
 
-/* @Codex */
 export interface CloudComparatorCasePack {
     schemaVersion: typeof CLOUD_COMPARATOR_CASE_PACK_SCHEMA_VERSION;
     id: string;
@@ -347,7 +330,6 @@ function parseDistillationPlan(value: unknown, path: string): CloudComparatorDis
     };
 }
 
-/* @Codex */
 export function hasCloudComparatorApproval(casePack: CloudComparatorCasePack): boolean {
     return casePack.privacy.directIdentifiersRemoved
         && casePack.privacy.quasiIdentifiersMinimized
@@ -355,7 +337,6 @@ export function hasCloudComparatorApproval(casePack: CloudComparatorCasePack): b
         && casePack.privacy.cloudExportApproved;
 }
 
-/* @Codex */
 export function parseCloudComparatorCasePack(value: unknown): CloudComparatorCasePack {
     if (!isRecord(value)) {
         throw new Error('Expected cloud comparator case pack object');

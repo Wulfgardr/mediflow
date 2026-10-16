@@ -1,4 +1,4 @@
-/* @Codex Issue 109, riferimento 68: review Lume, una gerarchia per caso. */
+/* Issue 109, riferimento 68: review Lume, una gerarchia per caso. */
 
 /* Selettori della review sintetica, condivisi con revisione-area. */
 .docGrid {
@@ -109,7 +109,7 @@
   .quietAction { transition-duration: 0ms; }
 }
 
-/* @Codex WUL-UIUX: focus visibile e target tattile per i pulsanti di campo. */
+/* WUL-UIUX: focus visibile e target tattile per i pulsanti di campo. */
 .fieldBtn:focus-visible {
   outline: none;
   box-shadow:

@@ -1,4 +1,3 @@
-/* @Codex */
 
 import { resolveStaticTerminology } from './terminology';
 
@@ -104,7 +103,7 @@ function median(values: number[]): number {
         : sorted[middle];
 }
 
-/* @Codex Una giornata clinica contribuisce una sola volta alla cadenza. */
+/* Una giornata clinica contribuisce una sola volta alla cadenza. */
 function utcDayIndex(date: Date): number {
     return Math.floor(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) / DAY_MS);
 }

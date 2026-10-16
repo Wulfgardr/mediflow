@@ -3,18 +3,13 @@ import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request'
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
-/* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
-/* @Codex */
 import { normalizeSettingValue } from '@/lib/settings-value';
-/* @Codex */
 import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
 import { apiInternalError } from '@/lib/api-error-response';
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSessionOrLocalToken(request);
     if (!session) return unauthorizedResponse();
 
@@ -26,7 +21,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Key and value required" }, { status: 400 });
         }
 
-        /* @Codex */
         const decision = evaluateSettingsWrite(key, session);
         if (!decision.allowed) {
             return NextResponse.json({ error: decision.reason }, { status: decision.status });
@@ -37,7 +31,6 @@ export async function POST(request: Request) {
             console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/security/settings-write-policy.ts`);
         }
 
-        /* @Codex */
         const persistedValue = normalizeSettingValue(value);
 
         // Upsert (Insert or Update) logic

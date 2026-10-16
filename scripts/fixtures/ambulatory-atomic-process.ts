@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from '../../lib/security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: independent SQLite writer used only with a synthetic temp database. */
+/* independent SQLite writer used only with a synthetic temp database. */
 import { dbServer } from '../../lib/db-server.ts';
 import { updateAmbulatory } from '../../lib/ambulatory-write.ts';
 

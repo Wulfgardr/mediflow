@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: ordinary route handlers with synthetic admission seams and real SQLite readback. */
+/* ordinary route handlers with synthetic admission seams and real SQLite readback. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -1,9 +1,6 @@
-/* @Codex */
 export type TherapyStatus = 'active' | 'suspended' | 'completed';
-/* @Codex */
 export type CheckupStatus = 'pending' | 'completed' | 'cancelled';
 
-/* @Codex */
 const THERAPY_STATUS_MAP: Record<string, TherapyStatus> = {
     active: 'active',
     suspended: 'suspended',
@@ -13,7 +10,6 @@ const THERAPY_STATUS_MAP: Record<string, TherapyStatus> = {
     interrupted: 'completed',
 };
 
-/* @Codex */
 const CHECKUP_STATUS_MAP: Record<string, CheckupStatus> = {
     pending: 'pending',
     completed: 'completed',
@@ -28,31 +24,26 @@ function clean(value: unknown): string | null {
     return trimmed.length > 0 ? trimmed : null;
 }
 
-/* @Codex */
 export function parseTherapyStatus(value: unknown): TherapyStatus | null {
     const key = clean(value);
     if (!key) return null;
     return Object.prototype.hasOwnProperty.call(THERAPY_STATUS_MAP, key) ? THERAPY_STATUS_MAP[key] : null;
 }
 
-/* @Codex */
 export function parseCheckupStatus(value: unknown): CheckupStatus | null {
     const key = clean(value);
     if (!key) return null;
     return Object.prototype.hasOwnProperty.call(CHECKUP_STATUS_MAP, key) ? CHECKUP_STATUS_MAP[key] : null;
 }
 
-/* @Codex */
 export function normalizeTherapyStatus(value: unknown, fallback: TherapyStatus = 'active'): TherapyStatus {
     return parseTherapyStatus(value) ?? fallback;
 }
 
-/* @Codex */
 export function normalizeCheckupStatus(value: unknown, fallback: CheckupStatus = 'pending'): CheckupStatus {
     return parseCheckupStatus(value) ?? fallback;
 }
 
-/* @Codex */
 export function therapyStatusFilterValues(value: string): string[] {
     const normalized = parseTherapyStatus(value);
     if (!normalized) return [value.trim()];
@@ -69,7 +60,6 @@ export function therapyStatusFilterValues(value: string): string[] {
     }
 }
 
-/* @Codex */
 export function checkupStatusFilterValues(value: string): string[] {
     const normalized = parseCheckupStatus(value);
     if (!normalized) return [value.trim()];

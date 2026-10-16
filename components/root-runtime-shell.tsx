@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -26,12 +25,12 @@ export function RootRuntimeShell({
 }) {
   const pathname = usePathname();
 
-  /* @Codex WUL-UIUX: i mockup non autenticati renderizzano nudi. */
+  /* WUL-UIUX: i mockup non autenticati renderizzano nudi. */
   if (MOCKUP_ROUTE_ALLOWLIST.has(pathname)) {
     return <>{children}</>;
   }
 
-  /* @Codex WUL-UIUX: layout fullscreen unico per tutte le route reali. La vecchia
+  /* WUL-UIUX: layout fullscreen unico per tutte le route reali. La vecchia
      shell con Sidebar + MobileShellChrome era di fatto codice morto (nessuna route
      la raggiungeva: cockpit, settings e patient coprivano gia tutto) e portava un
      secondo sistema di navigazione divergente con un h1 di brand concorrente.

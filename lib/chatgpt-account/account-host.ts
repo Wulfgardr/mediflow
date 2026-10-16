@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { accessSync, constants, mkdtempSync, mkdirSync, chmodSync, realpathSync, rmSync, writeFileSync } from 'node:fs';

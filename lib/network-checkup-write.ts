@@ -1,6 +1,6 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
 import { checkupCreateIdSchema } from './api-schemas/clinical-writes';
-/* @Codex: paired checkup boundary preserves current capability, normalization and ENC semantics. */
+/* paired checkup boundary preserves current capability, normalization and ENC semantics. */
 import { v4 as uuidv4 } from 'uuid';
 import { listChangedFields, requestIdFromRequest } from './security/audit';
 import { normalizeCheckupCreateInput, normalizeCheckupUpdateInput } from './api-v1-clinical-write-normalization';
@@ -82,7 +82,7 @@ function requiredAuditContext(context: NetworkCheckupMutationContext) {
     };
 }
 
-/* @Codex: boundary precedes shared IMMEDIATE admission, mutation and required audit. */
+/* boundary precedes shared IMMEDIATE admission, mutation and required audit. */
 export async function createNetworkScopedCheckup(
     context: NetworkCheckupMutationContext, body: Record<string, unknown>
 ): Promise<NetworkCheckupMutationResponse> {

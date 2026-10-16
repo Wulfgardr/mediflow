@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: real SQLite regression oracle for the five ordinary prosthetic writes. */
+/* real SQLite regression oracle for the five ordinary prosthetic writes. */
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -127,9 +127,9 @@ test('parent and paired scope admission, stale retry and archived parent', async
     }
 });
 
-/* @Codex: separate SQLite connections prove version serialization and parent currentness. */
+/* separate SQLite connections prove version serialization and parent currentness. */
 type ChildResult = { status?: number | string; value?: Record<string, unknown>; error?: string };
-/* @Codex: explicit startup barrier prevents a sequential launch from masquerading as contention. */
+/* explicit startup barrier prevents a sequential launch from masquerading as contention. */
 function launchChild(mode: 'update' | 'tombstone', ids: { patientId: string; id: string }) {
     const child = spawn(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/fixtures/prosthetic-atomic-process.ts', mode, ids.patientId, ids.id],
         { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: dir } });
@@ -175,7 +175,7 @@ test('two SQLite processes contend for one version; a later process sees tombsto
     assert.equal(read(parentIds.id).audit.length, 0);
 });
 
-/* @Codex: host actor attribution follows the admitted session, not a spoofed header. */
+/* host actor attribution follows the admitted session, not a spoofed header. */
 test('host system session retains its audit actor classification', async () => {
     if (baseline) return;
     const ids = seed();
@@ -190,7 +190,7 @@ test('host system session retains its audit actor classification', async () => {
     assert.ok(!JSON.stringify(event).includes('ENC:synthetic:'));
 });
 
-/* @Codex: a paired body cannot select another patient or actor. */
+/* a paired body cannot select another patient or actor. */
 test('paired create uses admitted patient and session identity', async () => {
     if (baseline) return;
     const ids = seed(); const other = seed();

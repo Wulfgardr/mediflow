@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +12,7 @@ import { validateAuditWriterControlFlow, validateDelegatedRouteAudit, validateLo
 
 const EVENT = 'record.changed';
 
-/* @Codex: real eight-handler roster plus parse-valid negative wiring/order mutations. */
+/* real eight-handler roster plus parse-valid negative wiring/order mutations. */
 test('diary required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
     const read = (file) => fs.readFileSync(file, 'utf8');
     const coreSource = read('lib/entry-write-operation.ts');
@@ -74,7 +73,7 @@ test('diary required-audit guard follows all eight handlers and rejects detached
     }
 });
 
-/* @Codex: each therapy operation has independent wiring and negative assertions. */
+/* each therapy operation has independent wiring and negative assertions. */
 test('therapy required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
     const read = (file) => fs.readFileSync(file, 'utf8');
     const coreSource = read('lib/therapy-write-operation.ts');
@@ -135,7 +134,7 @@ test('therapy required-audit guard follows all eight handlers and rejects detach
     }
 });
 
-/* @Codex: each observation operation has independent wiring and negative assertions. */
+/* each observation operation has independent wiring and negative assertions. */
 test('observation required-audit guard follows all eight handlers and rejects detached or bypassed audit', () => {
     const read = (file) => fs.readFileSync(file, 'utf8');
     const coreSource = read('lib/observation-write-operation.ts');
@@ -182,7 +181,7 @@ test('observation required-audit guard follows all eight handlers and rejects de
         }
         const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
         if (operation === 'create') {
-            /* @Codex: mutate the actual insert, including its authoritative identity overrides. */
+            /* mutate the actual insert, including its authoritative identity overrides. */
             const insert = coreSource.match(/const inserted = (tx\.insert\(observations\)[\s\S]*?\.run\(\));/);
             assert.ok(insert, 'observation create must expose the real insert statement');
             assert.notDeepEqual(validate({ coreSource: change(coreSource, insert[0],
@@ -243,7 +242,7 @@ test('checkup required-audit guard follows all eight handlers and rejects detach
         }
         const sourceKey = mode === 'network' ? 'bridgeSource' : 'routeSource';
         if (operation === 'create') {
-            /* @Codex: mutate the actual insert, including its authoritative identity overrides. */
+            /* mutate the actual insert, including its authoritative identity overrides. */
             const insert = coreSource.match(/const inserted = (tx\.insert\(checkups\)[\s\S]*?\.run\(\));/);
             assert.ok(insert, 'checkup create must expose the real insert statement');
             assert.notDeepEqual(validate({ coreSource: change(coreSource, insert[0],
@@ -332,7 +331,7 @@ test('main checks the real direct and transactional writer contracts and rejects
         ...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bownerFile:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bbridgeFile:\s*'([^']+)'/g).map((match) => match[1]),
-        /* @Codex: include the paired adapter and clear cardinality helper in the isolated gate fixture. */
+        /* include the paired adapter and clear cardinality helper in the isolated gate fixture. */
         ...gateSource.matchAll(/\badapterFile:\s*'([^']+)'/g).map((match) => match[1]),
         'lib/network-ambulatory-write.ts',
         'lib/test-container-clear.ts',
@@ -856,7 +855,7 @@ test('PIN guard accepts both canonical channels and rejects retirement/currentne
         requirePinRetirementOrder: true,
     };
     assert.deepEqual(validateAuditWriterControlFlow(config), []);
-    // @Codex: the post-CAS comment is explanatory, never the evidence of a commit.
+    // the post-CAS comment is explanatory, never the evidence of a commit.
     assert.deepEqual(validateAuditWriterControlFlow({ ...config, source: source.replace(
         '/* The credential CAS has committed: never abort its retirement fence. */',
         '/* Retain the failed completion state. */',
@@ -1040,7 +1039,7 @@ test('PIN guard accepts both canonical channels and rejects retirement/currentne
     }
 });
 
-/* @Codex: synthetic C04 transaction chain, independent of the runtime candidate checkout. */
+/* synthetic C04 transaction chain, independent of the runtime candidate checkout. */
 test('patient-update audit guard binds the PUT delegate, patient subject and required tx writer', () => {
     const spec = {
         handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
@@ -1109,7 +1108,7 @@ test('patient-update audit guard binds the PUT delegate, patient subject and req
     }
 });
 
-/* @Codex: C05 DELETE mutations use the frozen real source shape, without modifying runtime files. */
+/* C05 DELETE mutations use the frozen real source shape, without modifying runtime files. */
 test('patient-delete audit guard binds both DELETE routes to one tombstone and required tx writer', () => {
     const core = fs.readFileSync(path.join(process.cwd(), 'lib/patient-delete-operation.ts'), 'utf8');
     const audit = fs.readFileSync(path.join(process.cwd(), 'lib/security/audit.ts'), 'utf8');

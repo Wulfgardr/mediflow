@@ -10,14 +10,11 @@ import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { normalizeCheckupCreateInput } from '@/lib/api-v1-clinical-write-normalization';
-/* @Codex */
 import {
     checkupStatusFilterValues,
     normalizeCheckupStatus,
 } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { createCheckupOperation } from '@/lib/checkup-write-operation';
 
@@ -34,7 +31,6 @@ function parseLimit(value: string | null): number | null {
     return Math.min(parsed, 100);
 }
 
-/* @Codex */
 function parseDateParam(value: string | null): Date | null {
     if (!value) return null;
     const parsed = new Date(value);
@@ -55,7 +51,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         const { searchParams } = new URL(request.url);
         const limit = parseLimit(searchParams.get('limit'));
         const status = searchParams.get('status')?.trim();
-        /* @Codex */
         const statusFilterValues = status ? checkupStatusFilterValues(status) : null;
         const dateFrom = parseDateParam(searchParams.get('dateFrom'));
         const dateTo = parseDateParam(searchParams.get('dateTo'));
@@ -63,7 +58,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         const filters = [eq(checkups.patientId, id)];
         if (!includeDeleted) filters.push(isNull(checkups.deletedAt));
-        /* @Codex */
         if (statusFilterValues) filters.push(inArray(checkups.status, statusFilterValues));
         if (dateFrom) filters.push(gte(checkups.date, dateFrom));
         if (dateTo) filters.push(lte(checkups.date, dateTo));
@@ -103,12 +97,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     try {
         const auditSession = await requireLocalApiActorSession(request);
-        /* @Codex */
         const { id } = await params;
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
         const body = envelope.body;
-        /* @Codex */
         const auditBody = body;
         const parsedId = checkupCreateIdSchema.safeParse(body.id);
         if (!parsedId.success) return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -121,7 +113,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        // @Codex: preserve local-token actor selection outside the synchronous transaction.
+        // preserve local-token actor selection outside the synchronous transaction.
         const context = auditContextFromRequest(request, auditSession);
         const result = createCheckupOperation({
             patientId: id, checkupId: normalized.values.id, values: normalized.values, mode: 'v1',

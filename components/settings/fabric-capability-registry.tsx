@@ -1,4 +1,3 @@
-/* @Codex */
 import Link from 'next/link';
 import {
     FABRIC_CAPABILITY_LABELS,

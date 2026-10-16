@@ -1,8 +1,6 @@
-// @Codex
 import CryptoKit
 import Foundation
 
-/* @Codex */
 enum MediFlowQAStorageError: LocalizedError, Equatable {
     case invalidNamespace
     case missingNamespaceForQACopy
@@ -26,7 +24,6 @@ enum MediFlowQAStorageError: LocalizedError, Equatable {
     }
 }
 
-/* @Codex */
 enum MediFlowQAStorageSelection: Equatable {
     case ordinary
     case qa(namespace: String)
@@ -54,13 +51,11 @@ enum MediFlowQAStorageSelection: Equatable {
     }
 }
 
-/* @Codex */
 struct MediFlowMacStoragePair {
     let pairedStore: HomeBasePairedStore
     let cacheStore: HomeBasePatientCacheStore
 }
 
-/* @Codex */
 struct MediFlowMacStorageFactory {
     private let metadata: () -> [String: Any]
     private let bundleIdentifier: () -> String?

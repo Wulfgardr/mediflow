@@ -23,7 +23,6 @@ type TerminologyParityFixture = {
     items: TerminologyItem[];
 };
 
-/* @Codex */
 const parityFixture = JSON.parse(readFileSync(
     new URL('../native/contracts/terminology-parity.v1.json', import.meta.url),
     'utf8',

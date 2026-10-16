@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -263,7 +262,7 @@ test('publishes an exact deeply immutable non-authorizing graph', () => {
 });
 
 test('classifies all 36 OpenAPI GETs without admitting separate native authority to the 32 read candidates', () => {
-  // @Codex ADR 0135 keeps host-wide configuration under native authority. ADR 0115
+  // ADR 0135 keeps host-wide configuration under native authority. ADR 0115
   // authorizes WHO only as paired consultation and leaves its Headless packet separate.
   const excludedPrimaryOpenApiAuthority = [
     {

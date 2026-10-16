@@ -1,4 +1,4 @@
-/* @Codex — Mac-only, explicit consent/login/catalog/turn; never auto-apply. */
+/* Mac-only, explicit consent/login/catalog/turn; never auto-apply. */
 #if os(macOS)
 import Foundation
 import Combine

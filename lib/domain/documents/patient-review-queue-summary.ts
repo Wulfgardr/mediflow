@@ -90,7 +90,6 @@ const ATTENTION_STATES: ReadonlySet<ReviewQueueRowState> = new Set([
 
 const OPEN_PANEL_LABEL = 'Apri pannello';
 const PANEL_UNAVAILABLE_LABEL = 'Pannello non visibile';
-/* @Codex */
 const DOCUMENTS_PANEL_ANCHOR = '#documenti';
 
 function row(
@@ -253,7 +252,6 @@ function buildSmartImportRow(input: PatientReviewQueueInput['smartImport']): Pat
     );
 }
 
-/* @Codex */
 function buildArchiveRow(input: PatientReviewQueueInput['archive']): PatientReviewQueueRow {
     const anchor = DOCUMENTS_PANEL_ANCHOR;
 

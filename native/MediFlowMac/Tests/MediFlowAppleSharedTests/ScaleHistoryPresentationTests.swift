@@ -1,7 +1,6 @@
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class ScaleHistoryPresentationTests: XCTestCase {
     func testStoredScreeningTextAndVersionRemainIndependentOfCurrentPolicy() throws {
         for (id, score, interpretation) in [("mmse", 24, "Assenza di decadimento cognitivo (24-30)"),
@@ -92,7 +91,7 @@ final class ScaleHistoryPresentationTests: XCTestCase {
         XCTAssertNil(ScaleHistoryPresentation.item(from: entry))
     }
 
-    // @Codex: these are stored legacy literals, not recalculated scores or newly asserted cutoffs.
+    // these are stored legacy literals, not recalculated scores or newly asserted cutoffs.
     func testLegacyHistoricalScoresAndInterpretationsAreNotRecomputed() throws {
         for (score, interpretation) in [(18, "ALTO Rischio di Caduta (< 19)"),
                                          (24, "MEDIO Rischio di Caduta (19-24)"),

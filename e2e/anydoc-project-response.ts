@@ -1,4 +1,3 @@
-/* @Codex */
 import type { Page, Response as PlaywrightResponse } from '@playwright/test';
 
 // Same ceiling as boundedResponseText(project), not a larger inspector buffer.

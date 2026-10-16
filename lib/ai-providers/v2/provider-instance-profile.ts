@@ -1,4 +1,3 @@
-/* @Codex */
 import { types as nodeUtilTypes } from 'node:util';
 import { snapshotProviderLifecycleV2 } from './provider-lifecycle';
 export const PROVIDER_INSTANCE_PROFILE_V2_SCHEMA = 'mediflow.ai.provider-instance-profile.v2' as const;

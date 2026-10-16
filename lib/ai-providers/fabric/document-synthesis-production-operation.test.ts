@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
@@ -263,7 +262,6 @@ test('suppresses drift and denies caller source injection, unsupported extractio
     assert.equal(executions, 1);
 });
 
-/* @Codex */
 test('production registration completes Web retirement and disposes capture and preview handles', async () => {
     for (const reason of ['dispose', 'lock', 'delete'] as const) {
         const selected = context(); let entropy = 0; let extractions = 0;

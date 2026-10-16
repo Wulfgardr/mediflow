@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
@@ -14,7 +13,7 @@ const EXPECTED_NODE_ABI = '137';
 const EXPECTED_NEXT = '16.3.8';
 const SESSION_ID = 'a'.repeat(64);
 const CONTROL_ID = 'c'.repeat(64);
-/* @Codex: synchronous stage-only diagnostics; never print request cookies or response data. */
+/* synchronous stage-only diagnostics; never print request cookies or response data. */
 const traceProducer = (phase: string, started: bigint, detail = '') => {
     const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
     writeSync(2, `[unit-stage:next-producer] elapsed_ms=${elapsedMs.toFixed(1)} phase=${phase}${detail ? ` ${detail}` : ''}\n`);

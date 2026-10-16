@@ -1,4 +1,4 @@
-/* @Codex: Pure checkpoint/record assertions only; no host or UI proof. */
+/* Pure checkpoint/record assertions only; no host or UI proof. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { webcrypto } from 'node:crypto';
@@ -173,7 +173,7 @@ test('each clinical module requires authenticated sealed fields while canonical 
     }
 });
 
-// @Codex: PublicAppRevisionSummary uses the shared git --short=12 summary;
+// PublicAppRevisionSummary uses the shared git --short=12 summary;
 // descriptor provenance retains the immutable full owner-provided commit.
 test('host revision accepts the canonical 12-character prefix with coherent clean fingerprints', () => {
     const source = '25e8f8708f47a51c45f2bdfd64a8caa5e422d45b';

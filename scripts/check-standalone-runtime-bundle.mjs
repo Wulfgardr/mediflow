@@ -7,10 +7,10 @@ import { bundledTreatmentPortableFailure, treatmentPortablePrivateArtifact, runT
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
-import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs'; // @Codex
+import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 
-// @Codex: only safe, failure-only smoke diagnostics omit the CLI exception stack.
+// only safe, failure-only smoke diagnostics omit the CLI exception stack.
 class PdfPageWorkerSmokeError extends Error {}
 
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
@@ -63,7 +63,7 @@ const WEB_AUTH_OWNER_FILES = Object.freeze([
   ['package.json', 'ce1c7e461a95b8b939ff02317673a2c652b9ffcc5d2a7525a77134d1a99bb3d2'],
 ]);
 
-/* @Codex: P12 proves that the externalized final owner is a physical standalone copy
+/* P12 proves that the externalized final owner is a physical standalone copy
    and that its process-local authority cannot survive an A-to-B runtime restart. */
 const WEB_AUTH_OWNER_PROCESS_A = String.raw`
 'use strict';
@@ -124,7 +124,7 @@ function bundledWorkerFailure(standaloneDir) {
   return null;
 }
 
-/* @Codex: the PDF parser and renderer execute only through this digest-pinned,
+/* the PDF parser and renderer execute only through this digest-pinned,
    physically bundled child. A trace reference is required from the exact route. */
 function bundledPdfPageWorkerFailure(standaloneDir) {
   const workerPath = path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE);
@@ -147,7 +147,7 @@ function bundledPdfPageWorkerFailure(standaloneDir) {
     if (!fs.lstatSync(profileManifestPath).isFile()
         || createHash('sha256').update(fs.readFileSync(profileManifestPath)).digest('hex')
           !== 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf') return 'Standalone renderer manifest digest does not match the pinned child.';
-    // @Codex: required even when the optional OCR model is not provisioned.
+    // required even when the optional OCR model is not provisioned.
     const manifestPath = path.join(root, 'scripts', 'anydoc-tesseract-artifacts.json');
     if (!fs.lstatSync(manifestPath).isFile()
         || createHash('sha256').update(fs.readFileSync(manifestPath)).digest('hex')
@@ -263,7 +263,7 @@ function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {})
   });
 }
 
-/* @Codex: follow the pinned worker's desktop profiles and minimum glibc version.
+/* follow the pinned worker's desktop profiles and minimum glibc version.
    A supported host must produce a valid PNG; unavailable engines are not a pass. */
 function supportsPdfRendering(profiles, platform, arch, glibcVersion) {
   const profile = profiles.find((entry) => entry.platform === platform && entry.arch === arch);
@@ -351,7 +351,7 @@ function bundledAppleVisionScriptFailure(standaloneDir) {
   return null;
 }
 
-/* @Codex: OCR rasterization needs the exact physical N-API package pair in the
+/* OCR rasterization needs the exact physical N-API package pair in the
    standalone runtime. An exact roster also rejects accidental secret files. */
 function standaloneAppleVisionCanvasFailure(standaloneDir, requireFromStandalone) {
   if (process.platform !== 'darwin' || process.arch !== 'arm64') return null;
@@ -806,9 +806,8 @@ function runPdfPageWorkerSelfTest() {
     fs.mkdirSync(routeDirectory, { recursive: true });
     fs.writeFileSync(routePath, "'use strict';\n");
     fs.copyFileSync(sourceWorker, workerPath);
-    // @Codex
     fs.copyFileSync(path.join(process.cwd(), 'scripts', 'anydoc-pdf-renderer-profiles.json'), path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'));
-    // @Codex: exercise supported and unsupported hosts without simulating a renderer result.
+    // exercise supported and unsupported hosts without simulating a renderer result.
     const profiles = JSON.parse(fs.readFileSync(path.join(scriptsDir, 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
     for (const [platform, arch, libc, expected] of [
       ['darwin', 'arm64', undefined, true], ['win32', 'x64', undefined, true],
@@ -827,7 +826,6 @@ function runPdfPageWorkerSelfTest() {
     if (bundledPdfPageWorkerFailure(standaloneDir) !== null) {
       throw new Error('expected the pinned PDF page worker to pass');
     }
-    // @Codex
     const artifactManifestBytes = fs.readFileSync(artifactManifestPath);
     fs.appendFileSync(artifactManifestPath, ' ');
     if (!bundledPdfPageWorkerFailure(standaloneDir)?.includes('manifest digest'))
@@ -1056,7 +1054,7 @@ if (runtimeContract.schemaVersion !== 1 || runtimeContract.node?.major !== nodeC
 
 const requireFromStandalone = createRequire(serverPath);
 
-// @Codex: require the raw scheduler closure before any runtime smoke is attempted.
+// require the raw scheduler closure before any runtime smoke is attempted.
 await assertScheduledBackupRuntime(standaloneDir);
 
 function fail(message) {
@@ -1152,7 +1150,7 @@ function nativeArtifacts(packageDir, label, matcher) {
   }
 }
 
-// @Codex: The child-process parser must be fully self-contained and byte-identical.
+// The child-process parser must be fully self-contained and byte-identical.
 const anyDocWorkerFailure = bundledWorkerFailure(standaloneDir);
 if (anyDocWorkerFailure) fail(anyDocWorkerFailure);
 const appleVisionScriptFailure = bundledAppleVisionScriptFailure(standaloneDir);
@@ -1204,7 +1202,7 @@ const probe = new Database(':memory:');
 probe.prepare('select 1').get();
 probe.close();
 
-// @Codex: Native image optimization must not resolve through source node_modules.
+// Native image optimization must not resolve through source node_modules.
 let sharpEntry;
 try {
   sharpEntry = requireFromStandalone.resolve('sharp');

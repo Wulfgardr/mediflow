@@ -33,7 +33,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const apiRoot = path.join(repoRoot, 'app', 'api');
 
 const ALLOWLIST = [
-    /* @Codex Domain refusals are authored constants; unexpected exceptions stay generic. */
+    /* Domain refusals are authored constants; unexpected exceptions stay generic. */
     {
         file: 'app/api/drugs/update/route.ts',
         motivo:
@@ -155,7 +155,7 @@ function normalizza(testo, binding) {
         .replace(new RegExp(`\\b${b}\\s*\\?\\s*\\.`, 'g'), `${binding}.`);
 }
 
-/* @Codex: determina se un'assegnazione senza declarator risolve a un binding
+/* determina se un'assegnazione senza declarator risolve a un binding
    lessicale del catch. L'AST distingue gli scope annidati e ignora testo che
    sembra codice dentro commenti o stringhe. */
 function usaBindingLocaleCatch(corpo, nome, posizione) {
@@ -248,7 +248,7 @@ function analizza(file) {
            facoltativo: `dbHealthError = error.message`, su una variabile dichiarata
            fuori dal catch, e' la forma che sfuggiva. */
         const derivate = new Set();
-        /* @Codex: separa i binding che sopravvivono alla chiusura del catch. */
+        /* separa i binding che sopravvivono alla chiusura del catch. */
         const derivateVisibiliInCoda = new Set();
         const reDerivata = new RegExp(
             `(?:(const|let|var)\\s+)?([A-Za-z_$][\\w$]*)\\s*=[^;=]*(?:\\b${binding}\\s*\\.\\s*message\\b|\\bString\\s*\\(\\s*${binding}\\s*\\))`,
@@ -325,7 +325,7 @@ if (selfTest) {
         /* Confine della ricerca oltre il catch: una variabile omonima in un ALTRO
            handler dello stesso file non deve essere attribuita a questo catch. */
         { nome: 'variabile omonima in un altro handler', codice: "export async function GET(){try{}catch(error){const msg = error.message; console.error(msg)}}\nexport async function POST(){const msg = 'Richiesta non valida.'; return NextResponse.json({error:msg},{status:400})}", atteso: false },
-        /* @Codex: falsificatori per lo scope lessicale della ricerca in coda. */
+        /* falsificatori per lo scope lessicale della ricerca in coda. */
         { nome: 'variabile locale al catch ombreggiata nella coda', codice: "export async function GET(){try{}catch(error){const message = error.message; console.error(message)} const message = 'Errore interno.'; return NextResponse.json({error:message},{status:500})}", atteso: false },
         { nome: 'assegnazione a locale dichiarata prima nel catch', codice: "export async function GET(){try{}catch(error){let message; message = error.message; console.error(message)} const message = 'Errore interno.'; return NextResponse.json({error:message},{status:500})}", atteso: false },
         { nome: 'binding annidato non nasconde assegnazione esterna', codice: "export async function GET(){let message; try{}catch(error){message = error.message; if (debug) { const message = 'solo log'; console.error(message) }} return NextResponse.json({error:message},{status:500})}", atteso: true },

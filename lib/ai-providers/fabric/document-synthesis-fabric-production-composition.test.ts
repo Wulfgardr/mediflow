@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -32,7 +31,6 @@ test('does not expose the test binder outside Node test before dependency observ
 
 test('keeps the production terminal path direct and excludes forbidden composition concerns', async () => { const source = await readFile('lib/ai-providers/fabric/document-synthesis-fabric-production-composition.ts', 'utf8'); assert.match(source, /const TEST_HARNESS = \(\(\) => \{ for \(let index = 0; index < ProcessExecArgvLength; index \+= 1\)[\s\S]*?if \(!TEST_HARNESS\) return null; const bind = testBinding\(dependencies\);/u); assert.match(source, /const prepared = await prepareDocumentSynthesisFabricExecution\(handoff\);[\s\S]*?state = 'terminal';\s*return finalizeDocumentSynthesisFabricPreparedExecution\(prepared\.preparedToken\);/u); assert.doesNotMatch(source, /\/api\/proxy\/ollama|legacy service|providerToken:.*input|prompt:.*input|route|database|persistence|apply|UI/u); const terminal = source.match(/state = 'terminal';\s*return finalizeDocumentSynthesisFabricPreparedExecution\(prepared\.preparedToken\);/u)?.[0] ?? ''; assert.doesNotMatch(terminal, /catch|finally|freeze|clone|dispose|serialize|lookup|Promise/u); });
 
-/* @Codex */
 const OTHER_PAIR = Object.freeze({ ...PAIR, patientId: 'patient.synthetic.ds.production.other' });
 let webFixtureSequence = 0;
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 // Candidate fixture tool, never imported by the app or the ordinary TLS proxy.
 // Owner invocation (no implicit target, descriptor, client or credentials):
 // node scripts/mobile-home-base-interop-response-proxy.mjs \

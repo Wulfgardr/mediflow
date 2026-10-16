@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 const { CHATGPT_PRODUCT_ENTRY, selectProductOption, admitClinicalChatGptContext } = await import('./product-dispatch-seam.ts');

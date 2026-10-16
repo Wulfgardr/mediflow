@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
 
@@ -22,7 +21,7 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
     // values and would otherwise undo a click that landed too early.
     await openAiFunzioniSettings(page);
 
-    // @Codex: ordinary preferences require preview and a separate apply gesture.
+    // ordinary preferences require preview and a separate apply gesture.
     const preferences = page.getByTestId('function-preferences');
     const card = preferences.locator('article').filter({
       has: page.getByRole('heading', { name: 'Importazione assistita', exact: true }),
@@ -94,7 +93,7 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
 
     await page.goto(`/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
-    // @Codex: the blocked reason is disclosed in Riepilogo; the disabled
+    // the blocked reason is disclosed in Riepilogo; the disabled
     // generation control remains in the assisted summary disclosure.
     const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
       .getByRole('link', { name: 'Riepilogo', exact: true });

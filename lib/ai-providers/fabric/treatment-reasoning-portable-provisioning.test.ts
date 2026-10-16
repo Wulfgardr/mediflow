@@ -1,4 +1,4 @@
-/* @Codex: synthetic-only; no network, installer, model download or clinical DB. */
+/* synthetic-only; no network, installer, model download or clinical DB. */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
 import fs from 'node:fs';
@@ -195,7 +195,7 @@ test('physical-memory gate blocks activation of even synthetic fixtures; no admi
     assert.equal(fs.existsSync(path.join(f.root, 'selected.json')), false);
 });
 
-/* @Codex: application-root regressions use only owned synthetic directories. */
+/* application-root regressions use only owned synthetic directories. */
 function launcherFixture(t: TestContext) {
     const f = fixture(t);
     const applicationRoot = path.join(f.dataDir, 'launcher with spaces');

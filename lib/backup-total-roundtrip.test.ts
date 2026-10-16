@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -10,7 +9,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { commitExemptionImport, previewExemptionImport } from './exemption-catalog-import';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
-/* @Codex */
 import { createProstheticsCatalog } from './reference-data/prosthetics-catalog-service';
 import { PROSTHETICS_TEMPLATE } from './reference-data/prosthetics-catalog-contract';
 import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
@@ -26,9 +24,9 @@ const MEMBERSHIP_TABLE = 'patients_to_ambulatories';
 // C05: retired patient IDs are current-DB identity state, not an exported collection.
 // Their historical audit backfill does not qualify export/restore continuity (C15).
 const NON_BACKUP_TABLES = new Set(['settings', 'users', 'patient_duplicate_intents', 'patient_retired_ids']);
-/* @Codex Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
+/* Checkup enrollment is host-local authorization state and is not exported by the v1 clinical backup. */
 const LOCAL_ONLY_AUTHORITY_TABLES = new Set(['headless_checkup_active_role_attestations', 'archive_generation', 'archive_session_generations']);
-/* @Codex Command replay remains empty until append-only audit restore has a separate contract. */
+/* Command replay remains empty until append-only audit restore has a separate contract. */
 const AUDIT_DEPENDENT_EMPTY_TABLES = new Set(['durable_review_command_operations', 'durable_review_command_states']);
 const BACKUP_TABLES = {
     auditEvents: 'audit_events',
@@ -117,7 +115,7 @@ function insertRow(db: Database.Database, table: string, row: Record<string, unk
     ).run(...Object.values(row));
 }
 
-/* @Codex The authority record references a local user, which the backup intentionally does not export. */
+/* The authority record references a local user, which the backup intentionally does not export. */
 function alignSyntheticAuthorityActor(db: Database.Database): string {
     const current = db.prepare('SELECT id FROM users LIMIT 1').get() as { id: string } | undefined;
     assert.ok(current?.id, 'fixture database must contain a synthetic local user');
@@ -200,7 +198,6 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         ...(await sealed('siss_handoff_events', ['reason', 'next_action', 'notes', 'correlation_id'])),
         started_at: now + 18, completed_at: now + 19, outcome: 'completed', created_at: now + 18, updated_at: now + 19,
     });
-    /* @Codex */
     const proposal = {
         id: 'w7-proposal', patient_id: 'w7-patient', source_document_key: 'source-hmac-w7', candidate_key: 'candidate-hmac-w7',
         payload: await seal('document_diagnosis_proposals.payload'), status: 'accepted', confidence: 'high', decided_at: now + 20,
@@ -296,7 +293,7 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
     });
     insertRow(db, 'drugs', { aic: 'W7AIC', name: 'Farmaco sintetico', active_principle: 'Principio sintetico', company: 'Azienda sintetica', packaging: 'Fixture', packaging_search: 'fixture', class: 'A', price: 123, atc: 'W7ATC' });
     insertRow(db, 'exemptions', { code: 'W7EX', description: 'Esenzione sintetica', type: 'synthetic', source: 'fixture', start_date: now, end_date: now + 30, is_pharma: 1, is_specialist: 1, is_national: 0, updated_at: now + 25 });
-    /* @Codex Produce a real receipt using only an invented catalog row. */
+    /* Produce a real receipt using only an invented catalog row. */
     const bytes = Buffer.from([EXEMPTION_COLUMNS.join('|'), ['ZZ_BACKUP', 'Esenzione inventata backup', '\\N', '\\N', '\\N', 'S', 'N', '\\N'].join('|')].join('\r\n') + '\r\n');
     const preview = previewExemptionImport(db, bytes, 'inventato-backup.txt', 'synthetic-backup-operator');
     assert.ok(preview.proof);
@@ -309,7 +306,7 @@ type HeadlessSoapReplayFixture = {
     receipt: Record<string, unknown>;
 };
 
-/* @Codex The roundtrip source uses the real H7b owner so replay integrity, not a handcrafted ledger, is preserved. */
+/* The roundtrip source uses the real H7b owner so replay integrity, not a handcrafted ledger, is preserved. */
 function seedHeadlessSoapCommit(dataDir: string): HeadlessSoapReplayFixture {
     const fixtureUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-command-binding-test-fixture.ts')).href;
     const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-entry-commit-owner.ts')).href;
@@ -341,7 +338,6 @@ function seedHeadlessSoapCommit(dataDir: string): HeadlessSoapReplayFixture {
     )) as HeadlessSoapReplayFixture;
 }
 
-/* @Codex */
 function replayHeadlessSoapCommit(dataDir: string, fixture: HeadlessSoapReplayFixture): Record<string, unknown> {
     const fixtureUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-command-binding-test-fixture.ts')).href;
     const ownerUrl = pathToFileURL(path.join(ROOT, 'lib/security/headless-soap-entry-commit-owner.ts')).href;
@@ -408,7 +404,7 @@ function restoreArtifact(
     );
 }
 
-/* @Codex Exercises the real proposal owner across a same-ID/version restore in one Web process. */
+/* Exercises the real proposal owner across a same-ID/version restore in one Web process. */
 function exerciseCheckupAbaRestoreFence(targetDataDir: string, artifactPath: string): Record<string, unknown> {
     const artifactUrl = pathToFileURL(path.join(ROOT, 'lib/backup-artifact.ts')).href;
     const executorUrl = pathToFileURL(path.join(ROOT, 'lib/backup-restore-executor.ts')).href;
@@ -460,7 +456,6 @@ function exerciseCheckupAbaRestoreFence(targetDataDir: string, artifactPath: str
     )) as Record<string, unknown>;
 }
 
-/* @Codex */
 function headlessSoapRestoreFixture(): {
     payload: ReturnType<typeof createEmptyDataset>;
     audit: Record<string, unknown>;
@@ -579,7 +574,6 @@ function headlessSoapRestoreFixture(): {
     return { payload, audit };
 }
 
-/* @Codex */
 function insertAuditSnapshot(db: Database.Database, audit: Record<string, unknown>): void {
     insertRow(db, 'audit_events', {
         event_id: audit.eventId, schema_version: audit.schemaVersion, event_type: audit.eventType,
@@ -589,7 +583,6 @@ function insertAuditSnapshot(db: Database.Database, audit: Record<string, unknow
     });
 }
 
-/* @Codex */
 function countRows(db: Database.Database, table: string, where = ''): number {
     return (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)} ${where}`).get() as { count: number }).count;
 }
@@ -727,13 +720,11 @@ test('restores entries then exact H7b audits then ledger while preserving unrela
     } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
 });
 
-/* @Codex */
 function countCommandLedger(db: Database.Database): [number, number, number] {
     const count = (table: string) => (db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)}`).get() as { count: number }).count;
     return [count('durable_review_command_states'), count('durable_review_command_operations'), count('audit_events')];
 }
 
-/* @Codex */
 function seedCommandLedger(db: Database.Database): void {
     const reviewId = `review_${'a'.repeat(32)}`;
     db.prepare('INSERT INTO durable_review_command_states (review_id, review_state, revision, action) VALUES (?, ?, ?, ?)').run(reviewId, 'accepted', 2, 'accept');
@@ -745,7 +736,6 @@ function seedCommandLedger(db: Database.Database): void {
     );
 }
 
-/* @Codex */
 test('blocks current and legacy empty artifacts before clearing a target command replay ledger', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-command-hold-'));
     const emptyDataDir = path.join(workDir, 'empty-target');
@@ -920,7 +910,7 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             clearBackupTables(sourceDb, clinicalTables);
             clearBackupTables(targetDb, clinicalTables);
             const durableReviewCommand = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
-            /* @Codex Include nonempty synthetic repertory and receipt in the total round-trip gate. */
+            /* Include nonempty synthetic repertory and receipt in the total round-trip gate. */
             const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
             const catalogPreview = prosthetics.preview(catalogBytes, 'synthetic-roundtrip.csv', 'synthetic-backup');
             prosthetics.commit({ bytes: catalogBytes, sourceName: 'synthetic-roundtrip.csv', proof: catalogPreview.proof!, acceptSubset: true }, 'synthetic-backup', () => {});

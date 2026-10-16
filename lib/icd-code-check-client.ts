@@ -1,4 +1,3 @@
-/* @Codex */
 import { isWhoCheckCode, parseWhoCodeCheckResult, type WhoCodeCheckResult } from './reference-data/icd11-who-code-check-contract';
 
 export class WhoCodeCheckError extends Error {

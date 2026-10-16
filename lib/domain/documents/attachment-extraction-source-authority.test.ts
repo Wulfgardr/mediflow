@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -224,7 +223,6 @@ test('keeps callbacks, AnyDoc, routes, logging, and persistence outside the auth
     assert.match(restore, /revokeAttachmentExtractionLocatorGeneration\(\);\s*runDbServerImmediateTransaction/iu);
 });
 
-/* @Codex */
 test('encrypted projection capability copies local bytes, never decodes ENC on the server and wipes its own operation only', () => {
     seed('ENC:synthetic:sealed'); const { authority, session } = fixture();
     const legacy = authority.issue({ attachmentId: ATTACHMENT }); assert.ok(legacy);

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PatientEditSession, type PatientEditPort, type PatientEditRecord } from './patient-edit-session.ts';

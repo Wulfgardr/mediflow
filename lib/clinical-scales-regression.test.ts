@@ -1,4 +1,4 @@
-// @Codex MF085-002/003: production scoring and write seam; synthetic shared vectors only.
+// MF085-002/003: production scoring and write seam; synthetic shared vectors only.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -297,7 +297,7 @@ test('Production form and page are wired to the tested gates, not a parallel ref
     assert.match(form, /disabled=\{!currentAnswerValid \|\| isSubmitting\}/);
 });
 
-// @Codex: provenance survives the real submission/history seam with fetch denied.
+// provenance survives the real submission/history seam with fetch denied.
 test('POMA provenance stays metadata through submission and history without fetch', async (t) => {
     let fetches = 0;
     t.mock.method(globalThis, 'fetch', () => { fetches += 1; throw new Error('network forbidden in scale provenance test'); });

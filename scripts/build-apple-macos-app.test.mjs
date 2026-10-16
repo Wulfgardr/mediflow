@@ -1,4 +1,4 @@
-/* @Codex — real builder, native stager and Resources guard, synthetic Apple tools.
+/* real builder, native stager and Resources guard, synthetic Apple tools.
  * Headless tracing is intercepted ONLY to assert signing order; its actual guard
  * has separate tests and its real runtime requires the extracted-app smoke.
  * NOT Xcode, codesign, Gatekeeper, notarization or runtime-smoke evidence. */
@@ -158,7 +158,7 @@ exec "${process.execPath}" "$@"
     MEDIFLOW_PACKAGING_TEST_ROOT: root, MEDIFLOW_PACKAGING_TEST_PINS: 'synthetic-only', MEDIFLOW_CODESIGN_IDENTITY: '',
     MEDIFLOW_CHATGPT_EXECUTION_BINARY: input.binary, MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE: input.nativeSource,
     MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY: input.schemaDirectory, MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT: input.c1Receipt };
-  delete env.MEDIFLOW_MAC_QA_NAMESPACE; // @Codex: ordinary tests never inherit a QA build selection.
+  delete env.MEDIFLOW_MAC_QA_NAMESPACE; // ordinary tests never inherit a QA build selection.
   write(path.join(root, '.gitignore'), '.next/\nderived/\nevents.jsonl\ntool-state.json\n');
   const gitInit = spawnSync('git', ['init', '--initial-branch=main'], { cwd: root, encoding: 'utf8' });
   assert.equal(gitInit.status, 0, gitInit.stderr);
@@ -246,7 +246,7 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     } else assert.equal(seal, -1);
   });
 }
-/* @Codex: real metadata staging, synthetic Xcode/signing; no Keychain or runtime claim. */
+/* real metadata staging, synthetic Xcode/signing; no Keychain or runtime claim. */
 test('scheduled backup check uses copied WebRuntime before native relocation', t => {
   const input = buildFixture(t);
   pass(input.run());
@@ -373,7 +373,7 @@ for (const overlay of ['.next', '.next/static', 'public']) {
   test(`copied ${overlay} overlay symlink is rejected before writing through it`, t => {
     const input = buildFixture(t), outside = path.join(input.directory, 'unrelated-overlay');
     write(path.join(outside, 'sentinel.txt'), 'must stay unchanged\n');
-    // @Codex: keep identity valid so the overlay guard, not a missing BUILD_ID, denies this fixture.
+    // keep identity valid so the overlay guard, not a missing BUILD_ID, denies this fixture.
     if (overlay === '.next') write(path.join(outside, 'BUILD_ID'), `${input.buildId}\n`);
     const link = path.join(input.web, overlay); fs.rmSync(link, { recursive: true, force: true }); fs.mkdirSync(path.dirname(link), { recursive: true });
     fs.symlinkSync(outside, link);

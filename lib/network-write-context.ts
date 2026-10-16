@@ -1,34 +1,23 @@
-/* @Codex */
 import { cookies } from 'next/headers';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     authenticateNetworkPairedClient,
     getNetworkIdentitySummary,
     getNetworkOperatingMode,
 } from './network-home-base-server';
 import { evaluateNetworkDataPlaneModeGate } from './network-contract';
-/* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
-/* @Codex */
 import { requireLocalApiToken } from './security/local-api-auth';
-/* @Codex */
 export {
     resolveNetworkDiscoveryAuth,
 } from './network-discovery-auth';
-/* @Codex */
 import type { NetworkDiscoveryAuthContext } from './network-discovery-auth';
-/* @Codex */
 import { resolveNetworkDiscoveryAuth } from './network-discovery-auth';
-/* @Codex */
 import { forbiddenResponse, requireSession, unauthorizedResponse } from './security/server-auth';
 import { requirePairedNativeSession } from './security/paired-native-session';
 import { archiveWriteRequestDenial } from './security/archive-write-request';
-/* @Codex */
 import type { ServerSession } from './security/server-session';
 
-/* @Codex */
 export type NetworkWriteContext = {
     request: Request;
     scopeAmbulatoryId: string;
@@ -36,7 +25,6 @@ export type NetworkWriteContext = {
     session: ServerSession;
 };
 
-/* @Codex */
 export async function resolveNetworkScope(session: ServerSession): Promise<string | null> {
     const cookieStore = await cookies();
     const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
@@ -53,7 +41,6 @@ export async function getNetworkModeGateResponse(): Promise<NextResponse | null>
     return NextResponse.json(gate.value, { status: gate.status });
 }
 
-/* @Codex */
 export async function requireNetworkCapabilityContext(
     request: Request,
     requiredCapability: string
@@ -92,7 +79,6 @@ export async function requireNetworkCapabilityContext(
     };
 }
 
-/* @Codex */
 export const requireNetworkWriteContext = requireNetworkCapabilityContext;
 
 export async function requireNetworkDiscoveryAuth(

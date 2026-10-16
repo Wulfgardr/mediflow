@@ -7,15 +7,13 @@ import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import { buildPatientRestoreValues } from '@/lib/patient-lifecycle';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata,
     writeAuditEventInTransaction } from '@/lib/security/audit';
-/* @Codex */
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 
-/* @Codex: this cap applies only to the administrative restore envelope. */
+/* this cap applies only to the administrative restore envelope. */
 const RESTORE_PATIENT_JSON_MAX_BYTES = 65_536;
 
 export const dynamic = 'force-dynamic';
@@ -66,7 +64,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
         }
         const body = parsed.value as Record<string, unknown>;
-        /* @Codex: this host-only restore accepts no client actor or version fields. */
+        /* this host-only restore accepts no client actor or version fields. */
         if (Object.keys(body).some((key) => key !== 'patientId')) {
             return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
         }
@@ -75,7 +73,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'patientId is required' }, { status: 400 });
         }
 
-        /* @Codex: Web-admin identity is authoritative even when extra bearer headers are supplied. */
+        /* Web-admin identity is authoritative even when extra bearer headers are supplied. */
         const auditContext = auditContextFromSession(session);
         const requestId = requestIdFromRequest(request);
         const result = dbServer.transaction((tx) => {

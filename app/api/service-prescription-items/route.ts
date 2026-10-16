@@ -1,14 +1,11 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     createHostServicePrescriptionItem,
     listServicePrescriptionItems,
 } from '@/lib/service-prescription-write';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export async function GET(request: Request) {

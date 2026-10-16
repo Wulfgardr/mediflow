@@ -1,4 +1,3 @@
-/* @Codex */
 import { Buffer } from 'node:buffer';
 import https from 'node:https';
 import { types } from 'node:util';

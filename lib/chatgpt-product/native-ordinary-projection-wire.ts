@@ -1,4 +1,4 @@
-/* @Codex — closed plaintext transport; the authentic private grant is the authority. */
+/* closed plaintext transport; the authentic private grant is the authority. */
 import { types } from 'node:util';
 import { ProductError } from './product-contract';
 import type { NativeOrdinaryPreparation } from './native-ordinary-wire';

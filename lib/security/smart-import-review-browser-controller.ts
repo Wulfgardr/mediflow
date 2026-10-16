@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import { parseSmartImportPreviewWireRoot, type SmartImportPreviewWireRoot } from '../smart-import-preview-wire';
@@ -20,7 +19,6 @@ function exact(value: unknown): Record<string, unknown> | null {
     } catch { return null; }
 }
 
-/* @Codex */
 export function createSmartImportReviewBrowserController(sources: Sources = {}) {
     const context = createSmartImportContextProposalBrowserAdapter({ fetch: sources.fetch }); const selection = createSmartImportSelectionBrowserAdapter({ fetch: sources.fetch });
     const normalizer = createSmartImportProjectionAttachmentBrowserNormalizer({ clock: sources.clock }); const orchestrator = createSmartImportBrowserOrchestrator({ fetch: sources.fetch, requestId: sources.requestId, isCurrent: selection.isCurrent });

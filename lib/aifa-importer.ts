@@ -16,7 +16,6 @@ export type AifaImportClientResult = AifaCatalogClientStatus & {
     notModified?: boolean;
 };
 
-/* @Codex */
 export async function importAifaCsv(
     file: File,
     manifest: AifaCatalogManifestInput,
@@ -58,7 +57,6 @@ export async function getDrugStats(): Promise<number> {
     return (await getDrugCatalogStatus()).count;
 }
 
-/* @Codex */
 export class AifaReductionConfirmationRequired extends Error {
     constructor(message: string, public confirmation: string) { super(message); }
 }

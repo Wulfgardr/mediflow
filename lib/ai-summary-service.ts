@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import {
@@ -10,7 +9,6 @@ import {
 } from '@/lib/ai-task-contracts';
 import { db } from '@/lib/db';
 import { resolveTextModel } from '@/lib/ai-models';
-/* @Codex */
 import {
     sanitizeInsightMarkdown,
     splitInsightDiagnostics,
@@ -53,7 +51,6 @@ export class PatientInsightUnchangedError extends Error {
     }
 }
 
-/* @Codex */
 export type PatientSummaryRefreshResult =
     | { status: 'updated'; modelInfo: SummaryModelInfo }
     | { status: 'skipped'; reason: 'missing-patient-id' | 'disabled' | 'already-running' | 'unchanged' };
@@ -64,7 +61,6 @@ const inflight = new Map<string, Promise<SummaryModelInfo | null>>();
 // termine, cosi lo stato finale del burst viene comunque catturato senza N run.
 const pendingRerun = new Set<string>();
 
-/* @Codex */
 export function isSummaryGenerationInFlight(patientId: string): boolean {
     return inflight.has(patientId);
 }
@@ -126,12 +122,10 @@ export function parsePatientInsight(content: string): ParsedPatientInsight {
     };
 }
 
-/* @Codex */
 export { sanitizeInsightMarkdown } from '@/lib/patient-insight';
 
-/* @Codex */
 export async function getAiModelLabels(signal: AbortSignal = db.getSessionReadSignal()) {
-    // @Codex: a footer reads the saved configuration; model migration belongs
+    // a footer reads the saved configuration; model migration belongs
     // to the existing settings/generation owners, never to background rendering.
     const modelClinical = await db.settings.get('aiModel_clinical', { signal });
     signal.throwIfAborted();
@@ -143,7 +137,6 @@ export async function getAiModelLabels(signal: AbortSignal = db.getSessionReadSi
     };
 }
 
-/* @Codex */
 export async function regeneratePatientSummary(
     patientId: string,
     options: SummaryOptions = {}
@@ -261,7 +254,6 @@ export async function regeneratePatientSummary(
     }
 }
 
-/* @Codex */
 export async function refreshPatientSummaryIfEnabled(
     patientId: string,
     options: SummaryOptions = {}

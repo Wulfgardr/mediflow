@@ -1,4 +1,4 @@
-/* @Codex — validate PNG pixels before native decoders can publish a blank success.
+/* validate PNG pixels before native decoders can publish a blank success.
  * Stream/discard inflation; no full decompressed image buffer. Browser/native
  * decoder allocations remain outside a hard heap quota (see limits.md).
  */

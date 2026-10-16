@@ -1,4 +1,3 @@
-/* @Codex */
 import { randomUUID } from 'node:crypto';
 
 const STRONG_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { NextResponse } from 'next/server';
@@ -72,7 +71,6 @@ export function createSmartImportSelectionHttpHandler(sources: Sources) {
     };
 }
 
-/* @Codex */
 export function createSmartImportSelectionEpochHttpHandler(sources: EpochSources) {
     return async (): Promise<NextResponse> => {
         try {

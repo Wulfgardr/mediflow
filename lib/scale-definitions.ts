@@ -1,9 +1,9 @@
-// @Codex MF085-002/003: active versioned catalog; legacy is never an active alias.
+// MF085-002/003: active versioned catalog; legacy is never an active alias.
 import { type ScaleDefinition, withValidatedScoring } from './scale-validation';
 import { TINETTI_POMA28, TINETTI_POMA28_ID } from './scales/tinetti-poma28-v1';
 
 export const LEGACY_TINETTI: ScaleDefinition = withValidatedScoring({
-        // @Codex MF085-002: frozen answer semantics; no new submissions or rescore.
+        // MF085-002: frozen answer semantics; no new submissions or rescore.
         retired: true,
         id: 'tinetti',
         title: 'Scala Tinetti (Balance & Gait)',
@@ -159,7 +159,7 @@ const definitions: Record<string, ScaleDefinition> = {
     }
 };
 
-// @Codex: direct scoring and writer-bound scoring share the completeness contract.
+// direct scoring and writer-bound scoring share the completeness contract.
 export const SCALES: Readonly<Record<string, ScaleDefinition>> = Object.freeze(Object.fromEntries(
     Object.entries(definitions).map(([id, definition]) => [id, withValidatedScoring(definition)]),
 ));

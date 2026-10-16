@@ -1,4 +1,4 @@
-/* @Codex — explicit synthetic engine seam; NOT a real PDF/browser rendering test. */
+/* explicit synthetic engine seam; NOT a real PDF/browser rendering test. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { paintPdfPage, type PreviewPdfEngineFactory, type PreviewPdfPage, type PreviewPdfDocument, type PreviewRenderTask } from './document-viewer-pdf-core.ts';

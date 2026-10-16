@@ -1,12 +1,10 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import { forbiddenResponse, requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import {
@@ -19,7 +17,6 @@ import {
     readBackupSchedulerStateFromValue,
     runBackupSchedulerScript,
 } from '@/lib/backup-scheduler';
-/* @Codex */
 import { buildBackupSchedulerStatus, getSchedulerAdapter } from '@/lib/backup-scheduler-adapter';
 import { apiInternalError } from '@/lib/api-error-response';
 
@@ -110,7 +107,6 @@ export async function POST(request: Request) {
 
         const nextState = draftState;
 
-        /* @Codex */
         const adapter = getSchedulerAdapter();
         if (nextState.config.enabled) {
             if (!adapter.isSupported()) {

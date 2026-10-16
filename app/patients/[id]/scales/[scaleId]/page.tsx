@@ -9,7 +9,6 @@ import { SCALES } from '@/lib/scale-definitions';
 import { submitScale } from '@/lib/scale-submission';
 import { v4 as uuidv4 } from 'uuid';
 import styles from '@/components/scales/scale-workspace.module.css';
-/* @Codex */
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { useToast } from '@/components/ui/toast-provider';
@@ -22,14 +21,13 @@ export default function ScaleRunnerPage() {
     const scaleId = params.scaleId as string;
     const [setting, setSetting] = useState<'ambulatory' | 'home'>('ambulatory');
 
-    /* @Codex */
     const patient = useLiveQuery(() => db.patients.get(patientId), [patientId], undefined, ['patients']);
     const scaleDef = Object.prototype.hasOwnProperty.call(SCALES, scaleId) ? SCALES[scaleId] : undefined;
 
     const handleComplete = async (result: { score: number; answers: Record<string, string | number>; interpretation: string }) => {
         try {
             if (!scaleDef) return;
-            // @Codex MF085-003: validation and canonical metadata precede db.entries.add.
+            // MF085-003: validation and canonical metadata precede db.entries.add.
             await submitScale(scaleId, result.answers, submission => db.entries.add({
                 id: uuidv4(),
                 patientId,
@@ -44,7 +42,7 @@ export default function ScaleRunnerPage() {
                 attachments: []
             }));
 
-            // @Codex: Land on the independent reread of the saved evaluation.
+            // Land on the independent reread of the saved evaluation.
             router.push(`/patients/${patientId}/modules#scale`);
         } catch (error) {
             console.error("Failed to save scale", error);
@@ -68,7 +66,7 @@ export default function ScaleRunnerPage() {
                 statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
-                {/* @Codex: a retirement notice is clinical content, not optional header copy. */}
+                {/* a retirement notice is clinical content, not optional header copy. */}
                 <div className={workspaceStyles.loadingCard} role="status">
                     {scaleId === 'tinetti'
                         ? 'Versione Tinetti precedente ritirata. I risultati storici restano invariati; per una nuova valutazione scegliere POMA-28 v1.'
@@ -91,7 +89,7 @@ export default function ScaleRunnerPage() {
             statusLabel={patient ? 'Scrittura locale: il risultato resta nella cartella del paziente.' : 'Caricamento dati paziente...'}
             navItems={[]}
         >
-            {/* @Codex WUL-678: context stays selectable without secondary panels. */}
+            {/* WUL-678: context stays selectable without secondary panels. */}
             <section id="scala" className={styles.workspace}>
                 <label className={styles.context}>
                     Contesto

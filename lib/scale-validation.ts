@@ -1,4 +1,4 @@
-// @Codex MF085-003: pure input contract shared by UI and the write boundary.
+// MF085-003: pure input contract shared by UI and the write boundary.
 import { currentScaleInterpretation } from './scales/scale-use-contract';
 export interface ScaleQuestion {
     id: string;
@@ -83,7 +83,7 @@ export function validateScaleAnswers(definition: ScaleDefinition, input: unknown
 }
 
 export function withValidatedScoring(definition: ScaleDefinition): ScaleDefinition {
-    // @Codex: immutable catalog snapshots prevent accidental domain/provenance drift after binding.
+    // immutable catalog snapshots prevent accidental domain/provenance drift after binding.
     const questions = definition.questions.map(question => {
         const options = question.options?.map(option => Object.freeze({ ...option }));
         if (options) Object.freeze(options);

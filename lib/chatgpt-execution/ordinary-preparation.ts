@@ -1,4 +1,4 @@
-/* @Codex — local content preparation, NEVER egress or patient-context authority. */
+/* local content preparation, NEVER egress or patient-context authority. */
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';

@@ -1,5 +1,4 @@
 #!/bin/bash
-# @Codex
 # Entrypoint del bundle proof: avvia il server locale e apre la UI nel browser.
 set -euo pipefail
 

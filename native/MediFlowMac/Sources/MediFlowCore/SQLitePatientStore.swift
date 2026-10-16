@@ -58,7 +58,7 @@ public struct SQLitePatientStore {
         "address", "phone", "caregiver", "exemptions", "diagnoses", "updated_at",
         "notes", "monitoring_profile", "status_reason", "is_adi", "is_archived",
         "ambulatory_id", "created_at", "birth_date", "ai_summary",
-        "document_insights", "deletion_reason", "archive_reason", "archive_note", // @Codex
+        "document_insights", "deletion_reason", "archive_reason", "archive_note",
     ]
 
     private let path: String
@@ -70,7 +70,6 @@ public struct SQLitePatientStore {
     /// Patient summaries. The encrypted diagnoses projection is opt-in and only
     /// available for the active list; default and trash reads stay minimal.
     /// `scopeAmbulatoryId` (when provided) filters via the membership join.
-    /* @Codex */
     public func listPatients(
         scopeAmbulatoryId: String? = nil,
         includeDeleted: Bool = false,
@@ -110,7 +109,6 @@ public struct SQLitePatientStore {
     }
 
     /// Raw patient detail with ENC fields untouched, matching the HomeBase HTTP wire.
-    /* @Codex */
     public func loadRawPatientDetail(
         id: String, scopeAmbulatoryId: String? = nil
     ) throws -> HomeBasePatientDetail? {
@@ -118,7 +116,6 @@ public struct SQLitePatientStore {
     }
 
     /// Decrypted convenience retained for direct core consumers and tests.
-    /* @Codex */
     public func loadPatientDetail(
         id: String, scopeAmbulatoryId: String? = nil, masterKey: SymmetricKey
     ) throws -> HomeBasePatientDetail? {
@@ -126,7 +123,6 @@ public struct SQLitePatientStore {
         return PatientFieldCrypto.decryptDetail(raw, masterKey: masterKey)
     }
 
-    /* @Codex */
     private func loadPatientDetailRow(
         id: String, scopeAmbulatoryId: String?
     ) throws -> HomeBasePatientDetail? {
@@ -156,7 +152,7 @@ public struct SQLitePatientStore {
                 version: row.int(20) ?? 1, ambulatoryId: row.text(12),
                 createdAt: row.date(13), updatedAt: row.date(14),
                 deletedAt: row.date(21), deletionReason: row.text(22),
-                archiveReason: row.text(23), archiveNote: row.text(24)) // @Codex
+                archiveReason: row.text(23), archiveNote: row.text(24))
         }
         return rows.first
     }
@@ -486,7 +482,7 @@ public struct SQLitePatientStore {
             ("notes", p.notes), ("monitoringProfile", p.monitoringProfile),
             ("statusReason", p.statusReason), ("diagnoses", p.diagnoses),
             ("exemptions", p.exemptions),
-            ("archiveReason", p.archiveReason), ("archiveNote", p.archiveNote), // @Codex
+            ("archiveReason", p.archiveReason), ("archiveNote", p.archiveNote),
         ]
         for (name, value) in patches {
             if case .omit = value { continue }
@@ -518,7 +514,7 @@ public struct SQLitePatientStore {
               appendSealedString(&out, "notes", p.notes, masterKey),
               appendSealedString(&out, "status_reason", p.statusReason, masterKey)
         else { return nil }
-        /* @Codex: same unarchive precedence as normalizePatientUpdateInput. */
+        /* same unarchive precedence as normalizePatientUpdateInput. */
         if p.isArchived == false {
             out.append(("archive_reason", .null))
             out.append(("archive_note", .null))

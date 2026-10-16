@@ -1,11 +1,8 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
-/* @Codex */
 import { parseEntryDeleteInput, prepareEntryUpdate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { updateEntryOperation } from '@/lib/entry-write-operation';
 

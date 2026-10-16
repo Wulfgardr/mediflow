@@ -1,11 +1,10 @@
-/* @Codex */
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ts from 'typescript';
 import * as webpackRuntime from 'next/dist/compiled/webpack/webpack.js';
 
-/* @Codex: Exercise the actual hooks with React DOM, without a clinical server,
+/* Exercise the actual hooks with React DOM, without a clinical server,
    database or mocked React effects. The installed Next compiler bundles only
    these two modules and the tiny synthetic reader below. */
 let bundle: string;
@@ -96,7 +95,7 @@ async function mountReader(page: Page) {
 
 const settle = (reads: Route[], body: string) => Promise.all(reads.map(route => route.fulfill({ body })));
 const fail = (reads: Route[]) => Promise.all(reads.map(route => route.abort('failed')));
-/* @Codex: An intentional network fault also emits one browser resource error
+/* An intentional network fault also emits one browser resource error
    per fetch. Assert the complete console, including those expected failures;
    an additional hook error or any unrelated error must fail the test. */
 const expectedNetworkFailures = () => [

@@ -2,15 +2,12 @@
 
 import { useEffect } from 'react';
 
-/* @Codex */
 interface AppRevisionGuardProps {
   fingerprint: string;
 }
 
-/* @Codex */
 const REVISION_RELOAD_MARKER_KEY = 'mediflow-ui-revision-reloaded';
 
-/* @Codex */
 export function AppRevisionGuard({ fingerprint }: AppRevisionGuardProps) {
   useEffect(() => {
     let cancelled = false;

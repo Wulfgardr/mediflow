@@ -1,4 +1,4 @@
-/* @Codex: synthetic host/engine/ACL fixtures; no Docker, registry, PowerShell or WHO runtime. */
+/* synthetic host/engine/ACL fixtures; no Docker, registry, PowerShell or WHO runtime. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';

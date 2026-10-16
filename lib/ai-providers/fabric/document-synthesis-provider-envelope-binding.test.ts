@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -69,7 +68,6 @@ test('rejects hostile descriptors before reads or traps and stays synchronous un
     assert.equal(result!.status, 'available'); assert.equal(reads, 0); assert.deepEqual(unhandled, []); assert.equal(result instanceof Promise, false);
 });
 
-/* @Codex */
 test('derives canonical UTF-8 locators from the uniquely labelled authentic source', () => {
     const captured = captureDocumentSynthesisSourceSet({ sources: [source('unicode', '📄 Inizio: caffè 🙂\nFine.')], sourceSetEpoch: BigInt(3), revocationGeneration: BigInt(4) });
     assert.equal(captured.status, 'available');

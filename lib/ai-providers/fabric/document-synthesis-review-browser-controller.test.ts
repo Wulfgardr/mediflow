@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDocumentSynthesisReviewBrowserController } from './document-synthesis-review-browser-controller.ts';
@@ -103,7 +102,6 @@ test('reset aborts context reads and suppresses late selection, capture, ingest 
     }
 });
 
-/* @Codex */
 test('missing patient or empty ambulatory catalog never produces a confirmable context', async () => {
     for (const unavailable of ['patient', 'ambulatories', 'session'] as const) {
         const calls: string[] = [];
@@ -120,7 +118,6 @@ test('missing patient or empty ambulatory catalog never produces a confirmable c
     }
 });
 
-/* @Codex */
 test('a fresh confirmed request recovers after cancellation without reusing the old proposal or transport', async () => {
     for (const pause of ['/capture', '/ingest', '/preview']) {
         const f = fixture(pause);

@@ -1,11 +1,9 @@
-/* @Codex */
 export interface LatestRequestGuard {
     issue(): number;
     isLatest(requestId: number): boolean;
     discard(): number;
 }
 
-/* @Codex */
 export function createLatestRequestGuard(): LatestRequestGuard {
     let latestRequestId = 0;
 

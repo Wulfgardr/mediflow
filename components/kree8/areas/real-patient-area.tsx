@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { classNames } from '../cockpit-shared';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 
-/* @Codex #98, #68 */
+/* #98, #68 */
 type QuadroSignal = 'warning' | 'critical';
 
 type QuadroMetric = { label: string; value: string | number; note: string; signal?: QuadroSignal; loading?: boolean };
@@ -151,7 +151,7 @@ function PatientQuadro({
             <p className={patientStyles.quadroMetricLabel} data-testid="lume-quadro-metric-label">
               {metric.label}
             </p>
-            {/* @Codex WUL-UIUX: il caricamento è una linea in attesa, non un
+            {/* WUL-UIUX: il caricamento è una linea in attesa, non un
                 valore finto «in attesa» che sembra un dato. */}
             {metric.loading ? (
               <div aria-hidden="true">

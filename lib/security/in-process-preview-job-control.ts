@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type InProcessPreviewJobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'expired' | 'revoked';
 export type InProcessPreviewJobErrorCode = 'input_invalid' | 'dependency_unavailable' | 'idempotency_conflict' | 'job_ref_conflict' | 'revision_conflict' | 'job_missing' | 'job_terminal' | 'transition_invalid' | 'lease_expired' | 'lease_revoked' | 'rate_limited';
@@ -39,7 +38,6 @@ function copyTransition(value: unknown): Transition | null {
     const fields = values(value, ['jobRef', 'expectedRevision']); return fields && opaque(fields[0]) && typeof fields[1] === 'number' && Number.isSafeInteger(fields[1]) && fields[1] >= 0 ? { jobRef: fields[0], expectedRevision: fields[1] } : null;
 }
 
-/* @Codex */
 export function createInProcessPreviewJobControl(sources: InProcessPreviewJobControlSources) {
     const jobs = new Map<string, Record>(); const replays = new Map<string, Replay>(); const latches: Readonly<{ scope: InProcessPreviewJobScope; code: LeaseFailure }>[] = [];
     const snapshot = (record: Record): InProcessPreviewJob => Object.freeze({ jobRef: record.jobRef, revision: record.revision, state: record.state });

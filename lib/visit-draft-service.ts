@@ -1,4 +1,4 @@
-/* @Codex WUL-421 */
+/* WUL-421 */
 import { asc, sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import type { AifaDrug } from '@/lib/db';

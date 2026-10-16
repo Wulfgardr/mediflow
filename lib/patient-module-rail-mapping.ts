@@ -1,4 +1,4 @@
-/* @Codex WUL-560 L7B */
+/* WUL-560 L7B */
 
 import type {
     Kree8WorkspaceNavGroups,
@@ -14,7 +14,7 @@ const PATIENT_MODULE_RAIL_SPEC = [
         items: [
             { href: '#quadro', label: 'Quadro' },
             { href: '#attenzione', label: 'Attenzione' },
-            /* @Codex WUL-678: independent patient domains; historical identity hash remains valid. */
+            /* WUL-678: independent patient domains; historical identity hash remains valid. */
             { href: '#identita', label: 'Anagrafica' },
             { href: '#clinica', label: 'Diagnosi' },
             { href: '#amministrazione', label: 'Amministrazione' },

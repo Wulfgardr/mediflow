@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 /** A context proposal only; it proves neither membership, currentness, nor authority. */
@@ -36,7 +35,6 @@ function proposal(value: unknown): SmartImportContextProposal | null {
     return Object.freeze({ ambulatoryId: record.ambulatoryId });
 }
 
-/* @Codex */
 export function createSmartImportContextProposalBrowserAdapter(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;
     return Object.freeze({

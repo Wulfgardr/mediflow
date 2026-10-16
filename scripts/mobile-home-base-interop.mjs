@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 // Synthetic client/host interoperability support. No database imports, server
 // lifecycle, pairing bootstrap, simulator control, or default host credentials.
 import { createHash, randomBytes, randomUUID, webcrypto, X509Certificate } from 'node:crypto';

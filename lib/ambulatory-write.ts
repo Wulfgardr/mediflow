@@ -7,7 +7,6 @@ import { ambulatories, patients, patientsToAmbulatories } from './schema';
 import { activePatients } from './patient-lifecycle';
 import { clearTestContainerByMembership, TEST_CONTAINER_CLEAR_REASON } from './test-container-clear';
 import { buildAmbulatoryVersionConflictPayload, parseExpectedVersion } from './ambulatory-concurrency';
-/* @Codex */
 import {
     auditContextFromSession, listChangedFields, requestIdFromRequest,
     withAuditContextMetadata, writeAuditEventInTransaction,
@@ -25,7 +24,7 @@ type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 
 type AmbulatoryRow = typeof ambulatories.$inferSelect;
 
-/* @Codex: only admitted session and paired context choose audit actor and surface. */
+/* only admitted session and paired context choose audit actor and surface. */
 function ambulatoryAuditInput(
     context: AmbulatoryWriteContext,
     surface: 'host' | 'network',
@@ -53,7 +52,7 @@ function ambulatoryAuditInput(
     };
 }
 
-/* @Codex: every indirect default change is a durable versioned mutation. */
+/* every indirect default change is a durable versioned mutation. */
 function auditDefaultChange(tx: Tx, context: AmbulatoryWriteContext, surface: 'host' | 'network', id: string, version: number) {
     writeAuditEventInTransaction(tx, ambulatoryAuditInput(context, surface, 'ambulatory.updated', 'ambulatory', id,
         { changedFields: ['isDefault'], resourceVersion: version }));
@@ -98,7 +97,6 @@ function validateParent(
     return null;
 }
 
-/* @Codex */
 export function createAmbulatory(context: AmbulatoryWriteContext, rawBody: Record<string, unknown>, surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
     const name = typeof rawBody.name === 'string' ? rawBody.name.trim() : '';
     if (!name) return { status: 400, value: { error: 'Ambulatory name is required' } };
@@ -151,7 +149,6 @@ export function createAmbulatory(context: AmbulatoryWriteContext, rawBody: Recor
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export function updateAmbulatory(context: AmbulatoryWriteContext, id: string, rawBody: Record<string, unknown>, surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
     const expectedVersion = parseExpectedVersion(rawBody.version);
     if (expectedVersion === null) return { status: 400, value: { error: 'Version is required' } };
@@ -212,7 +209,6 @@ export function updateAmbulatory(context: AmbulatoryWriteContext, id: string, ra
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export function deleteAmbulatory(context: AmbulatoryWriteContext, id: string, expectedVersion: unknown, surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
@@ -248,7 +244,6 @@ export function deleteAmbulatory(context: AmbulatoryWriteContext, id: string, ex
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function clearAmbulatory(
     context: AmbulatoryWriteContext,
     ambulatoryId: string,

@@ -1,4 +1,3 @@
-/* @Codex */
 import type { ICD11_WHO_TOKEN_TARGET } from './icd11-who-credential-lease.ts';
 import type { ICD11_WHO_TRANSPORT_TARGET } from './icd11-who-service.ts';
 

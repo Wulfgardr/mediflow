@@ -7,10 +7,8 @@ import DataSeeder from '@/components/data-seeder';
 import { SettingsSectionIntro } from '@/components/settings/settings-ui';
 
 export default function SettingsDevelopmentPage() {
-    // @Codex
     const [nativeLaunchState, setNativeLaunchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-    // @Codex
     const openNativeApp = async () => {
         if (nativeLaunchState === 'loading') return;
         setNativeLaunchState('loading');
