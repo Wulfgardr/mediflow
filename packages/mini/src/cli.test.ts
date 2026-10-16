@@ -33,6 +33,14 @@ const capabilities = [{ operationId: 'mediflow.terminology.search.v1', capabilit
   inputSchema: 'mediflow.semantic-query-operation.input.v1',
   outputSchema: 'mediflow.semantic-query-execution.result.v1',
 }];
+capabilities.splice(3, 0, { operationId: 'mediflow.patient.checkup.status.transition.v1',
+  capabilityId: 'mediflow.patient.checkup.status.transition.v1', maximumStage: 'proposal_only',
+  inputSchema: 'mediflow.patient.checkup.status.transition.input.v1',
+  outputSchema: 'mediflow.patient.checkup.status.transition.preview-result.v1' });
+const checkupArgs = { checkupRef: `hcsr_${'d'.repeat(64)}`, targetStatus: 'completed', expectedRevision: 1 };
+const checkupPreview = { schemaVersion: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+  operationId: 'mediflow.patient.checkup.status.transition.v1', outcome: 'proposed',
+  proposalRef: `hcsp_${'e'.repeat(64)}`, expiresAt: 2000 };
 const capabilityCatalog = { schemaVersion: 'mediflow.system.capabilities.v1', operations: capabilities };
 const status = { schemaVersion: 'mediflow.system.headless-status.v1', candidateVersion: '0.8.5',
   protocolVersion: '2026-07-28', dataScope: 'non_phi_system_status', writes: 0, apply: 'none' };
@@ -114,7 +122,8 @@ type BoundOptions = { args?: string[]; timeoutMs?: number;
   terminology?: (input: unknown, signal: AbortSignal) => unknown;
   openLoops?: (input: unknown, signal: AbortSignal) => unknown;
   proposal?: (input: unknown, signal: AbortSignal) => unknown;
-  semantic?: (input: unknown, signal: AbortSignal) => unknown };
+  semantic?: (input: unknown, signal: AbortSignal) => unknown;
+  checkup?: (input: unknown, signal: AbortSignal) => unknown };
 async function runBound(input: string | Buffer, options: BoundOptions = {}) {
   const environment = createAipOperationRpcChildEnvironmentV1(`aipb_${'1'.repeat(32)}`);
   const child: ChildProcess = spawn(process.execPath,
@@ -142,6 +151,12 @@ async function runBound(input: string | Buffer, options: BoundOptions = {}) {
     capabilityId: 'mediflow.semantic_query_plan.execute.v1', serviceRef: 'SemanticQueryOperationServiceV1',
     maximumStage: 'read_only', timeoutMs: options.timeoutMs ?? 250,
     execute: options.semantic ?? ((value: unknown) => { observed.push(value); return semantic; }),
+  }, {
+    operationId: 'mediflow.patient.checkup.status.transition.v1',
+    capabilityId: 'mediflow.patient.checkup.status.transition.v1',
+    serviceRef: 'HeadlessCheckupStatusTransitionServiceV1', maximumStage: 'proposal_only',
+    timeoutMs: options.timeoutMs ?? 250,
+    execute: options.checkup ?? ((value: unknown) => { observed.push(value); return checkupPreview; }),
   }] });
   host.attach({ subscribe: (listener: (frame: unknown) => void) => {
     child.on('message', listener); return () => child.off('message', listener);
@@ -208,12 +223,13 @@ test('NDJSON session preserves all existing operation DTOs and dispatches multip
     { command: 'open-loops', args: {} },
     { command: 'follow-up-proposal', args: {} },
     { command: 'semantic-query', args: semanticArgs },
+    { command: 'checkup-status-preview', args: checkupArgs },
   ];
   const result = await runBound(requests.map((request) => JSON.stringify(request)).join('\n') + '\n',
     { args: ['--session'] });
   assert.equal(result.code, 0); assert.equal(result.stderr, '');
   const responses = result.stdout.trim().split('\n').map((line) => JSON.parse(line));
-  assert.deepEqual(responses.map((response) => response.result), [capabilityCatalog, terminology, loops, proposal, semantic]);
+  assert.deepEqual(responses.map((response) => response.result), [capabilityCatalog, terminology, loops, proposal, semantic, checkupPreview]);
   assert.ok(responses.every((response) => response.schemaVersion === 'mediflow.mini.session.v1' && response.ok === true));
   assert.deepEqual(JSON.parse(JSON.stringify(result.observed)), [
     { schemaVersion: 'mediflow.terminology.search.input.v1', operationId: 'mediflow.terminology.search.v1',
@@ -221,6 +237,8 @@ test('NDJSON session preserves all existing operation DTOs and dispatches multip
     { schemaVersion: 'mediflow.patient.open_loops.read.input.v1', operationId: 'mediflow.patient.open_loops.read.v1' },
     { schemaVersion: 'mediflow.patient.open_loops.follow_up.propose.input.v1',
       operationId: 'mediflow.patient.open_loops.follow_up.propose.v1' }, semanticInput,
+    { schemaVersion: 'mediflow.patient.checkup.status.transition.input.v1',
+      operationId: 'mediflow.patient.checkup.status.transition.v1', ...checkupArgs },
   ]);
 });
 
@@ -229,6 +247,7 @@ test('NDJSON session preserves operation denial and stops queued commands after 
     ['terminology search', { system: 'LOINC', query: 'synthetic', limit: 1 }, 'terminology'],
     ['open-loops', {}, 'openLoops'], ['follow-up-proposal', {}, 'proposal'],
     ['semantic-query', semanticArgs, 'semantic'],
+    ['checkup-status-preview', checkupArgs, 'checkup'],
   ] as const) {
     const result = await runBound(JSON.stringify({ command, args }) + '\n'
       + '{"command":"capabilities","args":{}}\n', {
@@ -313,4 +332,20 @@ test('keeps help, format and input budgets deterministic', async () => {
   assert.equal(formatted.stdout, success(capabilityCatalog));
   const oversized = runUnbound(Buffer.alloc(16 * 1024 + 1, 0x78));
   assert.equal(oversized.status, 2); assert.equal(oversized.stdout, failure('INVALID_REQUEST'));
+});
+
+test('checkup preview preserves host denial and cannot supply confirmation or commit authority', async () => {
+  const denied = { schemaVersion: 'mediflow.patient.checkup.status.transition.preview-result.v1',
+    operationId: 'mediflow.patient.checkup.status.transition.v1', outcome: 'denied', denialCode: 'revision_conflict' };
+  const result = await runBound(JSON.stringify({ command: 'checkup-status-preview', args: checkupArgs }),
+    { checkup: () => denied });
+  assert.equal(result.code, 0); assert.equal(result.stdout, success(denied));
+  for (const args of [{ ...checkupArgs, confirmation: true }, { ...checkupArgs, patientId: 'synthetic' },
+    { ...checkupArgs, expectedRevision: 0 }, { ...checkupArgs, targetStatus: 'pending' }]) {
+    const invalid = await runBound(JSON.stringify({ command: 'checkup-status-preview', args }));
+    assert.equal(invalid.code, 2); assert.equal(invalid.stdout, failure('INVALID_REQUEST'));
+    assert.deepEqual(invalid.observed, []);
+  }
+  const unbound = runUnbound(JSON.stringify({ command: 'checkup-status-preview', args: checkupArgs }));
+  assert.equal(unbound.status, 69); assert.equal(unbound.stdout, failure('TRANSPORT_UNBOUND'));
 });

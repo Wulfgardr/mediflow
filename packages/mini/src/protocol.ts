@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import {
   followUpProposalArgumentsSchema, openLoopsArgumentsSchema, semanticQueryArgumentsSchema,
-  terminologyArgumentsSchema,
+  terminologyArgumentsSchema, checkupStatusTransitionArgumentsSchema,
 } from '../../mcp/src/contracts.ts';
 import type { createOperationClient } from '../../mcp/src/operation-client.ts';
 
@@ -21,6 +21,7 @@ export const miniRequestSchema = z.discriminatedUnion('command', [
   z.object({ command: z.literal('open-loops'), args: openLoopsArgumentsSchema }).strict(),
   z.object({ command: z.literal('follow-up-proposal'), args: followUpProposalArgumentsSchema }).strict(),
   z.object({ command: z.literal('semantic-query'), args: semanticQueryArgumentsSchema }).strict(),
+  z.object({ command: z.literal('checkup-status-preview'), args: checkupStatusTransitionArgumentsSchema }).strict(),
 ]);
 
 export type MiniRequest = z.infer<typeof miniRequestSchema>;
@@ -42,6 +43,7 @@ export function executeMiniRequest(client: ReturnType<typeof createOperationClie
     case 'open-loops': return client.readOpenLoops();
     case 'follow-up-proposal': return client.proposeOpenLoopsFollowUp(request.args);
     case 'semantic-query': return client.executeSemanticQuery(request.args);
+    case 'checkup-status-preview': return client.previewCheckupStatusTransition(request.args);
   }
 }
 
