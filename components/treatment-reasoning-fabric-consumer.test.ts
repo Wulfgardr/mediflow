@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { indexTreatmentReasoningSources } from './treatment-reasoning-sources';
 
 const source = readFileSync(new URL('./treatment-reasoning-panel.tsx', import.meta.url), 'utf8');
 
@@ -18,7 +19,7 @@ test('roots the manual Treatment Reasoning consumer only in the browser controll
     );
     assert.match(source, /<option value="">Scegli l’ambulatorio<\/option>/u);
     assert.match(source, /type="checkbox" disabled=\{!ambulatory\} checked=\{confirmed\}/u);
-    assert.match(source, /Conferma e genera bozza/u);
+    assert.match(source, /Conferma e genera proposta/u);
     assert.ok(source.indexOf('await picker.client.begin()') > source.indexOf('if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed'),
         'provider dispatch must remain behind the explicit choice and confirmation gate');
     assert.match(source, /const handler = useRef\(false\)/u);
@@ -45,10 +46,24 @@ test('keeps the preview ephemeral, supersession-safe, and review-only', () => {
 });
 
 test('portable engine disclosure is conditional and provisioning UI is read-only', () => {
-    assert.match(source, /picker.selected\?\.provider/u);
+    const picker = readFileSync(new URL('./function-models/function-model-picker.tsx', import.meta.url), 'utf8');
+    assert.match(picker, /functionId === 'treatment_reasoning' && <TreatmentReasoningPortableSetup/u);
     assert.match(source, /publication.attestation.artifactDigest/u);
     assert.match(source, /ATHENA Transformers/u);
     const setup = readFileSync(new URL('./treatment-reasoning-portable-setup.tsx', import.meta.url), 'utf8');
     assert.match(setup, /NEEDS_CONTEXT/u); assert.match(setup, /Nessun download/u); assert.match(setup, /nessuna scrittura clinica/u);
     assert.doesNotMatch(setup, /fetch\(|onClick|useEffect|localStorage|child_process|node:fs/u);
+});
+
+
+test('indexes every proposal reference once, including sources used only by cautions or actions', () => {
+    const sources = indexTreatmentReasoningSources([
+        ['profile:clinical-summary'], ['therapy:source-b'], ['therapy:source-b'], ['attachment:source-c'],
+    ]);
+    assert.deepEqual(sources, [
+        { reference: 'profile:clinical-summary', label: 'Profilo clinico · Fonte 1' },
+        { reference: 'therapy:source-b', label: 'Terapia · Fonte 2' },
+        { reference: 'attachment:source-c', label: 'Allegato · Fonte 3' },
+    ]);
+    assert.equal(indexTreatmentReasoningSources([['opaque:source-d']])[0].label, 'Riferimento · Fonte 1');
 });

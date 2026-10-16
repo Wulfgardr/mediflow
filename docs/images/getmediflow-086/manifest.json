@@ -21,7 +21,9 @@
       "height": 1000,
       "title": "Documenti",
       "sourceCommit": "ddff0a929fbe4d60f144b64c55269892ec2419f6",
-      "capturedAt": "2026-09-07T23:58:59.652Z"
+      "capturedAt": "2026-09-07T23:58:59.652Z",
+      "historical": true,
+      "supersededBy": "../getmediflow-090/documents-light.png"
     },
     {
       "file": "diary.png",
@@ -61,7 +63,9 @@
       "title": "Treatment Intelligence con terapie, ATC e percorsi proposti",
       "sourceCommit": "bb89ad0479ee468aea959ac5c76113c7c04d335b",
       "capturedAt": "2026-09-21T14:39:48Z",
-      "status": "Faithful Get MediFlow reproduction of the successful Treatment Reasoning panel using synthetic polypharmacy: ATHENA prepares a source-linked review draft with limitations, cautions and proposed review pathways while medication, pathways and the record remain unchanged. It does not run ATHENA or represent an active clinical result."
+      "status": "Faithful Get MediFlow reproduction of the successful Treatment Reasoning panel using synthetic polypharmacy: ATHENA prepares a source-linked review draft with limitations, cautions and proposed review pathways while medication, pathways and the record remain unchanged. It does not run ATHENA or represent an active clinical result.",
+      "historical": true,
+      "supersededBy": "../getmediflow-090/ragionamento-terapeutico-light.png"
     },
     {
       "file": "headless-agent.png",

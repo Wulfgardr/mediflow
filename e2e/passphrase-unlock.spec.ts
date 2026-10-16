@@ -94,7 +94,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await staleInput.press('Enter');
   await expect.poll(() => heldCheck, 'the real answer of the server must reach the gate').toBeTruthy();
 
-  await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
   await page.getByRole('link', { name: 'Accesso', exact: true }).click();
   await page.getByLabel('PIN attuale', { exact: true }).first().fill(PIN);
   await page.getByLabel('Nuova passphrase', { exact: true }).fill(PASSPHRASE);
@@ -185,7 +185,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(page.getByTestId('pin-residue-notice')).toBeVisible(); // Pending remains visible in the unlocked shell.
 
   // The access settings describe the account as it is now, and no longer offer the PIN rotation the server refuses.
-  await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+  await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
   await page.getByRole('link', { name: 'Accesso', exact: true }).click();
   await expect(page.getByTestId('settings-access-passphrase')).toContainText('Questo archivio si sblocca con la passphrase.');
   await expect(page.getByRole('button', { name: 'Aggiorna PIN', exact: true })).toHaveCount(0);

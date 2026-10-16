@@ -115,8 +115,8 @@ function publicationFor(projection: Projection) {
     },
     sourceBindings: [
       { claimPath: 'summary', claim: summary, evidenceRefs: [profileRef] },
-      { claimPath: 'data.recommendation', claim: recommendation, evidenceRefs: [therapyRef] },
-      { claimPath: 'data.reasoning.0', claim: reasoning, evidenceRefs: [therapyRef] },
+      { claimPath: 'data.recommendation', claim: recommendation, evidenceRefs: [profileRef] },
+      { claimPath: 'data.reasoning.0', claim: reasoning, evidenceRefs: [profileRef] },
       { claimPath: 'data.caveats.0', claim: caveat, evidenceRefs: [profileRef] },
     ],
     attestation: {
@@ -184,7 +184,7 @@ async function createFixture(page: Page): Promise<{ patientId: string; therapyId
 
 test.describe.configure({ retries: 0 });
 
-test('Treatment Reasoning UI invia payload strict e mostra una proposta source-bound', async ({ page }) => {
+test('Treatment Reasoning UI invia payload strict e mostra una proposta source-bound', async ({ page }, testInfo) => {
   const calls: string[] = [];
   const bodies: RecordedBodies = {};
   const postGestureMutations: string[] = [];
@@ -272,7 +272,7 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   await openPatientSection(page, 'terapie');
 
   const panel = page.getByTestId('treatment-reasoning-panel');
-  const generate = panel.getByRole('button', { name: 'Genera bozza' });
+  const generate = panel.getByRole('button', { name: 'Prepara proposta' });
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('solo revisione');
   await expect(panel).toContainText('Non modifica la scheda e richiede sempre revisione clinica.');
@@ -282,9 +282,9 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   generationStarted = true;
   await generate.click();
 
-  const ambulatory = panel.getByLabel('Ambulatorio per questa bozza');
+  const ambulatory = panel.getByLabel('Ambulatorio per questa proposta');
   const confirmation = panel.getByRole('checkbox');
-  const confirmGeneration = panel.getByRole('button', { name: 'Conferma e genera bozza' });
+  const confirmGeneration = panel.getByRole('button', { name: 'Conferma e genera proposta' });
   await expect(ambulatory).toHaveValue('');
   await expect(confirmation).not.toBeChecked();
   await expect(confirmation).toBeDisabled();
@@ -303,25 +303,51 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   expect(postGestureMutations).toEqual([]);
 
   await generate.click();
-  const nextAmbulatory = panel.getByLabel('Ambulatorio per questa bozza');
+  const nextAmbulatory = panel.getByLabel('Ambulatorio per questa proposta');
   const nextConfirmation = panel.getByRole('checkbox');
   await expect(nextAmbulatory).toHaveValue('');
   await nextAmbulatory.selectOption(AMBULATORY_B.id);
   await nextConfirmation.check();
-  await panel.getByRole('button', { name: 'Conferma e genera bozza' }).click();
+  await expect(panel.getByRole('button', { name: 'Prepara proposta', exact: true })).toHaveCount(0);
+  const confirmAction = panel.getByRole('button', { name: 'Conferma e genera proposta' });
+  for (const color of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: color, reducedMotion: 'reduce' });
+    await page.locator('html').evaluate((element, dark) => element.classList.toggle('dark', dark), color === 'dark');
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 960 });
+      await confirmAction.scrollIntoViewIfNeeded();
+      await confirmAction.focus();
+      await expect(confirmAction).toBeFocused();
+      expect(await confirmAction.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.height >= 44 && bounds.left >= 0 && bounds.right <= innerWidth
+          && bounds.top >= 0 && bounds.bottom <= innerHeight
+          && [bounds.top + 2, bounds.bottom - 2].every(y => element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, y)));
+      }), `Confirmation must remain fully reachable at ${width}/${color}`).toBe(true);
+      expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+      await page.screenshot({ path: testInfo.outputPath(`treatment-preparation-${color}-${width}.png`) });
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.locator('html').evaluate(element => element.classList.remove('dark'));
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await panel.getByRole('button', { name: 'Conferma e genera proposta' }).click();
 
-  await expect(panel).toContainText('Anteprima da rivedere');
+  await expect(panel).toContainText('Proposta');
   await expect(panel).toContainText('Rivedere la terapia sintetica prima di ogni decisione clinica.');
   await expect(panel).toContainText('non è una prescrizione, esegue 0 scritture e non applica modifiche');
   await expect(panel).toContainText('Rivedi le evidenze');
   await expect(panel.getByRole('button', { name: /applica/u })).toHaveCount(0);
 
-  const bindings = panel.getByText('Fonti citate per claim');
+  const bindings = panel.getByText('Fonti della proposta');
   await bindings.click();
   await expect(panel).toContainText('data.recommendation');
+  await expect(panel.getByRole('button', { name: 'Terapia · Fonte 2: espandi le fonti della proposta' }).first()).toBeVisible();
+  await expect(panel.locator('code').filter({ hasText: `therapy:${fixture.therapyId}` })).toHaveText(`therapy:${fixture.therapyId}`);
+  await expect(panel.locator('code').filter({ hasText: 'profile:clinical-summary' })).toHaveText('profile:clinical-summary');
   await expect(panel).toContainText('Terapia sintetica presente nel contesto corrente.');
 
-  const governance = panel.getByText('Receipt, provenienza e currentness');
+  const governance = panel.getByText('Origine e dettagli della generazione');
   await governance.click();
   await expect(panel).toContainText('ATHENA MLX · locale');
   await expect(panel).toContainText('available_unqualified · required · 0 scritture');
@@ -371,4 +397,35 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
     'POST /api/ai/treatment-reasoning/ingest',
     'POST /api/ai/treatment-reasoning/preview',
   ]);
+  await bindings.click(); await governance.click();
+  await expect(panel.locator('code').filter({ hasText: `therapy:${fixture.therapyId}` })).toBeHidden();
+  await panel.getByRole('button', { name: 'Terapia · Fonte 2: espandi le fonti della proposta' }).first().click();
+  await expect(panel.locator('code').filter({ hasText: `therapy:${fixture.therapyId}` })).toBeVisible();
+  await bindings.click();
+  const published = panel.getByTestId('treatment-reasoning-proposal');
+  await expect(published).toHaveAttribute('data-ink-state', 'proposal');
+  const lead = published.getByText('Rivedere la terapia sintetica prima di ogni decisione clinica.', { exact: true }).first();
+  expect(await lead.evaluate(element => getComputedStyle(element.closest('p') ?? element).textDecorationStyle)).toBe('dashed');
+  for (const color of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: color, reducedMotion: 'reduce' });
+    await page.locator('html').evaluate((element, dark) => element.classList.toggle('dark', dark), color === 'dark');
+    for (const width of [1440, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 960 });
+      expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `TR overflow at ${width}/${color}`).toBe(true);
+      await panel.getByRole('heading', { name: 'Ragionamento terapeutico', exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath(`treatment-proposal-${color}-${width}-start.png`) });
+      await governance.scrollIntoViewIfNeeded();
+      await expect(governance).toBeInViewport();
+      await page.screenshot({ path: testInfo.outputPath(`treatment-proposal-${color}-${width}-end.png`) });
+    }
+  }
+  for (const scale of ['200%', '400%']) {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await page.locator('html').evaluate((element, fontSize) => { element.style.fontSize = fontSize; }, scale);
+    expect(await panel.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `TR text overflow at ${scale}`).toBe(true);
+    await governance.scrollIntoViewIfNeeded();
+    await expect(governance).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath(`treatment-text-${scale}.png`) });
+  }
+
 });
