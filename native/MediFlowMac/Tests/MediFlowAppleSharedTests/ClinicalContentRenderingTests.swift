@@ -105,7 +105,7 @@ final class ClinicalContentRenderingTests: XCTestCase {
 
     @MainActor
     func testNativeContentKeepsInlineMarksLinksAndFont() throws {
-        let rendered = ClinicalContentRendering.nativeAttributedString(from: "<p><strong>Grassetto</strong> <em>Corsivo</em> <u>Sottolineato</u> <s>Barrato</s> <a href=\"https://example.invalid/nota\">Fonte</a></p>")
+        let rendered = ClinicalContentRendering.nativeAttributedString(from: "<p><strong>Grassetto</strong> <em>Corsivo</em> <u>Sottolineato</u> <s>Barrato</s> <a href=\"https://127.0.0.1/nota\">Fonte</a></p>")
         func attributes(_ text: String) -> [NSAttributedString.Key: Any] {
             rendered.attributes(at: (rendered.string as NSString).range(of: text).location, effectiveRange: nil)
         }
@@ -113,7 +113,7 @@ final class ClinicalContentRenderingTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(attributes("Corsivo")[.font] as? NSFont).fontDescriptor.symbolicTraits.contains(.italic))
         XCTAssertEqual(attributes("Sottolineato")[.underlineStyle] as? Int, 1)
         XCTAssertEqual(attributes("Barrato")[.strikethroughStyle] as? Int, 1)
-        XCTAssertEqual((attributes("Fonte")[.link] as? URL)?.absoluteString, "https://example.invalid/nota")
+        XCTAssertEqual((attributes("Fonte")[.link] as? URL)?.absoluteString, "https://127.0.0.1/nota")
         XCTAssertEqual(try XCTUnwrap(attributes("Fonte")[.font] as? NSFont).pointSize, 13.5)
     }
 
