@@ -1,4 +1,4 @@
-/* @Codex — synthetic fixtures only; run with Node strip-types, no DB imports. */
+/* synthetic fixtures only; run with Node strip-types, no DB imports. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MAX_PREVIEW_BYTES, PREVIEW_LIMITS, PreviewError, textWindow, previewFailure } from './document-viewer-policy.ts';

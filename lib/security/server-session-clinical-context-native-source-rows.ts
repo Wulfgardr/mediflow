@@ -1,4 +1,4 @@
-/* @Codex — fixed host read model. No client projection, blob, path, decryption or write. */
+/* fixed host read model. No client projection, blob, path, decryption or write. */
 import 'server-only';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { dbServer } from '../db-server';

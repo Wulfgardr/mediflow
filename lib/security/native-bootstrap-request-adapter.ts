@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { admitNativeBootstrap } from './native-bootstrap-admission';

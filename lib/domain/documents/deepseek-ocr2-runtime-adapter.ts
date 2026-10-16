@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { types } from 'node:util';

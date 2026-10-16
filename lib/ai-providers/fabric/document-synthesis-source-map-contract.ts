@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { normalizeDocumentSynthesisOutput, type DocumentSynthesisOutput } from './document-synthesis-output-contract';

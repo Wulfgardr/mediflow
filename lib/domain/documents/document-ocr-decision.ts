@@ -1,6 +1,4 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
-/* @Codex */
 import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,
@@ -9,27 +7,22 @@ import {
     type DocumentDecisionSource,
 } from './document-decision';
 
-/* @Codex */
 export const DOCUMENT_OCR_REPLAY_SCHEMA_VERSION = 'mediflow.document_ocr_replay.v1';
 
-/* @Codex */
 export type DocumentOcrReplayStatus = 'ready_for_review' | 'blocked_no_text';
 
-/* @Codex */
 export interface BuildOcrNeededDocumentDecisionInput {
     source: Omit<DocumentDecisionSource, 'textState' | 'ocrStatus'> & Partial<Pick<DocumentDecisionSource, 'textState' | 'ocrStatus'>>;
     rationale?: string;
     generatedAt?: string;
 }
 
-/* @Codex */
 export interface BuildPostOcrReplayArtifactInput {
     originalDecision: DocumentDecision;
     ocrText: string;
     generatedAt?: string;
 }
 
-/* @Codex */
 export interface DocumentOcrReplayArtifact {
     schemaVersion: typeof DOCUMENT_OCR_REPLAY_SCHEMA_VERSION;
     idempotencyKey: string;
@@ -58,7 +51,6 @@ function replayKey(documentId: string, sourceSha256: string | undefined, ocrText
     ].join('|'));
 }
 
-/* @Codex */
 export function buildOcrNeededDocumentDecision(input: BuildOcrNeededDocumentDecisionInput): DocumentDecision {
     const source: DocumentDecisionSource = {
         ...input.source,
@@ -105,7 +97,6 @@ export function buildOcrNeededDocumentDecision(input: BuildOcrNeededDocumentDeci
     }));
 }
 
-/* @Codex */
 export function buildPostOcrReplayArtifact(input: BuildPostOcrReplayArtifactInput): DocumentOcrReplayArtifact {
     const normalizedText = normalizeOcrText(input.ocrText);
     const generatedAt = input.generatedAt ?? new Date().toISOString();

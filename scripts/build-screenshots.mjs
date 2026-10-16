@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';

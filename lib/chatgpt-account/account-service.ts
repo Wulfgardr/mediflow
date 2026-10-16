@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import type { AccountAction, AccountNotice, AccountOperation, AccountResult, AccountState, AccountStatus } from './account-contract';
 import { AccountError, accountResponse, loginResponse, modelPage, rateLimitsResponse, record, type AccountTransport } from './account-protocol';

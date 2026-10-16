@@ -1,4 +1,3 @@
-/* @Codex */
 #if DEBUG
 import Foundation
 

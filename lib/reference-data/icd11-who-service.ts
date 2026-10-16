@@ -1,4 +1,3 @@
-/* @Codex */
 import { types as nodeUtilTypes } from 'node:util';
 
 export const ICD11_WHO_SEARCH_OPERATION = 'mediflow.reference_data.icd11.search.v1' as const;

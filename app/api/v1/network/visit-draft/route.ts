@@ -1,6 +1,4 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { createVisitDraft, type VisitDraftRouteBody } from '@/lib/visit-draft-service';
 import { requireNetworkCapabilityContext } from '@/lib/network-write-context';
@@ -25,7 +23,6 @@ export async function POST(request: Request) {
         if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
         return NextResponse.json(result.value);
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/visit-draft error:', error);

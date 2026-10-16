@@ -1,4 +1,4 @@
-/* @Codex — an empty home or a nominal process group is not Windows confinement. */
+/* an empty home or a nominal process group is not Windows confinement. */
 import 'server-only';
 import { ExecutionError } from './execution-contract';
 import type { QualificationSnapshot } from '../chatgpt-product/product-contract';

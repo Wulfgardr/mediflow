@@ -23,7 +23,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [busyAction, setBusyAction] = useState<string | 'all' | null>(null);
     const insights = parsePatientDatedRecords<DocumentInsight>(patient.documentInsights);
-    // @Codex: an empty archive has no model footer and needs no model reads.
+    // an empty archive has no model footer and needs no model reads.
     const modelLabels = useAiModelLabels(Boolean(patient.id) && insights.length > 0);
     const { showToast } = useToast();
     const confirm = useConfirm();
@@ -112,7 +112,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
     };
 
     return (
-        /* @Codex: archived summaries share the document plane; only the active row expands. */
+        /* archived summaries share the document plane; only the active row expands. */
         <section className={disclosure.archive} aria-label="Sintesi archiviate" data-testid="document-insights-archive">
             <div className={disclosure.archiveToolbar}>
                 <p className={disclosure.hint}>Rivedi le sintesi insieme al testo sorgente.</p>

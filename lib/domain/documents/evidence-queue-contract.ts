@@ -1,20 +1,16 @@
-/* @Codex */
 import {
     parseDocumentParseEvidenceArtifactSnapshot,
     type DocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
 
-/* @Codex */
 export const MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION = 'mediflow.evidence_queue.v1';
 
-/* @Codex */
 export type EvidenceQueueSourceType =
     | 'attachment_parse_evidence'
     | 'attachment_summary'
     | 'diary_entry'
     | 'structured_chart';
 
-/* @Codex */
 export type EvidenceQueueDecisionReason =
     | 'included'
     | 'suppressed_stale'
@@ -23,10 +19,8 @@ export type EvidenceQueueDecisionReason =
     | 'needs_review'
     | 'invalidated';
 
-/* @Codex */
 export type EvidenceQueueFreshness = 'recent' | 'stale' | 'undated';
 
-/* @Codex */
 export type EvidenceQueueDiaryTemporalTag =
     | 'recent'
     | 'historical'
@@ -35,7 +29,6 @@ export type EvidenceQueueDiaryTemporalTag =
     | 'plan'
     | 'negation';
 
-/* @Codex */
 export interface EvidenceQueueAttachmentInput {
     id: string;
     patientId: string;
@@ -49,7 +42,6 @@ export interface EvidenceQueueAttachmentInput {
     replacedById?: string | null;
 }
 
-/* @Codex */
 export interface EvidenceQueueDiaryInput {
     id: string;
     patientId: string;
@@ -68,7 +60,6 @@ export interface EvidenceQueueDiaryInput {
     status?: string | null;
 }
 
-/* @Codex */
 export interface EvidenceQueueStructuredChartInput {
     id: string;
     patientId: string;
@@ -78,7 +69,6 @@ export interface EvidenceQueueStructuredChartInput {
     version?: string | number | null;
 }
 
-/* @Codex */
 export interface BuildEvidenceQueueInput {
     patientId: string;
     generatedAt?: string | Date;
@@ -87,7 +77,6 @@ export interface BuildEvidenceQueueInput {
     structuredChartItems?: EvidenceQueueStructuredChartInput[];
 }
 
-/* @Codex */
 export interface EvidenceQueueCitation {
     /** Source ids are unique inside a patient-scoped queue; offsets use JS UTF-16 string indices. */
     sourceId: string;
@@ -99,7 +88,6 @@ export interface EvidenceQueueCitation {
     snippet?: string;
 }
 
-/* @Codex */
 export interface EvidenceQueueRenderableClaim {
     id: string;
     kind: string;
@@ -107,7 +95,6 @@ export interface EvidenceQueueRenderableClaim {
     citation: EvidenceQueueCitation;
 }
 
-/* @Codex */
 export interface EvidenceQueueItem {
     id: string;
     source: {
@@ -133,7 +120,6 @@ export interface EvidenceQueueItem {
     renderableClaims: EvidenceQueueRenderableClaim[];
 }
 
-/* @Codex */
 export interface EvidenceQueue {
     schemaVersion: typeof MEDIFLOW_EVIDENCE_QUEUE_SCHEMA_VERSION;
     generatedAt: string;
@@ -567,7 +553,6 @@ function buildStructuredChartItem(input: EvidenceQueueStructuredChartInput, gene
     };
 }
 
-/* @Codex */
 export function buildEvidenceQueue(input: BuildEvidenceQueueInput): EvidenceQueue {
     const generatedAt = stableDate(input.generatedAt) || new Date().toISOString();
     const diaryEntries = input.diaryEntries ?? [];
@@ -595,7 +580,6 @@ export function buildEvidenceQueue(input: BuildEvidenceQueueInput): EvidenceQueu
     };
 }
 
-/* @Codex */
 export function getIncludedEvidenceQueueItems(queue: EvidenceQueue): EvidenceQueueItem[] {
     return queue.items.filter((item) => item.governance.reason === 'included');
 }

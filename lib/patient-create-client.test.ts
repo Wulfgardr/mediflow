@@ -1,4 +1,4 @@
-/* @Codex: real ApiTable and WebCrypto, declared HTTP transport double only.
+/* real ApiTable and WebCrypto, declared HTTP transport double only.
  * No mock provider is an authentication proof; route/SQL/physical-owner tests are separate. */
 import assert from 'node:assert/strict';
 import test from 'node:test';

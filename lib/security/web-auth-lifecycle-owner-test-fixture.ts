@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { bindSessionToArchive, currentArchiveGeneration } from './archive-session-generation';
-/* @Codex */
 import {
     begin,
     bootstrapControl,

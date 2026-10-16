@@ -1,10 +1,6 @@
-/* @Codex */
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { entries, patientsToAmbulatories } from './schema';
-/* @Codex */
 import type { EntrySummary } from './api/v1/types';
 
 type NetworkEntryListFilters = {
@@ -14,9 +10,7 @@ type NetworkEntryListFilters = {
     dateTo?: Date | null;
 };
 
-/* @Codex */
 export const NETWORK_ENTRY_READ_CAPABILITY = 'network.replica.readonly-clinical-diary';
-/* @Codex */
 export const NETWORK_GLOBAL_ENTRY_READ_CAPABILITY = 'network.replica.readonly-clinical-diary-global';
 
 function toIsoString(value: unknown): string | null {
@@ -44,7 +38,6 @@ function toEntrySummary(entry: typeof entries.$inferSelect): EntrySummary {
     };
 }
 
-/* @Codex */
 export async function listNetworkScopedEntries(
     patientId: string,
     scopeAmbulatoryId: string,
@@ -69,7 +62,6 @@ export async function listNetworkScopedEntries(
     return rows.map((row) => toEntrySummary(row.entry));
 }
 
-/* @Codex */
 export async function listNetworkScopedEntriesForAmbulatory(
     scopeAmbulatoryId: string,
     filters: NetworkEntryListFilters = {}
@@ -90,7 +82,6 @@ export async function listNetworkScopedEntriesForAmbulatory(
     return rows.map((row) => toEntrySummary(row.entry));
 }
 
-/* @Codex */
 export async function getNetworkScopedEntry(
     patientId: string,
     entryId: string,

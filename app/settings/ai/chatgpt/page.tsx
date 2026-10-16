@@ -1,4 +1,3 @@
-/* @Codex */
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';

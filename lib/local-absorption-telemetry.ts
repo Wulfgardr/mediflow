@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     buildEvidenceQueue,
     type BuildEvidenceQueueInput,
@@ -7,10 +6,8 @@ import {
     type EvidenceQueueSourceType,
 } from './domain/documents/evidence-queue-contract';
 
-/* @Codex */
 export const LOCAL_ABSORPTION_TELEMETRY_SCHEMA_VERSION = 'mediflow.local_absorption_telemetry.v1';
 
-/* @Codex */
 export interface LocalAbsorptionTelemetryReport {
     schemaVersion: typeof LOCAL_ABSORPTION_TELEMETRY_SCHEMA_VERSION;
     generatedAt: string;
@@ -68,7 +65,6 @@ function ageDays(generatedAt: string, sourceCreatedAt: string | undefined): numb
     return Math.max(0, Math.floor((generated - source) / 86_400_000));
 }
 
-/* @Codex */
 export function buildLocalAbsorptionTelemetryReport(queues: EvidenceQueue[]): LocalAbsorptionTelemetryReport {
     const byReason = emptyReasonCounts();
     const bySourceType = emptySourceTypeCounts();
@@ -121,7 +117,6 @@ export function buildLocalAbsorptionTelemetryReport(queues: EvidenceQueue[]): Lo
     };
 }
 
-/* @Codex */
 export function buildLocalAbsorptionTelemetryReportFromInputs(
     inputs: BuildEvidenceQueueInput[],
 ): LocalAbsorptionTelemetryReport {

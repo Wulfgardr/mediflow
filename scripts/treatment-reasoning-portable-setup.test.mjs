@@ -1,4 +1,4 @@
-/* @Codex: source/CLI contract only, no actual runtime distribution. */
+/* source/CLI contract only, no actual runtime distribution. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import fs from 'node:fs';
@@ -43,7 +43,7 @@ test('portable packaging checks complete synthetic source/trace closure and ever
     assert.equal(result.liveInference, false); assert.equal(result.check, 'treatment-portable-bundle-synthetic'); assert.ok(result.cases >= 23);
 });
 
-/* @Codex: Execute real composition modules, not a string/URL-wrapper assertion.
+/* Execute real composition modules, not a string/URL-wrapper assertion.
  * Only external DB/auth/lifecycle/other-lane acquisition boundaries are fixtures.
  * The provisioning module gets a native non-file ESM origin to expose any illegal
  * dependency on import.meta.url. This is NOT Webpack or a Next build substitute.
@@ -238,7 +238,7 @@ for (const platform of ['darwin', 'linux', 'win32']) {
     }
 }
 
-/* @Codex: relocated source closure, not a generated Next standalone bundle. */
+/* relocated source closure, not a generated Next standalone bundle. */
 function relocatedCliFixture(t) {
     const dir = directory(t); const app = path.join(dir, 'relocated app');
     const elsewhere = path.join(dir, 'operator cwd'); fs.mkdirSync(elsewhere);

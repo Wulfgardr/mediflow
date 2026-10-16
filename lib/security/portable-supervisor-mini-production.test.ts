@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -148,7 +147,7 @@ async function until(predicate: () => boolean): Promise<void> {
   }
 }
 
-// @Codex: exit can precede stdout delivery; close proves the Web streams drained.
+// exit can precede stdout delivery; close proves the Web streams drained.
 function waitForWebFixtureMarker(child: ChildProcess, output: () => string, marker: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let closed = false;
@@ -400,7 +399,7 @@ for (const { ending, revokedRequest } of scenarios) {
   });
 }
 
-// @Codex: force the proven exit-before-stdout ordering, then require the real marker.
+// force the proven exit-before-stdout ordering, then require the real marker.
 test('Web fixture marker survives exit before stdout delivery', async (t) => {
   const child = spawn(process.execPath, ['-e', "process.stdout.write('FIXTURE_ACTIVATED\\n');"], {
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -420,7 +419,7 @@ test('Web fixture marker survives exit before stdout delivery', async (t) => {
   assert.equal(output, 'FIXTURE_ACTIVATED\n');
 });
 
-// @Codex: a closed Web fixture without an activation marker still fails closed.
+// a closed Web fixture without an activation marker still fails closed.
 test('Web fixture closure cannot substitute for the activation marker', async () => {
   const child = spawn(process.execPath, ['-e', ''], { stdio: ['ignore', 'pipe', 'pipe'] });
   await assert.rejects(waitForWebFixtureMarker(child, () => '', 'FIXTURE_ACTIVATED'),

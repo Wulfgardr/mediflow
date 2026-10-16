@@ -112,7 +112,7 @@ final class PatientsWorkspaceLayoutTests: XCTestCase {
             XCTAssertFalse(PatientsWorkspaceLayout.usesSideBySide(containerWidth: width, isAccessibilitySize: false))
         }
     }
-    // @Codex: iPhone landscape must not become a two-column iPad layout.
+    // iPhone landscape must not become a two-column iPad layout.
     func testShortViewportsRetainOneColumnEvenAtWideWidths() {
         for width in sweep {
             XCTAssertFalse(PatientsWorkspaceLayout.usesSideBySide(

@@ -27,7 +27,7 @@ const DEFAULT_OBSERVATION_CODE = '8480-6';
 const DEFAULT_OBSERVATION_UNIT = 'mm[Hg]';
 
 /*
- * @Codex Observation.value e tipizzato number | string (lib/db.ts): import/API
+ * Observation.value e tipizzato number | string (lib/db.ts): import/API
  * possono scrivere stringhe (es. "120/80", "positivo"). Coerciamo una sola volta
  * al numero per i calcoli (delta, sparkline). Se non e un numero finito, niente
  * trend. La classificazione fuori-range usa il range per-record (refLow/refHigh)
@@ -103,12 +103,12 @@ export default function ObservationManager({
     const codeSelectRef = useRef<HTMLSelectElement>(null);
     const formDisclosureRef = useRef<HTMLDetailsElement>(null);
     const valueInputRef = useRef<HTMLInputElement>(null);
-    /* @Codex WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
+    /* WUL-UIUX: piu analiti possono restare aperti insieme (confronto tra
        parametri in polifarmaco); "full" espande l'intera storia oltre le ultime 5. */
     const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
     const [fullGroups, setFullGroups] = useState<Set<string>>(new Set());
     const selectionPatient = useRef<string | null>(null);
-    /* @Codex WUL-UIUX (Fase 3): "Per data" legge un prelievo/pannello a colpo
+    /* WUL-UIUX (Fase 3): "Per data" legge un prelievo/pannello a colpo
        d'occhio (piu analiti dello stesso giorno). "Stesso giorno" e un'euristica
        onesta di UI (label "Misure del giorno", non "Referto"): senza panelId nello
        schema non si afferma che sia lo stesso referto. */
@@ -164,7 +164,7 @@ export default function ObservationManager({
         valueInputRef.current?.focus();
     };
 
-    /* @Codex Etichetta italiana per un analita, con fallback al display grezzo
+    /* Etichetta italiana per un analita, con fallback al display grezzo
        (regge sia i record storici in inglese sia quelli nuovi). */
     const italianLoincLabel = (analyteCode: string, fallback: string) =>
         loincOptions.find((item) => item.code === analyteCode)?.displayIt ?? fallback;
@@ -181,7 +181,7 @@ export default function ObservationManager({
 
     type Observation = NonNullable<typeof observations>[number];
 
-    /* @Codex Raggruppamento per analita: una sezione densa per parametro,
+    /* Raggruppamento per analita: una sezione densa per parametro,
        gruppi ordinati per misura piu recente, codifica mostrata una sola volta. */
     const groups = useMemo(() => {
         if (!observations) return undefined;
@@ -219,7 +219,7 @@ export default function ObservationManager({
         setFullGroups(new Set());
     }, [groups, patientId]);
 
-    /* @Codex WUL-UIUX (Fase 3): raggruppamento per giorno locale di observedAt,
+    /* WUL-UIUX (Fase 3): raggruppamento per giorno locale di observedAt,
        per leggere insieme le misure dello stesso prelievo. Giorni piu recenti in
        cima; dentro il giorno, misure per ora decrescente. Chiave = data locale
        (non UTC) cosi non slitta a cavallo di mezzanotte. */
@@ -253,7 +253,7 @@ export default function ObservationManager({
         event.preventDefault();
         if (isSaving) return;
 
-        /* @Codex Accetta la virgola decimale italiana ("36,5") oltre al punto. */
+        /* Accetta la virgola decimale italiana ("36,5") oltre al punto. */
         const numericValue = Number(value.replace(',', '.').trim());
         const observedDate = new Date(observedAt);
         if (!Number.isFinite(numericValue)) {
@@ -285,7 +285,7 @@ export default function ObservationManager({
                 servicePrescriptionItemId,
             });
 
-            /* @Codex WUL-UIUX Trascrizione referto multi-analita: conservare la
+            /* WUL-UIUX Trascrizione referto multi-analita: conservare la
                data del prelievo e riportare il focus sul parametro, cosi la misura
                successiva dello stesso referto mantiene lo stesso timestamp. */
             setValue('');
@@ -360,7 +360,7 @@ export default function ObservationManager({
                         onChange={(e) => {
                             const next = e.target.value;
                             setCode(next);
-                            /* @Codex Imposta l'unita di default dell'analita
+                            /* Imposta l'unita di default dell'analita
                                (resta modificabile), evita "Glicemia 90 mmHg". */
                             const option = loincOptions.find((item) => item.code === next);
                             if (option?.defaultUnit) setUnitCode(option.defaultUnit);

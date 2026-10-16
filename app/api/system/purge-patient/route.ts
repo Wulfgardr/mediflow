@@ -7,7 +7,6 @@ import { and, eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
 import { patients, patientRetiredIds } from '@/lib/schema';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
     countPatientCascadeRows,

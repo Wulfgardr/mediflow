@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { EXEMPTION_MAX_BYTES } from './exemption-import-contract';
 import { ExemptionImportError } from './exemption-catalog-import';

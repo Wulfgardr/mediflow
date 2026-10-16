@@ -1,18 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-# @Codex
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# @Codex
 RUN_ID="$(date '+%Y%m%d-%H%M%S')"
 ARTIFACT_DIR="${MEDIFLOW_PARITY_ARTIFACT_DIR:-$ROOT_DIR/tmp-parity-smoke/$RUN_ID}"
 WEB_LOG="$ARTIFACT_DIR/web-smoke.log"
 NATIVE_LOG="$ARTIFACT_DIR/native-smoke.log"
 SUMMARY_FILE="$ARTIFACT_DIR/summary.md"
 
-# @Codex
 RUN_WEB="${MEDIFLOW_PARITY_RUN_WEB:-1}"
 RUN_NATIVE="${MEDIFLOW_PARITY_RUN_NATIVE:-1}"
 REQUIRE_WEB="${MEDIFLOW_PARITY_REQUIRE_WEB:-0}"

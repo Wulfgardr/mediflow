@@ -1,5 +1,5 @@
 import { isAiLaneEnabledValue } from '../ai-lane-kill-switch';
-/* @Codex — same preview output; no account/clinical material in browser storage. */
+/* same preview output; no account/clinical material in browser storage. */
 import { ordinaryWireObject, ORDINARY_FLOW_SCHEMA, ORDINARY_SELECTION_SCHEMA, type OrdinaryFunction, type OrdinaryFlowState } from '../chatgpt-product/ordinary-wire';
 import type { SynthesisCatalog, SynthesisChoice } from '../chatgpt-execution/execution-contract';
 import type { OrdinaryContentDisclosure } from '../chatgpt-product/product-contract';

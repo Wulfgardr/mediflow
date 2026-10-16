@@ -6,18 +6,16 @@ import './globals.css';
 // properties are the first design-token input available to the live cockpit.
 import './lume-tokens.css';
 import './lume-motion.css';
-/* @Codex */
 import './runtime-twin.css';
 import { getAppFingerprint } from '@/lib/app-revision';
 import { RootRuntimeShell } from '@/components/root-runtime-shell';
-/* @Codex */
 import { RuntimeTwinToolbar } from '@/components/runtime-twin-toolbar';
 import { RuntimeTwinDesignProvider } from '@/components/runtime-twin-design';
 import {
   UI_REDUCE_MOTION_STORAGE_KEY,
 } from '@/lib/ui-accessibility-preferences';
 
-/* @Codex: font Lume bundled locally so the layout remains usable offline. */
+/* font Lume bundled locally so the layout remains usable offline. */
 const voce = localFont({
   src: './fonts/Newsreader-Variable.ttf',
   variable: '--font-voce',
@@ -74,14 +72,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  /* @Codex: expose a stable revision fingerprint so stale browser tabs can self-heal after branch/server changes */
+  /* expose a stable revision fingerprint so stale browser tabs can self-heal after branch/server changes */
   const appFingerprint = getAppFingerprint();
-  /* @Codex ADR 0123: the flag controls comparison chrome, not the official UI. */
+  /* ADR 0123: the flag controls comparison chrome, not the official UI. */
   const runtimeTwin = process.env.MEDIFLOW_RUNTIME_TWIN === '1';
 
   return (
     <html lang="it" className={`${voce.variable} ${registro.variable}`} data-ui-style="redesign" data-lume="true" data-runtime-twin={runtimeTwin ? 'true' : undefined} data-runtime-twin-design="proposal" data-twin-composition="stream" suppressHydrationWarning>
-      {/* @Codex: keep layout fully local/offline by avoiding remote Google Font fetches */}
+      {/* keep layout fully local/offline by avoiding remote Google Font fetches */}
       <head>
         <meta name="mediflow-app-fingerprint" content={appFingerprint} />
         <Script id="ui-style-bootstrap" strategy="beforeInteractive">

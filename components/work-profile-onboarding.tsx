@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useState } from 'react';
 import Link from 'next/link';
 import {

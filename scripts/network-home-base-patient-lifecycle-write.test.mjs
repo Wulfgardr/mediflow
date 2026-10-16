@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -479,7 +478,7 @@ async function cleanupPatient(patientId) {
     assert.equal(deletion.response.status, 200);
 }
 
-/* @Codex: direct readback of the same synthetic DB used by the real HTTP server. */
+/* direct readback of the same synthetic DB used by the real HTTP server. */
 function patientMutationSnapshot(patientId) {
     const dataDir = process.env.MEDIFLOW_DATA_DIR;
     assert.ok(dataDir);

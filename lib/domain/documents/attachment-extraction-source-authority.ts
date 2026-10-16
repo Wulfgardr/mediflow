@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { Buffer } from 'node:buffer';
@@ -213,7 +212,7 @@ function createSourceAuthority(sessionValue: ServerSession, native: boolean) {
             cancel(): void { revoke(); },
             issue(value: unknown): object | null { return issue(value, false)?.locator ?? null; },
             issueProjection(value: unknown) { return issue(value, true); },
-            /* @Codex — one native capture, with a separate veto-only witness surviving byte finalize. */
+            /* one native capture, with a separate veto-only witness surviving byte finalize. */
             issueNativeOrdinarySource(value: unknown) {
                 if (!native) return null;
                 const issued = issue(value, false); if (!issued) return null;

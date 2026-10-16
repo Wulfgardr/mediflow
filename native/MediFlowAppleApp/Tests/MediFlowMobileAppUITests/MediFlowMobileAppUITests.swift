@@ -18,7 +18,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         super.tearDown()
     }
 
-    /* @Codex */
     private func launch(
         seedPatients: Bool = false,
         singlePatient: Bool = false,
@@ -26,7 +25,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         section: String? = nil,
         dynamicTypeSize: String? = nil
     ) {
-        // @Codex: Layout/setup fixtures must not inherit a real interoperability pairing or cache.
+        // Layout/setup fixtures must not inherit a real interoperability pairing or cache.
         app.launchEnvironment["MEDIFLOW_APPLE_DEV_SKIP_KEYCHAIN"] = "1"
         if seedPatients { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_PATIENTS"] = "1" }
         if singlePatient { app.launchEnvironment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] = "1" }
@@ -44,7 +43,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
-    /* @Codex: titles and picker ID match PatientWorkspaceSection and Workspace. */
+    /* titles and picker ID match PatientWorkspaceSection and Workspace. */
     private enum PatientSection: String {
         case overview = "Scheda"
         case diary = "Diario clinico"
@@ -68,7 +67,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
     }
 
     private func openPatientSection(_ section: PatientSection, file: StaticString = #filePath, line: UInt = #line) {
-        // @Codex: regular width has seven direct controls; compact/AX layouts
+        // regular width has seven direct controls; compact/AX layouts
         // keep an accessible picker for destinations without a direct control.
         XCTAssertTrue(sectionView("patient-section-navigation").waitForExistence(timeout: 15), file: file, line: line)
         let directQuery = app.buttons.matching(identifier: "patient-section-\(section.identifier)")
@@ -107,7 +106,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
-    /* @Codex: compact navigation hides the worklist; assert its selection on return. */
+    /* compact navigation hides the worklist; assert its selection on return. */
     private func assertPatientRemainsSelected(_ row: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         let destination = sectionView("patient-compact-detail-destination")
         if destination.exists {
@@ -124,7 +123,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
-    /* @Codex: the synthetic fixture is loaded-empty, not an unread/error fallback. */
+    /* the synthetic fixture is loaded-empty, not an unread/error fallback. */
     private func assertLoadedEmptyDocuments(file: StaticString = #filePath, line: UInt = #line) {
         let empty = sectionView("documents-empty-state")
         XCTAssertTrue(scrollDown(to: empty), file: file, line: line)
@@ -133,7 +132,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(sectionView("documents-read-state").exists, file: file, line: line)
     }
 
-    /* @Codex */
     private func attachScreenshot(named name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
@@ -318,7 +316,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
-    // @Codex #142: the outer project sidebar must overlay the iPad patient workspace.
+    // #142: the outer project sidebar must overlay the iPad patient workspace.
     func testProjectSidebarPreservesPatientWorkspaceWidthOnIPad() throws {
         // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
         // instead of reporting a device mismatch as a product failure.
@@ -365,7 +363,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
-    /* @Codex */
     func testPairedStatusIsVisibleAndReachableWithSyntheticPatients() throws {
         launch(seedPatients: true)
 
@@ -384,7 +381,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     /// The paired state must not displace the first worklist row when the
     /// compact iPhone workspace recomposes for landscape.
-    /* @Codex */
     func testPairedStatusKeepsFirstPatientReachableAcrossIPhoneRotation() throws {
         try XCTSkipUnless(UIDevice.current.userInterfaceIdiom == .phone, "iPhone-only first-viewport contract")
         launch(seedPatients: true, section: "modules")
@@ -448,7 +444,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "WUL-556-F01-iPhone-portrait-selection")
     }
 
-    // @Codex #142: AX Dynamic Type must select the existing single-column path.
+    // #142: AX Dynamic Type must select the existing single-column path.
     func testAccessibilityDynamicTypeUsesSinglePatientColumnOnIPad() throws {
         // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
         // instead of reporting a device mismatch as a product failure.
@@ -493,7 +489,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
     /// The list must remain usable as the container changes. It may keep the same
     /// width after reaching its intentional cap; the detail then absorbs the
     /// additional landscape space.
-    /* @Codex */
     func testIPadListColumnFollowsTheContainerAcrossRotation() throws {
         // Not applicable on iPhone: skipping keeps the iPhone suite meaningful
         // instead of reporting a device mismatch as a product failure.
@@ -783,7 +778,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Il giro completo, sullo stesso codice per iPhone e iPad
 
-    /* @Codex */
     func testCompactClinicalTabsExposeStableIdentifiers() throws {
         launch(seedPatients: true)
 
@@ -832,7 +826,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
-    // @Codex
     func testAccessibilityAuditCoversWorklistAndAgenda() throws {
         // Let XCTest vary Dynamic Type during the accessibility audit. The
         // debug AX5 override belongs to the dedicated layout tests; here it
@@ -944,12 +937,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
-    /* @Codex */
     func testPatientsSectionKeepsConnectionFormBehindSetupSheet() {
         launch()
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 10))
 
-        // @Codex: the mobile recovery surface owns its native Configura action.
+        // the mobile recovery surface owns its native Configura action.
         let status = sectionView("mobile-paired-status")
         XCTAssertTrue(status.waitForExistence(timeout: 10),
                       "A blocking connection state should use a concise recovery banner")
@@ -996,7 +988,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         )
     }
 
-    /* @Codex */
     func testUsablePatientHomeShowsWorklistBeforeConnectionSetup() throws {
         /* La meta speculare della matrice adattiva. I quattro contratti solo-iPad
            si auto-saltano su iPhone; questi cinque pretendono il cromo compatto,
@@ -1089,7 +1080,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(bianchi.waitForExistence(timeout: 5), "clearing the query must restore the list")
     }
 
-    /* @Codex */
     func testActivePatientRowShowsSourceOrderedDiagnosisSummaryAndOmitsMalformedData() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
@@ -1213,7 +1203,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
                       "Detail should show the AI insight summary when present")
     }
 
-    /* @Codex */
     func testPatientSortMenuUsesReadableLabelAndChangesOrder() {
         launch(seedPatients: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
@@ -1324,14 +1313,14 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(sectionView("entry-row-entry-phone").waitForNonExistence(timeout: 3))
     }
 
-    /* @Codex: run unchanged on both iPhone and iPad; each section has its own content. */
+    /* run unchanged on both iPhone and iPad; each section has its own content. */
     func testPatientSectionsKeepNavigationAndContentDistinct() {
         launch(seedPatients: true, section: "modules")
         let patient = app.buttons["patient-cell-uitest-1"]
         XCTAssertTrue(patient.waitForExistence(timeout: 15))
         patient.tap()
 
-        // @Codex: the expanded native disclosure exposes this Other container;
+        // the expanded native disclosure exposes this Other container;
         // its three section links retain their own identifiers inside it.
         let contentsQuery = app.otherElements.matching(identifier: "patient-chart-contents-disclosure")
         let contents = contentsQuery.element
@@ -1393,7 +1382,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertFalse(sectionView("documents-empty-state").exists)
     }
 
-    /* @Codex: synthetic draft only; no save, compute, recording or document import. */
+    /* synthetic draft only; no save, compute, recording or document import. */
     func testDiaryDraftSurvivesDocumentsRoundTripWithProgressiveTools() {
         launch(seedPatients: true, section: "modules")
         let patient = app.buttons["patient-cell-uitest-1"]
@@ -1417,7 +1406,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         let draftBody = "Testo sintetico da conservare nel diario"
         let draftTranscript = "Trascrizione sintetica ancora da rivedere"
 
-        // @Codex: a device-orientation event alone does not prove that the
+        // a device-orientation event alone does not prove that the
         // app window rotated. Record and await its geometry before reading the draft.
         func waitForDiaryOrientation(isLandscape: Bool) {
             let window = app.windows.firstMatch
@@ -1442,7 +1431,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
                            "The app window must complete the \(requested) transition before checking the draft")
         }
 
-        // @Codex: ScrollView's AX frame extends behind the keyboard. Derive each
+        // ScrollView's AX frame extends behind the keyboard. Derive each
         // gesture from the visible diary gutter, so scrolling cannot type keys
         // or drag inside the nested text editor. Preserve focus and both directions.
         func revealDiaryControl(_ control: XCUIElement) -> Bool {
@@ -1511,7 +1500,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         paragraph.typeText(draftBody)
         XCTAssertEqual(paragraph.value as? String, draftBody)
         attachScreenshot(named: "mobile-harmonization-draft-keyboard-portrait")
-        // @Codex: cross the actual adaptive layout with a populated draft. A
+        // cross the actual adaptive layout with a populated draft. A
         // reconstructed progressive shell may require resuming, but cannot lose data.
         XCUIDevice.shared.orientation = .landscapeLeft
         waitForDiaryOrientation(isLandscape: true)
@@ -1639,7 +1628,6 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Via Roma 1, Milano"].waitForNonExistence(timeout: 3))
     }
 
-    /* @Codex */
     func testEditPatientFormDisablesLockedFieldWithoutShowingCiphertext() {
         launch(seedPatients: true, lockedPatientFields: true, section: "modules")
         XCTAssertTrue(sectionView("clinical-workspace-patients-view").waitForExistence(timeout: 20))
@@ -1675,7 +1663,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.buttons["edit-patient-button"].tap()
         let archived = app.switches["edit-patient-archived"]
         XCTAssertTrue(archived.waitForExistence(timeout: 5))
-        // @Codex: verify the actual switch transition before relying on a saved flag.
+        // verify the actual switch transition before relying on a saved flag.
         XCTAssertTrue(revealInteropControl(archived))
         let archivedControls = archived.children(matching: .switch)
         XCTAssertEqual(archivedControls.count, 1, "The archived row must expose one native switch")
@@ -1697,7 +1685,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         archivedControl.tap()
         assertArchivedValue("1")
 
-        // @Codex: a new archive needs an explicit reason, including inline edits.
+        // a new archive needs an explicit reason, including inline edits.
         XCTAssertFalse(app.buttons["save-patient-button"].isEnabled)
         XCTAssertTrue(sectionView("patient-archive-validation").exists)
         selectInteropArchiveReason("Assegnato a MMG")
@@ -1860,7 +1848,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(adlOption.waitForExistence(timeout: 5), "The ADL scale option should be available")
         adlOption.tap()
 
-        // @Codex MF085-003: no first-option defaults; explicit zero is a real response.
+        // MF085-003: no first-option defaults; explicit zero is a real response.
         XCTAssertTrue(app.buttons["scale-question-bath"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["scale-incomplete"].exists)
         XCTAssertFalse(app.staticTexts["scale-score"].exists)
@@ -1908,7 +1896,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["E11.9 - Diabete tipo 2"].waitForExistence(timeout: 5))
     }
 
-    // @Codex: Observation only. Capture the actual native picker before choosing
+    // Observation only. Capture the actual native picker before choosing
     // its date-selection strategy; no save, production flags or guessed roles.
     func testObservePatientBirthDatePickerAccessibility() {
         launch(seedPatients: true, section: "modules")
@@ -1936,7 +1924,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
 
     // MARK: - Actual paired client / host interoperability (opt-in, no demo)
 
-    /* @Codex: The descriptor is supplied to the test runner in a private xctestrun.
+    /* The descriptor is supplied to the test runner in a private xctestrun.
        These tests are deliberately separate from launch(seedPatients:), because
        ordinary pairing/cache and the real HTTPS transport are part of the proof. */
     private struct InteropInput: Decodable {
@@ -2015,7 +2003,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
     private func revealInteropControl(_ element: XCUIElement) -> Bool {
         guard element.waitForExistence(timeout: 15) else { return false }
         for _ in 0..<16 {
-            // @Codex: a system Home gesture must fail, never count as revealing a control.
+            // a system Home gesture must fail, never count as revealing a control.
             guard app.state == .runningForeground else { return false }
             if element.isHittable { return true }
             let target = element.identifier.isEmpty ? element.label : element.identifier
@@ -2024,7 +2012,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
             guard let scroll = containers.min(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }) else {
                 return false
             }
-            // @Codex: use the same measured gutter as the verified draft helper;
+            // use the same measured gutter as the verified draft helper;
             // a generic swipe can hit the keyboard accessory or nested editor.
             let scrollFrame = scroll.frame
             let viewport = scrollFrame.intersection(app.frame)
@@ -2042,7 +2030,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
                 if overlay.frame.intersects(viewport) { bottom = min(bottom, overlay.frame.minY) }
             }
             guard viewport.width > 0, bottom > top else { return false }
-            // @Codex: the iPad archive recording showed a 12pt bottom inset
+            // the iPad archive recording showed a 12pt bottom inset
             // opening Dock/App Switcher. Keep both endpoints inside the measured
             // unobscured viewport, including when the keyboard shortens it.
             let inset = min((bottom - top) / 4, max(24, (bottom - top) * 0.15))
@@ -2069,7 +2057,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         if !secure { XCTAssertEqual(field.value as? String, value) }
     }
 
-    // @Codex: The real first login showed this system alert over the loaded
+    // The real first login showed this system alert over the loaded
     // patient list. Dismiss only its observed Not Now action; never save the
     // password or change AutoFill/Keychain preferences. Other alerts must fail.
     private func dismissObservedPasswordSavePromptIfPresent() {
@@ -2101,7 +2089,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         app.launchEnvironment = [:]
         app.launch()
         if fromRoot {
-            // @Codex: prove the ordinary first-open Configura path, without an
+            // prove the ordinary first-open Configura path, without an
             // initial-section shortcut or an injected operator session.
             XCTAssertTrue(openSection("Pazienti"))
             let status = sectionView("mobile-paired-status")
@@ -2117,7 +2105,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
-    // @Codex: Local-lock recovery must reuse the running app. Launching again
+    // Local-lock recovery must reuse the running app. Launching again
     // would clear memory independently and conceal retained clinical drafts.
     private func loginInteropFromSettings(_ input: InteropInput, useSavedPairing: Bool, verifyClearBeforeRead: Bool = false,
                                          connectionAlreadyOpen: Bool = false) {
@@ -2209,7 +2197,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "interop-\(input.host.os)-\(input.clientPlatform)-persisted-diary")
     }
 
-    /* @Codex: Run once per actual host and idiom, then independently reread via web API and the other app. */
+    /* Run once per actual host and idiom, then independently reread via web API and the other app. */
     func testRealPairedHostWorkflow() throws {
         let input = try interopInput()
         defer { app.terminate() }
@@ -2266,7 +2254,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         assertInteropReread(input, address: input.writeAddress, title: input.writeTitle)
     }
 
-    /* @Codex: Return the first client after the peer's write; no mutation in this phase. */
+    /* Return the first client after the peer's write; no mutation in this phase. */
     func testRealPairedOtherClientReread() throws {
         let input = try interopInput()
         let address = try XCTUnwrap(input.expectedAddress, "The peer's exact persisted address is required")
@@ -2276,7 +2264,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         assertInteropReread(input, address: address, title: title)
     }
 
-    /* @Codex: This barrier lives in the test runner's own temporary directory.
+    /* This barrier lives in the test runner's own temporary directory.
        Only the fixture owner may produce the HTTP receipts. Neither the app
        nor its credentials, storage, API or clock acquire a test seam. */
     private struct InteropLockBarrier {
@@ -2355,7 +2343,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         }
     }
 
-    /* @Codex: Positive data assertions precede the negative lock assertions.
+    /* Positive data assertions precede the negative lock assertions.
        A fresh process or an already-empty fixture cannot satisfy this proof. */
     func testRealPairedLockClearsClinicalPresentationBeforeLogoutCompletes() throws {
         let input = try interopInput()
@@ -2540,7 +2528,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         attachScreenshot(named: "interop-lock-fresh-read-without-unsaved-drafts")
     }
 
-    /* @Codex: Per-mutation checkpoints stop the UI until an independent normal
+    /* Per-mutation checkpoints stop the UI until an independent normal
        HTTPS reader has checked the exact record/version. These are distinct
        from the fixture tests and from the other native app's later reread. */
     private final class InteropModuleProbe {
@@ -2619,7 +2607,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return probe
     }
 
-    // @Codex: The two live app processes exchange only test-run receipts through
+    // The two live app processes exchange only test-run receipts through
     // a controller-owned relay. Neither app receives a fake transport or write.
     private func prepareInteropCAS(_ input: InteropInput, role: String) throws -> (InteropInput.CASCase, InteropModuleProbe) {
         let cas = try XCTUnwrap(input.cas, "A prior actual UI-created diary entry is required")
@@ -2720,7 +2708,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertEqual(body.element.label.components(separatedBy: .newlines).filter { !$0.isEmpty }, expectedParagraphs)
     }
 
-    /* @Codex: App A keeps its stale draft while app B commits through normal UI.
+    /* App A keeps its stale draft while app B commits through normal UI.
        Reload and explicit local reconciliation must each leave B's data intact. */
     func testRealPairedDiaryCASContenderPreservesDraftUntilExplicitSave() throws {
         let input = try interopInput()
@@ -2774,7 +2762,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try probe.complete()
     }
 
-    /* @Codex: App B is an actual second UI writer, then independently relaunches,
+    /* App B is an actual second UI writer, then independently relaunches,
        logs in with its saved pairing and rereads A's reconciled final content. */
     func testRealPairedDiaryCASPeerWritesAndRereadsReconciledEntry() throws {
         let input = try interopInput()
@@ -2804,7 +2792,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         try probe.complete()
     }
 
-    // @Codex: exact source identifier and option labels; the selected native
+    // exact source identifier and option labels; the selected native
     // value may be announced as the picker value or included in its label.
     private func assertInteropArchiveReason(_ title: String) {
         let query = app.descendants(matching: .any).matching(identifier: "patient-archive-reason")
@@ -2857,7 +2845,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         return try XCTUnwrap(interopRecordIDs(actionPrefix: actionPrefix).subtracting(existing).first)
     }
 
-    // @Codex: Return through the actual navigation destination, on either idiom.
+    // Return through the actual navigation destination, on either idiom.
     private func returnToInteropWorklist() {
         let destination = sectionView("patient-compact-detail-destination")
         if destination.exists {
@@ -2883,7 +2871,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 5), .completed)
     }
 
-    /* @Codex: All seven checkpoints concern a newly UI-created auxiliary
+    /* All seven checkpoints concern a newly UI-created auxiliary
        patient. The descriptor patient remains available to the other phases. */
     func testRealPairedNewPatientLifecycleWithIndependentRereads() throws {
         let input = try interopInput()
@@ -2964,7 +2952,7 @@ final class MediFlowMobileAppUITests: XCTestCase {
         XCTAssertTrue(revealInteropControl(app.staticTexts[try XCTUnwrap(expected["address"])]))
         try checkpoint("profile-updated", version: 2)
 
-        // @Codex: Lifecycle commands belong to the ordinary overflow menu.
+        // Lifecycle commands belong to the ordinary overflow menu.
         tapInteropButton("patient-actions-overflow")
         tapInteropButton("archive-patient-button")
         XCTAssertTrue(app.staticTexts["\(lastName) \(firstName)"].exists)

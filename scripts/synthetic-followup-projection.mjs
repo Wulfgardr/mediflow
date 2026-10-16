@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex: read/proposal-only synthetic projection; no task, notification or clinical write. */
+/* read/proposal-only synthetic projection; no task, notification or clinical write. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

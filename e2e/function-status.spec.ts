@@ -1,4 +1,4 @@
-/* @Codex WUL-674/673: browser states on synthetic configuration, no WHO egress. */
+/* WUL-674/673: browser states on synthetic configuration, no WHO egress. */
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 import { WHO_LOCAL_BINDING_ID } from '../lib/reference-data/icd11-who-local-contract';
@@ -132,7 +132,7 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     expect(written.diagnoses).toMatch(/^ENC:/u);
     expect(written.diagnoses).not.toContain(canonicalUri);
     const patientId = written.id as string;
-    // @Codex WUL-732: la scheda nuova apre la lista pazienti senza dipendere dal profilo.
+    // WUL-732: la scheda nuova apre la lista pazienti senza dipendere dal profilo.
     await expect(page).toHaveURL(new URL('/?area=incarico', baseURL!).href);
     const assertReread = async () => {
         await page.goto(`/patients/${patientId}/edit`);

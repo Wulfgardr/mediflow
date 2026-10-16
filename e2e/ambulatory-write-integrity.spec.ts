@@ -1,4 +1,4 @@
-/* @Codex: real settings recovery and currentness with isolated synthetic SQLite. */
+/* real settings recovery and currentness with isolated synthetic SQLite. */
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
@@ -42,7 +42,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         for (const lastName of ['SoloProva', 'Condiviso']) {
             const patientId = randomUUID();
             patientIds.push(patientId);
-            // @Codex: create through the authenticated Web route; its destination is
+            // create through the authenticated Web route; its destination is
             // the active/default ambulatory, then scope these synthetic IDs below.
             const response = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
                 id: patientId, firstName: 'Sintetico', lastName,
@@ -60,7 +60,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             expect((await response.json() as { id: string }).id).toBe(patientId);
             expect((await page.request.get(`/api/patients/${patientId}`)).status()).toBe(200);
         }
-        // @Codex: fixture-only alignment; the Web legacy route selected the
+        // fixture-only alignment; the Web legacy route selected the
         // default/active destination. Keep versions at their create value.
         sql.transaction(() => {
             for (const patientId of patientIds) {
@@ -99,7 +99,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         expect(read()).toEqual(before);
         await expect(page.getByText('Errore durante lo svuotamento', { exact: true })).toBeVisible();
         sql.exec('DROP TRIGGER synthetic_ambulatory_ui_audit');
-        // @Codex: the genuine accepted POST must remain current if its list reread fails.
+        // the genuine accepted POST must remain current if its list reread fails.
         let failedReads = 0;
         await page.route('**/api/ambulatories', async route => {
             if (route.request().method() === 'GET') {

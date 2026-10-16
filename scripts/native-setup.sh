@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# @Codex
 DATA_DIR="${MEDIFLOW_DATA_DIR:-$HOME/Library/Application Support/MediFlow}"
 DB_PATH="${MEDIFLOW_DB_PATH:-$DATA_DIR/medical.db}"
 CERT_DIR="${MEDIFLOW_TLS_CERT_DIR:-$DATA_DIR/certs}"
@@ -19,7 +18,7 @@ is_loopback_host() {
   esac
 }
 
-# @Codex: decide fresh installation before TLS/token/runtime files populate the directory.
+# decide fresh installation before TLS/token/runtime files populate the directory.
 MEDIFLOW_DATA_DIR="$DATA_DIR" MEDIFLOW_DB_PATH="$DB_PATH" \
   node "$ROOT_DIR/scripts/run-strip-types.mjs" "$ROOT_DIR/scripts/native-first-install.mjs"
 
@@ -41,7 +40,6 @@ RUNTIME_STATUS_PATH="$CONFIG_DIR/runtime-status.json"
 
 mkdir -p "$CONFIG_DIR"
 
-# @Codex
 TOKEN_FILE="$DATA_DIR/local-api-token"
 if [[ -n "${MEDIFLOW_LOCAL_API_TOKEN:-}" ]]; then
   TOKEN_VALUE="$MEDIFLOW_LOCAL_API_TOKEN"

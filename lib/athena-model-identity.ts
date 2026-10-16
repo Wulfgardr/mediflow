@@ -1,4 +1,3 @@
-/* @Codex */
 // ATHENA-R1-Qwen3-8B provenance:
 // - model card: https://huggingface.co/mims-harvard/ATHENA-R1-Qwen3-8B
 // - paper: arXiv:2606.28692

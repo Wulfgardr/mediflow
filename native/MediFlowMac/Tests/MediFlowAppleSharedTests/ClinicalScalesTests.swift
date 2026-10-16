@@ -1,4 +1,4 @@
-// @Codex MF085-002/003: complete vectors replace impossible partial-total injections; legacy literals are tested in history.
+// MF085-002/003: complete vectors replace impossible partial-total injections; legacy literals are tested in history.
 import XCTest
 @testable import MediFlowAppleShared
 

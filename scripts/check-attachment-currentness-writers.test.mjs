@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { analyzeSource, compareInventory, CONTRACT, inventory, policyFindings } from './check-attachment-currentness-writers.mjs';
@@ -51,7 +50,7 @@ test('keeps every retired OCR replay fingerprint absent from the live contract a
 
 test('exact repository inventory is classified with no currentness gaps', () => {
     const findings = compareInventory(inventory(), CONTRACT);
-    /* @Codex The retired OCR replay update is intentionally absent; the exact
+    /* The retired OCR replay update is intentionally absent; the exact
        live inventory now contains 22 current or delegated writers, the
        synthetic attachment of the restore drill among them. */
     assert.equal(CONTRACT.length, 22);

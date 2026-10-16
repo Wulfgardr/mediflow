@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
 
@@ -259,7 +258,7 @@ export function createTreatmentReasoningBrowserController(sources: Sources = {})
             const selectedProposal = proposal; const ambulatory = input.ambulatory as SmartImportAmbulatoryChoice; proposal = null; readOperation += 1;
             const clinicalContext = inputContext(input.contextInput, input.patientId); if (!clinicalContext) return fail('input_invalid');
             const token = generation; const currentOperation = ++operation; let selected: unknown = null;
-            // @Codex: caller facts and host-owned directory facts must remain bound to the accepted proposal.
+            // caller facts and host-owned directory facts must remain bound to the accepted proposal.
             const patientCurrent = () => {
                 const patient = clinicalContext.patient;
                 if (patient.id !== selectedProposal.patientId || patient.version !== selectedProposal.patientVersion

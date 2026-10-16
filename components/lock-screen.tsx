@@ -25,7 +25,6 @@ export function LockScreen() {
     // WUL-55: ref + nonce to restore focus to the credential field after a failed login.
     const pinInputRef = useRef<HTMLInputElement>(null);
     const [failedAttempt, setFailedAttempt] = useState(0);
-    /* @Codex */
     const previousRecoveryState = useRef(authRecoveryState);
 
     // A failed login re-enables and clears the input; deterministically restore focus so the
@@ -44,7 +43,7 @@ export function LockScreen() {
     if (!isLocked && !requiresSetup) return null;
 
     const attempt = async (longPinConfirmed: boolean) => {
-        /* @Codex: Enter cannot bypass a pending or unconfirmed recovery. */
+        /* Enter cannot bypass a pending or unconfirmed recovery. */
         if (authRecoveryState !== 'ready' || attempting.current) return;
         attempting.current = true;
         setLoading(true);
@@ -83,7 +82,6 @@ export function LockScreen() {
         if (longPinNotice && e.detail <= 1) void attempt(true);
     };
 
-    /* @Codex */
     const recoveryPending = authRecoveryState === 'pending';
     const credentialsDisabled = loading || authRecoveryState !== 'ready';
     const visibleError = error || authErrorMessage || (authRecoveryState === 'failed'
@@ -96,7 +94,7 @@ export function LockScreen() {
         : recoveryPending ? 'Sto chiudendo la sessione precedente…' : null;
 
     return (
-        // @Codex WUL-55 F2d-A: lock chrome uses the landed Lume identity without changing auth semantics.
+        // WUL-55 F2d-A: lock chrome uses the landed Lume identity without changing auth semantics.
         <div className={styles.lockShell} aria-label="MediFlow lock screen">
             <section className={styles.lockCard} aria-labelledby="mediflow-lock-title">
                 <div className={styles.brandRow}>
@@ -120,7 +118,7 @@ export function LockScreen() {
                             {recoveryMessage}
                         </p>
                     )}
-                    {/* @Codex WUL-55: keep the field name for assistive tech without repeating visible copy. */}
+                    {/* WUL-55: keep the field name for assistive tech without repeating visible copy. */}
                     <label className="sr-only" htmlFor="mediflow-lock-pin">
                         {passphrase ? 'Passphrase' : 'PIN operatore'}
                     </label>
@@ -194,7 +192,7 @@ export function LockScreen() {
                             </>
                         )}
                     </button>
-                    {/* @Codex: renewal is explicit because the session may be shared with
+                    {/* renewal is explicit because the session may be shared with
                         another tab. The next PIN submission waits for the lock receipt. */}
                     {!requiresSetup && (visibleError || authRecoveryState !== 'ready') && (
                         <div className="text-center text-sm">

@@ -1,4 +1,4 @@
-/* @Codex — synthetic test data only; never imported by production code. */
+/* synthetic test data only; never imported by production code. */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

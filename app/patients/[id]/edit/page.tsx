@@ -5,21 +5,16 @@ import ink from '@/components/ink-secondary.module.css';
 import { ApiConflictError, db } from '@/lib/db';
 import { useRouter, useParams } from 'next/navigation';
 import { Trash2, Archive, Download, ShieldAlert, RotateCcw } from 'lucide-react';
-/* @Codex */
 import PatientEditForm, { type PatientEditLoadedRecord } from '@/components/patient-edit-form';
 import { useLiveQuery } from '@/lib/live-query';
 import PatientActionModal, { ActionData } from '@/components/patient-action-modal';
-/* @Codex */
 import { useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-/* @Codex */
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
-/* @Codex */
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 
-/* @Codex */
 function messageFromError(error: unknown, fallback: string): string {
     if (error instanceof ApiConflictError) return error.message;
     if (error instanceof Error && error.message) return error.message;
@@ -33,7 +28,6 @@ export default function EditPatientPage() {
     const { showToast } = useToast();
     const confirm = useConfirm();
 
-    /* @Codex */
     const livePatient = useLiveQuery(async () => {
         const p = await db.patients.get(id);
         if (!p) return null;
@@ -43,7 +37,7 @@ export default function EditPatientPage() {
         return { ...p, checkups };
     }, [id], undefined, ['patients', 'checkups']);
 
-    /* @Codex: a missing live reread must not unmount an interrupted draft/journal.
+    /* a missing live reread must not unmount an interrupted draft/journal.
        Keep the last available record for this route; writes still use the editor's
        original CAS tokens and the server remains authoritative for availability. */
     const [lastAvailablePatient, setLastAvailablePatient] = useState<typeof livePatient>(undefined);
@@ -53,7 +47,7 @@ export default function EditPatientPage() {
     }, [livePatient, id]);
     const availablePatient = livePatient?.id === id ? livePatient
         : lastAvailablePatient?.id === id ? lastAvailablePatient : null;
-    /* @Codex: a late live-query result cannot replace an explicitly validated reread. */
+    /* a late live-query result cannot replace an explicitly validated reread. */
     const patient = reloadedPatient?.id === id
         && reloadedPatient.version !== undefined
         && (availablePatient?.version ?? -1) <= reloadedPatient.version
@@ -240,7 +234,7 @@ export default function EditPatientPage() {
                 )}
 
                 <div id="dati" className={workspaceStyles.anchorStack}>
-                    {/* @Codex: one snapshot per mounted patient, not per live-query revision. */}
+                    {/* one snapshot per mounted patient, not per live-query revision. */}
                     <PatientEditForm
                         key={id}
                         initialRecord={patient}

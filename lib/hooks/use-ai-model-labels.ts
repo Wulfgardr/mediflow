@@ -1,13 +1,11 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useState } from 'react';
 import { getAiModelLabels } from '@/lib/ai-summary-service';
 import { db } from '@/lib/db';
 
 type AiModelLabels = Awaited<ReturnType<typeof getAiModelLabels>>;
 
-/* @Codex */
 export function useAiModelLabels(enabled = true): AiModelLabels | null {
     const [modelLabels, setModelLabels] = useState<AiModelLabels | null>(null);
 

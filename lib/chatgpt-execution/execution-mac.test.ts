@@ -1,4 +1,4 @@
-/* @Codex — synthetic tests, not OS or live qualification. */
+/* synthetic tests, not OS or live qualification. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -5,7 +5,7 @@
 // Wave 0.8.1 — razionalizzazione dell'IA (WUL-522 fabric visibility):
 // - "Sicurezza e Dati" -> "Dati e sicurezza": l'accesso viene prima dei dati
 //   che protegge, e i Repertori restano qui perche' sono corpus locale.
-// @Codex: il nome Intelligence Fabric resta riconoscibile nella navigazione.
+// il nome Intelligence Fabric resta riconoscibile nella navigazione.
 // Il gruppo Funzioni intelligenti comprende stato, modelli e interruttori.
 // - Nuova voce `ai-fabric`: la Intelligence Fabric (ADR 0089/0090/0091) aveva
 //   contratto, status ed observability server-side ma nessuna superficie. E'
@@ -37,7 +37,6 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
         id: 'generale',
         label: 'Postazione',
         items: [
-            /* @Codex */
             {
                 id: 'panoramica',
                 href: '/settings',
@@ -86,7 +85,6 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 description: 'Schedulazione e restore',
                 keywords: ['backup', 'ripristino', 'restore', 'schedulazione backup', 'export dati', 'archivio cifrato'],
             },
-            /* @Codex */
             {
                 id: 'compliance-evidence',
                 href: '/settings/compliance',
@@ -136,7 +134,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 description: 'Profilo hardware, modelli, Ollama',
                 keywords: ['modelli ai', 'ollama', 'profilo hardware', 'download modelli', 'url provider', 'docker', 'test connessione', 'ocr', 'reasoning'],
             },
-            /* @Codex: account control and this explicit demo stay distinct. */
+            /* account control and this explicit demo stay distinct. */
             {
                 id: 'ai-chatgpt',
                 href: '/settings/ai/chatgpt',
@@ -273,7 +271,7 @@ export function searchSettingsNav(query: string, limit = 8): SettingsSearchMatch
     return matches.slice(0, limit);
 }
 
-/* @Codex: aria-current identifies the exact page, including the overview. */
+/* aria-current identifies the exact page, including the overview. */
 export function isSettingsItemActive(item: SettingsNavItem, pathname: string): boolean {
     return pathname === item.href;
 }

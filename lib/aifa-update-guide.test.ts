@@ -1,4 +1,4 @@
-/* @Codex: invented UI ports/receipts only; these tests do not qualify the server owner or SQLite. */
+/* invented UI ports/receipts only; these tests do not qualify the server owner or SQLite. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { assertAifaGuideStatus, createAifaUpdateGuide, type AifaGuideState } from './aifa-update-guide.ts';

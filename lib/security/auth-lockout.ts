@@ -1,12 +1,7 @@
-/* @Codex */
 export const AUTH_LOCKOUT_MAX_FAILURES = 5;
-/* @Codex */
 export const AUTH_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-/* @Codex */
 export const AUTH_LOCKOUT_DURATION_MS = 15 * 60 * 1000;
-/* @Codex */
 export const AUTH_INVALID_CREDENTIALS_CODE = 'AUTH_INVALID_CREDENTIALS';
-/* @Codex */
 export const AUTH_LOCKED_CODE = 'AUTH_LOCKED';
 
 type LockoutState = {
@@ -46,26 +41,22 @@ export type AuthFailurePayload = {
     lockedUntil?: string;
 };
 
-/* @Codex */
 export function normalizeLockoutDate(value: Date | string | number | null | undefined): Date | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
     return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/* @Codex */
 export function isLockoutActive(state: LockoutState, now: Date = new Date()): Date | null {
     const lockedUntil = normalizeLockoutDate(state.lockedUntil);
     if (!lockedUntil) return null;
     return lockedUntil.getTime() > now.getTime() ? lockedUntil : null;
 }
 
-/* @Codex */
 export function getRetryAfterSeconds(lockedUntil: Date, now: Date = new Date()): number {
     return Math.max(1, Math.ceil((lockedUntil.getTime() - now.getTime()) / 1000));
 }
 
-/* @Codex */
 export function resetLockoutState() {
     return {
         failedLoginAttempts: 0,
@@ -74,7 +65,6 @@ export function resetLockoutState() {
     };
 }
 
-/* @Codex */
 export function recordFailedLogin(state: LockoutState, now: Date = new Date()): LockoutFailureResult {
     const activeLockout = isLockoutActive(state, now);
     if (activeLockout) {
@@ -110,7 +100,6 @@ export function recordFailedLogin(state: LockoutState, now: Date = new Date()): 
     };
 }
 
-/* @Codex */
 export function createInvalidCredentialsResponse(remainingAttempts?: number): AuthFailureResponse {
     const message = typeof remainingAttempts === 'number' && remainingAttempts > 0
         ? `PIN non valido. Tentativi rimasti: ${remainingAttempts}.`
@@ -127,7 +116,6 @@ export function createInvalidCredentialsResponse(remainingAttempts?: number): Au
     };
 }
 
-/* @Codex */
 export function createLockoutResponse(lockedUntil: Date, now: Date = new Date()): AuthFailureResponse {
     const retryAfterSeconds = getRetryAfterSeconds(lockedUntil, now);
     const retryAfterMinutes = Math.max(Math.ceil(retryAfterSeconds / 60), 1);
@@ -144,7 +132,6 @@ export function createLockoutResponse(lockedUntil: Date, now: Date = new Date())
     };
 }
 
-/* @Codex */
 export function createFailureResponseFromResult(
     result: Pick<LockoutFailureResult, 'lockedUntil' | 'remainingAttempts'>,
     now: Date = new Date(),
@@ -155,13 +142,11 @@ export function createFailureResponseFromResult(
     return createInvalidCredentialsResponse(result.remainingAttempts);
 }
 
-/* @Codex */
 export function getActiveLockoutResponse(state: LockoutState, now: Date = new Date()): AuthFailureResponse | null {
     const lockedUntil = isLockoutActive(state, now);
     return lockedUntil ? createLockoutResponse(lockedUntil, now) : null;
 }
 
-/* @Codex */
 export function createInvalidCredentialsPayload(
     result?: Pick<LockoutFailureResult, 'remainingAttempts' | 'failedLoginAttempts'>,
 ): AuthFailurePayload {
@@ -171,7 +156,6 @@ export function createInvalidCredentialsPayload(
     };
 }
 
-/* @Codex */
 export function createLockedPayload(
     lockedUntil: Date,
     failedLoginAttempts: number = AUTH_LOCKOUT_MAX_FAILURES,

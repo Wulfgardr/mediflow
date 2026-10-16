@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX: sistema toast unico. Sostituisce gli alert() nativi per il
+/* WUL-UIUX: sistema toast unico. Sostituisce gli alert() nativi per il
    feedback non bloccante (esiti di salvataggio, errori). Regione aria-live polite
    cosi gli screen reader annunciano l'esito. Materiale overlay invariato, toni Lume.
    Niente dipendenze nuove. Due firme equivalenti:

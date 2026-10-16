@@ -31,7 +31,7 @@ async function readNetworkOverview(): Promise<NetworkOverviewPayload> {
     return response.json() as Promise<NetworkOverviewPayload>;
 }
 
-/* @Codex LUME-110/68 */
+/* LUME-110/68 */
 export default function SettingsPage() {
     const router = useRouter();
     const [networkOverview, setNetworkOverview] = useState<NetworkOverviewPayload | null>(null);
@@ -283,7 +283,6 @@ export default function SettingsPage() {
                     <Link href="/settings/backup" className={styles.secondaryAction}>Backup</Link>
                     <Link href="/settings/profilo" className={styles.secondaryAction}>Profilo</Link>
                     <Link href="/settings/repertori" className={styles.secondaryAction}>Repertori</Link>
-                    {/* @Codex */}
                     <Link href="/settings/ai/fabric" className={styles.secondaryAction}>Intelligence Fabric</Link>
                 </div>
             </nav>

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -10,7 +9,7 @@ import { Duplex } from 'node:stream';
 // Set the synthetic directory before importing any application module (ADR 0130).
 const inheritedDataDir = process.env.MEDIFLOW_DATA_DIR;
 assert.ok(inheritedDataDir && isAbsolute(inheritedDataDir), 'An absolute synthetic MEDIFLOW_DATA_DIR is required');
-// @Codex: this file owns an empty directory, even when the suite bootstraps its DB.
+// this file owns an empty directory, even when the suite bootstraps its DB.
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-proxy-test-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 after(() => {
@@ -18,7 +17,7 @@ after(() => {
     process.env.MEDIFLOW_DATA_DIR = inheritedDataDir;
 });
 
-// @Codex: literal delayed import is analyzable and follows data-directory setup.
+// literal delayed import is analyzable and follows data-directory setup.
 const { createForTest, createOpenAIConnectProxy } = await import('./execution-egress-proxy.ts');
 type ConnectTarget = { address: string; family: 4; port: 443 };
 type ResolvedTarget = { address: string; family: 4 };

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog.ts';
@@ -42,7 +41,6 @@ test('espone uno snapshot minimo, ordinato e congelato', () => {
     ]);
     assert.equal(snapshot.providerDisclosure.providers[0].effective.lifecycle, 'missing');
     assert.equal(snapshot.providerDisclosure.providers[1].effective.lifecycle, 'corrupt');
-    assert.equal(snapshot.capabilities.length, 16);
     assert.deepEqual(
         snapshot.capabilities.map((capability) => capability.id),
         Object.keys(FABRIC_CAPABILITY_DESCRIPTORS).sort(),

@@ -1,4 +1,3 @@
-/* @Codex */
 
 // Explicitly open db-server to execute the real pragma and schema-guard bootstrap.
 // This worker exists only so the concurrency regression can launch the same

@@ -1,4 +1,4 @@
-/* @Codex: PROPOSED WHO-TRIOS ordinary host-only setup. No DB, Web authority or remote engine. */
+/* PROPOSED WHO-TRIOS ordinary host-only setup. No DB, Web authority or remote engine. */
 import { randomUUID } from 'node:crypto';
 import { validateWhoLocalManifest } from './check-who-local-sidecar-manifest.mjs';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';

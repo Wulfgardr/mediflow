@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
 import { executeDocumentSynthesisChatGpt } from './document-synthesis-chatgpt-composition';
@@ -178,7 +177,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
                 });
             } catch { return captureDenied('operation_unavailable'); }
         },
-        /* @Codex — retire only retained host handles; no external route or writer. */
+        /* retire only retained host handles; no external route or writer. */
         async ingest(input: unknown, request = new Request('http://localhost/api/ai/document-synthesis/ingest', { method: 'POST' })): Promise<IngestResult> {
             const parsed = exact(input, ['captureHandle']); const handle = parsed?.captureHandle;
             if (typeof handle !== 'string' || !CAPTURE_HANDLE.test(handle) || !(request instanceof Request)) return ingestDenied('input_invalid');
@@ -251,7 +250,7 @@ function createOperation(context: AuthenticatedWebSessionProjectionOwnerContext,
     return operation;
 }
 
-/** @Codex — revoke-only cleanup; a DTO or another operation cannot address this private broker. */
+/** revoke-only cleanup; a DTO or another operation cannot address this private broker. */
 export function discardDocumentSynthesisPreparation(operation: DocumentSynthesisProductionOperation, input: unknown): void {
     const broker = operationBrokers.get(operation); if (!broker) return;
     const parsed = exact(input, ['captureHandle']) ?? exact(input, ['previewHandle']);

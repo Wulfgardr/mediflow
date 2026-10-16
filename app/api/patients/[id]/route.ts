@@ -4,24 +4,16 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { patients } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { parseExpectedVersion } from '@/lib/patient-concurrency';
 // WUL-306 (ADR 0066): soft-delete lifecycle helpers
 import { activePatients } from '@/lib/patient-lifecycle';
-/* @Codex */
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
-/* @Codex */
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-/* @Codex */
 import { updatePatientOperation } from '@/lib/patient-update-operation';
-/* @Codex */
 import { deletePatientOperation } from '@/lib/patient-delete-operation';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
-/* @Codex */
 function parsePatientDeletionReason(body: Record<string, unknown>, fallback: string): string | null {
     if (!Object.prototype.hasOwnProperty.call(body, 'deletionReason')) return fallback;
     if (typeof body.deletionReason !== 'string' || body.deletionReason.trim().length === 0) return null;
@@ -29,7 +21,6 @@ function parsePatientDeletionReason(body: Record<string, unknown>, fallback: str
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -46,7 +37,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -57,7 +47,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
-        /* @Codex */
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -76,7 +65,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        /* @Codex: actor/correlation are resolved before the synchronous commit. */
+        /* actor/correlation are resolved before the synchronous commit. */
         const auditContext = auditContextFromSession(session);
         const commit = updatePatientOperation({
             patientId: id, expectedVersion, values: normalized.values,
@@ -98,7 +87,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -106,7 +94,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
     try {
         const { id } = await params;
-        /* @Codex */
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
@@ -119,7 +106,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
         }
 
-        /* @Codex: resolve host identity before the synchronous tombstone/audit commit. */
+        /* resolve host identity before the synchronous tombstone/audit commit. */
         const auditContext = auditContextFromSession(session);
         const result = deletePatientOperation({
             patientId: id, expectedVersion, deletionReason,

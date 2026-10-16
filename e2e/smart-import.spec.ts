@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';

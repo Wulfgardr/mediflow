@@ -1,4 +1,3 @@
-/* @Codex */
 import { randomUUID } from 'node:crypto';
 import type {
     NetworkCapabilitiesResponse,
@@ -14,22 +13,16 @@ import type {
     NetworkSessionSummary,
 } from './api/v1/types';
 
-/* @Codex */
 export const NETWORK_PROTOCOL_VERSION = '1.11.0';
-/* @Codex */
 export const NETWORK_NODE_ID_KEY = 'network.nodeId';
-/* @Codex */
 export const NETWORK_MODE_KEY = 'network.mode';
-/* @Codex */
 export const NETWORK_SETTINGS_KEYS = [
     NETWORK_NODE_ID_KEY,
     NETWORK_MODE_KEY,
     'doctorName',
     'clinicName',
 ] as const;
-/* @Codex */
 export const NETWORK_PAIRING_INTENT_TTL_MINUTES = 10;
-/* @Codex */
 export const NETWORK_FSE_VALIDATE_CAPABILITY = 'network.fse.validate';
 
 type NetworkSettingsSnapshot = Partial<Record<(typeof NETWORK_SETTINGS_KEYS)[number], string>>;
@@ -127,7 +120,6 @@ export function buildNetworkNodeSummary(input: {
     };
 }
 
-/* @Codex */
 export function buildNetworkReplicaSummary(input: {
     operatingMode: NetworkOperatingMode;
     sessionState: NetworkSessionSummary['sessionState'];
@@ -568,7 +560,6 @@ export function createPairingIntentDraft(input: {
     };
 }
 
-/* @Codex */
 export function createConfirmedPairingResponse(input: {
     intent: NetworkPairingIntentResponse;
     clientId: string;

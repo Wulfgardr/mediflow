@@ -72,14 +72,12 @@ const REVIEW_CATALOGS: Kree8CatalogRow[] = [
   },
 ];
 
-/* @Codex */
 const REVIEW_CATALOG_STATE: Kree8CatalogClientState = {
   status: 'ready',
   rows: REVIEW_CATALOGS,
   indexedCount: 0,
 };
 
-/* @Codex */
 async function fetchCatalogCount(path: string): Promise<number> {
   const response = await fetch(path, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Catalog count failed: ${response.status}`);
@@ -87,12 +85,10 @@ async function fetchCatalogCount(path: string): Promise<number> {
   return Number(payload.count || 0);
 }
 
-/* @Codex */
 function catalogFreshnessFromCount(count: number): Kree8CatalogFreshness {
   return count > 0 ? 'fresh' : 'broken';
 }
 
-/* @Codex */
 function buildLiveCatalogState(
   drugCount: number,
   exemptionCount: number,
@@ -155,7 +151,6 @@ function buildLiveCatalogState(
 
 function RepertoriArea({ isReview }: { isReview: boolean }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
-  /* @Codex */
   const catalogState = useLiveQuery<Kree8CatalogClientState, Kree8CatalogClientState>(
     async () => {
       if (isReview) return REVIEW_CATALOG_STATE;

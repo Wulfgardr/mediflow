@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-/* @Codex */
 import { createDocumentSynthesisSourceBindingOwner } from './document-synthesis-source-binding.ts';
 
 const digestA = 'a'.repeat(64);

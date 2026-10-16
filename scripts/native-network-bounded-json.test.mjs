@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -93,11 +92,11 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             if (name === '@/lib/patient-json-object') {
                 return load('lib/patient-json-object.ts');
             }
-            // @Codex: exercise the actual diary object check, not the fallback dependency stub.
+            // exercise the actual diary object check, not the fallback dependency stub.
             if (name === '@/lib/entry-write-input') {
                 return load('lib/entry-write-input.ts');
             }
-            // @Codex: preserve the real therapy envelope check when exercising admitted network bodies.
+            // preserve the real therapy envelope check when exercising admitted network bodies.
             if (name === '@/lib/therapy-write-input') {
                 return load('lib/therapy-write-input.ts');
             }

@@ -1,9 +1,6 @@
-/* @Codex */
 import type { SissTransport, SissTransportMode } from './siss-adapter';
-/* @Codex */
 import { createSissPatientContextHandoff, SissPatientContextError } from './siss-patient-context';
 
-/* @Codex */
 export type SissPrescriptionHandoffResult = {
     status: 'handoff';
     mode: SissTransportMode;
@@ -13,7 +10,6 @@ export type SissPrescriptionHandoffResult = {
     message: string;
 };
 
-/* @Codex */
 export class SissPrescriptionError extends Error {
     readonly code: 'SISS_PATIENT_NOT_READY' | 'SISS_HANDOFF_FAILED';
     readonly status: number;
@@ -35,7 +31,6 @@ export class SissPrescriptionError extends Error {
     }
 }
 
-/* @Codex */
 export async function createSissPrescriptionHandoff(
     input: {
         patientId: string;

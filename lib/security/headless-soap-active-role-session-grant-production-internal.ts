@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { createHeadlessSoapActiveRoleAttestationStore } from './headless-soap-active-role-attestation-store';

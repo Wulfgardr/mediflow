@@ -1,5 +1,4 @@
 // Codex: created 2026-05-02
-// @Codex
 import Combine
 import Foundation
 #if os(macOS)
@@ -31,14 +30,13 @@ public struct HomeBaseRuntimeLaunchPlan: Equatable, Sendable {
     }
 }
 
-/* @Codex: only the packaged first-install helper runs before WebRuntime logs/PID exist. */
+/* only the packaged first-install helper runs before WebRuntime logs/PID exist. */
 struct HomeBaseRuntimeFirstInstallPlan: Sendable {
     let nodeBinaryPath: String
     let scriptPath: String
     let environment: [String: String]
 }
 
-/* @Codex */
 struct HomeBaseNodeRuntimeContract: Decodable {
     struct Node: Decodable { let major: Int; let version: String; let moduleVersion: String }
     let node: Node

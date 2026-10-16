@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 import {
     ANTHROPIC_MESSAGES_V2_MAX_TOKENS,

@@ -8,30 +8,25 @@ import PrivacyBlur from '@/components/privacy-blur';
 import { StatusGlyph } from '@/components/status-glyph';
 import type { Diagnosis, Patient } from '@/lib/db';
 
-/* @Codex */
 interface PatientExemptionLensItem {
     code: string;
     description?: string;
 }
 
 interface PatientIdentityLensProps {
-    /* @Codex */
     variant?: 'atlas' | 'reader';
-    /* @Codex WUL-678: a reader instance owns exactly one navigable domain. */
+    /* WUL-678: a reader instance owns exactly one navigable domain. */
     domain?: 'anagrafica' | 'clinica' | 'amministrazione';
     patient: Patient;
     ageLabel: string;
     birthDateLabel: string;
     diagnoses: Diagnosis[];
     exemptions: string[];
-    /* @Codex WUL-UIUX: opzionale: come livello 2 sotto il Foglio sinottico la lens
+    /* WUL-UIUX: opzionale: come livello 2 sotto il Foglio sinottico la lens
        non ripete il dock azioni (vive nel Foglio). {actions} rende nulla se assente. */
     actions?: ReactNode;
-    /* @Codex */
     summary?: string;
-    /* @Codex */
     nextStep?: string;
-    /* @Codex */
     exemptionDetails?: PatientExemptionLensItem[];
 }
 
@@ -55,9 +50,9 @@ export function PatientIdentityLens({
     actions,
     exemptionDetails = [],
 }: PatientIdentityLensProps) {
-    /* @Codex WUL-678: normalize both lookup sides, preserving the original exemption contract. */
+    /* WUL-678: normalize both lookup sides, preserving the original exemption contract. */
     const detailByCode = new Map(exemptionDetails.map((item) => [item.code.trim().toUpperCase(), item.description?.trim()]));
-    /* @Codex WUL-678: only the requested domain is rendered in each destination. */
+    /* WUL-678: only the requested domain is rendered in each destination. */
     if (variant === 'reader') {
         return (
             <div className={disclosure.identity}>
@@ -139,7 +134,7 @@ export function PatientIdentityLens({
                                 Quadro clinico
                             </p>
                             {diagnoses.length > 0 ? (
-                                /* @Codex: il contenitore nomina la collezione; ogni voce
+                                /* il contenitore nomina la collezione; ogni voce
                                    conserva codice, descrizione e sistema come contenuto naturale. */
                                 <ul
                                     aria-label="Diagnosi del quadro clinico"

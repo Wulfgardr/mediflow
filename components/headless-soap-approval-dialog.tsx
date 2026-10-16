@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import type { ClinicianSoapEntryFieldSetV1 } from '@/lib/headless/clinician-soap-entry-field-set';

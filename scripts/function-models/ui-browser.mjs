@@ -1,4 +1,4 @@
-/* @Codex: isolated React fixture and synthetic HTTP; no product server or real models. */
+/* isolated React fixture and synthetic HTTP; no product server or real models. */
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { chromium } from '@playwright/test';

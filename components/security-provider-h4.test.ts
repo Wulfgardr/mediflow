@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
@@ -51,7 +50,7 @@ test('the H4 codec internal is restricted to the exact H4-H7 verification owners
         .filter((path) => importPattern.test(readFileSync(path, 'utf8')))
         .map((path) => relative(repositoryRoot, path));
 
-    /* @Codex Later SOAP gates must parse and verify the H4 seal server-side.
+    /* Later SOAP gates must parse and verify the H4 seal server-side.
        Keep that privileged surface explicit instead of reviving the stale H4-only
        assumption or allowing a broad import pattern. */
     assert.deepEqual(importers, [
@@ -65,7 +64,7 @@ test('the H4 codec internal is restricted to the exact H4-H7 verification owners
 });
 
 test('only SecurityProvider composes the H4 seal owner outside tests', () => {
-    /* @Codex Type-only consumers carry the public seal contract through H5-H7;
+    /* Type-only consumers carry the public seal contract through H5-H7;
        authority composition remains a single concrete factory call. */
     const factoryCallPattern = /createClinicianSoapEntrySealOwner\s*\(\s*\{/u;
     const composers = typeScriptSources(repositoryRoot)

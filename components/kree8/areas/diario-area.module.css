@@ -1,4 +1,4 @@
-/* @Codex WUL-678: recent work sits on the substrate; the Filo keeps one shared axis. */
+/* WUL-678: recent work sits on the substrate; the Filo keeps one shared axis. */
 .timelineSection {
   min-width: 0;
   padding: 0;
@@ -20,7 +20,7 @@
   font-size: 0.9375rem;
   font-weight: 600;
 }
-/* @Codex: a section heading stays distinct from each entry title. */
+/* a section heading stays distinct from each entry title. */
 :global(html[data-runtime-twin-design='proposal']) .sectionTitle {
   font-size: var(--twin-type-section);
   font-weight: var(--twin-heading-weight);
@@ -29,7 +29,7 @@
 }
 :global(html[data-runtime-twin-design='proposal']) .sectionSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
 :global(html[data-runtime-twin-design='proposal']) .count { font-size: 0.9375rem; color: var(--lume-ink); }
-/* @Codex: dates orient the chronology; actions stay with their patient entry. */
+/* dates orient the chronology; actions stay with their patient entry. */
 :global(html[data-runtime-twin-design='proposal']) .date {
   font-size: var(--twin-type-body);
   font-weight: 600;
@@ -64,7 +64,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  /* @Codex The Filo inset belongs inside the feed width: content-box padding
+  /* The Filo inset belongs inside the feed width: content-box padding
      otherwise pushes active entries past the reflow viewport. */
   box-sizing: border-box;
   width: 100%;

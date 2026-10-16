@@ -1,4 +1,4 @@
-/* @Codex: one ordinary diary create/update authority; no headless receipt or generic CRUD path. */
+/* one ordinary diary create/update authority; no headless receipt or generic CRUD path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
 import { buildEntryVersionConflictPayload } from './entry-concurrency';
@@ -50,7 +50,7 @@ function sameNetworkCreate(existing: typeof entries.$inferSelect, values: typeof
         && existing.deletedAt === null;
 }
 
-/* @Codex: IMMEDIATE acquires the writer lock before parent/scope and duplicate reads. */
+/* IMMEDIATE acquires the writer lock before parent/scope and duplicate reads. */
 export function createEntryOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
         const admitted = input.mode === 'network'
@@ -82,7 +82,7 @@ export function createEntryOperation(input: CreateInput): Result {
     }, { behavior: 'immediate' });
 }
 
-/* @Codex: matched UPDATE IGNORE is an integrity fault, not an optimistic conflict. */
+/* matched UPDATE IGNORE is an integrity fault, not an optimistic conflict. */
 export function updateEntryOperation(input: UpdateInput): Result {
     return dbServer.transaction((tx): Result => {
         const existing = input.mode === 'network'

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { types } from 'node:util';

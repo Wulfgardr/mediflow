@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from '../../lib/security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: child-process SQLite fixture; synthetic test data only. */
+/* child-process SQLite fixture; synthetic test data only. */
 import { dbServer } from '../../lib/db-server.ts';
 import { patients } from '../../lib/schema.ts';
 import { eq } from 'drizzle-orm';
@@ -9,7 +9,7 @@ import type { ServerSession } from '../../lib/security/server-session';
 const sessionId = `synthetic-child-${process.pid}`;
 bindSyntheticArchiveSessions(sessionId);
 const [mode, patientId, id] = process.argv.slice(2);
-/* @Codex: both processes must finish startup before the parent releases either writer. */
+/* both processes must finish startup before the parent releases either writer. */
 if (mode === 'update') {
     process.stdout.write('READY\n');
     await new Promise<void>((resolve, reject) => {

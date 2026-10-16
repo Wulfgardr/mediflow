@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# @Codex
 """Create a private, relocatable xctestrun from an existing independent build.
 
 Does not build, install, boot, launch, change the project, or contact a host.

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { emissionPlan, emissionUnit, utf8Length, renderEmissionPlan, type EmissionPart, type EmissionPlan } from '../../chatgpt-execution/ordinary-emission-plan';
 

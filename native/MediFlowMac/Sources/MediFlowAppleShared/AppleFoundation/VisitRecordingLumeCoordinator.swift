@@ -1,4 +1,3 @@
-/* @Codex */
 import Combine
 import Foundation
 import MediFlowCore

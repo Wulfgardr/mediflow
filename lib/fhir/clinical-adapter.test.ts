@@ -1,4 +1,4 @@
-/* @Codex WUL-327 */
+/* WUL-327 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { toFhirCondition, toFhirObservation } from './clinical-adapter';

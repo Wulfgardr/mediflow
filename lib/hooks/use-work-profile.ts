@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseWorkProfileState, WorkProfileError, type WorkProfileCommand, type WorkProfileState } from '@/lib/work-profile';
 

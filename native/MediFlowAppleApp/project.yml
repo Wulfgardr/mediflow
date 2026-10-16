@@ -27,7 +27,7 @@ targets:
         CFBundleVersion: "86"
         LSApplicationCategoryType: public.app-category.medical
         UIApplicationSupportsIndirectInputEvents: true
-        # @Codex: local navigation only; never pairing or an authenticated command.
+        # local navigation only; never pairing or an authenticated command.
         CFBundleURLTypes:
           - CFBundleTypeRole: Viewer
             CFBundleURLName: com.mediflow.navigation
@@ -81,7 +81,7 @@ targets:
           - _mediflow-homebase._tcp
         # Recording remains macOS 26-gated; the general app deployment stays 14.
         NSMicrophoneUsageDescription: "MediFlow usa il microfono solo dopo il tuo consenso per trascrivere localmente la visita; l'audio non viene salvato."
-        # @Codex: same navigation grammar as iOS, scoped to the receiving window.
+        # same navigation grammar as iOS, scoped to the receiving window.
         CFBundleURLTypes:
           - CFBundleTypeRole: Viewer
             CFBundleURLName: com.mediflow.navigation

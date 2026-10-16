@@ -10,7 +10,6 @@ function sourceBetween(source: string, startMarker: string, endMarker: string): 
     return source.slice(start, end);
 }
 
-/* @Codex */
 test('a table notification wakes only matching and unscoped subscribers', () => {
     const bus = createDbChangeBus();
     let patientInvalidations = 0;
@@ -79,7 +78,7 @@ test('both React hooks retain dynamic scope resolver wiring', () => {
         sourceBetween(source, 'export function useLiveQueryState<', '    return { data, error, loading, refresh };'),
     ];
     for (const hookBlock of hookBlocks) {
-        /* @Codex Keep the resolver current after commit without mutating a ref
+        /* Keep the resolver current after commit without mutating a ref
            during render, which React's purity contract forbids. */
         assert.match(
             hookBlock,

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildFunctionModelCatalog, FUNCTION_SWITCH_KEYS, type FunctionModelSources } from './function-model-preferences';

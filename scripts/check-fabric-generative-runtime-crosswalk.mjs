@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';

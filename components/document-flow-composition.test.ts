@@ -1,4 +1,5 @@
-/* @Codex: source-contract tests, not rendered UI or route execution evidence. */
+import { sourceVariableDeclaration } from '../scripts/test-support/source-structure.mjs';
+/* source-contract tests, not rendered UI or route execution evidence. */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
@@ -56,10 +57,7 @@ test('source views retire on identity, security lock and full navigation, withou
 
 test('delete confirmation is fenced and failures remain visible; only successful deletion clears source state', async () => {
     const source = await upload();
-    const start = source.indexOf('const handleDelete =');
-    const end = source.indexOf('/* @Codex: extraction-only lifecycle', start);
-    assert.ok(start >= 0 && end > start, 'the delete handler must be present and isolated');
-    const body = source.slice(start, end);
+    const body = sourceVariableDeclaration(source, 'handleDelete');
     const orderedSteps = [
         'if (activeDelete.current) return;',
         'activeDelete.current = operation;',

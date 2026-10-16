@@ -1,4 +1,4 @@
-/* @Codex: capability-local v2. Browser-safe; never widen generic Fabric v1 unions. */
+/* capability-local v2. Browser-safe; never widen generic Fabric v1 unions. */
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';
 import type { PortableStatus, PortableHardwareReport } from './treatment-reasoning-portable-provisioning';
 import type { FabricStatusSnapshot } from './status';

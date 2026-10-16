@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from '../../lib/security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: independent SQLite process for service prescription race tests. */
+/* independent SQLite process for service prescription race tests. */
 import { eq } from 'drizzle-orm';
 import { dbServer } from '../../lib/db-server.ts';
 import { patients } from '../../lib/schema.ts';

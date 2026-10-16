@@ -1,4 +1,4 @@
-/* @Codex: shared Lume gesture primitives, with no ambient animation. */
+/* shared Lume gesture primitives, with no ambient animation. */
 @property --lume-surface-l {
   syntax: '<percentage>';
   inherits: false;

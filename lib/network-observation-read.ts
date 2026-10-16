@@ -1,10 +1,6 @@
-/* @Codex */
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import type { ObservationSummary } from './api/v1/types';
-/* @Codex */
 import { observations, patientsToAmbulatories } from './schema';
 
 type NetworkObservationListFilters = {
@@ -14,7 +10,6 @@ type NetworkObservationListFilters = {
     dateTo?: Date | null;
 };
 
-/* @Codex */
 export const NETWORK_OBSERVATION_READ_CAPABILITY = 'network.replica.readonly-observations';
 
 function toIsoString(value: unknown): string | null {
@@ -47,7 +42,6 @@ function toObservationSummary(observation: typeof observations.$inferSelect): Ob
     };
 }
 
-/* @Codex */
 export async function listNetworkScopedObservations(
     patientId: string,
     scopeAmbulatoryId: string,
@@ -72,7 +66,6 @@ export async function listNetworkScopedObservations(
     return rows.map((row) => toObservationSummary(row.observation));
 }
 
-/* @Codex */
 export async function getNetworkScopedObservation(
     patientId: string,
     observationId: string,

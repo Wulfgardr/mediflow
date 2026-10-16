@@ -1,4 +1,4 @@
-/* @Codex — genuine 0.8.8 owner; no cookie, database, native process or provider. */
+/* genuine 0.8.8 owner; no cookie, database, native process or provider. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { basename } from 'node:path';

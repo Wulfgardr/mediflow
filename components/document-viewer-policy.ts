@@ -1,4 +1,4 @@
-/* @Codex — local preview policy; no document contents in errors or logs. */
+/* local preview policy; no document contents in errors or logs. */
 export const PREVIEW_LIMITS = Object.freeze({
     sourceBytes: 25 * 1024 * 1024,
     textWindow: 65_536,

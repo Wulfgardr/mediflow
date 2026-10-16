@@ -1,8 +1,5 @@
-/* @Codex */
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-/* @Codex */
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import {
     servicePrescriptionCreateSchema,
     servicePrescriptionItemCreateSchema,
@@ -13,15 +10,10 @@ import {
     type ServicePrescriptionItemUpdatePayload,
     type ServicePrescriptionUpdatePayload,
 } from './api-schemas/prescriptions';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { activePatients } from './patient-lifecycle';
-/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
-/* @Codex */
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
-/* @Codex */
 import {
     SERVICE_PRESCRIPTION_CATEGORY_SET,
     SERVICE_PRESCRIPTION_ITEM_CONFIDENCE_SET,
@@ -35,9 +27,7 @@ import {
     parseOptionalPrescriptionDate,
     parsePrescriptionDate,
 } from './prescription-domain';
-/* @Codex */
 import { patients, patientsToAmbulatories, serviceCatalogEntries, servicePrescriptionItems, servicePrescriptions } from './schema';
-/* @Codex */
 import {
     listChangedFields,
     requestIdFromRequest,
@@ -47,12 +37,9 @@ import {
     type AuditEventType,
     type AuditRedactedMetadata,
 } from './security/audit';
-/* @Codex */
 import type { ServerSession } from './security/server-session';
 
-/* @Codex */
 export const NETWORK_SERVICE_PRESCRIPTION_READ_CAPABILITY = 'network.replica.readonly-service-prescriptions';
-/* @Codex */
 export const NETWORK_SERVICE_PRESCRIPTION_WRITE_CAPABILITY = 'network.replica.write-service-prescriptions';
 
 type MutationResponse =
@@ -85,7 +72,7 @@ function hasOwn(input: Record<string, unknown>, key: string): boolean {
     return Object.prototype.hasOwnProperty.call(input, key);
 }
 
-/* @Codex: patient admission is checked on the same transaction as the write. */
+/* patient admission is checked on the same transaction as the write. */
 function activeParentExists(tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0], patientId: string): boolean {
     return Boolean(tx.select({ id: patients.id }).from(patients)
         .where(and(eq(patients.id, patientId), activePatients())).get());
@@ -333,7 +320,7 @@ function selectServicePrescriptionItemConflictSnapshot(tx: Parameters<Parameters
     }).from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, id)).get() ?? null;
 }
 
-/* @Codex: audit actor and surface come from the admitted context. */
+/* audit actor and surface come from the admitted context. */
 function serviceAuditInput(
     context: HostContext | NetworkWriteContext,
     surface: 'host' | 'network',
@@ -360,7 +347,6 @@ function serviceAuditInput(
     };
 }
 
-/* @Codex */
 export async function listServicePrescriptions(patientId: string | null) {
     let query = dbServer.select().from(servicePrescriptions);
     if (patientId) {
@@ -370,7 +356,6 @@ export async function listServicePrescriptions(patientId: string | null) {
     return query.orderBy(desc(servicePrescriptions.prescribedAt));
 }
 
-/* @Codex */
 export async function listServicePrescriptionItems(input: { patientId?: string | null; prescriptionId?: string | null }) {
     let query = dbServer.select().from(servicePrescriptionItems);
     if (input.prescriptionId) {
@@ -383,7 +368,6 @@ export async function listServicePrescriptionItems(input: { patientId?: string |
     return query.orderBy(asc(servicePrescriptionItems.prescriptionId), asc(servicePrescriptionItems.ordinal));
 }
 
-/* @Codex */
 export async function listNetworkScopedServicePrescriptions(patientId: string, scopeAmbulatoryId: string) {
     const rows = await dbServer.select({ item: servicePrescriptions })
         .from(servicePrescriptions)
@@ -393,7 +377,6 @@ export async function listNetworkScopedServicePrescriptions(patientId: string, s
     return rows.map((row) => row.item);
 }
 
-/* @Codex */
 export async function listNetworkScopedServicePrescriptionItems(input: {
     patientId?: string | null;
     prescriptionId?: string | null;
@@ -419,7 +402,6 @@ export async function listNetworkScopedServicePrescriptionItems(input: {
     return listServicePrescriptionItems({ patientId: input.patientId });
 }
 
-/* @Codex */
 export async function createHostServicePrescription(context: HostContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionCreateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
@@ -442,7 +424,6 @@ export async function createHostServicePrescription(context: HostContext, rawBod
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function updateHostServicePrescription(context: HostContext & { id: string }, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
@@ -473,14 +454,13 @@ async function updateServicePrescription(
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function deleteHostServicePrescription(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
     return dbServer.transaction((tx): MutationResponse => {
         const existing = selectServicePrescriptionConflictSnapshot(tx, context.id);
         if (!existing) return { status: 404, value: { error: 'Service prescription not found' } };
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription', expectedVersion, context.id, existing) };
-        // @Codex: the aggregate version guards its hard-delete cascade.
+        // the aggregate version guards its hard-delete cascade.
         const childCount = tx.select({ count: sql<number>`count(*)` }).from(servicePrescriptionItems)
             .where(eq(servicePrescriptionItems.prescriptionId, context.id)).get()?.count ?? 0;
         const children = tx.delete(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, context.id)).run();
@@ -493,7 +473,6 @@ export async function deleteHostServicePrescription(context: HostContext & { id:
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function createHostServicePrescriptionItem(context: HostContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionItemCreateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
@@ -522,7 +501,6 @@ async function createServicePrescriptionItem(context: HostContext | NetworkWrite
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function updateHostServicePrescriptionItem(context: HostContext & { id: string }, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionItemUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
@@ -550,7 +528,6 @@ async function updateServicePrescriptionItem(context: (HostContext | NetworkWrit
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function deleteHostServicePrescriptionItem(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
     return dbServer.transaction((tx): MutationResponse => {
         const existing = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.id, context.id)).get();
@@ -566,7 +543,6 @@ export async function deleteHostServicePrescriptionItem(context: HostContext & {
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function createNetworkScopedServicePrescription(context: NetworkPatientContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionCreateSchema.safeParse({ ...rawBody, patientId: context.patientId });
     if (!parsed.success) return badRequest('Payload non valido');
@@ -586,28 +562,24 @@ export async function createNetworkScopedServicePrescription(context: NetworkPat
     }, { behavior: 'immediate' });
 }
 
-/* @Codex */
 export async function updateNetworkScopedServicePrescription(context: NetworkPrescriptionContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
     return updateServicePrescription({ ...context, id: context.prescriptionId }, parsed.data, 'network');
 }
 
-/* @Codex */
 export async function createNetworkScopedServicePrescriptionItem(context: NetworkWriteContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionItemCreateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
     return createServicePrescriptionItem(context, parsed.data, 'network');
 }
 
-/* @Codex */
 export async function updateNetworkScopedServicePrescriptionItem(context: NetworkItemContext, rawBody: Record<string, unknown>): Promise<MutationResponse> {
     const parsed = servicePrescriptionItemUpdateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
     return updateServicePrescriptionItem({ ...context, id: context.itemId }, parsed.data, 'network');
 }
 
-/* @Codex */
 export async function readServiceCatalog(searchParams: URLSearchParams) {
     const q = searchParams.get('q')?.trim();
     const code = searchParams.get('code')?.trim().toUpperCase();

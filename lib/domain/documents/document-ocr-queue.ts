@@ -16,7 +16,7 @@ export const DOCUMENT_OCR_QUEUE_REASONS = [
     'password_protected',
     'parser_failed',
     'resource_limit',
-    /* @Codex: WUL-194 W5 S1, paired client upload entering the OCR queue. */
+    /* WUL-194 W5 S1, paired client upload entering the OCR queue. */
     'paired_upload',
 ] as const;
 

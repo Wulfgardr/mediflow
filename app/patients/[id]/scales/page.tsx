@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Activity, ArrowRight, Brain, ClipboardCheck, HeartPulse, ListChecks } from 'lucide-react';
 
-/* @Codex */
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import styles from '@/components/scales/scale-workspace.module.css';
 import { db } from '@/lib/db';
@@ -30,7 +29,6 @@ function getScaleIcon(scaleId: string) {
 export default function ScalesPage() {
     const params = useParams();
     const id = params.id as string;
-    /* @Codex */
     const patient = useLiveQuery(() => db.patients.get(id), [id], undefined, ['patients']);
     const scales = Object.values(SCALES);
 
@@ -45,7 +43,7 @@ export default function ScalesPage() {
             statusLabel={`${scales.length} scale disponibili dalla libreria locale.`}
             navItems={[]}
         >
-            {/* @Codex WUL-678: each instrument is one complete, keyboard-accessible target. */}
+            {/* WUL-678: each instrument is one complete, keyboard-accessible target. */}
             <section id="libreria" className={styles.workspace} aria-label="Scegli una scala">
                 <div className={styles.catalog}>
                     {scales.map(scale => {

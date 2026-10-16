@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { acquireAuthenticatedWebSessionProjectionOwnerContext } from './server-auth';
 import { getNativeOrdinaryApplicationContext } from '../chatgpt-product/native-ordinary-composition';

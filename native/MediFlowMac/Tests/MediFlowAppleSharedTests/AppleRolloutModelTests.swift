@@ -1,5 +1,4 @@
 // Codex: created 2026-04-17
-// @Codex
 import XCTest
 @testable import MediFlowAppleShared
 
@@ -18,7 +17,7 @@ final class AppleRolloutModelTests: XCTestCase {
         }
     }
 
-    // @Codex: packaged runtime ownership must stay aligned with the live supervisor.
+    // packaged runtime ownership must stay aligned with the live supervisor.
     func testRuntimeCopySeparatesManagedRuntimeFromDiagnosticProviders() throws {
         let snapshot = AppleFoundationSnapshot.live
         let runtimeLane = try XCTUnwrap(snapshot.lanes.first { $0.id == "runtime" })

@@ -1,4 +1,4 @@
-/* @Codex — explicit local build review; never issues a qualification authority.
+/* explicit local build review; never issues a qualification authority.
  * node scripts/run-strip-types.mjs native/MediFlowMac/ExecutionCustodian/build.mjs
  * Requires the installed macOS SDK, nonprivileged user and fixed source bytes. */
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';

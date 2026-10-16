@@ -1,4 +1,4 @@
-/* @Codex WUL-684: keep the checkup panel anchored on wide layouts while the
+/* WUL-684: keep the checkup panel anchored on wide layouts while the
    narrow layout uses the trigger's viewport coordinates to stay reachable. */
 .popover {
   position: absolute;

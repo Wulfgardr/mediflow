@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -17,7 +16,7 @@ const VALID_SETTINGS = {
     aiUrl: 'http://localhost:11434/v1',
 } satisfies HostLocalProviderSettingsSnapshot;
 
-/* @Codex: verify the import boundary in a fresh process without opening any database. */
+/* verify the import boundary in a fresh process without opening any database. */
 test('a supplied settings reader never initializes the production data directory', () => {
     const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-binding-import-'));
     const dataDir = path.join(parent, 'must-remain-absent');

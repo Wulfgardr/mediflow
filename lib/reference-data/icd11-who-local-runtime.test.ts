@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createIcd11WhoLocalRuntime } from './icd11-who-local-runtime.ts';

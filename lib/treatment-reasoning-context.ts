@@ -1,4 +1,3 @@
-/* @Codex */
 import { clinicalRichTextToPlainText } from './clinical-rich-text';
 import type {
     Attachment,

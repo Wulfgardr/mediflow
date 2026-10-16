@@ -1,12 +1,7 @@
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import type { PatientDocumentReviewDraft } from './patient-document-review';
-/* @Codex */
 import { buildPatientDocumentDecision } from './patient-document-decision';
-/* @Codex */
 import { validateDocumentDecisionModelGovernance } from './document-decision-model-governance';
 
 const baseDraft: PatientDocumentReviewDraft = {

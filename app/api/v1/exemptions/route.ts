@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { exemptions } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
-/* @Codex */
 import { parseApiV1NullableDate } from '@/lib/api-v1-route-helpers';
 import { readExemptionCatalog } from '@/lib/network-catalog-read';
 
@@ -72,7 +71,7 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        /* @Codex: full imports must use the reviewed atomic protocol (ADR 0127). */
+        /* full imports must use the reviewed atomic protocol (ADR 0127). */
         if (Array.isArray(body)) {
             return NextResponse.json({ error: 'EXEMPTION_IMPORT_PREVIEW_REQUIRED', message: 'Usa l’anteprima import in Repertori esenzioni.' }, { status: 400 });
         }

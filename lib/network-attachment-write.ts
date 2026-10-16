@@ -1,29 +1,19 @@
 import { archiveGenerationForSession } from './security/archive-session-generation';
-/* @Codex */
 import { randomUUID } from 'node:crypto';
-/* @Codex */
 import { and, eq } from 'drizzle-orm';
-/* @Codex */
 import { getAttachmentPayloadByteSize, isSealedAttachmentValue, resolveMaxAttachmentBytes } from './attachment-payload';
-/* @Codex */
 import {
     listChangedFields,
     requestIdFromRequest,
     writeAuditEventInTransaction,
     type AuditRedactedMetadata,
 } from './security/audit';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { activePatients } from './patient-lifecycle';
-/* @Codex */
 import type { NetworkWriteContext } from './network-write-context';
-/* @Codex */
 import { attachments, patients, patientsToAmbulatories } from './schema';
-/* @Codex */
 import { createHostAttachmentCurrentness } from './attachment-currentness-host';
 
-/* @Codex */
 export const NETWORK_ATTACHMENT_WRITE_CAPABILITY = 'network.replica.write-documents';
 
 type NetworkAttachmentMutationContext = NetworkWriteContext & {
@@ -147,7 +137,6 @@ function writeNetworkAttachmentAuditEvent(
     });
 }
 
-/* @Codex */
 export async function createNetworkScopedAttachment(
     context: NetworkAttachmentMutationContext,
     body: Record<string, unknown>

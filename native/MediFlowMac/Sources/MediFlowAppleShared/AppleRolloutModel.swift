@@ -1,5 +1,4 @@
 // Codex: created 2026-04-17
-// @Codex
 import Foundation
 
 public enum AppleDeliveryPhase: String, CaseIterable, Codable, Sendable {
@@ -70,7 +69,6 @@ public enum AppleFoundationSection: String, CaseIterable, Identifiable, Sendable
     }
 }
 
-/* @Codex */
 public enum ClinicalWorkspaceSection: String, CaseIterable, Identifiable, Sendable {
     case patients, agenda, diary, analytics, scales, settings, runtime, overview, milestones
     /// Administration of the machine that holds the archive. Offered only where

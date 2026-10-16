@@ -1,4 +1,4 @@
-/* @Codex */
+import { hasSourceDirective } from '../../scripts/test-support/source-structure.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -72,7 +72,7 @@ test('rejects hostile response bodies and invalid ambulatory identifiers fail cl
 
 test('remains a browser-only proposal boundary without cookie, storage, or Smart Import authority imports', () => {
     const source = readFileSync(new URL('./smart-import-context-proposal-browser-adapter.ts', import.meta.url), 'utf8');
-    assert.match(source, /^\/\* @Codex \*\/\n'use client';/u);
+    assert.equal(hasSourceDirective(source, 'use client'), true);
     assert.doesNotMatch(source, /server-only|node:|document\.cookie|cookies\(|localStorage|sessionStorage|selection|epoch|normalizer|orchestrator|(?:ingest|preview|apply)|db-server|globalThis\.(?:document|localStorage|sessionStorage)/u);
     assert.match(source, /proposal only/u);
 });

@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import {
   assertKeyboardFocusProgresses,
@@ -53,7 +52,7 @@ for (const frameCase of FRAME_CASES) {
     await page.setViewportSize({ width: frameCase.width, height: frameCase.height });
     await openSyntheticFrame(page, frameCase.register);
 
-    // @Codex ADR 0123: ordinary navigation owns links; the review mockup has no app rail.
+    // ADR 0123: ordinary navigation owns links; the review mockup has no app rail.
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale' });
     const patientsNav = navigation.getByRole('link', { name: 'Pazienti', exact: true });
     await patientsNav.focus();

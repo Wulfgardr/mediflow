@@ -1,4 +1,3 @@
-/* @Codex */
 export interface RetiredOcrExtractionResult {
     readonly status: 'review_required';
     readonly reason: 'unsupported_local_extraction';
@@ -18,7 +17,6 @@ export interface RetiredOcrExtractionResult {
  * accepts the former call shape without inspecting the input or reaching a
  * model provider, and it can never authorize a write or candidate use.
  */
-/* @Codex */
 export async function extractDocumentWithAI(
     _imageBase64: unknown,
     _mode?: unknown,
@@ -39,7 +37,6 @@ export async function extractDocumentWithAI(
 }
 
 /** Terminal availability seam retained for compatibility checks. */
-/* @Codex */
 export async function isOcrModelAvailable(): Promise<false> {
     return false;
 }

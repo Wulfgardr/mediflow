@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex: only preview metadata fetch; patient writes use the existing encrypted client. */
+/* only preview metadata fetch; patient writes use the existing encrypted client. */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { db, type Patient } from '@/lib/db';
 import { useSecurity } from '@/components/security-provider';

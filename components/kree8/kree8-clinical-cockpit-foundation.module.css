@@ -556,7 +556,7 @@
 
 .ghostBtnSm:hover { background: var(--surface-soft); transform: translateY(-1px); }
 
-/* @Codex: primary and secondary actions share the same control geometry. */
+/* primary and secondary actions share the same control geometry. */
 :global(html[data-runtime-twin-design='proposal']) :is(.primaryBtn, .ghostBtn, .ghostBtnSm) {
   box-sizing: border-box;
   min-width: var(--lume-control-height);
@@ -569,7 +569,7 @@
   gap: 8px;
 }
 
-/* @Codex: related actions and state controls follow the same spacing scale. */
+/* related actions and state controls follow the same spacing scale. */
 :global(html[data-runtime-twin-design='proposal']) :is(.headerActions, .panelActions, .identityChips, .dockActions, .segmented) {
   gap: var(--lume-control-gap);
 }
@@ -726,8 +726,6 @@
 
 .modeSub { font-size: 0.75rem; color: var(--ink-muted); }
 
-/* @Codex */
-
 .settingsQuickGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -795,7 +793,7 @@
   }
 }
 
-/* @Codex Compact localhost titles preserve hierarchy without consuming the action row. */
+/* Compact localhost titles preserve hierarchy without consuming the action row. */
 @media (max-width: 480px) {
   .areaShell { gap: 8px; }
 
@@ -820,12 +818,12 @@
   }
 }
 
-/* @Codex WUL-676: clear directory heading, one working plane. */
+/* WUL-676: clear directory heading, one working plane. */
 :global(html[data-runtime-twin-design='proposal']) .areaCaption { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .areaTitle { letter-spacing: -0.035em; font: var(--type-page-title); }
 :global(html[data-runtime-twin-design='proposal']) .areaTitle em { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .areaHeader { padding: 14px 0 24px; }
-/* @Codex: page, section, subsection and supporting copy retain distinct roles. */
+/* page, section, subsection and supporting copy retain distinct roles. */
 :global(html[data-runtime-twin-design='proposal']) h2.panelTitle {
   font-size: var(--twin-type-section);
   font-weight: var(--twin-heading-weight);

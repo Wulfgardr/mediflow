@@ -1,4 +1,3 @@
-/* @Codex */
 /* PROPOSED transport tests: real host loopback sockets and SYNTHETIC JSON, never WHO/Docker evidence. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -157,7 +156,7 @@ test('IPv4 and IPv6 route proof rejects default and non-default routed egress; L
     assert.throws(() => validateOfflineRoutes('', ''), { code: 'external_route_present' });
 });
 
-// @Codex: observed public WHO postcoordination shape, still a synthetic transport peer.
+// observed public WHO postcoordination shape, still a synthetic transport peer.
 test('probe accepts both exact observed URI separators and rejects malformed combinations', async t => {
     const first = 'http://id.who.int/icd/release/11/2026-01/mms/257068234';
     const second = 'http://id.who.int/icd/release/11/2026-01/mms/194483911';

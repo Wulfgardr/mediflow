@@ -1,4 +1,4 @@
-/* @Codex #98, #68 */
+/* #98, #68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   assertKeyboardFocusProgresses,
@@ -71,7 +71,7 @@ async function setRegister(page: Page, register: QuadroCase['register']): Promis
   }, register);
 }
 
-/* @Codex ADR 0123: the real synoptic reader replaces the four static mockup
+/* ADR 0123: the real synoptic reader replaces the four static mockup
    metric cards. Clinical numbers below come from API-created records. */
 async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<{ quadro: Locator; patient: LivePatientFixture }> {
   await page.setViewportSize({ width: quadroCase.width, height: quadroCase.height });

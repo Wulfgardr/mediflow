@@ -1,4 +1,3 @@
-/* @Codex */
 import { stdin, stdout } from 'node:process';
 import { createOperationClient, OperationClientError } from '../../mcp/src/operation-client.ts';
 import { MINI_MAX_INPUT_BYTES, parseMiniRequest, executeMiniRequest, serializeMiniResponse,

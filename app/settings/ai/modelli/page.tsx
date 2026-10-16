@@ -1,9 +1,7 @@
 'use client';
 
-/* @Codex */
 import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
 
-/* @Codex */
 import Link from 'next/link';
 import { LocalProviderOnboardingPanel } from '@/components/settings/local-provider-onboarding-panel';
 import { Bot, Cpu, RefreshCw, Save } from 'lucide-react';

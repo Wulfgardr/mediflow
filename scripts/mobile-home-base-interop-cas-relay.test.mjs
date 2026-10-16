@@ -1,4 +1,4 @@
-/* @Codex: Pure synthetic receipt tests; no host, app or simulator is contacted. */
+/* Pure synthetic receipt tests; no host, app or simulator is contacted. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';

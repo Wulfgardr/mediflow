@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react';
 import { Save, User } from 'lucide-react';
 import { useSecurity } from '@/components/security-provider';
 import { useToast } from '@/components/ui/toast-provider';
-/* @Codex */
 import { WorkProfileSettings } from '@/components/work-profile-onboarding';
 import {
     SETTINGS_CARD_CLASS,
@@ -75,7 +74,7 @@ export default function SettingsProfilePage() {
             />
 
             <div className={SETTINGS_CARD_CLASS}>
-                {/* @Codex WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
+                {/* WUL-229: header icon disc + ink copy mapped to MediFlow tokens */}
                 <div className="mb-5 flex items-start gap-3">
                     <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                         <User className="h-4 w-4" />

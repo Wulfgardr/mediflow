@@ -1,4 +1,4 @@
-/* @Codex WUL-457: exact-string legacy systems only, not malformed-record normalization. */
+/* WUL-457: exact-string legacy systems only, not malformed-record normalization. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 

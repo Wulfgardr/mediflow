@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { inArray } from 'drizzle-orm';
 import { dbServer, runDbServerImmediateTransaction } from '../../db-server';
@@ -10,7 +9,7 @@ import { createFunctionModelPreferencesService, FUNCTION_MODEL_SETTING_KEYS, FUN
 import { createFunctionModelDispatch } from './function-model-dispatch';
 import { createPortableProvisioning } from './treatment-reasoning-portable-provisioning';
 
-// @Codex: launcher-owned root, independent of the Webpack module/asset location.
+// launcher-owned root, independent of the Webpack module/asset location.
 const portable = createPortableProvisioning({ applicationRoot: process.cwd() });
 const ollama = createHostProviderLifecycleService().service;
 const athena = createHostProviderLifecycleService({ provider: 'athena_mlx' }).service;

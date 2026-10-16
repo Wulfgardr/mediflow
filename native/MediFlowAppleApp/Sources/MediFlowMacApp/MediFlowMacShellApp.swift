@@ -34,14 +34,13 @@ struct MediFlowMacShellApp: App {
     }
 }
 
-/* @Codex */
 private struct MediFlowMacWindow: View {
     @StateObject private var scene = MediFlowMacSceneModel()
     @ObservedObject var appearance: AppleAppearanceStore
 
     var body: some View {
         MediFlowMacRootView(snapshot: .live, scene: scene, appearance: appearance)
-            // @Codex: Keep the existing supported floor while the new single
+            // Keep the existing supported floor while the new single
             // sidebar layout is verified; wider windows give room to the chart.
             .frame(minWidth: 1100, minHeight: 680)
             .preferredColorScheme(appearance.theme.preferredColorScheme)

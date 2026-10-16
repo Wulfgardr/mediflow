@@ -1,11 +1,9 @@
-/* @Codex */
 type StoredMessagePayload = {
     metadata?: string;
     attachmentType?: 'image' | 'file';
     attachmentBase64?: string;
 };
 
-/* @Codex */
 export function normalizeStoredMessagePayload(body: Record<string, unknown>): StoredMessagePayload {
     const metadata = body.metadata === undefined
         ? undefined

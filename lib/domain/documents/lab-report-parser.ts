@@ -1,4 +1,3 @@
-/* @Codex */
 import { classifyObservationRange, toNumericValue, type ObservationRangeFlag } from '../../observation-range';
 
 export interface ParsedLabResult {

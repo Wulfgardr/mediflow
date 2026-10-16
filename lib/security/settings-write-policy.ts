@@ -1,4 +1,3 @@
-/* @Codex */
 import type { ServerSession } from '@/lib/security/server-session';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 
@@ -30,7 +29,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     aifaNetworkAccess: { write: ['web-session'], note: 'opt-in AIFA public catalog HEAD and explicit download' },
     aifaCatalogRemoteState: { write: [], note: 'server-managed AIFA HTTP metadata and persistent debounce' },
     aifaCatalogManifest: { write: [], note: 'atomic AIFA catalog writer only' },
-    /* @Codex: only the named preferences service owns revision CAS. */
+    /* only the named preferences service owns revision CAS. */
     'ai.fabric.chatgptOrdinary': { write: [], note: 'ADR 0077 named authenticated ordinary controller with revision CAS only' },
     'ai.fabric.functionPreferences': { write: [], note: 'ADR 0129 dedicated authenticated preference service' },
     // --- AI model / provider / endpoint config (written from the web settings
@@ -60,7 +59,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     uiReduceMotion: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
     uiReduceTransparency: { write: ['web-session'], note: 'accessibility pref (components/ui-accessibility-provider.tsx)' },
     uiStyleMode: { write: ['web-session'], note: 'appearance pref (lib/ui-style-mode.ts)' },
-    /* @Codex: the onboarding owner performs preview, revision CAS and rollback. */
+    /* the onboarding owner performs preview, revision CAS and rollback. */
     'onboarding.workProfile': { write: [], note: 'server-managed work profile; dedicated authenticated Web route only (ADR 0120)' },
 
     // --- Terminology registry (web session). ---
@@ -86,7 +85,6 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     backupScheduler: { write: [], note: 'backup config (app/api/system/backup-scheduler route, web-admin only)' },
 };
 
-/* @Codex */
 export function settingsWriteChannelForSession(session: ServerSession): SettingsWriteChannel {
     if (session.authChannel === 'system') return 'local-token';
     if (isWebAdminSession(session)) return 'web-admin';
@@ -108,7 +106,6 @@ export type SettingsWriteDecision =
     | { allowed: true; unregistered: boolean }
     | { allowed: false; status: 400 | 403; reason: string };
 
-/* @Codex */
 export function evaluateSettingsWrite(
     key: string,
     session: ServerSession,

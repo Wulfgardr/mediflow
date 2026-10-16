@@ -1,4 +1,3 @@
-/* @Codex */
 
 import crypto from 'node:crypto';
 import { types } from 'node:util';
@@ -106,7 +105,6 @@ const successorFence = (): string | null => {
 };
 
 /** Process-local P2a state; callers supply primitive ordering data only. */
-/* @Codex */
 export function createWebAuthControlRecord(initialFence: unknown, initialGeneration: unknown = ZERO) {
     if (!text(initialFence) || !u64(initialGeneration)) throw new TypeError('invalid trusted control state');
     const state: ControlState = { fence: initialFence, generation: initialGeneration, pending: null, activeSessionId: null, clock: 0, ticketedPending: null,
@@ -236,7 +234,6 @@ export function createWebAuthControlRecord(initialFence: unknown, initialGenerat
 }
 
 /** Burns one exact prepared ticket and clears only its still-current pending attempt. */
-/* @Codex */
 export function abortPreparedAuthControlTicket(ticket: unknown): boolean {
     if (!enterTicketOperation()) return false;
     try {
@@ -265,7 +262,6 @@ function denyPreparedAuthControlActivation(record: PreparedAuthControlActivation
 }
 
 /** Resolves one exact ticket and session binding before the fallible-free final CAS. */
-/* @Codex */
 export function prepareAuthControlActivation(ticket: unknown, exactSessionId: unknown): PreparedAuthControlActivation | null {
     if (!enterTicketOperation()) return null;
     let binding: TicketBinding | undefined;
@@ -304,7 +300,6 @@ export function prepareAuthControlActivation(ticket: unknown, exactSessionId: un
 }
 
 /** Performs only the exact prepared lexical CAS; no registry or caller work is entered. */
-/* @Codex */
 export function commitPreparedAuthControlActivation(prepared: unknown): 0 | 1 {
     const activation = preparedAuthControlActivation;
     preparedAuthControlActivation = null;
@@ -326,7 +321,6 @@ export function commitPreparedAuthControlActivation(prepared: unknown): 0 | 1 {
 }
 
 /** Burns one exact prepared activation without mutating control authority. */
-/* @Codex */
 export function abortPreparedAuthControlActivation(prepared: unknown): boolean {
     const activation = preparedAuthControlActivation;
     if (!activation) return false;
@@ -336,7 +330,6 @@ export function abortPreparedAuthControlActivation(prepared: unknown): boolean {
 }
 
 /** Observes one exact ACTIVE ticket/session binding without spending or exposing it. */
-/* @Codex */
 export function isCurrentAuthControlSessionBinding(ticket: unknown, exactSessionId: unknown): boolean {
     if (!enterCurrentBindingObservation()) return false;
     try {
@@ -361,7 +354,6 @@ function denyPreparedAuthControlRetirement(record: PreparedAuthControlRetirement
 }
 
 /** Resolves one active ticket, session, and reason before the fallible-free retirement CAS. */
-/* @Codex */
 export function prepareAuthControlRetirement(ticket: unknown, exactSessionId: unknown, exactReason: unknown): PreparedAuthControlRetirement | null {
     if (!enterTicketOperation()) return null;
     let binding: TicketBinding | undefined;
@@ -400,7 +392,6 @@ export function prepareAuthControlRetirement(ticket: unknown, exactSessionId: un
 }
 
 /** Performs only the exact prepared lexical retirement CAS; no registry or caller work is entered. */
-/* @Codex */
 export function commitPreparedAuthControlRetirement(prepared: unknown): 0 | 2 {
     const retirement = preparedAuthControlRetirement;
     preparedAuthControlRetirement = null;
@@ -423,7 +414,6 @@ export function commitPreparedAuthControlRetirement(prepared: unknown): 0 | 2 {
 }
 
 /** Burns one exact prepared retirement without reviving control authority. */
-/* @Codex */
 export function abortPreparedAuthControlRetirement(prepared: unknown): boolean {
     const retirement = preparedAuthControlRetirement;
     if (!retirement) return false;
@@ -433,7 +423,6 @@ export function abortPreparedAuthControlRetirement(prepared: unknown): boolean {
 }
 
 /** Commits the exact prepared P2b ticket without exposing record or session authority. */
-/* @Codex */
 export function commitAuthControlTicket(ticket: unknown): boolean {
     if (!enterTicketOperation()) return false;
     let binding: TicketBinding | undefined;
@@ -461,7 +450,6 @@ export function commitAuthControlTicket(ticket: unknown): boolean {
 }
 
 /** Retires the exact active binding once; exact same-reason replay is receipt-only. */
-/* @Codex */
 export function retireAuthControlTicket(ticket: unknown, reason: unknown): 0 | 1 | 2 {
     if (!enterTicketOperation()) return 0;
     let binding: TicketBinding | undefined;

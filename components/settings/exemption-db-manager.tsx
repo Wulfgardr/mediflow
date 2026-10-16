@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useRef, useState } from 'react';
 import { Database } from 'lucide-react';

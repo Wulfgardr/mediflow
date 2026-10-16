@@ -1,4 +1,3 @@
-/* @Codex */
 import { AIService, type AIStats, type ChatMessage } from './ai-service';
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from './athena-model-identity';
 import {

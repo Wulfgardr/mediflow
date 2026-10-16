@@ -1,19 +1,13 @@
-/* @Codex */
 import type { DocumentQualityLevel } from '../../db';
-/* @Codex */
 import type {
     ExtractedPatientData,
     ExtractedPatientReviewDiagnosis,
     ExtractedPatientReviewTherapy,
 } from '../../pdf-service';
-/* @Codex */
 import type { SmartImportServicePrescriptionExtraction, TherapySuggestionState } from '../../ai-task-contracts';
-/* @Codex */
 import { splitDocumentIntoLines } from './document-excerpt';
-/* @Codex */
 import { applyPatientImportDecision, buildPatientImportDecision } from './patient-import-decision';
 
-/* @Codex */
 export type PatientDocumentReviewFieldKey =
     | 'firstName'
     | 'lastName'
@@ -23,7 +17,6 @@ export type PatientDocumentReviewFieldKey =
     | 'phone'
     | 'notes';
 
-/* @Codex */
 export interface PatientDocumentReviewField {
     key: PatientDocumentReviewFieldKey;
     label: string;
@@ -33,7 +26,6 @@ export interface PatientDocumentReviewField {
     sourceLabel: string;
 }
 
-/* @Codex */
 export interface PatientDocumentReviewDiagnosis {
     id: string;
     code: string;
@@ -45,7 +37,6 @@ export interface PatientDocumentReviewDiagnosis {
     included: boolean;
 }
 
-/* @Codex */
 export interface PatientDocumentReviewMedication {
     id: string;
     drugName: string;
@@ -63,7 +54,6 @@ export interface PatientDocumentReviewMedication {
     sourceLabel: string;
 }
 
-/* @Codex */
 export interface PatientDocumentReviewServicePrescription {
     id: string;
     serviceName: string;
@@ -91,7 +81,6 @@ export interface PatientDocumentReviewServicePrescription {
     }>;
 }
 
-/* @Codex */
 export interface PatientDocumentReviewDraft {
     source: ExtractedPatientData['source'];
     confidence: number;
@@ -107,7 +96,6 @@ export interface PatientDocumentReviewDraft {
     servicePrescriptions?: PatientDocumentReviewServicePrescription[];
 }
 
-/* @Codex */
 export interface ReviewedPatientImportDefaults {
     firstName?: string;
     lastName?: string;
@@ -151,20 +139,17 @@ export interface ReviewedPatientImportDefaults {
     }>;
 }
 
-/* @Codex */
 function buildSourceLabel(source: ExtractedPatientData['source']): string {
     if (source === 'ai') return 'Documento analizzato con AI locale';
     if (source === 'hybrid') return 'Documento analizzato con AI locale + fallback regex';
     return 'Documento letto con parsing locale';
 }
 
-/* @Codex */
 function formatDateInputValue(value?: Date): string {
     if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '';
     return value.toISOString().split('T')[0];
 }
 
-/* @Codex */
 function buildField(
     key: PatientDocumentReviewFieldKey,
     label: string,
@@ -185,7 +170,6 @@ function buildField(
     };
 }
 
-/* @Codex */
 function dedupeStrings(values: string[]): string[] {
     const seen = new Set<string>();
     const deduped: string[] = [];
@@ -201,7 +185,6 @@ function dedupeStrings(values: string[]): string[] {
     return deduped;
 }
 
-/* @Codex */
 function normalizeText(value: string | undefined): string {
     return (value || '')
         .normalize('NFKD')
@@ -211,13 +194,11 @@ function normalizeText(value: string | undefined): string {
         .trim();
 }
 
-/* @Codex */
 function extractLegacyDosage(value: string): string | undefined {
     const match = value.match(/\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|g|ml|ui|u|cp|cps|cpr|caps(?:ule)?|compress(?:a|e)|gtt|fial(?:a|e)|spruzzi?)\b(?:\s*[^\n,;]*)?/i);
     return match ? match[0].trim() : undefined;
 }
 
-/* @Codex */
 function buildSuggestedPatientNotes(data: ExtractedPatientData): string | undefined {
     const rawText = data.rawText?.trim() || '';
     if (!rawText) return undefined;
@@ -261,14 +242,12 @@ function buildSuggestedPatientNotes(data: ExtractedPatientData): string | undefi
     return text.length <= 220 ? text : `${text.slice(0, 219).trimEnd()}...`;
 }
 
-/* @Codex */
 function canPersistStructuredTherapy(medication: Pick<PatientDocumentReviewMedication, 'drugName' | 'dosage' | 'therapyState'>): boolean {
     return medication.therapyState === 'active'
         && Boolean(medication.drugName.trim())
         && Boolean(medication.dosage?.trim());
 }
 
-/* @Codex */
 const THERAPY_PLAUSIBILITY_RULES: Array<{
     family: string;
     therapyTokens: string[];
@@ -301,13 +280,10 @@ const THERAPY_PLAUSIBILITY_RULES: Array<{
     },
 ];
 
-/* @Codex */
 const MANUAL_REVIEW_ONLY_THERAPY_FAMILIES = new Set(['nutrition']);
 
-/* @Codex */
 const CURRENT_THERAPY_EVIDENCE_REGEX = /\bterapia alla dimissione\b|\bterapia domiciliare\b|\bindicazioni terapeutiche(?:\s+e\s+gestionali)?\s+alla\s+dimissione\b|\bpiano terapeutico aifa\b|\bfarmaco prescritto\b/i;
 
-/* @Codex */
 function buildClinicalContextProbe(data: ExtractedPatientData): string {
     return normalizeText([
         data.documentSummary,
@@ -318,7 +294,6 @@ function buildClinicalContextProbe(data: ExtractedPatientData): string {
     ].filter(Boolean).join(' '));
 }
 
-/* @Codex */
 function buildTherapyProbe(medication: ExtractedPatientReviewTherapy): string {
     return normalizeText([
         medication.drugName,
@@ -329,7 +304,6 @@ function buildTherapyProbe(medication: ExtractedPatientReviewTherapy): string {
     ].filter(Boolean).join(' '));
 }
 
-/* @Codex */
 function resolvePlausibleTherapyFamily(
     data: ExtractedPatientData,
     medication: ExtractedPatientReviewTherapy,
@@ -346,7 +320,6 @@ function resolvePlausibleTherapyFamily(
     return match?.family || null;
 }
 
-/* @Codex */
 function buildTherapyDefaultSelection(data: ExtractedPatientData, medication: ExtractedPatientReviewTherapy): {
     included: boolean;
     blockedReason?: string;
@@ -397,7 +370,6 @@ function buildTherapyDefaultSelection(data: ExtractedPatientData, medication: Ex
     };
 }
 
-/* @Codex */
 function mapReviewDiagnosis(diagnosis: ExtractedPatientReviewDiagnosis, index: number): PatientDocumentReviewDiagnosis {
     return {
         id: `diagnosis:${diagnosis.system}:${diagnosis.code}:${index}`,
@@ -411,7 +383,6 @@ function mapReviewDiagnosis(diagnosis: ExtractedPatientReviewDiagnosis, index: n
     };
 }
 
-/* @Codex */
 function mapLegacyMedication(medication: string, sourceLabel: string, index: number): PatientDocumentReviewMedication {
     const dosage = extractLegacyDosage(medication);
 
@@ -427,7 +398,6 @@ function mapLegacyMedication(medication: string, sourceLabel: string, index: num
     };
 }
 
-/* @Codex */
 function mapReviewTherapy(
     data: ExtractedPatientData,
     medication: ExtractedPatientReviewTherapy,
@@ -454,7 +424,6 @@ function mapReviewTherapy(
     };
 }
 
-/* @Codex */
 function mapReviewServicePrescription(
     item: SmartImportServicePrescriptionExtraction,
     sourceLabel: string,
@@ -488,7 +457,6 @@ function mapReviewServicePrescription(
     };
 }
 
-/* @Codex */
 export function buildPatientDocumentReviewDraft(data: ExtractedPatientData): PatientDocumentReviewDraft {
     const sourceLabel = buildSourceLabel(data.source);
     const notesValue = buildSuggestedPatientNotes(data) || '';
@@ -537,7 +505,6 @@ export function buildPatientDocumentReviewDraft(data: ExtractedPatientData): Pat
     };
 }
 
-/* @Codex */
 export function applyPatientDocumentReview(draft: PatientDocumentReviewDraft): ReviewedPatientImportDefaults {
     return applyPatientImportDecision(buildPatientImportDecision(draft));
 }

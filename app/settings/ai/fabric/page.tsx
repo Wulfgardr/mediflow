@@ -1,9 +1,7 @@
 'use client';
 
-/* @Codex */
 import { ChatGptAccountPanel } from '@/components/settings/chatgpt-account-panel';
 
-/* @Codex */
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import serviceStyles from '@/components/service-architecture-panel.module.css';
@@ -197,7 +195,7 @@ export default function SettingsAiFabricPage() {
                 </nav>
             </section>
 
-            {/* @Codex: external account metadata never feeds local preferences or readiness. */}
+            {/* external account metadata never feeds local preferences or readiness. */}
             <ChatGptAccountPanel />
             <FunctionStatusPanel />
             {state.kind === 'ready' && state.portable && <PortableTreatmentSection disclosure={state.portable} />}

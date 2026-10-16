@@ -1,4 +1,4 @@
-/* @Codex: two real-browser phases run against one synthetic DB, with a server restart between them. */
+/* two real-browser phases run against one synthetic DB, with a server restart between them. */
 import { expect, test } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { bootstrapUnlockedSession, openAiFunzioniSettings } from './utils';

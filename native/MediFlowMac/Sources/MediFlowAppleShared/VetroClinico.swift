@@ -76,7 +76,6 @@ public struct StatusBadge: View {
     }
 
     public var body: some View {
-        /* @Codex */
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         let toneColor = LumePalette.tint(for: tone, using: palette)
         Text(text)
@@ -122,7 +121,6 @@ public struct InfoRow: View {
     }
 
     public var body: some View {
-        /* @Codex */
         Group {
             if dynamicTypeSize >= .accessibility1 {
                 VStack(alignment: .leading, spacing: 2) {

@@ -1,6 +1,5 @@
 import Foundation
 
-/* @Codex */
 /// Presentation destinations only; none of these values is an API command.
 public enum ClinicalNavigationArea: String, CaseIterable, Sendable {
     case patients, agenda, diary, analytics, scales, settings

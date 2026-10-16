@@ -7,22 +7,15 @@ import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { PatientDetail } from '@/lib/api/v1/types';
-/* @Codex */
 import { parseExpectedVersion } from '@/lib/patient-concurrency';
 // WUL-306 (ADR 0066): soft-delete lifecycle helpers
 import { activePatients } from '@/lib/patient-lifecycle';
-/* @Codex */
 import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
-/* @Codex */
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-/* @Codex */
 import { updatePatientOperation } from '@/lib/patient-update-operation';
-/* @Codex */
 import { deletePatientOperation } from '@/lib/patient-delete-operation';
-/* @Codex */
 import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
 
-/* @Codex */
 function parsePatientDeletionReason(body: Record<string, unknown>, fallback: string): string | null {
     if (!Object.prototype.hasOwnProperty.call(body, 'deletionReason')) return fallback;
     if (typeof body.deletionReason !== 'string' || body.deletionReason.trim().length === 0) return null;
@@ -56,30 +49,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             address: patient.address ?? null,
             phone: patient.phone ?? null,
             caregiver: patient.caregiver ?? null,
-            /* @Codex */
             exemptions: patient.exemptions ?? null,
-            /* @Codex */
             diagnoses: patient.diagnoses ?? null,
-            /* @Codex */
             monitoringProfile: patient.monitoringProfile ?? null,
-            /* @Codex */
             statusReason: patient.statusReason ?? null,
-            /* @Codex */
             archiveReason: patient.archiveReason ?? null,
-            /* @Codex */
             archiveNote: patient.archiveNote ?? null,
             notes: patient.notes ?? null,
-            /* @Codex */
             aiSummary: patient.aiSummary ?? null,
-            /* @Codex */
             aiSummaryGeneratedAt: toIsoString(patient.aiSummaryGeneratedAt),
-            /* @Codex */
             aiSummaryContextHash: patient.aiSummaryContextHash ?? null,
-            /* @Codex */
             documentInsights: patient.documentInsights ?? null,
             isAdi: patient.isAdi ?? null,
             isArchived: patient.isArchived ?? null,
-            /* @Codex */
             version: patient.version,
             ambulatoryId: patient.ambulatoryId ?? null,
             createdAt: toIsoString(patient.createdAt),
@@ -95,7 +77,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-/* @Codex */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
@@ -106,7 +87,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
-        /* @Codex */
         const expectedVersion = parseExpectedVersion(body.version);
         if (expectedVersion === null) {
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
@@ -125,7 +105,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        /* @Codex: the actor was admitted before awaiting request input. */
+        /* the actor was admitted before awaiting request input. */
         const auditContext = auditContextFromRequest(request, archiveActorSession);
         const commit = updatePatientOperation({
             patientId: id, expectedVersion, values: normalized.values,
@@ -147,7 +127,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-/* @Codex */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
@@ -155,7 +134,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     try {
         const archiveActorSession = await requireLocalApiActorSession(request);
         const { id } = await params;
-        /* @Codex */
         const parsed = await readPatientJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error, ...('code' in parsed ? { code: parsed.code } : {}) }, { status: parsed.status });
         const body = parsed.body;
@@ -168,7 +146,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Invalid deletionReason' }, { status: 400 });
         }
 
-        /* @Codex: resolve the API actor before the synchronous tombstone/audit commit. */
+        /* resolve the API actor before the synchronous tombstone/audit commit. */
         const auditContext = auditContextFromRequest(request, archiveActorSession);
         const result = deletePatientOperation({
             patientId: id, expectedVersion, deletionReason,

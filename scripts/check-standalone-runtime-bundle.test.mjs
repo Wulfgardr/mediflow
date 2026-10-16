@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -97,7 +96,7 @@ const webAuthOwnerRoster = [
   'index.d.ts',
   'index.js',
   'internal/control-record.cjs',
-  'internal/native-session.cjs', // @Codex: canonical owner 0.8.7 roster
+  'internal/native-session.cjs', // canonical owner 0.8.7 roster
   'internal/owner.cjs',
   'internal/session-activation.cjs',
   'internal/session-cell.cjs',
@@ -191,8 +190,8 @@ test('digest-pinned text workers retain exact LF bytes on every checkout', () =>
   for (const worker of [
     'scripts/anydoc-local-extraction-worker.mjs',
     'scripts/anydoc-pdf-page-worker.mjs',
-    'scripts/anydoc-tesseract-artifacts.json', // @Codex
-    'scripts/anydoc-pdf-renderer-profiles.json', // @Codex
+    'scripts/anydoc-tesseract-artifacts.json',
+    'scripts/anydoc-pdf-renderer-profiles.json',
     'scripts/apple-vision-ocr.swift',
   ]) {
     assert.ok(
@@ -220,10 +219,10 @@ test('standalone checker proves web auth owner physical copy and restart denial'
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 
   const source = fs.readFileSync(checker, 'utf8');
-  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.9-local\.3f2e6f2a'/); // @Codex
+  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.9-local\.3f2e6f2a'/);
   assert.match(source, /['"]withCurrentResourceBinding['"]/);
-  assert.match(source, /root is not the frozen exact owner API with native session namespace/); // @Codex
-  // @Codex: the local 0.8.9 owner extends the native session surface without widening the root API.
+  assert.match(source, /root is not the frozen exact owner API with native session namespace/);
+  // the local 0.8.9 owner extends the native session surface without widening the root API.
   const frozenApi = source.match(/const WEB_AUTH_OWNER_KEYS = Object\.freeze\(\[([\s\S]*?)\]\)/)?.[1];
   assert.ok(frozenApi);
   assert.equal([...frozenApi.matchAll(/'[^']+'/g)].length, 23);
@@ -249,8 +248,8 @@ test('standalone config traces the isolated PDF worker dependency closure', () =
   assert.ok(externals, 'missing serverExternalPackages roster');
   for (const pattern of [
     anyDocPdfWorkerTracePattern,
-    "./scripts/anydoc-tesseract-artifacts.json", // @Codex
-    "./scripts/anydoc-pdf-renderer-profiles.json", // @Codex
+    "./scripts/anydoc-tesseract-artifacts.json",
+    "./scripts/anydoc-pdf-renderer-profiles.json",
     pdfLibTracePattern,
     pdfLibScopeTracePattern,
     pdfJsManifestTracePattern,
@@ -263,7 +262,6 @@ test('standalone config traces the isolated PDF worker dependency closure', () =
   assert.doesNotMatch(externals, /['"](?:pdf-lib|pdfjs-dist|@napi-rs\/canvas)['"]/u);
 });
 
-/* @Codex */
 test('standalone config traces the installed semver layout for sharp', () => {
   const configSource = fs.readFileSync(path.join(root, 'next.config.ts'), 'utf8');
   const includes = configSource.match(/outputFileTracingIncludes:\s*\{[\s\S]*?["']\/\*["']:\s*\[([\s\S]*?)\]/u)?.[1];

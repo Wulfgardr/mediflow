@@ -7,7 +7,6 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
-/* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
@@ -71,7 +70,6 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();

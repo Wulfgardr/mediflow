@@ -1,4 +1,3 @@
-/* @Codex */
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -70,7 +69,6 @@ function runBootstrapWorker(dataDir: string, importOnly = false): Promise<{ code
     });
 }
 
-/* @Codex */
 test('new-database bootstrap refuses a non-empty unknown schema', () => {
     const db = new Database(':memory:');
     try {
@@ -85,7 +83,6 @@ test('new-database bootstrap refuses a non-empty unknown schema', () => {
     }
 });
 
-/* @Codex */
 test('new-database bootstrap preserves application tables with a sqlite-like prefix', () => {
     const db = new Database(':memory:');
     try {
@@ -112,7 +109,6 @@ test('module imports do not create or bootstrap a clinical archive', { timeout: 
     }
 });
 
-/* @Codex */
 test('fresh data directory bootstraps the base schema before runtime guards', { timeout: 30_000 }, async () => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-db-fresh-bootstrap-'));
     const dbPath = path.join(dataDir, 'medical.db');
@@ -158,7 +154,6 @@ test('fresh data directory bootstraps the base schema before runtime guards', { 
     }
 });
 
-/* @Codex */
 test('concurrent first starts serialize on a genuinely empty database', { timeout: 30_000 }, async () => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-db-fresh-concurrent-'));
     try {

@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedHomeBaseCredentialsView: View {
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -10,7 +9,7 @@ struct PairedHomeBaseCredentialsView: View {
     @Binding var confirmsClearingPairing: Bool
 
     private var actionColumns: [GridItem] {
-        // @Codex #143: keep setup actions as readable rows at accessibility sizes.
+        // #143: keep setup actions as readable rows at accessibility sizes.
         dynamicTypeSize.isAccessibilitySize
             ? [GridItem(.flexible())]
             : [GridItem(.adaptive(minimum: 150), spacing: 8)]
@@ -130,7 +129,6 @@ struct PairedHomeBaseCredentialsView: View {
 
 }
 
-/* @Codex */
 struct PairedHomeBaseCredentialsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: PairedPatientsWorkspaceModel
@@ -147,7 +145,7 @@ struct PairedHomeBaseCredentialsSheet: View {
             }
             .navigationTitle("Collegamento MediFlow")
             #if os(iOS)
-            // @Codex #143: keep the setup title readable on compact screens.
+            // #143: keep the setup title readable on compact screens.
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
@@ -183,7 +181,6 @@ private struct WorklistPrimaryActionStyle: ViewModifier {
     }
 }
 
-/* @Codex */
 struct PairedPatientsWorklistView: View {
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -193,13 +190,13 @@ struct PairedPatientsWorklistView: View {
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
     @Binding var patientSortMode: PatientListSortMode
-    // @Codex: Compact navigation belongs to the workspace, not to a row.
+    // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
 
     @ViewBuilder
     var body: some View {
         #if os(macOS)
-        // @Codex: Keep the heading and filters fixed above the native list.
+        // Keep the heading and filters fixed above the native list.
         // Creation belongs to the workspace toolbar, which owns its capability gate.
         VStack(alignment: .leading, spacing: 0) {
             macOSWorklistHeader
@@ -226,7 +223,7 @@ struct PairedPatientsWorklistView: View {
         // received the caller's padding and background separately, which drew
         // the list as a stack of loose cards instead of one list.
         VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
-            // @Codex: A named collection, followed directly by its filters and rows.
+            // A named collection, followed directly by its filters and rows.
             if verticalSizeClass != .compact {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Pazienti")
@@ -249,7 +246,7 @@ struct PairedPatientsWorklistView: View {
     /// the patient rows so the two cannot drift apart.
     private static let mobileStackSpacing: CGFloat = 16
 
-    /* @Codex: In a short viewport the navigation bar owns the title, while
+    /* In a short viewport the navigation bar owns the title, while
        the result count shares the filter row without reducing its touch area. */
     @ViewBuilder
     private var mobileResultCount: some View {
@@ -267,7 +264,6 @@ struct PairedPatientsWorklistView: View {
     #endif
 
     #if os(macOS)
-    /* @Codex */
     private var macOSWorklistHeader: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text("Elenco")
@@ -282,7 +278,7 @@ struct PairedPatientsWorklistView: View {
                     .font(.headline)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    // @Codex: the filtered result can contain exactly one patient.
+                    // the filtered result can contain exactly one patient.
                     .accessibilityLabel(filteredPatients.count == 1
                         ? "1 paziente visibile nell'elenco caricato"
                         : "\(filteredPatients.count) pazienti visibili nell'elenco caricato")
@@ -417,7 +413,7 @@ struct PairedPatientsWorklistView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!model.canChangePatientSelection)
-                        // @Codex: Flat, separated records; selection is still model-owned.
+                        // Flat, separated records; selection is still model-owned.
                         .background(model.selectedPatientID == patient.id ? PlatformColors.selection : .clear)
                         .overlay(alignment: .bottom) { Divider() }
                         .accessibilityAddTraits(model.selectedPatientID == patient.id ? .isSelected : [])
@@ -445,7 +441,6 @@ struct PairedPatientsWorklistView: View {
         }
     }
 
-    /* @Codex */
     private var patientSelection: Binding<String?> {
         Binding(
             get: { model.selectedPatientID },
@@ -465,7 +460,7 @@ struct PairedPatientsWorklistView: View {
     @ViewBuilder
     private func activePatientLabel(_ patient: HomeBasePatientSummary) -> some View {
         #if os(macOS)
-        // @Codex: Give identity the full first line in a 280–340 pt sidebar.
+        // Give identity the full first line in a 280–340 pt sidebar.
         // Recency shares the metadata line, leaving diagnosis its own third line.
         VStack(alignment: .leading, spacing: 5) {
             patientName(patient)
@@ -486,7 +481,7 @@ struct PairedPatientsWorklistView: View {
         .contentShape(Rectangle())
         #else
         if dynamicTypeSize.isAccessibilitySize {
-            // @Codex: Keep clinical context visible with scaled text. A single
+            // Keep clinical context visible with scaled text. A single
             // wrapping summary avoids separate code, description and count rows.
             VStack(alignment: .leading, spacing: 6) {
                 patientName(patient)
@@ -496,7 +491,7 @@ struct PairedPatientsWorklistView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
         } else if verticalSizeClass == .compact {
-            // @Codex: Ordinary text in a short viewport keeps the identity-only
+            // Ordinary text in a short viewport keeps the identity-only
             // row; accessibility text retains its clinical summary above.
             VStack(alignment: .leading, spacing: 6) {
                 patientName(patient)
@@ -590,7 +585,6 @@ struct PairedPatientsWorklistView: View {
     }
 
     #if os(iOS)
-    /* @Codex */
     @ViewBuilder
     private func accessibilityPatientDiagnosis(_ patient: HomeBasePatientSummary) -> some View {
         if let summary = PatientWorklistDiagnosisSummary(rawDiagnoses: patient.diagnoses) {
@@ -610,7 +604,6 @@ struct PairedPatientsWorklistView: View {
     }
     #endif
 
-    /* @Codex */
     @ViewBuilder
     private func patientDiagnosis(_ patient: HomeBasePatientSummary) -> some View {
         if let summary = PatientWorklistDiagnosisSummary(rawDiagnoses: patient.diagnoses) {
@@ -655,7 +648,6 @@ struct PairedPatientsWorklistView: View {
                 }
             }
             .font(.caption)
-            // @Codex
             .foregroundStyle(PlatformColors.secondaryInk)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
@@ -667,7 +659,7 @@ struct PairedPatientsWorklistView: View {
         }
     }
 
-    /// @Codex: Native selection owns both ink and background on the Mac row.
+    /// Native selection owns both ink and background on the Mac row.
     /// A separate light chip made the dark-mode code disappear when selected.
     private func diagnosisCodePill(_ code: String, patient: HomeBasePatientSummary) -> some View {
         #if os(macOS)
@@ -694,7 +686,6 @@ struct PairedPatientsWorklistView: View {
                 Text(PairedPatientsWorkspaceSupport.relativeUpdated(updated))
                     .font(.caption2)
                     .registro()
-                    // @Codex
                     .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("patient-cell-updated-\(patient.id)")
@@ -714,7 +705,7 @@ struct PairedPatientsWorklistView: View {
 
     private var patientSearchControls: some View {
         #if os(macOS)
-        // @Codex: Search stays in the workspace toolbar; local controls use
+        // Search stays in the workspace toolbar; local controls use
         // standard native styles without an additional material container.
         macOSFilterCluster
         #else
@@ -730,7 +721,6 @@ struct PairedPatientsWorklistView: View {
     }
 
     #if os(macOS)
-    /* @Codex */
     private var macOSFilterCluster: some View {
         VStack(alignment: .leading, spacing: 10) {
             patientViewModePicker
@@ -742,7 +732,6 @@ struct PairedPatientsWorklistView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /* @Codex */
     @ViewBuilder
     private var resetFiltersButton: some View {
         if isFilteringActive {
@@ -764,7 +753,6 @@ struct PairedPatientsWorklistView: View {
     #endif
 
 
-    /* @Codex */
     @ViewBuilder
     private var patientViewModePicker: some View {
         // A segmented control divides its width equally and truncates; it never
@@ -794,7 +782,6 @@ struct PairedPatientsWorklistView: View {
     }
 
     #if os(macOS)
-    /* @Codex */
     private var patientSortMenu: some View {
         // A menu-style Picker states the active order on its own face. The
         // previous Menu showed a bare pair of arrows: the current sort was only
@@ -844,7 +831,6 @@ struct PairedPatientsWorklistView: View {
     // Plain tinted capsule (no glass): glass inside the glass card would nest.
 }
 
-/* @Codex */
 struct PatientWorklistDiagnosisSummary: Equatable {
     let displayText: String
     /// The code on its own, so the row can set it as a pill instead of running
@@ -871,7 +857,6 @@ struct PatientWorklistDiagnosisSummary: Equatable {
     }
 }
 
-/* @Codex */
 private struct NativePatientSelectionListModifier: ViewModifier {
     @Binding var selection: String?
     let isEnabled: Bool
@@ -935,7 +920,7 @@ private struct WorklistRowHover: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // @Codex: Separate adjacent records without adding another card.
+            // Separate adjacent records without adding another card.
             .padding(.vertical, 8)
             .padding(.horizontal, 4)
             .background(
@@ -964,7 +949,6 @@ private extension View {
     }
 }
 
-/* @Codex */
 struct PairedPatientCreateView: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
 

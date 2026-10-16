@@ -1,4 +1,4 @@
-/* @Codex — static raster decoding, one short-lived blob URL, no network inputs. */
+/* static raster decoding, one short-lived blob URL, no network inputs. */
 import { assertImageSize, clearPreviewCanvas, PREVIEW_LIMITS, PreviewError, previewCanvasSize } from './document-viewer-policy.ts';
 import { validatePngPixels } from './document-viewer-png.ts';
 import { PreviewScope } from './document-viewer-scope.ts';

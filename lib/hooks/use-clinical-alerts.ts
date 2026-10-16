@@ -30,7 +30,6 @@ export function selectMostUrgentAlerts(alerts: readonly ClinicalAlert[]): Clinic
 }
 
 export function useClinicalAlerts() {
-    /* @Codex */
     return useLiveQuery(async () => {
         // Only consider active patients
         const patients = await db.patients

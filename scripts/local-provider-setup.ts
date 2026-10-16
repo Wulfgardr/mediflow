@@ -1,4 +1,4 @@
-/* @Codex: privileged host composition; never import from a web route or consumer. */
+/* privileged host composition; never import from a web route or consumer. */
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';

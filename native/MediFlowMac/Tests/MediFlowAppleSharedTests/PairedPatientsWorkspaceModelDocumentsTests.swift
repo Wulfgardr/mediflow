@@ -2,7 +2,6 @@ import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 // S6 (Wave 5, ADR 0076): model-level coverage for the documents domain: list +
 // on-demand detail load, upload with the ENC seal (payload-reale check per the
 // spec trappole), follow-up projection dedup + prefill, and capability gating.

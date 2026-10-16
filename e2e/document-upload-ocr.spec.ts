@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
@@ -100,7 +99,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
       void responsePromise.catch(() => {}); // An acquire failure still reports its own assertion.
       await page.getByRole('button', { name: `Estrai testo localmente da ${attachment.name}` }).click();
       const acquired = await acquirePromise;
-      // @Codex: acquire status stays direct; the unchanged client validates its grant.
+      // acquire status stays direct; the unchanged client validates its grant.
       // Observe project bytes passively, without relying on the inspector body cache.
       expect(acquired.status()).toBe(200);
       const response = await responsePromise;
@@ -159,7 +158,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
   });
 }
 
-/* @Codex: a completed response held by the browser must never reappear after cancellation. */
+/* a completed response held by the browser must never reappear after cancellation. */
 test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo', async ({ page }) => {
   test.setTimeout(90_000);
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');

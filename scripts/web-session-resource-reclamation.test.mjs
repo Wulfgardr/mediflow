@@ -1,4 +1,4 @@
-/* @Codex — internal list unit tests; installed-root tests prove runtime authority. */
+/* internal list unit tests; installed-root tests prove runtime authority. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

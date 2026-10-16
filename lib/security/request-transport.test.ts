@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import { isHttpsRequest, isTrustedWebMutationRequest, sessionCookieOptionsForRequest } from './request-transport.ts';
 
 const PROXY_HEADERS = { 'x-mediflow-tls-proxy': 'local-api' };

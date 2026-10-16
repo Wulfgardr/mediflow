@@ -1,4 +1,4 @@
-/* @Codex: status presentation cannot confer installation or current availability. */
+/* status presentation cannot confer installation or current availability. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { whoSetupGuideStatus } from './who-local-setup-guide-state.ts';

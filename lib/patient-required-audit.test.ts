@@ -1,4 +1,4 @@
-/* @Codex: WUL-719 real synthetic SQLite, real PUT routes, auth seams only. */
+/* WUL-719 real synthetic SQLite, real PUT routes, auth seams only. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
