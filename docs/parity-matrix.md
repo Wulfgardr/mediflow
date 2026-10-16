@@ -33,7 +33,7 @@ non prova Windows 11 x64; un simulatore non prova un dispositivo fisico.
 | Accesso v3 nei client Apple abbinati | [PR #539](https://github.com/Wulfgardr/mediflow/pull/539) integrata in `main` a `4c69e4daa` | La prova UI Mac sul precedente candidato `65da737353e8b02d84e476299e5c4088d38aedab` ha completato accesso v3 e creazione di un paziente inventato, con indirizzo decifrato. Il client iPhone in simulatore ha poi eseguito accesso v3 e letto la stessa cartella e lo stesso indirizzo. Non copre tutte le interazioni native. |
 | Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Anteprima, conferma ed esiti per riga presenti; 129 test Swift e tre prove HTTP reali su archivio sintetico riusciti. Selettore CSV sul candidato integrato ancora da verificare. |
 | Documenti multipli e quattro viste AI su iPhone/iPad | [PR #541](https://github.com/Wulfgardr/mediflow/pull/541) integrata in `main` a `65898d6a6ed1296a89850e19ce123791d37bb026` | Invii sequenziali con esiti per file e interruzione sulle risposte incerte. 113 test Node e 57 Swift riusciti; correzione dei tre hash CI inclusa nel contributo integrato. L'esistenza delle viste non prova una generazione o l'uso su dispositivi fisici. |
-| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) aperta: delta `44cb68a5cc2f9f66bd170cd5be6f313990aa9d97`, head `c3d8f117e812f0fdea507daf76a93e060a636a57`; base ancora il branch di #541, da aggiornare a `main` | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora in corso. |
+| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) aperta: delta `44cb68a5cc2f9f66bd170cd5be6f313990aa9d97`, head `91b0a6979f79693c3dd98307dbe55510ec3374ef`, base `main` | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora da completare. |
 | Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | 55 test Swift, sette test Web e build Mac/iOS riusciti. Corretti i casi di raggruppamento e numerazione segnalati dalla review indipendente; review finale senza rilievi. Interazione e rilettura dall'host ancora da provare. |
 
 Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce
@@ -88,7 +88,7 @@ non ancora integrati sono descritti nelle PR sopra, non attribuiti alla base.
 | Ambiente e revisione | Risultato osservato | Ancora aperto |
 | --- | --- | --- |
 | Omarchy/Arch ARM, Node 24.21.0, base `a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e` | Sei prove dell'harness ufficiale e tre prove di accesso riuscite; Supervisor Headless con cinque operazioni riuscito | Non è Ubuntu; non copre l'interazione completa, i nuovi contributi Apple o la generazione ChatGPT |
-| Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo e risposta HTTP 503 ancora senza causa stabilita; trasporto di prova intermittente. Supervisor Headless completo non verificato, attesa e cleanup ancora in analisi |
+| Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo e risposta HTTP 503 ancora senza causa stabilita; trasporto di prova intermittente. Supervisor Headless completo non verificato; attese e pulizia del test corrette nella [PR #546](https://github.com/Wulfgardr/mediflow/pull/546) |
 
 Le prove guest non attestano un installer nativo, Windows x64 o Ubuntu.
 Su una nuova fixture Windows, il primo avvio canonico ha completato la
@@ -100,7 +100,9 @@ successi successivi. La precedente attesa Headless di 15 secondi non aveva
 raggiunto la readiness: il Supervisor completo non è ancora un PASS. La
 risposta HTTP 503 e l'intermittenza del trasporto restano osservazioni aperte;
 non è dimostrato che abbiano la stessa causa né che il solo trasporto spieghi
-il rifiuto applicativo.
+il rifiuto applicativo. Il log della successiva esecuzione diagnostica, recuperato
+il 16 ottobre, mostra un arresto precedente all’attivazione: uno dei due
+Supervisor concorrenti non ha pubblicato l’indirizzo entro l’attesa del test.
 
 ### Tre funzioni Ollama: prove reali e limiti
 
@@ -108,6 +110,7 @@ Sul candidato sorgente `c3ee6f5f10e83664994e98c02ec25b532df84670`, con
 Ollama 0.40.5 e il modello locale già installato `qwen3.5:35b-a3b`, sono
 state eseguite preview HTTP canoniche su un nuovo archivio cifrato con dati
 interamente inventati. L'ammissione della versione è un contributo separato,
+nella [PR #548](https://github.com/Wulfgardr/mediflow/pull/548),
 con seguito documentale `f66b7e353e54e73ffc30e01f08c0a38b947a6817`;
 non viene attribuita alle revisioni precedenti o a una distribuzione installata.
 
