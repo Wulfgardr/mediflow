@@ -12,11 +12,11 @@ struct PairedHomeBaseCredentialsView: View {
         // #143: keep setup actions as readable rows at accessibility sizes.
         dynamicTypeSize.isAccessibilitySize
             ? [GridItem(.flexible())]
-            : [GridItem(.adaptive(minimum: 150), spacing: 8)]
+            : [GridItem(.adaptive(minimum: 170), spacing: 12)]
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             Text("Collegamento MediFlow")
                 .font(.headline)
             Text("Configura il collegamento al computer MediFlow e accedi con la passphrase o il PIN precedente.")
@@ -30,26 +30,42 @@ struct PairedHomeBaseCredentialsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("homebase-reconciliation-state")
-            TextField("Server HTTPS", text: $model.serverURL)
-                .accessibilityIdentifier("homebase-server-url-field")
-            TextField("Fingerprint SHA256 (opzionale)", text: $model.tlsPin)
-                .accessibilityIdentifier("homebase-tls-pin-field")
-            Button("Scopri in LAN") {
+            credentialField("Indirizzo del computer") {
+                TextField("https://…", text: $model.serverURL)
+                    .accessibilityIdentifier("homebase-server-url-field")
+            }
+            credentialField("Impronta SHA-256 del certificato (opzionale)") {
+                TextField("Impronta SHA-256", text: $model.tlsPin)
+                    .accessibilityIdentifier("homebase-tls-pin-field")
+            }
+            Button("Cerca nella rete locale") {
                 Task { await model.discoverHomeBase() }
             }
             .accessibilityIdentifier("homebase-discover-button")
             .disabled(model.isWorking)
             .frame(maxWidth: .infinity, alignment: .leading)
-            TextField("Paired client ID", text: $model.pairedClientId)
-                .accessibilityIdentifier("homebase-paired-client-id-field")
-            SecureField("Paired client token", text: $model.pairedClientToken)
-                .accessibilityIdentifier("homebase-paired-client-token-field")
-            TextField("Username (opzionale se utente unico)", text: $model.username)
-                .accessibilityIdentifier("homebase-username-field")
-            SecureField("Passphrase o PIN precedente", text: $model.password)
-                .accessibilityIdentifier("homebase-password-field")
-            TextField("Ambulatorio attivo (opzionale)", text: $model.ambulatoryId)
-                .accessibilityIdentifier("homebase-ambulatory-field")
+            Divider()
+            credentialField("Identificativo del dispositivo") {
+                TextField("Identificativo", text: $model.pairedClientId)
+                    .accessibilityIdentifier("homebase-paired-client-id-field")
+            }
+            credentialField("Codice di abbinamento") {
+                SecureField("Codice di abbinamento", text: $model.pairedClientToken)
+                    .accessibilityIdentifier("homebase-paired-client-token-field")
+            }
+            Divider()
+            credentialField("Utente (facoltativo se unico)") {
+                TextField("Nome utente", text: $model.username)
+                    .accessibilityIdentifier("homebase-username-field")
+            }
+            credentialField("Passphrase o PIN precedente") {
+                SecureField("Passphrase o PIN precedente", text: $model.password)
+                    .accessibilityIdentifier("homebase-password-field")
+            }
+            credentialField("Ambulatorio attivo (opzionale)") {
+                TextField("Identificativo dell’ambulatorio", text: $model.ambulatoryId)
+                    .accessibilityIdentifier("homebase-ambulatory-field")
+            }
             // The ambulatory scope picker used to live here, in the pairing form.
             // It has moved to the patients workspace toolbar: the active
             // ambulatory is the scope a clinician works in and changes during a
@@ -57,7 +73,7 @@ struct PairedHomeBaseCredentialsView: View {
             // Buried in "Collegamento MediFlow" it was unreachable without
             // opening a configuration sheet — and on iOS that sheet is not even
             // on the same screen as the list it scopes.
-            LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 12) {
                 Button("Accedi operatore") {
                     Task { await model.login() }
                 }
@@ -109,7 +125,10 @@ struct PairedHomeBaseCredentialsView: View {
                     .accessibilityIdentifier("homebase-error-message")
             }
         }
-        .padding(16)
+        .textFieldStyle(.roundedBorder)
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .padding(20)
         .lumeSurface(zone: .field)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("homebase-configuration-form")
@@ -124,6 +143,18 @@ struct PairedHomeBaseCredentialsView: View {
             Button("Annulla", role: .cancel) {}
         } message: {
             Text("Rimuove credenziali paired e snapshot locale da questo dispositivo.")
+        }
+    }
+
+    private func credentialField<Field: View>(_ title: String, @ViewBuilder field: () -> Field) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            field().frame(minHeight: 44)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
         }
     }
 
