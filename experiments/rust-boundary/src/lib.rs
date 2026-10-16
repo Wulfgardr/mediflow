@@ -94,8 +94,8 @@ fn canonical(value: &Value) -> Result<String, CodecError> {
             let outcome = string(map, "outcome")?;
             match outcome {
                 "prepared" => {
-                    exact(map, &["schemaVersion", "method", "requestRef", "outcome", "challenge", "expiresAt"])?;
-                    format!(",\"outcome\":\"prepared\",\"challenge\":{},\"expiresAt\":{}", challenge(map)?, number(map, "expiresAt", 1)?)
+                    exact(map, &["schemaVersion", "method", "requestRef", "outcome", "challenge", "preparedAt", "expiresAt"])?;
+                    format!(",\"outcome\":\"prepared\",\"challenge\":{},\"preparedAt\":{},\"expiresAt\":{}", challenge(map)?, number(map, "preparedAt", 0)?, number(map, "expiresAt", 1)?)
                 }
                 "activated" => {
                     exact(map, &["schemaVersion", "method", "requestRef", "outcome", "expiresAt"])?;
@@ -138,13 +138,27 @@ mod tests {
         let capture = format!("{{\"schemaVersion\":\"{CAPTURE_SCHEMA}\",\"userRef\":\"user.{}\",\"parentRef\":\"parent.{}\",\"patientId\":\"patient.synthetic.01\",\"ambulatoryId\":\"ambulatory.synthetic.01\",\"selectionEpoch\":0,\"expectedPatientVersion\":1,\"expiresAt\":9007199254740991}}", "3".repeat(64), "4".repeat(64));
         let frames = [prepare(), format!("{{{base}\"activate\",{request},\"challenge\":\"{challenge}\",\"capture\":{capture}}}"),
             format!("{{{base}\"revoke_all\",{request},\"reason\":\"logout\"}}"),
-            format!("{{{base}\"ack\",{request},\"outcome\":\"prepared\",\"challenge\":\"{challenge}\",\"expiresAt\":1}}"),
+            format!("{{{base}\"ack\",{request},\"outcome\":\"prepared\",\"challenge\":\"{challenge}\",\"preparedAt\":0,\"expiresAt\":1}}"),
             format!("{{{base}\"ack\",{request},\"outcome\":\"activated\",\"expiresAt\":9007199254740991}}"),
             format!("{{{base}\"ack\",{request},\"outcome\":\"revoked\"}}"),
             format!("{{{base}\"ack\",{request},\"outcome\":\"denied\",\"denialCode\":\"timeout\"}}")];
         for frame in frames { assert_eq!(decode(frame.as_bytes()), Ok(frame)); }
         let over = format!("{{{base}\"ack\",{request},\"outcome\":\"activated\",\"expiresAt\":9007199254740992}}");
         assert_eq!(decode(over.as_bytes()), Err(CodecError::FrameInvalid));
+    }
+    #[test]
+    fn prepared_timestamp_requires_a_safe_integer_and_rejects_legacy() {
+        let challenge = format!("pswc_{}", "2".repeat(64));
+        let prepared = |timestamp: &str| format!("{{\"schemaVersion\":\"{SCHEMA}\",\"method\":\"ack\",\"requestRef\":\"{REQUEST}\",\"outcome\":\"prepared\",\"challenge\":\"{challenge}\",\"preparedAt\":{timestamp},\"expiresAt\":9007199254740991}}");
+        for timestamp in ["0", "1", "9007199254740991"] {
+            let frame = prepared(timestamp);
+            assert_eq!(decode(frame.as_bytes()), Ok(frame));
+        }
+        for timestamp in ["-1", "1.5", "9007199254740992", "\"1000\"", "null", "true"] {
+            assert_eq!(decode(prepared(timestamp).as_bytes()), Err(CodecError::FrameInvalid));
+        }
+        let legacy = prepared("1000").replace("\"preparedAt\":1000,", "");
+        assert_eq!(decode(legacy.as_bytes()), Err(CodecError::FrameInvalid));
     }
     #[test]
     fn rejects_noncanonical_forms_and_bad_bytes() {

@@ -122,7 +122,7 @@ export function createPortableSupervisorWebControlV1(sourcesValue: unknown) {
     }
     const expiresAt = timestamp + PORTABLE_SUPERVISOR_WEB_PREPARE_TTL_MS;
     pending = record({ requestRef, challenge, expiresAt }); phase = 'prepared';
-    return ack(requestRef, { outcome: 'prepared', challenge, expiresAt });
+    return ack(requestRef, { outcome: 'prepared', challenge, preparedAt: timestamp, expiresAt });
   };
   const activate = async (frame: PortableSupervisorWebIpcFrameV1): Promise<string> => {
     const requestRef = frame.requestRef as string;

@@ -51,7 +51,7 @@ test('mints one five-second challenge tied to the request and denies a second pr
   const current = fixture();
   const prepared = await parsed(current.control.handle(request({ method: 'prepare' })));
   assert.deepEqual({ ...prepared }, { schemaVersion: SCHEMA, method: 'ack', requestRef: REQUEST,
-    outcome: 'prepared', challenge: CHALLENGE, expiresAt: 6_000 });
+    outcome: 'prepared', challenge: CHALLENGE, preparedAt: 1_000, expiresAt: 6_000 });
   const replay = await parsed(current.control.handle(request({ method: 'prepare' })));
   assert.equal(replay.outcome, 'denied'); assert.equal(replay.denialCode, 'replayed');
   assert.deepEqual(current.revocations, []);
@@ -70,6 +70,18 @@ test('consumes wrong or expired challenge attempts and terminalizes authority', 
     const after = await parsed(current.control.handle(request({ method: 'prepare' })));
     assert.equal(after.denialCode, 'host_unavailable');
   }
+});
+
+test('parent clock rollback after preparation revokes authority before activation', async () => {
+  const current = fixture();
+  await current.control.handle(request({ method: 'prepare' }));
+  current.setNow(999);
+  const denied = await parsed(current.control.handle(request({ method: 'activate',
+    challenge: CHALLENGE, capture: capture() })));
+  assert.equal(denied.outcome, 'denied');
+  assert.equal(denied.denialCode, 'host_unavailable');
+  assert.deepEqual(current.activations, []);
+  assert.deepEqual(current.revocations, ['explicit']);
 });
 
 test('ACKs activation only after the async host bind succeeds with a canonical capture', async () => {
