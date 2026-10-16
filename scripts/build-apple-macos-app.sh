@@ -9,6 +9,7 @@
 # Env:
 #   MEDIFLOW_SKIP_WEB_BUILD=1     reuse a matching payload with recorded build identity
 #   MEDIFLOW_MAC_CONFIG=Release   build configuration (default Debug)
+#   MEDIFLOW_MAC_PREBUILT_ARCHIVE raw native ZIP + .receipt.json from this clean HEAD
 #   MEDIFLOW_MAC_QA_NAMESPACE     explicit QA copy; exactly 32 lowercase hex digits
 #   MEDIFLOW_CODESIGN_IDENTITY    sign the bundle (incl. the injected runtime);
 #                                 "-" for ad-hoc, or a Developer ID. Unset = no sign
@@ -58,6 +59,7 @@ INITIAL_APP_REVISION="$CURRENT_APP_REVISION"
 INITIAL_APP_BRANCH="$CURRENT_APP_BRANCH"
 INITIAL_APP_WORKTREE_HASH="$CURRENT_APP_WORKTREE_HASH"
 INITIAL_APP_SOURCE_FINGERPRINT="$CURRENT_APP_SOURCE_FINGERPRINT"
+INITIAL_NATIVE_REVISION=""
 
 # skipped Web builds may reuse only a payload sealed by this script's
 # full-build path. This is provenance for local packaging, not a content digest.
@@ -117,7 +119,8 @@ NODE
 assert_checkout_unchanged() {
   read_checkout_identity
   if [[ "$CURRENT_APP_REVISION" != "$INITIAL_APP_REVISION" || "$CURRENT_APP_BRANCH" != "$INITIAL_APP_BRANCH" \
-    || "$CURRENT_APP_WORKTREE_HASH" != "$INITIAL_APP_WORKTREE_HASH" || "$CURRENT_APP_SOURCE_FINGERPRINT" != "$INITIAL_APP_SOURCE_FINGERPRINT" ]]; then
+    || "$CURRENT_APP_WORKTREE_HASH" != "$INITIAL_APP_WORKTREE_HASH" || "$CURRENT_APP_SOURCE_FINGERPRINT" != "$INITIAL_APP_SOURCE_FINGERPRINT" ]] \
+    || { [[ -n "$INITIAL_NATIVE_REVISION" ]] && [[ "$(git -C "$ROOT_DIR" rev-parse HEAD)" != "$INITIAL_NATIVE_REVISION" ]]; }; then
     echo "Il checkout e cambiato durante la creazione del bundle macOS; il bundle non viene sigillato." >&2
     exit 1
   fi
@@ -165,12 +168,30 @@ NODE
 }
 preflight_app_destination
 
+# better-sqlite3 and the native app must match the active Node architecture.
+case "$(node -p 'process.arch')" in
+  arm64) XCODE_ARCH="arm64" ;;
+  x64) XCODE_ARCH="x86_64" ;;
+  *) echo "Unsupported Node architecture for MediFlowMac bundle." >&2; exit 1 ;;
+esac
+
+if [[ "${MEDIFLOW_MAC_PREBUILT_ARCHIVE+x}" == x ]]; then
+  [[ -n "$MEDIFLOW_MAC_PREBUILT_ARCHIVE" && "$INITIAL_APP_WORKTREE_HASH" == "clean" ]] \
+    || { echo "Prebuilt native import requires an archive and a clean checkout." >&2; exit 1; }
+  INITIAL_NATIVE_REVISION="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+  "$ROOT_DIR/scripts/check-apple-structure.sh"
+  "$ROOT_DIR/scripts/check-apple-network-entitlements.sh"
+  python3 "$ROOT_DIR/scripts/macos-native-artifact.py" import \
+    --archive "$MEDIFLOW_MAC_PREBUILT_ARCHIVE" --destination "$APP" \
+    --revision "$INITIAL_NATIVE_REVISION" --configuration "$CONFIG" --architecture "$XCODE_ARCH"
+else
 # xcodebuild needs a full Xcode (the Liquid Glass code needs the 26 SDK).
 # an explicit per-command toolchain must win over global selection.
 if [[ -z "${DEVELOPER_DIR:-}" ]] && { [[ "$(xcode-select -p 2>/dev/null)" == *CommandLineTools* ]] || ! command -v xcodebuild >/dev/null 2>&1; }; then
   for dev in /Applications/Xcode.app/Contents/Developer /Applications/Xcode-beta.app/Contents/Developer; do
     [[ -d "$dev" ]] && export DEVELOPER_DIR="$dev" && break
   done
+fi
 fi
 
 # 1. Web runtime (Next.js standalone)
@@ -216,21 +237,15 @@ fi
 node "$ROOT_DIR/scripts/run-strip-types.mjs" "$STAGE_EXECUTION_MAC_ASSETS" \
   --check --installation-root "$STANDALONE_DIR"
 
-# better-sqlite3 is architecture-specific, so the app executable must
-# match the WebRuntime built by the active Node process.
-case "$(node -p 'process.arch')" in
-  arm64) XCODE_ARCH="arm64" ;;
-  x64) XCODE_ARCH="x86_64" ;;
-  *) echo "Unsupported Node architecture for MediFlowMac bundle." >&2; exit 1 ;;
-esac
-
 # 2. Regenerate the project (+ guards) and build the macOS app
+if [[ "${MEDIFLOW_MAC_PREBUILT_ARCHIVE+x}" != x ]]; then
 "$ROOT_DIR/scripts/generate-apple-xcodeproj.sh"
 echo "Building $SCHEME ($CONFIG)..."
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
   -derivedDataPath "$DERIVED" -destination "platform=macOS,arch=$XCODE_ARCH" \
   -jobs 2 build CODE_SIGNING_ALLOWED=NO ARCHS="$XCODE_ARCH" ONLY_ACTIVE_ARCH=YES \
   'OTHER_SWIFT_FLAGS=$(inherited) -j2'
+fi
 
 [[ -d "$APP" ]] || { echo "Build failed: $APP not found" >&2; exit 1; }
 
