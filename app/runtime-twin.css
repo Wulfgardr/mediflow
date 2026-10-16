@@ -69,8 +69,3 @@ html[data-runtime-twin-design='proposal'] div[data-lume-control='theme'] {
 }
 
 @media (pointer: coarse), (max-width: 700px) { html[data-runtime-twin-design='proposal'] { --lume-control-height: 44px; } }
-
-/* Con il mouse l'etichetta di un'azione sta su una riga: il pulsante cresce in larghezza, non in altezza. */
-@media (pointer: fine) and (min-width: 701px) {
-    html[data-runtime-twin-design='proposal'] :is(.ui-btn-primary, .ui-btn-secondary, .mf-btn-secondary, [data-lume-action]) { white-space: nowrap; }
-}

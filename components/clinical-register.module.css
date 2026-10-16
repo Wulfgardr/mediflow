@@ -121,7 +121,7 @@
 }
 
 /* Row commands inside a register table: quiet text, a border only on hover; the bin stays an icon. */
-.rowControls { flex-wrap: nowrap; gap: 2px; }
+.rowControls { flex-wrap: wrap; justify-content: flex-start; gap: 2px; }
 .rowControls > :is(button,a) { min-height: var(--lume-control-height, 44px); padding: 6px 8px; border-color: transparent; color: var(--lume-ink); }
 .rowControls > button:not([aria-label]) svg { display: none; }
 .rowControls > button[aria-label] { color: var(--lume-ink-muted); }
