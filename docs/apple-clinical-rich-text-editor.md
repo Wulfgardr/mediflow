@@ -45,8 +45,11 @@ selezione unica attraverso più campi di testo.
 Su dati esclusivamente sintetici, con Xcode 26.6:
 
 - `swift test --package-path native/MediFlowMac --filter 'ClinicalRichText|ClinicalInline'`:
-  50 test superati, inclusi round-trip delle 40 fixture Web, trasformazioni
-  e conservazione del contenuto, stili e binding del campo durante i rientri.
+  55 test superati, inclusi round-trip delle 40 fixture Web, trasformazioni,
+  conservazione del contenuto, stili e binding del campo durante i rientri.
+  Le regressioni verificano anche la continuità della numerazione quando
+  si aggiunge una voce, si converte un paragrafo adiacente o si rientra
+  una voce in una sottolista compatibile già esistente.
 - `node scripts/run-strip-types.mjs --test lib/clinical-rich-text.test.ts`:
   7 test superati con Node 24.21.0 e directory dati sintetica esplicita.
 - Build Debug arm64 degli scheme `MediFlowMacApp` e `MediFlowMobileApp`

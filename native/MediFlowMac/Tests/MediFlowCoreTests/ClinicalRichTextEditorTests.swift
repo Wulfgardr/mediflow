@@ -316,6 +316,40 @@ final class ClinicalRichTextEditorTests: XCTestCase {
         }
     }
 
+    func testAppendingToLoadedNumberedListContinuesTheSameList() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ol><li>A</li></ol>")
+        document.appendNewBlock(kind: .numberedItem)
+        document.updateText(id: document.blocks.last!.id, text: "B")
+        XCTAssertEqual(document.renderedHTML, "<ol><li>A</li><li>B</li></ol>")
+    }
+
+    func testChangingAdjacentParagraphToNumberedItemJoinsItsNeighborList() {
+        for original in ["<ol><li>A</li></ol><p>B</p>", "<p>A</p><ol><li>B</li></ol>"] {
+            var document = ClinicalRichTextEditorDocument.load(html: original)
+            let paragraph = document.blocks.first { $0.editableKind == .paragraph }!
+            document.setKind(id: paragraph.id, kind: .numberedItem)
+            XCTAssertEqual(document.renderedHTML, "<ol><li>A</li><li>B</li></ol>")
+        }
+    }
+
+    func testChangingParagraphBetweenCompatibleListsJoinsBothGroups() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ol><li>A</li></ol><p>B</p><ol><li>C</li></ol>")
+        document.setKind(id: document.blocks[1].id, kind: .numberedItem)
+        XCTAssertEqual(document.renderedHTML, "<ol><li>A</li><li>B</li><li>C</li></ol>")
+    }
+
+    func testIndentReusesCompatibleSublistAndKeepsItsNumbering() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ol><li>A<ol><li>X</li></ol></li><li>B</li></ol>")
+        XCTAssertTrue(document.increaseIndent(id: document.blocks.last!.id))
+        XCTAssertEqual(document.renderedHTML, "<ol><li>A<ol><li>X</li><li>B</li></ol></li></ol>")
+    }
+
+    func testIndentFindsPreviousItemThatContainsOnlyASublist() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ul><li><ul><li>X</li></ul></li><li>B</li></ul>")
+        XCTAssertTrue(document.increaseIndent(id: document.blocks.last!.id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li><ul><li>X</li><li>B</li></ul></li></ul>")
+    }
+
     // MARK: - Visit draft insertion (D5)
 
     func testBlocksFromVisitDraftSectionsSkipsEmptySectionsAndJoinsLines() {
