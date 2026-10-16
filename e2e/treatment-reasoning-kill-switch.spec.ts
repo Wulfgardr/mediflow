@@ -89,5 +89,5 @@ test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('Ragionamento terapeutico spento');
   await expect(panel.getByRole('link', { name: 'Apri le funzioni cliniche' })).toHaveAttribute('href', '/settings/ai/funzioni');
-  await expect(panel.getByRole('button', { name: 'Genera bozza' })).toBeDisabled();
+  await expect(panel.getByRole('button', { name: 'Prepara proposta' })).toBeDisabled();
 });

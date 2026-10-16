@@ -103,6 +103,7 @@
     "TerminologyParityContractTests.swift",
     "TherapyFilteringTests.swift",
     "TherapyPlanDocumentTests.swift",
+    "TreatmentReasoningPresentationTests.swift",
     "VersionConflictPresentationTests.swift",
     "VisitRecordingCaptureTests.swift",
     "VisitRecordingLumeCoordinatorTests.swift",

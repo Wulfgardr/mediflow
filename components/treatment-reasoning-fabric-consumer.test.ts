@@ -19,7 +19,7 @@ test('roots the manual Treatment Reasoning consumer only in the browser controll
     );
     assert.match(source, /<option value="">Scegli l’ambulatorio<\/option>/u);
     assert.match(source, /type="checkbox" disabled=\{!ambulatory\} checked=\{confirmed\}/u);
-    assert.match(source, /Conferma e genera bozza/u);
+    assert.match(source, /Conferma e genera proposta/u);
     assert.ok(source.indexOf('await picker.client.begin()') > source.indexOf('if (!treatmentReasoningEnabled || !proposal || !ambulatory || !confirmed'),
         'provider dispatch must remain behind the explicit choice and confirmation gate');
     assert.match(source, /const handler = useRef\(false\)/u);
@@ -46,7 +46,8 @@ test('keeps the preview ephemeral, supersession-safe, and review-only', () => {
 });
 
 test('portable engine disclosure is conditional and provisioning UI is read-only', () => {
-    assert.match(source, /picker.selected\?\.provider/u);
+    const picker = readFileSync(new URL('./function-models/function-model-picker.tsx', import.meta.url), 'utf8');
+    assert.match(picker, /functionId === 'treatment_reasoning' && <TreatmentReasoningPortableSetup/u);
     assert.match(source, /publication.attestation.artifactDigest/u);
     assert.match(source, /ATHENA Transformers/u);
     const setup = readFileSync(new URL('./treatment-reasoning-portable-setup.tsx', import.meta.url), 'utf8');
