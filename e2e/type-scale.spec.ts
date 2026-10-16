@@ -166,65 +166,65 @@ const typographyTest = test.extend<{ patientFixture: { id: string; name: string 
   },
 });
 
-for (const routePattern of ROUTES) {
-  typographyTest.describe(`Punto: testo renderizzato ${routePattern}`, () => {
-    typographyTest.setTimeout(routePattern.endsWith('/modules') ? 180_000 : 120_000);
-    for (const theme of ['light', 'dark'] as const) {
-      typographyTest.describe(theme, () => {
-        typographyTest.beforeEach(async ({ page }) => {
-          await page.setViewportSize({ width: 1440, height: 960 });
-          await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
-          await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        });
-        typographyTest('pagina e dettagli', async ({ page, patientFixture: fixture }, info) => {
-          const route = routePattern.replace('[id]', fixture.id);
-          const response = await page.goto(route);
-          expect(response?.ok(), route).toBeTruthy();
-          await page.waitForLoadState('networkidle');
-          if (route === '/') {
-            await expect(page.locator('h1').or(page.getByTestId('work-profile-onboarding')).first()).toBeVisible();
-            const onboarding = page.getByTestId('work-profile-onboarding');
-            if (await onboarding.isVisible()) {
-              await expect(onboarding).toHaveAttribute('aria-busy', 'false');
-              await screenshot(page, 'onboarding', theme);
-            }
-          } else await expect(page.locator('h1').first()).toBeVisible();
-          await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
-          await expect(page.locator('.mf-skeleton:visible')).toHaveCount(0);
-          await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`));
-          if (route.endsWith('/modules')) {
-            const person = page.getByRole('heading', { name: fixture.name, exact: true });
-            await expect(person).toBeVisible();
-            await expect(person).toHaveCSS('font-size', '28px');
-            await expect(person).toHaveCSS('font-weight', '400');
-          }
-          if (route === '/settings/ai/modelli') await expect(page.getByRole('button', { name: 'Salva configurazione', exact: true })).toBeEnabled();
-          await assertType(page, route, info);
-          await assertDetailMenus(page, route, info);
-          if (route === '/patients/import') await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
-          if (route === '/analytics') await screenshot(page, 'analisi', theme);
-          if (route === '/settings/ai/modelli') await screenshot(page, 'modelli', theme);
-          if (route.endsWith('/modules')) {
-            await screenshot(page, 'scheda', theme);
-            for (const pane of PANES) {
-              await openPatientSection(page, pane);
-              if (pane === 'diario') await expect(page.locator('#diario > h3 .apple-chip')).toHaveText('1 voce');
-              await expandDetails(page);
-              await assertType(page, `scheda-${pane}`, info);
-            }
-          } else {
-            await expandDetails(page);
-            await assertType(page, `${route}-dettagli`, info);
-          }
-          if (route === '/settings/profilo') {
-            const onboarding = page.getByTestId('work-profile-onboarding');
+// Una sessione e un paziente di prova per tema: ripeterli per ogni pagina
+// portava il job E2E oltre il suo limite. Ogni pagina resta un passo del rapporto.
+for (const theme of ['light', 'dark'] as const) {
+  typographyTest.describe(`Punto: testo renderizzato, ${theme}`, () => {
+    typographyTest.setTimeout(ROUTES.length * 20_000 + 120_000);
+    typographyTest.beforeEach(async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
+      await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    });
+    typographyTest('tutte le pagine e i dettagli', async ({ page, patientFixture: fixture }, info) => {
+      for (const routePattern of ROUTES) await typographyTest.step(routePattern, async () => {
+        const route = routePattern.replace('[id]', fixture.id);
+        const response = await page.goto(route);
+        expect(response?.ok(), route).toBeTruthy();
+        await page.waitForLoadState('networkidle');
+        if (route === '/') {
+          await expect(page.locator('h1').or(page.getByTestId('work-profile-onboarding')).first()).toBeVisible();
+          const onboarding = page.getByTestId('work-profile-onboarding');
+          if (await onboarding.isVisible()) {
             await expect(onboarding).toHaveAttribute('aria-busy', 'false');
-            await assertType(page, 'onboarding', info);
-            await screenshot(page, 'profilo', theme);
+            await screenshot(page, 'onboarding', theme);
           }
-        });
+        } else await expect(page.locator('h1').first()).toBeVisible();
+        await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
+        await expect(page.locator('.mf-skeleton:visible')).toHaveCount(0);
+        await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`));
+        if (route.endsWith('/modules')) {
+          const person = page.getByRole('heading', { name: fixture.name, exact: true });
+          await expect(person).toBeVisible();
+          await expect(person).toHaveCSS('font-size', '28px');
+          await expect(person).toHaveCSS('font-weight', '400');
+        }
+        if (route === '/settings/ai/modelli') await expect(page.getByRole('button', { name: 'Salva configurazione', exact: true })).toBeEnabled();
+        await assertType(page, route, info);
+        await assertDetailMenus(page, route, info);
+        if (route === '/patients/import') await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
+        if (route === '/analytics') await screenshot(page, 'analisi', theme);
+        if (route === '/settings/ai/modelli') await screenshot(page, 'modelli', theme);
+        if (route.endsWith('/modules')) {
+          await screenshot(page, 'scheda', theme);
+          for (const pane of PANES) {
+            await openPatientSection(page, pane);
+            if (pane === 'diario') await expect(page.locator('#diario > h3 .apple-chip')).toHaveText('1 voce');
+            await expandDetails(page);
+            await assertType(page, `scheda-${pane}`, info);
+          }
+        } else {
+          await expandDetails(page);
+          await assertType(page, `${route}-dettagli`, info);
+        }
+        if (route === '/settings/profilo') {
+          const onboarding = page.getByTestId('work-profile-onboarding');
+          await expect(onboarding).toHaveAttribute('aria-busy', 'false');
+          await assertType(page, 'onboarding', info);
+          await screenshot(page, 'profilo', theme);
+        }
       });
-    }
+    });
   });
 }
 
