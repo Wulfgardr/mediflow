@@ -47,8 +47,6 @@ final class ClinicalRichTextEditorTests: XCTestCase {
         let preservedFixtureNames: Set<String> = [
             "malformed-unclosed-allowed-tag",
             "malformed-crossed-nesting",
-            "nested-lists",
-            "nested-blockquotes",
         ]
         for name in preservedFixtureNames {
             guard let fixture = fixtures.first(where: { $0.name == name }) else {
@@ -155,6 +153,167 @@ final class ClinicalRichTextEditorTests: XCTestCase {
             return XCTFail("expected an editable paragraph")
         }
         XCTAssertEqual(span.text, "Prima riga\nSeconda riga")
+    }
+
+    func testIndentAndOutdentListItemKeepsStylesAndFollowingSiblings() {
+        let original = "<ul><li>A</li><li><strong>B [1]</strong></li><li>C</li></ul>"
+        var document = ClinicalRichTextEditorDocument.load(html: original)
+        let id = document.blocks[1].id
+        XCTAssertFalse(document.canIncreaseIndent(id: document.blocks[0].id))
+        XCTAssertTrue(document.increaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A<ul><li><strong>B [1]</strong></li></ul></li><li>C</li></ul>")
+        document.updateText(id: id, text: "B rivisto [1]")
+        XCTAssertTrue(document.decreaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A</li><li><strong>B rivisto [1]</strong></li><li>C</li></ul>")
+    }
+
+    func testIndentThenOutdentRestoresOriginalSanitizedBytes() {
+        let original = "<ol><li><p>A</p></li><li><p><em>B <strong>C</strong></em></p></li></ol>"
+        var document = ClinicalRichTextEditorDocument.load(html: original)
+        let id = document.blocks[1].id
+        XCTAssertTrue(document.increaseIndent(id: id))
+        XCTAssertTrue(document.decreaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, original)
+    }
+
+    func testNestedMixedListsCanBeEditedAndMovedWithTheirSubtree() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ol><li>A</li><li>B<ul><li>C</li></ul></li><li>D</li></ol>")
+        let ids = document.blocks.map(\.id)
+        XCTAssertTrue(document.blocks.allSatisfy { !$0.isPreserved })
+        XCTAssertTrue(document.increaseIndent(id: ids[1]))
+        XCTAssertEqual(document.renderedHTML, "<ol><li>A<ol><li>B<ul><li>C</li></ul></li></ol></li><li>D</li></ol>")
+        XCTAssertEqual(document.blocks.map(\.id), ids)
+        document.updateText(id: ids[2], text: "C rivisto")
+        XCTAssertTrue(document.decreaseIndent(id: ids[1]))
+        XCTAssertEqual(document.renderedHTML, "<ol><li>A</li><li>B<ul><li>C rivisto</li></ul></li><li>D</li></ol>")
+    }
+
+    func testOutdentNestedItemKeepsTrailingSiblingsUnderMovedItem() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ul><li>A<ol><li>B</li><li>C</li></ol></li><li>D</li></ul>")
+        XCTAssertTrue(document.decreaseIndent(id: document.blocks[1].id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A</li><li>B<ol><li>C</li></ol></li><li>D</li></ul>")
+        XCTAssertEqual(document.blocks.compactMap(\.runs).flatMap { $0 }.map(\.text), ["A", "B", "C", "D"])
+    }
+
+    func testOutdentTopLevelItemSplitsListAndRetainsItsChildren() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ul><li>A</li><li>B<ol><li>C</li></ol></li><li>D</li></ul>")
+        XCTAssertTrue(document.decreaseIndent(id: document.blocks[1].id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A</li></ul><p>B</p><ol><li>C</li></ol><ul><li>D</li></ul>")
+    }
+
+    func testWebDirectNestedListIsProjectedWithoutChangingNoOpBytes() {
+        let original = "<ul><li>A</li><ul><li><strong>B <em>[2]</em></strong></li></ul><li>C</li></ul>"
+        var document = ClinicalRichTextEditorDocument.load(html: original)
+        XCTAssertEqual(document.renderedHTML, original)
+        XCTAssertEqual(document.blocks.count, 3)
+        XCTAssertTrue(document.blocks.allSatisfy { !$0.isPreserved })
+        document.updateText(id: document.blocks[1].id, text: "B rivisto [2]")
+        XCTAssertEqual(document.blocks[1].runs?.map(\.text).joined(), "B rivisto [2]")
+        XCTAssertTrue(document.decreaseIndent(id: document.blocks[1].id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A</li><li><strong>B rivisto </strong><strong><em>[2]</em></strong></li><li>C</li></ul>")
+    }
+
+    func testParagraphAndHeadingIndentAsQuotesAndCanBeOutdented() {
+        for html in ["<p>A <u>[3]</u></p>", "<h2>A <u>[3]</u></h2>"] {
+            var document = ClinicalRichTextEditorDocument.load(html: html)
+            let id = document.blocks[0].id
+            XCTAssertFalse(document.canDecreaseIndent(id: id))
+            XCTAssertTrue(document.increaseIndent(id: id))
+            XCTAssertEqual(document.renderedHTML, "<blockquote>" + html + "</blockquote>")
+            XCTAssertTrue(document.increaseIndent(id: id))
+            XCTAssertEqual(document.renderedHTML, "<blockquote><blockquote>" + html + "</blockquote></blockquote>")
+            XCTAssertTrue(document.decreaseIndent(id: id))
+            XCTAssertTrue(document.decreaseIndent(id: id))
+            XCTAssertEqual(document.renderedHTML, html)
+        }
+    }
+
+    func testMultiblockQuoteKeepsGroupingWhenEditingOrIndentingOneParagraph() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<blockquote><p>A [1]</p><p>B [2]</p></blockquote><p>C</p>")
+        let id = document.blocks[1].id
+        XCTAssertTrue(document.increaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, "<blockquote><p>A [1]</p><blockquote><p>B [2]</p></blockquote></blockquote><p>C</p>")
+        XCTAssertTrue(document.decreaseIndent(id: id))
+        XCTAssertTrue(document.decreaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, "<blockquote><p>A [1]</p></blockquote><p>B [2]</p><p>C</p>")
+    }
+
+    func testChangingNestedListKindRetainsDescendantsAndNeighborQuote() {
+        let quote = "<blockquote><p>Citazione <em>[7]</em></p><p>Secondo periodo</p></blockquote>"
+        var document = ClinicalRichTextEditorDocument.load(html: "<ul><li>A</li><li>B<ul><li>C</li></ul></li></ul>" + quote)
+        document.setKind(id: document.blocks[1].id, kind: .numberedItem)
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A</li></ul><ol><li>B<ul><li>C</li></ul></li></ol>" + quote)
+    }
+
+    func testUnsupportedNeighborRemainsByteExactThroughIndentAndTextEdit() {
+        let opaque = "<h1>Legacy [4]</h1><p><strong>Non chiuso</p>"
+        var document = ClinicalRichTextEditorDocument.load(html: opaque)
+        document.appendNewBlock(kind: .paragraph)
+        let id = document.blocks.last!.id
+        document.updateText(id: id, text: "Nota [5]")
+        XCTAssertTrue(document.increaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, opaque + "<blockquote><p>Nota [5]</p></blockquote>")
+        let preserved = document.blocks.first!.id
+        XCTAssertFalse(document.increaseIndent(id: preserved))
+        XCTAssertFalse(document.decreaseIndent(id: preserved))
+    }
+
+    func testHeadingInsideListRetainsHeadingWhenOutdented() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ul><li>A</li><li><h2>B [1]</h2></li></ul>")
+        let id = document.blocks[1].id
+        XCTAssertTrue(document.increaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A<ul><li><h2>B [1]</h2></li></ul></li></ul>")
+        XCTAssertTrue(document.decreaseIndent(id: id))
+        XCTAssertTrue(document.decreaseIndent(id: id))
+        XCTAssertEqual(document.renderedHTML, "<ul><li>A</li></ul><h2>B [1]</h2>")
+    }
+
+    func testFirstIndentedWebListAndMalformedListsStayOpaque() {
+        for original in [
+            "<ul><ul><li>A</li></ul><li>B</li></ul>",
+            "<ul><li>A<li>B</li></li></ul>"
+        ] {
+            var document = ClinicalRichTextEditorDocument.load(html: original)
+            XCTAssertTrue(document.blocks.allSatisfy(\.isPreserved))
+            document.appendNewBlock(kind: .paragraph)
+            document.updateText(id: document.blocks.last!.id, text: "Nota")
+            XCTAssertEqual(document.renderedHTML, original + "<p>Nota</p>")
+        }
+    }
+
+    func testUnknownOrRemovedBlockCannotChangeIndentation() {
+        var document = ClinicalRichTextEditorDocument.load(html: "<ul><li>A</li><li>B</li></ul>")
+        let removed = document.blocks[1].id
+        document.removeBlock(id: removed)
+        let before = document
+        XCTAssertFalse(document.increaseIndent(id: removed))
+        XCTAssertFalse(document.decreaseIndent(id: removed))
+        XCTAssertEqual(document, before)
+    }
+
+    func testEveryWebFixtureRetainsContentThroughAvailableStructuralCommands() throws {
+        func content(_ document: ClinicalRichTextEditorDocument) -> String {
+            document.blocks.map { block in
+                block.runs?.map(\.text).joined() ?? block.preservedPreviewText ?? ""
+            }.joined(separator: "|")
+        }
+        for fixture in try loadFixtures() {
+            let original = ClinicalRichTextEditorDocument.load(html: fixture.sanitized)
+            for block in original.blocks where !block.isPreserved {
+                for action in 0..<3 {
+                    var edited = original
+                    switch action {
+                    case 0: _ = edited.increaseIndent(id: block.id)
+                    case 1: _ = edited.decreaseIndent(id: block.id)
+                    default: edited.setKind(id: block.id, kind: .paragraph)
+                    }
+                    XCTAssertEqual(content(edited), content(original), "Content changed for \(fixture.name), command \(action)")
+                    let reloaded = ClinicalRichTextEditorDocument.load(html: edited.renderedHTML)
+                    XCTAssertEqual(content(reloaded), content(original), "Reload lost content for \(fixture.name), command \(action)")
+                    XCTAssertEqual(reloaded.renderedHTML, edited.renderedHTML)
+                }
+            }
+        }
     }
 
     // MARK: - Visit draft insertion (D5)

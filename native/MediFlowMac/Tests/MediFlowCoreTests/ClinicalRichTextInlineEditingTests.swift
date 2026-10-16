@@ -103,8 +103,6 @@ final class ClinicalRichTextInlineEditingTests: XCTestCase {
     func testUnsupportedStructureRemainsOpaqueAndSurvivesNeighborEdits() throws {
         for opaque in [
             "<h1>Legacy</h1>", "<p><strong>Non chiuso</p>",
-            "<ul><li>Uno<ul><li>Due</li></ul></li></ul>",
-            "<blockquote><blockquote><p>Annidato</p></blockquote></blockquote>",
             "<p>&NotEqualTilde;</p>",
             "<p><strong>A <em>&NotEqualTilde;</em></strong></p>"
         ] {
