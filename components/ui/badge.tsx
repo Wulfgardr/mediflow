@@ -1,5 +1,5 @@
 /* @Codex WUL-UIUX (STREAM E): pillola di stato condivisa. Consolida le decine di
-   varianti className scritte a mano (rounded-full border px-.. text-[11px]
+   varianti className scritte a mano (rounded-full border px-.. text-xs
    font-semibold + tinte semantiche) in un'unica API a toni. Le ricette dei toni
    derivano da status-glyph.tsx, che era la resa canonica del vocabolario
    Lume (accento minerale, plum, success, critical, warning e inchiostro). */
@@ -58,13 +58,13 @@ const PALETTE_CLASSES: Record<BadgePalette, string> = {
 };
 
 /* Le pillole a palette usano una geometria piu compatta di quelle semantiche:
-   micro-testo maiuscolo (px-2 py-0.5 text-[10px] font-bold uppercase) contro
-   il default (px-2.5 py-1 text-[11px] font-semibold). `size` la seleziona. */
+   micro-testo maiuscolo (px-2 py-0.5 text-xs font-semibold uppercase) contro
+   il default (px-2.5 py-1 text-xs font-semibold). `size` la seleziona. */
 export type BadgeSize = 'default' | 'xs';
 
 const SIZE_CLASSES: Record<BadgeSize, string> = {
-    default: 'gap-1.5 px-2.5 py-1 text-[11px] font-semibold tracking-tight',
-    xs: 'gap-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+    default: 'gap-1.5 px-2.5 py-1 text-xs font-semibold tracking-tight',
+    xs: 'gap-1 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide',
 };
 
 export interface BadgeProps {

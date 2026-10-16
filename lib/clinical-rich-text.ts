@@ -115,3 +115,13 @@ export function compactClinicalRichText(value: string | null | undefined, maxCha
 export function isClinicalRichTextBlank(value: string | null | undefined): boolean {
     return clinicalRichTextToPlainText(value).replace(/\s+/g, '').length === 0;
 }
+
+/** Removes Markdown marks (headings, emphasis, code ticks, list bullets) for one-line previews. */
+export function stripMarkdownMarks(value: string): string {
+    return value
+        .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+        .replace(/^\s{0,3}(?:[-*+]|\d+[.)])\s+/gm, '')
+        .replace(/(\*\*|__)(?=\S)([\s\S]*?\S)\1/g, '$2')
+        .replace(/(^|[\s(])([*_])(?=\S)([^*_\n]*?\S)\2(?=[\s).,;:!?]|$)/g, '$1$3')
+        .replace(/`([^`\n]+)`/g, '$1');
+}

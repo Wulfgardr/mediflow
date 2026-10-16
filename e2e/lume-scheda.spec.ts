@@ -101,6 +101,8 @@ async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locato
     expect.soft(target.height, `${target.label}: altezza target`).toBeGreaterThanOrEqual(minimum);
   }
   expect(evidence.title).toBeGreaterThan(evidence.atoms);
+  expect(evidence.title).toBe(await page.evaluate(() => innerWidth < 700 ? 26 : 28));
+  await expect(header.locator('h1')).toHaveCSS('font-weight', '400');
   expect(evidence.leftPadding).toBeGreaterThanOrEqual(16);
   expect(evidence.rightPadding).toBeGreaterThanOrEqual(16);
   const surface = page.getByTestId('lume-scheda-surface');
@@ -108,7 +110,10 @@ async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locato
   await expect(surface).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(header).toHaveCSS('box-shadow', 'none');
   for (const control of await header.locator('a, button').all()) {
-    if (await control.isVisible()) await assertNotClippedInViewport(control, await control.innerText());
+    if (await control.isVisible()) {
+      await assertNotClippedInViewport(control, await control.innerText());
+      await expect(control).toHaveCSS('font-family', /system-ui/);
+    }
   }
 }
 

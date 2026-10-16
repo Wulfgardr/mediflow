@@ -128,7 +128,7 @@ export default function ScalesLibraryPage() {
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div className={`space-y-1 ${styles.sectionHeading}`}>
                         {!proposal && <p className="mf-eyebrow">Catalogo scale</p>}
-                        <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
+                        <h2 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                             {proposal ? 'Scegli una scala' : 'Scale pronte alla somministrazione'}
                         </h2>
                         {proposal && <p>Il punteggio verrà registrato nella cartella del paziente.</p>}
@@ -174,7 +174,7 @@ export default function ScalesLibraryPage() {
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className={`space-y-1 ${styles.sectionHeading}`}>
                             {!proposal && <p className="mf-eyebrow">Avvio scala</p>}
-                            <h2 className="text-xl font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
+                            <h2 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
                                 Scegli il paziente
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
@@ -216,7 +216,7 @@ export default function ScalesLibraryPage() {
                                     <strong className="block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                         {patient.lastName} {patient.firstName}
                                     </strong>
-                                    <span className="lume-code mt-1 block truncate text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
+                                    <span className="lume-code mt-1 block truncate" style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
                                 </span>
                                 <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
                                     Avvia

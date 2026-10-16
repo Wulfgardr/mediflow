@@ -49,3 +49,40 @@ dal cambiamento visivo.
 Accettazione: deriva dei token, contrasto testo almeno 4,5:1 nei due temi,
 font locali, build web/Apple e navigazione sulle superfici reali con soli
 dati sintetici, a larghezza compatta ed estesa e con movimento ridotto.
+
+## Emendamento 2026-10: scala tipografica web
+
+Il web definisce i ruoli in `app/globals.css`, come classi `type-*` e proprietà
+`--type-*` riusate dai CSS module. I corpi della specifica sono espressi in rem
+con riferimento di 16 px, senza fissare il corpo della radice: seguono così
+la dimensione del testo scelta nel browser. Il nome paziente passa da 28 a
+26 px in larghezza compatta. Il nome prodotto resta Newsreader 500 a 21 px.
+
+Tailwind 4 carica esplicitamente `tailwind.config.ts`: `text-xs` vale 12 px,
+`text-sm` 13 px, `text-base` 14 px e `text-lg` 15 px. `sm` serve soprattutto
+date, note e metadati; i controlli condivisi fissano il ruolo ordinario a 14 px.
+`medium` equivale a 400; `semibold` a 600. Gli alias storici dei pesi maggiori
+equivalgono a 600 ma non sono ammessi nei nuovi sorgenti. Le classi da `xl`
+in su non sostituiscono il ruolo di titolo. Titoli, nomi e prosa clinica
+usano Newsreader; comandi, errori, tabelle e valori usano il sistema. Il mono
+a 12 px e peso 400 identifica codici e righe di comando, mai stati vuoti.
+L'enfasi nel testo clinico ricco usa il registro 600, senza sintetizzare
+un grassetto Newsreader fuori specifica.
+
+Il punto finale dei titoli di pagina è decorativo, escluso dal nome
+accessibile; i nomi delle persone restano senza punto. È l'applicazione
+del punto di chiusura previsto dalla specifica, senza associarlo allo stato
+di salvataggio. Avvio e sblocco mostrano il marchio corrente MediFlow.
+
+`check:type-scale` controlla utility, CSS e stili inline in `app/` e
+`components/`, con due sole eccezioni per testo nascosto nella navigazione
+contratta. Il test `e2e/type-scale.spec.ts` misura famiglia, peso e corpo
+del testo renderizzato, con campi, segnaposto, dettagli e pannelli della
+scheda, nei due temi e con dimensioni della radice aumentate. Le rotte
+delle impostazioni sono enumerate dal filesystem. L'insieme ammesso nel
+test è indipendente dai valori dei ruoli implementati.
+
+Il test non copre ogni dialogo, ogni stato remoto, documenti incorporati
+o app Apple. Lo zoom reale del browser resta distinto dal controllo in rem.
+L'esistenza dello spec non attesta una sua esecuzione riuscita: le prove
+sulla revisione restano necessarie prima dell'accettazione visuale.

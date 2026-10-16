@@ -40,7 +40,7 @@ function SourceDocuments({ source, revision, refresh }: { source: SourceWithDocu
             <ProstheticsOriginalLinks documents={source.documents} />
             <label className="block">Originale per {source.name}<input className="block min-h-11 w-full" type="file" disabled={busy} onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
             <label className="block">Pagina o sezione (facoltativa)<input className="input-field" maxLength={100} value={page} disabled={busy} onChange={e => setPage(e.target.value)} /></label>
-            <button type="button" style={{ minHeight: 44 }} className="ui-btn-secondary min-h-11" disabled={!file || busy} onClick={() => void attach()}>Allega originale</button>
+            <button type="button" style={{ minHeight: 'var(--lume-control-height, 44px)' }} className="ui-btn-secondary" disabled={!file || busy} onClick={() => void attach()}>Allega originale</button>
             <p role="status">{busy ? 'Registrazione originale…' : message}</p>
         </div>
     </details>;
@@ -58,7 +58,7 @@ export function ProstheticsSourcesPanel() {
     return <section aria-label="Fonti protesica" className="space-y-3 text-sm">
         <h3 className="font-semibold">Fonti e originali</h3>
         <p>Originali conservati in chiaro nell’archivio locale. Allega solo documenti di repertorio privi di dati dei pazienti.</p>
-        <button type="button" style={{ minHeight: 44 }} className="ui-btn-secondary min-h-11" onClick={() => void refresh().catch(() => setMessage('Fonti non leggibili. Riprova.'))}>Rileggi fonti</button>
+        <button type="button" style={{ minHeight: 'var(--lume-control-height, 44px)' }} className="ui-btn-secondary" onClick={() => void refresh().catch(() => setMessage('Fonti non leggibili. Riprova.'))}>Rileggi fonti</button>
         <p role="status">{message || (data ? (data.sources.length ? `${data.sources.length} fonti` : 'Nessuna fonte importata.') : 'Lettura delle fonti…')}</p>
         {data?.sources.map(source => <SourceDocuments key={`${source.id}:${data.revision}`} source={source} revision={data.revision} refresh={refresh} />)}
     </section>;

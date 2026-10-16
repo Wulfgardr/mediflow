@@ -124,7 +124,7 @@ export default function DataSeeder() {
                         <Settings2 className="w-5 h-5" />
                     </div>
                     <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-200">Seeder</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700 dark:text-amber-200">Seeder</p>
                         <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Generatore Dati di Test</h4>
                     </div>
                 </div>
@@ -140,7 +140,7 @@ export default function DataSeeder() {
             <div className={`${SUBSECTION_CLASS} space-y-3`}>
                 <label className="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
                     <span>Numero Pazienti</span>
-                    <span className="rounded-full border border-amber-200/70 bg-amber-50/85 px-3 py-1 font-mono text-xs font-semibold text-amber-700 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">{patientCount}</span>
+                    <span className="rounded-full border border-amber-200/70 bg-amber-50/85 px-3 py-1 tabular-nums text-xs font-semibold text-amber-700 dark:border-amber-500/20 dark:bg-amber-900/10 dark:text-amber-200">{patientCount}</span>
                 </label>
                 <RangeInput
                     min={1}
@@ -151,7 +151,7 @@ export default function DataSeeder() {
                     title="Numero Pazienti"
                     aria-label="Seleziona il numero di pazienti da generare"
                 />
-                <div className="flex justify-between text-[10px] text-amber-500 dark:text-amber-200/70">
+                <div className="flex justify-between text-xs text-amber-500 dark:text-amber-200/70">
                     <span>1</span>
                     <span>100</span>
                     <span>250</span>
@@ -256,7 +256,7 @@ export default function DataSeeder() {
                             onChange={e => setNukeAll(e.target.checked)}
                             className="h-4 w-4 rounded border-slate-300 accent-red-500 transition-colors dark:border-white/10 dark:bg-white/5"
                         />
-                        <span className={`text-[10px] uppercase font-bold tracking-[0.18em] transition-colors ${nukeAll ? 'text-red-600 dark:text-red-200' : 'text-slate-400 group-hover:text-red-400 dark:text-slate-500 dark:group-hover:text-red-300'}`}>
+                        <span className={`text-xs uppercase font-semibold tracking-[0.18em] transition-colors ${nukeAll ? 'text-red-600 dark:text-red-200' : 'text-slate-400 group-hover:text-red-400 dark:text-slate-500 dark:group-hover:text-red-300'}`}>
                             Elimina Anche Dati Reali (Reset Totale)
                         </span>
                     </label>
@@ -265,7 +265,7 @@ export default function DataSeeder() {
                         onClick={handleNuke}
                         disabled={loading || nuking}
                         className={cn(
-                            "flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-xs font-bold transition-[background-color,color,opacity] disabled:opacity-50",
+                            "flex w-full items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-xs font-semibold transition-[background-color,color,opacity] disabled:opacity-50",
                             nukeAll
                                 ? "border-red-600 bg-red-600 text-white shadow-[0_16px_30px_rgba(220,38,38,0.22)] hover:bg-red-700"
                                 : "border-red-200 bg-white/85 text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-red-950/10 dark:text-red-200 dark:hover:bg-red-900/20"
@@ -278,7 +278,7 @@ export default function DataSeeder() {
                 </div>
             </div>
 
-            <p className="text-center text-[10px] text-amber-700 dark:text-amber-200/80">
+            <p className="text-center text-xs text-amber-700 dark:text-amber-200/80">
                 I pazienti generati avranno codice fiscale che inizia con &quot;TEST-&quot; per distinguerli dai reali.
             </p>
         </div>

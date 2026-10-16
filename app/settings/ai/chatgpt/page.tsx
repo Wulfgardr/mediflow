@@ -11,7 +11,7 @@ export default function ChatGptProductPage() {
         <header className={styles.header}>
             <div className={styles.identity}>
                 <Image className={styles.logo} src="/brand/openai/chatgpt-mark.png" alt="Logo OpenAI" width={40} height={40} unoptimized />
-                <div><h1>OpenAI · ChatGPT</h1><p>Servizio esterno · abbonamento personale ChatGPT.</p></div>
+                <div><h1 className="type-page-title">OpenAI · ChatGPT<span aria-hidden="true">.</span></h1><p>Servizio esterno · abbonamento personale ChatGPT.</p></div>
             </div>
             <Link href="/settings/ai/fabric" prefetch={false} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.returnLink}`}>Torna a Intelligence Fabric</Link>
         </header>

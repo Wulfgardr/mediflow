@@ -143,7 +143,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                                 <span className={disclosure.hint}>Archiviata il {formatDate(insight.date)}</span>
                                 <span className={disclosure.archiveMetadata}>
                                     {insight.quality?.level && (
-                                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[13px] font-medium ${qualityTone(insight.quality.level)}`}>
+                                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-sm font-medium ${qualityTone(insight.quality.level)}`}>
                                             {qualityLabel(insight.quality.level)}
                                         </span>
                                     )}

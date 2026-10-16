@@ -92,7 +92,7 @@ function LiveGovernanceArea({
           <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
             Stato operativo <em>· controlli della postazione</em>
-          </h1>
+          <span aria-hidden="true">.</span></h1>
           <p className={styles.areaSubtitle}>
             Storage autorevole sul Mac home-base; accessi paired, cache ed export
             restano percorsi espliciti.

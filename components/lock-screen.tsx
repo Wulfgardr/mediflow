@@ -100,14 +100,14 @@ export function LockScreen() {
         <div className={styles.lockShell} aria-label="MediFlow lock screen">
             <section className={styles.lockCard} aria-labelledby="mediflow-lock-title">
                 <div className={styles.brandRow}>
-                    <span className={styles.brandWord}>
+                    <span className={`${styles.brandWord} type-brand`}>
                         MediFlow<span className={styles.brandDot} aria-hidden="true" />
                     </span>
                 </div>
 
                 <div className={styles.headerBlock}>
-                    <h1 id="mediflow-lock-title" className={styles.title}>
-                        Sblocca MediFlow
+                    <h1 id="mediflow-lock-title" className={`${styles.title} type-page-title`}>
+                        Sblocca MediFlow<span aria-hidden="true">.</span>
                     </h1>
                 </div>
 

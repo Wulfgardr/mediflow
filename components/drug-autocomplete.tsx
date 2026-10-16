@@ -169,7 +169,7 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
 
             {isOpen && results.length > 0 && (
                 <div className={drugPopoverClassName} role="listbox" id={listboxId} aria-label="Risultati catalogo farmaci">
-                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] px-2 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
+                    <div role="presentation" className="mb-1 flex items-center justify-between gap-3 border-b border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] px-2 pb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">
                         <span>Risultati catalogo ({results.length})</span>
                         <span className="flex items-center gap-1">
                             <Database className="w-3 h-3" />
@@ -199,12 +199,12 @@ export default function DrugAutocomplete({ onSelect, placeholder = "Cerca per no
                                         <Activity className="w-3 h-3" />
                                         {drug.activePrinciple}
                                     </div>
-                                    <div className="mt-1 truncate text-[10px] text-[color:var(--lume-ink-muted)]">
+                                    <div className="mt-1 truncate text-xs text-[color:var(--lume-ink-muted)]">
                                         {drug.company} {drug.class ? `• Fascia ${drug.class}` : ''} {drug.atc ? `• ATC: ${drug.atc}` : ''}
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <span className="apple-chip lume-registro text-[10px]">AIC {drug.aic}</span>
+                                    <span className="apple-chip lume-registro text-xs">AIC {drug.aic}</span>
                                     {drug.price !== undefined && drug.price > 0 && (
                                         <div className="mt-1 text-xs font-medium text-[color:var(--lume-ink-muted)]">€ {drug.price.toFixed(2)}</div>
                                     )}

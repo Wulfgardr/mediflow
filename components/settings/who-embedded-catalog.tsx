@@ -59,13 +59,13 @@ export function WhoEmbeddedCatalog({ onChanged }: { onChanged(): void }) {
         } finally { active.current = null; if (mounted.current) setBusy(false); }
     }
     const label = status ? { ready: 'Pronto', absent: 'Assente', unverified: 'Non verificato' }[status.state] : 'Stato non ancora letto';
-    return <div className="mt-4 space-y-3 text-[14px] font-normal" data-testid="who-embedded-catalog">
-        <h3 className="text-[14px] font-semibold">Catalogo WHO incorporato</h3>
+    return <div className="mt-4 space-y-3 text-base font-normal" data-testid="who-embedded-catalog">
+        <h3 className="text-base font-semibold">Catalogo WHO incorporato</h3>
         <p>Stato: {label}{status && !status.enabled ? ' · Disattivato dal gestore' : ''} · MMS 2026-01 · Inglese</p>
         {status?.manifest && <p>{status.manifest.categories.toLocaleString('it-IT')} categorie con codice disponibili senza rete, Docker o credenziali.</p>}
         {status?.state === 'absent' && <p>Il catalogo non è incluso in questa distribuzione. Per cercare senza Docker serve prima un’acquisizione confermata.</p>}
         {status?.state === 'unverified' && <p>Il catalogo non ha superato i controlli. La ricerca incorporata non è disponibile.</p>}
-        <p className="text-[13px] text-[color:var(--lume-ink-muted)]">{WHO_EMBEDDED_ATTRIBUTION}. Dati WHO separati dalla licenza del software. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione.</p>
+        <p className="text-sm text-[color:var(--lume-ink-muted)]">{WHO_EMBEDDED_ATTRIBUTION}. Dati WHO separati dalla licenza del software. Solo categorie e titoli inglesi, senza sinonimi o postcoordinazione.</p>
         <div className="flex flex-wrap gap-2">
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !status?.enabled} onClick={() => void run('preview')}>Aggiorna dalla WHO</button>
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { setError(''); void refresh().catch(() => setError('Stato del catalogo WHO non leggibile.')); }}>Rileggi catalogo</button>
@@ -75,7 +75,7 @@ export function WhoEmbeddedCatalog({ onChanged }: { onChanged(): void }) {
         {busy && <p role="status">Operazione WHO in corso…</p>}
         {preview && <div className="space-y-2 border-t border-[color:var(--lume-border-color)] pt-3">
             <p>Anteprima: {preview.manifest.categories.toLocaleString('it-IT')} categorie · {preview.manifest.rows.toLocaleString('it-IT')} righe · {preview.manifest.withoutCode.toLocaleString('it-IT')} righe senza codice escluse · {preview.manifest.bytes.toLocaleString('it-IT')} byte.</p>
-            <details className="text-[13px]"><summary>Impronta del file verificato</summary><p className="break-all">SHA-256: <code>{preview.manifest.sha256}</code></p></details>
+            <details className="text-sm"><summary>Impronta del file verificato</summary><p className="break-all">SHA-256: <code>{preview.manifest.sha256}</code></p></details>
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => void run('activate')}>Attiva catalogo verificato</button>
         </div>}
         {notice && <p role="status">{notice}</p>}

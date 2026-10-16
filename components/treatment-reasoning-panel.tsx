@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import ink from './ink-secondary.module.css';
 import styles from './clinical-register.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
@@ -226,52 +227,44 @@ export default function TreatmentReasoningPanel({
     return (
         <div className={`${styles.register} ${styles.review}`} data-testid="treatment-reasoning-panel">
             <div className={styles.toolbar}>
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="flex min-w-0 items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] bg-[color:var(--lume-ink)] text-[color:var(--lume-surface-focal)] shadow-[var(--lume-shadow-focal)]">
-                            <BrainCircuit className="h-5 w-5" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-
-                            <h3 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico</h3>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <span className="apple-chip">{sourceSummary.total} fonti</span>
-                                <span className="apple-chip">review-only</span>
-                                <span className="text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
-                                    {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'Motore locale da selezionare'}
-                                </span>
-                            </div>
-                        </div>
+                <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                        <h3 className="flex items-center gap-2 text-[color:var(--lume-ink)]" style={{ font: 'var(--type-strong)' }}>
+                            <BrainCircuit className="h-4 w-4 shrink-0 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
+                            Ragionamento terapeutico
+                        </h3>
+                        <p className="mt-1 text-[color:var(--lume-ink-muted)]" style={{ font: 'var(--type-meta)' }}>
+                            {formatCountLabel(sourceSummary.total, 'fonte', 'fonti')} · solo revisione · {picker.view.remote ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : picker.selected?.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : picker.selected?.provider === 'athena_transformers' ? 'ATHENA Transformers · CPU locale' : 'motore locale da scegliere'}
+                        </p>
                     </div>
 
-                    <FunctionModelPicker picker={picker} />
-                    <button
-                        type="button"
-                        onClick={loadProposal}
-                        disabled={!canPrepare}
-                        aria-describedby="treatment-reasoning-boundary-note"
-                        className={`${styles.control} ${styles.primary}`}
-                    >
-                        {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
-                        {publication ? 'Aggiorna bozza' : 'Genera bozza'}
-                    </button>
+                    <div className={styles.reasoningActions}>
+                        <FunctionModelPicker picker={picker} />
+                        <button
+                            type="button"
+                            onClick={loadProposal}
+                            disabled={!canPrepare}
+                            aria-describedby="treatment-reasoning-boundary-note"
+                            className={`${styles.control} ${styles.primary} shrink-0 ${styles.reasoningAction}`}
+                        >
+                            {isBusy ? <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+                            {publication ? 'Aggiorna bozza' : 'Genera bozza'}
+                        </button>
+                    </div>
                     <p id="treatment-reasoning-boundary-note" className="sr-only">
                         Anteprima di sola revisione. Non scrive né applica modifiche alla scheda clinica.
                     </p>
                 </div>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="space-y-4 py-4">
                 {!treatmentReasoningEnabled ? (
-                    <div className="flex items-start gap-3 rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-critical)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-critical)_11%,var(--lume-surface-field))] p-4 text-sm text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                        <div>
-                            <p className="font-semibold">Treatment Reasoning disabilitato</p>
-                            <p className="mt-1 text-xs leading-5">Il controllo locale impedisce di avviare nuove anteprime da questo pannello. Il gate del server resta l’autorità finale su ogni richiesta.</p>
-                            <Link href="/settings/ai/funzioni" className="mt-2 inline-block text-xs font-semibold underline underline-offset-4">
-                                Apri Impostazioni AI
-                            </Link>
-                        </div>
+                    <div className="rounded-[12px] border border-[color:var(--lume-rule)] bg-[color:var(--lume-surface-field)] p-4 text-sm text-[color:var(--lume-ink-muted)]">
+                        <p className="font-semibold text-[color:var(--lume-ink)]">Ragionamento terapeutico spento</p>
+                        <p className="mt-1">Si accende per funzione nelle impostazioni dell’Intelligence Fabric.</p>
+                        <Link href="/settings/ai/funzioni" className="mt-2 inline-block font-semibold underline underline-offset-4">
+                            Apri le funzioni cliniche
+                        </Link>
                     </div>
                 ) : null}
 
@@ -306,7 +299,7 @@ export default function TreatmentReasoningPanel({
                 <div className={styles.reviewCounts}>
                     {sourceSummaryItems.map(([label, value]) => (
                         <div key={label}>
-                            <span className="block text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
+                            <span className="block text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">{label}</span>
                             <span className="text-sm font-semibold text-[color:var(--lume-ink)]">{value}</span>
                         </div>
                     ))}
@@ -321,7 +314,7 @@ export default function TreatmentReasoningPanel({
                 {isGenerating ? (
                     <div role="status" aria-live="polite" className="space-y-3 py-8 text-center">
                         <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                        <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
+                        <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Preparazione anteprima...</p>
                     </div>
                 ) : null}
 
@@ -330,7 +323,7 @@ export default function TreatmentReasoningPanel({
                         <div className="rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] bg-[color:var(--lume-surface-field)] p-4 text-[color:var(--lume-ink-muted)] transition-colors duration-[var(--lume-dur-firma)] ease-[var(--lume-ease)]">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                <p className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Anteprima da rivedere</p>
+                                <p className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Anteprima da rivedere</p>
                             </div>
                             <p className={ink.pencil + " mt-2 text-sm leading-6"}>
                                 <PrivacyBlur intensity="sm">{publication.value.data.recommendation || publication.value.summary}</PrivacyBlur>
@@ -350,7 +343,7 @@ export default function TreatmentReasoningPanel({
                             <div className="rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-signal-warning)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-signal-warning)_11%,var(--lume-surface-field))] p-4 text-[color:color-mix(in_srgb,var(--lume-signal-warning)_60%,var(--lume-ink))]">
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                                    <h4 className="text-xs font-bold uppercase tracking-normal">Dati mancanti e limiti</h4>
+                                    <h4 className="text-xs font-semibold uppercase tracking-normal">Dati mancanti e limiti</h4>
                                 </div>
                                 <ul className="mt-3 space-y-2 text-sm leading-5">
                                     {publication.value.data.caveats.map((caveat, index) => (
@@ -367,7 +360,7 @@ export default function TreatmentReasoningPanel({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <ClipboardList className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                    <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
+                                    <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Evidenze chiave</h4>
                                 </div>
                                 {publication.value.data.keyEvidence.length === 0 ? (
                                     <p className={`rounded-[14px] border p-3 text-xs ${semanticSignalSurfaceClass('critical')}`}>Nessuna evidenza chiave strutturata.</p>
@@ -382,7 +375,7 @@ export default function TreatmentReasoningPanel({
                             <div className="space-y-3">
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="h-4 w-4 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                                    <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
+                                    <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Flag e cautele</h4>
                                 </div>
                                 {publication.value.data.safetyFlags.length === 0 ? (
                                     <p className="rounded-[14px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)] p-3 text-xs text-[color:var(--lume-ink-muted)]">Nessun flag strutturato nella proposta.</p>
@@ -398,7 +391,7 @@ export default function TreatmentReasoningPanel({
 
                         {publication.value.data.suggestedActions.length > 0 ? (
                             <div className="space-y-3">
-                                <h4 className="text-xs font-bold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
+                                <h4 className="text-xs font-semibold uppercase tracking-normal text-[color:var(--lume-ink-muted)]">Azioni proposte</h4>
                                 <div className="min-w-0">
                                     {publication.value.data.suggestedActions.map((action) => (
                                         <div key={action.id} className={styles.proposalRow}>
@@ -416,7 +409,7 @@ export default function TreatmentReasoningPanel({
 
                         {publication.value.data.reasoning.length > 0 ? (
                             <details className="group rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-focal)]">
-                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     Traccia sintetica del ragionamento
                                     <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
                                 </summary>
@@ -432,14 +425,14 @@ export default function TreatmentReasoningPanel({
                         ) : null}
 
                         <details className="group rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]">
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                 Fonti citate per claim
                                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
                             </summary>
                             <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3">
                                 {publication.sourceBindings.map((binding) => (
                                     <div key={binding.claimPath} className={styles.proposalRow}>
-                                        <span className="break-all lume-code text-xs text-[color:var(--lume-ink-muted)]">{binding.claimPath}</span>
+                                        <span className="break-all lume-code text-[color:var(--lume-ink-muted)]">{binding.claimPath}</span>
                                         <p className="mt-1 font-semibold leading-5 text-[color:var(--lume-ink)]"><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
                                         <DocumentReferenceChip references={[...binding.evidenceRefs]} />
                                     </div>
@@ -448,46 +441,46 @@ export default function TreatmentReasoningPanel({
                         </details>
 
                         <details className="group rounded-[16px] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)]">
-                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                 Receipt, provenienza e currentness
                                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
                             </summary>
                             <dl className="grid gap-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] px-4 py-3 text-xs sm:grid-cols-2">
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provider attestato</dt>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provider attestato</dt>
                                     <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'OpenAI · abbonamento ChatGPT · contesto redatto' : publication.attestation.provider === 'athena_mlx' ? 'ATHENA MLX · locale' : 'ATHENA Transformers · CPU locale'}</dd>
                                 </div>
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Stato</dt>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Stato</dt>
                                     <dd className="mt-1 text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? 'Consenso sui byte redatti · nessuna ammissione clinica implicita' : publication.attestation.readiness} · {publication.review} · {publication.writesPerformed} scritture</dd>
                                 </div>
                                 {publication.schemaVersion === 'mediflow.ai.treatment-reasoning-publication.v2' && <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Motore e artefatto attestati</dt>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Motore e artefatto attestati</dt>
                                     <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.attestation.model} · {publication.attestation.platform} · ammissione {publication.attestation.admissionRevision}<br />SHA-256 {publication.attestation.artifactDigest}</dd>
                                 </div>}
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Currentness</dt>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Currentness</dt>
                                     <dd className="mt-1 text-[color:var(--lume-ink)]">Acquisita {formatDateTime(publication.capturedAt)}</dd>
                                 </div>
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Revisione sorgente</dt>
-                                    <dd className="mt-1 break-all lume-code text-xs text-[color:var(--lume-ink)]">{publication.sourceRevision}</dd>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Revisione sorgente</dt>
+                                    <dd className="mt-1 break-all lume-code text-[color:var(--lume-ink)]">{publication.sourceRevision}</dd>
                                 </div>
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Receipt Fabric</dt>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Receipt Fabric</dt>
                                     <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.fabricReceipt.provider === 'chatgpt_subscription' ? <>OpenAI · {publication.fabricReceipt.model} · {publication.fabricReceipt.effort} · testo redatto inviato con consenso</> : <>{publication.fabricReceipt.venue} · {publication.fabricReceipt.egressProfile.id}@{publication.fabricReceipt.egressProfile.version} · egress {publication.fabricReceipt.egressProfile.egress}</>}</dd>
                                 </div>
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provenienza</dt>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Provenienza</dt>
                                     <dd className="mt-1 break-all text-[color:var(--lume-ink)]">{publication.provenance.preprocessing.join(' → ')}</dd>
                                 </div>
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione receipt</dt>
-                                    <dd className="mt-1 break-all lume-code text-xs text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione receipt</dt>
+                                    <dd className="mt-1 break-all lume-code text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.outputSha256 : publication.attestation.receiptRef}</dd>
                                 </div>
                                 <div>
-                                    <dt className="font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione provenienza</dt>
-                                    <dd className="mt-1 break-all lume-code text-xs text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
+                                    <dt className="font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">Attestazione provenienza</dt>
+                                    <dd className="mt-1 break-all lume-code text-[color:var(--lume-ink)]">{publication.attestation.provider === 'chatgpt_subscription' ? publication.attestation.sourceSha256 : publication.attestation.provenanceRef}</dd>
                                 </div>
                             </dl>
                         </details>

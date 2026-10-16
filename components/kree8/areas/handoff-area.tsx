@@ -96,7 +96,7 @@ function HandoffArea() {
           <p className={styles.areaCaption}>Portali regionali (SISS)</p>
           <h1 className={styles.areaTitle}>
             Apri il portale con il paziente pronto <em>· atto ufficiale sul portale</em>
-          </h1>
+          <span aria-hidden="true">.</span></h1>
           <p className={styles.areaSubtitle}>
             MediFlow prepara identità, consenso e codice fiscale, poi apre il
             portale regionale corretto. L&apos;atto certificato si completa sul

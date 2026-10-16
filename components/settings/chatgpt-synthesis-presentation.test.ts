@@ -104,7 +104,8 @@ test('Lume geometry and typography are scoped; no decorative status styling or f
         assert.match(text, /var\(--lume-radius-control, 12px\)/);
         assert.match(text, /var\(--lume-control-height, 44px\)/);
         assert.match(text, /var\(--lume-font-sans/);
-        assert.match(text, /font-size: 1rem/);
+        assert.match(text, /font-size: 0\.9375rem/);
+        assert.doesNotMatch(text, /font-size: (?:1rem|16px)/);
         assert.match(text, /focus-visible/);
         assert.match(text, /prefers-reduced-motion/);
         assert.doesNotMatch(text, /border-left|linear-gradient|#[a-f\d]{3,8}\b|\.badge|\.pill/i);

@@ -1,3 +1,4 @@
+import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import { useMemo } from 'react';
 import {
@@ -56,11 +57,6 @@ const AI_QUEUE: Kree8DecisionCard[] = [
 
 /* @Codex */
 const AGENDA_HEADING_ID = 'turno-agenda-heading';
-
-/* @Codex */
-function formatCountLabel(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
 
 function TurnoArea({
   filter,

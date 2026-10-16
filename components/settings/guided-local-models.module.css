@@ -1,5 +1,5 @@
 /* @Codex: bounded local settings controls, R12 / 44px commands / 32px status. */
-.surface, .selector { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 14px; }
+.surface, .selector { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 0.875rem; }
 .selector { border-radius: 12px; padding: 16px; }
 .surface { display: grid; gap: 16px; }
 .surface > *, .selector > * { min-width: 0; }
@@ -13,7 +13,7 @@
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .surface button, .surface select, .surface input[type='text'], .surface summary,
 .surface a, .selector button, .selector select, .selector input {
-    min-height: 44px; max-width: 100%; border-radius: 12px; font-size: 14px; font-weight: 600;
+    min-height: 44px; max-width: 100%; border-radius: 12px; font-size: 0.875rem; font-weight: 600;
 }
 .surface select, .surface input[type='text'], .selector select, .selector input { width: 100%; min-width: 0; }
 .surface button, .selector button { white-space: normal; overflow-wrap: anywhere; }
@@ -23,19 +23,19 @@
 .selector button:focus-visible, .selector select:focus-visible {
     outline: 2px solid var(--lume-accent); outline-offset: 2px;
 }
-.hint { font-size: 13px; line-height: 1.5; color: var(--lume-ink-muted); }
-.status { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; border: 1px solid color-mix(in srgb, var(--lume-ink) 18%, transparent); border-radius: 12px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
-.notice { min-height: 32px; font-size: 14px; line-height: 1.6; }
+.hint { font-size: 0.8125rem; line-height: 1.5; color: var(--lume-ink-muted); }
+.status { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; border: 1px solid color-mix(in srgb, var(--lume-ink) 18%, transparent); border-radius: 12px; padding: 4px 10px; font-size: 0.8125rem; font-weight: 600; }
+.notice { min-height: 32px; font-size: 0.875rem; line-height: 1.6; }
 .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 8px; }
 .preset { display: grid; align-content: start; gap: 8px; padding: 16px; text-align: left; border: 1px solid color-mix(in srgb, var(--lume-ink) 18%, transparent); background: var(--lume-surface-focal); }
 .preset[aria-pressed='true'] { outline: 2px solid var(--lume-accent); outline-offset: -2px; }
 .recommendation { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 160px; text-align: left; }
-.commands { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+.commands { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8125rem; line-height: 1.5; }
 
 /* @Codex: roles and draft actions stay readable when the preset grid wraps. */
 .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px; }
 .roles > div { min-width: 0; display: grid; align-content: start; gap: 8px; }
-.presetAction { font-size: 13px; line-height: 1.5; }
+.presetAction { font-size: 0.8125rem; line-height: 1.5; }
 
 .selector { padding: 16px 0; border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; background: transparent; }
 .presets { grid-template-columns: minmax(0,1fr); gap: 0; }

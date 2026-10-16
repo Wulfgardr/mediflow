@@ -1,6 +1,7 @@
 'use client';
 
 /* @Codex WUL-672: local Search only; provisioning and activation are host-owned. */
+import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useMemo, useState } from 'react';
 import { createICDReferenceDataClient, icdClientErrorMessage, icdReadinessMessage, type ICDReadiness, type ICDSearchReceipt } from '@/lib/icd-service';
 import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
@@ -31,7 +32,7 @@ export function WhoSetupPanel() {
     }
     const canVerify = state.kind === 'ready' && ['configured', 'available', 'unavailable'].includes(state.readiness.status);
     return <section id="who-setup" className={SETTINGS_CARD_CLASS} aria-labelledby="who-setup-title" data-testid="who-setup-panel">
-        <h2 id="who-setup-title" className="text-[15px] font-semibold">Terminologia WHO</h2>
+        <h2 id="who-setup-title" className="text-lg font-semibold">Terminologia WHO</h2>
         <p className="mt-1 text-sm text-[color:var(--lume-ink-muted)]">ICD-11 · MMS 2026-01 · inglese</p>
         <WhoEmbeddedCatalog onChanged={() => setRefresh(value => value + 1)} />
         {state.kind === 'loading' && <p className="mt-4 text-sm" role="status">Lettura della configurazione…</p>}
@@ -50,7 +51,7 @@ export function WhoSetupPanel() {
         </p>}
         {probe.kind === 'error' && <p className="mt-3 text-sm" role="alert">Verifica non riuscita: {probe.message} <time dateTime={probe.at}>{new Date(probe.at).toLocaleTimeString('it-IT')}</time></p>}
         <WhoCodeCheckForm />
-        <details className="mt-5 text-[14px]"><summary className="cursor-pointer font-semibold">Opzionale: servizio locale WHO</summary>
+        <details className="mt-5 text-base"><summary className="cursor-pointer font-semibold">Opzionale: servizio locale WHO</summary>
         <WhoLocalSetupGuide status={state.kind === 'ready' ? 'catalogState' in state.readiness ? undefined : state.readiness.status : state.kind} onRefresh={() => { setState({ kind: 'loading' }); setRefresh(value => value + 1); }} />
         <details className="mt-5 text-sm">
             <summary className="cursor-pointer font-medium">Per chi gestisce il server</summary>

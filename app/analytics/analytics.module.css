@@ -58,17 +58,17 @@
     max-width: 32ch;
     margin: 0.5rem 0 0;
     color: var(--lume-ink);
-    font-size: 1.3rem;
-    font-weight: 650;
+    font-size: 0.9375rem;
+    font-weight: 600;
     line-height: 1.35;
     text-wrap: balance;
 }
 .primaryValue {
     margin: 1.25rem 0 0;
     color: var(--lume-ink);
-    font-size: clamp(2.75rem, 6vw, 4.5rem);
+    font-size: 0.9375rem;
     font-variant-numeric: tabular-nums;
-    font-weight: 650;
+    font-weight: 600;
     letter-spacing: -0.035em;
     line-height: 0.95;
 }
@@ -76,7 +76,7 @@
     margin: 0;
     color: var(--lume-ink-muted);
     font-family: var(--lume-font-sans);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -85,7 +85,7 @@
     max-width: 70ch;
     margin: 0.75rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.82rem;
+    font-size: 0.8125rem;
     line-height: 1.55;
 }
 .filterField {
@@ -102,7 +102,7 @@
     align-items: center;
     gap: 0.4rem 0.75rem;
     color: var(--lume-ink);
-    font-size: 0.82rem;
+    font-size: 0.8125rem;
     font-weight: 600;
 }
 .filterField strong {
@@ -129,15 +129,15 @@
 .sectionHeading h2 {
     margin: 0;
     color: var(--lume-ink);
-    font-size: 1.05rem;
-    font-weight: 650;
+    font-size: 0.9375rem;
+    font-weight: 600;
     text-wrap: balance;
 }
 .sectionHeading div > p {
     max-width: 70ch;
     margin: 0.35rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     line-height: 1.55;
 }
 .factList {
@@ -153,13 +153,13 @@
 }
 .factRow dt {
     color: var(--lume-ink);
-    font-size: 0.84rem;
-    font-weight: 550;
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 .factRow dd {
     margin: 0;
     color: var(--lume-ink-muted);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     text-align: right;
 }
 .chart {
@@ -173,7 +173,7 @@
     gap: 1rem;
     margin-bottom: 0.4rem;
     color: var(--lume-ink-muted);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
 }
 .chartDatum strong {
     color: var(--lume-ink);
@@ -209,7 +209,7 @@
     min-width: 36rem;
     border-collapse: collapse;
     color: var(--lume-ink);
-    font-size: 0.8rem;
+    font-size: 0.8125rem;
 }
 .dataTable th,
 .dataTable td {
@@ -220,7 +220,7 @@
 }
 .dataTable th {
     color: var(--lume-ink-muted);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 600;
 }
 .dataTable th:last-child,
@@ -233,7 +233,7 @@
 .emptyState {
     margin: 1.25rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.82rem;
+    font-size: 0.8125rem;
     line-height: 1.55;
 }
 .dataTable .emptyState {
@@ -250,7 +250,7 @@
     display: grid;
     gap: 0.4rem;
     color: var(--lume-ink-muted);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 600;
 }
 .compactField select {
@@ -286,7 +286,7 @@
     background: color-mix(in srgb, var(--lume-signal-warning) 10%, var(--lume-surface-field));
     color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
     padding: 0.85rem;
-    font-size: 0.82rem;
+    font-size: 0.8125rem;
 }
 .warningState svg {
     width: 1rem;
@@ -347,7 +347,7 @@
 }
 :global(html[data-runtime-twin-design='proposal']) .primaryValue {
     margin-top: 20px;
-    font-size: clamp(2.75rem, 5vw, 3.5rem);
+    font-size: 0.9375rem;
     line-height: 1.1;
 }
 :global(html[data-runtime-twin-design='proposal']) .filterField {
@@ -360,10 +360,10 @@
     line-height: var(--twin-body-leading);
 }
 :global(html[data-runtime-twin-design='proposal']) .filterField label {
-    font-weight: 500;
+    font-weight: 600;
 }
 :global(html[data-runtime-twin-design='proposal']) .compactField select {
-    font-weight: 500;
+    font-weight: 600;
 }
 :global(html[data-runtime-twin-design='proposal']) .dataTable th,
 :global(html[data-runtime-twin-design='proposal']) .chartDatum {
@@ -372,20 +372,20 @@
 }
 
 .focusSurface { border: 0; border-bottom: 1px solid var(--lume-rule-strong); background: transparent; padding: 0 0 28px; }
-.answer h2, .sectionHeading h2 { font: 600 14px/1.5 var(--lume-font-sans); }
+.answer h2, .sectionHeading h2 { font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .tableScroller { border: 0; background: transparent; }
-.dataTable { font: 14px/1.5 var(--lume-font-sans); }
-.dataTable th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; border-color: var(--lume-rule-strong); }
+.dataTable { font: 0.875rem/1.5 var(--lume-font-sans); }
+.dataTable th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .05em; border-color: var(--lume-rule-strong); }
 :global(html[data-runtime-twin-design='proposal']) .focusSurface { border-radius: 0; padding-inline: 0; }
 :global(html[data-runtime-twin-design='proposal']) .answer h2,
-:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 { font: 600 14px/1.5 var(--lume-font-sans); }
+:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 { font: 600 0.875rem/1.5 var(--lume-font-sans); }
 
 .analysisGrid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 40px; align-items: start; }
 .analysisGrid > :global(#indicatori) { grid-column: 1; }
 .analysisGrid > :global(#eta) { grid-column: 2; grid-row: 1 / 3; }
 .analysisGrid > :global(#diagnosi) { grid-column: 1; }
 :global(html[data-runtime-twin-design='proposal']) .focusSurface { grid-template-columns: minmax(0,1fr) minmax(0,1fr); padding-block: 0 28px; gap: 40px; }
-:global(html[data-runtime-twin-design='proposal']) .primaryValue { margin: 12px 0 0; font: 400 36px/1.1 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
+:global(html[data-runtime-twin-design='proposal']) .primaryValue { margin: 12px 0 0; font: var(--type-threshold); font-variant-numeric: tabular-nums; }
 :global(html[data-runtime-twin-design='proposal']) .filterField { border: 0; padding: 0; }
 .analysisGrid .layerSection { border: 0; padding: 0 0 28px; }
 .analysisGrid .sectionHeading { display: block; }

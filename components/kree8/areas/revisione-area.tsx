@@ -113,7 +113,7 @@ function RevisioneArea() {
           <p className={styles.areaCaption}>Revisione documento</p>
           <h1 className={styles.areaTitle}>
             Referto cardiologico <em>· document #DOC-2026-241</em>
-          </h1>
+          <span aria-hidden="true">.</span></h1>
           <p className={styles.areaSubtitle}>
             Conferma cosa applicare alla scheda. Nessun aggiornamento automatico:
             ogni decisione resta nell&apos;audit locale.

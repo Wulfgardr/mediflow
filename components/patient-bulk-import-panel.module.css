@@ -10,7 +10,7 @@
     overflow-wrap: anywhere;
 }
 .section { display: grid; gap: 16px; min-width: 0; padding-block: 16px; border-top: 1px solid var(--lume-rule); }
-.section h2 { font: 600 14px/1.5 var(--lume-font-sans); }
+.section h2 { font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .panel p { line-height: 1.55; margin: 0; }
 .muted { color: var(--lume-ink-muted); font-size: 0.875rem; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
@@ -66,7 +66,7 @@
 .table th:first-child, .table td:first-child { width: 64px; }
 .table td p { font-size: 0.875rem; margin-top: 8px; }
 .table small { display: block; line-height: 1.5; }
-.table code { font-size: 0.8125rem; white-space: normal; }
+.table code { font: var(--type-code); white-space: normal; }
 .panel progress { width: 100%; height: 16px; accent-color: var(--lume-ink-fresh); }
 @media (max-width: 640px) {
     .panel { gap: 16px; }
@@ -81,13 +81,13 @@
 @media (prefers-reduced-motion: reduce) { .panel *, .panel *::before, .panel *::after { transition: none; animation: none; } }
 @media (forced-colors: active) { .primary, .secondary, .notice { border: 1px solid ButtonText; } }
 
-.panel { font: 14px/1.5 var(--lume-font-sans); }
+.panel { font: 0.875rem/1.5 var(--lume-font-sans); }
 .preview tbody td { color: var(--lume-ink-pencil); }
 .preview td:nth-child(2) { text-decoration: underline dashed; text-underline-offset: 4px; }
 .previewLayout { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,.4fr); gap: 40px; align-items: start; }
 .previewLayout > div { min-width: 0; }
 .confirmation { position: sticky; top: 16px; display: grid; gap: 16px; min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); }
-.confirmation h3 { margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 12px/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
+.confirmation h3 { margin: 0; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 0.75rem/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
 .confirmation .actions { align-items: stretch; flex-direction: column; }
 @media (max-width: 1000px) {
  .previewLayout { grid-template-columns: minmax(0,1fr); gap: 24px; }

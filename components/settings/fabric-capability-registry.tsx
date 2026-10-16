@@ -47,7 +47,7 @@ export function FabricCapabilityRegistry({ snapshot }: { snapshot: FabricStatusS
                                     >
                                     <div className={styles.fabricCapabilityName}>
                                         <strong>{FABRIC_CAPABILITY_LABELS[capability.id]}</strong>
-                                        <code className="lume-registro">{capability.id}</code>
+                                        <code className="type-code">{capability.id}</code>
                                     </div>
 
                                     <dl className={styles.fabricCapabilityFacts}>
@@ -85,7 +85,7 @@ export function FabricCapabilityRegistry({ snapshot }: { snapshot: FabricStatusS
                                         ) : capability.killSwitch ? (
                                             <>
                                                 <Link href="/settings/ai/funzioni">Vai agli interruttori delle funzioni</Link>
-                                                <code className="lume-registro">{capability.killSwitch}</code>
+                                                <code className="type-code">{capability.killSwitch}</code>
                                             </>
                                         ) : (
                                             <span>Nessun interruttore dedicato</span>

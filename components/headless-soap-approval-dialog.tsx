@@ -63,7 +63,7 @@ export function HeadlessSoapApprovalDialog({
                     </div>
                     <div className="rounded-2xl border border-[color:var(--lume-border)] p-3">
                         <dt className="mf-field-label">Data</dt>
-                        <dd className="break-words font-mono text-xs text-[color:var(--lume-ink)]">
+                        <dd className="break-words type-code text-[color:var(--lume-ink)]">
                             <time dateTime={fieldSet.date}>{fieldSet.date}</time>
                         </dd>
                     </div>
@@ -95,15 +95,15 @@ export function HeadlessSoapApprovalDialog({
                     <dl className="space-y-2 rounded-2xl border border-[color:var(--lume-border)] p-4 text-xs">
                         <div>
                             <dt className="font-semibold text-[color:var(--lume-ink-muted)]">Metadata codec</dt>
-                            <dd className="break-all font-mono text-[color:var(--lume-ink)]">{fieldSet.metadata.codec}</dd>
+                            <dd className="break-all type-code text-[color:var(--lume-ink)]">{fieldSet.metadata.codec}</dd>
                         </div>
                         <div>
                             <dt className="font-semibold text-[color:var(--lume-ink-muted)]">Metadata SHA-256</dt>
-                            <dd className="break-all font-mono text-[color:var(--lume-ink)]">{fieldSet.metadata.sha256.hex}</dd>
+                            <dd className="break-all type-code text-[color:var(--lume-ink)]">{fieldSet.metadata.sha256.hex}</dd>
                         </div>
                         <div>
                             <dt className="font-semibold text-[color:var(--lume-ink-muted)]">Payload SHA-256</dt>
-                            <dd className="break-all font-mono text-[color:var(--lume-ink)]">{fieldSet.payloadDigest.sha256.hex}</dd>
+                            <dd className="break-all type-code text-[color:var(--lume-ink)]">{fieldSet.payloadDigest.sha256.hex}</dd>
                         </div>
                     </dl>
                 </section>

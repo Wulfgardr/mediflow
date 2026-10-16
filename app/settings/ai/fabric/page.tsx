@@ -78,7 +78,7 @@ function FabricProviderSection({ snapshot }: { snapshot: FabricStatusSnapshot })
                         >
                             <div className={styles.fabricCapabilityName}>
                                 <strong>{provider.label}</strong>
-                                <code className="lume-registro">{provider.id}</code>
+                                <code className="type-code">{provider.id}</code>
                                 <p className="mt-2 text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
                                     {presentation.accessBoundary}
                                 </p>
