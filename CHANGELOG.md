@@ -1,9 +1,9 @@
 # Changelog
 
-This file collects MediFlow's relevant changes.
+Questo file raccoglie le modifiche principali di MediFlow.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Il formato segue [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
+le versioni seguono [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Non ancora rilasciato]
 
@@ -13,8 +13,8 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
 
 - Un solo lanciatore per macOS, Windows e Linux: `MediFlow.command`,
   `MediFlow.cmd` e `MediFlow.sh` chiedono come vuoi usare MediFlow e avviano
-  sempre la build di produzione. La configurazione sta nella cartella utente
-  del sistema, fuori dall'archivio clinico. I vecchi `Start_MediFlow.command`
+  la build di produzione nell'uso ordinario. La configurazione sta nella
+  cartella utente del sistema, fuori dall'archivio clinico. I vecchi `Start_MediFlow.command`
   e `Start-MediFlow.ps1` non esistono più
   ([#529](https://github.com/Wulfgardr/mediflow/pull/529)).
 
@@ -31,7 +31,7 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
   provenienza riportata nella prescrizione; i documenti tornano con il backup
   completo ([#528](https://github.com/Wulfgardr/mediflow/pull/528)).
 
-### Intelligence Fabric
+### Funzioni AI
 
 - Ollama 0.40.4 è ammesso per le funzioni locali; una versione non supportata
   viene indicata come tale, non come servizio irraggiungibile
@@ -39,16 +39,16 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
 
 ### Interfaccia
 
-- Una sola voce tipografica: Newsreader per titoli e persone, il carattere di
-  sistema a quattro misure per tutto il resto, il monospaziato solo per i
-  codici. Pulsanti a un'altezza sola, 40 px con il mouse e 44 su touch, e
-  azioni di riga senza cornice nel diario e nella scheda
+- Tipografia uniforme: Newsreader per titoli e nomi dei pazienti, carattere di
+  sistema su quattro dimensioni per gli altri testi e monospaziato per i
+  codici. Pulsanti alti 40 px con il mouse e 44 px sui dispositivi touch;
+  azioni senza cornice nel diario e nella scheda
   ([#530](https://github.com/Wulfgardr/mediflow/pull/530)).
 
-### Pulizia
+### Manutenzione
 
-- Tolti codice non più usato e materiale storico superato: circa 8.000 righe
-  in meno, con i rimandi storici portati al tag `v0.9.0`
+- Rimossi codice inutilizzato e materiale storico superato, per circa 8.000
+  righe. I collegamenti storici rimandano al tag `v0.9.0`
   ([#531](https://github.com/Wulfgardr/mediflow/pull/531)).
 - [Riflessione sulle prestazioni](./docs/analysis/2026-10-15-riflessione-prestazioni.md)
   della 0.9.0, con le misure da cui partire
@@ -56,26 +56,33 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
 
 ## [0.9.0] - 2026-10-15
 
-La 0.9.0 non aggiunge funzioni cliniche: rende più solide quelle che ci sono.
-Il dettaglio per chi lavora in ambulatorio, i limiti e le verifiche della
-consegna sono nella [pagina della release](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0).
+La 0.9.0 consolida salvataggio, accesso e recupero dell'archivio.
+Le [note della release](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
+riportano funzioni, limiti e verifiche.
 
 - Diario, terapie, misure, prescrizioni e schede si salvano in un'unica
-  transazione con il loro audit.
+  transazione insieme al registro delle modifiche (audit).
 - Se due sessioni modificano la stessa voce, la seconda non sovrascrive in
   silenzio.
 - La passphrase apre l'archivio; il PIN resta per confermare le operazioni
   delicate.
 - Il backup cifrato contiene l'intero archivio, si verifica dall'interfaccia e
   si ripristina in modo atomico.
-- All'avvio MediFlow verifica di essere la versione scaricata.
+- All'avvio MediFlow verifica che il server corrisponda alla revisione del codice.
 - Su un computer nuovo l'archivio si prepara da solo.
 
-Release sorgente con Node 24, provata su macOS (Apple Silicon), Windows 11 ARM
-e Arch Linux ARM; si parte da un checkout Git del tag `v0.9.0`. App native e
-installer firmati non fanno parte di questa release. La pubblicazione non
-autorizza l'uso con dati clinici reali. Due test instabili sono in quarantena
-fino al 23 ottobre 2026: continuano a girare, le cause non sono risolte.
+Codice sorgente per Web locale e Headless con Node 24, provato su macOS
+Apple Silicon, Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM su
+Parallels. L'avvio verificato richiede un checkout Git pulito del tag
+`v0.9.0`; ZIP e TAR.GZ privi di `.git` non sono profili di avvio qualificati.
+App native e installer firmati non sono inclusi.
+
+Le funzioni AI sono facoltative e producono proposte da rivedere; i servizi
+esterni sono spenti per impostazione predefinita. Le prove su dati sintetici
+e la pubblicazione dei sorgenti non autorizzano l'uso clinico.
+Due cause di instabilità dei test sono in quarantena fino al 23 ottobre
+2026 alle 00:00 UTC: i test continuano a essere eseguiti e le cause restano
+irrisolte.
 
 ## [0.8.6] - 2026-09-07
 
