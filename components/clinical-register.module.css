@@ -132,3 +132,4 @@
 @media (min-width: 1024px) { .reasoningActions { flex-wrap: nowrap; } }
 .sectionHead:has(.sectionHeadAction) { justify-content: flex-start; align-items: center; }
 .sectionHeadAction { margin-left: auto; }
+.register > section:first-child > .sectionHead { margin-top: 0; }

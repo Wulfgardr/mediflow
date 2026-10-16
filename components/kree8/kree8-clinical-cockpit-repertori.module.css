@@ -1,4 +1,5 @@
-.catalogRow, .catalogHeader { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto; align-items: center; gap: 16px; }
+.catalogRow, .catalogHeader { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) 7rem; align-items: center; gap: 16px; }
+.catalogRow > button { justify-self: end; }
 .catalogHeader { min-height: 36px; margin-top: 16px; border-bottom: 1px solid var(--lume-rule-strong); color: var(--lume-ink-muted); font-size: 0.75rem; }
 .catalogRow { min-height: 44px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule); }
 .catalogRow[data-selected='true'] { background: var(--lume-surface-selected); }
