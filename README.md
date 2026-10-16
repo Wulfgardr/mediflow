@@ -134,13 +134,6 @@ esenzioni e protesica sono ancora da importare.
   <img src="./docs/images/getmediflow-090/documents-light.png" alt="Documenti del paziente, con originale e revisione separati">
 </picture>
 
-Le schermate usano dati di esempio. Quella documentale mostra la revisione,
-senza dimostrare l'esecuzione di un modello AI o dell'estrazione del testo.
-
-L'interfaccia segue [Punto d'inchiostro](./docs/design/punto-inchiostro/01-specifica.md).
-I [limiti delle verifiche tipografiche](./docs/known-limitations.md#nota-successiva-tipografia-web-ottobre-2026)
-sono documentati separatamente.
-
 </details>
 
 <details>
@@ -330,7 +323,8 @@ La precedente repository privata è archiviata. Database clinici, credenziali
 e fonti riservate restano fuori da Git.
 
 [Contribuire](./CONTRIBUTING.md) · [Architettura](./ARCHITECTURE.md) ·
-[Topologia della repository](./docs/repository-topology.md)
+[Topologia della repository](./docs/repository-topology.md) ·
+[Specifica visiva](./docs/design/punto-inchiostro/01-specifica.md)
 
 <details>
 <summary><strong>Accesso per agenti (Headless)</strong></summary>
