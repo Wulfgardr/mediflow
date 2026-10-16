@@ -7,7 +7,7 @@ read_when:
 
 # Dove vive MediFlow: topologia della repository
 
-Ultimo aggiornamento: 2026-09-05
+Ultimo aggiornamento: 2026-10-16
 
 Questa mappa aiuta agenti e contributori a collocare il lavoro senza confondere
 ambiti che hanno responsabilità diverse: il **runtime clinico**, cioè il codice
@@ -61,12 +61,17 @@ secondo [`SECURITY.md`](../SECURITY.md).
 | `scripts/` | tooling | Script di build, test, benchmark, smoke. |
 | `public/` | runtime clinico (asset) | Asset statici serviti dall'app. |
 | `docs/` | documentazione | Documentazione canonica del progetto. |
-| **`whitepaper/`** | **publication/site** | **Whitepaper/sito di pubblicazione. Non è runtime clinico, non importare da `app/`, `components/`, `lib/`.** |
 | `oss-assets/` | publication/site | Asset pubblici storicamente raccolti per la distribuzione open source. |
 | `tmp-*/` | tooling effimero | Output di test e build temporanei (in `.gitignore` o esclusi dal typecheck). |
 | `tmp/` | tooling effimero | Scratchpad locale. |
 | `Farmaci/` | dati di riferimento | Dataset farmaceutici di riferimento. |
 | `certs/` | dev tooling | Certificati TLS locali per dev. |
+
+Il [whitepaper storico](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/whitepaper/index.html), gli strumenti del
+gemello 0.8.6, sei verbali di luglio, quattro proposte superate e gli originali
+PNG 0.8 restano nello storico Git e nel tag v0.9.0. Non fanno più parte
+dell’albero corrente. `tools/code-explorer/`, le immagini ottimizzate e i
+manifest di provenienza restano disponibili.
 
 ## Confine Application Services, Fabric e integrazioni opzionali
 
@@ -191,10 +196,8 @@ e validazione clinica restano fuori dal claim della 0.8.5.
 
 ## ⚠️ Regole operative
 
-- Modifiche a `whitepaper/` **non** richiedono test del runtime clinico né
-  rebuild dei moduli nativi: è un artefatto di pubblicazione.
 - Codice in `app/`, `components/`, `lib/`, `hooks/` non deve importare da
-  `whitepaper/` o `oss-assets/`.
+  `oss-assets/`.
 - I path `tmp-*/` sono esclusi da `tsconfig.typecheck.json` (vedi `exclude`).
 - Non creare mirror operativi o pipeline di export verso la repository privata
   archiviata.
@@ -203,7 +206,7 @@ e validazione clinica restano fuori dal claim della 0.8.5.
 - Per la lista completa dei `.md` tracciati, vedi
   [docs/markdown-index.md](./markdown-index.md).
 
-## Ciclo di vita dei branch — lease di promozione
+## Ciclo di vita dei branch: lease di promozione
 
 Regola adottata il 2026-08-07, dopo il collegio sul residuo `WUL-362`.
 
@@ -280,5 +283,5 @@ Il confine ha due lati e il gate controlla entrambi:
 Come `check:schema-writers`, l'allowlist è stale-sensitive nelle due direzioni: un
 contratto che non descrive più una scrittura reale fa fallire il gate tanto quanto una
 scrittura non dichiarata. `--self-test` verifica che il gate sappia distinguere le forme
-di scrittura dai casi leciti che gli somigliano — un `Map.delete` ha la stessa forma di
+di scrittura dai casi leciti che gli somigliano: un `Map.delete` ha la stessa forma di
 `tx.delete(<table>)`, e il divieto di `auto_apply` non deve segnalare sé stesso.

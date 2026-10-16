@@ -143,10 +143,5 @@
     "path": "tests/ui06/browser-harness.mjs",
     "reason": "WUL-729: Browser lifecycle/React fixture helper imported by the local component suite.",
     "owner": "@Wulfgardr"
-  },
-  {
-    "path": "tools/runtime-twin-086/seed.mjs",
-    "reason": "WUL-729: Synthetic runtime-twin fixture producer; guarded seeding operation, not an assertion suite.",
-    "owner": "@Wulfgardr"
   }
 ]
