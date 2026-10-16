@@ -196,7 +196,7 @@ function DiarioArea({
                         <h3 id={titleId} className={diaryStyles.entryTitle}>{entry.title}</h3>
                       </div>
                       <span className={proposal ? diaryStyles.date : `${diaryStyles.date} lume-registro`} data-lume-entry-part="date">
-                        {entry.dateLabel}
+                        {entry.dateLabel.replace(', ', '\n')}
                       </span>
                     </div>
 

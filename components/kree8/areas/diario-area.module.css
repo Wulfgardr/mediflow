@@ -315,7 +315,7 @@
 .entry { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 0 16px; padding: 16px 0; }
 .entryTop { display: contents; }
 .titleGroup, .preview, .provenance, .entryFooter { grid-column: 2; }
-.date { grid-column: 1; grid-row: 1 / span 3; white-space: normal; }
+.date { grid-column: 1; grid-row: 1 / span 3; white-space: pre-line; }
 @media (max-width: 700px) {
   .entry { grid-template-columns: minmax(0, 1fr); }
   .titleGroup, .preview, .provenance, .entryFooter { grid-column: 1; }
@@ -331,3 +331,16 @@
 .entryFooter { border: 0; padding: 0; }
 .patientIdentity strong {
   font: var(--type-person-preview); }
+
+/* Azioni di riga quiete: si ripetono su ogni voce, quindi niente cornice. */
+:global(html[data-runtime-twin-design='proposal']) .entryActions > :is(a, button) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--lume-ink-muted);
+}
+:global(html[data-runtime-twin-design='proposal']) .entryActions > :is(a, button):hover {
+  background: var(--lume-surface-selected);
+  color: var(--lume-ink);
+  transform: none;
+}
