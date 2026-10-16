@@ -128,11 +128,12 @@ function canonical(value: unknown): PortableSupervisorWebIpcFrameV1 {
   if (method !== 'ack') return fail();
   const outcome = tag(value, 'outcome');
   if (outcome === 'prepared') {
-    const parsed = exact(value, ['schemaVersion', 'method', 'requestRef', 'outcome', 'challenge', 'expiresAt']);
-    if (parsed.schemaVersion !== PORTABLE_SUPERVISOR_WEB_IPC_SCHEMA_V1 || !integer(parsed.expiresAt, 1)) return fail();
+    const parsed = exact(value, ['schemaVersion', 'method', 'requestRef', 'outcome', 'challenge', 'preparedAt', 'expiresAt']);
+    if (parsed.schemaVersion !== PORTABLE_SUPERVISOR_WEB_IPC_SCHEMA_V1
+      || !integer(parsed.preparedAt) || !integer(parsed.expiresAt, 1)) return fail();
     return record({ schemaVersion: PORTABLE_SUPERVISOR_WEB_IPC_SCHEMA_V1, method: 'ack',
       requestRef: request(parsed.requestRef), outcome: 'prepared', challenge: challenge(parsed.challenge),
-      expiresAt: parsed.expiresAt });
+      preparedAt: parsed.preparedAt, expiresAt: parsed.expiresAt });
   }
   if (outcome === 'activated') {
     const parsed = exact(value, ['schemaVersion', 'method', 'requestRef', 'outcome', 'expiresAt']);

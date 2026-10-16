@@ -260,6 +260,20 @@ atomico. Il Supervisor accetta frame esclusivamente dall'esatto `ChildProcess`
 Web creato da lui e nega replay, campi extra, challenge errata, frame oversized
 o messaggi successivi a disconnect.
 
+Emendamento WUL-694 (16 ottobre 2026): l'ACK `prepared` include obbligatoriamente
+`preparedAt` ed `expiresAt`, campionati e calcolati sul solo orologio del parent.
+Il Web verifica che la loro differenza sia positiva e non superiore a 5 secondi;
+verifica inoltre l'attesa locale usando soltanto il proprio orologio. Non confronta
+la scadenza assoluta del parent con l'ora assoluta del Web: su Windows sono stati
+osservati scarti fra processi anche di 5 ms. La scadenza autoritativa della challenge,
+il consumo monouso e la revoca restano verificati dal parent sul proprio orologio.
+Nessun margine temporale viene aggiunto alle scadenze.
+
+Questo protocollo e interno ai figli dell'esatto bundle verificato, avviati insieme
+dallo stesso Supervisor; non e l'API pubblica `/api/v1` ne un protocollo fra versioni
+installate separatamente. Il record chiuso `v1` evolve insieme a questi due peer:
+`preparedAt` mancante o campi extra vengono rifiutati, senza fallback ai vecchi ACK.
+
 Il payload `activate` contiene soltanto:
 
 - riferimenti Web gia hashati a utente e parent;
