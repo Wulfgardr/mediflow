@@ -747,7 +747,7 @@
 .caseLensDiagnoses { display: grid; gap: 8px; }
 .patientDiagnosisPill { padding: 8px 0; border-bottom: 1px solid var(--lume-rule); }
 .patientDiagnosisPill > span { white-space: normal; }
-.worklistLensActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+.worklistLensActions { display: flex; flex-wrap: wrap; align-items: start; gap: 12px; }
 .worklistLensActions > a { flex: 1; }
 @media (max-width: 1200px) {
   :global(html[data-runtime-twin-design='proposal']) .inboxLayout { grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; }

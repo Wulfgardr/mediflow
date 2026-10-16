@@ -715,6 +715,7 @@ function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
 }
 
 function Toolbar({
+  activeArea,
   onSearchRequest,
   onOpenCommand,
   operatorName,
@@ -731,14 +732,14 @@ function Toolbar({
 
   return (
     <div className={shellStyles.toolbar}>
-      <button
+      {activeArea === 'incarico' && <button
         type="button"
         className={shellStyles.search}
         onClick={onSearchRequest}
       >
         <Search size={14} />
         <span>Cerca nella lista pazienti</span>
-      </button>
+      </button>}
       {/* @Codex: scorciatoia esplicita per la palette read-only di navigazione e aiuto. */}
       <button
         type="button"

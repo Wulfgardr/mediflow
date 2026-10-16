@@ -47,6 +47,14 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
   const [opened, setOpened] = useState<string[]>([]);
   const [area, setArea] = useState<string | null>(null);
+  const destinationIsActive = (href: string) => href.includes('?area=')
+    ? ((pathname === '/' || pathname === '/diary') && href.endsWith(`=${pathname === '/diary' ? 'diario' : area}`))
+      || (href.endsWith('=incarico') && pathname.startsWith('/patients/'))
+    : pathname.startsWith(href);
+  const activeDestination = destinations.find(({ href }) => destinationIsActive(href))
+    ?? (pathname.startsWith('/settings') || (pathname === '/' && area === 'governance')
+      ? { href: '/settings', label: 'Impostazioni' }
+      : destinations[0]);
   const directoryReturn = useRef<DirectoryReturn | null>(null);
   const [railOpen, setRailOpen] = useState(true);
   /* @Codex: one confirmation boundary for the new route shortcuts. Replay the
@@ -93,7 +101,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
         <nav aria-label="Navigazione principale" className={styles.navigation}>
-          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={(href.includes('?area=') ? (pathname === '/' && href.endsWith(`=${area}`)) || (href.endsWith('=incarico') && pathname.startsWith('/patients/')) : pathname.startsWith(href)) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
+          {destinations.map(({ href, label, icon: Icon }, index) => <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={destinationIsActive(href) ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link>)}
           <details className={styles.mobileMore} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
             <summary><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
             <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
@@ -114,7 +122,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
             {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
           </button>
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
-            <Link className={styles.directoryTab} href="/?area=incarico" aria-current={pathname === '/' ? 'page' : undefined}>Pazienti</Link>
+            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
               <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></Link>
               {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
