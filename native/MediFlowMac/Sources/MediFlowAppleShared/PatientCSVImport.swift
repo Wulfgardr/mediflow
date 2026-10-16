@@ -158,6 +158,7 @@ final class PatientCSVImportModel: ObservableObject {
     private let read: () async throws -> [HomeBasePatientSummary]
     private let create: (PatientCSVRow, String) async throws -> HomeBaseCreatedResource
     private let now: () -> Date
+    private let didFinish: () async -> Void
     private var previewDate: Date?
     private var generation = UUID()
     private var stopped = false
@@ -171,9 +172,11 @@ final class PatientCSVImportModel: ObservableObject {
     init(destination: String, isCurrent: @escaping () -> Bool,
          read: @escaping () async throws -> [HomeBasePatientSummary],
          create: @escaping (PatientCSVRow, String) async throws -> HomeBaseCreatedResource,
-         now: @escaping () -> Date = Date.init) {
+         now: @escaping () -> Date = Date.init,
+         didFinish: @escaping () async -> Void = {}) {
         self.destination = destination; self.isCurrent = isCurrent
         self.read = read; self.create = create; self.now = now
+        self.didFinish = didFinish
     }
 
     func load(_ bytes: Data) async {
@@ -245,11 +248,13 @@ final class PatientCSVImportModel: ObservableObject {
             }
         }
         rows = []
-        if hasUncertainResult { return }
-        let confirmed = receipts.filter { $0.outcome == .confirmed }.count
-        let remaining = receipts.filter { $0.outcome == .notSent }.count
-        notice = remaining == 0 ? "Invii conclusi: \(confirmed) confermate. Controlla anche le righe escluse."
-            : "Importazione parziale: \(confirmed) confermate, \(remaining) non inviate."
+        if !hasUncertainResult {
+            let confirmed = receipts.filter { $0.outcome == .confirmed }.count
+            let remaining = receipts.filter { $0.outcome == .notSent }.count
+            notice = remaining == 0 ? "Invii conclusi: \(confirmed) confermate. Controlla anche le righe escluse."
+                : "Importazione parziale: \(confirmed) confermate, \(remaining) non inviate."
+        }
+        await didFinish()
     }
 
     func reconcile() async {

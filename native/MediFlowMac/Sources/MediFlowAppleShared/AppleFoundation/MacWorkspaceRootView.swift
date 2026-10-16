@@ -1,4 +1,5 @@
 #if os(macOS)
+import Combine
 import SwiftUI
 
 @MainActor
@@ -76,6 +77,7 @@ public final class MediFlowMacSceneModel: ObservableObject {
     @Published private(set) var startupError: String?
     let capabilities = ClinicalWorkspaceCapabilitiesStore()
     private let storageProvider: () throws -> MediFlowMacStoragePair
+    private var workspaceObservation: AnyCancellable?
 
     public init() {
         storageProvider = Self.processStores
@@ -109,7 +111,11 @@ public final class MediFlowMacSceneModel: ObservableObject {
         guard workspaceModel == nil, startupError == nil else { return }
         do {
             let stores = try storageProvider()
-            workspaceModel = PairedPatientsWorkspaceModel(pairedStore: stores.pairedStore, cacheStore: stores.cacheStore)
+            let model = PairedPatientsWorkspaceModel(pairedStore: stores.pairedStore, cacheStore: stores.cacheStore)
+            workspaceObservation = model.objectWillChange.sink { [weak self] in
+                self?.objectWillChange.send()
+            }
+            workspaceModel = model
         } catch {
             startupError = error.localizedDescription
         }

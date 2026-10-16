@@ -1,4 +1,5 @@
 #if os(macOS)
+import Combine
 import CryptoKit
 import XCTest
 @testable import MediFlowAppleShared
@@ -102,6 +103,38 @@ final class MediFlowQAStorageTests: XCTestCase {
         invalid.prepareWorkspaceIfNeeded()
         XCTAssertNil(invalid.workspaceModel)
         XCTAssertNotNil(invalid.startupError)
+    }
+
+    func testScenePublishesConnectionAndScopeChangesWithoutNavigation() throws {
+        let scene = MediFlowMacSceneModel(storageFactory: MediFlowMacStorageFactory(
+            metadata: { [MediFlowQAStorageSelection.metadataKey: self.namespaceA] },
+            bundleIdentifier: { "com.mediflow.qa.\(self.namespaceA)" },
+            applicationSupportDirectory: { self.temporaryDirectory },
+            pairedStoreBuilder: { _, _ in self.makeStore() },
+            cacheStoreBuilder: { _, _, _ in HomeBasePatientCacheStore(cacheDirectory: self.temporaryDirectory,
+                keyProvider: { SymmetricKey(data: Data(repeating: 4, count: 32)) }) }
+        ))
+        scene.prepareWorkspaceIfNeeded()
+        let workspace = try XCTUnwrap(scene.workspaceModel)
+        XCTAssertNil(workspace.clinicalWorkspaceConnection)
+        var sceneChanged = false
+        let observation = scene.objectWillChange.sink { sceneChanged = true }
+        defer { observation.cancel() }
+
+        workspace.configurePairedOnlineForTests()
+        let connectedIdentity = try XCTUnwrap(workspace.clinicalWorkspaceConnection?.identity)
+        XCTAssertTrue(sceneChanged, "Il root deve vedere la connessione senza cambiare sezione")
+        sceneChanged = false
+
+        workspace.ambulatoryId = "synthetic-scope"
+        XCTAssertTrue(sceneChanged)
+        XCTAssertNotEqual(workspace.clinicalWorkspaceConnection?.identity, connectedIdentity)
+        sceneChanged = false
+
+        workspace.pairedClientToken = "replacement-token"
+        XCTAssertTrue(sceneChanged)
+        XCTAssertNil(workspace.clinicalWorkspaceConnection)
+        XCTAssertEqual(scene.section, .patients)
     }
 
     func testFactoryUsesDedicatedPairedDefaultsDomainDistinctFromQAAppIdentity() throws {
