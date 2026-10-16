@@ -2,7 +2,7 @@
 // Public data-only contract. No runtime, environment, HTTP or credential imports.
 export const WHO_LOCAL_BINDING_ID = 'who.icd11.v2.2026-01.mms.en.local.v1' as const;
 export const WHO_LOCAL_TTL_MS = 86_400_000;
-export const WHO_LOCAL_ATTRIBUTION = 'ICD-11 — World Health Organization (WHO), CC BY-ND 3.0 IGO';
+export const WHO_LOCAL_ATTRIBUTION = 'ICD-11, World Health Organization (WHO), CC BY-ND 3.0 IGO';
 export type WhoLocalStatus = 'disabled' | 'configuration_required' | 'configured' | 'available' | 'unavailable';
 export type WhoLocalEntry = Readonly<{ code: string; description: string; system: 'ICD-11'; canonicalUri: string }>;
 export type WhoLocalReference = Readonly<{ releaseId: '2026-01'; language: 'en'; bindingId: typeof WHO_LOCAL_BINDING_ID;
