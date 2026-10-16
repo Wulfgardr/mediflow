@@ -10,7 +10,7 @@ import { type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } fr
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
-import { useRuntimeWorkspaceArea } from '@/components/runtime-twin-workspace';
+import { useRuntimeWorkspaceArea, useRuntimeWorkspaceCommand } from '@/components/runtime-twin-workspace';
 import { X } from 'lucide-react';
 
 import {
@@ -227,6 +227,8 @@ export function Kree8ClinicalCockpit({
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [patientSearchFocusSignal, setPatientSearchFocusSignal] = useState(0);
   const [commandCenterMode, setCommandCenterMode] = useState<CommandCenterMode>(null);
+  const openCommandCenter = useCallback(() => setCommandCenterMode('commands'), []);
+  const commandsInWorkspace = useRuntimeWorkspaceCommand(isReview ? null : openCommandCenter);
   const [agendaBridge, setAgendaBridge] = useState<ClinicalAgendaBridgeClientState>({
     status: 'idle',
   });
@@ -598,7 +600,8 @@ export function Kree8ClinicalCockpit({
             openArea('incarico', false);
             setPatientSearchFocusSignal((current) => current + 1);
           }}
-          onOpenCommand={() => setCommandCenterMode('commands')}
+          onOpenCommand={openCommandCenter}
+          commandsInWorkspace={commandsInWorkspace}
           operatorName={operatorName}
         />
         <div

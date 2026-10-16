@@ -128,3 +128,68 @@ for (const theme of ['light', 'dark']) {
     expect(errors, 'nessun errore runtime durante il percorso').toEqual([]);
   });
 }
+
+test.describe('toolbar mobile', () => {
+  test.use({ hasTouch: true, viewport: { width: 320, height: 812 } });
+
+  test('comandi in Altro conservano accesso touch e focus', async ({ page }, info) => {
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(value => localStorage.setItem('mediflow-theme', value), theme);
+      for (const width of [320, 390]) {
+        await page.setViewportSize({ width, height: 812 });
+        await page.goto('/?area=repertori');
+        await pageHealth(page);
+        await expect(page.getByRole('button', { name: /Mostra dettaglio repertorio/ }).first()).toBeVisible();
+        await expect(page.locator('[data-mobile-commands="workspace"]')).toBeHidden();
+        const canvas = page.getByTestId('lume-frame-canvas');
+        const panel = page.getByTestId('lume-frame-panel');
+        const canvasBox = await canvas.boundingBox();
+        const panelBox = await panel.boundingBox();
+        expect(panelBox!.y - canvasBox!.y, 'nessuna riga vuota prima del contenuto').toBeLessThanOrEqual(1);
+
+        const summary = page.getByRole('navigation', { name: 'Navigazione principale' }).locator('summary').filter({ hasText: /^Altro$/ });
+        const command = page.getByRole('button', { name: 'Comandi e aiuto', exact: true });
+        await summary.tap();
+        await assertControlUnclipped(command, 'Comandi e aiuto in Altro');
+        expect((await command.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        await capture(page, `${theme}-${width}-altro`, info);
+        await command.tap();
+        const dialog = page.getByRole('dialog', { name: 'Comandi MediFlow', exact: true });
+        await expect(dialog).toBeVisible();
+        await expect(page.getByRole('combobox', { name: 'Cerca un comando' })).toBeFocused();
+        await expect(summary.locator('..')).not.toHaveAttribute('open');
+        await page.keyboard.press('Escape');
+        await expect(dialog).toBeHidden();
+        await expect(summary).toBeFocused();
+
+        await page.keyboard.press('Enter');
+        await command.focus();
+        await page.keyboard.press('Enter');
+        await expect(dialog).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(summary).toBeFocused();
+        await page.keyboard.press('Control+k');
+        await expect(dialog).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(summary).toBeFocused();
+      }
+    }
+    await page.setViewportSize({ width: 701, height: 812 });
+    await expect(page.getByRole('button', { name: 'Apri comandi e aiuto tastiera' })).toBeVisible();
+    await page.getByRole('button', { name: 'Apri comandi e aiuto tastiera' }).click();
+    await expect(page.getByRole('dialog', { name: 'Comandi MediFlow' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 320, height: 812 });
+    await page.goto('/settings');
+    await page.getByText('Altro', { exact: true }).tap();
+    await expect(page.getByRole('button', { name: 'Comandi e aiuto', exact: true })).toHaveCount(0);
+    await page.goto('/mockups/kree8');
+    await page.getByRole('button', { name: 'Apri comandi e aiuto tastiera' }).click();
+    await expect(page.getByRole('dialog', { name: 'Comandi MediFlow' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    expect(errors).toEqual([]);
+  });
+});

@@ -718,6 +718,7 @@ function Toolbar({
   activeArea,
   onSearchRequest,
   onOpenCommand,
+  commandsInWorkspace = false,
   operatorName,
 }: {
   activeArea: AreaId;
@@ -726,12 +727,13 @@ function Toolbar({
   onOpenArea: (area: AreaId) => void;
   onSearchRequest: () => void;
   onOpenCommand: () => void;
+  commandsInWorkspace?: boolean;
   operatorName: string;
 }) {
   const operatorInitials = buildOperatorInitials(operatorName);
 
   return (
-    <div className={shellStyles.toolbar}>
+    <div className={shellStyles.toolbar} data-mobile-commands={commandsInWorkspace ? 'workspace' : undefined}>
       {activeArea === 'incarico' && <button
         type="button"
         className={shellStyles.search}
