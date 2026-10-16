@@ -1,5 +1,8 @@
 <div align="center">
-<img src="./docs/design/lume/icona/mediflow-icon-giorno.svg" width="100" height="100" alt="MediFlow: il filo della storia clinica">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/design/punto-inchiostro/icona/punto-grafite.svg">
+  <img src="./docs/design/punto-inchiostro/icona/punto-giorno.svg" width="100" height="100" alt="MediFlow: un tratto che da matita diventa inchiostro e si chiude nel punto">
+</picture>
 
 # MediFlow
 
