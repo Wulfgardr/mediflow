@@ -25,7 +25,7 @@ const recommended = [
 
 export default function SettingsAiModelsPage() {
     const { hardwareProfile, aiConfig, setAiConfig, isSavingAi, aiSettingsLoadState, aiTestStatus, aiHealth,
-        applyHardwareProfile, saveAiConfig, testAiConnection } = useAiSettingsController();
+        applyHardwareProfile, saveAiConfig, savedConfigurationRevision, testAiConnection } = useAiSettingsController();
 
     return (
         <section className={styles.surface} data-testid="settings-ai-models-section">
@@ -53,7 +53,7 @@ export default function SettingsAiModelsPage() {
                     <button type="button" onClick={testAiConnection} disabled={aiTestStatus === 'testing' || !aiConfig.url}
                         className={SETTINGS_SECONDARY_BUTTON_CLASS}>
                         <RefreshCw aria-hidden="true" className="h-4 w-4" />
-                        {aiTestStatus === 'testing' ? 'Verifica in corso…' : 'Test Connessione'}
+                        {aiTestStatus === 'testing' ? 'Verifica in corso…' : 'Verifica connessione'}
                     </button>
                 </div>
                 <div role="status" className={styles.notice}>
@@ -122,7 +122,7 @@ export default function SettingsAiModelsPage() {
                 <div className={styles.actions}>
                     <button type="button" onClick={saveAiConfig} disabled={isSavingAi} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
                         <Save aria-hidden="true" className="h-4 w-4" />
-                        {isSavingAi ? 'Salvataggio...' : 'Salva Configurazione'}
+                        {isSavingAi ? 'Salvataggio...' : 'Salva configurazione'}
                     </button>
                     <Link href="/settings/ai/funzioni">Abilita le funzioni cliniche</Link>
                     <Link href="/settings/ai/fabric">Verifica lo stato delle funzioni</Link>
@@ -133,7 +133,7 @@ export default function SettingsAiModelsPage() {
 
             </fieldset>
             <details className={styles.accountDetails}><summary>Account OpenAI · ChatGPT</summary><ChatGptAccountPanel /></details>
-            <LocalProviderOnboardingPanel />
+            <LocalProviderOnboardingPanel configurationRevision={savedConfigurationRevision} />
         </section>
     );
 }

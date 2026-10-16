@@ -8,8 +8,10 @@ export const dynamic = 'force-dynamic';
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 function failure(error: unknown) {
     const code = error instanceof LocalProviderOnboardingError ? error.code : 'state_unavailable';
-    return reply({ error: code }, code === 'owner_locked' ? 401
-        : code === 'input_invalid' ? 400 : code === 'provider_unreachable' ? 503 : 409);
+    const versionMismatch = error instanceof LocalProviderOnboardingError && code === 'provider_version_unsupported'
+        ? error.versionMismatch : undefined;
+    return reply({ error: code, ...(versionMismatch ? { versionMismatch } : {}) }, code === 'owner_locked' ? 401
+        : code === 'input_invalid' ? 400 : ['provider_unreachable', 'provider_unready'].includes(code) ? 503 : 409);
 }
 export async function GET(request: Request) {
     try {

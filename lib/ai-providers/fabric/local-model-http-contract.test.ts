@@ -66,10 +66,10 @@ function sourcesAt(url: string): FunctionModelSources {
     athenaLifecycle: { status: 'denied', reason: 'missing' }, athenaIdentity: 'synthetic', athenaAvailable: false };
 }
 
-for (const id of ['patient_insight', 'smart_import', 'document_synthesis'] as const) {
+for (const version of ['0.33.3', '0.40.4']) for (const id of ['patient_insight', 'smart_import', 'document_synthesis'] as const) {
     for (const mode of ['host_configuration', 'saved_preference', 'request_override'] as const) {
-        test(`${id}: ${mode} reaches the unchanged adapter as exactly the cataloged HTTP model`, async t => {
-            const fixture = await transportFixture(t); let sources = sourcesAt(fixture.url);
+        test(`${version} ${id}: ${mode} reaches the unchanged adapter as exactly the cataloged HTTP model`, async t => {
+            const fixture = await transportFixture(t, { version }); let sources = sourcesAt(fixture.url);
             const role = id === 'document_synthesis' ? 'reasoning' : 'clinical';
             const catalog = buildFunctionModelCatalog(sources);
             const host = catalog.bindings.find(binding => binding.modelOptionId === catalog.hostDefaults[id]); assert.ok(host);
@@ -117,7 +117,7 @@ for (const id of ['patient_insight', 'smart_import', 'document_synthesis'] as co
 
 test('unchanged canonical attestor stops at unsupported synthetic version, before preload', async t => {
     const fixture = await transportFixture(t, { version: '0.0.0-synthetic' });
-    await assert.rejects(attestLocalOllamaModel(fixture.url, 'synthetic-clinical:1'), /provider_unready/);
+    await assert.rejects(attestLocalOllamaModel(fixture.url, 'synthetic-clinical:1'), /provider_version_unsupported/);
     assert.deepEqual(fixture.seen.map(call => call.path), ['/api/version']);
 });
 
