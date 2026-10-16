@@ -1,3 +1,4 @@
+import { AifaReductionConfirmationRequired } from './aifa-importer';
 /* @Codex: UI-only operation lifetime; no authority, writer or HTTP contract is minted here. */
 import type { AifaCatalogClientStatus, AifaImportClientResult } from './aifa-importer';
 import type { AifaCatalogManifestInput } from './aifa-catalog';
@@ -17,8 +18,8 @@ export const INITIAL_AIFA_GUIDE_STATE: AifaGuideState = {
 };
 type Ports = {
     read: () => Promise<AifaCatalogClientStatus>;
-    update: (signal: AbortSignal) => Promise<AifaImportClientResult>;
-    importFile: (file: File, manifest: AifaCatalogManifestInput) => Promise<AifaImportClientResult>;
+    update: (signal: AbortSignal, confirmation?: string) => Promise<AifaImportClientResult>;
+    importFile: (file: File, manifest: AifaCatalogManifestInput, confirmation?: string) => Promise<AifaImportClientResult>;
     clear: () => Promise<void>;
 };
 type Confirm = () => Promise<boolean>;
@@ -113,20 +114,30 @@ export function createAifaUpdateGuide(ports: Ports, publish: (state: AifaGuideSt
                     notice: { tone: 'error', text: 'Lettura del catalogo non riuscita. L’ultimo stato osservato resta visibile; riprova con Rileggi stato.' } });
             }
         },
-        async update() {
+        async update(confirmReduction?: (message: string) => Promise<boolean>) {
             const token = begin('updating');
             if (token === null) return;
             const abort = new AbortController();
             controller = abort;
             let acknowledged = false;
             try {
-                const result = await ports.update(abort.signal);
+                let result: AifaImportClientResult;
+                try { result = await ports.update(abort.signal); }
+                catch (error) {
+                    if (!(error instanceof AifaReductionConfirmationRequired) || !confirmReduction) throw error;
+                    if (!current(token) || !await confirmReduction(error.message) || !current(token) || abort.signal.aborted) {
+                        emit({ notice: { tone: 'warning', text: 'Riduzione non confermata. Catalogo precedente conservato.' } });
+                        return;
+                    }
+                    result = await ports.update(abort.signal, error.confirmation);
+                }
                 if (!current(token)) return;
                 assertImportResult(result);
                 if (result.rejectedRecords !== 0) throw new Error('Risultato AIFA inatteso. Rileggi stato.');
                 acknowledged = true;
                 await reconcile(token, result, abort.signal.aborted
                     ? 'Aggiornamento confermato dal server nonostante la richiesta di annullamento. Stato del catalogo riletto.'
+                    : result.notModified ? 'AIFA non segnala variazioni rispetto al catalogo locale. Stato riletto.'
                     : `Aggiornamento confermato: ${result.count.toLocaleString('it-IT')} confezioni. Stato del catalogo riletto.`);
             } catch (error) {
                 if (current(token)) emit({ reconciliationRequired: true, notice: {
@@ -142,7 +153,7 @@ export function createAifaUpdateGuide(ports: Ports, publish: (state: AifaGuideSt
             emit({ phase: 'cancelling' });
             controller.abort(); // A request to cancel is not an acknowledgement of rollback.
         },
-        async importFile(file: File, manifest: AifaCatalogManifestInput, confirm: Confirm) {
+        async importFile(file: File, manifest: AifaCatalogManifestInput, confirm: Confirm, confirmReduction?: (message: string) => Promise<boolean>) {
             const token = begin('confirming-import');
             if (token === null) return;
             const capturedManifest = { ...manifest };
@@ -152,7 +163,16 @@ export function createAifaUpdateGuide(ports: Ports, publish: (state: AifaGuideSt
                 if (!await confirm() || !current(token)) return;
                 emit({ phase: 'importing' });
                 sent = true;
-                const result = await ports.importFile(file, capturedManifest);
+                let result: AifaImportClientResult;
+                try { result = await ports.importFile(file, capturedManifest); }
+                catch (error) {
+                    if (!(error instanceof AifaReductionConfirmationRequired) || !confirmReduction) throw error;
+                    if (!current(token) || !await confirmReduction(error.message) || !current(token)) {
+                        emit({ notice: { tone: 'warning', text: 'Riduzione non confermata. Catalogo precedente conservato.' } });
+                        return;
+                    }
+                    result = await ports.importFile(file, capturedManifest, error.confirmation);
+                }
                 if (!current(token)) return;
                 assertImportResult(result);
                 acknowledged = true;

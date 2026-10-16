@@ -7,11 +7,16 @@ import path from 'node:path';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import Database from 'better-sqlite3';
+import { IncomingMessage } from 'node:http';
+import { Socket } from 'node:net';
+import { NodeNextRequest } from 'next/dist/server/base-http/node.js';
+import { NextRequestAdapter } from 'next/dist/server/web/spec-extension/adapters/next-request.js';
 import { AIFA_CATALOG_DEFAULT_SOURCE_URL } from './aifa-catalog';
 
 const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
 type CatalogModules = {
+    getAifaCatalogSnapshot: typeof import('./aifa-catalog-server.ts').getAifaCatalogSnapshot;
     clearAifaCatalog: typeof import('./aifa-catalog-server.ts').clearAifaCatalog;
     getAifaCatalogStatus: typeof import('./aifa-catalog-server.ts').getAifaCatalogStatus;
     replaceAifaCatalog: typeof import('./aifa-catalog-server.ts').replaceAifaCatalog;
@@ -282,8 +287,14 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.deepEqual(await failedBody.json(), { error: 'Aggiornamento AIFA non riuscito; catalogo conservato' });
     assert.equal(calls, 0);
     assert.equal(getAifaCatalogSnapshot(), bodySnapshot);
+    const { dbServer: testDb } = await import('./db-server.ts');
+    const { settings: testSettings } = await import('./schema.ts');
+    assert.equal((await POST(request())).status, 403, 'network is disabled until explicitly allowed');
+    assert.equal(calls, 0);
+    (await loadCatalogModules()).clearAifaCatalog();
+    testDb.insert(testSettings).values({ key: 'aifaNetworkAccess', value: 'enabled' }).onConflictDoUpdate({ target: testSettings.key, set: { value: 'enabled' } }).run();
     const validCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000401;TEST ROUTE;A01AA01;Principio route';
-    t.mock.method(globalThis, 'fetch', async () => new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } }));
+    t.mock.method(globalThis, 'fetch', async () => new Response(validCsv, { headers: { 'Content-Type': 'text/csv', etag: '"route-version"', 'Last-Modified': 'Wed, 14 Oct 2026 23:02:27 GMT' } }));
     /* @Codex Regression: a zero-byte POST can still expose a ReadableStream. */
     for (const emptyChunks of [0, 1]) {
         const streamedEmpty = streamed(new ReadableStream({ start(controller) {
@@ -301,6 +312,20 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal(payload.manifest.sourceUrl, 'https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv');
     assert.equal(payload.count, 1);
     const committed = getAifaCatalogSnapshot();
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+        assert.equal((init.headers as Record<string, string>)['If-None-Match'], '"route-version"');
+        return new Response(null, { status: 304 });
+    });
+    const notModified = await POST(request());
+    assert.equal(notModified.status, 200); assert.equal((await notModified.json()).notModified, true);
+    assert.equal(getAifaCatalogSnapshot(), committed);
+    const { listAuditEvents } = await import('./security/audit');
+    const noChangeAudit = (await listAuditEvents({ eventType: 'reference_data.aifa.updated', actorRef: current!.userId }))
+        .find(event => event.redactedMetadata?.flags?.includes('not-modified'));
+    assert.ok(noChangeAudit);
+    assert.equal(noChangeAudit.redactedMetadata?.aifaCatalog?.before?.sha256, payload.manifest.sha256);
+    assert.equal(noChangeAudit.redactedMetadata?.aifaCatalog?.after?.sha256, payload.manifest.sha256);
+    testDb.insert(testSettings).values({ key: 'aifaNetworkAccess', value: 'enabled' }).onConflictDoUpdate({ target: testSettings.key, set: { value: 'enabled' } }).run();
     for (const bytes of [new Uint8Array([0xff]), new TextEncoder().encode('not a csv')]) {
         t.mock.method(globalThis, 'fetch', async () => new Response(bytes, { headers: { 'Content-Type': 'text/csv' } }));
         assert.equal((await POST(request())).status, 422);
@@ -311,11 +336,14 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal(getAifaCatalogSnapshot(), committed);
     const catalog = await loadCatalogModules();
     t.mock.method(globalThis, 'fetch', async () => {
-        catalog.replaceUnverifiedDrugCatalog([{ aic: '000000999', name: 'CONCURRENT SYNTHETIC', nameSearch: 'concurrent synthetic' }]);
+        const concurrent = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+        try {
+            concurrent.prepare('UPDATE drugs SET name = ?, name_search = ?').run('CONCURRENT SYNTHETIC', 'concurrent synthetic');
+        } finally { concurrent.close(); }
         return new Response(validCsv, { headers: { 'Content-Type': 'text/csv' } });
     });
     assert.equal((await POST(request())).status, 409);
-    assert.equal((await catalog.searchAifaCatalog('concurrent', 1)).rows[0].aic, '000000999');
+    assert.equal((await catalog.searchAifaCatalog('concurrent', 1)).rows[0].name, 'CONCURRENT SYNTHETIC');
     const changed = getAifaCatalogSnapshot();
     t.mock.method(globalThis, 'fetch', async () => {
         current = null;
@@ -363,4 +391,223 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal(bodyCancelled, true);
     assert.equal(calls, 0);
     assert.equal(getAifaCatalogSnapshot(), before);
+});
+
+test('AIFA source debounce persists across calls, respects egress denial and recomputes status after replacement', async t => {
+    const catalog = await loadCatalogModules();
+    const { checkAifaSource, getAifaSourceStatus } = await import('./aifa-catalog-source-server');
+    const { AIFA_REMOTE_SETTING_KEY, AIFA_NETWORK_SETTING_KEY, AIFA_SOURCE_CHECK_INTERVAL_MS } = await import('./aifa-catalog-source');
+    const { dbServer } = await import('./db-server');
+    const { settings } = await import('./schema');
+    const { eq } = await import('drizzle-orm');
+    const { AIFA_DOWNLOAD_URL } = await import('./aifa-catalog-download');
+    const set = (key: string, value: string) => dbServer.insert(settings).values({ key, value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
+    const previousNetwork = process.env.MEDIFLOW_NETWORK_DISABLED;
+    delete process.env.MEDIFLOW_NETWORK_DISABLED;
+    catalog.clearAifaCatalog();
+    dbServer.delete(settings).where(eq(settings.key, AIFA_REMOTE_SETTING_KEY)).run();
+    set(AIFA_NETWORK_SETTING_KEY, 'disabled');
+    let calls = 0;
+    const transport = (async (_url, init) => {
+        calls++; assert.equal(init?.method, 'HEAD');
+        return new Response(null, { headers: { etag: '"source-new"', 'last-modified': 'Wed, 14 Oct 2026 23:02:27 GMT', 'content-length': '80' } });
+    }) as typeof fetch;
+    try {
+        t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-15T10:00:00Z') });
+        assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, transport)).remote.reason, 'network_disabled');
+        assert.equal(calls, 0);
+        set(AIFA_NETWORK_SETTING_KEY, 'enabled');
+        process.env.MEDIFLOW_NETWORK_DISABLED = '1';
+        assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, transport)).networkAllowed, false);
+        assert.equal(calls, 0); delete process.env.MEDIFLOW_NETWORK_DISABLED;
+        const first = await checkAifaSource(new AbortController().signal, () => undefined, transport);
+        assert.equal(first.remote.outcome, 'available'); assert.equal(calls, 1);
+        assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, transport)).remote.checkedAt, first.remote.checkedAt);
+        assert.equal(calls, 1);
+        const { acquireAifaCatalogOperation } = await import('./aifa-catalog-lock');
+        const release = acquireAifaCatalogOperation();
+        try { assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, transport)).remote.reason, 'busy'); }
+        finally { release(); }
+        const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000801;SINTETICO;A01AA01;Sintetico';
+        await catalog.replaceAifaCatalog(new File([csv], 'synthetic.csv'), { sourceUrl: AIFA_DOWNLOAD_URL,
+            downloadedAt: '2026-10-15', version: 'synthetic-http', etag: '"source-new"', lastModified: first.remote.lastModified });
+        assert.equal((await getAifaSourceStatus()).remote.outcome, 'unchanged');
+        t.mock.timers.setTime(Date.now() + AIFA_SOURCE_CHECK_INTERVAL_MS - 1);
+        await checkAifaSource(new AbortController().signal, () => undefined, transport); assert.equal(calls, 1);
+        t.mock.timers.setTime(Date.now() + 1);
+        assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, transport)).remote.outcome, 'unchanged');
+        assert.equal(calls, 2);
+        t.mock.timers.setTime(Date.now() + AIFA_SOURCE_CHECK_INTERVAL_MS);
+        const failed = (async () => { calls++; throw new Error('synthetic HEAD failure'); }) as typeof fetch;
+        assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, failed)).remote.outcome, 'unavailable');
+        assert.equal((await checkAifaSource(new AbortController().signal, () => undefined, transport)).remote.outcome, 'unavailable');
+        assert.equal(calls, 3, 'failures are persistently debounced too');
+    } finally {
+        if (previousNetwork === undefined) delete process.env.MEDIFLOW_NETWORK_DISABLED;
+        else process.env.MEDIFLOW_NETWORK_DISABLED = previousNetwork;
+        dbServer.delete(settings).where(eq(settings.key, AIFA_REMOTE_SETTING_KEY)).run();
+        catalog.clearAifaCatalog();
+    }
+});
+
+test('reduction below 90% requires confirmation bound to both catalog and file; audit failure rolls back replacement', async () => {
+    const catalog = await loadCatalogModules();
+    const { getAifaCatalogSnapshot } = await import('./aifa-catalog-server');
+    const { AifaReductionError } = await import('./aifa-catalog-lock');
+    const { listAuditEvents } = await import('./security/audit');
+    const makeFile = (count: number, suffix = '') => new File(['CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n' + Array.from({ length: count }, (_, index) =>
+        `${String(index + 1).padStart(9, '0')};SINTETICO ${index}${suffix};A01AA01;Principio inventato`).join('\n')], 'synthetic.csv');
+    const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-10-15', version: 'synthetic-reduction' };
+    catalog.clearAifaCatalog();
+    await catalog.replaceAifaCatalog(makeFile(10), manifest);
+    await catalog.replaceAifaCatalog(makeFile(9), manifest);
+    const snapshot = getAifaCatalogSnapshot();
+    const before = await catalog.getAifaCatalogStatus();
+    let confirmation = '';
+    await assert.rejects(catalog.replaceAifaCatalog(makeFile(8), manifest), (error: unknown) => {
+        assert.ok(error instanceof AifaReductionError); assert.equal(error.previousCount, 9); assert.equal(error.nextCount, 8);
+        confirmation = error.confirmation; return true;
+    });
+    assert.equal(getAifaCatalogSnapshot(), snapshot);
+    await assert.rejects(catalog.replaceAifaCatalog(makeFile(8, ' diverso'), manifest, undefined, { confirmedReduction: confirmation }), AifaReductionError);
+    const result = await catalog.replaceAifaCatalog(makeFile(8), manifest, undefined, { confirmedReduction: confirmation });
+    assert.ok(result.manifest);
+    const event = (await listAuditEvents({ eventType: 'reference_data.aifa.updated' })).find(event => event.redactedMetadata?.aifaCatalog?.after?.sha256 === result.manifest?.sha256 && event.redactedMetadata?.aifaCatalog?.forcedReduction)!;
+    assert.equal(event.actorType, 'system');
+    assert.equal(event.redactedMetadata?.aifaCatalog?.before?.sha256, before.manifest?.sha256);
+    assert.equal(event.redactedMetadata?.aifaCatalog?.after?.sha256, result.manifest.sha256);
+    assert.equal(event.redactedMetadata?.aifaCatalog?.forcedReduction, true);
+    const committed = getAifaCatalogSnapshot();
+    const sqlite = new Database(path.join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'));
+    try {
+        sqlite.exec("CREATE TRIGGER synthetic_aifa_audit_fail BEFORE INSERT ON audit_events WHEN NEW.event_type = 'reference_data.aifa.updated' BEGIN SELECT RAISE(IGNORE); END");
+        await assert.rejects(catalog.replaceAifaCatalog(makeFile(8, ' audit'), manifest), /Required audit insert/);
+        assert.equal(getAifaCatalogSnapshot(), committed);
+    } finally { sqlite.exec('DROP TRIGGER synthetic_aifa_audit_fail'); sqlite.close(); catalog.clearAifaCatalog(); }
+});
+
+test('HEAD route accepts zero-byte Next.js POST streams, authenticates, rejects input and retires with its session', async t => {
+    const catalog = await loadCatalogModules();
+    const load = createRequire(import.meta.url);
+    const auth = load('./security/server-auth.ts') as typeof import('./security/server-auth');
+    const owner = load('./security/web-auth-lifecycle-owner-adapter.ts') as typeof import('./security/web-auth-lifecycle-owner-adapter');
+    const route = load('../app/api/drugs/source/route.ts') as typeof import('../app/api/drugs/source/route');
+    const { dbServer } = await import('./db-server');
+    const { settings } = await import('./schema');
+    const { eq } = await import('drizzle-orm');
+    const setNetwork = (value: string) => dbServer.insert(settings).values({ key: 'aifaNetworkAccess', value }).onConflictDoUpdate({ target: settings.key, set: { value } }).run();
+    const resetRemote = () => dbServer.delete(settings).where(eq(settings.key, 'aifaCatalogRemoteState')).run();
+    let current: Awaited<ReturnType<typeof auth.requireSession>> = null;
+    t.mock.method(auth, 'requireSession', async () => current);
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
+        calls++; assert.equal(init.method, 'HEAD');
+        return new Response(null, { headers: { etag: '"head-route"', 'Last-Modified': 'Wed, 14 Oct 2026 23:02:27 GMT' } });
+    });
+    const request = () => {
+        const incoming = new IncomingMessage(new Socket());
+        incoming.method = 'POST';
+        incoming.url = 'http://localhost/api/drugs/source';
+        incoming.headers = { ...Object.fromEntries(syntheticExemptionRequest(incoming.url, { method: 'POST' }).headers), 'content-length': '0' };
+        incoming.push(null);
+        const adapted = NextRequestAdapter.fromNodeNextRequest(new NodeNextRequest(incoming), new AbortController().signal);
+        assert.ok(adapted.body, 'Next.js supplies a stream even for a zero-byte POST');
+        return adapted;
+    };
+    assert.equal((await route.POST(request())).status, 401); assert.equal((await route.GET()).status, 401); assert.equal(calls, 0);
+    const control = owner.bootstrapControl()!;
+    const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-aifa-head-login' });
+    const issued = owner.issue(attempt, { id: 'synthetic-head-user', username: 'synthetic-aifa', role: 'clinician' })!;
+    const resolved = owner.resolve(issued.sessionId, control.controlId);
+    if (resolved.status !== 'active') throw new Error('synthetic session setup failed');
+    current = resolved.projection; bindSyntheticArchiveSessions(current.id);
+    const before = catalog.getAifaCatalogSnapshot();
+    try {
+        resetRemote(); setNetwork('disabled');
+        const disabled = await route.POST(request());
+        assert.equal(disabled.status, 200);
+        assert.equal((await disabled.json()).networkAllowed, false); assert.equal(calls, 0);
+        assert.equal((await route.POST(syntheticExemptionRequest('http://localhost/api/drugs/source?url=invalid', { method: 'POST' }))).status, 400);
+        assert.equal((await route.POST(syntheticExemptionRequest('http://localhost/api/drugs/source', { method: 'POST', body: '{}' }))).status, 400);
+        setNetwork('enabled');
+        assert.equal((await route.POST(request())).status, 200); assert.equal(calls, 1);
+        await route.POST(request()); assert.equal(calls, 1);
+        assert.equal((await route.GET()).status, 200); assert.equal(calls, 1);
+        resetRemote();
+        t.mock.method(globalThis, 'fetch', async () => {
+            calls++; owner.retire(current!, 'dispose'); current = null;
+            return new Response(null, { headers: { etag: '"head-revoked"' } });
+        });
+        assert.equal((await route.POST(request())).status, 503);
+        assert.equal(catalog.getAifaCatalogSnapshot(), before);
+        assert.equal((await route.GET()).status, 401);
+    } finally { if (current) owner.retire(current, 'dispose'); resetRemote(); }
+});
+
+test('confirmation rejects a different file or catalog even when reduction is no longer below 90%', async t => {
+    const catalog = await loadCatalogModules();
+    const { AifaReductionError, AifaUpdateError } = await import('./aifa-catalog-lock');
+    const makeFile = (count: number) => new File(['CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n' + Array.from({ length: count }, (_, index) =>
+        `${String(index + 1).padStart(9, '0')};SINTETICO ${index};A01AA01;Principio inventato`).join('\n')], 'synthetic.csv');
+    const manifest = { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL, downloadedAt: '2026-10-15', version: 'synthetic-confirmation' };
+    for (const scenario of ['different file', 'changed catalog']) await t.test(scenario, async () => {
+        catalog.clearAifaCatalog();
+        await catalog.replaceAifaCatalog(makeFile(100), manifest);
+        let confirmation = '';
+        await assert.rejects(catalog.replaceAifaCatalog(makeFile(80), manifest), (error: unknown) => {
+            assert.ok(error instanceof AifaReductionError);
+            confirmation = error.confirmation;
+            return true;
+        });
+        if (scenario === 'changed catalog') {
+            catalog.clearAifaCatalog();
+            await catalog.replaceAifaCatalog(makeFile(80), manifest);
+        }
+        const before = catalog.getAifaCatalogSnapshot();
+        try {
+            await assert.rejects(catalog.replaceAifaCatalog(makeFile(scenario === 'different file' ? 95 : 80), manifest,
+                undefined, { confirmedReduction: confirmation }), (error: unknown) => error instanceof AifaUpdateError && error.status === 409);
+            assert.equal(catalog.getAifaCatalogSnapshot(), before);
+        } finally { catalog.clearAifaCatalog(); }
+    });
+});
+
+test('manual import excludes legacy replacement and clearing through services and v1 routes', async t => {
+    const catalog = await loadCatalogModules();
+    const { AifaUpdateError } = await import('./aifa-catalog-lock');
+    const load = createRequire(import.meta.url);
+    const route = load('../app/api/v1/drugs/route.ts') as typeof import('../app/api/v1/drugs/route');
+    const { getOrCreateLocalApiToken } = await import('./security/local-api-token');
+    const token = getOrCreateLocalApiToken();
+    const legacy = [{ aic: '000000999', name: 'LEGACY SINTETICO' }];
+    const request = (method: string) => new Request('http://localhost/api/v1/drugs', {
+        method, headers: { authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        ...(method === 'POST' ? { body: JSON.stringify(legacy) } : {}),
+    });
+    const csv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000101;SINTETICO;A01AA01;Inventato';
+    for (const writer of ['replace', 'clear', 'POST', 'DELETE']) await t.test(writer, async () => {
+        catalog.clearAifaCatalog();
+        catalog.replaceUnverifiedDrugCatalog(legacy);
+        const before = catalog.getAifaCatalogSnapshot();
+        const file = new File([csv], 'synthetic.csv');
+        const bytes = await file.arrayBuffer();
+        let resume!: (value: ArrayBuffer) => void;
+        t.mock.method(file, 'arrayBuffer', () => new Promise<ArrayBuffer>(resolve => { resume = resolve; }));
+        const pending = catalog.replaceAifaCatalog(file, { sourceUrl: AIFA_CATALOG_DEFAULT_SOURCE_URL,
+            downloadedAt: '2026-10-15', version: 'synthetic-lock' });
+        const conflict = (error: unknown) => error instanceof AifaUpdateError && error.status === 409;
+        try {
+            if (writer === 'replace') assert.throws(() => catalog.replaceUnverifiedDrugCatalog(legacy), conflict);
+            else if (writer === 'clear') assert.throws(() => catalog.clearAifaCatalog(), conflict);
+            else {
+                const response = await route[writer as 'POST' | 'DELETE'](request(writer));
+                assert.equal(response.status, 409);
+                assert.deepEqual(await response.json(), { error: 'Operazione AIFA già in corso' });
+            }
+            assert.equal(catalog.getAifaCatalogSnapshot(), before);
+        } finally { resume(bytes); await pending; }
+        assert.equal((await catalog.searchAifaCatalog('sintetico', 10)).rows[0].aic, '000000101');
+        assert.equal((await route.POST(request('POST'))).status, 200);
+        assert.equal((await route.DELETE(request('DELETE'))).status, 200);
+    });
 });

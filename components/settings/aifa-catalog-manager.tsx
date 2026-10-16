@@ -9,6 +9,8 @@ import { createAifaUpdateGuide, INITIAL_AIFA_GUIDE_STATE, type AifaGuidePhase } 
 import { Button } from '@/components/ui/button';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { semanticSignalSurfaceClass } from '@/components/ui/semantic-signal';
+import { AifaRemoteNotice, useAifaRemoteStatus } from './aifa-remote-notice';
+import type { AifaDownloadProgress } from '@/lib/aifa-catalog-download';
 import { SETTINGS_CARD_CLASS } from './settings-ui';
 
 const AIFA_PANEL_STYLE = { minWidth: 0, border: '1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent)', borderRadius: 'var(--lume-radius-panel)', background: 'var(--lume-surface-focal)', padding: 24 };
@@ -29,20 +31,25 @@ export default function AifaCatalogManager() {
     const confirm = useConfirm();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const guide = useRef<ReturnType<typeof createAifaUpdateGuide> | null>(null);
+    const [progress, setProgress] = useState<AifaDownloadProgress | null>(null);
     const [state, setState] = useState(INITIAL_AIFA_GUIDE_STATE);
     const [sourceUrl, setSourceUrl] = useState(AIFA_CATALOG_DEFAULT_SOURCE_URL);
     const [downloadedAt, setDownloadedAt] = useState('');
     const [datasetVersion, setDatasetVersion] = useState('');
     useEffect(() => {
-        const current = createAifaUpdateGuide({ read: getDrugCatalogStatus, update: updateAifaCatalog,
+        const current = createAifaUpdateGuide({ read: getDrugCatalogStatus, update: (signal, confirmation) => updateAifaCatalog(signal, confirmation, setProgress),
             importFile: importAifaCsv, clear: clearDrugDatabase }, setState);
         guide.current = current;
-        void current.refresh(); // Local read only, including Strict Mode remounts.
+        void current.refresh();
         return () => { guide.current = null; current.dispose(); };
     }, []);
     const drugCatalog = state.catalog;
     const busy = state.phase !== 'idle';
-    const writeDisabled = busy || state.reconciliationRequired;
+    const remote = useAifaRemoteStatus(drugCatalog?.manifest?.importedAt, busy);
+    const writeDisabled = busy || state.reconciliationRequired || remote.checking;
+    const update = () => guide.current?.update(async message => (await confirm({ title: 'Confermare la riduzione del catalogo?',
+        message: `${message} Confermando, il file sarà scaricato di nuovo e applicato solo se identico a quello appena controllato.`,
+        confirmLabel: 'Conferma riduzione', tone: 'danger' })).confirmed);
     const phaseText = state.reading ? 'Lettura dello stato locale in corso…' : phaseLabels[state.phase];
     const handleAifaUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.currentTarget.files?.[0];
@@ -52,7 +59,7 @@ export default function AifaCatalogManager() {
             const result = await confirm({ title: 'Importare il file AIFA?',
                 message: 'Il CSV locale sostituirà il catalogo al completamento dell’importazione. Controlla fonte, data e versione dichiarate.', confirmLabel: 'Importa' });
             return result.confirmed;
-        });
+        }, async message => (await confirm({ title: 'Confermare la riduzione del catalogo?', message, confirmLabel: 'Conferma riduzione', tone: 'danger' })).confirmed);
     };
     const handleClearDrugs = () => {
         void guide.current?.clear(async () => {
@@ -97,11 +104,11 @@ export default function AifaCatalogManager() {
                     <Server className="w-8 h-8" style={{ color: 'color-mix(in srgb, var(--lume-ink-muted) 58%, transparent)' }} />
                 </div>
 
-                {/* @Codex Explicit acquisition; opening this page only reads local status. */}
+                <AifaRemoteNotice {...remote} disabled={busy} settings />
                 <div className="space-y-2">
-                    <Button onClick={() => void guide.current?.update()} disabled={writeDisabled}
+                    <Button onClick={() => void update()} disabled={writeDisabled || !remote.status?.networkAllowed}
                         className="w-full" style={AIFA_COMMAND_STYLE}>
-                        Aggiorna da AIFA
+                        Aggiorna ora
                     </Button>
                     <p className="text-sm leading-6 text-[color:var(--lume-ink-muted)]">
                         Scarica il feed ufficiale via Internet su tua richiesta. Il catalogo precedente resta disponibile fino al completamento della sostituzione atomica. Nessun dato clinico viene inviato.
@@ -109,6 +116,10 @@ export default function AifaCatalogManager() {
                         {' '}Dati descrittivi e provvisori: non certificano disponibilità, rimborsabilità o appropriatezza.
                         {' '}<a className="underline" href="https://www.aifa.gov.it/copyright" target="_blank" rel="noopener noreferrer">Condizioni AIFA</a>.
                     </p>
+                    {progress && <div role="status" className="text-sm">
+                        <p>{progress.phase === 'validating' ? 'Download completato. Validazione del catalogo…' : `${(progress.receivedBytes / 1024 / 1024).toLocaleString('it-IT', { maximumFractionDigits: 1 })} MiB ricevuti${progress.totalBytes ? ` su ${(progress.totalBytes / 1024 / 1024).toLocaleString('it-IT', { maximumFractionDigits: 1 })} MiB` : ''}`}</p>
+                        {progress.phase === 'downloading' && progress.totalBytes && <progress aria-label="Download AIFA" max={progress.totalBytes} value={progress.receivedBytes} className="w-full" />}
+                    </div>}
                     <p role="status" aria-live="polite" className="text-sm">{phaseText}</p>
                     {state.notice && <p role={state.notice.tone === 'error' ? 'alert' : 'status'} className="text-sm leading-6">{state.notice.text}</p>}
                     {state.reconciliationRequired && <p className="text-sm leading-6">Prima di un’altra modifica, rileggi il catalogo. Una richiesta di annullamento non conferma un rollback.</p>}
