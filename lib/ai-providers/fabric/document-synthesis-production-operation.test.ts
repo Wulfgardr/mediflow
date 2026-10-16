@@ -117,14 +117,24 @@ test('preserves the confirmed selection through encrypted client bytes, real Any
     try {
         database.prepare('INSERT INTO ambulatories (id, name, type) VALUES (?, ?, ?)')
             .run(PAIR.ambulatoryId, 'Ambulatorio sintetico', 'test');
-        database.prepare('INSERT INTO patients (id, first_name, last_name, tax_code, version) VALUES (?, ?, ?, ?, 1)')
-            .run(PAIR.patientId, 'Persona', 'Sintetica', 'SYNTHETICDS000001');
+        database.prepare('INSERT INTO patients (id, first_name, last_name, tax_code, version, diagnoses) VALUES (?, ?, ?, ?, 1, ?)')
+            .run(PAIR.patientId, 'Persona', 'Sintetica', 'SYNTHETICDS000001', 'synthetic existing diagnoses');
+        database.prepare('INSERT INTO therapies (id, patient_id, drug_name, dosage, start_date, status) VALUES (?, ?, ?, ?, ?, ?)')
+            .run('therapy.synthetic.existing', PAIR.patientId, 'Farmaco sintetico esistente', '1 mg', 1, 'active');
         database.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)')
             .run(PAIR.patientId, PAIR.ambulatoryId);
         database.prepare('INSERT INTO attachments (id, patient_id, name, type, size, path, data, document_source_ref, document_revision, document_freshness_epoch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             .run(attachmentId, PAIR.patientId, 'synthetic.rtf', 'application/rtf', bytes.length, 'synthetic.rtf', `ENC:${bytes.toString('base64')}`,
                 CURRENT.documentSourceRef, CURRENT.documentRevision, CURRENT.documentFreshnessEpoch);
     } finally { database.close(); }
+    const snapshot = () => {
+        const check = new Database(path.join(DATA_DIRECTORY, 'medical.db'), { readonly: true });
+        try {
+            return ['patients', 'therapies', 'audit_events'].map((table) =>
+                check.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+        } finally { check.close(); }
+    };
+    const before = snapshot();
     const selected = context(serverSessionProjectionOwnerRegistry);
     const epochs = () => [selected.owner.snapshotSelectionEpoch(selected.session), selected.owner.snapshotReviewContextEpoch(selected.session)];
     assert.deepEqual(epochs(), [1, 1]);
@@ -152,6 +162,7 @@ test('preserves the confirmed selection through encrypted client bytes, real Any
     assert.equal((await (await acquire()).ingest({ captureHandle: captured.captureHandle })).code, 'capture_consumed');
     assert.equal((await (await acquire()).preview({ previewHandle: ingested.previewHandle })).code, 'preview_consumed');
     assert.equal(executions, 1);
+    assert.deepEqual(snapshot(), before, 'preview and replay must preserve diagnoses, therapies, patient version and audit');
 });
 
 test('shares DS handles across fresh authentic projections only within their canonical owner', async () => {
