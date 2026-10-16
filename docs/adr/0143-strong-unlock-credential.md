@@ -278,3 +278,34 @@ Sblocco, cambio, recupero e riavvio su dati sintetici; migrazione interrotta a
 ogni passo; segreto errato, involucro corrotto e kit mancante con errori che
 non rivelano nulla; ricerca del segreto in log, errori e argomenti di processo;
 review crittografica indipendente del diff.
+
+## Client Apple v3 — 16 ottobre 2026, WUL-777
+
+Il client condiviso da macOS, iOS e iPadOS adotta il protocollo v3: dopo il gesto
+di accesso legge `GET /api/auth/check`, richiede parametri espliciti e deriva
+localmente verificatore e KEK con gli stessi domini HKDF, normalizzazione NFKC
+e 2.000.000 di iterazioni del browser. `POST /api/auth/native/login` accetta
+`username` con uno solo tra `verifier` e il precedente `password` per gli
+account PIN. Il verificatore condiviso dell'host decide quale formato accettare;
+pairing, ammissione monouso, blocco tentativi e fence delle sessioni restano obbligatori.
+
+Il preflight pubblico non concede autorità nativa o Web. Una risposta mancante,
+una versione sconosciuta o un testo compatibile con una passphrase davanti a parametri PIN fermano
+il client senza invio del segreto, retry o downgrade. Gli eventuali PIN legacy
+di almeno 15 caratteri richiedono il browser con la sua conferma esplicita.
+Il preflight corrente espone il salt soltanto nell'archivio a utente unico;
+un archivio multiutente con account v3 resta quindi chiuso per il client Apple.
+
+La risposta nativa include la generazione dell'archivio. Per v3 il client
+ricontrolla generazione, salt e versione e apre l'involucro prima di consegnare
+sessione e master key alla UI. Un involucro incoerente provoca il logout della
+sessione appena ricevuta. La chiave resta in memoria; la passphrase lascia il
+campo dopo il successo. Una risposta di login ritardata dopo blocco o cambio
+di collegamento viene ritirata senza riattivare la UI.
+
+`native/contracts/crypto-golden-vectors.v3.json` è prodotto dalle primitive
+WebCrypto canoniche ed è consumato anche dai test Swift. Su Apple la primitiva
+PBKDF2 usa CommonCrypto; le piattaforme senza CommonCrypto conservano il
+percorso Crypto già presente. I test con trasporto simulato e la prova HTTPS
+isolata host/client non sostituiscono la verifica delle app su Mac, iPhone e
+iPad, né dichiarano qualificazione clinica o disponibilità su hardware non provato.
