@@ -8,7 +8,7 @@ import UIKit
 #endif
 
 public enum ClinicalContentRendering {
-    public enum ForegroundStyle: Equatable, Sendable {
+    public enum ForegroundStyle: Hashable, Sendable {
         case primary, secondary
     }
 
@@ -110,19 +110,73 @@ public enum ClinicalContentRendering {
     }
 }
 
+@MainActor
+final class ClinicalContentTextModel: ObservableObject {
+    struct Request: Hashable {
+        let content: String
+        var foregroundStyle: ClinicalContentRendering.ForegroundStyle = .primary
+    }
+
+    private struct Rendered {
+        let request: Request
+        let content: NSAttributedString
+    }
+
+    @Published private var rendered: Rendered?
+    private let importContent: @MainActor (Request) -> NSAttributedString
+
+    init(importContent: @escaping @MainActor (Request) -> NSAttributedString = {
+        ClinicalContentRendering.nativeAttributedString(from: $0.content, foregroundStyle: $0.foregroundStyle)
+    }) {
+        self.importContent = importContent
+    }
+
+    func value(for request: Request) -> NSAttributedString? {
+        rendered?.request == request ? rendered?.content : nil
+    }
+
+    func load(_ request: Request) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        guard !Task.isCancelled, value(for: request) == nil else { return }
+        let content = importContent(request)
+        guard !Task.isCancelled else { return }
+        rendered = Rendered(request: request, content: content)
+    }
+}
+
+@MainActor
 public struct ClinicalContentText: View {
     private let content: String
     private let foregroundStyle: ClinicalContentRendering.ForegroundStyle
+    @StateObject private var rendering: ClinicalContentTextModel
 
     public init(_ content: String, foregroundStyle: ClinicalContentRendering.ForegroundStyle = .primary) {
+        self.init(content, foregroundStyle: foregroundStyle, rendering: ClinicalContentTextModel())
+    }
+
+    init(
+        _ content: String, foregroundStyle: ClinicalContentRendering.ForegroundStyle = .primary,
+        rendering: ClinicalContentTextModel
+    ) {
         self.content = content
         self.foregroundStyle = foregroundStyle
+        self._rendering = StateObject(wrappedValue: rendering)
     }
 
     public var body: some View {
-        ClinicalContentPlatformText(content: ClinicalContentRendering.nativeAttributedString(
-            from: content, foregroundStyle: foregroundStyle
-        ))
+        let request = ClinicalContentTextModel.Request(content: content, foregroundStyle: foregroundStyle)
+        Group {
+            if let rendered = rendering.value(for: request) {
+                ClinicalContentPlatformText(content: rendered)
+            } else {
+                ProgressView("Caricamento contenuto...")
+            }
+        }
+        .task(id: request) {
+            await rendering.load(request)
+        }
     }
 }
 

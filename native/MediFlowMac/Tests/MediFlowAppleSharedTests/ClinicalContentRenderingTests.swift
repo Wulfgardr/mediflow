@@ -29,8 +29,11 @@ final class ClinicalContentRenderingTests: XCTestCase {
 
     #if canImport(AppKit)
     @MainActor
-    func testSwiftUIContentDrawsNestedMarkersAtDifferentIndents() throws {
-        let content = ClinicalContentText("<ol><li>Prima voce<ol><li>Seconda voce</li></ol></li></ol>")
+    func testSwiftUIContentDrawsNestedMarkersAtDifferentIndents() async throws {
+        let html = "<ol><li>Prima voce<ol><li>Seconda voce</li></ol></li></ol>"
+        let rendering = ClinicalContentTextModel()
+        await rendering.load(.init(content: html))
+        let content = ClinicalContentText(html, rendering: rendering)
             .frame(width: 400, height: 120, alignment: .topLeading)
         let host = NSHostingView(rootView: content)
         host.frame = NSRect(x: 0, y: 0, width: 400, height: 120)
@@ -61,6 +64,59 @@ final class ClinicalContentRenderingTests: XCTestCase {
         XCTAssertEqual(lineStarts.count, 2, "Expected two readable list lines: \(lineStarts)")
         guard lineStarts.count == 2 else { return }
         XCTAssertGreaterThan(lineStarts[1], lineStarts[0] + 20)
+    }
+
+    @MainActor
+    func testViewConstructionAndBodyDoNotImportHTML() async {
+        var imports = 0
+        let rendering = ClinicalContentTextModel { request in
+            imports += 1
+            return NSAttributedString(string: request.content)
+        }
+        let html = "<p>Nota sintetica</p>"
+        let view = ClinicalContentText(html, rendering: rendering)
+        _ = view.body
+        XCTAssertEqual(imports, 0)
+        let request = ClinicalContentTextModel.Request(content: html)
+        XCTAssertNil(rendering.value(for: request))
+        await rendering.load(request)
+        XCTAssertEqual(imports, 1)
+        XCTAssertEqual(rendering.value(for: request)?.string, html)
+        await rendering.load(request)
+        XCTAssertEqual(imports, 1)
+    }
+
+    @MainActor
+    func testContentAndStyleChangesNeverExposePreviousRenderedValue() async {
+        let rendering = ClinicalContentTextModel { NSAttributedString(string: $0.content) }
+        let first = ClinicalContentTextModel.Request(content: "Nota sintetica A")
+        let second = ClinicalContentTextModel.Request(content: "Nota sintetica B")
+        let deleted = ClinicalContentTextModel.Request(content: second.content, foregroundStyle: .secondary)
+        await rendering.load(first)
+        XCTAssertNotNil(rendering.value(for: first))
+        XCTAssertNil(rendering.value(for: second))
+        await rendering.load(second)
+        XCTAssertNil(rendering.value(for: first))
+        XCTAssertNotNil(rendering.value(for: second))
+        XCTAssertNil(rendering.value(for: deleted))
+        await rendering.load(deleted)
+        XCTAssertNil(rendering.value(for: second))
+        XCTAssertNotNil(rendering.value(for: deleted))
+    }
+
+    @MainActor
+    func testCancelledLoadDoesNotImportOrPublishContent() async {
+        var imports = 0
+        let rendering = ClinicalContentTextModel { request in
+            imports += 1
+            return NSAttributedString(string: request.content)
+        }
+        let request = ClinicalContentTextModel.Request(content: "Nota sintetica annullata")
+        let loading = Task { await rendering.load(request) }
+        loading.cancel()
+        await loading.value
+        XCTAssertEqual(imports, 0)
+        XCTAssertNil(rendering.value(for: request))
     }
 
     @MainActor
