@@ -119,8 +119,9 @@ per mantenerla allineata al lavoro sul paziente.
 ### Diagnosi e resolver ICD-11
 
 La diagnosi può restare un testo libero. Quando è utile affiancarle una
-codifica, il resolver OMS ICD-11 può proporre un codice strutturato: il servizio
-è opzionale e il suggerimento resta da rivedere prima del salvataggio.
+codifica, il catalogo WHO MMS 2026-01 permette di cercare per codice o titolo
+inglese senza Docker dopo acquisizione verificata. Il servizio WHO locale resta
+opzionale. La selezione richiede revisione e salvataggio esplicito.
 
 * Inserisci una diagnosi e, quando utile, richiedi un suggerimento codificato
   (es. `5A10`).
@@ -165,6 +166,22 @@ organizzative e operative con cui usi il sistema.
 
 ---
 Per supporto, apri una issue o consulta la documentazione tecnica.
+
+### Catalogo ICD-11 incorporato
+
+In Impostazioni, Repertori, Terminologia WHO si legge lo stato del catalogo
+MMS 2026-01 inglese. Un catalogo pronto permette ricerca per codice o titolo
+senza Docker, credenziali o rete. Il bundle include l’archivio WHO originale:
+35.664 categorie con codice, importate e verificate al primo uso.
+Aggiorna dalla WHO scarica un’anteprima
+con conferma; Attiva catalogo verificato richiede una seconda conferma e conserva
+la versione precedente ripristinabile. Il download non invia dati della cartella.
+
+Il controllo codice verifica la presenza della categoria, non la diagnosi clinica.
+Niente sinonimi, traduzione italiana o postcoordinazione. Dati WHO CC BY-ND 3.0 IGO,
+non MIT. Sono accettati file tab-separated UTF-8, anche in ZIP; XLSX non supportato.
+Le diagnosi cambiano solo dopo selezione e salvataggio espliciti del medico.
+Il servizio WHO Docker rimane opzionale. [Procedura e limiti](./icd-who-setup.md).
 
 ## Catalogo farmaci AIFA
 
