@@ -595,6 +595,7 @@ export function Kree8ClinicalCockpit({
           }}
           onOpenCommand={openCommandCenter}
           commandsInWorkspace={commandsInWorkspace}
+          searchAcrossAreas={isReview}
           operatorName={operatorName}
         />
         <div

@@ -54,7 +54,7 @@ async function pageHealth(page: Page) {
   await expect(page.locator('h1').first()).toBeVisible();
   await expect(page).toHaveTitle(/MediFlow/);
   await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
-  await expect(page.locator('nextjs-portal')).not.toContainText(/Runtime Error|Build Error|Unhandled Runtime/);
+  await expect(page.locator('nextjs-portal').filter({ hasText: /Runtime Error|Build Error|Unhandled Runtime/ })).toHaveCount(0);
   await expect(page.locator('[data-twin-workspace]')).toBeVisible();
   const canvas = page.getByTestId('lume-frame-canvas');
   if (await canvas.count()) await assertNoHorizontalOverflow(page, [{ label: 'canvas', selector: '[data-testid="lume-frame-canvas"]' }]);
