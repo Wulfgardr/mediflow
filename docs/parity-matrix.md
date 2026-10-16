@@ -15,7 +15,8 @@ Ultimo aggiornamento: 2026-10-16 (inventario corrente WUL-694; baseline e prove 
 L'inventario comprende l'accesso v3 integrato in `main` a
 `4c69e4daa7163605765f8f7112d76dcf8e34cc02` e il successivo contributo ChatGPT
 integrato a `9e2912e6df3c84d963726cd5ac8e2207fb98dff8`. Il codice integrato,
-quello nelle PR e le prove sui candidati sono distinti. I conteggi e gli esiti 0.8 nelle
+quello nelle PR e le prove sui candidati sono distinti. Le righe seguenti
+riportano anche le successive integrazioni Apple. I conteggi e gli esiti 0.8 nelle
 sezioni successive sono storia: non misurano il completamento del prodotto
 corrente e non impongono nuovi blocchi oltre il contratto vigente. La parità
 totale non è attestata.
@@ -30,10 +31,10 @@ non prova Windows 11 x64; un simulatore non prova un dispositivo fisico.
 | Contributo | Stato e revisione | Limite della prova |
 | --- | --- | --- |
 | Accesso v3 nei client Apple abbinati | [PR #539](https://github.com/Wulfgardr/mediflow/pull/539) integrata in `main` a `4c69e4daa` | La prova UI Mac sul precedente candidato `65da737353e8b02d84e476299e5c4088d38aedab` ha completato accesso v3 e creazione di un paziente inventato, con indirizzo decifrato. Il client iPhone in simulatore ha poi eseguito accesso v3 e letto la stessa cartella e lo stesso indirizzo. Non copre tutte le interazioni native. |
-| Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) aperta: delta `5b6fcf1601d09037306ec70203f457dd7500e3b3`, head `1752258c5ac9689770f79bb032bfbc8899b7df68` | Anteprima, conferma ed esiti per riga presenti; 129 test Swift e tre prove HTTP reali su archivio sintetico riusciti. Il precedente merge `0f2211196` nel branch conserva l'accesso v3; non è un merge in `main`. Selettore CSV sul candidato integrato ancora da verificare. |
-| Documenti multipli e quattro viste AI su iPhone/iPad | [PR #541](https://github.com/Wulfgardr/mediflow/pull/541) aperta, head `e940fd2448ee50d062b82754ddce370db73b6b19` | Invii sequenziali con esiti per file e interruzione sulle risposte incerte. 113 test Node e 57 Swift riusciti; il nuovo head corregge tre hash verificati dalla CI, ancora in revisione. L'esistenza delle viste non prova una generazione o l'uso su dispositivi fisici. |
-| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) aperta: delta `44cb68a5cc2f9f66bd170cd5be6f313990aa9d97`, head `c3d8f117e812f0fdea507daf76a93e060a636a57` sopra #541 | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora in corso. |
-| Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) aperta, head `128efccfd75d7d5940e1ac50ef80d4e7d0d87abd` | 55 test Swift, sette test Web e build Mac/iOS riusciti. Corretti i casi di raggruppamento e numerazione segnalati dalla review indipendente; review finale senza rilievi. Interazione e rilettura dall'host ancora da provare. |
+| Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Anteprima, conferma ed esiti per riga presenti; 129 test Swift e tre prove HTTP reali su archivio sintetico riusciti. Selettore CSV sul candidato integrato ancora da verificare. |
+| Documenti multipli e quattro viste AI su iPhone/iPad | [PR #541](https://github.com/Wulfgardr/mediflow/pull/541) integrata in `main` a `65898d6a6ed1296a89850e19ce123791d37bb026` | Invii sequenziali con esiti per file e interruzione sulle risposte incerte. 113 test Node e 57 Swift riusciti; correzione dei tre hash CI inclusa nel contributo integrato. L'esistenza delle viste non prova una generazione o l'uso su dispositivi fisici. |
+| Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) aperta: delta `44cb68a5cc2f9f66bd170cd5be6f313990aa9d97`, head `c3d8f117e812f0fdea507daf76a93e060a636a57`; base ancora il branch di #541, da aggiornare a `main` | Caricamento multiplo, conservazione della bozza e salvataggio esplicito presenti; 21 test mirati riusciti. Prova UI sul candidato integrato ancora in corso. |
+| Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | 55 test Swift, sette test Web e build Mac/iOS riusciti. Corretti i casi di raggruppamento e numerazione segnalati dalla review indipendente; review finale senza rilievi. Interazione e rilettura dall'host ancora da provare. |
 
 Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce
 accesso, CSV, documenti multipli e allegati del diario: build Mac completa, build iOS Simulator e verifica rigorosa
@@ -57,11 +58,11 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 | Funzione | Web macOS | Web Windows 11 ARM | Web Ubuntu | Nativo macOS | iPhone / iPad |
 | --- | --- | --- | --- | --- | --- |
 | Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Integrato con #539; accesso v3 UI riuscito sul candidato `65da73735` | Integrato con #539; accesso e lettura della stessa cartella riusciti nel simulatore iPhone sul candidato `65da73735`; hardware fisico da provare |
-| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati sul candidato `65da73735`; CSV in #542, ancora da provare nella UI integrata | Lettura paired della cartella e dell'indirizzo riuscita in simulatore iPhone; CSV in #542; touch, tastiera iPad e rilettura dopo riavvio da provare |
-| Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Upload dal compositore in #543; rientro, elenchi annidati e citazioni multiblocco in #544, non ancora integrata | Contributi #543 e #544 presenti; editor e round-trip da provare; scritture offline escluse dal contratto |
-| Documenti e OCR | Caricamento, estrazione locale e revisione da provare; Apple Vision sul Mac | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload multiplo in #541; OCR e revisione derivata sull'host | Upload multiplo in #541; motore OCR sull'host, non sul dispositivo |
+| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati sul candidato `65da73735`; CSV integrato con #542, ancora da provare nella UI integrata | Lettura paired della cartella e dell'indirizzo riuscita in simulatore iPhone; CSV integrato con #542; touch, tastiera iPad e rilettura dopo riavvio da provare |
+| Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Upload dal compositore in #543; rientro, elenchi annidati e citazioni multiblocco integrati con #544; interazione da provare | Contributi #543 e #544 presenti; editor e round-trip da provare; scritture offline escluse dal contratto |
+| Documenti e OCR | Caricamento, estrazione locale e revisione da provare; Apple Vision sul Mac | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload multiplo integrato con #541; OCR e revisione derivata sull'host | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
-| Quattro esperienze AI / ChatGPT | Accesso, catalogo e annullamento del login reali riusciti nel contributo #540; generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste in #541; esecuzione sul Mac qualificato, generazioni non provate |
+| Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
 | Conflitti, lock, backup e recupero | Conflitto, riavvio e ripristino completo sintetico da provare | Lifecycle riuscito; avvio completo del Supervisor Headless ancora in analisi | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
@@ -87,7 +88,7 @@ non ancora integrati sono descritti nelle PR sopra, non attribuiti alla base.
 | Ambiente e revisione | Risultato osservato | Ancora aperto |
 | --- | --- | --- |
 | Omarchy/Arch ARM, Node 24.21.0, base `a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e` | Sei prove dell'harness ufficiale e tre prove di accesso riuscite; Supervisor Headless con cinque operazioni riuscito | Non è Ubuntu; non copre l'interazione completa, i nuovi contributi Apple o la generazione ChatGPT |
-| Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo non spiegato e non riprodotto. Supervisor Headless completo ancora da verificare: limite di attesa dell'harness e cleanup in analisi |
+| Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo e risposta HTTP 503 ancora senza causa stabilita; trasporto di prova intermittente. Supervisor Headless completo non verificato, attesa e cleanup ancora in analisi |
 
 Le prove guest non attestano un installer nativo, Windows x64 o Ubuntu.
 Su una nuova fixture Windows, il primo avvio canonico ha completato la
@@ -96,7 +97,39 @@ readiness di autenticazione in 8,197 secondi e la migrazione dello schema da
 codice sorgente. Questa prova non ha riprodotto il primo `DB_QUERY_FAILED`
 e non ne spiega la causa. L'errore iniziale resta registrato insieme ai
 successi successivi. La precedente attesa Headless di 15 secondi non aveva
-raggiunto la readiness: il Supervisor completo non è ancora un PASS.
+raggiunto la readiness: il Supervisor completo non è ancora un PASS. La
+risposta HTTP 503 e l'intermittenza del trasporto restano osservazioni aperte;
+non è dimostrato che abbiano la stessa causa né che il solo trasporto spieghi
+il rifiuto applicativo.
+
+### Tre funzioni Ollama: prove reali e limiti
+
+Sul candidato sorgente `c3ee6f5f10e83664994e98c02ec25b532df84670`, con
+Ollama 0.40.5 e il modello locale già installato `qwen3.5:35b-a3b`, sono
+state eseguite preview HTTP canoniche su un nuovo archivio cifrato con dati
+interamente inventati. L'ammissione della versione è un contributo separato,
+con seguito documentale `f66b7e353e54e73ffc30e01f08c0a38b947a6817`;
+non viene attribuita alle revisioni precedenti o a una distribuzione installata.
+
+| Funzione | Esito reale | Limite |
+| --- | --- | --- |
+| Patient Insight | Secondo tentativo HTTP riuscito in circa 8,9 secondi | Il primo è stato rifiutato con `proposal_invalid`. Un replay dello stesso prompt ha prodotto una nuova risposta valida, ma non ha riprodotto né spiegato il primo errore. Non è dichiarato risolto. |
+| Smart Import | Proposta valida in circa 15,8 secondi, con una diagnosi e una terapia inventate | Fonte riletta dalla fixture e decifrata dal client; nessuna applicazione della proposta. |
+| Document Synthesis | Proposta valida in circa 31,2 secondi | Percorso completo di caricamento cifrato, capture, AnyDoc su PDF testo e preview; non prova scansioni, OCR o interazione UI. |
+
+Le tre proposte hanno superato i parser previsti e conservano zero scritture
+cliniche. Il paziente riletto è invariato e i campi derivati dell'allegato
+restano vuoti. Modello esplicito, nessun download o ripiego, nessun uso di
+ChatGPT in queste prove. I tempi includono preparazione e trasporto; il digest
+osservato resta `observed_not_causal`, con stato `available_unqualified`.
+Queste prove non attestano qualità o ammissione clinica.
+
+L'attivazione Web a freddo si è fermata al limite host di 30 secondi con
+`verification_interrupted` (circa 31,2 secondi nella finestra del client).
+Dopo un precaricamento tecnico esplicito, la nuova attivazione a caldo è
+riuscita in circa 2,6 secondi. Il precaricamento manuale non dimostra un
+percorso utente a freddo riuscito. La pagina consente di rileggere lo stato
+e confermare un nuovo tentativo; non esegue retry automatici.
 
 ### ChatGPT come provider e plugin MediFlow
 
@@ -161,10 +194,12 @@ Restano da completare:
 
 - UI del candidato Apple integrato: CSV, caricamenti multipli, diario, editor,
   cambio paziente, revoca del contesto e conservazione degli esiti parziali;
-- causa dell'errore Windows a freddo e prova completa del Supervisor Headless;
+- cause del primo errore Windows e del 503, trasporto intermittente e prova
+  completa del Supervisor Headless;
 - percorsi su Ubuntu e interazioni sui dispositivi iPhone/iPad fisici;
-- generazione, revisione e annullamento durante una generazione per ciascuna
-  funzione AI, quando il provider e la quota lo consentono;
+- causa del primo rifiuto Patient Insight e attivazione Ollama a freddo;
+- generazioni ChatGPT, revisione e annullamento durante una generazione,
+  quando il provider e la quota lo consentono;
 - conflitti, errore parziale, riavvio, ripristino sintetico completo e limiti
   della cache mobile, senza introdurre scritture offline.
 
