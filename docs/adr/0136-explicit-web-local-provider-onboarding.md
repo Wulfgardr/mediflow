@@ -69,3 +69,21 @@ Fixture sintetiche per servizio, route e componente montato: prima attivazione,
 idempotenza, recupero, modello assente, errore rete, binding/versione cambiati,
 owner bloccato e revoca. Lint e typecheck; nessuna build o inferenza live richiesta.
 La promozione resta soggetta alla verifica del parent sul tree integrato.
+
+## Attesa del caricamento a freddo — WUL-694, 16 ottobre 2026
+
+Una prova sul candidato di compatibilità Ollama della PR #548 ha negato
+l'attivazione al limite di 30 secondi; un successivo precaricamento esplicito
+e la verifica a caldo sono riusciti.
+Il solo aumento dell'attesa della pagina non potrebbe evitare quel diniego.
+Il budget locale dell'intera verifica passa a 60 secondi; quello della pagina
+a 70 secondi. La lettura conserva 10 secondi e il corpo HTTP 5 secondi.
+La pagina comunica il nuovo limite e resta annullabile, senza polling o retry.
+
+Il budget comprende attestazione, riautenticazione finale e commit; non è
+la durata di una sessione o di un grant. Non cambia le scadenze dell'owner,
+i suoi resource-use, lock o revoche. Il commit richiede ancora la medesima
+sessione attiva, il resource-use corrente e la stessa revisione del binding e
+del lifecycle. La scadenza monotona è verificata anche se il callback del timer
+è ritardato. Un risultato dopo 60 secondi o dopo cancellazione non ammette il
+provider. Non vengono omessi controlli di versione, località o digest.

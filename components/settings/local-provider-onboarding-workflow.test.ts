@@ -241,7 +241,7 @@ for (const kind of ['read', 'post'] as const) {
         f.handle(() => new Promise(() => {}));
         const pending = kind === 'post' ? f.controller.activate() : f.controller.refresh();
         await until(() => f.calls.length === (kind === 'post' ? 2 : 1));
-        context.mock.timers.tick(kind === 'post' ? 40_001 : 10_001); await pending;
+        context.mock.timers.tick(kind === 'post' ? 70_001 : 10_001); await pending;
         assert.equal(f.view().messageCode, 'request_timed_out'); assert.equal(f.view().status, null);
         assert.equal(f.view().phase, 'interrupted'); assert.equal(f.calls.at(-1)?.init.signal?.aborted, true);
         const count = f.calls.length; context.mock.timers.tick(200_000); await nextTurn(); assert.equal(f.calls.length, count);
@@ -261,4 +261,19 @@ test('versione non ammessa arriva alla vista e viene cancellata alla rilettura',
     await f.controller.refresh();
     assert.equal(f.view().versionMismatch, undefined);
     assert.equal(f.posts().length, 1);
+});
+
+
+test('the page keeps one explicit verification pending beyond the former forty-second wait', async context => {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    const f = fixture(); await f.controller.refresh();
+    const response = deferred<Response>();
+    f.handle(call => call.init.method === 'POST' ? response.promise : undefined);
+    const pending = f.controller.activate(); await until(() => f.posts().length === 1);
+    context.mock.timers.tick(55_000); await nextTurn();
+    assert.equal(f.view().phase, 'verifying'); assert.equal(f.posts().length, 1);
+    f.status = { ...f.status, state: 'available_unqualified', version: 1,
+        revision: 'b'.repeat(64), receipt: 'receipt_' + 'b'.repeat(32) };
+    response.resolve(Response.json(f.status)); await pending;
+    assert.equal(f.view().phase, 'completed'); assert.equal(f.posts().length, 1);
 });
