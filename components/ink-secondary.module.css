@@ -18,7 +18,7 @@
 .surface :is(h4, h5) { font-size: 0.875rem; font-weight: 600; }
 .surface :global(.lume-registro) { font-family: var(--lume-font-sans); }
 .surface :is(button, input:not([type='checkbox']):not([type='radio']), select, summary) {
-    min-height: 44px;
+    min-height: var(--lume-control-height, 44px);
     font-size: 0.875rem;
 }
 .surface :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {

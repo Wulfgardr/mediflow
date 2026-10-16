@@ -827,6 +827,7 @@
 :global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) {
     min-height: var(--lume-control-height);
     padding: 8px 14px;
+    border-radius: var(--lume-control-radius);
     white-space: nowrap;
     gap: var(--lume-control-gap);
     font-size: 0.875rem;
