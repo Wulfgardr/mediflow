@@ -194,8 +194,9 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
         });
         const prepared = await exchange(prepareFrame, currentRequest, 'prepared', PREPARE_TIMEOUT_MS);
         const challengedAt = hostNow();
-        if (challengedAt < startedAt || !integer(prepared.expiresAt, challengedAt + 1)
-            || (prepared.expiresAt as number) > challengedAt + PREPARE_TIMEOUT_MS) {
+        if (challengedAt < startedAt || challengedAt - startedAt >= PREPARE_TIMEOUT_MS
+            || !integer(prepared.preparedAt) || !integer(prepared.expiresAt, prepared.preparedAt + 1)
+            || (prepared.expiresAt as number) - prepared.preparedAt > PREPARE_TIMEOUT_MS) {
             disconnect(); return fail('protocol_invalid');
         }
         let captureValue: unknown;

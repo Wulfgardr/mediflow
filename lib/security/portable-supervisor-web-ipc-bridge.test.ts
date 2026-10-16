@@ -50,9 +50,9 @@ function fixture(responder?: (frame: Record<string, unknown>, emit: (value: unkn
         connected: () => connected };
 }
 
-const ack = (requestRef: unknown, outcome: 'prepared' | 'activated' | 'revoked', expiresAt?: number) =>
+const ack = (requestRef: unknown, outcome: 'prepared' | 'activated' | 'revoked', expiresAt?: number, preparedAt = 1_000) =>
     encodePortableSupervisorWebIpcFrameV1(outcome === 'prepared'
-        ? { schemaVersion: SCHEMA, method: 'ack', requestRef, outcome, challenge: CHALLENGE, expiresAt }
+        ? { schemaVersion: SCHEMA, method: 'ack', requestRef, outcome, challenge: CHALLENGE, preparedAt, expiresAt }
         : outcome === 'activated'
             ? { schemaVersion: SCHEMA, method: 'ack', requestRef, outcome, expiresAt }
             : { schemaVersion: SCHEMA, method: 'ack', requestRef, outcome });
@@ -116,6 +116,33 @@ test('rejects expired or overlong challenge windows before reading capture', asy
         await assert.rejects(current.bridge.activate(() => { reads += 1; return capture(); }),
             rejects('protocol_invalid'));
         assert.equal(reads, 0);
+        assert.equal(current.disconnected(), 1);
+    }
+});
+
+test('accepts a bounded parent challenge when process clocks differ', async () => {
+    for (const offset of [-16, -5, 5, 16]) {
+        const current = fixture((frame, emit) => emit(ack(frame.requestRef,
+            frame.method === 'prepare' ? 'prepared' : 'activated',
+            frame.method === 'prepare' ? 6_000 + offset : 20_000, 1_000 + offset)));
+        const result = await current.bridge.activate(capture);
+        assert.equal(result.expiresAt, 20_000);
+        assert.equal(current.frames.length, 2);
+        assert.equal(current.disconnected(), 0);
+    }
+});
+
+test('rejects a late preparation ACK or local clock rollback before reading capture', async () => {
+    for (const timestamp of [999, 6_000, 6_001]) {
+        const current = fixture((frame, emit) => {
+            current.setNow(timestamp);
+            emit(ack(frame.requestRef, 'prepared', 6_000));
+        });
+        let reads = 0;
+        await assert.rejects(current.bridge.activate(() => { reads += 1; return capture(); }),
+            rejects('protocol_invalid'));
+        assert.equal(reads, 0);
+        assert.equal(current.frames.length, 1);
         assert.equal(current.disconnected(), 1);
     }
 });

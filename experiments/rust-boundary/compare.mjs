@@ -70,15 +70,21 @@ function client(command) {
 function vectors() {
   const schemaVersion='mediflow.portable-supervisor.web-ipc.v1'; const requestRef=`pswr_${'1'.repeat(32)}`; const challenge=`pswc_${'2'.repeat(64)}`;
   const capture={schemaVersion:'mediflow.portable-supervisor.web-capture.v1',userRef:`user.${'3'.repeat(64)}`,parentRef:`parent.${'4'.repeat(64)}`,patientId:'patient.synthetic.01',ambulatoryId:'ambulatory.synthetic.01',selectionEpoch:7,expectedPatientVersion:3,expiresAt:10000};
-  const positive=[{schemaVersion,method:'prepare',requestRef},{schemaVersion,method:'activate',requestRef,challenge,capture},{schemaVersion,method:'revoke_all',requestRef,reason:'application_lock'},{schemaVersion,method:'ack',requestRef,outcome:'prepared',challenge,expiresAt:5000},{schemaVersion,method:'ack',requestRef,outcome:'activated',expiresAt:10000},{schemaVersion,method:'ack',requestRef,outcome:'revoked'},{schemaVersion,method:'ack',requestRef,outcome:'denied',denialCode:'challenge_invalid'}];
+  const positive=[{schemaVersion,method:'prepare',requestRef},{schemaVersion,method:'activate',requestRef,challenge,capture},{schemaVersion,method:'revoke_all',requestRef,reason:'application_lock'},{schemaVersion,method:'ack',requestRef,outcome:'prepared',challenge,preparedAt:1000,expiresAt:5000},{schemaVersion,method:'ack',requestRef,outcome:'activated',expiresAt:10000},{schemaVersion,method:'ack',requestRef,outcome:'revoked'},{schemaVersion,method:'ack',requestRef,outcome:'denied',denialCode:'challenge_invalid'}];
   for(const reason of ['logout','application_lock','reselection','expiry','web_disconnect','mcp_disconnect','restart','explicit'])positive.push({...positive[2],reason});
   for(const denialCode of ['protocol_invalid','frame_too_large','replayed','challenge_invalid','challenge_expired','context_invalid','context_stale','already_bound','host_unavailable','activation_failed','revoke_failed','timeout'])positive.push({...positive[6],denialCode});
   for(const n of [0,1,9007199254740991])positive.push({...positive[1],capture:{...capture,selectionEpoch:n,expectedPatientVersion:Math.max(1,n),expiresAt:Math.max(1,n)}});
+  for(const preparedAt of [0,1,Number.MAX_SAFE_INTEGER])positive.push({...positive[3],preparedAt,expiresAt:Number.MAX_SAFE_INTEGER});
   positive.push({...positive[1],capture:{...capture,patientId:'a'.repeat(128),ambulatoryId:'Z.0_:-'}});
   const out=positive.map((value,i)=>({name:`positive-${i}`,bytes:Buffer.from(encodePortableSupervisorWebIpcFrameV1(value)),positive:true}));
   const first=out[0].bytes.toString(); const activation=out[1].bytes.toString();
   const negative=['', 'null','[]','true','{}',' '+first,first+'\n',first+' ',first.replace('"method":"prepare",','"method":"prepare","method":"prepare",'),JSON.stringify({method:'prepare',schemaVersion,requestRef}),first.replace('"method"','"extra"'),first.replace('prepare','dispatch'),first.replace('pswr_','PSWR_'),activation.replace('"selectionEpoch":7','"selectionEpoch":-0'),activation.replace('"selectionEpoch":7','"selectionEpoch":7.0'),activation.replace('"selectionEpoch":7','"selectionEpoch":7e0'),activation.replace('"selectionEpoch":7','"selectionEpoch":9007199254740992'),activation.replace('"expectedPatientVersion":3','"expectedPatientVersion":0'),activation.replace('patient.synthetic.01','é'),activation.replace('patient.synthetic.01','a'.repeat(129)),first.replace('prepare','prepa\\u0072e'),'x'.repeat(4096), '[[[[[[[', first.slice(0,-1), first+'{}'];
   negative.forEach((s,i)=>out.push({name:`negative-${i}`,bytes:Buffer.from(s),positive:false}));
+  const prepared=out[3].bytes.toString();
+  out.push({name:'negative-prepared-legacy',bytes:Buffer.from(prepared.replace('"preparedAt":1000,','')),positive:false});
+  for(const [name,value] of Object.entries({negative:'-1',fraction:'1.5',unsafe:'9007199254740992',string:'"1000"',null:'null',boolean:'true'})) {
+    out.push({name:`negative-preparedAt-${name}`,bytes:Buffer.from(prepared.replace('"preparedAt":1000',`"preparedAt":${value}`)),positive:false});
+  }
   out.push({name:'negative-leading-bom',bytes:Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),out[0].bytes]),positive:false});
   let seed=706; const next=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
   for(let i=0;i<256;i++) { const b=Buffer.from(out[i%positive.length].bytes); b[next()%b.length]=32+(next()%95);out.push({name:`mutation-${i}`,bytes:b}); }
