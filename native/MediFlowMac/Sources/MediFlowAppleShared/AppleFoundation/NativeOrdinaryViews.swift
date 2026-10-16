@@ -1,6 +1,8 @@
 /* original function surfaces, no settings copy or apply action. */
-#if os(macOS)
 import SwiftUI
+#if os(iOS)
+import SafariServices
+#endif
 
 struct NativePatientInsightView: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
@@ -37,7 +39,11 @@ private struct NativeOrdinaryExperience: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let function: NativeOrdinaryFunction
     @StateObject private var model: NativeOrdinaryModel
+    @Environment(\.scenePhase) private var scenePhase
     @AccessibilityFocusState private var statusFocused: Bool
+    #if os(iOS)
+    @State private var loginPage: NativeOrdinaryLoginPage?
+    #endif
     init(workspaceModel: PairedPatientsWorkspaceModel, function: NativeOrdinaryFunction, attachmentId: String? = nil) {
         self.workspaceModel = workspaceModel; self.function = function
         _model = StateObject(wrappedValue: NativeOrdinaryModel(function: function, snapshot: {
@@ -50,9 +56,8 @@ private struct NativeOrdinaryExperience: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Proposte").chartGroupHeading()
                     Text(function.title).inkRegister(weight: .semibold)
-                    Text("Supporto alle terapie · solo revisione. Nessuna modifica alla cartella.").chartMetadata()
-                    Text("OpenAI · abbonamento ChatGPT · consenso per ogni proposta").chartMetadata()
-                }.padding(.bottom, 18)
+                    Text("Con l’abbonamento ChatGPT").chartMetadata()
+                }.padding(.bottom, 8)
             } else {
                 Text("\(function.title) con OpenAI").font(.headline)
             }
@@ -81,8 +86,13 @@ private struct NativeOrdinaryExperience: View {
             }
             if let challenge = model.challenge, let url = challenge.safeURL {
                 Text("Codice di accesso: \(challenge.userCode)").textSelection(.enabled)
+                #if os(iOS)
+                Button("Apri la pagina di accesso OpenAI") { loginPage = NativeOrdinaryLoginPage(url: url) }
+                    .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-login-link")
+                #else
                 Link("Apri la pagina di accesso OpenAI", destination: url)
                     .accessibilityIdentifier("clinical-workspace-\(function.rawValue)-login-link")
+                #endif
             }
             if let catalog = model.catalog {
                 Picker(function == .treatmentReasoning ? "Modello per la proposta" : "Modello e ragionamento", selection: $model.selectedOptionId) {
@@ -96,7 +106,10 @@ private struct NativeOrdinaryExperience: View {
                     VStack(alignment: .leading, spacing: 12) { phaseActions }
                 }.padding(.vertical, 8).disabled(model.isWorking)
             } else {
-                HStack { phaseActions }.disabled(model.isWorking)
+                ViewThatFits(in: .horizontal) {
+                    HStack { phaseActions }
+                    VStack(alignment: .leading, spacing: 12) { phaseActions }
+                }.disabled(model.isWorking)
             }
             if ![.idle, .completed, .closing, .blocked].contains(model.phase) {
                 Button("Annulla e chiudi") { model.cancel() }
@@ -122,6 +135,15 @@ private struct NativeOrdinaryExperience: View {
         .onAppear { model.observe(workspaceModel) }
         .onDisappear { model.invalidate() }
         .onChange(of: model.phase) { _ in statusFocused = true }
+        .onChange(of: scenePhase) { phase in
+            if phase == .background { model.invalidate() }
+        }
+        #if os(iOS)
+        .sheet(item: $loginPage) { page in NativeOrdinaryLoginBrowser(url: page.url) }
+        .onChange(of: model.challenge?.userCode) { code in
+            if code == nil { loginPage = nil }
+        }
+        #endif
     }
     @ViewBuilder private func primaryAction<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         if function == .treatmentReasoning { content().buttonStyle(.borderedProminent) }
@@ -231,5 +253,18 @@ private struct NativeOrdinaryProposalView: View {
             }
         }
     }
+}
+
+#if os(iOS)
+private struct NativeOrdinaryLoginPage: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+private struct NativeOrdinaryLoginBrowser: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
 #endif

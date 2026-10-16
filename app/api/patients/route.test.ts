@@ -1,4 +1,4 @@
-/* @Codex: actual Next route + Drizzle/better-sqlite3 + physical owner 0.8.9-local.3f2e6f2a.
+/* @Codex: actual Next route + Drizzle/better-sqlite3 + physical owner 0.8.10.
  * Test-only HTTP context/cookie/audit seams are NOT a real middleware/login proof.
  * No production fault flag, alternate owner or real database. Original runner required. */
 import assert from 'node:assert/strict';
@@ -39,7 +39,7 @@ const fencedHeaders = (preview: PatientCreatePreviewContext) => ({
 });
 
 test('actual patient HTTP route boundaries on synthetic SQL', async t => {
-    assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.9-local.3f2e6f2a');
+    assert.equal(JSON.parse(readFileSync(join(dirname(ownerPath), 'package.json'), 'utf8')).version, '0.8.10');
     assert.equal(createHash('sha256').update(readFileSync(ownerPath)).digest('hex'), '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5');
     // Register cleanup before acquiring resources. Run every disposer even if an
     // import/assertion (or another disposer) fails; never swallow cleanup errors.

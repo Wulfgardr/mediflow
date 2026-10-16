@@ -1394,10 +1394,8 @@ struct PairedPatientsWorkspaceView: View {
                 confirmsFHIRExport: $confirmsFHIRExport
             )
             .chartCard()
-            #if os(macOS)
             NativePatientInsightView(workspaceModel: model).chartCard()
             NativeSmartImportView(workspaceModel: model).chartCard()
-            #endif
             #if !os(macOS)
             // Patient facts precede optional collection summaries.
             if !populatedPatientSections.isEmpty ||

@@ -1,5 +1,5 @@
 /* fake HTTP transport only. Mac UI/viewmodel tests, no authority/admission claims. */
-#if os(macOS)
+#if canImport(MediFlowAppleShared)
 import Foundation
 import XCTest
 @testable import MediFlowAppleShared
@@ -36,6 +36,33 @@ final class NativeOrdinaryModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .completed); XCTAssertNotNil(model.proposal)
         XCTAssertEqual(commands, ["consent", "login/start", "login/complete", "models", "generate"])
         model.invalidate(); XCTAssertNil(model.proposal); XCTAssertEqual(model.phase, .idle)
+    }
+    func testEverySharedFunctionDiscardsConsentAndProposalWhenContextIsInvalidated() async throws {
+        for function in NativeOrdinaryFunction.allCases {
+            let input: NativeOrdinaryInput
+            switch function {
+            case .patientInsight: input = .patientInsight
+            case .smartImport: input = .smartImport
+            case .documentSynthesis: input = .documentSynthesis(attachmentId: "synthetic-attachment")
+            case .treatmentReasoning: input = .treatmentReasoning
+            }
+            let source = NativeOrdinarySnapshot(connection: self.source().connection,
+                preparation: .init(functionId: function, patientId: "synthetic-patient", ambulatoryId: "synthetic-ambulatory",
+                    patientRevision: 1, input: input), fingerprint: function.rawValue)
+            var commands: [String] = []
+            let model = NativeOrdinaryModel(function: function, snapshot: { source }, services: .init(
+                prepare: { _, _ in try F.decode(NativeOrdinaryResponse.self, F.response(function, "needs_consent")) },
+                command: { command, _ in
+                    commands.append(command.path)
+                    return try F.decode(NativeOrdinaryResponse.self, F.response(function, "closed"))
+                }, status: { _ in throw NativeOrdinaryContractError.invalid }))
+            model.prepare(); await settle(model)
+            XCTAssertEqual(model.phase, .needsConsent); XCTAssertTrue(commands.isEmpty)
+            model.invalidate()
+            XCTAssertNil(model.disclosure); XCTAssertNil(model.challenge); XCTAssertNil(model.catalog); XCTAssertNil(model.proposal)
+            await settle(model)
+            XCTAssertEqual(model.phase, .idle); XCTAssertEqual(commands, ["cancel"])
+        }
     }
     func testLatePreparationAfterContextABAIsCancelledThroughOldConnection() async throws {
         let original = source(); var current = original

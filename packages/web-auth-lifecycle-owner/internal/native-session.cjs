@@ -809,7 +809,8 @@ function createServerSessionOwner() {
         return Boolean(channel && 'value' in channel && channel.value === 'native'
             && expiry && 'value' in expiry && NumberIsSafeInteger(expiry.value) && expiry.value > DateNow()
             && cell.tagged === getWeakMapValue(nativeSessionBindings, session)
-            && cell.tagged.clientPlatform === 'macos' && typeof cell.tagged.tokenHash === 'string'
+            && (cell.tagged.clientPlatform === 'macos' || cell.tagged.clientPlatform === 'ios' || cell.tagged.clientPlatform === 'ipados')
+            && typeof cell.tagged.tokenHash === 'string'
             && /^[a-f0-9]{64}$/u.test(cell.tagged.tokenHash)
             && (cell.principal.role === 'admin' || cell.principal.role === 'user'));
     }
@@ -912,7 +913,7 @@ function createServerSessionOwner() {
         const binding = ObjectFreeze({ principalRef: cell.principal.userId,
             authenticationGeneration: cell.generation, sessionId: cell.principal.id,
             username: cell.principal.username, role: cell.principal.role,
-            clientId: cell.tagged.clientId, clientPlatform: 'macos', tokenHash: cell.tagged.tokenHash,
+            clientId: cell.tagged.clientId, clientPlatform: cell.tagged.clientPlatform, tokenHash: cell.tagged.tokenHash,
             expiresAt: cell.expiresAt });
         let completed = false;
         record.binding = true;
