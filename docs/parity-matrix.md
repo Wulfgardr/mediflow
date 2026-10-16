@@ -1,14 +1,137 @@
 ---
-summary: "Canonical parity contract for localhost and Apple clients, with feature and interaction evidence kept separate."
+summary: "Current platform inventory and historical Apple parity contract, with source availability and exact-revision interaction evidence kept separate."
 read_when:
   - "Planning or reviewing macOS, iPhone, or iPad parity work."
   - "Checking feature parity separately from interaction and assistive-technology evidence."
 ---
 
-# Matrice parity localhost ↔ client Apple
+# Matrice di parità Web, Apple e Headless
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-09-06 (riconciliazione testuale della sorgente Apple 0.8.6; prove UI/interop separate e pending)
+Ultimo aggiornamento: 2026-10-16 (inventario corrente WUL-694; baseline e prove storiche separate)
+
+## Riconciliazione corrente — WUL-694, 16 ottobre 2026
+
+Inventario del codice sulla base `a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e`, con il raccordo Mini della PR
+che introduce questa sezione. La revisione del candidato provato deve essere
+registrata nella ricevuta della singola prova. I conteggi e gli esiti 0.8 più
+sotto sono storici: non sono una percentuale di completamento del prodotto
+corrente. La parità totale non è attestata.
+
+WUL-694 richiede macOS, Windows 11, Ubuntu, iPhone e iPad per la 1.0. Sono
+attualmente disponibili Windows 11 ARM e Omarchy/Arch ARM in Parallels, Mac e
+simulatori Apple quando avviabili. Omarchy non prova Ubuntu 24.04 x86_64;
+Windows ARM non prova Windows 11 x64; un simulatore non prova un dispositivo
+fisico. Le destinazioni richieste assenti restano **bloccate**, non vengono
+eliminate dal perimetro. La presenza di una VM non attesta una prova guest.
+
+### Inventario funzionale e destinazioni da qualificare
+
+`Da provare` indica codice presente ma assenza di una ricevuta corrente qui
+registrata; `bloccata` identifica un requisito o ambiente non ancora coperto.
+`Manuale per contratto` conserva un gesto o una responsabilità esplicita:
+non trasforma una funzione richiesta e assente in una funzione facoltativa.
+Le prove recenti del bundle Mac appartengono alle rispettive ricevute di
+installazione; non vengono trasferite a nuovi candidati o ad altre piattaforme.
+
+| Funzione | Web macOS | Web Windows 11 | Web Ubuntu | Nativo macOS | iPhone / iPad |
+| --- | --- | --- | --- | --- | --- |
+| Accesso e account v3 | Da provare: verifier/passphrase Web | Da provare sul guest nominato; ARM distinto da x64 | Bloccata: target Ubuntu richiesto non disponibile | Bloccata sulla base: login nativo PIN, verifier v3 in WUL-777 | Bloccata sulla base: stesso login nativo, WUL-777; hardware da qualificare |
+| Impostazioni e singola cartella senza AI | Da provare: pazienti, diario, terapie, controlli, osservazioni, prescrizioni | Stessi sorgenti; da provare localmente nel guest | Bloccata: ambiente richiesto assente | CRUD via home-base presente; editor/round-trip da provare | CRUD paired presente; touch, tastiera iPad e round-trip da provare |
+| Azioni in blocco e diario complesso | Da provare: selezione, risultato per paziente, editor e recupero bozza | Da provare sul guest | Bloccata: ambiente assente | Bloccata per equivalenza completa: flussi in blocco ed editor complesso non attestati | Bloccata per equivalenza completa: stessi residui; scritture offline escluse dal contratto |
+| Documenti e OCR | Da provare: caricamento, estrazione locale, review, errori e ripresa; Apple Vision sul Mac | Da provare: stesso dominio, OCR Tesseract e dipendenze guest | Bloccata: Ubuntu assente; un esito Omarchy resta separato | Upload singolo e lettura presenti; OCR/revisione derivata sull'host; multi-file da completare | Stesso upload singolo paired; motore OCR sull'host, non sul telefono |
+| Repertori WHO, AIFA, esenzioni, protesica | Da provare: import, ricerca, freschezza e ripresa | Da provare: servizi e cataloghi locali al guest | Bloccata: ambiente assente | Lookup e flussi manuali presenti; amministrazione cataloghi sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
+| Quattro esperienze AI / ChatGPT | Da provare per funzione e provider ammesso; WUL-778 | Bloccata finché manca qualifica runtime corrente del target; WUL-778 | Bloccata: target e qualifica runtime assenti | Quattro viste ChatGPT presenti solo macOS; esecuzione e grant da qualificare in WUL-778 | Bloccata: le quattro viste sono compilate solo macOS; mantenere autorità host, non introdurre inferenza locale implicita |
+| Salvataggio, conflitti, lock, backup e recupero | Da provare: scrittura nominale, conflitto, logout e ripristino completo sintetico | Da provare con runtime e archivio guest | Bloccata: ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup/recupero sull'host |
+
+Fonti correnti: `lib/security/native-login-http.ts` e
+`lib/security/host-credential-verification.ts` (accesso),
+`PairedPatientsWorkspaceModel.swift` (CRUD e HTTP),
+`PairedPatientDocumentsSection.swift` (picker singolo),
+`anydoc-apple-vision-ocr-composition.ts` (Vision/Tesseract),
+`NativeOrdinaryViews.swift` e i relativi callsite macOS (quattro esperienze),
+`NativeAIConfigurationView.swift` (account/grant), e il roster delle scritture
+in [clinical-write-roster.md](./clinical-write-roster.md).
+La scheda AI non conferisce accesso a un account né autorizza un invio.
+ATHENA/MLX resta limitata ai target supportati; il fallback manuale deve restare
+utilizzabile senza modello, senza trasformare un errore AI in salvataggio.
+
+### Headless, MCP e Mini correnti
+
+Il catalogo in `packages/mcp/src/contracts.ts` contiene cinque operazioni:
+terminologia, Open Loops, proposta follow-up, query semantica e anteprima
+transizione checkup. Le prime letture e la query sono read-only; follow-up e
+checkup sono proposal-only. Il commit checkup richiede il Web trusted con
+revisione, gesto, step-up e protezioni del dominio: non è un comando agente.
+
+Mini espone `status`, `capabilities`, `terminology search`, `open-loops`,
+`follow-up-proposal`, `semantic-query` e `checkup-status-preview`, riusando gli
+schemi e l'OperationClient MCP. Esempio sintetico, nel trasporto Mini già
+avviato e autorizzato dal Supervisor:
+
+```json
+{"command":"checkup-status-preview","args":{"checkupRef":"hcsr_1111111111111111111111111111111111111111111111111111111111111111","targetStatus":"completed","expectedRevision":1}}
+```
+
+Il riferimento è opaco e va ottenuto dal contesto host corrente; quello
+nell'esempio non individua un checkup reale. Non sono ammessi patientId,
+proof, confirmation o commit aggiunti dal chiamante. L'anteprima non garantisce
+che la successiva conferma Web sia ancora valida. Il protocollo Mini corrente
+è `packages/mini/src/protocol.ts`; il vecchio manifest
+`packages/mini/contracts/mini-parity.json` citato nella sezione storica non è
+presente sulla base corrente e il conteggio 4/66 non misura questi comandi.
+
+### Percorsi di prova e ricevute richieste
+
+Per ogni destinazione annotare SHA completa, identità runtime letta da
+`/api/system/revision`, versione/architettura OS e Node, percorso dell'artefatto
+installato, archivio sintetico isolato e risultato osservato. Salvare screenshot
+e log privi di dati reali nella custodia della qualifica. Una ricevuta di
+compilazione non promuove una casella di interazione.
+
+1. **Accesso:** nuovo account sintetico, passphrase v3, logout, login errato,
+   sessione scaduta e lock; ripetere sui client nativi dopo WUL-777. Provare
+   l'interfaccia senza riutilizzare sessioni o archivi clinici.
+2. **Cartella senza AI:** creare due pazienti distinguibili; modificare diario,
+   terapia, osservazione, checkup e prescrizione; rileggere dopo riavvio. Forzare
+   conflitto/versione e cambio paziente durante una richiesta; verificare che
+   nessuna modifica finisca sull'altro paziente. Coprire selezione e azioni in
+   blocco, annullamento, risultato parziale e recupero bozza.
+3. **Documenti/repertori:** caricare PDF testo, scansione e formato non ammesso;
+   verificare review, errore e ripresa, picker singolo/multiplo dichiarato e
+   assenza di scrittura derivata implicita. Verificare WHO/AIFA/esenzioni/protesica
+   con cataloghi sintetici o fonti ammesse e comportamento manuale senza AI.
+4. **AI:** per ciascuna delle quattro funzioni, provider non disponibile,
+   annullamento, consenso, generazione e proposta da rivedere; controllare
+   account, modello effettivo e ricevuta con WUL-778. Su mobile l'assenza della
+   vista richiesta resta un blocco, non un PASS tramite browser sul Mac.
+5. **Salvataggio/recupero:** verificare audit, conflitto, errore parziale,
+   riavvio e ripristino sintetico completo; sul mobile verificare cache stale e
+   sola lettura offline, senza inventare un writer offline.
+6. **MCP/Mini:** avviare il Supervisor con archivio sintetico; prima del binding
+   attendere rifiuto, poi attivare Intelligent Host nel suo Web. Chiedere una
+   preview checkup con revisione corrente e una obsoleta. Verificare zero commit
+   da Mini, conferma separata nel Web, revoca e chiusura senza processi residui.
+
+Harness riusabili: `npm run test:mini-cli` (IPC tra processi, DTO e rifiuti),
+`npm run test:mcp:intelligent-host`, `npm run test:headless-portable`,
+`npm run smoke:intelligent-host:production` (MCP con Web reale e archivio
+sintetico; porta 3001 libera), `npm run test:network:home-base-checkup-write`,
+`npm run test:network:home-base-readonly`, `npm run test:patient-document-import`,
+`npm run test:document-synthesis`, `npm run test:parity:smoke` e
+`scripts/native-test.sh`. Gli harness che scrivono richiedono un archivio
+sintetico esplicito; i test guest e l'interazione nativa vanno eseguiti nel
+rispettivo ambiente, non sostituiti da test Node sul Mac.
+
+Prove automatiche della tranche Mini, eseguite il 16 ottobre 2026 sul Mac
+macOS 27.2 con Node 24.21.0: `test:mini-cli` 21/21, `test:mcp:intelligent-host`
+33/33 e `test:headless-portable` 277/277; `check:headless-portable-imports`
+PASS. I test Mini avviano processi Node distinti su IPC reale con servizi
+sintetici: coprono dispatch NDJSON, output canonico, conflitto di revisione,
+rifiuto di campi di autorità, host assente e denial del servizio. Non provano
+un checkup clinico reale, una sessione UI o un'installazione guest. Codice Mini verificato e registrato nel commit `f607d57b2baaac14f27c12a5c4b0f8f4cdb6b34f`;
+questo non promuove la base
+`a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e` a prova del nuovo comando.
 
 ## Gate MediFlow 0.8
 
@@ -92,7 +215,7 @@ esercitata: in Chrome di produzione riguarda la web app, non l'app nativa
 macOS; dentro l'app macOS riguarda soltanto quest'ultima. Né queste sessioni
 né gli audit XCTest dimostrano un uso reale di VoiceOver su iPhone o iPad.
 
-## Fotografia corrente
+## Fotografia storica 0.8 — non misura il candidato corrente
 
 | Classe | Righe | Significato |
 | --- | ---: | --- |
