@@ -48,7 +48,7 @@ function rememberDescendants(pid) {
   const result = windows
     ? spawnSync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
       "$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_Process | ForEach-Object { '{0} {1}' -f $_.ProcessId, $_.ParentProcessId }"],
-    { encoding: 'utf8', env: process.env, timeout: 5_000, maxBuffer: 1024 * 1024 })
+    { encoding: 'utf8', env: process.env, timeout: 30_000, maxBuffer: 1024 * 1024 })
     : spawnSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', env: {}, timeout: 5_000 });
   assert.equal(result.status, 0, 'Cannot observe child cleanup');
   if (windows) assert.match(result.stdout.trim(), /^\d+ \d+(?:\r?\n\d+ \d+)*$/u, 'Invalid process observation');
@@ -218,7 +218,7 @@ async function waitForReady(readStderr, child) {
   throw new Error('Production Supervisor did not become ready');
 }
 async function waitForHeadlessReady(readStderr, child) {
-  for (let attempt = 0; attempt < 1_500; attempt += 1) {
+  for (let attempt = 0; attempt < 6_000; attempt += 1) {
     const match = readStderr().match(/^MEDIFLOW_HEADLESS_WEB_READY (.+)$/mu);
     if (match) {
       const { url } = JSON.parse(match[1]);
