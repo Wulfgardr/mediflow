@@ -30,7 +30,7 @@ const frames = () => [
   { schemaVersion: SCHEMA, method: 'activate', requestRef: REQUEST, challenge: CHALLENGE, capture: capture() },
   { schemaVersion: SCHEMA, method: 'revoke_all', requestRef: REQUEST, reason: 'application_lock' },
   { schemaVersion: SCHEMA, method: 'ack', requestRef: REQUEST, outcome: 'prepared', challenge: CHALLENGE,
-    expiresAt: 5_000 },
+    preparedAt: 1_000, expiresAt: 5_000 },
   { schemaVersion: SCHEMA, method: 'ack', requestRef: REQUEST, outcome: 'activated', expiresAt: 10_000 },
   { schemaVersion: SCHEMA, method: 'ack', requestRef: REQUEST, outcome: 'revoked' },
   { schemaVersion: SCHEMA, method: 'ack', requestRef: REQUEST, outcome: 'denied', denialCode: 'challenge_invalid' },
@@ -107,6 +107,15 @@ test('validates request, challenge, capture identifiers, epochs, versions and ex
   ];
   for (const input of invalid) {
     assert.throws(() => encodePortableSupervisorWebIpcFrameV1(input), rejects('frame_invalid'));
+  }
+});
+
+test('prepared ACK requires the parent timestamp and rejects invalid or legacy records', () => {
+  const prepared = frames()[3]!;
+  const { preparedAt: _preparedAt, ...legacy } = prepared;
+  for (const value of [legacy, ...[-1, 1.5, Number.MAX_SAFE_INTEGER + 1, '1000', null]
+    .map(preparedAt => ({ ...prepared, preparedAt }))]) {
+    assert.throws(() => encodePortableSupervisorWebIpcFrameV1(value), rejects('frame_invalid'));
   }
 });
 
