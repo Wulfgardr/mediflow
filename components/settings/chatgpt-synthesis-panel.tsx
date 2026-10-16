@@ -1,5 +1,4 @@
 'use client';
-/* @Codex */
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useSecurity } from '@/components/security-provider';

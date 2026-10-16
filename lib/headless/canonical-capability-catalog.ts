@@ -1,4 +1,3 @@
-/* @Codex */
 export type HeadlessCanonicalCapabilityDescriptor = Readonly<{
   schema: 'mediflow.headless.canonical-capability-descriptor.v1';
   anchorId: string;

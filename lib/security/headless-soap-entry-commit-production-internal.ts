@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { headlessSoapCommandBindingProductionOwner } from './headless-soap-command-binding-production-internal';

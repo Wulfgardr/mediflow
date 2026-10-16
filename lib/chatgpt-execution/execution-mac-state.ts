@@ -1,4 +1,4 @@
-/* @Codex — pure protocol validation. This module cannot issue product authority. */
+/* pure protocol validation. This module cannot issue product authority. */
 import { ExecutionError } from './execution-contract';
 export type MacOwnerFrame = Readonly<{ sequence: number; kind: 'START' | 'LIVE' | 'STOP' | 'ERROR'; value: number; detail: number }>;
 export function parseMacOwnerFrame(line: string, nonce: string): MacOwnerFrame {

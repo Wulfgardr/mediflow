@@ -1,4 +1,4 @@
-/* @Codex — isolated test loader. No production module imports this file.
+/* isolated test loader. No production module imports this file.
  * Synthetic pin substitution tests filesystem/layout behavior with the REAL
  * validation code. It is NOT evidence about the 220 MB public binary or signing.
  * Without the explicit test-only mode, every production pin remains unchanged.

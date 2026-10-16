@@ -1,4 +1,3 @@
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession } from '@/lib/security/server-auth';
 

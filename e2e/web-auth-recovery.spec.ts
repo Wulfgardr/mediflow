@@ -1,4 +1,4 @@
-/* @Codex: ordinary shared-cookie tabs; no injected key/session or auth response. */
+/* ordinary shared-cookie tabs; no injected key/session or auth response. */
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
 

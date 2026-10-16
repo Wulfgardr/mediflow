@@ -23,7 +23,7 @@ import {
   type AgendaFilter,
   type SemanticSignal,
 } from '@/lib/ui-semantic-signal';
-/* @Codex WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
+/* WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
 import {
   clinicalEntryTypeLabel,
   formatWorkspaceDate,
@@ -33,7 +33,7 @@ import {
   type Kree8PatientSource,
   type PillVariant,
 } from '@/lib/patient-workspace';
-/* @Codex WUL-362 C1: il candidato AI passa dal view-model canonico condiviso. */
+/* WUL-362 C1: il candidato AI passa dal view-model canonico condiviso. */
 import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
 import { stripMarkdownMarks } from '@/lib/clinical-rich-text';
 import styles from './kree8-clinical-cockpit-foundation.module.css';
@@ -50,7 +50,7 @@ export type AreaId =
   | 'handoff'
   | 'governance';
 
-/* @Codex WUL-UIUX: id validi per il deep-link ?area= letto da app/page.tsx. */
+/* WUL-UIUX: id validi per il deep-link ?area= letto da app/page.tsx. */
 export const AREA_ID_VALUES: AreaId[] = ['turno', 'incarico', 'scheda', 'diario', 'revisione', 'repertori', 'handoff', 'governance'];
 type DocDecision = 'pending' | 'apply' | 'note' | 'ignore';
 type StageId = 'identity' | 'consent' | 'handoff' | 'outcome';
@@ -108,15 +108,14 @@ type Kree8PatientClientState = {
 type Kree8AgendaClientState = {
   status: Kree8PatientStatus;
   rows: Kree8AgendaRow[];
-  /* @Codex WUL-UIUX: conteggio degli appuntamenti di oggi sull'intero set, non
+  /* WUL-UIUX: conteggio degli appuntamenti di oggi sull'intero set, non
      limitato alle max 6 righe mostrate. */
   todayCount?: number;
-  /* @Codex WUL-UIUX: totale dei passaggi pianificati (oggi + futuri) prima dello
+  /* WUL-UIUX: totale dei passaggi pianificati (oggi + futuri) prima dello
      slice(0,6), cosi la testata non dichiara solo le righe visibili. */
   plannedCount?: number;
 };
 
-/* @Codex */
 type Kree8DiaryEntry = {
   id: string;
   patientId: string;
@@ -131,7 +130,6 @@ type Kree8DiaryEntry = {
   attachmentCount: number;
 };
 
-/* @Codex */
 type Kree8DiaryClientState = {
   status: Kree8PatientStatus;
   entries: Kree8DiaryEntry[];
@@ -145,7 +143,7 @@ type Kree8DecisionCard = {
   pill: string;
   pillVariant: PillVariant;
   action: string;
-  /* @Codex: every rendered decision CTA must resolve to an explicit area;
+  /* every rendered decision CTA must resolve to an explicit area;
      patient-bound actions may also switch context before navigation. */
   target: AreaId;
   patientId?: string;
@@ -190,13 +188,10 @@ const STAGE_ORDER: StageId[] = ['identity', 'consent', 'handoff', 'outcome'];
 
 type FieldKind = 'structured' | 'note' | 'blocked';
 
-/* @Codex */
 type Kree8CatalogFreshness = 'fresh' | 'ok' | 'stale' | 'broken' | 'off';
 
-/* @Codex */
 type Kree8CatalogStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-/* @Codex */
 type Kree8CatalogRow = {
   id: string;
   name: string;
@@ -207,7 +202,6 @@ type Kree8CatalogRow = {
   actionLabel?: string;
 };
 
-/* @Codex */
 type Kree8CatalogClientState = {
   status: Kree8CatalogStatus;
   rows: Kree8CatalogRow[];
@@ -359,13 +353,11 @@ const REVIEW_PATIENT_LIST: Kree8Patient[] = [
   },
 ];
 
-/* @Codex */
 const REVIEW_DIARY_ENTRIES: Kree8DiaryEntry[] = [
   { id: 'review-diary-1', patientId: 'p1', patientName: 'M. R.', patientCode: 'AB-2026-014', patientHref: '/patients/p1', title: 'Controllo pressorio domiciliare', typeLabel: 'Visita', dateLabel: '08 mag, 09:30', preview: 'Pressione domiciliare nella norma, terapia confermata e prossimo controllo programmato.', deleted: false, attachmentCount: 1 },
   { id: 'review-diary-2', patientId: 'p2', patientName: 'C. D.', patientCode: 'CD-2026-088', patientHref: '/patients/p2', title: 'Review esami metabolici', typeLabel: 'Nota', dateLabel: '07 mag, 11:15', preview: 'Documenti in revisione: verificare esenzione e follow-up diabetologico.', deleted: false, attachmentCount: 2 },
 ];
 
-/* @Codex */
 const REVIEW_DIARY_STATE: Kree8DiaryClientState = {
   status: 'ready',
   entries: REVIEW_DIARY_ENTRIES,
@@ -410,7 +402,6 @@ function maskTaxCode(value: string | null | undefined): string {
   return trimmed.length <= 6 ? trimmed : `CF …${trimmed.slice(-6)}`;
 }
 
-/* @Codex */
 function normalizeClinicalSearch(value: string): string {
   return value
     .normalize('NFD')
@@ -420,7 +411,6 @@ function normalizeClinicalSearch(value: string): string {
     .trim();
 }
 
-/* @Codex */
 function formatKnownMonitoringProfile(value: string | null | undefined): string | null {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return null;
@@ -433,7 +423,6 @@ function formatKnownMonitoringProfile(value: string | null | undefined): string 
   return null;
 }
 
-/* @Codex */
 function isMetadataLikeClinicalText(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return true;
@@ -446,7 +435,6 @@ function isMetadataLikeClinicalText(value: string): boolean {
   return false;
 }
 
-/* @Codex */
 function extractReadableClinicalText(value: unknown, depth = 0): string | null {
   if (depth > 2 || value == null) return null;
 
@@ -497,7 +485,6 @@ function extractReadableClinicalText(value: unknown, depth = 0): string | null {
   return null;
 }
 
-/* @Codex */
 function compactPatientPreviewText(value: string): string | null {
   const plain = value
     .replace(/```[\s\S]*?```/g, ' ')
@@ -513,7 +500,7 @@ function compactPatientPreviewText(value: string): string | null {
   return plain.length > 230 ? `${plain.slice(0, 227).trim()}…` : plain;
 }
 
-/* @Codex WUL-362 C1: aiSummary non viene piu scavato con l'estrazione ricorsiva
+/* WUL-362 C1: aiSummary non viene piu scavato con l'estrazione ricorsiva
    generica: il candidato AI passa dal view-model canonico del Patient Insight.
    Wrong-task, envelope invalidi e risultati unknown/unreadable non producono
    testo e lasciano il posto ai fallback non-AI. */
@@ -531,7 +518,6 @@ function buildInsightPreviewText(aiSummary: unknown): string | null {
   return null;
 }
 
-/* @Codex */
 export function buildPatientPreviewSummary(
   patient: Kree8PatientSource,
   isArchived: boolean,
@@ -554,7 +540,6 @@ export function buildPatientPreviewSummary(
   return 'Nessuna sintesi clinica disponibile.';
 }
 
-/* @Codex */
 function patientMatchesSearch(patient: Kree8Patient, query: string): boolean {
   if (!query) return true;
   const searchable = normalizeClinicalSearch([
@@ -602,7 +587,6 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
   };
 }
 
-/* @Codex */
 function compactClinicalText(value: string | null | undefined): string {
   const plain = stripMarkdownMarks(value ?? '')
     .replace(/<[^>]*>/g, ' ')
@@ -617,7 +601,6 @@ function compactClinicalText(value: string | null | undefined): string {
   return plain.length > 180 ? `${plain.slice(0, 177)}…` : plain;
 }
 
-/* @Codex */
 function buildGlobalDiaryState(
   entries: ClinicalEntry[],
   patients: Kree8Patient[],
@@ -670,7 +653,7 @@ const PILL_VARIANT_CLASS: Record<SemanticSignal, string> = {
   plum: styles.pillPlum,
 };
 
-/* @Codex: shared status geometry also applies to cockpit labels. */
+/* shared status geometry also applies to cockpit labels. */
 function PillBadge({
   variant,
   children,
@@ -695,7 +678,6 @@ function PillBadge({
   );
 }
 
-/* @Codex */
 function DiagnosisPill({ diagnosis }: { diagnosis: string }) {
   const separatorIndex = diagnosis.indexOf(' · ');
   const code = separatorIndex >= 0 ? diagnosis.slice(0, separatorIndex) : '';
@@ -742,7 +724,7 @@ function Toolbar({
         <Search size={14} />
         <span>Cerca nella lista pazienti</span>
       </button>}
-      {/* @Codex: scorciatoia esplicita per la palette read-only di navigazione e aiuto. */}
+      {/* scorciatoia esplicita per la palette read-only di navigazione e aiuto. */}
       <button
         type="button"
         className={`${shellStyles.toolChip} ${shellStyles.commandToolChip}`}

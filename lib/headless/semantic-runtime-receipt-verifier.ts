@@ -1,7 +1,6 @@
 import { types } from 'node:util';
 import type { SemanticOutcome, SemanticReceipt } from './semantic-runtime';
 
-/* @Codex */
 export type SemanticCoverageReceipt = Readonly<{
   schema: 'mediflow.headless.semantic-coverage-receipt.v1';
   applyPolicy: 'none'; writesPerformed: 0;

@@ -1,33 +1,23 @@
-/* @Codex */
 import { and, asc, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm';
-/* @Codex */
 import { parseApiV1Limit, toApiV1IsoString } from './api-v1-route-helpers';
-/* @Codex */
 import type { DrugSummary, ExemptionSummary } from './api/v1/types';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import { drugs, exemptions } from './schema';
-/* @Codex */
 import {
     applyTerminologyRegistryVersion,
     findTerminologyRegistryEntry,
     loadTerminologyRegistry,
 } from './terminology-registry';
-/* @Codex */
 import {
     normalizeTerminologySystem,
     resolveStaticTerminology,
     searchStaticTerminology,
     type TerminologyItem,
 } from './terminology';
-/* @Codex */
 import { getAifaCatalogStatus, searchAifaCatalog } from './aifa-catalog-server';
 
-/* @Codex */
 export const NETWORK_CATALOG_READ_CAPABILITY = 'network.catalogs.readonly';
 
-/* @Codex */
 export type CatalogJsonResult = {
     body: unknown;
     status?: number;
@@ -61,7 +51,6 @@ function toExemptionSummary(item: typeof exemptions.$inferSelect): ExemptionSumm
     };
 }
 
-/* @Codex */
 export async function readDrugCatalog(searchParams: URLSearchParams): Promise<CatalogJsonResult> {
     const q = searchParams.get('q')?.trim();
     const countOnly = searchParams.get('count') === '1';
@@ -90,7 +79,6 @@ export async function readDrugCatalog(searchParams: URLSearchParams): Promise<Ca
     return { body: rows.map((row) => toDrugSummary(row, status.state === 'ready')) };
 }
 
-/* @Codex */
 export async function readExemptionCatalog(searchParams: URLSearchParams): Promise<CatalogJsonResult> {
     const q = searchParams.get('q')?.trim();
     const countOnly = searchParams.get('count') === '1';
@@ -143,7 +131,6 @@ export async function readExemptionCatalog(searchParams: URLSearchParams): Promi
     return { body: rows.map(toExemptionSummary) };
 }
 
-/* @Codex */
 export async function searchAtcTerminology(query: string, limit: number): Promise<TerminologyItem[]> {
     const q = query.trim();
     const pattern = `%${q}%`;
@@ -218,7 +205,6 @@ async function resolveAtcTerminology(code: string): Promise<TerminologyItem | nu
     };
 }
 
-/* @Codex */
 export async function searchTerminologyCatalog(searchParams: URLSearchParams): Promise<CatalogJsonResult> {
     const system = normalizeTerminologySystem(searchParams.get('system'));
     const q = searchParams.get('q')?.trim() || '';
@@ -245,7 +231,6 @@ export async function searchTerminologyCatalog(searchParams: URLSearchParams): P
     return { body: [], status: 200 };
 }
 
-/* @Codex */
 export async function resolveTerminologyCatalog(searchParams: URLSearchParams): Promise<CatalogJsonResult> {
     const system = normalizeTerminologySystem(searchParams.get('system'));
     const code = searchParams.get('code')?.trim() || '';
@@ -271,7 +256,6 @@ export async function resolveTerminologyCatalog(searchParams: URLSearchParams): 
     return { body: { error: 'System not supported yet' }, status: 400 };
 }
 
-/* @Codex */
 export async function listTerminologyCatalogSystems(): Promise<CatalogJsonResult> {
     return { body: await loadTerminologyRegistry() };
 }

@@ -7,10 +7,8 @@ import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { EntrySummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { parseEntryDeleteInput, prepareEntryUpdate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { updateEntryOperation } from '@/lib/entry-write-operation';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
 function toIsoString(value: unknown): string | null {
@@ -62,7 +60,6 @@ export async function GET(
     }
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -72,7 +69,6 @@ export async function PUT(
 
     try {
         const auditSession = await requireLocalApiActorSession(request);
-        /* @Codex */
         const { id, entryId } = await params;
         const parsed = await readEntryJsonObject(request);
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
@@ -93,7 +89,6 @@ export async function PUT(
     }
 }
 
-/* @Codex */
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string; entryId: string }> }
@@ -103,7 +98,6 @@ export async function DELETE(
 
     try {
         const auditSession = await requireLocalApiActorSession(request);
-        /* @Codex */
         const { id, entryId } = await params;
         // WUL-308: DELETE keeps the soft-delete tombstone and gains the version guard.
         const parsedBody = await parseEntryDeleteInput(request, 'api-v1-delete');

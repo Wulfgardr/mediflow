@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

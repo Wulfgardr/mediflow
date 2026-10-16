@@ -1,4 +1,4 @@
-/* @Codex — bounded child lifecycle and installer-local Mac network denial. */
+/* bounded child lifecycle and installer-local Mac network denial. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';

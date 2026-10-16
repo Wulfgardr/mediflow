@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash, randomUUID, X509Certificate } from 'node:crypto';
 import { execFileSync } from 'node:child_process';

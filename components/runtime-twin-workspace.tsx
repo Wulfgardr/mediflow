@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-676: one application frame; open record ids live only in the
+/* WUL-676: one application frame; open record ids live only in the
    unlocked React session. The SecurityProvider unmounts this frame on lock. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -24,7 +24,7 @@ const destinations = [
   { href: '/scales', label: 'Scale', icon: ClipboardList },
 ];
 
-/* @Codex: the mounted cockpit publishes its displayed area, including a
+/* the mounted cockpit publishes its displayed area, including a
    profile-derived default. This is presentation state, never a URL command. */
 type DirectoryReturn = { patientId: string; query: string; scope: 'ambulatorio' | 'network' | 'tutti'; list: 'attivi' | 'archivio'; restore: boolean };
 const DirectoryReturnContext = createContext<{ current: DirectoryReturn | null } | null>(null);
@@ -70,7 +70,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       : destinations[0]);
   const directoryReturn = useRef<DirectoryReturn | null>(null);
   const [railOpen, setRailOpen] = useState(true);
-  /* @Codex: one confirmation boundary for the new route shortcuts. Replay the
+  /* one confirmation boundary for the new route shortcuts. Replay the
      actual link once, so its close-tab action and Next navigation stay atomic.
      Browser history and security lock keep their existing owners. */
   useEffect(() => {
@@ -158,7 +158,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   );
 }
 
-/* @Codex: this menu reorganizes the existing canonical anchors, never drops a
+/* this menu reorganizes the existing canonical anchors, never drops a
    capability or treats an unloaded count as an empty record. */
 export function RuntimeTwinPatientNavigation({ items, active }: { items: readonly { href: string; label: string; meta?: string }[]; active: string }) {
   const menu = useRef<HTMLDetailsElement>(null);

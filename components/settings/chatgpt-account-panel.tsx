@@ -1,5 +1,5 @@
 'use client';
-/* @Codex: local visibility follows the existing security lifecycle; API owns authority. */
+/* local visibility follows the existing security lifecycle; API owns authority. */
 import { useSecurity } from '@/components/security-provider';
 import { ChatGptAccountCard } from './chatgpt-account-card';
 

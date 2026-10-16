@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

@@ -1,4 +1,4 @@
-/* @Codex — per-session preparation with a backend-wide, crash-persistent hold.
+/* per-session preparation with a backend-wide, crash-persistent hold.
  * Files and receipts never qualify a host. Only the concrete issuer does. */
 import 'server-only';
 import { constants, closeSync, fstatSync, lstatSync, mkdirSync, openSync, unlinkSync } from 'node:fs';
@@ -18,7 +18,7 @@ function hostExecutionDiagnostic(event: ExecutionDiagnostic): void {
     if (process.env[EXECUTION_DIAGNOSTIC_ENV] !== '1') return;
     reportExecutionDiagnostic((projection) => console.warn(EXECUTION_DIAGNOSTIC_PREFIX, JSON.stringify(projection)), event);
 }
-/** @Codex — closed preparation stage only; no error object or local artifact metadata crosses this sink. */
+/** closed preparation stage only; no error object or local artifact metadata crosses this sink. */
 export function reportMacProductPreparationDiagnostic(stage: PreparationDiagnosticStage): void {
     hostExecutionDiagnostic({ event: 'preparation_failed', method: null, errorCode: 'upstream_error', rpcCode: null,
         httpStatus: null, tls: false, network: false, device: false, experimental: false, permission: false, stage });

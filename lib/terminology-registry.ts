@@ -6,7 +6,6 @@ import {
     type TerminologySystemCode,
 } from './terminology';
 
-/* @Codex */
 export const TERMINOLOGY_REGISTRY_KEY = 'terminologyRegistry';
 
 export type TerminologyRegistryEntry = {
@@ -75,12 +74,10 @@ function parseRegistryValue(value: unknown): unknown {
     }
 }
 
-/* @Codex */
 export function listDefaultTerminologyRegistry(): TerminologyRegistryEntry[] {
     return DEFAULT_REGISTRY.map(cloneRegistryEntry);
 }
 
-/* @Codex */
 export function mergeTerminologyRegistryEntries(value: unknown): TerminologyRegistryEntry[] {
     const items = Array.isArray(parseRegistryValue(value)) ? parseRegistryValue(value) as unknown[] : [];
     const overrides = new Map<TerminologySystemCode, unknown>();
@@ -94,7 +91,6 @@ export function mergeTerminologyRegistryEntries(value: unknown): TerminologyRegi
     return DEFAULT_REGISTRY.map((fallback) => sanitizeRegistryEntry(overrides.get(fallback.system), fallback));
 }
 
-/* @Codex */
 export function findTerminologyRegistryEntry(
     registry: TerminologyRegistryEntry[],
     system: TerminologySystemCode,
@@ -102,7 +98,6 @@ export function findTerminologyRegistryEntry(
     return registry.find((entry) => entry.system === system) ?? null;
 }
 
-/* @Codex */
 export function applyTerminologyRegistryVersion(
     item: TerminologyItem,
     entry: TerminologyRegistryEntry | null,
@@ -113,7 +108,6 @@ export function applyTerminologyRegistryVersion(
     };
 }
 
-/* @Codex */
 export function upsertTerminologyRegistryEntry(
     current: TerminologyRegistryEntry[],
     value: unknown,
@@ -144,7 +138,6 @@ export function upsertTerminologyRegistryEntry(
     });
 }
 
-/* @Codex */
 export async function loadTerminologyRegistry(): Promise<TerminologyRegistryEntry[]> {
     await import('server-only');
     const [{ dbServer }, { settings }] = await Promise.all([

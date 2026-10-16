@@ -43,7 +43,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
             onClose();
         } catch (err) {
             console.error(err);
-            /* @Codex WUL-UIUX (STREAM E): l'errore non deve piu sparire in console:
+            /* WUL-UIUX (STREAM E): l'errore non deve piu sparire in console:
                l'utente vedeva la modale restare aperta senza spiegazioni. */
             showToast({
                 title: 'Operazione non riuscita',
@@ -68,7 +68,7 @@ export default function PatientActionModal({ isOpen, onClose, onConfirm, patient
     const title = isDelete ? 'Elimina scheda' : isExport ? 'Esporta FHIR con controllo FSE' : 'Archivia scheda';
 
     return (
-        // @Codex WUL-229: patient action modal aligned with the Lume overlay recipe.
+        // WUL-229: patient action modal aligned with the Lume overlay recipe.
         <Modal
             open={isOpen}
             onClose={onClose}

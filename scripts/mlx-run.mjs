@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 // Cross-platform gate for the Apple MLX lane.
 // MLX (mlx_lm) runs only on macOS Apple Silicon. On every other platform this
 // wrapper exits 0 with a clear message instead of failing with a cryptic error,

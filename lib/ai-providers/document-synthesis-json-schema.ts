@@ -1,4 +1,3 @@
-/* @Codex */
 /** Static generation constraint, not source authority or a replacement for host validation. */
 type Schema = Readonly<{
     type: 'object' | 'array' | 'string';

@@ -1,14 +1,11 @@
-/* @Codex */
 import type {
     NetworkAiRuntimeKillSwitches,
     NetworkAiRuntimeHardwareProfile,
     NetworkAiRuntimeSummary,
     NetworkOperatingMode,
 } from './api/v1/types';
-/* @Codex */
 import { resolveAiLaneKillSwitchState } from './ai-lane-kill-switch';
 
-/* @Codex */
 type NetworkAiRuntimeKillSwitchSnapshot = Partial<Record<
     | 'aiPatientInsightKillSwitch'
     | 'aiDocumentSynthesisKillSwitch'
@@ -17,7 +14,6 @@ type NetworkAiRuntimeKillSwitchSnapshot = Partial<Record<
     string | null | undefined
 >>;
 
-/* @Codex */
 export function resolveNetworkAiRuntimeKillSwitches(snapshot: NetworkAiRuntimeKillSwitchSnapshot) {
     return {
         patientInsight: resolveAiLaneKillSwitchState(snapshot.aiPatientInsightKillSwitch),

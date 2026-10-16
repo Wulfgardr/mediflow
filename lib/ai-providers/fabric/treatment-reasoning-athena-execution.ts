@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 
 import { ATHENA_R1_QWEN3_8B_MODEL_ID } from '../../athena-model-identity';

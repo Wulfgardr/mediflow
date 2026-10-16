@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex: Independent HTTPS rereads for actual UI checkpoints; no clinical
+/* Independent HTTPS rereads for actual UI checkpoints; no clinical
    writer, DB access, simulator control, proxy control or production imports. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -29,7 +29,7 @@ export const modules = {
     entry: { route: 'entries', nested: true, fields: ['title', 'content', 'type'], encryptedFields: ['title', 'content'] },
 };
 
-// @Codex: Only a newly UI-created auxiliary record may enter the lifecycle run.
+// Only a newly UI-created auxiliary record may enter the lifecycle run.
 // History is advanced after the independent read succeeds, never on assertion alone.
 const patientStages = ['created', 'profile-updated', 'archived', 'reactivated', 'trashed', 'restored', 'restored-reread'];
 
@@ -155,7 +155,7 @@ export async function compareRecords(step, webRows, pairedRows, webKey, pairedKe
         pairedObservation: 'exact-record-fields-and-version', nativePeerApp: 'not-proven-by-this-API-receipt' };
 }
 
-// @Codex: Shared PublicAppRevisionSummary defaults to git --short=12.
+// Shared PublicAppRevisionSummary defaults to git --short=12.
 // Bind that response to this fixture owner's immutable full commit and clean
 // fingerprint. This checks consistency; it does not attest binary contents.
 export function assertHostRevision(summary, sourceCommit) {

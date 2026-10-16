@@ -2,7 +2,6 @@ import XCTest
 import MediFlowCore
 @testable import MediFlowAppleShared
 
-/* @Codex */
 @MainActor
 final class ClinicalNavigationRouterTests: XCTestCase {
     func testDestinationVocabularyMatchesTheExistingUI() {

@@ -1,15 +1,14 @@
 import { format } from 'date-fns';
-import { scaleHistoryNotice } from '@/lib/scale-history'; // @Codex MF085-002
+import { scaleHistoryNotice } from '@/lib/scale-history'; // MF085-002
 
 import { it } from 'date-fns/locale';
 import { ClinicalEntry, Attachment, db } from '@/lib/db';
 import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home, Building2, Paperclip } from 'lucide-react';
-/* @Codex */
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
 import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
-/* @Codex: a reading-led diary presentation uses the same entry and actions. */
+/* a reading-led diary presentation uses the same entry and actions. */
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import twin from './twin-diary.module.css';
 
@@ -67,7 +66,6 @@ function presentEntry(entry: TimelineEntryData): EntryPresentation {
 }
 
 function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], onView: (file: Attachment) => void }) {
-    /* @Codex */
     const attachments = useLiveQuery(
         async () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,7 +222,6 @@ export function TimelineEntryCard({
                 {/* Main Text Content */}
                 <div style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
                     <PrivacyBlur>
-                        {/* @Codex */}
                         <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
                     </PrivacyBlur>
                 </div>
@@ -234,7 +231,7 @@ export function TimelineEntryCard({
                     <EntryAttachments attachmentIds={entry.attachments} onView={onViewAttachment} />
                 )}
 
-                {/* @Codex MF085-002: descriptive provenance; never recompute a recorded score. */}
+                {/* MF085-002: descriptive provenance; never recompute a recorded score. */}
                 {entry.type === 'scale' && scaleHistoryNotice(entry.metadata, entry.title) && (
                     <p className="mt-3 text-xs text-[color:var(--lume-ink-muted)]" data-testid="scale-provenance-notice">
                         {scaleHistoryNotice(entry.metadata, entry.title)}

@@ -1,4 +1,3 @@
-/* @Codex */
 import XCTest
 @testable import MediFlowCore
 

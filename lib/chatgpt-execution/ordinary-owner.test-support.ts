@@ -1,4 +1,3 @@
-/* @Codex */
 /* SYNTHETIC TEST DOUBLE ONLY. NOT the external owner, admission or production API.
  * Exercises negative and critical-section contracts; cannot prove real owner parity. */
 import { types } from 'node:util';

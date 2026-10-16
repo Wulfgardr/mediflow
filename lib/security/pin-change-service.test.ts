@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import test from 'node:test';
@@ -218,7 +217,7 @@ async function seedUser(db: TestDatabase, userId = 'user-1') {
     }).run();
 }
 
-/* @Codex: service tests use the real shared owner, with a bounded request-reader seam. */
+/* service tests use the real shared owner, with a bounded request-reader seam. */
 function nativePinSession(userId = 'user-1') {
     const binding = { clientId: 'synthetic-pin-ios', clientPlatform: 'ios' as const, tokenHash: 'a'.repeat(64) };
     const native = createNativeServerSession(

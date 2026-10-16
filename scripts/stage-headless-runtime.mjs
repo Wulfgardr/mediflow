@@ -1,4 +1,4 @@
-/* @Codex: one delivery closure, not a runtime installer. Only reads the current
+/* one delivery closure, not a runtime installer. Only reads the current
  * checkout and already-normalized app; Next's installed tracer is build-only. */
 import fs from 'node:fs';
 import path from 'node:path';

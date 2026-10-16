@@ -1,4 +1,3 @@
-/* @Codex */
 import { readBoundedJsonBody } from '../../bounded-request-body';
 import { mintResourcePort, releaseResourcePort, registerPrivateResource, unregisterPrivateResource,
     beginResourceUse, commitResourceUse, abortResourceUse } from '../../security/web-auth-lifecycle-owner-adapter';

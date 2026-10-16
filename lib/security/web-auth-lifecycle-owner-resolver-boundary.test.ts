@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -18,7 +17,7 @@ const PRODUCER = 'lib/security/web-auth-next-producer-boundary.test.ts';
 const H1_MATRIX = 'lib/security/server-auth.test.ts';
 const GUARD_SCRIPT = `check:${OWNER_STEM}-boundary`;
 const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrency=1 ${D1A} ${PRODUCER} ${D1B} ${H1_MATRIX}`;
-// @Codex ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
+// ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
 // Aliases and owner delivery stay guarded independently of standalone tracing additions.
 // Reviewed 2026-10-16: 25 MiB prosthetic originals, three traced modules, runtime-twin-086 tool removed.
 const NEXT_RESOLVER_AST_SHA256 = '4c5cfae31adbff3a00ac0af7a7dd674deeb806227e126d1e6c9bfad76c324ffc';
@@ -171,7 +170,7 @@ const livePackage = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'ut
 const liveFiles = repositoryFiles(ROOT);
 
 test('freezes the sole comment-insensitive Next resolver surface', () => {
-    // @Codex: read source only; never execute the build helper while checking its closure.
+    // read source only; never execute the build helper while checking its closure.
     for (const [file, expected] of Object.entries(REVIEWED_TRACE_FILES)) {
         assert.equal(digest(readFileSync(path.join(ROOT, file), 'utf8')), expected, file);
     }

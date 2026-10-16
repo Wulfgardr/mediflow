@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedPatientDetailSection: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -52,7 +51,7 @@ struct PairedPatientDetailSection: View {
                     if detail.isArchived == true { PairedPatientFlagChip("Archiviato", tone: .neutral) }
                 }
             }
-            /* @Codex: archive provenance belongs with the archived state. */
+            /* archive provenance belongs with the archived state. */
             if showsAdministration && detail.isArchived == true {
                 ChartGroup("Archiviazione") {
                     if model.isPatientFieldLocked(.archiveReason) || model.isPatientFieldLocked(.archiveNote) {
@@ -102,7 +101,7 @@ struct PairedPatientDetailSection: View {
             ChartGroup("Identità") {
                 InfoRow("Codice fiscale", detail.taxCode)
                 if let birth = detail.birthDate {
-                    InfoRow("Data di nascita", birthDateText(birth)) // @Codex
+                    InfoRow("Data di nascita", birthDateText(birth))
                 }
             }
 
@@ -126,7 +125,7 @@ struct PairedPatientDetailSection: View {
                     ForEach(care, id: \.0) { InfoRow($0.0, $0.1) }
                 }
             }
-            // @Codex: Keep the existing bounded counts available after patient
+            // Keep the existing bounded counts available after patient
             // facts, instead of starting every chart with six equally weighted tiles.
             DisclosureGroup("Riepilogo della cartella") {
                 patientSignals(detail, exemptionsCount: exemptions.count)
@@ -144,14 +143,14 @@ struct PairedPatientDetailSection: View {
             } else if showsAdministration && !exemptions.isEmpty {
                 ChartGroup("Esenzioni · \(exemptions.count)") {
                     #if os(macOS)
-                    // @Codex: Keep every code readable when the document narrows.
+                    // Keep every code readable when the document narrows.
                     Text(exemptions.joined(separator: ", "))
                         .font(.body)
                         .registro()
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                     #else
-                    // @Codex: Codes wrap as text rather than overflowing a row of chips.
+                    // Codes wrap as text rather than overflowing a row of chips.
                     Text(exemptions.joined(separator: ", "))
                     .font(.body)
                     .registro()
@@ -236,7 +235,7 @@ struct PairedPatientDetailSection: View {
         }
     }
 
-    /* @Codex: Read-only review signals from this patient's decrypted snapshot.
+    /* Read-only review signals from this patient's decrypted snapshot.
        Opening the existing Documents section leaves its loading, permissions
        and explicit manual actions with the existing workspace/model. */
     @ViewBuilder
@@ -289,7 +288,6 @@ struct PairedPatientDetailSection: View {
         }
     }
 
-    /* @Codex */
     private var reviewDocumentReadState: PatientReviewDocumentReadState {
         switch model.attachmentsLoadState {
         case .idle: .idle
@@ -301,7 +299,7 @@ struct PairedPatientDetailSection: View {
     }
 
     #if os(macOS)
-    /* @Codex: Read the patient facts as a document. Collection counts are not
+    /* Read the patient facts as a document. Collection counts are not
        load states; the workspace continues to own loading and error feedback. */
     private var macPatientFacts: some View {
         let contacts: [(label: String, value: String, isCode: Bool)] = [
@@ -319,7 +317,7 @@ struct PairedPatientDetailSection: View {
             ChartGroup("Identità") {
                 macPatientFact("Codice fiscale", detail.taxCode, isCode: true)
                 if let birth = detail.birthDate {
-                    macPatientFact("Data di nascita", birthDateText(birth), isCode: false) // @Codex
+                    macPatientFact("Data di nascita", birthDateText(birth), isCode: false)
                 }
             }
             if !contacts.isEmpty {
@@ -340,7 +338,7 @@ struct PairedPatientDetailSection: View {
         }
     }
 
-    /* @Codex: read the existing bounded patient snapshot; links only navigate. */
+    /* read the existing bounded patient snapshot; links only navigate. */
     @ViewBuilder
     private var macClinicalSummary: some View {
         let active = model.therapies.filter { $0.deletedAt == nil && $0.status == "active" }
@@ -564,7 +562,7 @@ struct PairedPatientDetailSection: View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 
-    /* @Codex: DOB preserves its stored civil day in every device time zone. */
+    /* DOB preserves its stored civil day in every device time zone. */
     private func birthDateText(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "it_IT")
@@ -580,7 +578,7 @@ struct PairedPatientDetailSection: View {
             Text("Modifica anagrafica")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            // @Codex: keep the submitted fields stable until acknowledgement;
+            // keep the submitted fields stable until acknowledgement;
             // explicit cancellation and session lock retain their own controls.
             Group {
             TextField("Nome", text: $model.editPatientFirstName)
@@ -589,7 +587,6 @@ struct PairedPatientDetailSection: View {
                 .accessibilityIdentifier("edit-patient-lastName")
             TextField("Codice fiscale", text: $model.editPatientTaxCode)
                 .accessibilityIdentifier("edit-patient-taxCode")
-            /* @Codex */
             Toggle("Data di nascita presente", isOn: Binding(
                 get: { model.editPatientBirthDate != nil },
                 set: { model.setPatientBirthDatePresent($0) }
@@ -606,7 +603,6 @@ struct PairedPatientDetailSection: View {
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("edit-patient-birthDate")
             }
-            /* @Codex */
             TextField("Indirizzo", text: $model.editPatientAddress)
                 .accessibilityIdentifier("edit-patient-address")
                 .disabled(model.isPatientFieldLocked(.address))
@@ -626,10 +622,10 @@ struct PairedPatientDetailSection: View {
                     .accessibilityIdentifier("edit-patient-locked-fields-message")
             }
             Toggle("Archiviato", isOn: $model.editPatientIsArchived)
-                .disabled(model.isWorking) // @Codex
+                .disabled(model.isWorking)
                 .accessibilityIdentifier("edit-patient-archived")
             if model.editPatientIsArchived {
-                PatientArchiveFields(model: model) // @Codex: same fields as the sheet.
+                PatientArchiveFields(model: model) // same fields as the sheet.
             }
             Toggle("ADI (assistenza domiciliare)", isOn: $model.editPatientIsAdi)
                 .accessibilityIdentifier("edit-patient-adi")
@@ -701,7 +697,6 @@ struct PairedPatientDetailSection: View {
                     .accessibilityIdentifier("add-diagnosis-button")
                 }
             }
-            /* @Codex */
             .disabled(model.isPatientFieldLocked(.diagnoses))
 
             VStack(alignment: .leading, spacing: 4) {
@@ -743,7 +738,6 @@ struct PairedPatientDetailSection: View {
                 }
                 exemptionCatalogResultsList
             }
-            /* @Codex */
             .disabled(model.isPatientFieldLocked(.exemptions))
             }
             .disabled(model.isWorking)
@@ -764,7 +758,6 @@ struct PairedPatientDetailSection: View {
         .textFieldStyle(.roundedBorder)
     }
 
-    /* @Codex */
     @ViewBuilder
     private var exemptionCatalogResultsList: some View {
         if model.isSearchingExemptionCatalog

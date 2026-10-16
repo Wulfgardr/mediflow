@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { types } from 'node:util';
@@ -92,7 +91,6 @@ function entryFromPairedClient(client: StoredNetworkPairedClient | null): Admiss
  * Authenticates only through the server-owned paired-client state and emits a
  * process-local, one-use token. Source-surface headers are intentionally not read.
  */
-/* @Codex */
 export async function admitNativeBootstrap(value: unknown): Promise<NativeBootstrapAdmission | null> {
     const request = canonicalPairedRequest(value);
     if (!request) return null;
@@ -111,7 +109,6 @@ export async function admitNativeBootstrap(value: unknown): Promise<NativeBootst
 }
 
 /** Consume exactly once before a later route packet is assembled. */
-/* @Codex */
 export async function consumeNativeBootstrapAdmission(value: unknown): Promise<NativeBootstrapRouteBinding | null> {
     try {
         if (!value || typeof value !== 'object' || IsProxy(value)) return null;

@@ -1,6 +1,5 @@
 import { parseExpectedVersion } from './version-concurrency';
 
-/* @Codex */
 export type CheckupConflictSnapshot = {
     id: string;
     patientId: string;
@@ -9,7 +8,6 @@ export type CheckupConflictSnapshot = {
     deletedAt: string | null;
 };
 
-/* @Codex */
 export type CheckupVersionConflictPayload = {
     error: 'Conflict';
     code: 'VERSION_CONFLICT';
@@ -30,12 +28,10 @@ type CheckupConflictSource = {
     deletedAt?: Date | string | number | null;
 };
 
-/* @Codex */
 export function parseCheckupExpectedVersion(value: unknown): number | null {
     return parseExpectedVersion(value);
 }
 
-/* @Codex */
 export function buildCheckupVersionConflictPayload(
     expectedVersion: number,
     recordId: string,

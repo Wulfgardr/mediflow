@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SYNTHETIC_LAB_REPORT_FIXTURES } from './lab-report-parser.fixtures.ts';

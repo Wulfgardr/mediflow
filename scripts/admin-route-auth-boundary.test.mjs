@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -23,7 +22,6 @@ const WEB_ADMIN_ROUTES = [
     { file: 'app/api/system/restore-patient/route.ts', handlers: ['GET', 'POST'] },
 ];
 
-/* @Codex */
 const SESSION_REQUIRED_SYSTEM_ROUTES = [
     { file: 'app/api/system/update-awareness/route.ts', handlers: ['GET'] },
 ];
@@ -161,7 +159,6 @@ test('backup verification cannot write: its route imports the preflight and no e
     assert.doesNotMatch(source, /backup-restore-executor|restoreBackupArtifact|db-server|@\/lib\/schema/);
 });
 
-/* @Codex */
 test('session-only system metadata routes require a web session before returning local details', () => {
     for (const route of SESSION_REQUIRED_SYSTEM_ROUTES) {
         const source = readSource(route.file);
@@ -176,7 +173,6 @@ test('session-only system metadata routes require a web session before returning
     }
 });
 
-/* @Codex */
 test('system revision remains unauthenticated but exposes only launcher and drift-check fields without a session', () => {
     const source = readSource('app/api/system/revision/route.ts');
     const block = handlerSource(source, 'GET');

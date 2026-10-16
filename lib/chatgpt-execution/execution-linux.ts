@@ -1,4 +1,4 @@
-/* @Codex — no process, network, helper discovery or platform emulation. */
+/* no process, network, helper discovery or platform emulation. */
 import 'server-only';
 import { ExecutionError } from './execution-contract';
 import type { QualificationSnapshot } from '../chatgpt-product/product-contract';

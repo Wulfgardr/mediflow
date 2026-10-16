@@ -15,7 +15,7 @@ export const DEFAULT_TOKENS_PATH = path.join(ROOT_DIR, 'docs/design/lume/tokens/
 export const DEFAULT_CSS_MIRROR_PATH = path.join(ROOT_DIR, 'app/lume-tokens.css');
 export const DEFAULT_GLOBAL_CSS_PATH = path.join(ROOT_DIR, 'app/globals.css');
 
-// @Codex: fail-closed repository scan for literal colors outside Lume.
+// fail-closed repository scan for literal colors outside Lume.
 const PALETTE_SOURCE_DIRS = ['app', 'components'];
 const PALETTE_SOURCE_EXTENSIONS = new Set(['.css', '.tsx']);
 const TAILWIND_PALETTE = '(?:blue|sky|indigo|violet|purple|emerald|green|lime|amber|yellow|orange|rose|pink|red|teal|cyan|fuchsia|slate|gray|zinc|neutral|stone)';
@@ -491,7 +491,7 @@ function cssWeight(weight) {
   return `${percent}%`;
 }
 
-// @Codex WUL-517: blocca le dichiarazioni sorgente per il sottoinsieme elencato.
+// WUL-517: blocca le dichiarazioni sorgente per il sottoinsieme elencato.
 // evaluateContract misura testo e tinta; il bordo resta un peso sorgente
 // esplicito. Specificità, !important e override esterni non sono una prova della
 // cascade effettiva e restano contratti separati.

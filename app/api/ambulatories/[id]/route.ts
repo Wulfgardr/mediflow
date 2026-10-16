@@ -16,7 +16,7 @@ export async function PUT(request: Request, context: RouteContext) {
         const { id } = await context.params;
         const parsed = await readAmbulatoryJsonObject(request);
         if (!parsed.ok) return parsed.response;
-        /* @Codex: retain the admitted host session through the atomic writer. */
+        /* retain the admitted host session through the atomic writer. */
         const result = updateAmbulatory({ request, session }, id, parsed.body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
@@ -37,7 +37,6 @@ export async function DELETE(request: Request, context: RouteContext) {
         const parsed = await readAmbulatoryJsonObject(request, 'empty-object');
         if (!parsed.ok) return parsed.response;
         const body = parsed.body;
-        /* @Codex */
         const result = deleteAmbulatory({ request, session }, id, body.version);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {

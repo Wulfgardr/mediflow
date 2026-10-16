@@ -1,4 +1,3 @@
-/* @Codex */
 
 import type { SemanticSignal } from '@/lib/ui-semantic-signal';
 

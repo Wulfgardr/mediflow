@@ -1,9 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { scaleInterpretationVersionLabel } from './scale-history';
-/* @Codex */
 import { clinicalRichTextToPlainText } from './clinical-rich-text';
-/* @Codex */
 import type { Patient, ClinicalEntry, Therapy, Observation } from './db';
 
 // Extending jsPDF type to include lastAutoTable (added by autotable plugin)
@@ -11,7 +9,7 @@ export interface JsPDFWithAutoTable extends jsPDF {
     lastAutoTable: { finalY: number };
 }
 
-/* @Codex WUL-327: lo zero è un punteggio valido e non deve degradare al
+/* WUL-327: lo zero è un punteggio valido e non deve degradare al
    segnaposto. Solo i numeri non finiti diventano '-'; le stringhe conservano
    il comportamento attuale e non vengono mai coerte a numero. */
 const formatScaleScore = (score: unknown): string | number => {
@@ -26,7 +24,6 @@ export const generatePatientReport = (
     entries: ClinicalEntry[],
     lastScales: ClinicalEntry[],
     therapies: Therapy[] = [],
-    /* @Codex */
     observations: Observation[] = []
 ) => {
     const doc = new jsPDF();
@@ -68,7 +65,6 @@ export const generatePatientReport = (
     // --- PATIENT INFO GRID ---
     let currentY = 40;
 
-    /* @Codex */
     const ensureSpace = (minimumHeight: number) => {
         if (currentY + minimumHeight > pageHeight - bottomMargin) {
             doc.addPage();
@@ -76,7 +72,6 @@ export const generatePatientReport = (
         }
     };
 
-    /* @Codex */
     const startSection = (title: string, minimumHeight: number = 24) => {
         ensureSpace(minimumHeight);
         doc.setFontSize(12);
@@ -86,7 +81,6 @@ export const generatePatientReport = (
         currentY += 2;
     };
 
-    /* @Codex */
     const renderEmptyState = (message: string) => {
         doc.setFontSize(10);
         doc.setFont("helvetica", "italic");
@@ -95,14 +89,12 @@ export const generatePatientReport = (
         currentY += 12;
     };
 
-    /* @Codex */
     const formatDate = (value: Date | string | undefined) => {
         if (!value) return 'N/D';
         const date = value instanceof Date ? value : new Date(value);
         return Number.isNaN(date.getTime()) ? 'N/D' : date.toLocaleDateString('it-IT');
     };
 
-    /* @Codex */
     const parseDiagnoses = (value: unknown) => {
         if (Array.isArray(value)) {
             return value;
@@ -158,9 +150,7 @@ export const generatePatientReport = (
 
     // Notes Section
     if (patient.notes) {
-        /* @Codex */
         const noteLines = doc.splitTextToSize(patient.notes, pageWidth - 36);
-        /* @Codex */
         const noteHeight = Math.max(16, 10 + (noteLines.length * 5));
 
         ensureSpace(noteHeight + 10);
@@ -181,7 +171,6 @@ export const generatePatientReport = (
     }
 
     // --- ICD DIAGNOSES ---
-    /* @Codex */
     const diagnoses = parseDiagnoses(patient.diagnoses);
 
     startSection("Diagnosi ICD", 28);
@@ -216,7 +205,6 @@ export const generatePatientReport = (
     }
 
     // --- ACTIVE THERAPY ---
-    /* @Codex */
     const activeTherapies = therapies.filter(t => t.status === 'active');
 
     startSection("Terapia Farmacologica Attiva", 24);
@@ -252,7 +240,6 @@ export const generatePatientReport = (
     // --- CLINICAL DIARY ---
     startSection("Diario Clinico (Ultime Attività)", 24);
 
-    /* @Codex */
     const diaryEntries = entries.filter((entry) => entry.type !== 'scale' && !entry.deletedAt).slice(0, 30);
 
     if (diaryEntries.length > 0) {
@@ -285,7 +272,6 @@ export const generatePatientReport = (
     // --- LAB OBSERVATIONS (LOINC + UCUM) ---
     startSection("Osservazioni Codificate (LOINC + UCUM)", 30);
 
-    /* @Codex */
     if (observations.length > 0) {
         const observationData = observations.map((observation) => [
             formatDate(observation.observedAt),

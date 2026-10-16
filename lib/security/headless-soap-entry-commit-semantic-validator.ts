@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 
 import {

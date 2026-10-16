@@ -1,4 +1,4 @@
-/* @Codex — native pre-attempt grants and host captures. No key, PIN, decryptor or writer. */
+/* native pre-attempt grants and host captures. No key, PIN, decryptor or writer. */
 import 'server-only';
 import { createHash, randomBytes } from 'node:crypto';
 import * as native from './native-inference-lifecycle';
@@ -243,14 +243,14 @@ export function closeNativeOrdinaryHostSources(capture: NativeOrdinaryHostSource
     const state = records.get(capture); if (state) close(state);
 }
 
-/* @Codex — descriptive branch only, after authentic source acquisition. */
+/* descriptive branch only, after authentic source acquisition. */
 export function nativeOrdinaryDocumentRequiresProjection(capture: NativeOrdinaryHostSourceCapture): boolean {
     const state = stateOf(capture);
     if (state.request.functionId !== 'document_synthesis' || !nativeOrdinaryHostSourcesAreCurrent(capture)) return fail();
     return state.roster.length > 0;
 }
 
-/* @Codex — revocation-only views; never expose the private capture or source metadata. */
+/* revocation-only views; never expose the private capture or source metadata. */
 export function nativeOrdinaryHostSourceSignal(capture: NativeOrdinaryHostSourceCapture): AbortSignal {
     return stateOf(capture).controller.signal;
 }

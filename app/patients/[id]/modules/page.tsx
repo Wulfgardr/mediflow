@@ -31,7 +31,7 @@ import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
 import Timeline from '@/components/timeline';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
-/* @Codex WUL-678: scoped to the new-scale targets below. */
+/* WUL-678: scoped to the new-scale targets below. */
 import scaleStyles from '@/components/scales/scale-workspace.module.css';
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY, isAiDocumentSynthesisEnabledValue } from '@/lib/ai-document-synthesis-kill-switch';
 import { AI_PATIENT_INSIGHT_KILL_SWITCH_KEY, isAiPatientInsightEnabledValue } from '@/lib/ai-patient-insight-kill-switch';
@@ -56,7 +56,7 @@ import { buildPatientModuleRailGroups } from '@/lib/patient-module-rail-mapping'
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { calculateAge, estimateBirthYearFromTaxCode } from '@/lib/utils';
 
-/* @Codex These helpers are invoked only from explicit UI events. Keeping their
+/* These helpers are invoked only from explicit UI events. Keeping their
    time and navigation side effects outside render makes that boundary visible
    to React's purity checks. */
 function buildObservationRequestId(loop: OpenLoop): string {
@@ -73,7 +73,7 @@ export default function PatientDetailPage() {
     const params = useParams();
     const id = params.id as string;
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-    /* @Codex Whether this browser can actually hand a file to the system.
+    /* Whether this browser can actually hand a file to the system.
        Probed rather than assumed: the Web Share API accepts files on iOS, iPadOS
        and Safari on the Mac, and refuses them in several desktop browsers. A
        button that opens nothing is worse than an absent one, so the control is
@@ -85,7 +85,7 @@ export default function PatientDetailPage() {
         setCanShareFhirFile(navigator.canShare({ files: [probe] }));
     }, []);
     const [observationPrefill, setObservationPrefill] = useState<ObservationPrefill | undefined>();
-    /* @Codex One stable clock sample is sufficient for this read-only staleness
+    /* One stable clock sample is sufficient for this read-only staleness
        projection; it must not change as a side effect of an unrelated render. */
     const [currentTimestampMs] = useState(() => Date.now());
     const confirm = useConfirm();
@@ -101,7 +101,7 @@ export default function PatientDetailPage() {
         undefined,
         ['entries'],
     );
-    /* @Codex WUL-UIUX Fase 7: stesso filtro del builder (ne completati ne
+    /* WUL-UIUX Fase 7: stesso filtro del builder (ne completati ne
        annullati): cosi nextCheckup, la sezione Follow-up e i conteggi condivisi
        raccontano lo stesso insieme, e un appuntamento annullato non compare piu
        come prossimo follow-up. */
@@ -123,7 +123,7 @@ export default function PatientDetailPage() {
         undefined,
         ['attachments'],
     );
-    /* @Codex WUL-UIUX: conteggi per la striscia di segnali sopra la piega. */
+    /* WUL-UIUX: conteggi per la striscia di segnali sopra la piega. */
     // Terapie attive complete (non solo il conteggio) per servire i principi attivi
     // con posologia direttamente nella cella, senza scendere al TherapyManager.
     const activeTherapies = useLiveQuery(
@@ -141,7 +141,7 @@ export default function PatientDetailPage() {
         undefined,
         ['therapies'],
     );
-    /* @Codex WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
+    /* WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
        le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
        le osservazioni del paziente, senza filtri). */
     const therapies = useLiveQuery(
@@ -195,7 +195,7 @@ export default function PatientDetailPage() {
         undefined,
         ['observations'],
     );
-    /* @Codex WUL-UIUX (Fase 4): ultima misura per il Foglio sinottico, con delta
+    /* WUL-UIUX (Fase 4): ultima misura per il Foglio sinottico, con delta
        calcolato DENTRO il gruppo per codice (mai tra analiti diversi) e solo se
        stessa unita e valori numerici. Classificazione fuori-range da observation-range. */
     const latestMeasure = useLiveQuery<SynopticMeasure | null>(
@@ -232,7 +232,7 @@ export default function PatientDetailPage() {
         undefined,
         ['observations'],
     );
-    /* @Codex WUL-UIUX: conteggi leggeri per i chip delle sezioni collassabili. */
+    /* WUL-UIUX: conteggi leggeri per i chip delle sezioni collassabili. */
     const prestazioniCount = servicePrescriptions?.length;
     const protesicaCount = useLiveQuery(
         async () => db.prostheticPrescriptions.query({ patientId: id }).count(),
@@ -252,7 +252,7 @@ export default function PatientDetailPage() {
         undefined,
         ['settings'],
     );
-    /* @Codex LUME-104/68: non derivare lo stato fail-closed del pannello mentre
+    /* LUME-104/68: non derivare lo stato fail-closed del pannello mentre
        la preferenza e ancora in caricamento: aprirebbe la sezione per un falso
        "bloccato" e CollapsibleSection, correttamente, non la richiuderebbe. */
     const { data: patientInsightKillSwitch, loading: patientInsightKillSwitchLoading } = useLiveQueryState(
@@ -267,9 +267,7 @@ export default function PatientDetailPage() {
         undefined,
         ['settings'],
     );
-    /* @Codex */
     const exemptionCodes = Array.isArray(patient?.exemptions) ? patient.exemptions : [];
-    /* @Codex */
     const exemptionDetails = useLiveQuery(
         async () => {
             const uniqueCodes = [...new Set(
@@ -303,7 +301,7 @@ export default function PatientDetailPage() {
         ['exemptions'],
     );
 
-    /* @Codex WUL-UIUX Fase 7: stessa pipeline del Quadro (lib/patient-workspace).
+    /* WUL-UIUX Fase 7: stessa pipeline del Quadro (lib/patient-workspace).
        I numeri della Scheda con un omologo nel cockpit derivano da qui e non
        possono divergere per costruzione. Finche una query non e pronta il
        workspace resta undefined: mai zeri finti durante il caricamento. */
@@ -328,7 +326,7 @@ export default function PatientDetailPage() {
         () => new Map((linkedServiceCatalogEntries ?? []).map((entry) => [entry.id, entry])),
         [linkedServiceCatalogEntries],
     );
-    /* @Codex Smart Import production receives one pure host projection. The
+    /* Smart Import production receives one pure host projection. The
        legacy generator/apply service is deliberately absent from this page. */
     const smartImportFabricCaptureInput = useMemo(
         () => patient && entries && attachments && activeTherapies
@@ -365,9 +363,9 @@ export default function PatientDetailPage() {
     const activeEntries = (entries ?? []).filter((entry) => !entry.deletedAt);
     const nonScaleEntries = activeEntries.filter((entry) => entry.type !== 'scale');
     const scaleEntries = activeEntries.filter((entry) => entry.type === 'scale');
-    // @Codex: Keep deleted evaluations available to the existing audited restore flow.
+    // Keep deleted evaluations available to the existing audited restore flow.
     const scaleHistoryEntries = (entries ?? []).filter((entry) => entry.type === 'scale');
-    /* @Codex WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
+    /* WUL-UIUX: il Diario non deve mostrare le compilazioni scala (hanno
        la loro sezione). Manteniamo le voci cancellate per il toggle audit interno
        di Timeline; filtriamo solo il tipo scala, cosi il conteggio del chip torna. */
     const timelineEntries = (entries ?? []).filter((entry) => entry.type !== 'scale');
@@ -435,7 +433,7 @@ export default function PatientDetailPage() {
         patient.updatedAt ? new Date(patient.updatedAt).getTime() : 0,
         ...activeEntries.map((entry) => (entry.date ? new Date(entry.date).getTime() : 0)),
         ...(activeTherapies ?? []).map((therapy) => new Date(therapy.updatedAt ?? therapy.startDate).getTime()),
-        /* @Codex WUL-UIUX: usa il max tra prelievo e registrazione, cosi una misura
+        /* WUL-UIUX: usa il max tra prelievo e registrazione, cosi una misura
            retrodatata trascritta oggi rende comunque stale l'insight. */
         latestObservation
             ? Math.max(
@@ -468,7 +466,7 @@ export default function PatientDetailPage() {
             missingTextCount: attachmentItems.length - attachmentsWithTextCount,
         },
     });
-    /* @Codex WUL-678: route existing review actions to their presented domain, without changing queue state. */
+    /* WUL-678: route existing review actions to their presented domain, without changing queue state. */
     const reviewQueueSummary = {
         ...reviewQueueProjection,
         rows: reviewQueueProjection.rows.map((row) => row.anchor && (row.id === 'insight' || row.id === 'smart-import')
@@ -480,7 +478,7 @@ export default function PatientDetailPage() {
     const reviewQueueAttentionRows = reviewQueueSummary.rows.filter((row) =>
         ['da-rivedere', 'bloccato', 'serve-testo'].includes(row.state),
     );
-    /* @Codex WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
+    /* WUL-UIUX: i numeri che contano subito, soprattutto su pazienti
        complessi. Nessun "fuori range": senza range di riferimento clinici non si
        inventano flag (resta onesto). */
     // Ultimo contatto = voce di diario piu recente; warning oltre 90 giorni se il
@@ -492,7 +490,7 @@ export default function PatientDetailPage() {
     const contactStale = daysSinceContact !== null && daysSinceContact > 90 && !patient.isArchived;
     // Documenti caricati senza sintesi: azionabile, a differenza del conteggio referti.
     const missingSynthesisCount = attachmentItems.length - attachmentsWithTextCount;
-    /* @Codex WUL-UIUX (Fase 4): input per il Foglio sinottico. Terapie e ultima
+    /* WUL-UIUX (Fase 4): input per il Foglio sinottico. Terapie e ultima
        misura hanno righe dedicate; qui restano i segnali di contesto onesti senza
        una riga propria. Nessun flag fuori-range inventato. */
     const otherProblemsCount = Math.max(0, diagnosisItems.length - (leadDiagnosis ? 1 : 0));
@@ -531,7 +529,7 @@ export default function PatientDetailPage() {
     });
     const openLoopCount = openLoopProjection.groups.reduce((total, group) => total + group.loops.length, 0)
         + openLoopProjection.standaloneLoops.length;
-    /* @Codex WUL-560 L7B / D-WebRail-01: ordine raggruppato esplicito; ogni
+    /* WUL-560 L7B / D-WebRail-01: ordine raggruppato esplicito; ogni
        oggetto conserva href, label e meta del caller senza binding inferiti. */
     const workspaceNavItems: Kree8WorkspaceNavItem[] = [
         { href: '#quadro', label: 'Quadro' },
@@ -552,7 +550,7 @@ export default function PatientDetailPage() {
     ];
     const workspaceNavGroups = buildPatientModuleRailGroups(workspaceNavItems);
 
-    /* @Codex Validates against the FSE and builds the bundle, or returns null
+    /* Validates against the FSE and builds the bundle, or returns null
        when the export must not proceed.
        Extracted so downloading and sharing take the same road: the native
        client already separates preparing the bundle from handing it over
@@ -620,7 +618,7 @@ export default function PatientDetailPage() {
         }
     };
 
-    /* @Codex The counterpart of the native ShareLink: hand the bundle to the
+    /* The counterpart of the native ShareLink: hand the bundle to the
        system so it can go to Mail, AirDrop or Files, instead of only landing in
        the downloads folder. Same FSE gate as the export, because sharing a
        bundle the validator rejected would be the same mistake with a wider
@@ -755,7 +753,7 @@ export default function PatientDetailPage() {
                     nextCheckupTitle={nextCheckup?.title}
                 />
 
-                {/* @Codex WUL-678: three actual folder destinations; #identita remains an identity-only alias. */}
+                {/* WUL-678: three actual folder destinations; #identita remains an identity-only alias. */}
                 {(['anagrafica', 'clinica', 'amministrazione'] as const).map((domain) => (
                     <CollapsibleSection key={domain} id={domain === 'anagrafica' ? 'identita' : domain}
                         title={domain === 'anagrafica' ? 'Anagrafica' : domain === 'clinica' ? 'Clinica' : 'Amministrazione'}
@@ -860,7 +858,7 @@ export default function PatientDetailPage() {
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={workspaceStyles.clinicalSection}
                     >
-                        {/* @Codex: SISS presentation reuses the existing export/share gates. */}
+                        {/* SISS presentation reuses the existing export/share gates. */}
                         <SissWorkspace
                             patientId={id}
                             patientTaxCode={patient.taxCode}
@@ -886,7 +884,7 @@ export default function PatientDetailPage() {
                             || smartImportSourceCount > 0
                             || reviewQueueSummary.rows.some((row) => row.id === 'insight' && row.state === 'bloccato'))}
                 >
-                    {/* @Codex WUL-678: upload, source list, then review; no duplicated evidence tiles. */}
+                    {/* WUL-678: upload, source list, then review; no duplicated evidence tiles. */}
                     <DocumentUpload patientId={id}>
                         {documentInsights.length > 0 ? (
                             <details id="document-insights" className={disclosure.disclosure}>
@@ -906,7 +904,7 @@ export default function PatientDetailPage() {
                         count={scaleEntries.length > 0 ? formatCountLabel(scaleEntries.length, 'registrata', 'registrate') : undefined}
                         summary="Risultati registrati e nuove valutazioni."
                     >
-                        {/* @Codex: Read stored results without rescoring historical instruments. */}
+                        {/* Read stored results without rescoring historical instruments. */}
                         <div className="mb-8 space-y-4">
                             <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Valutazioni registrate</h4>
                             {entries ? (
@@ -917,7 +915,7 @@ export default function PatientDetailPage() {
                                 />
                             ) : <p className={workspaceStyles.mutedText}>Valutazioni in caricamento.</p>}
                         </div>
-                        {/* @Codex WUL-678: one target per scale, with explicit spacing. */}
+                        {/* WUL-678: one target per scale, with explicit spacing. */}
                         <div className={scaleStyles.quickStart}>
                             <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Nuova valutazione</h4>
                             <div className={scaleStyles.catalog}>
@@ -936,7 +934,7 @@ export default function PatientDetailPage() {
                         </div>
                     </CollapsibleSection>
 
-                {/* @Codex WUL-678: connect the folder follow-up action to the existing planner. */}
+                {/* WUL-678: connect the folder follow-up action to the existing planner. */}
                 <CollapsibleSection
                     id="follow-up"
                     kicker="Pianificazione"

@@ -1,4 +1,4 @@
-/* @Codex: therapy-specific object, own-key and date boundary; shared clinical normalizers are unchanged. */
+/* therapy-specific object, own-key and date boundary; shared clinical normalizers are unchanged. */
 import { v4 as uuidv4 } from 'uuid';
 import { readBoundedJsonBody } from './bounded-request-body';
 
@@ -20,7 +20,7 @@ export function therapyJsonObject(value: unknown): Record<string, unknown> | nul
         ? value as Record<string, unknown> : null;
 }
 
-/* @Codex: bounded request-json read occurs after route auth, before any DB effects. */
+/* bounded request-json read occurs after route auth, before any DB effects. */
 export async function readTherapyJsonObject(request: Request, surface: TherapySurface, operation: TherapyMutation) {
     const parsed = await readBoundedJsonBody(request, LOCAL_THERAPY_JSON_MAX_BYTES, 'request-json');
     if (!parsed.ok) return parsed.status === 413
@@ -51,7 +51,7 @@ function allowedFields(surface: TherapySurface, operation: TherapyMutation): Set
     return fields;
 }
 
-/* @Codex: Web keeps Zod and route mapping; this guards only inputs that Zod strips or coerces. */
+/* Web keeps Zod and route mapping; this guards only inputs that Zod strips or coerces. */
 export function validateTherapyInput(body: Record<string, unknown>, surface: TherapySurface, operation: TherapyMutation): Invalid | null {
     if (!Object.keys(body).every((name) => allowedFields(surface, operation).has(name))) return invalid();
     if (operation === 'create' && hasOwn(body, 'id') && (typeof body.id !== 'string' || !body.id.trim())) return invalid('Invalid id');

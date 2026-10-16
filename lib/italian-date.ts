@@ -1,4 +1,3 @@
-/* @Codex */
 
 /**
  * Parse Italian date formats (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY)

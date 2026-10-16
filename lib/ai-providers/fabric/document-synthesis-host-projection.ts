@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 export const DOCUMENT_SYNTHESIS_HOST_PROJECTION_SCHEMA_VERSION = 'mediflow.document-synthesis.host-projection.v1' as const;

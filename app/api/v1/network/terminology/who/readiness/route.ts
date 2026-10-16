@@ -1,4 +1,4 @@
-/* @Codex: WUL-673. Existing paired authority; no native-to-Web session conversion. */
+/* WUL-673. Existing paired authority; no native-to-Web session conversion. */
 import { NETWORK_CATALOG_READ_CAPABILITY } from '@/lib/network-catalog-read';
 import { requireNetworkCapabilityContext } from '@/lib/network-write-context';
 import { peekSession } from '@/lib/security/server-session';

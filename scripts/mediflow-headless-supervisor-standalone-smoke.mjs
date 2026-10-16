@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +13,7 @@ import { OPERATION_DESCRIPTORS, publicCatalog } from '../packages/mcp/src/contra
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 let BASE_URL;
 const ORDINARY_URL = 'http://127.0.0.1:3001';
-// @Codex: the same real authenticated smoke, now against an extracted app.
+// the same real authenticated smoke, now against an extracted app.
 const args = process.argv.slice(2);
 assert.ok(args.length === 0 || (args.length === 2 && args[0] === '--app'),
   'Usage: mediflow-headless-supervisor-standalone-smoke.mjs [--app <physical.app>]');

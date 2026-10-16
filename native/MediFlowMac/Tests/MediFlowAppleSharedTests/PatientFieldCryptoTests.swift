@@ -20,7 +20,6 @@ final class PatientFieldCryptoTests: XCTestCase {
         )
     }
 
-    /* @Codex */
     func testArchiveDetailDecryptsJSONStringFieldsAndHidesUnreadableValues() throws {
         let reason = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("other")!, masterKey: key))
         let note = try XCTUnwrap(CryptoService.encryptField(CryptoService.jsonEncode("Trasferimento sintetico")!, masterKey: key))
@@ -52,7 +51,6 @@ final class PatientFieldCryptoTests: XCTestCase {
                      "ciphertext must never be shown when the key is unavailable")
     }
 
-    /* @Codex */
     func testEditableFieldResolvesAbsentPlaintextAndLockedByteExactly() {
         XCTAssertEqual(PatientFieldCrypto.resolveStringField(nil, masterKey: key), .absent)
         XCTAssertEqual(
@@ -67,7 +65,6 @@ final class PatientFieldCryptoTests: XCTestCase {
             .locked(ciphertext: "ENC:corrupt:value"))
     }
 
-    /* @Codex */
     func testLockedEditableFieldEncodesAsOmit() {
         let wrongKey = SymmetricKey(size: .bits256)
         let locked = PatientFieldCrypto.resolveStringField(encString, masterKey: wrongKey)

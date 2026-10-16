@@ -1,4 +1,4 @@
-/* @Codex — PDF.js adapter. Imported only by the local preview, never by an API. */
+/* PDF.js adapter. Imported only by the local preview, never by an API. */
 import type { RenderTask } from 'pdfjs-dist';
 import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';

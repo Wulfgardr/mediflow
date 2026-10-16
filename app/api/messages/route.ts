@@ -5,7 +5,6 @@ import { dbServer } from '@/lib/db-server';
 import { messages } from '@/lib/schema';
 import { eq, asc, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { normalizeStoredMessagePayload } from '@/lib/message-persistence';
 /* STREAM B: server-side list params (whitelisted, plaintext columns only). */
@@ -17,7 +16,6 @@ const MESSAGE_SORT_COLUMNS = {
 } as const;
 
 export async function GET(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -53,7 +51,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);

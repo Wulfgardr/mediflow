@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import { deriveNetworkIdentitySummary } from './network-identity-model.ts';
 
 test('deriveNetworkIdentitySummary requires node credentials when only device pairing exists', () => {

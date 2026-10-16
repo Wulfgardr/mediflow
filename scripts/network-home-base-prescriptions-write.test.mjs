@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -83,7 +82,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         });
         assert.equal(outsideScopeServiceCreate.response.status, 404);
 
-        // @Codex: observe rollback through the real admitted paired HTTP adapter.
+        // observe rollback through the real admitted paired HTTP adapter.
         const faultDb = openTestDb();
         const snapshotService = () => ({
             prescriptions: faultDb.prepare('SELECT * FROM service_prescriptions WHERE patient_id=?').all(patientId),
@@ -187,7 +186,7 @@ test('paired prescriptions and prosthetics write smoke covers capability, scope,
         assert.equal(staleServiceUpdate.json?.entity, 'service_prescription');
         assert.equal(staleServiceUpdate.json?.currentVersion, 2);
 
-        // @Codex: the paired item PUT has its own CAS, mandatory event and rollback.
+        // the paired item PUT has its own CAS, mandatory event and rollback.
         const itemId = itemA.json.id;
         const itemDb = openTestDb();
         const itemState = () => ({

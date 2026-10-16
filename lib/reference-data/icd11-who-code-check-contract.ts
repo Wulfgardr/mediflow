@@ -1,5 +1,4 @@
 import { isWhoEmbeddedTitle, parseWhoEmbeddedReference, type WhoEmbeddedReference } from './icd11-embedded-contract';
-/* @Codex */
 import { parseWhoLocalReference, whoExactRecord, type WhoLocalReference } from './icd11-who-local-contract';
 
 const MMS_PREFIX = 'http://id.who.int/icd/release/11/2026-01/mms/';

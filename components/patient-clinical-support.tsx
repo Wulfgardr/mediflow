@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-678: one clinical proposal area, folded without unmounting controllers. */
+/* WUL-678: one clinical proposal area, folded without unmounting controllers. */
 import type { ReactNode } from 'react';
 import AIPatientInsight from '@/components/ai-patient-insight';
 import type { Patient } from '@/lib/db';

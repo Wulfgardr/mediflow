@@ -1,5 +1,4 @@
 // Codex: created 2026-04-17
-// @Codex
 import CryptoKit
 import Foundation
 
@@ -8,7 +7,6 @@ public actor HomeBasePatientsClient {
     private let configuration: HomeBaseConnectionConfiguration
     private let session: URLSession
 
-    // @Codex
     init(configuration: HomeBaseConnectionConfiguration, session: URLSession) {
         self.configuration = configuration
         self.session = session
@@ -22,9 +20,9 @@ public actor HomeBasePatientsClient {
         self.session = URLSession(configuration: sessionConfiguration, delegate: delegate, delegateQueue: nil)
     }
 
-    /* @Codex: named ADR0135 configuration services, native credentials only. */
+    /* named ADR0135 configuration services, native credentials only. */
     #if os(macOS)
-    /* @Codex — named paired Mac ordinary routes, distinct from account/configuration. */
+    /* named paired Mac ordinary routes, distinct from account/configuration. */
     public func prepareNativeOrdinary(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
                                       sessionCookie: String) async throws -> NativeOrdinaryResponse {
         let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/prepare")
@@ -33,7 +31,7 @@ public actor HomeBasePatientsClient {
             body: encode(preparation))
         return try decode(NativeOrdinaryResponse.self, from: data)
     }
-    /* @Codex — only the named pre-attempt projection endpoint accepts these bounded bytes. */
+    /* only the named pre-attempt projection endpoint accepts these bounded bytes. */
     public func projectNativeOrdinary(_ plan: NativeOrdinaryProjectionPlan, body: Data,
                                       credentials: HomeBasePairedCredentials, sessionCookie: String,
                                       ambulatoryId: String?) async throws -> NativeOrdinaryResponse {
@@ -95,7 +93,6 @@ public actor HomeBasePatientsClient {
         try value.validate(); return value
     }
 
-    /* @Codex */
     public func login(
         username: String?, password: String, credentials: HomeBasePairedCredentials
     ) async throws -> HomeBaseLoginResult {
@@ -227,7 +224,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBasePatientSummary].self, from: data)
     }
 
-    /* @Codex */
     public func fetchPatients(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -342,7 +338,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
     }
 
-    /* @Codex */
     public func searchDrugs(
         query: String,
         limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
@@ -364,7 +359,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseDrugSummary].self, from: data)
     }
 
-    /* @Codex */
     public func searchExemptions(
         query: String,
         limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
@@ -386,7 +380,7 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseExemptionSummary].self, from: data)
     }
 
-    /* @Codex: WUL-673. Named local WHO contracts on the canonical paired channel. */
+    /* WUL-673. Named local WHO contracts on the canonical paired channel. */
     public func searchWHO(query: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseWHOSearchResponse {
         let query = try HomeBaseWHODecoder.normalizedQuery(query)
         let (data, status) = try await sendWHO(path: "search", parameters: [URLQueryItem(name: "q", value: query)], credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -445,7 +439,6 @@ public actor HomeBasePatientsClient {
         }
     }
 
-    /* @Codex */
     public func searchTerminology(
         system: String,
         query: String,
@@ -470,7 +463,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseTerminologyItem].self, from: data)
     }
 
-    /* @Codex */
     public func resolveTerminology(
         system: String,
         code: String,
@@ -493,7 +485,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseTerminologyItem.self, from: data)
     }
 
-    /* @Codex */
     public func fetchTerminologySystems(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -516,7 +507,7 @@ public actor HomeBasePatientsClient {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
-        // @Codex: preserve the data-source protocol witness; native projection opts into a fresh read explicitly.
+        // preserve the data-source protocol witness; native projection opts into a fresh read explicitly.
         try await fetchPatient(id: id, credentials: credentials, sessionCookie: sessionCookie,
                                ambulatoryId: ambulatoryId, fresh: false)
     }
@@ -543,7 +534,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBasePatientDetail.self, from: data)
     }
 
-    /* @Codex */
     public func createPatient(
         payload: HomeBasePatientCreatePayload,
         credentials: HomeBasePairedCredentials,
@@ -562,7 +552,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func softDeletePatient(
         id: String,
         version: Int,
@@ -584,7 +573,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func restorePatient(
         id: String,
         version: Int,
@@ -606,7 +594,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func fetchEntries(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -614,7 +601,7 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseEntrySummary] {
-        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        // preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
         try await fetchEntries(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
                                ambulatoryId: ambulatoryId, limit: limit, fresh: false)
     }
@@ -642,7 +629,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseEntrySummary].self, from: data)
     }
 
-    /* @Codex */
     public func createEntry(
         patientId: String,
         payload: HomeBaseEntryCreatePayload,
@@ -664,7 +650,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updatePatient(
         patientId: String,
         payload: HomeBasePatientUpdatePayload,
@@ -733,7 +718,7 @@ public actor HomeBasePatientsClient {
         sessionCookie: String,
         ambulatoryId: String?
     ) async throws -> HomeBaseAttachmentDetail {
-        // @Codex: preserve the data-source protocol witness; sensitive projection reads pass fresh explicitly.
+        // preserve the data-source protocol witness; sensitive projection reads pass fresh explicitly.
         try await fetchAttachment(patientId: patientId, attachmentId: attachmentId, credentials: credentials,
                                   sessionCookie: sessionCookie, ambulatoryId: ambulatoryId, fresh: false)
     }
@@ -813,7 +798,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseNetworkAiRuntimeSummary.self, from: data)
     }
 
-    /* @Codex */
     public func fetchTherapies(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -821,7 +805,7 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseTherapySummary] {
-        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        // preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
         try await fetchTherapies(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
                                  ambulatoryId: ambulatoryId, limit: limit, fresh: false)
     }
@@ -849,7 +833,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseTherapySummary].self, from: data)
     }
 
-    /* @Codex */
     public func createTherapy(
         patientId: String,
         payload: HomeBaseTherapyCreatePayload,
@@ -871,7 +854,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updateTherapy(
         patientId: String,
         therapyId: String,
@@ -895,7 +877,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
-    /* @Codex */
     public func fetchCheckups(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -918,7 +899,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseCheckupSummary].self, from: data)
     }
 
-    /* @Codex */
     public func fetchScopedCheckups(
         dateFrom: Date?,
         dateTo: Date?,
@@ -950,7 +930,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseCheckupSummary].self, from: data)
     }
 
-    /* @Codex */
     public func fetchScopedEntries(
         type: String?,
         dateFrom: Date?,
@@ -984,7 +963,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseEntrySummary].self, from: data)
     }
 
-    /* @Codex */
     public func createCheckup(
         patientId: String,
         payload: HomeBaseCheckupCreatePayload,
@@ -1006,7 +984,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updateCheckup(
         patientId: String,
         checkupId: String,
@@ -1030,7 +1007,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
-    /* @Codex */
     public func fetchObservations(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -1038,7 +1014,7 @@ public actor HomeBasePatientsClient {
         ambulatoryId: String?,
         limit: Int = HomeBaseClinicalListLimit.boundaryMaximum
     ) async throws -> [HomeBaseObservationSummary] {
-        // @Codex: preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
+        // preserve the protocol witness while keeping cache bypass explicit at the projection boundary.
         try await fetchObservations(patientId: patientId, credentials: credentials, sessionCookie: sessionCookie,
                                     ambulatoryId: ambulatoryId, limit: limit, fresh: false)
     }
@@ -1066,7 +1042,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseObservationSummary].self, from: data)
     }
 
-    /* @Codex */
     public func createObservation(
         patientId: String,
         payload: HomeBaseObservationCreatePayload,
@@ -1088,7 +1063,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updateObservation(
         patientId: String,
         observationId: String,
@@ -1112,7 +1086,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
-    /* @Codex */
     public func fetchServicePrescriptions(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -1130,7 +1103,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseServicePrescriptionSummary].self, from: data)
     }
 
-    /* @Codex */
     public func createServicePrescription(
         payload: HomeBaseServicePrescriptionCreatePayload,
         credentials: HomeBasePairedCredentials,
@@ -1149,7 +1121,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updateServicePrescription(
         prescriptionId: String,
         payload: HomeBaseServicePrescriptionUpdatePayload,
@@ -1170,7 +1141,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
-    /* @Codex */
     public func fetchServicePrescriptionItems(
         patientId: String? = nil,
         prescriptionId: String? = nil,
@@ -1196,7 +1166,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseServicePrescriptionItemSummary].self, from: data)
     }
 
-    /* @Codex */
     public func createServicePrescriptionItem(
         payload: HomeBaseServicePrescriptionItemCreatePayload,
         credentials: HomeBasePairedCredentials,
@@ -1215,7 +1184,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updateServicePrescriptionItem(
         itemId: String,
         payload: HomeBaseServicePrescriptionItemUpdatePayload,
@@ -1236,7 +1204,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
-    /* @Codex */
     public func fetchServiceCatalog(
         query: String? = nil,
         code: String? = nil,
@@ -1265,7 +1232,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseServiceCatalogEntrySummary].self, from: data)
     }
 
-    /* @Codex */
     public func fetchServiceCatalogCount(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -1282,7 +1248,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCatalogCountResponse.self, from: data)
     }
 
-    /* @Codex */
     public func fetchProstheticPrescriptions(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -1300,7 +1265,6 @@ public actor HomeBasePatientsClient {
         return try decode([HomeBaseProstheticPrescriptionSummary].self, from: data)
     }
 
-    /* @Codex */
     public func createProstheticPrescription(
         payload: HomeBaseProstheticPrescriptionCreatePayload,
         credentials: HomeBasePairedCredentials,
@@ -1319,7 +1283,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseCreatedResource.self, from: data)
     }
 
-    /* @Codex */
     public func updateProstheticPrescription(
         prescriptionId: String,
         payload: HomeBaseProstheticPrescriptionUpdatePayload,
@@ -1340,7 +1303,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseMutationAcknowledgement.self, from: data)
     }
 
-    /* @Codex */
     public func fetchNetworkCapabilities(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -1356,7 +1318,6 @@ public actor HomeBasePatientsClient {
         return try decode(NetworkCapabilitiesResponse.self, from: data)
     }
 
-    /* @Codex */
     public func fetchNetworkIdentity(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -1372,7 +1333,6 @@ public actor HomeBasePatientsClient {
         return try decode(NetworkIdentitySummary.self, from: data)
     }
 
-    /* @Codex */
     public func fetchNetworkNode(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -1388,7 +1348,6 @@ public actor HomeBasePatientsClient {
         return try decode(NetworkNodeSummary.self, from: data)
     }
 
-    /* @Codex */
     public func fetchNetworkRevision(
         credentials: HomeBasePairedCredentials,
         sessionCookie: String,
@@ -1404,7 +1363,6 @@ public actor HomeBasePatientsClient {
         return try decode(NetworkRevisionSummary.self, from: data)
     }
 
-    /* @Codex */
     public func fetchFseValidatePatient(
         patientId: String,
         credentials: HomeBasePairedCredentials,
@@ -1423,7 +1381,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseValidatePatientExportResponse.self, from: data)
     }
 
-    /* @Codex */
     public func validateFseDocument(
         payload: HomeBaseFseDocumentValidationPayload,
         credentials: HomeBasePairedCredentials,
@@ -1461,7 +1418,6 @@ public actor HomeBasePatientsClient {
         ]
     }
 
-    /* @Codex */
     private func pairedLoginHeaders(credentials: HomeBasePairedCredentials) -> [String: String] {
         [
             "x-mediflow-paired-client-id": credentials.clientId,
@@ -1469,14 +1425,12 @@ public actor HomeBasePatientsClient {
         ]
     }
 
-    /* @Codex */
     private func accountHeaders(
         credentials: HomeBasePairedCredentials, sessionCookie: String
     ) -> [String: String] {
         pairedLoginHeaders(credentials: credentials).merging(["Cookie": sessionCookie]) { _, new in new }
     }
 
-    /* @Codex */
     private static func hasPairedCredentials(_ credentials: HomeBasePairedCredentials) -> Bool {
         !credentials.clientId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !credentials.clientToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -1720,13 +1674,12 @@ private struct AmbulatoryClearRequest: Encodable {
     let version: Int
 }
 
-/* @Codex */
 public struct HomeBaseCreatedResource: Decodable, Equatable, Sendable {
     public let id: String
     public let version: Int?
 }
 
-/* @Codex — the paired source/ordinary operation cannot redirect its credentials or projection. */
+/* the paired source/ordinary operation cannot redirect its credentials or projection. */
 private final class NativeOrdinaryNoRedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {

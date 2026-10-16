@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { EventEmitter, once } from 'node:events';
@@ -200,9 +199,9 @@ for (const failedChild of [0, 1]) test(`asynchronous child ${failedChild} spawn 
     assert.equal(ctx.runtime.terminate(), false);
   }));
 
-// @Codex Test-only observation boundary: never add platform keys to spawnOptions.env.
+// Test-only observation boundary: never add platform keys to spawnOptions.env.
 const CF_ENCODING_KEY = '__CF_USER_TEXT_ENCODING';
-// @Codex Node 24 libuv supplies these Windows bootstrap variables even for env: {}.
+// Node 24 libuv supplies these Windows bootstrap variables even for env: {}.
 // PROCESSOR_ARCHITECTURE is also observed in the independent Windows control.
 // This is an observation ceiling, never the environment passed to spawn.
 const WINDOWS_BOOTSTRAP_KEYS = Object.freeze([

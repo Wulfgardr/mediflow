@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
@@ -135,11 +134,11 @@ test('Patient Insight UI invia un payload strict e mostra una proposta review-on
   const insightDisclosure = page.locator('#patient-insight');
   await insightDisclosure.locator(':scope > summary').click();
   await expect(insightDisclosure).toHaveAttribute('open', '');
-  // @Codex: this spec already owns a synthetic preview transport; make its local
+  // this spec already owns a synthetic preview transport; make its local
   // catalog prerequisite explicit without claiming a real provider invocation.
   const modelPicker = page.getByRole('combobox', { name: 'Modello per questa proposta' });
   await expect(modelPicker).toBeEnabled();
-  // @Codex: the picker reads its catalog on first focus, matching ordinary UI use.
+  // the picker reads its catalog on first focus, matching ordinary UI use.
   await modelPicker.focus();
   await expect(modelPicker.locator('option')).toHaveText([
     `Predefinito · ${MODEL}`,

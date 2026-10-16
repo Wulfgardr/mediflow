@@ -1,4 +1,4 @@
-/* @Codex — browser-only controller; no authority, automatic inference or storage. */
+/* browser-only controller; no authority, automatic inference or storage. */
 import { PRODUCT_NAMESPACE, PRODUCT_OPERATION, PRODUCT_DATA_CLASS, ProductError,
     type ProductResponse, type ProductSnapshot, type ProductLoginChallenge, type ProductOperation, type ProductRequest } from './product-contract';
 import type { SynthesisRequest } from '../chatgpt-execution/execution-contract';

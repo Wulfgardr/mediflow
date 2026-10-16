@@ -6,7 +6,7 @@ CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
 DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
 APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 
-# @Codex: build and setup must use a Node that satisfies the project contract,
+# build and setup must use a Node that satisfies the project contract,
 # including the installed better-sqlite3 native binding.
 REQUIRED_NODE_MAJOR="$(tr -dc '0-9' < "$ROOT_DIR/.nvmrc")"
 select_mediflow_node() {
@@ -34,13 +34,13 @@ if ! select_mediflow_node; then
   exit 1
 fi
 
-# @Codex: expose the exact product and source before any native build work.
+# expose the exact product and source before any native build work.
 "$MEDIFLOW_NODE_BINARY" "$ROOT_DIR/scripts/launcher-helpers.mjs" identity-summary
 
 "$ROOT_DIR/scripts/native-setup.sh"
 "$ROOT_DIR/scripts/build-apple-macos-app.sh"
 
-# @Codex: the universal Xcode target is the only supported macOS entrypoint.
+# the universal Xcode target is the only supported macOS entrypoint.
 if [[ ! -d "$APP" ]]; then
   echo "Bundle macOS non trovato: $APP" >&2
   exit 1

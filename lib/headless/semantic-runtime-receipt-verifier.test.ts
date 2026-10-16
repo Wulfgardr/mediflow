@@ -3,7 +3,6 @@ import test from 'node:test';
 import { createSemanticRuntime } from './semantic-runtime';
 import { verifySemanticRuntimeReceiptBatch } from './semantic-runtime-receipt-verifier';
 
-/* @Codex */
 const graph = () => ({ operations: [
   { operationId: 'op.synthetic.read', capabilityId: 'cap.synthetic.read', applicationServiceRef: 'SyntheticReadService', maximumStage: 'read', authorityPolicy: 'read_only' },
   { operationId: 'op.synthetic.preview', capabilityId: 'cap.synthetic.preview', applicationServiceRef: 'SyntheticPreviewService', maximumStage: 'preview', authorityPolicy: 'read_only' },

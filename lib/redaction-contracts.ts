@@ -1,7 +1,5 @@
-/* @Codex */
 export const REDACTION_SCHEMA_VERSION = 'mediflow.redaction.v1';
 
-/* @Codex */
 export type RedactionEntityType =
     | 'person'
     | 'date'
@@ -13,7 +11,6 @@ export type RedactionEntityType =
     | 'identifier'
     | 'other';
 
-/* @Codex */
 export interface RedactionEntity {
     type: RedactionEntityType;
     text: string;
@@ -24,14 +21,12 @@ export interface RedactionEntity {
     confidence?: number;
 }
 
-/* @Codex */
 export interface RedactionResult {
     schemaVersion: typeof REDACTION_SCHEMA_VERSION;
     redactedText: string;
     entities: RedactionEntity[];
 }
 
-/* @Codex */
 export interface RedactionParseResult {
     value: RedactionResult;
     validContract: boolean;
@@ -78,7 +73,6 @@ function normalizeEntity(value: unknown): RedactionEntity | null {
     };
 }
 
-/* @Codex */
 export function parseRedactionResult(value: unknown): RedactionParseResult {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return {

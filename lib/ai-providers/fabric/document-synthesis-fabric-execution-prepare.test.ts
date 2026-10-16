@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { afterEach, test } from 'node:test';
@@ -38,7 +37,6 @@ test('burns the prepared token before a literal tail call with no caller evidenc
 
 test('cancellation accepts only authentic active handoffs and burns the handoff', { concurrency: false }, async () => { let release!: () => void; const fixture = await handoff(async () => new Promise((resolve) => { release = () => resolve({ content: body(), stats: { latency: 0, tokensIn: 0, tokensOut: 0 } }); })); const unhandled: unknown[] = []; const listener = (reason: unknown) => { unhandled.push(reason); }; process.on('unhandledRejection', listener); try { const pending = prepareDocumentSynthesisFabricExecution(fixture.value); await new Promise<void>((resolve) => setImmediate(resolve)); cancelDocumentSynthesisFabricExecutionPrepare({}); cancelDocumentSynthesisFabricExecutionPrepare(new Proxy(fixture.value, {})); cancelDocumentSynthesisFabricExecutionPrepare(fixture.value); exact(await pending, 'canceled'); exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable'); release(); await new Promise<void>((resolve) => setImmediate(resolve)); assert.deepEqual(unhandled, []); } finally { process.off('unhandledRejection', listener); fixture.restore(); } });
 
-/* @Codex */
 test('structured generation still denies missing or wrong output schemaVersion without retry', { concurrency: false }, async () => {
     for (const version of [undefined, 'wrong.synthetic.version']) {
         const envelope = JSON.parse(body());

@@ -1,22 +1,16 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { therapyJsonObject } from '@/lib/therapy-write-input';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_THERAPY_READ_CAPABILITY,
     getNetworkScopedTherapy,
 } from '@/lib/network-therapy-read';
-/* @Codex */
 import {
     NETWORK_THERAPY_WRITE_CAPABILITY,
     updateNetworkScopedTherapy,
 } from '@/lib/network-therapy-write';
-/* @Codex */
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
 
-/* @Codex */
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string; therapyId: string }> }
@@ -38,7 +32,6 @@ export async function GET(
     }
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; therapyId: string }> }
@@ -62,7 +55,6 @@ export async function PUT(
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API PUT /api/v1/network/patients/[id]/therapies/[therapyId] error:', error);

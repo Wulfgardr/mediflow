@@ -1,7 +1,6 @@
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class PatientArchiveContractsTests: XCTestCase {
     func testArchivePatchDistinguishesOmitNullAndSealedValue() throws {
         let cases: [(HomeBasePatientUpdatePayload, Set<String>)] = [

@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
@@ -119,7 +118,7 @@ async function continueAdmittedLocalOcrDocument(bytes: Buffer, initial: LocalExt
         }));
 }
 
-/* @Codex: real WASM composition smoke on the development host; no platform impersonation. */
+/* real WASM composition smoke on the development host; no platform impersonation. */
 export async function continueAnyDocWithTesseractForTest(attachmentId: string, input: unknown,
     initial: LocalExtractionResult): Promise<LocalExtractionResult> {
     if (!process.execArgv.some((arg) => arg === '--test' || arg.startsWith('--test-'))) return initial;

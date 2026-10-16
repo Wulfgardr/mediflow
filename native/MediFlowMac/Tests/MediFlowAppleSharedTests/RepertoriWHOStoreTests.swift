@@ -1,5 +1,5 @@
 #if os(macOS)
-// @Codex: WUL-673. Actual RepertoriStore with a deliberately cancellation-ignorant
+// WUL-673. Actual RepertoriStore with a deliberately cancellation-ignorant
 // datasource. These are synthetic state tests, not UI or live acceptance.
 import Foundation
 import XCTest

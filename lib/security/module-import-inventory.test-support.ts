@@ -1,4 +1,3 @@
-/* @Codex */
 import { realpathSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

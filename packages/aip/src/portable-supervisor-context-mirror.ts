@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 const SOURCE_KEYS = ['now', 'hashRef', 'readPatientVersion', 'schedule', 'onTerminal'] as const;

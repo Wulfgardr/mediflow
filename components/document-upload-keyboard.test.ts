@@ -1,4 +1,4 @@
-/* @Codex: deterministic DOM/event adapter tests, NOT React/Chromium/chooser proof. */
+/* deterministic DOM/event adapter tests, NOT React/Chromium/chooser proof. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';

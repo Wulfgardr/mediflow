@@ -1,4 +1,3 @@
-/* @Codex */
 
 import { createHash } from 'node:crypto';
 import { AifaUpdateError, AifaReductionError, acquireAifaCatalogOperation } from './aifa-catalog-lock';
@@ -57,7 +56,7 @@ export async function getAifaCatalogStatus(): Promise<AifaCatalogStatus> {
     };
 }
 
-/* @Codex Snapshot includes every stored drug field and the raw manifest, including legacy catalogs. */
+/* Snapshot includes every stored drug field and the raw manifest, including legacy catalogs. */
 function catalogSnapshot(connection: Pick<typeof dbServer, 'select'>): string {
     const hash = createHash('sha256');
     for (const row of connection.select().from(drugs).orderBy(asc(drugs.aic)).all()) {
@@ -72,7 +71,7 @@ export function getAifaCatalogSnapshot(): string {
     return dbServer.transaction((transaction) => catalogSnapshot(transaction));
 }
 
-/* @Codex Strict structure check for automatic acquisition; manual parser behavior stays unchanged. */
+/* Strict structure check for automatic acquisition; manual parser behavior stays unchanged. */
 function assertCompleteCsv(text: string): void {
     const delimiter = (text.split(/\r?\n/, 1)[0] || '').includes(';') ? ';' : ',';
     let mode: 'start' | 'plain' | 'quoted' | 'closed' = 'start';

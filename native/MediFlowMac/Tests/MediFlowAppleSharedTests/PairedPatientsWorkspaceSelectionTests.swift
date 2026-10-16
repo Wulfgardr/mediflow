@@ -2,9 +2,8 @@ import CryptoKit
 import Foundation
 import XCTest
 @testable import MediFlowAppleShared
-/* @Codex */
 final class PairedPatientsWorkspaceSelectionTests: XCTestCase {
-    // @Codex: Real model + HTTP decoder, synthetic transport held until explicitly released.
+    // Real model + HTTP decoder, synthetic transport held until explicitly released.
     @MainActor func testAttachmentReadPublishesSuccessAfterExclusiveOperationBegins() async throws {
         let (model, gate) = makeAttachmentModel()
         model.configurePairedOnlineForTests(selectedPatient: detail(id: "patient-a", version: 1))
@@ -59,13 +58,13 @@ final class PairedPatientsWorkspaceSelectionTests: XCTestCase {
         model.configurePairedOnlineForTests(
             patients: [summary(id: "patient-a", version: 1), summary(id: "patient-b", version: 1)],
             selectedPatient: detail(id: "patient-a", version: 1), entries: [entry(patientID: "patient-a")])
-        model.activePatientSection = .diary // @Codex
+        model.activePatientSection = .diary
         model.ambulatoryId = " scope-a "
         model.applyPatientRefreshForSelectionTests([summary(id: "patient-b", version: 2), summary(id: "patient-a", version: 1)])
         XCTAssertEqual(model.selectedPatientID, "patient-a")
         XCTAssertNil(model.selectedPatient)
         XCTAssertTrue(model.entries.isEmpty)
-        XCTAssertEqual(model.activePatientSection, .diary) // @Codex: same chart refresh keeps orientation.
+        XCTAssertEqual(model.activePatientSection, .diary) // same chart refresh keeps orientation.
     }
     @MainActor func testRevisionIdentityRefreshKeepsWorkspaceUntilReloadCommits() {
         let model = makeModel()
@@ -132,7 +131,7 @@ final class PairedPatientsWorkspaceSelectionTests: XCTestCase {
             entries: [entry(patientID: patient.id)], therapies: [therapy(patientID: patient.id)],
             attachments: [attachment(patientID: patient.id)])
         model.newEntryTitle = "Bozza sintetica"
-        model.activePatientSection = .diary // @Codex
+        model.activePatientSection = .diary
         model.newEntryVisitTranscript = "Trascrizione sintetica"
         model.newEntryVisitDraftReviewed = true
         model.newEntryAttachmentIds = ["attachment-a"]
@@ -149,11 +148,10 @@ final class PairedPatientsWorkspaceSelectionTests: XCTestCase {
         XCTAssertEqual(model.newEntryTitle, "")
         XCTAssertEqual(model.newEntryVisitTranscript, "")
         XCTAssertFalse(model.newEntryVisitDraftReviewed)
-        XCTAssertEqual(model.activePatientSection, .overview) // @Codex
-        XCTAssertEqual(model.attachmentsLoadState, .idle) // @Codex
+        XCTAssertEqual(model.activePatientSection, .overview)
+        XCTAssertEqual(model.attachmentsLoadState, .idle)
     }
 
-    /* @Codex */
     @MainActor private func makeAttachmentModel() -> (PairedPatientsWorkspaceModel, SelectionAttachmentResponseGate) {
         let host = "selection-\(UUID().uuidString.lowercased()).invalid"
         let gate = SelectionAttachmentResponseGate()
@@ -220,7 +218,6 @@ final class PairedPatientsWorkspaceSelectionTests: XCTestCase {
     }
 }
 
-/* @Codex */
 private final class SelectionAttachmentResponseGate: @unchecked Sendable {
     let started = XCTestExpectation(description: "Synthetic attachment request started")
     private let lock = NSLock()
@@ -244,7 +241,6 @@ private final class SelectionAttachmentResponseGate: @unchecked Sendable {
     }
 }
 
-/* @Codex */
 private final class SelectionAttachmentURLProtocol: URLProtocol, @unchecked Sendable {
     private static let lock = NSLock()
     private static var gates: [String: SelectionAttachmentResponseGate] = [:]

@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -28,7 +27,7 @@ interface AIPatientInsightProps {
 
 type AvailablePreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
 
-/* @Codex: scoped control geometry overrides the legacy shared button chrome. */
+/* scoped control geometry overrides the legacy shared button chrome. */
 const actionStyle = { borderRadius: 'var(--lume-control-radius, 10px)', fontSize: '0.875rem', minHeight: 'var(--lume-control-height, 44px)' };
 
 function safeError(preview: Exclude<PatientInsightPreviewWire, { status: 'available' }>): string {
@@ -140,7 +139,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
 
     if (!patient.aiSummary && !preview && !isGenerating && !enabled) {
         return (
-            /* @Codex: a disabled function is a compact state with an explicit recovery action. */
+            /* a disabled function is a compact state with an explicit recovery action. */
             <section className="min-w-0 space-y-4 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)]" data-testid="patient-insight-disabled-card">
                 <h3 className="text-base font-semibold">Patient Insight disabilitata</h3>
                 <p className="text-[color:var(--lume-ink-muted)]">La scheda resta consultabile. Riattiva la funzione per generare una nuova bozza.</p>
@@ -166,7 +165,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
     }
 
     return (
-        /* @Codex: one reading plane, visible clinical content and collapsed technical evidence. */
+        /* one reading plane, visible clinical content and collapsed technical evidence. */
         <section className="min-w-0 space-y-5 py-3 text-sm leading-relaxed text-[color:var(--lume-ink)] [overflow-wrap:anywhere]">
             <header className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 basis-64">

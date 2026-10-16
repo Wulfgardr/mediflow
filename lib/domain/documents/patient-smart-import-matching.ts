@@ -49,7 +49,6 @@ const NO_NOVELTY_FOLLOW_UP_MARKERS = /\b(controllo|follow up|richiesta di visita
 const NO_NOVELTY_CONTINUATION_MARKERS = /\b(continuare|proseguire|mantenere|come da piano in corso|senza variazioni|senza novita|nessuna novita|nessun cambiamento)\b/;
 const NO_NOVELTY_CHANGE_MARKERS = /\b(nuov|peggior|riacut|acut|switch|passare a|sostit|sospend|interromp|inizia|introd|increment|aument|ridurr|modifica posolog|titolaz|decrement|dimission)\b/;
 
-/* @Codex */
 export function hasUsableTherapyDosage(value: string | undefined): boolean {
     const normalized = normalizeText(value);
     if (!normalized) return false;
@@ -57,7 +56,6 @@ export function hasUsableTherapyDosage(value: string | undefined): boolean {
     return !/da verificare|da confermare|non chiar|non nota|non disponibile|sconosciut|incert|dubb|valutar|\bn a\b/.test(normalized);
 }
 
-/* @Codex */
 export function isNoClinicalNoveltyContext(value: string | undefined): boolean {
     const normalized = normalizeText(value);
     if (!normalized) return false;
@@ -72,7 +70,6 @@ export function isNoClinicalNoveltyContext(value: string | undefined): boolean {
         || (hasFollowUp && hasContinuation);
 }
 
-/* @Codex */
 export function classifyExtractedTherapyState(input: TherapyStateClassificationInput): TherapyReviewCandidate['therapyState'] {
     const explicitState = input.therapyState;
     const probe = normalizeText([
@@ -380,7 +377,6 @@ function overlapCount(candidate: string, tokens: string[]): number {
     return tokens.reduce((count, token) => count + (haystack.includes(token) ? 1 : 0), 0);
 }
 
-/* @Codex */
 function queryLooksSingleIngredient(query: string): boolean {
     if (/\s*\/\s*|\s*\+\s*|\s+\be\b\s+/i.test(query)) {
         return false;
@@ -392,7 +388,6 @@ function queryLooksSingleIngredient(query: string): boolean {
     return tokens.length > 0 && tokens.length <= 2;
 }
 
-/* @Codex */
 function candidateHasCombinationActivePrinciple(candidate: AifaDrug): boolean {
     return splitIngredientComponents(candidate.activePrinciple || '').length > 1;
 }
@@ -485,7 +480,6 @@ export function rankDrugMatch(candidate: AifaDrug, suggestion: ParsedAiTherapy):
     return score;
 }
 
-/* @Codex */
 export function rankDrugCatalogSearchResult(query: string, candidate: AifaDrug): number {
     const normalizedQuery = normalizeText(sanitizeDrugSearchText(query) || query);
     const queryTokens = uniqueTokens(tokenize(sanitizeDrugSearchText(query) || query))
@@ -544,7 +538,6 @@ export function rankDrugCatalogSearchResult(query: string, candidate: AifaDrug):
     return score;
 }
 
-/* @Codex */
 export function sortDrugCatalogSearchResults(query: string, candidates: AifaDrug[]): AifaDrug[] {
     return [...candidates].sort((left, right) => {
         const scoreDiff = rankDrugCatalogSearchResult(query, right) - rankDrugCatalogSearchResult(query, left);

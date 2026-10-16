@@ -84,7 +84,6 @@ const DOC_FIELDS: {
 
 /* ───────────────────────── Revisione documenti ───────────────────────── */
 
-/* @Codex */
 function RevisioneArea() {
   const [decisions, setDecisions] = useState<Record<string, DocDecision>>(() =>
     Object.fromEntries(DOC_FIELDS.map((f) => [f.id, 'pending'])),

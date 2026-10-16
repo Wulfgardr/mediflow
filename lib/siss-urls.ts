@@ -1,7 +1,5 @@
-/* @Codex */
 import type { SissAction } from './siss-actions';
 
-/* @Codex */
 export const SISS_URLS = {
     MENU: 'https://operatorisiss.servizirl.it/menusiss/',
     PRESCRITTIVO_REGIONALE: 'https://operatorisiss.servizirl.it/prescrittivoRegionale/pages/dashboard',
@@ -12,7 +10,6 @@ export const SISS_URLS = {
     ANAGRAFE: 'https://operatorisiss.servizirl.it/anagrafe/',
 } as const;
 
-/* @Codex */
 export const SISS_ACTION_URLS: Record<SissAction, string> = {
     'menu.open': SISS_URLS.MENU,
     'prescription.create': SISS_URLS.PRESCRITTIVO_REGIONALE,

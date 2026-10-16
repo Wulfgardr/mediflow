@@ -1,15 +1,10 @@
-/* @Codex */
 import type { DocumentDiagnosisSuggestion, DocumentQualityLevel } from '../../db';
-/* @Codex */
 import type { DocumentIntelligenceNegativeReason } from './document-intelligence-case-pack';
-/* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
 import { splitDocumentIntoLines } from './document-excerpt';
 
-/* @Codex */
 export const DOCUMENT_EVIDENCE_PACK_SCHEMA_VERSION = 'mediflow.document_evidence_pack.v2';
 
-/* @Codex */
 export type DocumentEvidenceKind =
     | 'problem'
     | 'medication'
@@ -17,22 +12,16 @@ export type DocumentEvidenceKind =
     | 'care_setting'
     | 'functional_status';
 
-/* @Codex */
 export type DocumentEvidenceTemporality = 'current' | 'historical' | 'planned' | 'unknown';
 
-/* @Codex */
 export type DocumentEvidenceStatus = 'active' | 'suspended' | 'resolved' | 'planned' | 'unknown';
 
-/* @Codex */
 export type DocumentEvidenceOrigin = 'documented' | 'inferred';
 
-/* @Codex */
 export type DocumentEvidenceSuppressedReason = DocumentIntelligenceNegativeReason;
 
-/* @Codex */
 export type DocumentEvidenceSourceFreshness = 'recent' | 'stale' | 'undated';
 
-/* @Codex */
 export interface DocumentEvidenceSuppressedCandidate {
     id: string;
     label: string;
@@ -41,14 +30,12 @@ export interface DocumentEvidenceSuppressedCandidate {
     sourceId: string;
 }
 
-/* @Codex */
 export interface DocumentEvidenceSourceGovernance {
     sourcePriority: number;
     freshness: DocumentEvidenceSourceFreshness;
     suppressedCandidates: DocumentEvidenceSuppressedCandidate[];
 }
 
-/* @Codex */
 export interface DocumentEvidenceFact {
     id: string;
     kind: DocumentEvidenceKind;
@@ -63,7 +50,6 @@ export interface DocumentEvidenceFact {
     dosage?: string;
 }
 
-/* @Codex */
 export interface DocumentEvidencePack {
     schemaVersion: typeof DOCUMENT_EVIDENCE_PACK_SCHEMA_VERSION;
     source: {
@@ -76,7 +62,6 @@ export interface DocumentEvidencePack {
     sourceGovernance?: DocumentEvidenceSourceGovernance;
 }
 
-/* @Codex */
 export interface BuildDocumentEvidencePackInput {
     documentInsightId: string;
     fileName: string;
@@ -389,7 +374,6 @@ function pickHeuristicFactLines(
     return facts;
 }
 
-/* @Codex */
 export function buildDocumentEvidencePack(input: BuildDocumentEvidencePackInput): DocumentEvidencePack {
     const suppressedCandidates = extractSuppressedCandidates(input);
     const diagnosisFacts = input.diagnoses
@@ -450,7 +434,6 @@ function renderFact(fact: DocumentEvidenceFact): string {
     return `${prefix}${fact.label}${buildFactTag(fact)}`;
 }
 
-/* @Codex */
 export function renderDocumentEvidencePackLines(pack: DocumentEvidencePack): string[] {
     const byKind = new Map<DocumentEvidenceKind, DocumentEvidenceFact[]>();
     for (const fact of pack.facts) {
@@ -474,7 +457,6 @@ export function renderDocumentEvidencePackLines(pack: DocumentEvidencePack): str
     return lines;
 }
 
-/* @Codex */
 export function renderDocumentEvidencePackContext(pack: DocumentEvidencePack, maxChars = 600): string {
     const lines = renderDocumentEvidencePackLines(pack);
     if (lines.length === 0) return '';

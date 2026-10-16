@@ -3,7 +3,6 @@ import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { sql } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
@@ -46,7 +45,6 @@ import {
     requireSession,
     unauthorizedResponse,
 } from '@/lib/security/server-auth';
-/* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
     type BackupDataset,
@@ -60,10 +58,8 @@ import { disposeCheckupStatusTransitionForHostV1 } from
     '@/lib/security/headless-checkup-status-transition-web-production';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
-/* @Codex */
 export const dynamic = 'force-dynamic';
 
-/* @Codex */
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     return [...rows].sort((left, right) => {
         const leftKey = String(left.idempotencyKey ?? left.attestationRef ?? left.actorRef ?? left.id ?? left.key ?? left.code ?? left.aic ?? left.patientId ?? left.conversationId ?? '');
@@ -73,7 +69,6 @@ function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     });
 }
 
-/* @Codex */
 function filterRowsByReference<T extends Record<string, unknown>>(
     rows: T[],
     foreignKey: 'patientId' | 'conversationId',
@@ -85,7 +80,6 @@ function filterRowsByReference<T extends Record<string, unknown>>(
     });
 }
 
-/* @Codex */
 function buildBackupDataset(): BackupDataset {
     return dbServer.transaction((tx): BackupDataset => {
         const ambulatoriesRows = tx.select().from(ambulatories).all();
@@ -175,7 +169,6 @@ function buildBackupDataset(): BackupDataset {
     });
 }
 
-/* @Codex */
 export async function GET() {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();

@@ -1,4 +1,4 @@
-/* @Codex WUL-678: scale-only presentation, shared 44px targets and 12px controls. */
+/* WUL-678: scale-only presentation, shared 44px targets and 12px controls. */
 .workspace {
     --scale-control-radius: var(--lume-radius-control);
     font: 0.875rem/1.5 var(--lume-font-sans);
@@ -12,7 +12,7 @@
 .engine { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .progress { margin: 0; color: var(--lume-ink-muted); font-size: 0.9375rem; font-variant-numeric: tabular-nums; }
 .question { margin: 0 0 24px; font-size: 0.9375rem; font-weight: 600; line-height: 1.5; }
-/* @Codex: semantic grouping adds no second frame or intrinsic minimum width. */
+/* semantic grouping adds no second frame or intrinsic minimum width. */
 .questionGroup { min-width: 0; width: 100%; margin: 0; padding: 0; border: 0; }
 .legend { max-width: 100%; padding: 0; }
 .answers { display: grid; gap: 12px; min-width: 0; }
@@ -72,7 +72,7 @@
 .back { margin-bottom: 16px; }
 @media (max-width: 390px) { .actions { align-items: stretch; } .navigation { flex: 1 1 100%; } .navigation .control { flex: 1; } }
 
-/* @Codex: keep the named return target readable within scale pages only. */
+/* keep the named return target readable within scale pages only. */
 .screen :global(header a[title="Torna alle scale"]),
 .screen :global(header a[title="Torna alla scheda paziente"]) {
     min-height: 44px; border-radius: 12px; padding: 10px 12px;

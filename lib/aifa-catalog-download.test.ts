@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
@@ -84,7 +83,6 @@ test('deadline aborts a stalled transport at the production bound', async (t) =>
     await assert.rejects(pending, { status: 504 });
 });
 
-/* @Codex */
 test('deadline is also checked synchronously by the transaction guard after parsing', async (t) => {
     t.mock.timers.enable({ apis: ['Date'], now: 0 });
     await assert.rejects(withAifaDownload(new AbortController().signal, async (_file, _acquisition, _signal, assertDeadline) => {

@@ -1,4 +1,3 @@
-/* @Codex */
 
 import { expect, test } from '@playwright/test';
 
@@ -87,7 +86,7 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   const helpDialog = page.getByRole('dialog', { name: 'Aiuto e scorciatoie', exact: true });
   await expect(helpDialog).toHaveCount(1);
   await expect(helpDialog.getByText('Apri la Scheda della riga attiva', { exact: true })).toBeVisible();
-  // @Codex: Delayed navigation focus must not escape a newly opened modal.
+  // Delayed navigation focus must not escape a newly opened modal.
   const closeHelp = helpDialog.getByRole('button', { name: 'Chiudi comandi', exact: true });
   await expect(closeHelp).toBeFocused();
   await page.keyboard.press('Tab');

@@ -1,4 +1,3 @@
-/* @Codex */
 import type { WhoReference } from './reference-data/icd11-reference';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;

@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 
 export const DOCUMENT_SYNTHESIS_SOURCE_BINDING_SCHEMA_VERSION = 'mediflow.document-synthesis.source-binding.v1' as const;

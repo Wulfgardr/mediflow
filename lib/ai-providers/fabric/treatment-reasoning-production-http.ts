@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import type { createTreatmentReasoningChatGptService } from './treatment-reasoning-chatgpt-production';
 type RemoteResult = Awaited<ReturnType<Awaited<ReturnType<ReturnType<typeof createTreatmentReasoningChatGptService>['acquirePreview']>>['preview']>>;

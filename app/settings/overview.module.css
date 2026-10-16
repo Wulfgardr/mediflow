@@ -1,4 +1,4 @@
-/* @Codex WUL-669: overview only; preserve the Original comparison. */
+/* WUL-669: overview only; preserve the Original comparison. */
 :global(html[data-runtime-twin-design='proposal']) .overview {
     gap: 0;
     max-width: 64rem;
@@ -79,7 +79,7 @@
     }
 }
 
-/* @Codex: share action geometry with the approved settings controls. */
+/* share action geometry with the approved settings controls. */
 :global(html[data-runtime-twin-design='proposal']) .overview .actions > :is(button, a),
 :global(html[data-runtime-twin-design='proposal']) .overview > nav a,
 :global(html[data-runtime-twin-design='proposal']) .overview .details summary {

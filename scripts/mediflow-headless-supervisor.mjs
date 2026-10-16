@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,7 +26,7 @@ function prepareDataDirectory() {
   process.env.MEDIFLOW_DATA_DIR = canonical;
 }
 
-// @Codex: trusted bundle composition supplies only its physical Web layout; no CLI/env override.
+// trusted bundle composition supplies only its physical Web layout; no CLI/env override.
 export async function runHeadlessSupervisorV1(childOptions = {}) {
   const args = process.argv.slice(2);
   if (args.length > 0 && !(args.length === 1 && ['--mini', '--maintenance-web'].includes(args[0]))) {

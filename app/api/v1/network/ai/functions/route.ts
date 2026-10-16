@@ -1,4 +1,3 @@
-/* @Codex */
 import { nativeConfigurationHttp } from '@/lib/native-ai-configuration-production';
 export const runtime = 'nodejs';
 export async function GET(request: Request) { return nativeConfigurationHttp.GET(request); }

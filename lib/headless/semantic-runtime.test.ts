@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSemanticRuntime } from './semantic-runtime';
-/* @Codex */
 const operation = (execute = () => ({ outcome: 'read' as const, resultRef: 'synthetic:record:1' })) => ({
   operationId: 'headless.synthetic.read.v1',
   capabilityId: 'capability.synthetic.read.v1',

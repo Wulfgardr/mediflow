@@ -1,4 +1,4 @@
-/* @Codex — fake HTTP transport only. Mac UI/viewmodel tests, no authority/admission claims. */
+/* fake HTTP transport only. Mac UI/viewmodel tests, no authority/admission claims. */
 #if os(macOS)
 import Foundation
 import XCTest

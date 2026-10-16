@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { collectChatgptFocusedTests } from './additional-test-selection.mjs';
-/* @Codex — no installer, network dependency resolution, personal home or DB smoke. */
+/* no installer, network dependency resolution, personal home or DB smoke. */
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, existsSync, mkdirSync, lstatSync, realpathSync, writeFileSync } from 'node:fs';

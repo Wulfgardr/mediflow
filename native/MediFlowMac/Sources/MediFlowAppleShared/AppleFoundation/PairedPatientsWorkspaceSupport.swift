@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 enum PairedPatientsWorkspaceSupport {
     static let clinicalPreviewCap = HomeBaseClinicalListLimit.boundaryMaximum
 
@@ -19,19 +18,16 @@ enum PairedPatientsWorkspaceSupport {
         return years
     }
 
-    /* @Codex */
     static func birthYear(from birthDate: Date?) -> Int? {
         guard let birthDate else { return nil }
         let year = Calendar.current.component(.year, from: birthDate)
         return year > 0 ? year : nil
     }
 
-    /* @Codex */
     static func birthYearText(from birthDate: Date?) -> String? {
         birthYear(from: birthDate).map(String.init)
     }
 
-    /* @Codex */
     static func compactTaxCode(_ taxCode: String) -> String {
         let normalized = taxCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard normalized.count > 6 else { return normalized }
@@ -70,12 +66,10 @@ enum PairedPatientsWorkspaceSupport {
     }
 }
 
-/* @Codex */
 func cleanedPatientWorkspaceValue(_ value: String?) -> String? {
     value.flatMap { $0.trimmedOrNil }
 }
 
-/* @Codex */
 struct PairedPatientFlagChip: View {
     let text: String
     let tone: VetroTone
@@ -145,7 +139,6 @@ struct ClinicalCodePill: View {
     }
 }
 
-/* @Codex */
 struct PairedPatientSectionHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject var model: PairedPatientsWorkspaceModel
@@ -153,14 +146,13 @@ struct PairedPatientSectionHeader: View {
     let subtitle: String
     let systemImage: String
     let refreshIdentifier: String
-    var itemCount: Int? = nil // @Codex: nil means unread, never an invented zero.
+    var itemCount: Int? = nil // nil means unread, never an invented zero.
     /// Wayfinding hue for this section. See `ClinicalSectionAccent` for why it
     /// tints the glyph and nothing else.
     var accent: ClinicalSectionAccent = .anagrafica
     let action: () -> Void
 
     var body: some View {
-        /* @Codex */
         Group {
             if dynamicTypeSize >= .accessibility1 {
                 VStack(alignment: .leading, spacing: 8) {
@@ -208,7 +200,6 @@ struct PairedPatientSectionHeader: View {
     }
 }
 
-/* @Codex */
 struct PairedPatientFormButtons: View {
     let primaryLabel: String
     let primaryIdentifier: String
@@ -236,7 +227,6 @@ struct PairedPatientFormButtons: View {
     }
 }
 
-/* @Codex */
 struct PairedPatientCounterStrip: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let values: [(String, Int)]
@@ -264,7 +254,6 @@ struct PairedPatientCounterStrip: View {
     }
 }
 
-/* @Codex */
 enum PatientLifecycleSheet: String, Identifiable {
     case archive
     case unarchive
@@ -273,7 +262,6 @@ enum PatientLifecycleSheet: String, Identifiable {
     var id: String { rawValue }
 }
 
-/* @Codex */
 enum FseValidationRecordKind: String, CaseIterable, Identifiable {
     case therapy
     case observation

@@ -1,4 +1,4 @@
-# @Codex — stdlib-only inspection; never imports model/wheel code to audit an archive.
+# stdlib-only inspection; never imports model/wheel code to audit an archive.
 import email
 import hashlib
 import importlib.metadata

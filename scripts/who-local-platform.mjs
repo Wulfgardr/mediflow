@@ -1,4 +1,4 @@
-/* @Codex: PROPOSED WHO-TRIOS host-only boundary. Never import from Web/server routes. */
+/* PROPOSED WHO-TRIOS host-only boundary. Never import from Web/server routes. */
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';

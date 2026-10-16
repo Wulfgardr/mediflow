@@ -1,4 +1,3 @@
-/* @Codex */
 import rendererProfiles from '../../../scripts/anydoc-pdf-renderer-profiles.json' with { type: 'json' };
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';

@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -11,7 +10,7 @@ import {
     type AiRolloutGuardSelection,
 } from '@/lib/ai-rollout-model-guard';
 
-/* @Codex WUL-684: translate presentation values; do not change model/role matching. */
+/* WUL-684: translate presentation values; do not change model/role matching. */
 const ACTIVITY_LABELS: Readonly<Record<string, string>> = {
     'Patient Insight': 'Quadro paziente', 'Smart Import': 'Importazione assistita',
     Redaction: 'Protezione dei dati identificativi',

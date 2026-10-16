@@ -1,4 +1,3 @@
-/* @Codex */
 export const SYNTHETIC_LAB_REPORT_FIXTURES = [
     {
         id: 'columns-and-decimal-comma',

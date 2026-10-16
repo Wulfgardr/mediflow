@@ -1,4 +1,3 @@
-/* @Codex */
 import { readBoundedJsonBody } from './bounded-request-body';
 import { FunctionModelError, type createFunctionModelPreferencesService } from './ai-providers/fabric/function-model-preferences';
 import { NativeConfigurationGrantError } from './native-ai-configuration-grants';

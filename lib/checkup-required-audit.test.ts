@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: candidate real-SQLite oracle for the eight ordinary checkup mutations. */
+/* candidate real-SQLite oracle for the eight ordinary checkup mutations. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import profiles from '../../../scripts/anydoc-pdf-renderer-profiles.json' with { type: 'json' };
 import { createHash } from 'node:crypto';

@@ -1,4 +1,3 @@
-/* @Codex */
 import type { TreatmentReasoningContextInput } from '../../treatment-reasoning-context';
 import { buildTreatmentReasoningContextBundle } from '../../treatment-reasoning-context';
 import type { TreatmentReasoningEvidenceSourceKind } from '../../treatment-reasoning-contract';

@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { Buffer } from 'node:buffer';

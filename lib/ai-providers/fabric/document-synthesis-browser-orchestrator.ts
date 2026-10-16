@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import { parseDocumentSynthesisPreviewWire, type DocumentSynthesisPreviewWire } from './document-synthesis-preview-wire';

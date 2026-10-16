@@ -1,35 +1,24 @@
-/* @Codex */
 import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex */
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-/* @Codex */
 import { cookies } from 'next/headers';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     authenticateNetworkPairedClient,
     getNetworkIdentitySummary,
 } from '@/lib/network-home-base-server';
-/* @Codex */
 import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read';
-/* @Codex */
 import {
     deleteNetworkScopedPatient,
     NETWORK_PATIENT_LIFECYCLE_CAPABILITY,
 } from '@/lib/network-patient-lifecycle';
-/* @Codex */
 import {
     NETWORK_PATIENT_WRITE_CAPABILITY,
     updateNetworkScopedPatient,
 } from '@/lib/network-patient-write';
 import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
-/* @Codex */
 import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { requireAccountSession } from '@/lib/security/paired-native-session';
 
-/* @Codex */
 async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireAccountSession>>) {
     const cookieStore = await cookies();
     const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
@@ -37,7 +26,6 @@ async function resolveNetworkScope(session: Awaited<ReturnType<typeof requireAcc
     return identity.scope.effectiveAmbulatoryId;
 }
 
-/* @Codex */
 async function requireNetworkPatientWriteContext(
     request: Request,
     patientId: string
@@ -79,7 +67,6 @@ async function requireNetworkPatientWriteContext(
     };
 }
 
-/* @Codex */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const pairedClient = await authenticateNetworkPairedClient(request);
     if (!pairedClient) return unauthorizedResponse();
@@ -114,7 +101,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-/* @Codex */
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -127,7 +113,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         const result = await updateNetworkScopedPatient(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API PUT /api/v1/network/patients/[id] error:', error);
@@ -135,7 +120,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-/* @Codex */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -154,7 +138,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API DELETE /api/v1/network/patients/[id] error:', error);

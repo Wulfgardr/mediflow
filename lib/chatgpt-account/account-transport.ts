@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';

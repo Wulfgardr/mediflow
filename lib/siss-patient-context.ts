@@ -1,6 +1,4 @@
-/* @Codex */
 import type { SissTransport } from './siss-adapter';
-/* @Codex */
 import {
     normalizeSissPatientTaxCode,
     requiresSissPatientFiscalCode,
@@ -8,7 +6,6 @@ import {
     type SissPatientContextHandoffResult,
 } from './siss-patient-context-shared';
 
-/* @Codex */
 export class SissPatientContextError extends Error {
     readonly code: 'SISS_PATIENT_NOT_READY' | 'SISS_HANDOFF_FAILED';
     readonly status: number;
@@ -63,7 +60,6 @@ function describeSissAction(action: SissPatientContextAction): {
     }
 }
 
-/* @Codex */
 export async function createSissPatientContextHandoff(
     input: {
         patientId: string;
@@ -82,7 +78,6 @@ export async function createSissPatientContextHandoff(
     }
 
     if (input.action === 'menu.open') {
-        /* @Codex */
         const { createSissCorrelationId, SISS_PORTAL_URLS } = await import('./siss-adapter');
         const actionDescriptor = describeSissAction(input.action);
         return {
@@ -106,11 +101,9 @@ export async function createSissPatientContextHandoff(
     }
 
     const actionDescriptor = describeSissAction(input.action);
-    /* @Codex */
     let sissAdapterModule: typeof import('./siss-adapter') | null = null;
 
     try {
-        /* @Codex */
         sissAdapterModule = await import('./siss-adapter');
         const result = await sissAdapterModule.executeSissAdapterRequest(
             {

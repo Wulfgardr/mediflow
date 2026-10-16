@@ -1,5 +1,4 @@
 import { PROTOTYPE_TEST_FILES } from './additional-test-selection.mjs';
-/* @Codex */
 // Standalone research/prototype suite; it does not qualify a product release.
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';

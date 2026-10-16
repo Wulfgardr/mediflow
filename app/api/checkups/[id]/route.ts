@@ -6,31 +6,24 @@ import { dbServer } from '@/lib/db-server';
 import { checkups, patients } from '@/lib/schema';
 import { and, eq, exists } from 'drizzle-orm';
 import { activePatients } from '@/lib/patient-lifecycle';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { auditContextFromSession, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { updateCheckupOperation } from '@/lib/checkup-write-operation';
-/* @Codex */
 import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
-/* @Codex */
 import { parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
-/* @Codex */
 import { parseClinicalDeleteBody } from '@/lib/api-v1-clinical-lifecycle';
 
-/* @Codex: preserve the preflight 404-before-field-validation ordering; the
+/* preserve the preflight 404-before-field-validation ordering; the
    IMMEDIATE checkup operation rechecks the active parent before its UPDATE. */
 function activeCheckupParent() {
     return exists(dbServer.select({ id: patients.id }).from(patients)
         .where(and(eq(patients.id, checkups.patientId), activePatients())));
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -56,7 +49,7 @@ export async function PUT(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        // @Codex: host audit context is resolved before the synchronous IMMEDIATE mutation.
+        // host audit context is resolved before the synchronous IMMEDIATE mutation.
         const context = auditContextFromSession(session);
         const result = updateCheckupOperation({
             checkupId: id, expectedVersion, values: normalized.values, mode: 'web',
@@ -77,7 +70,6 @@ export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);

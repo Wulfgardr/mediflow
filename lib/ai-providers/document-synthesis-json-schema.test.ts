@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DOCUMENT_SYNTHESIS_V2_JSON_SCHEMA as schema } from './document-synthesis-json-schema.ts';

@@ -1,10 +1,7 @@
-/* @Codex */
 export const CLINICAL_ENTITIES_SCHEMA_VERSION = 'mediflow.clinical_entities.v1';
 
-/* @Codex */
 export type ClinicalEntityType = 'problem' | 'medication';
 
-/* @Codex */
 export interface ClinicalEntity {
     type: ClinicalEntityType;
     text: string;
@@ -14,13 +11,11 @@ export interface ClinicalEntity {
     confidence?: number;
 }
 
-/* @Codex */
 export interface ClinicalEntitiesResult {
     schemaVersion: typeof CLINICAL_ENTITIES_SCHEMA_VERSION;
     entities: ClinicalEntity[];
 }
 
-/* @Codex */
 export interface ClinicalEntitiesParseResult {
     value: ClinicalEntitiesResult;
     validContract: boolean;
@@ -58,7 +53,6 @@ function normalizeEntity(value: unknown): ClinicalEntity | null {
     };
 }
 
-/* @Codex */
 export function parseClinicalEntitiesResult(value: unknown): ClinicalEntitiesParseResult {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return {

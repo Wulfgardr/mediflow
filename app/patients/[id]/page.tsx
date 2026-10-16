@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/* @Codex WUL-562: la route storica non apre una seconda superficie clinica. */
+/* WUL-562: la route storica non apre una seconda superficie clinica. */
 export default async function PatientDetailPage({
   params,
 }: {

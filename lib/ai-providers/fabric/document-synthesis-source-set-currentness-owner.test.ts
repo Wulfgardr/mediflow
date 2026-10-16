@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { copyFileSync, unlinkSync } from 'node:fs';
 import { afterEach, test } from 'node:test';

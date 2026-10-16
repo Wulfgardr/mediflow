@@ -1,4 +1,4 @@
-/* @Codex #71, #75 */
+/* #71, #75 */
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
@@ -34,7 +34,7 @@ async function openNewEntry(page: Page, patient: SyntheticPatient): Promise<void
 }
 
 async function forceSyntheticDraftError(page: Page): Promise<void> {
-  // @Codex: reach the optional tools through the ordinary disclosure.
+  // reach the optional tools through the ordinary disclosure.
   const session = page.locator('details#sessione-visita');
   if (await session.getAttribute('open') === null) {
     await session.locator(':scope > summary').click();
@@ -88,7 +88,7 @@ async function attachVisualProof(
   await editor.focus();
   await expect(editor).toBeFocused();
 
-  // @Codex: the ordinary composer has one sheet and inline disclosures;
+  // the ordinary composer has one sheet and inline disclosures;
   // validate their actual geometry instead of the retired rail/aside grid.
   const overflowProof = await page.getByTestId('progressive-entry-composer').evaluate((composer) => {
     const form = composer.querySelector<HTMLElement>('form[aria-label="Nuova voce clinica"]');
@@ -141,7 +141,7 @@ async function attachVisualProof(
     expect(surface.backdropFilter).toBe('none');
   }
 
-  /* @Codex #75: toolbar, canvas e campo restano opachi e contenuti sul viewport reale. */
+  /* #75: toolbar, canvas e campo restano opachi e contenuti sul viewport reale. */
   const editorSurfaces = await page.locator('[data-lume-editor-surface]').evaluateAll((elements) =>
     elements.map((element) => {
       const node = element as HTMLElement;
@@ -191,7 +191,7 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
       'Puoi retrodatare la voce quando ricostruisci il diario.',
     );
 
-    /* @Codex #75 */
+    /* #75 */
     const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
     await expect(editor).toHaveAttribute('aria-multiline', 'true');
     await expect(editor).toHaveAttribute('aria-required', 'true');
@@ -213,7 +213,7 @@ test('nuova voce Lume espone stato, focus, errori e salvataggio senza affidarsi 
         - button "Aumenta rientro"
     `);
 
-    // @Codex: ordinary native selects preserve type/setting values and
+    // ordinary native selects preserve type/setting values and
     // keyboard order; the previous segmented buttons are no longer rendered.
     const entryType = page.getByRole('combobox', { name: 'Tipo di voce', exact: true });
     const setting = page.getByRole('combobox', { name: 'Luogo della voce clinica', exact: true });

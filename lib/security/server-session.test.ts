@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import crypto, { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -134,7 +133,6 @@ const exactRuntimeSymbols = (
         && [...symbols].every((symbol) => actual.some((use) => use.symbol === symbol));
 };
 
-/* @Codex */
 const validateO1CSessionImports = (sources: Readonly<Record<string, string>>) => {
     const errors: string[] = [];
     const sessionUses = inventory(sources, 'lib/security/server-session');

@@ -1,6 +1,6 @@
 import { isAiLaneEnabledValue } from '../ai-lane-kill-switch';
 import { createOrdinaryBrowser, type OrdinaryBrowserView } from './ordinary-browser';
-/* @Codex: a request-local model selection, never clinical authority or persistence. */
+/* a request-local model selection, never clinical authority or persistence. */
 import { api, parsePreferences, ModelUiError, errorText } from './browser';
 import type { FunctionModelPreferences, FunctionModelId, FunctionModelChoice } from './browser';
 export type PickerView = Readonly<{ dto: FunctionModelPreferences | null; choice: FunctionModelChoice | null; loading: boolean; error: string | null; blocked: boolean; consumed: boolean; remote?: OrdinaryBrowserView }>;

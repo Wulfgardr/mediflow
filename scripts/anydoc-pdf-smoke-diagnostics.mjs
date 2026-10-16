@@ -1,4 +1,4 @@
-/* @Codex: failure-only diagnostics for the synthetic standalone PDF smoke.
+/* failure-only diagnostics for the synthetic standalone PDF smoke.
  * This is build/checker tooling, not a worker protocol or an admission validator.
  * Never return child text, exception messages, paths, input bytes or body previews.
  * Bounds mirror the existing smoke observer; they do not change its spawn limits.

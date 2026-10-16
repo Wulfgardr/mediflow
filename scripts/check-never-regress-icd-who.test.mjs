@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -99,7 +98,7 @@ test('canonical URI data exception is confined to the exact native codec fixture
         uri, `let uri = "${uri}"`), false);
 });
 
-/* @Codex: pin each new exception to its exact source line and file. */
+/* pin each new exception to its exact source line and file. */
 const pairedWhoUrlSeams = [
   [
     "lib/reference-data/icd11-who-network-route.test.ts",

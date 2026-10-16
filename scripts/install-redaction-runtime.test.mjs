@@ -1,4 +1,4 @@
-/* @Codex — synthetic installer regressions. NO authentic model, Mac qualification or egress grant. */
+/* synthetic installer regressions. NO authentic model, Mac qualification or egress grant. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';

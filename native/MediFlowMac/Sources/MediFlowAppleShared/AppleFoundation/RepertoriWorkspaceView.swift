@@ -1,5 +1,5 @@
 #if os(macOS)
-// @Codex: WUL-673. Consultation only; canonical paired WHO, no patient autoapply.
+// WUL-673. Consultation only; canonical paired WHO, no patient autoapply.
 import SwiftUI
 
 @MainActor
@@ -409,7 +409,7 @@ struct RepertoriWorkspaceView: View {
             .accessibilityIdentifier("repertori-exemptions-list")
 
         case .terminology:
-            EmptyView() // @Codex: WHO has its own typed, provenance-preserving surface above.
+            EmptyView() // WHO has its own typed, provenance-preserving surface above.
         }
     }
 

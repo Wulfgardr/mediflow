@@ -4,11 +4,8 @@ import { dbServer } from '@/lib/db-server';
 import { ambulatories, patients, patientsToAmbulatories } from '@/lib/schema';
 import { eq, and, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { patientUnassignSchema } from '@/lib/api-schemas/patient-bulk';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
 import { auditContextFromSession, requestIdFromRequest, withAuditContextMetadata, writeAuditEventInTransaction } from '@/lib/security/audit';
@@ -19,7 +16,6 @@ import { buildPatientVersionConflictPayload } from '@/lib/patient-concurrency';
 const MEMBERSHIP_JSON_MAX_BYTES = 262_144;
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);

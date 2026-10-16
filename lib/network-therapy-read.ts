@@ -1,12 +1,7 @@
-/* @Codex */
 import { and, desc, eq, gte, inArray, lte } from 'drizzle-orm';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import type { TherapySummary } from './api/v1/types';
-/* @Codex */
 import { therapies, patientsToAmbulatories } from './schema';
-/* @Codex */
 import { normalizeTherapyStatus, therapyStatusFilterValues } from './status-normalization';
 
 type NetworkTherapyListFilters = {
@@ -16,7 +11,6 @@ type NetworkTherapyListFilters = {
     dateTo?: Date | null;
 };
 
-/* @Codex */
 export const NETWORK_THERAPY_READ_CAPABILITY = 'network.replica.readonly-therapies';
 
 function toIsoString(value: unknown): string | null {
@@ -48,7 +42,6 @@ function toTherapySummary(therapy: typeof therapies.$inferSelect): TherapySummar
     };
 }
 
-/* @Codex */
 export async function listNetworkScopedTherapies(
     patientId: string,
     scopeAmbulatoryId: string,
@@ -74,7 +67,6 @@ export async function listNetworkScopedTherapies(
     return rows.map((row) => toTherapySummary(row.therapy));
 }
 
-/* @Codex */
 export async function getNetworkScopedTherapy(
     patientId: string,
     therapyId: string,

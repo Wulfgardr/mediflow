@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedPatientPrescriptionSections: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     private let actionColumns = [GridItem(.adaptive(minimum: 150), spacing: 8)]
@@ -55,7 +54,6 @@ struct PairedPatientPrescriptionSections: View {
         }
     }
 
-    /* @Codex */
     private var prostheticPrescriptionsSection: some View {
         let counters = ProstheticPrescriptionFiltering.counters(model.prostheticPrescriptions)
         return VStack(alignment: .leading, spacing: 10) {
@@ -189,7 +187,6 @@ struct PairedPatientPrescriptionSections: View {
         .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
-    /* @Codex */
     private var servicePrescriptionForm: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Nuova prestazione", systemImage: "cross.case")
@@ -283,7 +280,6 @@ struct PairedPatientPrescriptionSections: View {
         }
     }
 
-    /* @Codex */
     private func prostheticPrescriptionRow(_ prescription: HomeBaseProstheticPrescriptionSummary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
@@ -349,7 +345,6 @@ struct PairedPatientPrescriptionSections: View {
         .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
-    /* @Codex */
     private var prostheticPrescriptionForm: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Nuova prescrizione protesica", systemImage: "figure.walk.motion")
@@ -420,7 +415,6 @@ struct PairedPatientPrescriptionSections: View {
         }
     }
 
-    /* @Codex */
 
     private func serviceDatesLine(_ prescription: HomeBaseServicePrescriptionSummary) -> some View {
         let values: [String] = [
@@ -435,7 +429,6 @@ struct PairedPatientPrescriptionSections: View {
             .opacity(values.isEmpty ? 0 : 1)
     }
 
-    /* @Codex */
     private static func serviceMatchLabel(_ rawValue: String) -> String {
         switch rawValue {
         case "matched":

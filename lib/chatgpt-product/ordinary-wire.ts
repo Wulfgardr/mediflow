@@ -1,4 +1,4 @@
-/* @Codex — content/provenance DTOs only. No DTO authorizes execution. */
+/* content/provenance DTOs only. No DTO authorizes execution. */
 import type { ModelEffort } from '../chatgpt-execution/execution-contract';
 export type OrdinaryFunction = 'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning';
 export type OrdinaryRemoteReceipt = Readonly<{

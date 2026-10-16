@@ -1,4 +1,4 @@
-/* @Codex — isolated loopback only. No DNS or upstream socket is real in this test. */
+/* isolated loopback only. No DNS or upstream socket is real in this test. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { connect } from 'node:net';

@@ -54,7 +54,6 @@ function iterationsForVersion(version: number): number {
     return iterations;
 }
 
-/* @Codex */
 function getCryptoApi(): Crypto {
     if (!globalThis.crypto) {
         throw new Error('Web Crypto API unavailable');

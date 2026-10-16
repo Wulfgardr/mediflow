@@ -1,4 +1,4 @@
-/* @Codex — named setting, default OFF; no bearer capabilities are persisted. */
+/* named setting, default OFF; no bearer capabilities are persisted. */
 import 'server-only';
 import * as owner from '../security/web-auth-lifecycle-owner-adapter';
 import { createHash } from 'node:crypto';

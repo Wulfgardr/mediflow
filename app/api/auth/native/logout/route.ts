@@ -1,4 +1,3 @@
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { requirePairedNativeSession } from '@/lib/security/paired-native-session';
 import { retireServerSessionForLogout } from '@/lib/security/server-session';

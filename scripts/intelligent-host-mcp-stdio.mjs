@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { createUsefulMcpServer } from '../packages/mcp/src/server.ts';
 

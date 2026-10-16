@@ -1,4 +1,4 @@
-/* @Codex — fixed physical deployment layouts, not an execution qualification. */
+/* fixed physical deployment layouts, not an execution qualification. */
 import 'server-only';
 import { lstatSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, normalize, parse, relative, sep } from 'node:path';

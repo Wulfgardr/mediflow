@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { randomBytes, webcrypto } from 'node:crypto';
 import fs from 'node:fs';

@@ -1,5 +1,5 @@
 'use client';
-/* @Codex — source/job identity gates all publications, including successful late jobs. */
+/* source/job identity gates all publications, including successful late jobs. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { clearPreviewCanvas, PreviewError, previewFailure, type PreviewFailure } from './document-viewer-policy.ts';
 import type { DocumentPreview } from './document-viewer-preview.ts';

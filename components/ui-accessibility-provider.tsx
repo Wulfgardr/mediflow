@@ -1,10 +1,7 @@
 'use client';
 
-/* @Codex */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-/* @Codex */
 import { db } from '@/lib/db';
-/* @Codex */
 import {
     normalizeAccessibilityPreference,
     UI_REDUCE_MOTION_SETTING_KEY,
@@ -13,21 +10,17 @@ import {
     UI_REDUCE_TRANSPARENCY_STORAGE_KEY,
 } from '@/lib/ui-accessibility-preferences';
 
-/* @Codex */
 interface UIAccessibilityProviderProps {
     children: ReactNode;
 }
 
-/* @Codex */
 interface UIAccessibilityState {
     reduceMotion: boolean;
     setReduceMotion: (enabled: boolean) => void;
 }
 
-/* @Codex */
 const UIAccessibilityContext = createContext<UIAccessibilityState | undefined>(undefined);
 
-/* @Codex */
 function readStoredPreference(storageKey: string): boolean {
     if (typeof window === 'undefined') return false;
 
@@ -38,12 +31,10 @@ function readStoredPreference(storageKey: string): boolean {
     }
 }
 
-/* @Codex */
 function applyPreferenceToDocument(key: 'uiReduceMotion' | 'uiReduceTransparency', enabled: boolean) {
     window.document.documentElement.dataset[key] = enabled ? 'true' : 'false';
 }
 
-/* @Codex */
 export function UIAccessibilityProvider({ children }: UIAccessibilityProviderProps) {
     const [reduceMotion, setReduceMotionState] = useState<boolean>(() => readStoredPreference(UI_REDUCE_MOTION_STORAGE_KEY));
 
@@ -113,7 +104,6 @@ export function UIAccessibilityProvider({ children }: UIAccessibilityProviderPro
     );
 }
 
-/* @Codex */
 export function useUIAccessibility(): UIAccessibilityState {
     const context = useContext(UIAccessibilityContext);
 

@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import MediFlowCore
 
-/* @Codex */
 final class ClinicalRichTextInlineEditingTests: XCTestCase {
     func testMixedExistingParagraphIsEditableAndFormatsOnlySelectedWord() throws {
         let original = "<p><strong>Prima</strong> seconda terza</p>"

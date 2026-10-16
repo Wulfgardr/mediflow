@@ -1,6 +1,5 @@
 import type { FseValidationIssue } from './terminology';
 
-/* @Codex */
 export type ValidationItem = {
     id: string;
     ok: boolean;
@@ -8,7 +7,6 @@ export type ValidationItem = {
     warnings: FseValidationIssue[];
 };
 
-/* @Codex */
 export type ValidationSummary = {
     total: number;
     ok: number;
@@ -19,7 +17,6 @@ export type ValidationSummary = {
     items: ValidationItem[];
 };
 
-/* @Codex */
 export type ValidatePatientExportResponse = {
     patientId: string;
     hasErrors: boolean;
@@ -28,7 +25,6 @@ export type ValidatePatientExportResponse = {
     observationVitals: ValidationSummary;
 };
 
-/* @Codex */
 export function buildValidationMessage(validation: ValidatePatientExportResponse): string {
     return [
         `Terapie: ${validation.therapyMedication.total} record, ${validation.therapyMedication.errorCount} errori, ${validation.therapyMedication.warningCount} warning`,

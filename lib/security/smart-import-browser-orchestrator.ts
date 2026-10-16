@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import { parseSmartImportPreviewWireRoot, type SmartImportPreviewWireRoot } from '../smart-import-preview-wire';

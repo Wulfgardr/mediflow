@@ -8,11 +8,8 @@ import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { CheckupSummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { normalizeCheckupUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
-/* @Codex */
 import { normalizeCheckupStatus } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { updateCheckupOperation } from '@/lib/checkup-write-operation';
 import { parseCheckupExpectedVersion } from '@/lib/checkup-concurrency';
@@ -66,7 +63,6 @@ export async function GET(
     }
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; checkupId: string }> }
@@ -76,7 +72,6 @@ export async function PUT(
 
     try {
         const auditSession = await requireLocalApiActorSession(request);
-        /* @Codex */
         const { id, checkupId } = await params;
         const envelope = await readCheckupJsonObject(request);
         if (!envelope.ok) return envelope.response;
@@ -99,7 +94,7 @@ export async function PUT(
             return NextResponse.json({ error: normalized.error }, { status: 400 });
         }
 
-        // @Codex: host audit context is resolved before the synchronous IMMEDIATE mutation.
+        // host audit context is resolved before the synchronous IMMEDIATE mutation.
         const context = auditContextFromRequest(request, auditSession);
         const result = updateCheckupOperation({
             patientId: id, checkupId: checkupId, expectedVersion, values: normalized.values, mode: 'v1',
@@ -117,7 +112,6 @@ export async function PUT(
     }
 }
 
-/* @Codex */
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string; checkupId: string }> }
@@ -127,7 +121,6 @@ export async function DELETE(
 
     try {
         const auditSession = await requireLocalApiActorSession(request);
-        /* @Codex */
         const { id, checkupId } = await params;
         // WUL-308: DELETE writes a version-guarded soft-delete tombstone like entries.
         const parsedBody = await parseClinicalDeleteBody(request);

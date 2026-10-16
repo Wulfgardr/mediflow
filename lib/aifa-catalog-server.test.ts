@@ -167,7 +167,6 @@ test('runtime search applies cross-field tokens before the result cap', async ()
     assert.deepEqual(search.rows.map((row) => row.aic), ['TARGET']);
 });
 
-/* @Codex */
 test('guarded replacement detects legacy changes and rolls back actual SQLite write failures', async () => {
     const catalog = await loadCatalogModules();
     const { getAifaCatalogSnapshot } = await import('./aifa-catalog-server.ts');
@@ -209,7 +208,7 @@ test('guarded replacement detects legacy changes and rolls back actual SQLite wr
     }
 });
 
-/* @Codex Uses the actual lifecycle owner and SQLite; only the HTTP cookie reader and external transport are synthetic. */
+/* Uses the actual lifecycle owner and SQLite; only the HTTP cookie reader and external transport are synthetic. */
 test('update route guards streamed bodies and cancels on actual session retirement', { timeout: 10_000 }, async (t) => {
     await loadCatalogModules();
     const load = createRequire(import.meta.url);
@@ -236,7 +235,7 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal((await POST(syntheticExemptionRequest('http://localhost/api/drugs/update?url=https://invalid.example', { method: 'POST' }))).status, 400);
     assert.equal((await POST(syntheticExemptionRequest('http://localhost/api/drugs/update', { method: 'POST', body: '{}' }))).status, 400);
     assert.equal(calls, 0);
-    /* @Codex Body guards run before transport and leave the catalog intact. */
+    /* Body guards run before transport and leave the catalog intact. */
     const bodySnapshot = getAifaCatalogSnapshot();
     const streamed = (body: ReadableStream<Uint8Array>, signal?: AbortSignal) => syntheticExemptionRequest('http://localhost/api/drugs/update', {
         method: 'POST', body, signal, duplex: 'half',
@@ -283,7 +282,7 @@ test('update route guards streamed bodies and cancels on actual session retireme
         start(controller) { controller.error(new Error('synthetic body read failure')); },
     })));
     assert.equal(failedBody.status, 422);
-    /* @Codex Unexpected errors never expose raw exception text through the domain-error branch. */
+    /* Unexpected errors never expose raw exception text through the domain-error branch. */
     assert.deepEqual(await failedBody.json(), { error: 'Aggiornamento AIFA non riuscito; catalogo conservato' });
     assert.equal(calls, 0);
     assert.equal(getAifaCatalogSnapshot(), bodySnapshot);
@@ -295,7 +294,7 @@ test('update route guards streamed bodies and cancels on actual session retireme
     testDb.insert(testSettings).values({ key: 'aifaNetworkAccess', value: 'enabled' }).onConflictDoUpdate({ target: testSettings.key, set: { value: 'enabled' } }).run();
     const validCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000401;TEST ROUTE;A01AA01;Principio route';
     t.mock.method(globalThis, 'fetch', async () => new Response(validCsv, { headers: { 'Content-Type': 'text/csv', etag: '"route-version"', 'Last-Modified': 'Wed, 14 Oct 2026 23:02:27 GMT' } }));
-    /* @Codex Regression: a zero-byte POST can still expose a ReadableStream. */
+    /* Regression: a zero-byte POST can still expose a ReadableStream. */
     for (const emptyChunks of [0, 1]) {
         const streamedEmpty = streamed(new ReadableStream({ start(controller) {
             if (emptyChunks) controller.enqueue(new Uint8Array(0));
@@ -369,7 +368,7 @@ test('update route guards streamed bodies and cancels on actual session retireme
     assert.equal((await pending).status, 401);
     assert.equal(getAifaCatalogSnapshot(), before);
 
-    /* @Codex Session retirement must also interrupt body validation before network. */
+    /* Session retirement must also interrupt body validation before network. */
     const nextControl = owner.bootstrapControl()!;
     const nextAttempt = owner.begin('login', { controlId: nextControl.controlId, ifMatch: nextControl.etag, idempotencyKey: 'synthetic-aifa-login-0002' });
     const nextIssued = owner.issue(nextAttempt, principal)!;

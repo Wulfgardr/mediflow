@@ -1,4 +1,4 @@
-/* @Codex — host-only orchestration, fixed corpus and actual binding. */
+/* host-only orchestration, fixed corpus and actual binding. */
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';

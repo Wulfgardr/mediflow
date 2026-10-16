@@ -3,7 +3,6 @@ import test from 'node:test';
 
 import { toFhirFullUrl, toFhirId } from './id';
 
-/* @Codex */
 test('toFhirId keeps normalized source identifiers distinct', () => {
     const sanitizedId = toFhirId('entry/a', 'encounter');
     const validId = toFhirId('entry-a', 'encounter');

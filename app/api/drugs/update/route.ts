@@ -1,6 +1,5 @@
 import { assertEmptyAifaRequestBody } from '@/lib/aifa-catalog-request';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { mintResourcePort, releaseResourcePort, registerPrivateResource, unregisterPrivateResource,
     beginResourceUse, commitResourceUse } from '@/lib/security/web-auth-lifecycle-owner-adapter';

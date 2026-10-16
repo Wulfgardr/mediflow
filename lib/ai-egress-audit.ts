@@ -1,4 +1,3 @@
-/* @Codex */
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import os from 'node:os';

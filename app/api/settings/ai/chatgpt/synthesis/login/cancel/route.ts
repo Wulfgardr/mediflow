@@ -1,4 +1,3 @@
-/* @Codex */
 import { handleChatGptProductRequest } from '@/lib/chatgpt-product/product-production';
 
 export const runtime = 'nodejs';

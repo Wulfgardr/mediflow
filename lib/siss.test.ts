@@ -1,8 +1,5 @@
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import { completeSissPortalHandoff, openSissPrescrizione, prepareSissPortalWindow } from './siss';
 
 type PopupStub = {

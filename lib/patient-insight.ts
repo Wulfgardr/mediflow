@@ -1,8 +1,6 @@
-/* @Codex */
 import { detectSuspiciousPersonNames } from './patient-data-guardrails';
 import { stripModelArtifacts } from './model-artifacts';
 
-/* @Codex */
 export const CLAIM_SUPPORT_FALLBACK = 'DATI-INCOMPLETI';
 
 const SOURCES_TITLE = 'Fonti usate per i claim';

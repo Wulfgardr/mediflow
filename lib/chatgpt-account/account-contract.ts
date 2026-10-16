@@ -1,4 +1,4 @@
-/* @Codex: browser-safe DTO; account presence never grants execution. */
+/* browser-safe DTO; account presence never grants execution. */
 export type AccountState = 'unavailable' | 'disconnected' | 'starting' | 'awaiting_login' | 'verifying' | 'connected' | 'error';
 export type AccountNotice = 'host_unavailable' | 'timeout' | 'protocol_error' | 'process_exited' | 'login_failed' | 'login_expired' | 'canceled' | 'logout_unconfirmed' | 'busy' | 'session_expired' | 'invalid_state' | null;
 export type AccountAction = 'connect' | 'cancel_login' | 'complete_login' | 'refresh_account' | 'read_models' | 'read_rate_limits' | 'logout' | 'configure_host';

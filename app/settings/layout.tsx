@@ -3,7 +3,7 @@
 // WUL-297 settings shell: persistent sidebar + sub-routes.
 
 import type { ReactNode } from 'react';
-/* @Codex: an explicit local return, never browser-history navigation. */
+/* an explicit local return, never browser-history navigation. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -29,7 +29,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             statusLabel="I dati clinici e i servizi restano locali."
         >
             {/* <lg: la sidebar collassa in una barra compatta (vedi SettingsNavSidebar). */}
-            {/* @Codex: stable scope for the optional full-runtime design comparison. */}
+            {/* stable scope for the optional full-runtime design comparison. */}
             <div data-runtime-settings className={styles.settingsWorkspace + " " + ink.surface + " grid gap-4 lg:grid-cols-[216px_minmax(0,1fr)] lg:items-start lg:gap-6"}>
                 <aside className="lg:sticky lg:top-2">
                     <SettingsNavSidebar onSearchRequest={openSearch} />

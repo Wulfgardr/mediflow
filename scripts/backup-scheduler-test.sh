@@ -108,7 +108,7 @@ NODE
 
 TMP_DIR="$TMP_DIR" node "$TMP_DIR/verify-backup-artifact.mjs"
 
-# @Codex: a recent lock owned by a live PID must remain exclusive.
+# a recent lock owned by a live PID must remain exclusive.
 printf '{"pid":%s,"startedAt":"%s"}' "$$" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" > "$OUT_DIR/.mediflow-backup.lock"
 if MEDIFLOW_DATA_DIR="$DATA_DIR" \
   MEDIFLOW_BACKUP_DEST_DIR="$OUT_DIR" \
@@ -122,7 +122,7 @@ if [[ ! -f "$OUT_DIR/.mediflow-backup.lock" ]]; then
   exit 1
 fi
 
-# @Codex: the same live PID must not keep a stale lock active after PID reuse.
+# the same live PID must not keep a stale lock active after PID reuse.
 printf '{"pid":%s,"startedAt":"2020-01-01T00:00:00.000Z"}' "$$" > "$OUT_DIR/.mediflow-backup.lock"
 touch -t 202001010000 "$OUT_DIR/.mediflow-backup.lock"
 MEDIFLOW_DATA_DIR="$DATA_DIR" \

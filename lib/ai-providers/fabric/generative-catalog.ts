@@ -1,4 +1,3 @@
-/* @Codex */
 import type { FabricCapabilityDescriptor, GenerativeCapabilityId } from './contract';
 
 const GENERATIVE_VENUES = Object.freeze(['local_process', 'home_base'] as const);

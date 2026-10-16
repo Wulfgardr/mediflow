@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -203,7 +202,7 @@ test('rejects a selection expiry not inherited from Web without partial durable 
     } finally { db.close(); }
 });
 
-/* @Codex Orphan identifiers conflict pre-ledger; a colliding durable row is receipt corruption. */
+/* Orphan identifiers conflict pre-ledger; a colliding durable row is receipt corruption. */
 test('classifies orphan and durable deterministic identifier collisions before the first write', async () => {
     const owner = createHeadlessSoapEntryCommitOwner();
 
@@ -304,7 +303,7 @@ test('classifies replay conflict before authority and rejects a tampered durable
         (error) => error instanceof HeadlessSoapEntryCommitOwnerError && error.code === 'receipt_unavailable');
 });
 
-/* @Codex A field-exact digest chain is not a valid replay unless its H6/H4 semantics remain intact. */
+/* A field-exact digest chain is not a valid replay unless its H6/H4 semantics remain intact. */
 test('rejects a digest-consistent replay forged across binding, entry and audit semantics', async () => {
     const bound = await command(0x64);
     const owner = createHeadlessSoapEntryCommitOwner();

@@ -1,5 +1,4 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 
 import { createDocumentSynthesisCloudProbeFromHostEnvironment } from '@/lib/ai-providers/v2/document-synthesis-cloud-probe-composition';
@@ -43,7 +42,7 @@ type ProbeSessionLifecycle = Readonly<{
     current(): boolean; close(): void;
 }>;
 
-/* @Codex: retirement of the exact Web session aborts in-flight provider I/O. */
+/* retirement of the exact Web session aborts in-flight provider I/O. */
 function bindProbeToSession(session: NonNullable<Awaited<ReturnType<typeof requireSession>>>): ProbeSessionLifecycle | null {
     const port = mintResourcePort(session); if (!port) return null;
     const controller = new AbortController();
@@ -106,7 +105,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const archiveDenial = archiveWriteRequestDenial(request, session);
     if (archiveDenial) return archiveDenial;
 
-    /* @Codex: parsing is an await boundary; re-read the exact admin session
+    /* parsing is an await boundary; re-read the exact admin session
        immediately before constructing and executing the egress capability. */
     const currentSession = await requireSession();
     if (!currentSession || !isWebAdminSession(currentSession)

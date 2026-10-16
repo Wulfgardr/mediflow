@@ -1,4 +1,3 @@
-/* @Codex */
 // Decode/encode the existing encrypted patient diagnoses JSON. Optional WHO
 // provenance is retained as data during native edits; this codec does no lookup.
 import Foundation
@@ -11,7 +10,7 @@ public struct ClinicalDiagnosis: Equatable, Sendable {
     /// encode round-trip does not rewrite an existing diagnosis date. nil for a
     /// diagnosis added on-device (encode then stamps it with the default date).
     public let date: String?
-    /* @Codex: optional additions do not change the encoded shape of legacy rows. */
+    /* optional additions do not change the encoded shape of legacy rows. */
     public let canonicalUri: String?
     public let reference: HomeBaseJSONValue?
 

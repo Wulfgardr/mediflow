@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { createHash as nodeCreateHash } from 'node:crypto';

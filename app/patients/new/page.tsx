@@ -9,28 +9,23 @@ import {
     type ServicePrescriptionPriority,
 } from '@/lib/db';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet } from 'lucide-react'; // @Codex: manual CSV entrypoint
+import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet } from 'lucide-react'; // manual CSV entrypoint
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PdfImporter from '@/components/pdf-importer';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { ExtractedPatientData } from '@/lib/pdf-service';
-/* @Codex */
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
-/* @Codex */
 import PatientDocumentImportReview from '@/components/patient-document-import-review';
-/* @Codex */
 import {
     buildPatientDocumentReviewDraft,
     type PatientDocumentReviewDraft,
     type ReviewedPatientImportDefaults,
 } from '@/lib/domain/documents/patient-document-review';
 
-/* @Codex */
 type ImportedServicePrescriptionDraft = NonNullable<ReviewedPatientImportDefaults['servicePrescriptions']>[number];
 
-/* @Codex */
 type ImportedPatientDraft = {
     firstName?: string;
     lastName?: string;
@@ -56,7 +51,6 @@ type ImportedPatientDraft = {
     servicePrescriptions?: ImportedServicePrescriptionDraft[];
 };
 
-/* @Codex */
 const SERVICE_PRESCRIPTION_CATEGORIES = new Set<ServicePrescriptionCategory>([
     'lab',
     'imaging',
@@ -67,7 +61,6 @@ const SERVICE_PRESCRIPTION_CATEGORIES = new Set<ServicePrescriptionCategory>([
     'other',
 ]);
 
-/* @Codex */
 const SERVICE_PRESCRIPTION_PRIORITIES = new Set<ServicePrescriptionPriority>([
     'U',
     'B',
@@ -77,21 +70,18 @@ const SERVICE_PRESCRIPTION_PRIORITIES = new Set<ServicePrescriptionPriority>([
     'unknown',
 ]);
 
-/* @Codex */
 function normalizeServicePrescriptionCategory(
     value: ImportedServicePrescriptionDraft['category'],
 ): ServicePrescriptionCategory {
     return value && SERVICE_PRESCRIPTION_CATEGORIES.has(value) ? value : 'other';
 }
 
-/* @Codex */
 function normalizeServicePrescriptionPriority(value: string | undefined): ServicePrescriptionPriority {
     return value && SERVICE_PRESCRIPTION_PRIORITIES.has(value as ServicePrescriptionPriority)
         ? value as ServicePrescriptionPriority
         : 'unknown';
 }
 
-/* @Codex */
 function parseImportedServicePrescriptionDate(value: string | undefined, fallback: Date): Date {
     if (!value) return fallback;
     const parsed = new Date(value);
@@ -103,11 +93,8 @@ export default function NewPatientPage() {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [importedData, setImportedData] = useState<ImportedPatientDraft | null>(null);
-    /* @Codex */
     const [pendingImportReview, setPendingImportReview] = useState<PatientDocumentReviewDraft | null>(null);
-    /* @Codex */
     const [formSeed, setFormSeed] = useState(0);
-    /* @Codex */
     const [importMeta, setImportMeta] = useState<{
         quality?: { level: string; reason?: string };
         diagnosisCount: number;
@@ -210,7 +197,7 @@ export default function NewPatientPage() {
                 await db.servicePrescriptions.bulkPut(servicePrescriptionItems);
             }
 
-            router.push('/?area=incarico'); // @Codex WUL-732: torna alla lista anche senza profilo confermato.
+            router.push('/?area=incarico'); // WUL-732: torna alla lista anche senza profilo confermato.
         } catch (error) {
             console.error("Failed to save patient", error);
             showToast({ tone: 'error', title: 'Errore durante il salvataggio', description: 'Controlla i dati e riprova.' });
@@ -264,7 +251,6 @@ export default function NewPatientPage() {
                 </div>
                 <PdfImporter onDataExtracted={(data) => {
                     const imported = data as ExtractedPatientData;
-                    /* @Codex */
                     setPendingImportReview(buildPatientDocumentReviewDraft(imported));
                     setImportMeta({
                         quality: imported.documentQuality,
@@ -275,7 +261,6 @@ export default function NewPatientPage() {
                 }} />
             </section>
 
-            {/* @Codex */}
             {importMeta && (
                 <section id="controllo" className="space-y-4 scroll-mt-40">
                     <div className={`mf-alert animate-in fade-in slide-in-from-top-4 duration-500 !p-6 ${
@@ -313,7 +298,6 @@ export default function NewPatientPage() {
                         </div>
                     </div>
 
-                    {/* @Codex */}
                     {pendingImportReview && (
                         <PatientDocumentImportReview
                             draft={pendingImportReview}

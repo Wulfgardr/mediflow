@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import type { QualifiedExecutionHost } from './execution-host';
 import { readMacQualification, takeMacQualifiedHost } from './execution-mac-qualification';

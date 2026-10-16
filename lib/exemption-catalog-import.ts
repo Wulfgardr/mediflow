@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type Database from 'better-sqlite3';

@@ -1,4 +1,4 @@
-/* @Codex WUL-676: scoped composition for the runtime-twin writing sheet. */
+/* WUL-676: scoped composition for the runtime-twin writing sheet. */
 .page {
     box-sizing: border-box;
     width: 100%;
@@ -80,7 +80,7 @@
 .editor [data-lume-editor-surface="toolbar"] button { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 5px; }
 .editor [data-lume-editor-surface="toolbar"] button > span { display: none; }
 .editor [data-lume-editor-surface="canvas"] { padding: 18px 20px 12px; }
-/* @Codex: grow with the note up to a bounded canvas, then scroll the text. */
+/* grow with the note up to a bounded canvas, then scroll the text. */
 .editor [data-lume-editor-surface="field"] {
     min-height: 260px;
     max-height: 440px;

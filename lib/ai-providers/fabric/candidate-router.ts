@@ -1,4 +1,3 @@
-/* @Codex */
 import type { PairingReconnectionClass } from '../../network-pairing-lifecycle';
 import { ProviderRegistryError } from '../registry';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';

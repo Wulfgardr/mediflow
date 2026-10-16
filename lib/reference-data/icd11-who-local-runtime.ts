@@ -1,4 +1,3 @@
-/* @Codex */
 import { ICD11_WHO_BINDING, Icd11WhoServiceError, type Icd11WhoServiceErrorCode } from './icd11-who-service.ts';
 import { parseIcd11WhoOfficialSearchBody } from './icd11-who-official-search-parser.ts';
 import { isWhoArtifactDigest, resolveWhoSearchReference, WHO_LOCAL_BINDING_ID, WHO_LOCAL_TTL_MS,

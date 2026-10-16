@@ -1,4 +1,4 @@
-/* @Codex: synthetic real-HTTP Web-cookie and local-v1-token therapy audit/budget proof. */
+/* synthetic real-HTTP Web-cookie and local-v1-token therapy audit/budget proof. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
@@ -116,7 +116,7 @@ test('real Web cookie and local v1 token admit therapy writes, enforce 4 MiB and
     }
 });
 
-/* @Codex: real paired capability plus Web session, with required-audit failure readback. */
+/* real paired capability plus Web session, with required-audit failure readback. */
 test('real paired therapy create and PUT rollback audit FAIL and IGNORE', async () => {
     const ready = await request('GET', '/api/v1/ambulatories', { headers: { authorization: `Bearer ${token}` } });
     assert.equal(ready.status, 200);

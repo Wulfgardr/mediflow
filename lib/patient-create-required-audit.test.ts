@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: C05 real patient POST handlers on synthetic SQLite; auth/cookie seams only. */
+/* C05 real patient POST handlers on synthetic SQLite; auth/cookie seams only. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
