@@ -1,8 +1,8 @@
-# WHO locale — candidato Mac 0.8.6, follow-up 4
+# WHO locale: candidato Mac 0.8.6, follow-up 4
 
 **Il perimetro attuale comprende Mac, localhost sul Mac e backend condiviso/Headless sullo stesso Mac.** I percorsi Windows, Linux, Mini e iOS/iPadOS sono rinviati alla 1.0: conservarne sorgenti e test di portabilità non equivale a qualificarne il rilascio. Anche la prova Linux r3 allegata serve a diagnosticare F-WHO4, non a provare il funzionamento sul Mac.
 
-**PROPOSTA, non contratto accettato:** prima di procedere occorre leggere [WHO-TRIOS, emendamento D9–D11](../proposals/WHO-TRIOS-ADR.md). Restano invariati gli ADR accettati, le route applicative, il motore di ricerca e il launcher base. Le sezioni storiche spiegano i passaggi precedenti, ma le loro istruzioni su pubblicazione Docker, v3 e tre OS NON costituiscono la procedura Mac corrente, per la quale prevalgono questo capitolo e D9–D11.
+**PROPOSTA, non contratto accettato:** prima di procedere occorre leggere [WHO-TRIOS, emendamento D9–D11](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/proposals/WHO-TRIOS-ADR.md). Restano invariati gli ADR accettati, le route applicative, il motore di ricerca e il launcher base. Le sezioni storiche spiegano i passaggi precedenti, ma le loro istruzioni su pubblicazione Docker, v3 e tre OS NON costituiscono la procedura Mac corrente, per la quale prevalgono questo capitolo e D9–D11.
 
 ## Correzioni e gate
 
@@ -68,13 +68,13 @@ Il candidato qui descritto non è stato eseguito su Mac né dentro Docker/WHO. I
 
 ---
 
-## Documentazione storica conservata — non procedura Mac corrente
+## Documentazione storica conservata: non procedura Mac corrente
 
 # Contesto dei precedenti candidati WHO locali
 
 Nei candidati precedenti la scelta era il sidecar WHO locale, dietro l'Application Service server-only di [ADR 0115](./adr/0115-icd11-who-reference-data-adapter.md). Il vecchio container MediFlow e la porta `8888` restavano ritirati, senza ripiego su ICD-9, JSON WHO grezzo o servizio WHO remoto e senza credenziali OAuth. Il candidato comprendeva Search, stato e procedura guidata con installer locale a comandi fissi; il server Web non eseguiva Docker.
 
-Il [manifesto](./who-local-sidecar.manifest.json) distribuito lascia non valorizzati i lock obbligatori, che ogni installazione deve registrare fuori Git. La documentazione congelata riporta una prova ARM64 del 7 settembre 2026 con acquisizione, Search, riavvio offline e ripristino completati dopo l'accettazione esplicita dell'operatore. Quell'esito non accetta termini per altri utenti né attiva servizi nelle loro installazioni; viene conservato come prova storica, non ripetuto o attestato nuovamente. La revisione tri-OS rimane una [proposta di contratto WHO-TRIOS](../proposals/WHO-TRIOS-ADR.md), non un ADR accettato.
+Il [manifesto](./who-local-sidecar.manifest.json) distribuito lascia non valorizzati i lock obbligatori, che ogni installazione deve registrare fuori Git. La documentazione congelata riporta una prova ARM64 del 7 settembre 2026 con acquisizione, Search, riavvio offline e ripristino completati dopo l'accettazione esplicita dell'operatore. Quell'esito non accetta termini per altri utenti né attiva servizi nelle loro installazioni; viene conservato come prova storica, non ripetuto o attestato nuovamente. La revisione tri-OS rimane una [proposta di contratto WHO-TRIOS](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/proposals/WHO-TRIOS-ADR.md), non un ADR accettato.
 
 ## Configurazione server e stato
 
@@ -102,7 +102,7 @@ Lo stato `configured` non equivale ad `available`, e leggerlo non avvia ricerche
 
 La cache resta esclusivamente in RAM, con 256 chiavi/4 MiB e TTL assoluto di 24 ore, non rinnovato dalle hit. Binding, immagine e dataset separano le chiavi; disable, cambio di configurazione, dispose o clock regressivo invalidano cache e risultati pendenti. Il listener loopback non autentica gli altri processi locali dell'host.
 
-## Percorso ordinario locale tri-OS — PROPOSTA
+## Percorso ordinario locale tri-OS: PROPOSTA
 
 La proposta tri-OS introduce un percorso comune Node 24 per macOS, Windows e Linux, sullo **stesso computer che ospita MediFlow**: Windows/Linux non dipendono da Mac, relay o server remoto. Prima che l'estensione sostituisca il limite di provisioning di ADR 0115, il parent deve accettare WHO-TRIOS. Contratto Web e DTO Search/CodeInfo rimangono invariati.
 
@@ -218,10 +218,10 @@ Le registrazioni ordinarie v1 restano leggibili, ma status non le promuove e sta
 
 ### Disponibilità nell'interfaccia
 
-La guida separa i passaggi necessari a ottenere il servizio — prerequisiti, evidenza dell'immagine, download e qualifica — dalla configurazione salvata e dalla risposta diretta osservata. La scelta dell'OS riguarda quindi il server, non il browser: copiare un comando o selezionare un checkbox non installa WHO né lo rende disponibile. Anche `ready` della CLI attesta una qualifica salvata, non il DTO `available` della sessione applicativa.
+La guida separa i passaggi necessari a ottenere il servizio (prerequisiti, evidenza dell'immagine, download e qualifica) dalla configurazione salvata e dalla risposta diretta osservata. La scelta dell'OS riguarda quindi il server, non il browser: copiare un comando o selezionare un checkbox non installa WHO né lo rende disponibile. Anche `ready` della CLI attesta una qualifica salvata, non il DTO `available` della sessione applicativa.
 Per verificare quest'ultima in MediFlow occorrono **Rileggi configurazione** e una **Verifica con termine di esempio** esplicita, distinguendo un risultato in cache da una risposta diretta. Il percorso non introduce nuove route privilegiate, accessi al DB o scritture cliniche.
 
-## Accettazione su macchina pulita — NOT_RUN per tutti e tre gli OS
+## Accettazione su macchina pulita: NOT_RUN per tutti e tre gli OS
 
 La procedura definisce le prove da raccogliere, ma non ne attesta l'esecuzione. Il parent può eseguirla soltanto dopo revisione/accettazione dell'ADR e autorizzazione delle risorse di test, su una macchina/account dedicato senza dati clinici né WHO preesistente. Node 24, dipendenze **del lockfile** e runtime scelto devono essere già preparati dall'operatore.
 Registrare OS/build, architettura Node, versione Node/Docker/daemon, tipologia di endpoint ammessa, immagine realmente disponibile, stato del firewall e spazio libero: sono le condizioni che permettono di riferire l'esito a quel target. I readback restano privati; negli artefatti condivisibili entra soltanto il binding pseudonimizzato, mai `Config.Env`, credenziali o dettagli personali.
@@ -262,7 +262,7 @@ Solo dopo la qualifica avviare esplicitamente il launcher MediFlow dello stesso 
 
 In assenza delle registrazioni obbligatorie, il manifesto distribuito fallisce intenzionalmente entrambi i gate. Il server Web MediFlow non avvia automaticamente il servizio.
 
-## Prova storica riportata nella base — 7 settembre 2026
+## Prova storica riportata nella base: 7 settembre 2026
 
 Questa prova appartiene alla base congelata e documenta il target verificato il 7 settembre 2026. Non costituisce una verifica del candidato tri-OS.
 
@@ -307,7 +307,7 @@ La documentazione congelata registra la consultazione del 2026-09-06 delle fonti
 Le interazioni verificano comando comune e tre OS, nuovo consenso, clipboard, reset/focus e assenza di richieste/provider o disponibilità inventata; non provano backend o WHO. Il componente reale è montato in StrictMode, con promesse clipboard controllate per osservare completamenti tardivi, cambio passo/host, reset e smontaggio. La fixture parent `lib/reference-data/repertory-guides-ui.test.ts`, aggiornata entro D2, parte dal default Node e richiede poi la scelta esplicita macOS/Windows/Linux, conservando consenso, clipboard, reset, focus e zero richieste. I casi AIFA restano invariati e anche questa fixture browser è **NOT_RUN**. Il cleanup della UI è corretto senza sopprimere il warning; ESLint completo resta un gate parent da rieseguire.
 
 
-## Follow-up 2 — trasporto proposto senza curl nell'immagine
+## Follow-up 2: trasporto proposto senza curl nell'immagine
 
 **PROPOSED; nessuna qualifica runtime Linux/Windows/macOS nella consegna di riferimento.** Sull'immagine ARM64 pinnata il parent ha osservato exit127 di `curl`, prima che partisse qualsiasi richiesta HTTP. Questo esito non prova presenza o assenza di wget, Python, Node o altri strumenti nel container, e la proposta non cerca un'alternativa tra questi.
 
@@ -341,14 +341,14 @@ Il parent deve leggere i soli ID registrati e la causa, non ripetere il setup fi
 - Node 24, [HTTP API](https://nodejs.org/docs/latest-v24.x/api/http.html): è il riferimento per agent, proxy d'ambiente e client HTTP, senza aggiunta di librerie esterne.
 
 `GUEST-A-Z.md` della consegna di riferimento descrive review, preflight, prova Linux isolata, alternative Windows/macOS, readback delle ricevute, stop-rules e successiva prova applicativa. L'intera procedura guest resta **NOT_RUN**.
-# F5 — Mac: primo avvio, diagnosi e ripresa dello stato posseduto incompleto
+# F5: Mac: primo avvio, diagnosi e ripresa dello stato posseduto incompleto
 
 RUN_ID: 989f06de3f2341be87d202cc2ee55652. **PROPOSED; qualifica reale Mac non eseguita nella consegna di riferimento.** Il perimetro 0.8.6 comprende Mac, localhost sul Mac e backend condiviso/Headless sullo stesso Mac; non viene qualificato alcun nuovo percorso Windows/Linux/Mini/mobile.
 
 ## Stato di partenza e significato delle evidenze
 
 La capsula parent riporta Node 24.19/Mac, **222 PASS/0 FAIL/3 SKIP** nella suite precedente e quattro scenari di trasporto PASS sull'immagine ARM64 pinnata. Il successivo setup WHO, pur con ACCETTO reale, è fallito: nel log pre-cleanup compare un errore di caricamento di `icd11_2026-01-17_release-icf-mms_en.pbf.gz`, seguito dalla terminazione con codice 134 del processo WHO, con OOM=false. Il relay con codice 137 contemporaneo non basta a diagnosticare un timeout incompatibile.
-La causa sottostante — acquisizione esterna, proxy/DNS/TLS, distribuzione del catalogo, caricamento/compatibilità del servizio o altro — **non è dimostrata**, e il diff privo di file dataset non prova un guasto di rete. Il container posseduto è fermo e WHO deve restare disabilitato; il servizio estraneo sulla porta 8888 non è un'alternativa né una risorsa da modificare. Questi esiti parent descrivono il punto di partenza, non risultati del candidato F5.
+La causa sottostante (acquisizione esterna, proxy/DNS/TLS, distribuzione del catalogo, caricamento/compatibilità del servizio o altro) **non è dimostrata**, e il diff privo di file dataset non prova un guasto di rete. Il container posseduto è fermo e WHO deve restare disabilitato; il servizio estraneo sulla porta 8888 non è un'alternativa né una risorsa da modificare. Questi esiti parent descrivono il punto di partenza, non risultati del candidato F5.
 
 ## A. Integrare senza sostituire la base
 

@@ -1,5 +1,4 @@
 /* @Codex */
-import type { ICDCode } from './icd-codes';
 import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
     type WhoLocalReadiness, type WhoLocalReceipt, type WhoLocalReference } from './reference-data/icd11-who-local-contract';
 
@@ -16,6 +15,12 @@ const RECEIPT_KEYS = [
     'resultCount', 'latencyMs', 'completedAt',
 ] as const;
 const READINESS_KEYS = ['schemaVersion', 'status', 'releaseId', 'language'] as const;
+
+export interface ICDCode {
+    code: string;
+    description: string;
+    system: string;
+}
 
 export interface ICDSearchResult extends ICDCode {
     isLegacy: false;

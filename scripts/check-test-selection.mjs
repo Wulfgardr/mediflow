@@ -100,7 +100,8 @@ async function collectSelections(root) {
 
 async function main(root) {
   const listed = execFileSync('git', ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], { maxBuffer: 32 * 1024 * 1024, encoding: 'utf8' });
-  const testFiles = discoverTestFiles(listed.split('\0').filter(Boolean), (file) => fs.readFileSync(path.join(root, file), 'utf8'));
+  const paths = listed.split('\0').filter((file) => file && fs.existsSync(path.join(root, file)));
+  const testFiles = discoverTestFiles(paths, (file) => fs.readFileSync(path.join(root, file), 'utf8'));
   const exclusions = JSON.parse(fs.readFileSync(path.join(root, EXCLUSIONS), 'utf8'));
   const result = checkTestSelection(testFiles, await collectSelections(root), exclusions);
   for (const error of result.errors) process.stderr.write(`${error}\n`);

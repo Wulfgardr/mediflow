@@ -216,7 +216,7 @@
     {
       "area": "documenti",
       "feature": "Smart Import (candidati diagnosi/terapie da documenti, applica in scheda)",
-      "web": "analisi AI candidati ICD-11/AIFA, select/edit/scarta, preview resolver, applica scrittura, kill switch AI_SMART_IMPORT (components/patient-smart-import-panel.tsx)",
+      "web": "analisi AI candidati ICD-11/AIFA, select/edit/scarta, preview resolver, applica scrittura, kill switch AI_SMART_IMPORT (https://github.com/Wulfgardr/mediflow/blob/v0.9.0/components/patient-smart-import-panel.tsx)",
       "native": "host-only per la policy corrente: nessuna superficie Smart Import lato Apple; WUL-409 resta una lane review-first separata, non un requisito automatico di parity",
       "boundary": "host-only: ADR 0076 esclude scritture document-derived/AI dal client paired finche una nuova decisione non ne ridefinisce il boundary",
       "gap": "host-only",
@@ -566,7 +566,7 @@
     {
       "area": "settings-host",
       "feature": "Network Operating Mode (gestione modalità boundary)",
-      "web": "NetworkOperatingModePanel, POST /api/settings/network.mode, /api/system/network-overview (components/settings/network-operating-mode-panel.tsx)",
+      "web": "NetworkOperatingModePanel, POST /api/settings/network.mode, /api/system/network-overview (https://github.com/Wulfgardr/mediflow/blob/v0.9.0/components/settings/network-operating-mode-panel.tsx)",
       "native": "host-only: riguarda il nodo che espone il boundary, non il client paired",
       "boundary": "host-only: settings network scritti solo home-base (lib/network-home-base-server.ts)",
       "gap": "host-only",
@@ -722,7 +722,7 @@
       "commit": "9ee798887fbba93b50d644f223a9a14cd85fa71c",
       "tree": "e4e5b69c7d034822dc7a311181e9dc08336e4ade",
       "note": "Code and documentation base before the parity closeout documentation packet. This is not a self-referential final packet hash.",
-      "runRecord": "docs/analysis/2026-07-27-parity-0.8-recovery-run.md"
+      "runRecord": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/analysis/2026-07-27-parity-0.8-recovery-run.md"
     },
     "rowReference": "Each integer is the zero-based index in rows. Feature counts retain the guarded 30/13/23 contract. Interaction evidence is separate and non-exclusive.",
     "featureParity": {
@@ -784,7 +784,7 @@
     },
     "controlToActionReference": {
       "canonicalDocument": "docs/parity-matrix.md#control-to-action-map",
-      "runRecordSection": "docs/analysis/2026-07-27-parity-0.8-recovery-run.md#8-control-to-action-map",
+      "runRecordSection": "https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/analysis/2026-07-27-parity-0.8-recovery-run.md#8-control-to-action-map",
       "axPress": {
         "status": "corrected",
         "scope": ["macOS agenda sidebar", "macOS patient selection"],
