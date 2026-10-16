@@ -93,6 +93,7 @@ export function useAiSettingsController() {
         manualConfig: { ...DEFAULT_AI_INSIGHT_MANUAL_CONFIG },
     });
     const [isSavingAi, setIsSavingAi] = useState(false);
+    const [savedConfigurationRevision, setSavedConfigurationRevision] = useState(0);
     const [aiSettingsLoadState, setAiSettingsLoadState] = useState<'loading' | 'ready' | 'failed'>('loading');
     const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
     const [aiHealth, setAiHealth] = useState<AIHealthState | null>(null);
@@ -234,6 +235,7 @@ export function useAiSettingsController() {
             });
             await saveAIInsightStoredSettings(aiInsightSettings);
             setAiTestStatus('idle');
+            setSavedConfigurationRevision(previous => previous + 1);
             showToast({ tone: 'success', title: 'Configurazione AI salvata' });
         } catch (e) {
             console.error(e);
@@ -295,7 +297,7 @@ export function useAiSettingsController() {
                 status: health.status === 'ok' && installedModels.length > 0 ? 'ok' : 'error',
                 message: health.status === 'ok'
                     ? installedModels.length > 0
-                        ? `Ollama è raggiungibile: ${installedModels.length} modelli presenti. Questo test non abilita le funzioni cliniche.`
+                        ? `Ollama è raggiungibile: ${installedModels.length === 1 ? '1 modello presente' : `${installedModels.length} modelli presenti`}. Questo test non abilita le funzioni cliniche.`
                         : 'Ollama è raggiungibile, ma non contiene modelli. Consulta i consigli qui sotto.'
                     : 'Ollama non è raggiungibile. Controlla indirizzo e servizio locale, poi riprova.',
                 models: installedModels,
@@ -350,6 +352,7 @@ export function useAiSettingsController() {
         applyHardwareProfile,
         updateManualInsightConfig,
         saveAiConfig,
+        savedConfigurationRevision,
         testAiConnection,
     };
 }
