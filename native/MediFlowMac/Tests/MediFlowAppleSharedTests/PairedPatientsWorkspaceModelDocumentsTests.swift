@@ -678,6 +678,32 @@ final class PairedAttachmentImportBatchTests: XCTestCase {
         for _ in 0..<100 { await Task.yield() }
         XCTAssertTrue(batch.results.isEmpty); XCTAssertEqual(calls, 1)
     }
+    func testVoluntaryStopPreservesFirstSuccessAndAcceptsOnlyUsefulLateAcknowledgement() async {
+        for acknowledged in [false, true] {
+            let batch = PairedAttachmentImportBatch()
+            var pending: CheckedContinuation<PairedAttachmentUploadOutcome, Never>?, calls = 0
+            batch.start(urls, isCurrent: { true }) { _ in
+                calls += 1
+                if calls == 1 { return .uploaded }
+                return await withCheckedContinuation { pending = $0 }
+            }
+            for _ in 0..<1000 where pending == nil { await Task.yield() }
+            XCTAssertEqual(calls, 2); XCTAssertNotNil(pending)
+            batch.stop()
+            XCTAssertEqual(batch.results[0].message, "Caricato")
+            XCTAssertTrue(batch.results[1].message.contains("non ancora confermato"))
+            XCTAssertEqual(batch.results[2].message, "Non avviato")
+            XCTAssertTrue(batch.isRunning); XCTAssertTrue(batch.isStopping)
+            batch.start(urls, isCurrent: { true }) { _ in calls += 1; return .uploaded }
+            XCTAssertEqual(calls, 2)
+            pending?.resume(returning: acknowledged ? .uploaded : .unconfirmed)
+            await settle(batch)
+            XCTAssertEqual(calls, 2); XCTAssertEqual(batch.results[0].message, "Caricato")
+            if acknowledged { XCTAssertEqual(batch.results[1].message, "Caricato") }
+            else { XCTAssertTrue(batch.results[1].message.contains("non confermato")) }
+            XCTAssertEqual(batch.results[2].message, "Non avviato")
+        }
+    }
     func testContextChangeAfterUploadDiscardsResultsAndNeverStartsNextFile() async {
         let batch = PairedAttachmentImportBatch(); var current = true, calls = 0
         batch.start(urls, isCurrent: { current }) { _ in calls += 1; current = false; return .uploaded }

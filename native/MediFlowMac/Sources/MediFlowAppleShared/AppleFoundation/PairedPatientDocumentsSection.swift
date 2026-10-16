@@ -148,7 +148,8 @@ struct PairedPatientDocumentsSection: View {
                         Text("\(result.fileName): \(result.message)").font(.caption)
                     }
                     if importBatch.isRunning {
-                        Button("Interrompi importazione") { importBatch.cancel() }
+                        Button(importBatch.isStopping ? "Verifica esito in corso…" : "Interrompi importazione") { importBatch.stop() }
+                            .disabled(importBatch.isStopping)
                     }
                 }.accessibilityIdentifier("attachment-import-results")
             }
@@ -627,6 +628,8 @@ final class PairedAttachmentImportBatch: ObservableObject {
     }
     @Published private(set) var results: [Result] = []
     @Published private(set) var isRunning = false
+    @Published private(set) var isStopping = false
+    private var currentIndex: Int?
     private var generation: UInt = 0
     private var inFlight = false
     private var task: Task<Void, Never>?
@@ -637,23 +640,30 @@ final class PairedAttachmentImportBatch: ObservableObject {
         generation &+= 1
         let epoch = generation
         results = urls.enumerated().map { Result(id: $0.offset, fileName: $0.element.lastPathComponent, message: "Non avviato") }
-        isRunning = true; inFlight = true
+        isRunning = true; inFlight = true; isStopping = false
         task = Task {
-            defer { inFlight = false; if generation == epoch { isRunning = false } }
+            defer {
+                inFlight = false
+                if generation == epoch { isRunning = false; isStopping = false; currentIndex = nil }
+            }
             for (index, url) in urls.enumerated() {
-                guard generation == epoch, !Task.isCancelled, isCurrent() else {
+                guard generation == epoch, isCurrent() else {
                     if generation == epoch { cancel() }
                     return
                 }
+                guard !isStopping, !Task.isCancelled else { return }
+                currentIndex = index
                 results[index].message = "Caricamento in corso…"
                 do {
                     let outcome = try await upload(url)
-                    guard generation == epoch, !Task.isCancelled, isCurrent() else {
+                    guard generation == epoch, isCurrent() else {
                         if generation == epoch { cancel() }
                         return
                     }
                     switch outcome {
-                    case .uploaded: results[index].message = "Caricato"
+                    case .uploaded:
+                        results[index].message = "Caricato"
+                        if isStopping || Task.isCancelled { return }
                     case .uploadedNeedsRefresh:
                         results[index].message = "Caricato; ricarica l’archivio prima di proseguire."
                         return
@@ -662,19 +672,29 @@ final class PairedAttachmentImportBatch: ObservableObject {
                         return
                     }
                 } catch {
-                    guard generation == epoch, !Task.isCancelled, isCurrent() else {
+                    guard generation == epoch, isCurrent() else {
                         if generation == epoch { cancel() }
                         return
                     }
-                    results[index].message = "Importazione interrotta: \(error.localizedDescription)"
+                    results[index].message = isStopping || error is CancellationError
+                        ? "Esito non confermato: verifica l’archivio prima di riprovare."
+                        : "Importazione interrotta: \(error.localizedDescription)"
                     return
                 }
             }
         }
     }
+    func stop() {
+        guard inFlight, !isStopping else { return }
+        isStopping = true
+        if let currentIndex {
+            results[currentIndex].message = "Interruzione richiesta: esito non ancora confermato."
+        }
+        task?.cancel()
+    }
     func cancel() {
         generation &+= 1
         task?.cancel(); task = nil
-        results = []; isRunning = false
+        results = []; isRunning = false; isStopping = false; currentIndex = nil
     }
 }
