@@ -3,7 +3,6 @@ import { isOrdinaryFunctionSelected } from '../../chatgpt-product/ordinary-flow'
 import { createTreatmentReasoningChatGptService } from './treatment-reasoning-chatgpt-production';
 import { captureFunctionModelTransportGuard, captureTreatmentReasoningDispatch } from './function-model-dispatch';
 
-/* @Codex */
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 
@@ -37,7 +36,7 @@ import { createPortableProvisioning } from './treatment-reasoning-portable-provi
 
 const lifecycle = createHostProviderLifecycleService({ provider: 'athena_mlx' }).service;
 
-/** @Codex: Web P3 resources follow the exact active cell; native keeps its existing owner path. */
+/** Web P3 resources follow the exact active cell; native keeps its existing owner path. */
 export function registerTreatmentReasoningProductionResource(
     context: AuthenticatedWebSessionProjectionOwnerContext,
     dispose: () => void,

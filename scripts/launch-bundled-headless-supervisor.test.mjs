@@ -1,4 +1,4 @@
-/* @Codex: real integrity/argument guard over a synthetic app layout. These are
+/* real integrity/argument guard over a synthetic app layout. These are
  * NOT positive Supervisor/MCP smoke tests. The real smoke is the existing
  * mediflow-headless-supervisor-standalone-smoke.mjs --app <extracted.app>. */
 import assert from 'node:assert/strict';
@@ -191,7 +191,7 @@ test('trace removes type-only edges and resolves only exact local files', t => {
   assert.throws(() => traceSourceText(ts, path.join(root, 'entry.ts'), "import './missing';", root), /Missing source dependency/u);
 });
 
-// @Codex: execute the actual source TS loader + actual portable contract, not a
+// execute the actual source TS loader + actual portable contract, not a
 // substitute Supervisor. This tests module confinement only, never MCP readiness.
 test('guarded loader executes the unchanged IPC contract and rejects a foreign module', t => {
   const require = createRequire(path.join(ROOT, 'package.json'));

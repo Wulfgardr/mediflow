@@ -6,9 +6,7 @@ import { dbServer } from '@/lib/db-server';
 import { patients, ambulatories, patientsToAmbulatories } from '@/lib/schema';
 import { and, eq, notInArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 // WUL-306 (ADR 0066): historical orphan child rows (patient_id no longer resolves)
 import {
@@ -50,9 +48,7 @@ function inspectRepair(tx: Pick<typeof dbServer, 'select'>) {
         orphanChildRowCounts: Object.fromEntries(orphanChildren.map(([name, rows]) => [name, rows.length])) as PatientCascadeCounts };
 }
 
-/* @Codex */
 export async function GET() {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
@@ -77,14 +73,11 @@ export async function GET() {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
         console.error("Fix Orphan Dry-Run Error:", error);
-        /* @Codex */
         return NextResponse.json({ error: 'Failed to inspect orphan patients' }, { status: 500 });
     }
 }
 
-/* @Codex */
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     if (!isWebAdminSession(session)) return forbiddenResponse();
@@ -191,7 +184,6 @@ export async function POST(request: Request) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
         console.error("Fix Orphan Error:", error);
-        /* @Codex */
         return NextResponse.json({ error: 'Failed to fix orphan patients' }, { status: 500 });
     }
 }

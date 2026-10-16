@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 import { createHash } from 'node:crypto';
 import { EGRESS_PROFILE_VERSION } from './contract';

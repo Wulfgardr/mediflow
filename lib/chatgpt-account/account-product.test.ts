@@ -1,4 +1,4 @@
-/* @Codex: invented account metadata, presentation lifetime and picker separation. */
+/* invented account metadata, presentation lifetime and picker separation. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdirSync } from 'node:fs';

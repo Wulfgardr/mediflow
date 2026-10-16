@@ -1,4 +1,4 @@
-/* @Codex: authenticated preview metadata only; no patient writes. */
+/* authenticated preview metadata only; no patient writes. */
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';

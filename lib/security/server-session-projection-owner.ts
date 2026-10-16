@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { ArchiveReplacedError } from '../archive-generation';
 
@@ -1371,13 +1370,11 @@ export function createPortProjectionOwnerFactory(sourceOverrides: Partial<Select
 }
 
 /** Creates the full projection surface while external-owner ports govern Web currentness and cleanup. */
-/* @Codex */
 export function createFullPortProjectionOwnerFactory(sourceOverrides: Partial<SelectionSources> = {}) {
     return createFullPortProjectionOwnerProcessOwner(sourceOverrides).registry;
 }
 
 /** Shares one final-owner registry with its private selection lifecycle and binding controllers. */
-/* @Codex */
 export function createFullPortProjectionOwnerProcessOwner(sourceOverrides: Partial<SelectionSources> = {}) {
     return createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('port-full', sourceOverrides);
 }

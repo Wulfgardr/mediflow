@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import * as nativeLifetime from './native-inference-lifecycle';
 
@@ -48,7 +47,6 @@ export function bindProjectionBrokerToServerSession(
  * Binds a broker to one opaque ACTIVE Web-session resource identity.
  * The binding never accepts or publishes session authority.
  */
-/* @Codex */
 export function bindProjectionBrokerToActiveWebSessionResource(
     port: WebResourcePort | import('./native-inference-lifecycle').NativeInferencePort,
     control: ProjectionBrokerControl,

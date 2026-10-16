@@ -1,8 +1,5 @@
-/* @Codex */
 import { eq } from 'drizzle-orm';
-/* @Codex */
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
-/* @Codex */
 import { migrateProstheticsSources } from './reference-data/prosthetics-catalog-schema';
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
 import { dbServer, openDbServer, runDbServerImmediateTransaction } from './db-server';
@@ -164,7 +161,7 @@ export class BackupRestoreBlockedError extends Error {
     }
 }
 
-/* @Codex v1 cannot restore command replay receipts without their append-only audit ledger. */
+/* v1 cannot restore command replay receipts without their append-only audit ledger. */
 function assertCommandRecoveryIsRepresentable(): void {
     const state = dbServer.select({ reviewId: durableReviewCommandStates.reviewId }).from(durableReviewCommandStates).get();
     const operation = dbServer.select({ id: durableReviewCommandOperations.id }).from(durableReviewCommandOperations).get();
@@ -221,7 +218,7 @@ function insertRows<T extends Record<string, unknown>>(
         return { ...metadata, bytes: Buffer.from(base64 as string, 'base64') };
     }) : rows;
     for (const group of chunk(insertableRows, 250)) {
-        /* @Codex Repertory dates are declared source text, not clinical timestamp columns. */
+        /* Repertory dates are declared source text, not clinical timestamp columns. */
         runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
     }
 }
@@ -231,7 +228,6 @@ const HEADLESS_SOAP_AUDIT_KEYS = [
     'subjectType', 'subjectRef', 'sourceSurface', 'requestId', 'redactedMetadata', 'createdAt',
 ] as const;
 
-/* @Codex */
 function parseHeadlessSoapAuditSnapshot(value: unknown): Record<string, unknown> {
     if (typeof value !== 'string') throw new BackupRestoreBlockedError('audit', 'invalid H7b audit snapshot.');
     try {
@@ -248,14 +244,12 @@ function parseHeadlessSoapAuditSnapshot(value: unknown): Record<string, unknown>
     }
 }
 
-/* @Codex */
 function dateSeconds(value: Date | null): number | null {
     return value instanceof Date && Number.isFinite(value.getTime()) && value.getTime() % 1000 === 0
         ? value.getTime() / 1000
         : null;
 }
 
-/* @Codex */
 function snapshotStoredAudit(row: typeof auditEvents.$inferSelect): Record<string, unknown> {
     return {
         eventId: row.eventId, schemaVersion: row.schemaVersion, eventType: row.eventType,
@@ -266,7 +260,7 @@ function snapshotStoredAudit(row: typeof auditEvents.$inferSelect): Record<strin
     };
 }
 
-/* @Codex Audit collision checks run under the writer lock and before any target collection is cleared. */
+/* Audit collision checks run under the writer lock and before any target collection is cleared. */
 function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): void {
     for (const row of rows) {
         const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);
@@ -279,7 +273,7 @@ function preflightHeadlessSoapAuditCollisions(rows: Record<string, unknown>[]): 
     }
 }
 
-/* @Codex Restore must synchronously retire volatile authority before the first destructive write. */
+/* Restore must synchronously retire volatile authority before the first destructive write. */
 function runMutationFence(fence: BackupRestoreMutationFence): void {
     if (typeof fence !== 'function') {
         throw new BackupRestoreBlockedError('runtime_fence', 'runtime mutation fence unavailable.');
@@ -294,7 +288,7 @@ function runMutationFence(fence: BackupRestoreMutationFence): void {
     }
 }
 
-/* @Codex Entries already exist at this point; audits are inserted/reused field-exactly before the ledger. */
+/* Entries already exist at this point; audits are inserted/reused field-exactly before the ledger. */
 function restoreHeadlessSoapEntryCommits(rows: Record<string, unknown>[]): void {
     for (const row of rows) {
         const audit = parseHeadlessSoapAuditSnapshot(row.auditSnapshot);

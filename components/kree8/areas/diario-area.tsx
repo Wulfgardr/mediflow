@@ -11,7 +11,6 @@ import {
 
 import { db, type ClinicalEntry } from '@/lib/db';
 import { useLiveQuery } from '@/lib/live-query';
-/* @Codex */
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { PillBadge } from '../cockpit-shared';
 import type { AreaId, Kree8DiaryClientState, Kree8DiaryEntry } from '../cockpit-shared';
@@ -78,7 +77,7 @@ function entryPresentation(entry: Kree8DiaryEntry, raw?: ClinicalEntry): DiaryEn
   };
 }
 
-/* @Codex issue 105, riferimento 68 */
+/* issue 105, riferimento 68 */
 function DiarioArea({
   diaryState,
   onOpenArea,

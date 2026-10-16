@@ -1,4 +1,3 @@
-/* @Codex */
 import type {
     ClinicianSoapEntryFieldSetV1,
     ClinicianSoapEntryMetadataV1,

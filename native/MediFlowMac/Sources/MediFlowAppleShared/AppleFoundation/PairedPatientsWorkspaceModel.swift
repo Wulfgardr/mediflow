@@ -1,5 +1,5 @@
 import SwiftUI
-import Combine // @Codex
+import Combine
 import CryptoKit
 import MediFlowCore  // CryptoService now lives in the platform-free core (ADR 0071)
 #if os(macOS)
@@ -23,7 +23,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let ambulatoryName: String?
     }
     @Published private(set) var operatorIdentity: OperatorIdentity? {
-        didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } } // @Codex
+        didSet { if oldValue?.userId != operatorIdentity?.userId { discardCachedPatientPresentation() } }
     }
     @Published var serverURL = HomeBasePairedSettings.defaultServerURL {
         didSet { invalidateLoginIfChanged(oldValue, serverURL) }
@@ -42,16 +42,15 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var ambulatoryId = "" {
         didSet {
             guard oldValue.trimmedOrNil != ambulatoryId.trimmedOrNil else { return }
-            discardCachedPatientPresentation() // @Codex
+            discardCachedPatientPresentation()
             invalidatePatientLoadContext()
             clearSelectedPatientWorkspace()
-        } // @Codex
+        }
     }
     @Published private(set) var availableAmbulatories: [NetworkAmbulatorySummary] = []
     @Published private(set) var patients: [HomeBasePatientSummary] = []
-    /* @Codex */
     @Published private(set) var selectedPatientID: String?
-    // @Codex: Per-workspace presentation state, never persisted or sent to the API.
+    // Per-workspace presentation state, never persisted or sent to the API.
     @Published var activePatientSection: PatientWorkspaceSection = .overview
     @Published private(set) var selectedPatient: HomeBasePatientDetail? {
         didSet {
@@ -63,7 +62,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 selectedPatientID = nil
             }
             guard previousID != currentID else { return }
-            /* @Codex */
             cancelEditingPatient()
             editablePatientFields = [:]
             lockedPatientFields = []
@@ -107,10 +105,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // every time a NEW draft is computed, so a stale review never authorizes a
     // later, different draft.
     @Published var newEntryVisitDraftReviewed = false
-    // @Codex: defense in depth for the review/insert gate. A response can only
+    // defense in depth for the review/insert gate. A response can only
     // authorize insertion while the same patient remains selected.
     private var newEntryVisitDraftPatientId: String?
-    // @Codex: a draft is usable only for the exact transcript mutation that
+    // a draft is usable only for the exact transcript mutation that
     // produced it. The UUID prevents A -> B -> A from reviving an in-flight or
     // previously reviewed draft; the digest binds the exact UTF-8 payload.
     private var newEntryVisitTranscriptMutationReference = UUID()
@@ -118,7 +116,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private var newEntryVisitDraftTranscriptDigest: Data?
     @Published private(set) var editingEntryId: String?
     @Published private(set) var editingEntryVersion: Int?
-    // @Codex: A conflict/reloaded version never silently rebases the local draft.
+    // A conflict/reloaded version never silently rebases the local draft.
     @Published private(set) var editingEntryRequiresReconciliation = false
     @Published private(set) var editingEntryRemoteReview: HomeBaseEntrySummary?
     private var editingEntryDraftID = UUID()
@@ -136,7 +134,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientFirstName = ""
     @Published var editPatientLastName = ""
     @Published var editPatientTaxCode = ""
-    /* @Codex: the wire day is Gregorian UTC, matching the web date-only editor. */
+    /* the wire day is Gregorian UTC, matching the web date-only editor. */
     @Published var editPatientBirthDate: Date?
     private var editingPatientBaseline: (id: String, version: Int, birthDate: Date?)?
     private var patientEditGeneration = UUID()
@@ -150,7 +148,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editPatientCaregiver = ""
     @Published var editPatientNotes = ""
     @Published var editPatientIsArchived = false
-    /* @Codex: one archive draft/policy for the profile editor and archive sheet. */
+    /* one archive draft/policy for the profile editor and archive sheet. */
     enum PatientArchiveReason: String, CaseIterable {
         case assignedMMG = "assigned_mmg", deceased, other
         var label: String {
@@ -176,19 +174,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published private(set) var editPatientDiagnoses: [ClinicalDiagnosis] = []
     @Published var editPatientIsAdi = false
     @Published private(set) var editPatientExemptions: [String] = []
-    /* @Codex */
     enum EncryptedPatientField: Hashable {
         case address, phone, caregiver, notes, diagnoses, exemptions, archiveReason, archiveNote
     }
-    /* @Codex */
     @Published private(set) var lockedPatientFields: Set<EncryptedPatientField> = []
     private var editablePatientFields: [EncryptedPatientField: PatientFieldCrypto.EditableField] = [:]
     @Published var newExemptionCode = ""
-    /* @Codex */
     @Published private(set) var exemptionCatalogResults: [HomeBaseExemptionSummary] = []
-    /* @Codex */
     @Published private(set) var isSearchingExemptionCatalog = false
-    /* @Codex */
     @Published private(set) var exemptionCatalogStatusMessage: String?
     // Patient CREATE form (ADR 0071: served only by the on-device local authority).
     @Published var isCreatingPatient = false
@@ -214,9 +207,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var newTherapyHasEndDate = false
     @Published var newTherapyEndDate = Date()
     @Published var newTherapyDiagnosisCode = ""
-    /* @Codex */
     @Published private(set) var newTherapyDrugCatalogResults: [HomeBaseDrugSummary] = []
-    /* @Codex */
     @Published private(set) var isSearchingNewTherapyDrugCatalog = false
     @Published private(set) var editingTherapyId: String?
     @Published private(set) var editingTherapyVersion: Int?
@@ -231,11 +222,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published var editTherapyHasEndDate = false
     @Published var editTherapyEndDate = Date()
     @Published var editTherapyDiagnosisCode = ""
-    /* @Codex */
     @Published private(set) var editTherapyDrugCatalogResults: [HomeBaseDrugSummary] = []
-    /* @Codex */
     @Published private(set) var isSearchingEditTherapyDrugCatalog = false
-    /* @Codex */
     @Published private(set) var drugCatalogStatusMessage: String?
     @Published var newCheckupTitle = ""
     @Published var newCheckupNotes = ""
@@ -309,7 +297,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // preview/share, upload with wire precheck, single-record FSE validation.
     @Published private(set) var attachments: [HomeBaseAttachmentSummary] = []
     @Published private(set) var attachmentsPatientId: String?
-    // @Codex: An empty array is not evidence that the archive has been read.
+    // An empty array is not evidence that the archive has been read.
     @Published private(set) var attachmentsLoadState: ClinicalWorkspaceLoadState = .idle
     private var activeAttachmentsLoadID: UUID?
     private var attachmentsLoadingPatientID: String?
@@ -336,7 +324,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         pendingConflict.map(VersionConflictPresentation.init)
     }
     @Published private(set) var isWorking = false
-    /* @Codex */
     @Published private(set) var canChangePatientSelection = true
 
     private let pairedStore: HomeBasePairedStore
@@ -344,9 +331,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private let automaticActions: AppleFoundationLaunchOverrides.AutomaticActions
     private var didPerformAutomaticActions = false
     private var sessionCookie: String? {
-        didSet { if oldValue != sessionCookie { discardCachedPatientPresentation() } } // @Codex
+        didSet { if oldValue != sessionCookie { discardCachedPatientPresentation() } }
     }
-    /* @Codex */
     @Published private(set) var cacheMetadata: HomeBasePatientCacheMetadata?
     @Published private(set) var cachedPatientProfile: HomeBasePatientDetail?
     @Published private(set) var cachedProfileMetadata: HomeBasePatientCacheMetadata?
@@ -355,34 +341,21 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private var displayedCacheContext: HomeBasePatientCacheContext?
     private var cacheReadsInvalidated = false
     var cacheIsStale: Bool { cacheMetadata?.isStale == true || cachedProfileMetadata?.isStale == true }
-    /* @Codex */
     private var loginGeneration: UInt = 0
-    private let clinicalSessionInvalidations = PassthroughSubject<Void, Never>() // @Codex
+    private let clinicalSessionInvalidations = PassthroughSubject<Void, Never>()
     private var newEntryDraftId = UUID().uuidString
-    /* @Codex */
     private var newTherapyDrugCatalogTask: Task<Void, Never>?
-    /* @Codex */
     private var editTherapyDrugCatalogTask: Task<Void, Never>?
-    /* @Codex */
     private var exemptionCatalogTask: Task<Void, Never>?
-    /* @Codex */
     private var newObservationCodeTerminologyTask: Task<Void, Never>?
-    /* @Codex */
     private var newObservationUnitTerminologyTask: Task<Void, Never>?
-    /* @Codex */
     private var editObservationCodeTerminologyTask: Task<Void, Never>?
-    /* @Codex */
     private var editObservationUnitTerminologyTask: Task<Void, Never>?
-    /* @Codex */
     private var isDrugCatalogAvailable = true
-    /* @Codex */
     private var isExemptionCatalogAvailable = true
-    /* @Codex */
     private var isTerminologySearchAvailable = true
-    /* @Codex */
     private var lastSeenNetworkFingerprint: String?
     private let dataSourceFactory: (@MainActor (PairedPatientsWorkspaceModel) -> any HomeBasePatientsDataSource)?
-    /* @Codex */
     private struct PatientLoadContext {
         let requestID: UUID
         let patientID: String?
@@ -396,7 +369,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let client: any HomeBasePatientsDataSource
         let masterKey: SymmetricKey?
     }
-    /* @Codex */
     private struct PatientWorkspacePayload {
         let detail: HomeBasePatientDetail
         let entries: [HomeBaseEntrySummary]
@@ -407,16 +379,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let serviceItems: [HomeBaseServicePrescriptionItemSummary]
         let prosthetics: [HomeBaseProstheticPrescriptionSummary]
     }
-    /* @Codex */
     private var activePatientLoadRequestID: UUID?
-    /* @Codex */
     private var workspaceGeneration: UInt = 0
-    // @Codex: A navigation read leaves the selected workspace editable until
+    // A navigation read leaves the selected workspace editable until
     // commit. It owns no clinical writer, selection lease or persisted intent.
     private var navigationLoadRequestID: UUID?
     private enum NavigationDraftForm: CaseIterable, Hashable { case therapy, checkup, observation, service, prosthetic }
     private var navigationCleanDates: [NavigationDraftForm: [Date]] = [:]
-    /* @Codex */
     private var exclusiveOperationIDs: Set<UUID> = []
     // S3 (D3, lane PRREG): injectable seam for the "Prescrittivo regionale"
     // handoff action (clipboard + external URL). Defaults to the real
@@ -459,12 +428,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         self.systemActions = systemActions
         let launchOverrides = AppleFoundationLaunchOverrides.load()
         self.automaticActions = launchOverrides.automaticActions
-        // @Codex: Exact defaults also protect date-only drafts, without treating
+        // Exact defaults also protect date-only drafts, without treating
         // the form's initial Date() values as user changes.
         defer { for form in NavigationDraftForm.allCases { markNavigationDatesClean(form) } }
 
         #if DEBUG
-        /* @Codex */
         // The synthetic click-map must not inspect a developer's real paired
         // token or encrypted patient cache. It seeds the clinical list/detail
         // models in performAutomaticActionsIfNeeded(), so keep this launch path
@@ -503,7 +471,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     #if DEBUG
-    /* @Codex */
     func configurePairedOnlineForTests(
         credentials: HomeBasePairedCredentials = HomeBasePairedCredentials(clientId: "test-client", clientToken: "test-token"),
         sessionCookie: String = "sid=test",
@@ -526,22 +493,20 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         self.therapies = therapies
         self.attachments = attachments
         self.attachmentsPatientId = attachments.isEmpty ? nil : selectedPatient?.id
-        self.attachmentsLoadState = attachments.isEmpty ? .idle : .loaded // @Codex
+        self.attachmentsLoadState = attachments.isEmpty ? .idle : .loaded
         self.connectionState = .pairedOnline
     }
 
-    /* @Codex */
     func applyPatientRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) {
         patients = refreshedPatients
         reconcilePatientSelection(selectedPatientID, in: refreshedPatients)
     }
 
-    func applyPatientRevisionRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) { // @Codex
+    func applyPatientRevisionRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) {
         patients = refreshedPatients
         reconcilePatientSelection(selectedPatientID, in: refreshedPatients, invalidatingWorkspace: false)
     }
 
-    /* @Codex */
     func applyPatientTrashRefreshForSelectionTests(_ refreshedPatients: [HomeBasePatientSummary]) {
         patients = refreshedPatients
         clearSelectedPatientWorkspace()
@@ -598,7 +563,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
         let base = Date(timeIntervalSince1970: 1_750_000_000)
         let patients = [
-            /* @Codex */
             HomeBasePatientSummary(id: "uitest-1", firstName: "Mario", lastName: "Rossi",
                                    birthDate: nil, taxCode: "RSSMRA80A01H501U",
                                    isAdi: false, isArchived: false, version: 1, updatedAt: base,
@@ -613,7 +577,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                                    isAdi: false, isArchived: true, version: 1,
                                    updatedAt: base.addingTimeInterval(-7200))
         ]
-        // @Codex
         return ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_SINGLE_PATIENT"] == "1"
             ? Array(patients.prefix(1))
             : patients
@@ -628,7 +591,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         guard ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_PATIENTS"] == "1" else {
             return nil
         }
-        /* @Codex */
         let lockedAddress = ProcessInfo.processInfo.environment["MEDIFLOW_APPLE_UITEST_LOCKED_PATIENT_FIELDS"] == "1"
             ? "ENC:locked:uitest" : "Via Roma 1, Milano"
         return HomeBasePatientDetail(
@@ -835,7 +797,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             return
         }
 
-        // @Codex: ADR 0106 retires local authority on success or an ambiguous
+        // ADR 0106 retires local authority on success or an ambiguous
         // result. A reply from a retired generation cannot clear a newer login.
         let generation = loginGeneration
         await runTask {
@@ -873,14 +835,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func lockSessionNow() async {
-        // @Codex: capture only what the best-effort remote logout needs. Local
+        // capture only what the best-effort remote logout needs. Local
         // revocation and presentation clearing must finish before the first await.
         let logoutClient = makeClient()
         let logoutCredentials = pairedCredentials
         let logoutCookie = sessionCookie
         let operationID = beginExclusiveOperation()
         defer { finishExclusiveOperation(operationID) }
-        clearOperatorSessionPresentation() // @Codex
+        clearOperatorSessionPresentation()
         let generation = loginGeneration
 
         statusMessage = "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
@@ -905,7 +867,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             : "Sessione bloccata localmente. Logout remoto non confermato; accedi di nuovo per continuare."
     }
 
-    // @Codex: explicit lock and a current 401 revoke the same local presentation.
+    // explicit lock and a current 401 revoke the same local presentation.
     // This synchronous helper never sends logout or changes device pairing/scope.
     private func clearOperatorSessionPresentation() {
         invalidateLoginGeneration()
@@ -976,7 +938,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         masterKey = CryptoService.unwrapMasterKeyVersioned(blob: wrapped, pin: pin, salt: salt)
     }
 
-    /* @Codex */
     func loadPatients(includeDeleted: Bool = false) async {
         guard let sessionCookie else {
             errorMessage = "Esegui prima la login operatore."
@@ -1036,7 +997,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                     // A revoked session/scope cannot mint a fresh offline snapshot, even on this secondary read.
                     self.invalidateCacheAfterReadFailure(error)
                     if status == 401 {
-                        // @Codex: revoke while this read is known current. Clearing
+                        // revoke while this read is known current. Clearing
                         // the workspace invalidates runTask's later failure epoch.
                         self.applyPatientLoadFailure(error)
                     } else {
@@ -1066,7 +1027,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }, canApplyFailure: requestIsCurrent)
     }
 
-    /* @Codex */
     func loadPatientTrash() async {
         await loadPatients(includeDeleted: true)
         clearSelectedPatientWorkspace()
@@ -1080,7 +1040,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         #if DEBUG
         if let detail = Self.uiTestSeededDetail(for: patient) {
             selectedPatientID = patient.id
-            setSelectedPatient(detail) // @Codex
+            setSelectedPatient(detail)
             entries = Self.uiTestSeededEntries(patientId: patient.id)
             therapies = Self.uiTestSeededTherapies(patientId: patient.id)
             checkups = Self.uiTestSeededCheckups(patientId: patient.id)
@@ -1095,7 +1055,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             return
         }
         #endif
-        // @Codex: Cached profiles use a separate read-only presentation, never the online workspace.
+        // Cached profiles use a separate read-only presentation, never the online workspace.
         if connectionState == .cached || connectionState == .pairedOfflineDegraded {
             restoreCachedPatientProfile(patientID: patient.id)
             return
@@ -1121,7 +1081,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     var navigationAvailability: ClinicalNavigationAvailability {
         guard connectionState == .pairedOnline, sessionCookie != nil,
               pairedCredentials != nil, masterKey != nil else { return .locked }
@@ -1267,13 +1226,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             pendingConflict = nil
             return
         }
-        let editorID = editingEntryDraftID // @Codex
+        let editorID = editingEntryDraftID
         guard let context = beginPatientLoad(patientID: current.id, clearingWorkspace: false) else { return }
         do {
             let payload = try await fetchPatientWorkspace(context)
             guard canPublishPatientLoad(context) else { return }
             publishPatientWorkspace(payload, context: context)
-            // @Codex: Refresh the comparison, never the operator's text or CAS
+            // Refresh the comparison, never the operator's text or CAS
             // version. Acceptance is a separate, local-only review action.
             if editingEntryDraftID == editorID, editingEntryRequiresReconciliation {
                 prepareEditingEntryReview(from: payload.entries)
@@ -1311,7 +1270,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         Task { await loadPatients() }
     }
 
-    /* @Codex */
     func loadSelectedPatientEntries() async {
         guard let patientId = selectedPatient?.id,
               let sessionCookie,
@@ -1331,7 +1289,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func createEntryForSelectedPatient() async {
         guard canCreateEntry else { return }
         guard let patientId = selectedPatient?.id,
@@ -1405,7 +1362,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 self.entries = entries
             } catch {
                 guard isCurrent() else { return }
-                // @Codex: A confirmed save does not turn session expiry into a refresh-only warning.
+                // A confirmed save does not turn session expiry into a refresh-only warning.
                 if case HomeBaseClientError.httpStatus(401, _) = error { throw error }
                 self.errorMessage = "Voce inviata, ma aggiornamento diario non riuscito: \(error.localizedDescription)"
             }
@@ -1416,7 +1373,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// encrypted metadata matches the web's shape, so the web reads it back.
     func submitScale(_ definition: ClinicalScaleDefinition, answers: [String: Int]) async {
         guard let patientId = selectedPatient?.id else { return }
-        // @Codex MF085-003: reject before any insertion, seal or clinical write.
+        // MF085-003: reject before any insertion, seal or clinical write.
         do {
             try await ClinicalScales.submit(definition: definition, answers: answers) { submission in
                 let definition = submission.definition
@@ -1473,10 +1430,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func startEditingEntry(_ entry: HomeBaseEntrySummary) {
         guard canMutateEntry(entry) else { return }
-        // @Codex: Reopening the same row is not consent to discard its draft.
+        // Reopening the same row is not consent to discard its draft.
         guard editingEntryId != entry.id else { return }
         editingEntryDraftID = UUID()
         editingEntryRequiresReconciliation = false
@@ -1498,10 +1454,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         statusMessage = "Modifica voce diario pronta."
     }
 
-    /* @Codex */
     func cancelEditingEntry() {
         // Also used by privacy invalidation: never gate this clear on isWorking.
-        editingEntryDraftID = UUID() // @Codex
+        editingEntryDraftID = UUID()
         editingEntryRequiresReconciliation = false
         editingEntryRemoteReview = nil
         editingEntryId = nil
@@ -1514,9 +1469,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editingEntryOriginalAttachmentIds = nil
     }
 
-    /* @Codex */
     func insertNewEntrySOAPTemplate() {
-        guard !isWorking else { return } // @Codex
+        guard !isWorking else { return }
         // Passes the template through the transcoder too (D11): parse it into
         // the same editor model as any other content, rather than assigning raw
         // HTML into what used to be a plain-text field.
@@ -1668,10 +1622,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // ADR 0071 update: patient CREATE still works through the on-device local
     // authority when available, and now also has a paired HTTP wire path gated by
     // network.replica.write-patient-lifecycle.
-    // @Codex: opening controls must not depend on the still-empty draft.
+    // opening controls must not depend on the still-empty draft.
     var canStartCreatingPatient: Bool {
         !isWorking
-        && connectionState != .cached && connectionState != .pairedOfflineDegraded // @Codex
+        && connectionState != .cached && connectionState != .pairedOfflineDegraded
         && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
@@ -1682,7 +1636,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         && !newPatientTaxCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /* @Codex: lifecycle and exact manual draft of this create flow only. */
+    /* lifecycle and exact manual draft of this create flow only. */
     private var patientCreateGeneration = UUID()
 
     private struct PatientCreateDraft: Equatable {
@@ -1704,7 +1658,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func startCreatingPatient() {
-        patientCreateGeneration = UUID() // @Codex
+        patientCreateGeneration = UUID()
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
@@ -1718,7 +1672,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func cancelCreatingPatient() {
-        patientCreateGeneration = UUID() // @Codex
+        patientCreateGeneration = UUID()
         isCreatingPatient = false
     }
 
@@ -1736,7 +1690,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
             return
         }
-        /* @Codex */
         let draft = patientCreateDraft
         let createGeneration = patientCreateGeneration
         var formWasPresented = isCreatingPatient
@@ -1800,7 +1753,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     // A4: edit patient anagrafica.
     func startEditingPatient() {
         guard let patient = selectedPatient else { return }
-        /* @Codex */
         cancelPatientArchive()
         patientEditGeneration = UUID()
         editingPatientBaseline = (patient.id, patient.version, patient.birthDate)
@@ -1813,7 +1765,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editPatientCaregiver = patient.caregiver ?? ""
         editPatientNotes = patient.notes ?? ""
         editPatientIsArchived = patient.isArchived ?? false
-        preparePatientArchiveFields(patient) // @Codex
+        preparePatientArchiveFields(patient)
         editPatientIsAdi = patient.isAdi ?? false
         editPatientDiagnoses = DiagnosesCodec.decode(patient.diagnoses)
         editPatientExemptions = ExemptionCodesCodec.decode(patient.exemptions)
@@ -1825,7 +1777,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         statusMessage = "Modifica anagrafica pronta."
     }
 
-    /* @Codex */
     func isPatientFieldLocked(_ field: EncryptedPatientField) -> Bool {
         lockedPatientFields.contains(field)
     }
@@ -1844,7 +1795,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         resetExemptionCatalogSearch(clearAvailability: false)
     }
 
-    /* @Codex */
     func scheduleExemptionCatalogSearch() {
         exemptionCatalogTask?.cancel()
         guard isExemptionCatalogAvailable else {
@@ -1865,7 +1815,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func selectExemptionCatalogResult(_ exemption: HomeBaseExemptionSummary) {
         editPatientExemptions = CatalogSelection.adding(exemption, to: editPatientExemptions)
         newExemptionCode = ""
@@ -1892,15 +1841,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     func cancelEditingPatient() {
         isEditingPatient = false
-        /* @Codex */
         patientEditGeneration = UUID()
         editingPatientBaseline = nil
         editPatientBirthDate = nil
-        cancelPatientArchive() // @Codex
+        cancelPatientArchive()
         resetExemptionCatalogSearch(clearAvailability: false)
     }
 
-    /* @Codex */
     func setPatientBirthDatePresent(_ present: Bool) {
         editPatientBirthDate = present
             ? (editingPatientBaseline?.birthDate ?? Self.patientBirthDateCalendar.startOfDay(for: Date()))
@@ -1916,7 +1863,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func savePatient() async {
-        /* @Codex: hold the editor's CAS version and reject stale completion. */
+        /* hold the editor's CAS version and reject stale completion. */
         guard let current = selectedPatient, let baseline = editingPatientBaseline,
               baseline.id == current.id, isEditingPatient, !isWorking else { return }
         if let validation = patientArchiveValidationMessage(isArchived: editPatientIsArchived) {
@@ -1926,7 +1873,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
         #if DEBUG
         if Self.isUITestSeeded {
-            setSelectedPatient(editedPatientDetail(from: current)) // @Codex: refresh the fixture's editable-field baseline too.
+            setSelectedPatient(editedPatientDetail(from: current)) // refresh the fixture's editable-field baseline too.
             cancelEditingPatient()
             statusMessage = "Anagrafica aggiornata."
             return
@@ -1944,8 +1891,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di salvare."
             return
         }
-        /* @Codex */
-        let archivePatch: (reason: PatchValue<String>, note: PatchValue<String>) // @Codex
+        let archivePatch: (reason: PatchValue<String>, note: PatchValue<String>)
         do { archivePatch = try patientArchivePatch(isArchived: editPatientIsArchived) }
         catch { errorMessage = error.localizedDescription; return }
         let payload = HomeBasePatientUpdatePayload(
@@ -1998,18 +1944,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 ambulatoryId: scope
             )
             try validateCurrent()
-            self.setSelectedPatient(fetchedDetail) // @Codex
+            self.setSelectedPatient(fetchedDetail)
             self.cancelEditingPatient()
             self.statusMessage = "Anagrafica aggiornata sull'home-base."
         }, canApplyFailure: { (try? validateCurrent()) != nil })
     }
 
-    /* @Codex */
     var isFieldCryptoUnlocked: Bool {
         masterKey != nil
     }
 
-    /* @Codex */
     var canArchivePatient: Bool {
         guard let patient = selectedPatient else { return false }
         return patient.deletedAt == nil
@@ -2018,11 +1962,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
-            && !isEditingPatient // @Codex: finish the existing profile draft first.
+            && !isEditingPatient // finish the existing profile draft first.
             && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
-    /* @Codex */
     var canUnarchivePatient: Bool {
         guard let patient = selectedPatient else { return false }
         return patient.deletedAt == nil
@@ -2031,11 +1974,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && pairedCredentials != nil
             && connectionState == .pairedOnline
             && !isWorking
-            && !isEditingPatient // @Codex
+            && !isEditingPatient
             && permitsCapability(NetworkCapabilityKey.writePatientProfile)
     }
 
-    /* @Codex */
     var canSoftDeletePatient: Bool {
         guard let patient = selectedPatient else { return false }
         return patient.deletedAt == nil
@@ -2046,7 +1988,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && permitsCapability(NetworkCapabilityKey.writePatientLifecycle)
     }
 
-    /* @Codex */
     func canRestorePatient(_ patient: HomeBasePatientSummary) -> Bool {
         patient.deletedAt != nil
             && sessionCookie != nil
@@ -2055,7 +1996,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     @discardableResult
     func setSelectedPatientArchived(_ isArchived: Bool) async -> Bool {
         guard let current = selectedPatient, let baseline = patientArchiveBaseline,
@@ -2121,7 +2061,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return completed
     }
 
-    /* @Codex */
     func startPatientArchive() {
         guard let patient = selectedPatient, !isEditingPatient, !isWorking else { return }
         // Reappearance (including rotation) must not replace an open draft.
@@ -2190,7 +2129,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 try sealChanged(editPatientArchiveNote, original: baseline.note))
     }
 
-    /* @Codex */
     func softDeleteSelectedPatient(reason: String?) async {
         guard let patient = selectedPatient, canSoftDeletePatient else { return }
         guard let sessionCookie, let credentials = pairedCredentials else {
@@ -2229,7 +2167,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func restorePatient(_ patient: HomeBasePatientSummary) async {
         guard canRestorePatient(patient) else { return }
         guard let sessionCookie, let credentials = pairedCredentials else {
@@ -2259,7 +2196,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// JSON-encode (matching JSON.stringify) and encrypt to ENC:. The caller holds
     /// the key, so this never emits plaintext for an encrypted field (.omit on a
     /// crypto failure leaves the stored value untouched rather than clobbering it).
-    /* @Codex */
     private func encryptedPatientPatchValue(
         _ text: String?, field: EncryptedPatientField, masterKey: SymmetricKey, structured: Bool = false
     ) -> PatchValue<String> {
@@ -2291,12 +2227,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return enc
     }
 
-    /* @Codex */
     private func setSelectedPatient(_ raw: HomeBasePatientDetail) {
         setSelectedPatient(raw, masterKey: masterKey)
     }
 
-    /* @Codex */
     private func setSelectedPatient(_ raw: HomeBasePatientDetail, masterKey: SymmetricKey?) {
         let fields: [EncryptedPatientField: PatientFieldCrypto.EditableField] = [
             .address: PatientFieldCrypto.resolveStringField(raw.address, masterKey: masterKey),
@@ -2326,7 +2260,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     private func editedPatientDetail(from current: HomeBasePatientDetail) -> HomeBasePatientDetail {
-        let birthDate: Date? // @Codex: fixture follows the same nullable patch.
+        let birthDate: Date? // fixture follows the same nullable patch.
         switch patientBirthDatePatch {
         case .omit: birthDate = current.birthDate
         case .null: birthDate = nil
@@ -2360,7 +2294,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
     #endif
 
-    /* @Codex */
     private struct DiaryEditorSnapshot: Equatable {
         let title: String
         let type: PairedDiaryEntryType
@@ -2517,13 +2450,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 if self.editingEntryDraftID == editorID { self.prepareEditingEntryReview(from: entries) }
             } catch {
                 guard isCurrent() else { return }
-                if case HomeBaseClientError.httpStatus(401, _) = error { throw error } // @Codex
+                if case HomeBaseClientError.httpStatus(401, _) = error { throw error }
                 self.errorMessage = "Voce aggiornata, ma rilettura diario non riuscita: \(error.localizedDescription)"
             }
         }, canApplyFailure: { isCurrent() })
     }
 
-    /* @Codex */
     func softDeleteEntry(id entryId: String, reason: String?) async {
         guard let entry = entries.first(where: { $0.id == entryId }),
               canMutateEntry(entry) else { return }
@@ -2562,7 +2494,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func restoreEntry(id entryId: String) async {
         guard let entry = entries.first(where: { $0.id == entryId }),
               canRestoreEntry(entry) else { return }
@@ -2598,7 +2529,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func loadSelectedPatientTherapies() async {
         guard let patientId = selectedPatient?.id,
               let sessionCookie,
@@ -2618,7 +2548,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     /// The selected patient's diagnoses (decoded), for the therapy diagnosis-link picker.
     var currentPatientDiagnoses: [ClinicalDiagnosis] {
         guard let detail = selectedPatient else { return [] }
@@ -2633,17 +2562,14 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return currentPatientDiagnoses.first { $0.code == code }?.description
     }
 
-    /* @Codex */
     func scheduleNewTherapyDrugCatalogSearch() {
         scheduleDrugCatalogSearch(target: .newTherapy)
     }
 
-    /* @Codex */
     func scheduleEditTherapyDrugCatalogSearch() {
         scheduleDrugCatalogSearch(target: .editTherapy)
     }
 
-    /* @Codex */
     func selectNewTherapyDrugCatalogResult(_ drug: HomeBaseDrugSummary) {
         let draft = CatalogSelection.applying(
             drug,
@@ -2661,7 +2587,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         resetNewTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
-    /* @Codex */
     func selectEditTherapyDrugCatalogResult(_ drug: HomeBaseDrugSummary) {
         let draft = CatalogSelection.applying(
             drug,
@@ -2727,7 +2652,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func startEditingTherapy(_ therapy: HomeBaseTherapySummary) {
         guard canMutateTherapy(therapy) else { return }
         editingTherapyId = therapy.id
@@ -2747,7 +2671,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         statusMessage = "Modifica terapia pronta."
     }
 
-    /* @Codex */
     func cancelEditingTherapy() {
         editingTherapyId = nil
         editingTherapyVersion = nil
@@ -2765,7 +2688,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         resetEditTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
-    /* @Codex */
     func updateEditingTherapy() async {
         guard canUpdateEditingTherapy else { return }
         guard let patientId = selectedPatient?.id,
@@ -2819,7 +2741,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func softDeleteTherapy(id therapyId: String) async {
         guard let therapy = therapies.first(where: { $0.id == therapyId }),
               canMutateTherapy(therapy) else { return }
@@ -2856,7 +2777,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func loadSelectedPatientCheckups() async {
         guard let patientId = selectedPatient?.id,
               let sessionCookie,
@@ -2876,7 +2796,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func createCheckupForSelectedPatient() async {
         guard canCreateCheckup else { return }
         guard let patientId = selectedPatient?.id,
@@ -2912,7 +2831,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func startEditingCheckup(_ checkup: HomeBaseCheckupSummary) {
         guard canMutateCheckup(checkup) else { return }
         editingCheckupId = checkup.id
@@ -2924,7 +2842,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         statusMessage = "Modifica controllo pronta."
     }
 
-    /* @Codex */
     func cancelEditingCheckup() {
         editingCheckupId = nil
         editingCheckupVersion = nil
@@ -2934,7 +2851,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editCheckupDate = Date()
     }
 
-    /* @Codex */
     func updateEditingCheckup() async {
         guard canUpdateEditingCheckup else { return }
         guard let patientId = selectedPatient?.id,
@@ -2974,7 +2890,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func softDeleteCheckup(id checkupId: String) async {
         guard let checkup = checkups.first(where: { $0.id == checkupId }),
               canMutateCheckup(checkup) else { return }
@@ -3011,7 +2926,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func loadSelectedPatientObservations() async {
         guard let patientId = selectedPatient?.id,
               let sessionCookie,
@@ -3031,7 +2945,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func createObservationForSelectedPatient() async {
         guard canCreateObservation else { return }
         guard let patientId = selectedPatient?.id,
@@ -3071,7 +2984,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func startEditingObservation(_ observation: HomeBaseObservationSummary) {
         guard canMutateObservation(observation) else { return }
         editingObservationId = observation.id
@@ -3085,7 +2997,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         statusMessage = "Modifica osservazione pronta."
     }
 
-    /* @Codex */
     func cancelEditingObservation() {
         editingObservationId = nil
         editingObservationVersion = nil
@@ -3097,7 +3008,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         editObservationObservedAt = Date()
     }
 
-    /* @Codex */
     func updateEditingObservation() async {
         guard canUpdateEditingObservation else { return }
         guard let patientId = selectedPatient?.id,
@@ -3142,7 +3052,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func softDeleteObservation(id observationId: String) async {
         guard let observation = observations.first(where: { $0.id == observationId }),
               canMutateObservation(observation) else { return }
@@ -3179,53 +3088,44 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func scheduleNewObservationCodeTerminologySearch() {
         scheduleObservationTerminologySearch(target: .newCode)
     }
 
-    /* @Codex */
     func scheduleNewObservationUnitTerminologySearch() {
         scheduleObservationTerminologySearch(target: .newUnit)
     }
 
-    /* @Codex */
     func scheduleEditObservationCodeTerminologySearch() {
         scheduleObservationTerminologySearch(target: .editCode)
     }
 
-    /* @Codex */
     func scheduleEditObservationUnitTerminologySearch() {
         scheduleObservationTerminologySearch(target: .editUnit)
     }
 
-    /* @Codex */
     func selectNewObservationCodeTerminology(_ item: HomeBaseTerminologyItem) {
         newObservationCode = item.code
         newObservationDisplay = item.display
         resetObservationTerminologySearch(target: .newCode)
     }
 
-    /* @Codex */
     func selectNewObservationUnitTerminology(_ item: HomeBaseTerminologyItem) {
         newObservationUnitCode = item.code
         resetObservationTerminologySearch(target: .newUnit)
     }
 
-    /* @Codex */
     func selectEditObservationCodeTerminology(_ item: HomeBaseTerminologyItem) {
         editObservationCode = item.code
         editObservationDisplay = item.display
         resetObservationTerminologySearch(target: .editCode)
     }
 
-    /* @Codex */
     func selectEditObservationUnitTerminology(_ item: HomeBaseTerminologyItem) {
         editObservationUnitCode = item.code
         resetObservationTerminologySearch(target: .editUnit)
     }
 
-    /* @Codex */
     func loadSelectedPatientServicePrescriptions() async {
         guard let patientId = selectedPatient?.id,
               let sessionCookie,
@@ -3244,7 +3144,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func createServicePrescriptionForSelectedPatient() async {
         guard canCreateServicePrescription else { return }
         guard let patientId = selectedPatient?.id,
@@ -3320,7 +3219,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func bookServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) async {
         let scheduledAt = prescription.scheduledAt ?? Date()
         await updateServicePrescriptionWithItems(
@@ -3342,7 +3240,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     func performServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) async {
         let performedAt = prescription.performedAt ?? Date()
         await updateServicePrescriptionWithItems(
@@ -3364,7 +3261,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     func receiveServicePrescriptionReport(_ prescription: HomeBaseServicePrescriptionSummary) async {
         let reportReceivedAt = prescription.reportReceivedAt ?? Date()
         await updateServicePrescriptionWithItems(
@@ -3386,7 +3282,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     func cancelServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) async {
         await updateServicePrescriptionWithItems(
             prescription,
@@ -3405,7 +3300,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     func loadSelectedPatientProstheticPrescriptions() async {
         guard let patientId = selectedPatient?.id,
               let sessionCookie,
@@ -3421,7 +3315,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func createProstheticPrescriptionForSelectedPatient() async {
         guard canCreateProstheticPrescription else { return }
         guard let patientId = selectedPatient?.id,
@@ -3462,7 +3355,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func markProstheticPrescriptionTested(_ prescription: HomeBaseProstheticPrescriptionSummary) async {
         guard canTestProstheticPrescription(prescription),
               let patientId = selectedPatient?.id,
@@ -3489,18 +3381,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func dismissFHIRWarningValidation() {
         pendingFHIRWarningValidation = nil
     }
 
-    /* @Codex */
     func prepareFHIRExport(confirmWarnings: Bool = false) async {
         guard canPrepareFHIRExport,
               let patient = selectedPatient,
               let sessionCookie,
               let credentials = pairedCredentials else { return }
-        let scope = ambulatoryId.trimmedOrNil // @Codex
+        let scope = ambulatoryId.trimmedOrNil
         await runTask {
             let validate = self.patientReadValidator(patientId: patient.id, credentials: credentials,
                 sessionCookie: sessionCookie, ambulatoryId: scope)
@@ -3511,7 +3401,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: scope
             )
-            try validate() // @Codex
+            try validate()
             let errorCount = validation.totalErrorCount
             let warningCount = validation.totalWarningCount
             if validation.hasErrors {
@@ -3620,7 +3510,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newCheckupNotes = "\(suggestion.excerpt)\nSuggerito da \(suggestion.citation.fileName)"
         newCheckupStatus = .pending
         newCheckupSource = "ai_suggestion"
-        activePatientSection = .clinical // @Codex: reveal the existing form without submitting it.
+        activePatientSection = .clinical // reveal the existing form without submitting it.
         statusMessage = "Controllo precompilato dal follow-up: rivedi e salva per confermare."
     }
 
@@ -3632,7 +3522,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         canLoadAttachments && !isWorking
     }
 
-    /* @Codex */
     func loadSelectedPatientAttachments(reportStatus: Bool = true) async {
         #if DEBUG
         // The deterministic demo has no document binary fixtures. Keep the
@@ -3642,7 +3531,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             guard let patientId = selectedPatient?.id else { return }
             attachments = AppleFoundationDemoMode.isDemoDataset ? [AppleFoundationDemoMode.documentSummary(patientId: patientId)] : []
             attachmentsPatientId = patientId
-            attachmentsLoadState = .loaded // @Codex
+            attachmentsLoadState = .loaded
             selectedAttachmentDetail = nil
             attachmentShareURL = nil
             errorMessage = nil
@@ -3652,10 +3541,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         #endif
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else {
             errorMessage = "Apri prima un paziente con sessione paired online."
-            attachmentsLoadState = .unavailable("Documenti non ancora letti: apri una sessione paired online.") // @Codex
+            attachmentsLoadState = .unavailable("Documenti non ancora letti: apri una sessione paired online.")
             return
         }
-        // @Codex: Diary, Documents and the workspace can request the same list.
+        // Diary, Documents and the workspace can request the same list.
         // Coalesce only an in-flight read; explicit refresh still refetches.
         guard attachmentsLoadingPatientID != patientId || activeAttachmentsLoadID == nil else { return }
         let requestID = UUID()
@@ -3725,7 +3614,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         guard let patientId = selectedPatient?.id, let sessionCookie, let credentials = pairedCredentials else { return }
         guard summary.patientId == patientId else { return }
         attachmentShareURL = nil
-        let scope = ambulatoryId.trimmedOrNil // @Codex
+        let scope = ambulatoryId.trimmedOrNil
         await runTask {
             let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
                 sessionCookie: sessionCookie, ambulatoryId: scope)
@@ -3737,7 +3626,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: scope
             )
-            try validate() // @Codex
+            try validate()
             guard self.selectedPatient?.id == patientId else { return }
             self.selectedAttachmentDetail = ClinicalFieldCrypto.decryptAttachmentDetail(detail, masterKey: self.masterKey)
         }
@@ -3842,7 +3731,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             guard self.selectedPatient?.id == patientId else { return }
             self.attachments = fetchedAttachments
             self.attachmentsPatientId = patientId
-            self.attachmentsLoadState = .loaded // @Codex
+            self.attachmentsLoadState = .loaded
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
         }
     }
@@ -3850,7 +3739,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     private func invalidateAttachmentPatientState() {
         attachments = []
         attachmentsPatientId = nil
-        // @Codex
         activeAttachmentsLoadID = nil
         attachmentsLoadingPatientID = nil
         attachmentsLoadState = .idle
@@ -3863,7 +3751,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         fseDocumentValidationTargetLabel = nil
     }
 
-    // @Codex: new-entry content is patient-bound PHI. Switching patients must
+    // new-entry content is patient-bound PHI. Switching patients must
     // invalidate both pending/reviewed visit drafts and anything already
     // inserted into the composer before it can be saved under another patient.
     private func invalidatePatientBoundNewEntryState() {
@@ -3931,7 +3819,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = "Apri prima un paziente con sessione paired online."
             return
         }
-        let scope = ambulatoryId.trimmedOrNil // @Codex
+        let scope = ambulatoryId.trimmedOrNil
         await runTask {
             let validate = self.patientReadValidator(patientId: patientId, credentials: credentials,
                 sessionCookie: sessionCookie, ambulatoryId: scope)
@@ -3942,7 +3830,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 sessionCookie: sessionCookie,
                 ambulatoryId: scope
             )
-            try validate() // @Codex
+            try validate()
             self.fseDocumentValidationResult = response
             self.fseDocumentValidationTargetLabel = label
             self.statusMessage = response.ok
@@ -3951,7 +3839,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func checkNetworkRevisionOnForeground() async {
         await checkNetworkRevision(refreshOnChange: true)
     }
@@ -3986,7 +3873,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             ambulatoryId = ""
             patients = []
             selectedPatient = nil
-            selectedPatientID = nil // @Codex
+            selectedPatientID = nil
             entries = []
             therapies = []
             checkups = []
@@ -4033,19 +3920,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return HomeBasePairedCredentials(clientId: clientId, clientToken: clientToken)
     }
 
-    /* @Codex */
     private func beginLoginGeneration() -> UInt {
-        invalidateLoginGeneration() // @Codex
+        invalidateLoginGeneration()
         return loginGeneration
     }
 
-    /* @Codex */
     private func invalidateLoginGeneration() {
         loginGeneration &+= 1
-        clinicalSessionInvalidations.send() // @Codex: clear retained cross-patient models synchronously.
+        clinicalSessionInvalidations.send() // clear retained cross-patient models synchronously.
     }
 
-    /* @Codex */
     private func invalidateLoginIfChanged(_ oldValue: String, _ newValue: String) {
         guard oldValue != newValue else { return }
         if sessionCookie != nil {
@@ -4054,12 +3938,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             clearOperatorSessionPresentation()
             return
         }
-        discardCachedPatientPresentation() // @Codex
+        discardCachedPatientPresentation()
         invalidateLoginGeneration()
     }
 
-    /* @Codex */
-    // @Codex: subscribers discard clinical projections on every context transition,
+    // subscribers discard clinical projections on every context transition,
     // including A -> B -> A in one actor turn. No patient payload travels here.
     var clinicalWorkspaceInvalidations: AnyPublisher<Void, Never> {
         Publishers.Merge3(
@@ -4074,7 +3957,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return nativeOperatorConnection
     }
 
-    // @Codex: host configuration requires native login, not a patient-list read.
+    // host configuration requires native login, not a patient-list read.
     // This carries transport identity only; ADR0135 authority is checked by the host.
     var nativeOperatorConnection: ClinicalWorkspaceConnection? {
         guard let sessionCookie, let credentials = pairedCredentials else { return nil }
@@ -4088,13 +3971,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     private enum TherapyCatalogTarget {
         case newTherapy
         case editTherapy
     }
 
-    /* @Codex */
     private enum ObservationTerminologyTarget {
         case newCode
         case newUnit
@@ -4111,20 +3992,16 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private struct CatalogLookupContext {
         let credentials: HomeBasePairedCredentials
         let sessionCookie: String
         let ambulatoryId: String?
     }
 
-    /* @Codex */
     private static let catalogSearchDebounceNanoseconds: UInt64 = 300_000_000
 
-    /* @Codex */
     private static let catalogMinimumQueryLength = 2
 
-    /* @Codex */
     private var catalogLookupContext: CatalogLookupContext? {
         guard let sessionCookie,
               let credentials = pairedCredentials,
@@ -4138,7 +4015,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     private func scheduleDrugCatalogSearch(target: TherapyCatalogTarget) {
         cancelDrugCatalogTask(target)
         guard isDrugCatalogAvailable else {
@@ -4165,7 +4041,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func performDrugCatalogSearch(query: String, target: TherapyCatalogTarget) async {
         guard drugCatalogQuery(target) == query,
               let context = catalogLookupContext else {
@@ -4191,7 +4066,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func performExemptionCatalogSearch(query: String) async {
         guard newExemptionCode.trimmingCharacters(in: .whitespacesAndNewlines) == query,
               let context = catalogLookupContext else {
@@ -4217,7 +4091,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func scheduleObservationTerminologySearch(target: ObservationTerminologyTarget) {
         cancelObservationTerminologyTask(target)
         guard isTerminologySearchAvailable else {
@@ -4239,7 +4112,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         setObservationTerminologyTask(task, target: target)
     }
 
-    /* @Codex */
     private func performObservationTerminologySearch(query: String, target: ObservationTerminologyTarget) async {
         guard observationTerminologyQuery(target) == query,
               let context = catalogLookupContext else {
@@ -4265,13 +4137,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func drugCatalogQuery(_ target: TherapyCatalogTarget) -> String {
         let raw = target == .newTherapy ? newTherapyDrugName : editTherapyDrugName
         return raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /* @Codex */
     private func observationTerminologyQuery(_ target: ObservationTerminologyTarget) -> String {
         switch target {
         case .newCode:
@@ -4285,7 +4155,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func setDrugCatalogResults(_ results: [HomeBaseDrugSummary], target: TherapyCatalogTarget) {
         switch target {
         case .newTherapy:
@@ -4295,7 +4164,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func setDrugCatalogLoading(_ isLoading: Bool, target: TherapyCatalogTarget) {
         switch target {
         case .newTherapy:
@@ -4305,7 +4173,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func setObservationTerminologyResults(_ results: [HomeBaseTerminologyItem], target: ObservationTerminologyTarget) {
         switch target {
         case .newCode:
@@ -4319,7 +4186,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func setObservationTerminologyLoading(_ isLoading: Bool, target: ObservationTerminologyTarget) {
         switch target {
         case .newCode:
@@ -4333,7 +4199,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func cancelDrugCatalogTask(_ target: TherapyCatalogTarget) {
         switch target {
         case .newTherapy:
@@ -4345,7 +4210,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func setObservationTerminologyTask(_ task: Task<Void, Never>?, target: ObservationTerminologyTarget) {
         switch target {
         case .newCode:
@@ -4359,7 +4223,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func cancelObservationTerminologyTask(_ target: ObservationTerminologyTarget) {
         switch target {
         case .newCode:
@@ -4377,7 +4240,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func markDrugCatalogUnavailable() {
         isDrugCatalogAvailable = false
         newTherapyDrugCatalogResults = []
@@ -4387,7 +4249,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         drugCatalogStatusMessage = "Catalogo non disponibile, inserimento manuale"
     }
 
-    /* @Codex */
     private func markExemptionCatalogUnavailable() {
         isExemptionCatalogAvailable = false
         exemptionCatalogResults = []
@@ -4395,7 +4256,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         exemptionCatalogStatusMessage = "Catalogo non disponibile, inserimento manuale"
     }
 
-    /* @Codex */
     private func markTerminologySearchUnavailable() {
         isTerminologySearchAvailable = false
         for target in [ObservationTerminologyTarget.newCode, .newUnit, .editCode, .editUnit] {
@@ -4404,7 +4264,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func resetNewTherapyDrugCatalogSearch(clearAvailability: Bool) {
         newTherapyDrugCatalogTask?.cancel()
         newTherapyDrugCatalogTask = nil
@@ -4416,7 +4275,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func resetEditTherapyDrugCatalogSearch(clearAvailability: Bool) {
         editTherapyDrugCatalogTask?.cancel()
         editTherapyDrugCatalogTask = nil
@@ -4428,7 +4286,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func resetExemptionCatalogSearch(clearAvailability: Bool) {
         exemptionCatalogTask?.cancel()
         exemptionCatalogTask = nil
@@ -4440,14 +4297,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func resetObservationTerminologySearch(target: ObservationTerminologyTarget) {
         cancelObservationTerminologyTask(target)
         setObservationTerminologyResults([], target: target)
         setObservationTerminologyLoading(false, target: target)
     }
 
-    /* @Codex */
     private func resetCatalogAvailability() {
         resetNewTherapyDrugCatalogSearch(clearAvailability: true)
         resetEditTherapyDrugCatalogSearch(clearAvailability: true)
@@ -4483,7 +4338,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return raw == "1" || raw == "true" || raw == "yes"
     }
 
-    /* @Codex */
     private func beginPatientLoad(
         patientID: String?, clearingWorkspace: Bool
     ) -> PatientLoadContext? {
@@ -4501,7 +4355,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return context
     }
 
-    /* @Codex */
     private func fetchPatientWorkspace(
         _ context: PatientLoadContext, isCurrent: () -> Bool = { true }
     ) async throws -> PatientWorkspacePayload {
@@ -4510,46 +4363,45 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         let cookie = context.sessionCookie
         let scope = context.ambulatoryID
         guard let patientID = context.patientID else { throw HomeBaseClientError.contract }
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let detail = try await client.fetchPatient(
             id: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let entries = try await client.fetchEntries(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptEntry($0, masterKey: context.masterKey) }
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let therapies = try await client.fetchTherapies(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptTherapy($0, masterKey: context.masterKey) }
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let checkups = try await client.fetchCheckups(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptCheckup($0, masterKey: context.masterKey) }
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let observations = try await client.fetchObservations(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope)
             .map { ClinicalFieldCrypto.decryptObservation($0, masterKey: context.masterKey) }
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let services = ServicePrescriptionFiltering.sorted(try await client.fetchServicePrescriptions(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let serviceItems = ServicePrescriptionFiltering.sortedItems(try await client.fetchServicePrescriptionItems(
             patientId: patientID, prescriptionId: nil, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         let prosthetics = ProstheticPrescriptionFiltering.sorted(try await client.fetchProstheticPrescriptions(
             patientId: patientID, credentials: credentials, sessionCookie: cookie, ambulatoryId: scope))
-        guard isCurrent() else { throw CancellationError() } // @Codex
+        guard isCurrent() else { throw CancellationError() }
         return PatientWorkspacePayload(
             detail: detail, entries: entries, therapies: therapies, checkups: checkups,
             observations: observations, services: services, serviceItems: serviceItems,
             prosthetics: prosthetics)
     }
 
-    /* @Codex */
     private func publishPatientWorkspace(
         _ payload: PatientWorkspacePayload, context: PatientLoadContext
     ) {
-        // @Codex: Only a current, fully completed read can refresh the bounded encrypted profile.
+        // Only a current, fully completed read can refresh the bounded encrypted profile.
         if let cacheContext = patientCacheContext, patientCacheStorageEnabled, !cacheReadsInvalidated {
             do { try cacheStore.savePatientDetail(payload.detail, context: cacheContext) }
             catch { errorMessage = "Profilo letto, ma cache locale non aggiornata: \(error.localizedDescription)" }
@@ -4567,7 +4419,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         pendingFHIRWarningValidation = nil
     }
 
-    /* @Codex */
     private func canPublishPatientLoad(_ context: PatientLoadContext) -> Bool {
         guard activePatientLoadRequestID == context.requestID else { return false }
         let contextIsCurrent = selectedPatientID == context.patientID
@@ -4583,20 +4434,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return true
     }
 
-    /* @Codex */
     private func finishCurrentPatientLoad() {
         activePatientLoadRequestID = nil
         refreshWorkingState()
     }
 
-    /* @Codex */
     private func invalidatePatientLoadContext() {
         workspaceGeneration &+= 1
         activePatientLoadRequestID = nil
         refreshWorkingState()
     }
 
-    /* @Codex */
     private func beginExclusiveOperation() -> UUID {
         let operationID = UUID()
         exclusiveOperationIDs.insert(operationID)
@@ -4604,22 +4452,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return operationID
     }
 
-    /* @Codex */
     private func finishExclusiveOperation(_ operationID: UUID) {
         exclusiveOperationIDs.remove(operationID)
         refreshWorkingState()
     }
 
-    /* @Codex */
     private func refreshWorkingState() {
         canChangePatientSelection = exclusiveOperationIDs.isEmpty
         isWorking = activePatientLoadRequestID != nil || !exclusiveOperationIDs.isEmpty
     }
 
-    /* @Codex */
     private func applyPatientLoadFailure(_ error: Error) {
         if case HomeBaseClientError.httpStatus(let status, _) = error, status == 401 {
-            clearOperatorSessionPresentation() // @Codex
+            clearOperatorSessionPresentation()
             statusMessage = "Sessione operatore scaduta. Accedi di nuovo per continuare."
         } else if case HomeBaseClientError.httpStatus(let status, _) = error, status == 403 {
             statusMessage = "Operazione non autorizzata nello scope paired corrente."
@@ -4627,14 +4472,13 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         errorMessage = error.localizedDescription
     }
 
-    /* @Codex */
     private static func fhirTimestamp(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.string(from: date)
     }
 
-    // @Codex: validate both before dispatch and after suspension. The epoch also
+    // validate both before dispatch and after suspension. The epoch also
     // rejects a scope/patient switch away and back to the same identifiers.
     private func patientReadValidator(patientId: String, credentials: HomeBasePairedCredentials,
                                       sessionCookie: String, ambulatoryId: String?) -> () throws -> Void {
@@ -4692,7 +4536,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return rows.map { ClinicalFieldCrypto.decryptObservation($0, masterKey: masterKey) }
     }
 
-    /* @Codex */
     private func fetchServicePrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionSummary] {
         let validate = patientReadValidator(patientId: patientId, credentials: credentials,
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -4703,7 +4546,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return ServicePrescriptionFiltering.sorted(rows)
     }
 
-    /* @Codex */
     private func fetchServicePrescriptionItems(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseServicePrescriptionItemSummary] {
         let validate = patientReadValidator(patientId: patientId, credentials: credentials,
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -4715,7 +4557,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return ServicePrescriptionFiltering.sortedItems(rows)
     }
 
-    /* @Codex */
     private func fetchProstheticPrescriptions(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseProstheticPrescriptionSummary] {
         let validate = patientReadValidator(patientId: patientId, credentials: credentials,
             sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
@@ -4726,7 +4567,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return ProstheticPrescriptionFiltering.sorted(rows)
     }
 
-    /* @Codex */
     func generatePatientReportPDF() {
         guard let detail = selectedPatient else {
             errorMessage = "Apri prima un paziente."
@@ -4750,7 +4590,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func updateServicePrescriptionWithItems(
         _ prescription: HomeBaseServicePrescriptionSummary,
         status: PairedServicePrescriptionStatus,
@@ -4799,7 +4638,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func checkNetworkRevision(refreshOnChange: Bool) async {
         guard activePatientLoadRequestID == nil,
               connectionState == .pairedOnline,
@@ -4843,7 +4681,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func fetchRevisionWorkspace(
         _ context: PatientLoadContext
     ) async throws -> (patients: [HomeBasePatientSummary], workspace: PatientWorkspacePayload?) {
@@ -4904,7 +4741,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         )
     }
 
-    /* @Codex */
     private var patientCacheStorageEnabled: Bool {
         #if DEBUG
         if AppleFoundationDemoMode.skipsStoredPairing { return false }
@@ -4912,7 +4748,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return !Self.localAuthorityEnabled
     }
 
-    /* @Codex */
     private var patientCacheContext: HomeBasePatientCacheContext? {
         guard patientCacheStorageEnabled, masterKey != nil, let operatorIdentity,
               let sessionCookie, let credentials = pairedCredentials else { return nil }
@@ -4920,7 +4755,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             tlsPin: tlsPin, credentials: credentials, operatorId: operatorIdentity.userId, sessionCookie: sessionCookie)
     }
 
-    /* @Codex */
     static func permitsCacheFallback(for error: Error) -> Bool {
         switch error {
         case HomeBaseClientError.transport(.unreachable), HomeBaseClientError.transport(.timeout): return true
@@ -4928,7 +4762,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func invalidateCacheAfterReadFailure(_ error: Error) {
         if Self.permitsCacheFallback(for: error) {
             discardCachedPatientPresentation()
@@ -4943,7 +4776,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         if patientCacheStorageEnabled { try? cacheStore.clear() }
     }
 
-    /* @Codex */
     private func discardCachedPatientPresentation() {
         cacheExpiryTask?.cancel()
         cacheExpiryTask = nil
@@ -4957,7 +4789,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         cachedPatientProfile = nil
     }
 
-    /* @Codex */
     @discardableResult
     private func restoreCachedPatientList(markOffline: Bool = false) -> Bool {
         guard !cacheReadsInvalidated, let context = patientCacheContext else { return false }
@@ -4980,7 +4811,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func restoreCachedPatientProfile(patientID: String) {
         clearSelectedPatientWorkspace(preservingSelectionID: patientID)
         errorMessage = nil
@@ -5022,7 +4852,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     func refreshOfflineCacheIfNeeded() {
         guard let displayedCacheContext else { return }
         guard displayedCacheContext == patientCacheContext else {
@@ -5037,7 +4866,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         if let profileID, cacheMetadata?.isStale == false { restoreCachedPatientProfile(patientID: profileID) }
     }
 
-    /* @Codex */
     private func scheduleCacheExpiry() {
         cacheExpiryTask?.cancel()
         let expiries = [cacheMetadata, cachedProfileMetadata].compactMap { $0 }.filter { !$0.isStale }.map(\.expiresAt)
@@ -5050,7 +4878,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    static func reconciledPatientSelectionID( // @Codex
+    static func reconciledPatientSelectionID(
         _ currentID: String?,
         in patients: [HomeBasePatientSummary]
     ) -> String? {
@@ -5060,7 +4888,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return currentID
     }
 
-    @discardableResult // @Codex
+    @discardableResult
     private func reconcilePatientSelection(
         _ currentID: String?, in patients: [HomeBasePatientSummary],
         invalidatingWorkspace: Bool = true
@@ -5078,13 +4906,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         return reconciledID
     }
 
-    /* @Codex */
     private func clearSelectedPatientWorkspace(preservingSelectionID: String? = nil) {
-        // @Codex: A refresh of the same chart keeps its section; a new context does not.
+        // A refresh of the same chart keeps its section; a new context does not.
         if selectedPatientID != preservingSelectionID { activePatientSection = .overview }
-        cachedPatientProfile = nil // @Codex
-        cachedProfileLockedFields = [] // @Codex
-        cachedProfileMetadata = nil // @Codex
+        cachedPatientProfile = nil
+        cachedProfileLockedFields = []
+        cachedProfileMetadata = nil
         let needsDirectPatientStateInvalidation = selectedPatient == nil
         selectedPatient = nil
         selectedPatientID = preservingSelectionID
@@ -5113,20 +4940,20 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         canApplyFailure: @escaping () -> Bool = { true }
     ) async {
         let operationID = beginExclusiveOperation()
-        let generation = loginGeneration // @Codex
-        let readGeneration = workspaceGeneration // @Codex
+        let generation = loginGeneration
+        let readGeneration = workspaceGeneration
         errorMessage = nil
         pendingConflict = nil
         defer { finishExclusiveOperation(operationID) }
         do {
             try await operation()
         } catch {
-            // @Codex: old-session/scope failures cannot replace a lock or a new login.
+            // old-session/scope failures cannot replace a lock or a new login.
             guard !(error is CancellationError), loginGeneration == generation, workspaceGeneration == readGeneration,
                   canApplyFailure() else { return }
             if case HomeBaseClientError.httpStatus(let status, _) = error,
                status == 401 {
-                applyPatientLoadFailure(error) // @Codex: reuse synchronous revocation and its error copy.
+                applyPatientLoadFailure(error) // reuse synchronous revocation and its error copy.
                 return
             } else if case HomeBaseClientError.httpStatus(let status, _) = error,
                       status == 403 {
@@ -5152,7 +4979,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func applyPatientReloadFailure(_ error: Error) {
         if case HomeBaseClientError.versionConflict(let payload) = error {
             pendingConflict = payload
@@ -5169,7 +4995,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         }
     }
 
-    /* @Codex */
     private func resetNewTherapyForm() {
         newTherapyDrugName = ""
         newTherapyAIC = ""
@@ -5182,21 +5007,19 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newTherapyHasEndDate = false
         newTherapyEndDate = Date()
         newTherapyDiagnosisCode = ""
-        markNavigationDatesClean(.therapy) // @Codex
+        markNavigationDatesClean(.therapy)
         resetNewTherapyDrugCatalogSearch(clearAvailability: false)
     }
 
-    /* @Codex */
     private func resetNewCheckupForm() {
         newCheckupTitle = ""
         newCheckupNotes = ""
         newCheckupStatus = .pending
         newCheckupDate = Date()
         newCheckupSource = "manual"
-        markNavigationDatesClean(.checkup) // @Codex
+        markNavigationDatesClean(.checkup)
     }
 
-    /* @Codex */
     private func resetNewObservationForm() {
         newObservationDisplay = ""
         newObservationCode = ""
@@ -5204,12 +5027,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newObservationUnitCode = ""
         newObservationNotes = ""
         newObservationObservedAt = Date()
-        markNavigationDatesClean(.observation) // @Codex
+        markNavigationDatesClean(.observation)
         resetObservationTerminologySearch(target: .newCode)
         resetObservationTerminologySearch(target: .newUnit)
     }
 
-    /* @Codex */
     private func resetNewServicePrescriptionForm() {
         newServicePrescribedAt = Date()
         newServiceStatus = .prescribed
@@ -5232,10 +5054,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newServiceDocumentRefs = ""
         newServiceNotes = ""
         newServiceItemsText = ""
-        markNavigationDatesClean(.service) // @Codex
+        markNavigationDatesClean(.service)
     }
 
-    /* @Codex */
     private func resetNewProstheticPrescriptionForm() {
         newProstheticPrescribedAt = Date()
         newProstheticStatus = .prescribed
@@ -5252,10 +5073,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         newProstheticSource = .manual
         newProstheticDocumentRefs = ""
         newProstheticNotes = ""
-        markNavigationDatesClean(.prosthetic) // @Codex
+        markNavigationDatesClean(.prosthetic)
     }
 
-    /* @Codex */
     var isEditingEntry: Bool {
         editingEntryId != nil
     }
@@ -5270,12 +5090,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
-    /* @Codex */
     var isEditingTherapy: Bool {
         editingTherapyId != nil
     }
 
-    /* @Codex */
     var canCreateTherapy: Bool {
         selectedPatient != nil
             && sessionCookie != nil
@@ -5286,7 +5104,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var canUpdateEditingTherapy: Bool {
         editingTherapyId != nil
             && editingTherapyVersion != nil
@@ -5299,11 +5116,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var canUpdateEditingEntry: Bool {
         editingEntryId != nil
             && editingEntryVersion != nil
-            && !editingEntryRequiresReconciliation // @Codex
+            && !editingEntryRequiresReconciliation
             && selectedPatient != nil
             && sessionCookie != nil
             && pairedCredentials != nil
@@ -5314,12 +5130,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
-    /* @Codex */
     var isEditingCheckup: Bool {
         editingCheckupId != nil
     }
 
-    /* @Codex */
     var canCreateCheckup: Bool {
         selectedPatient != nil
             && sessionCookie != nil
@@ -5329,7 +5143,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var canUpdateEditingCheckup: Bool {
         editingCheckupId != nil
             && editingCheckupVersion != nil
@@ -5341,12 +5154,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var isEditingObservation: Bool {
         editingObservationId != nil
     }
 
-    /* @Codex */
     var canCreateObservation: Bool {
         selectedPatient != nil
             && sessionCookie != nil
@@ -5359,7 +5170,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var canCreateServicePrescription: Bool {
         selectedPatient != nil
             && sessionCookie != nil
@@ -5369,7 +5179,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var canCreateProstheticPrescription: Bool {
         selectedPatient != nil
             && sessionCookie != nil
@@ -5379,7 +5188,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     var canPrepareFHIRExport: Bool {
         selectedPatient != nil
             && sessionCookie != nil
@@ -5391,7 +5199,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && permitsCapability(NetworkCapabilityKey.fseValidate)
     }
 
-    /* @Codex */
     var canUpdateEditingObservation: Bool {
         editingObservationId != nil
             && editingObservationVersion != nil
@@ -5406,7 +5213,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     func canMutateEntry(_ entry: HomeBaseEntrySummary) -> Bool {
         entry.deletedAt == nil
             && selectedPatient?.id == entry.patientId
@@ -5417,7 +5223,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && permitsCapability(NetworkCapabilityKey.writeClinicalDiary)
     }
 
-    /* @Codex */
     func canRestoreEntry(_ entry: HomeBaseEntrySummary) -> Bool {
         entry.deletedAt != nil
             && selectedPatient?.id == entry.patientId
@@ -5427,7 +5232,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     func canMutateTherapy(_ therapy: HomeBaseTherapySummary) -> Bool {
         therapy.deletedAt == nil
             && selectedPatient?.id == therapy.patientId
@@ -5437,7 +5241,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     func canMutateCheckup(_ checkup: HomeBaseCheckupSummary) -> Bool {
         checkup.deletedAt == nil
             && selectedPatient?.id == checkup.patientId
@@ -5447,7 +5250,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     func canMutateObservation(_ observation: HomeBaseObservationSummary) -> Bool {
         observation.deletedAt == nil
             && selectedPatient?.id == observation.patientId
@@ -5457,7 +5259,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     func canMutateServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
         selectedPatient?.id == prescription.patientId
             && sessionCookie != nil
@@ -5466,13 +5267,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && !isWorking
     }
 
-    /* @Codex */
     func canBookServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
         canMutateServicePrescription(prescription)
             && prescription.status == PairedServicePrescriptionStatus.prescribed.rawValue
     }
 
-    /* @Codex */
     func canPerformServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
         canMutateServicePrescription(prescription)
             && [
@@ -5481,14 +5280,12 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             ].contains(prescription.status)
     }
 
-    /* @Codex */
     func canReceiveReportServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
         canMutateServicePrescription(prescription)
             && prescription.status != PairedServicePrescriptionStatus.reportReceived.rawValue
             && prescription.status != PairedServicePrescriptionStatus.cancelled.rawValue
     }
 
-    /* @Codex */
     func canCancelServicePrescription(_ prescription: HomeBaseServicePrescriptionSummary) -> Bool {
         canMutateServicePrescription(prescription)
             && prescription.status != PairedServicePrescriptionStatus.cancelled.rawValue
@@ -5496,7 +5293,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             && prescription.status != PairedServicePrescriptionStatus.reportReceived.rawValue
     }
 
-    /* @Codex */
     func canTestProstheticPrescription(_ prescription: HomeBaseProstheticPrescriptionSummary) -> Bool {
         selectedPatient?.id == prescription.patientId
             && sessionCookie != nil
@@ -5526,7 +5322,6 @@ enum PairedCryptoError: LocalizedError {
     }
 }
 
-/* @Codex */
 extension HomeBaseValidatePatientExportResponse {
     var totalErrorCount: Int {
         therapyMedication.errorCount + observationVitals.errorCount

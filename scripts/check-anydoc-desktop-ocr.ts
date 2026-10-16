@@ -1,4 +1,3 @@
-/* @Codex */
 import { inspectAnyDocDesktopOcrCapability } from '../lib/domain/documents/anydoc-pdf-child-process-owner';
 import { extractAnyDocLocalBytes } from '../lib/domain/documents/anydoc-local-extraction-runner';
 

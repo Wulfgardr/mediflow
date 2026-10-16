@@ -7,9 +7,7 @@ import { users, settings, ambulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import { hashAccessVerifier } from '@/lib/security/unlock-credential';
-/* @Codex */
 import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
-/* @Codex */
 import {
     abortWebAuthControl,
     beginWebAuthControl,
@@ -18,14 +16,10 @@ import {
     webAuthControlMutationFromRequest,
     type WebAuthControlMutation,
 } from '@/lib/security/web-auth-control-transport';
-/* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
-/* @Codex */
 import { authSetupSchema } from '@/lib/api-schemas/auth';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
-/* @Codex */
 function setupResponse(payload: Record<string, unknown>, status: number, etag?: string) {
     const response = NextResponse.json(payload, { status });
     response.headers.set('Cache-Control', 'no-store');
@@ -49,7 +43,6 @@ export async function POST(request: Request) {
         const archiveGeneration = currentArchiveGeneration();
         const existingUsers = await dbServer.select().from(users).limit(1);
         if (existingUsers.length > 0) {
-            /* @Codex */
             abortWebAuthControl(attempt);
             attempt = null;
             return setupResponse({ error: "Setup already completed", code: "SETUP_ALREADY_COMPLETED" }, 409, mutation.ifMatch);
@@ -99,7 +92,7 @@ export async function POST(request: Request) {
             }
             if (ambulatoryName) {
                 tx.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } }).run();
-                /* @Codex: first setup creates the named workspace atomically;
+                /* first setup creates the named workspace atomically;
                    existing ambulatory choices remain owned by their settings. */
                 const name = ambulatoryName.trim();
                 if (name && !tx.select({ id: ambulatories.id }).from(ambulatories).limit(1).get()) {
@@ -111,7 +104,6 @@ export async function POST(request: Request) {
             }
         });
 
-        /* @Codex */
         const session = issueWebAuthControl(attempt, { id: userId, username, role: 'admin' });
         attempt = null;
         if (!session) {

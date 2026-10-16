@@ -4,7 +4,7 @@ import XCTest
 @testable import MediFlowCore
 @testable import MediFlowAppleShared
 
-/* @Codex: Actual model/client/sealing, substituted transport; no host or UI. */
+/* Actual model/client/sealing, substituted transport; no host or UI. */
 final class PairedDiarySaveTests: XCTestCase {
     @MainActor
     func testCreateAcknowledgementDoesNotEraseChangesAfterTheSubmittedSnapshot() async throws {
@@ -312,7 +312,6 @@ final class PairedDiarySaveTests: XCTestCase {
     }
 }
 
-/* @Codex */
 private enum DiaryFixture {
     static let key = SymmetricKey(data: Data(repeating: 19, count: 32))
     static let patient = HomeBasePatientDetail(
@@ -421,7 +420,6 @@ private final class DiarySaveURLProtocol: URLProtocol, @unchecked Sendable {
     private static var transports: [Int: DiarySaveTransport] = [:]
     private static var nextPort = 47000
     private(set) var body = Data()
-    /* @Codex */
     static func register(_ transport: DiarySaveTransport) -> URL {
         lock.withLock {
             let port = nextPort
@@ -435,7 +433,7 @@ private final class DiarySaveURLProtocol: URLProtocol, @unchecked Sendable {
         }
     }
     static func remove(endpoint: URL) { _ = lock.withLock { transports.removeValue(forKey: endpoint.port!) } }
-    // @Codex Fail closed in URLProtocol even for unregistered requests; no network fallback.
+    // Fail closed in URLProtocol even for unregistered requests; no network fallback.
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {

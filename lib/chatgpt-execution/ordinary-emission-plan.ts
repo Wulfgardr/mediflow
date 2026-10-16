@@ -1,4 +1,4 @@
-/* @Codex — content representation only; no server/session/provider authority. */
+/* content representation only; no server/session/provider authority. */
 export type EmissionUnit = Readonly<{ kind: 'data'; value: string; encoding: 'text' | 'json-string' }>;
 export type EmissionPart = string | EmissionUnit | Readonly<{ kind: 'utf8-length'; unit: EmissionUnit }>;
 export type EmissionPlan = readonly EmissionPart[];

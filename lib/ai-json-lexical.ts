@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 export type JsonStringLiteral = Readonly<{ start: number; end: number; value: string; key: boolean; path: readonly (string | number)[] }>;

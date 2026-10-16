@@ -1,6 +1,5 @@
 import { parseExpectedVersion } from './version-concurrency';
 
-/* @Codex */
 export type TherapyConflictSnapshot = {
     id: string;
     patientId: string;
@@ -9,7 +8,6 @@ export type TherapyConflictSnapshot = {
     deletedAt: string | null;
 };
 
-/* @Codex */
 export type TherapyVersionConflictPayload = {
     error: 'Conflict';
     code: 'VERSION_CONFLICT';
@@ -30,12 +28,10 @@ type TherapyConflictSource = {
     deletedAt?: Date | string | number | null;
 };
 
-/* @Codex */
 export function parseTherapyExpectedVersion(value: unknown): number | null {
     return parseExpectedVersion(value);
 }
 
-/* @Codex */
 export function buildTherapyVersionConflictPayload(
     expectedVersion: number,
     recordId: string,

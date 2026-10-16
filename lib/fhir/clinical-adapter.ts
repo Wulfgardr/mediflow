@@ -12,7 +12,6 @@ export function fhirDiagnosisSystem(system: string): string | undefined {
     }
 }
 
-/* @Codex */
 export function toFhirCondition(
     diagnosis: FhirDiagnosisInput,
     patientReference: string,
@@ -46,7 +45,6 @@ export function toFhirCondition(
     };
 }
 
-/* @Codex */
 export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference: string): Encounter {
     return {
         resourceType: "Encounter",
@@ -70,7 +68,7 @@ export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference:
     };
 }
 
-/* @Codex WUL-327: un punteggio scala è presente solo se è un numero finito
+/* WUL-327: un punteggio scala è presente solo se è un numero finito
    (o una stringa non vuota che ne rappresenta uno). Lo zero è un valore
    clinico valido; il vecchio guard per verità lo scartava, mentre una stringa
    di soli spazi diventava silenziosamente `valueInteger: 0`. */
@@ -85,7 +83,6 @@ function toFiniteScaleScore(score: unknown): number | null {
     return null;
 }
 
-/* @Codex */
 export function toFhirObservation(entry: FhirClinicalEntryInput, patientReference: string): Observation | null {
     const score = toFiniteScaleScore(entry.metadata?.score);
     if (entry.type !== 'scale' || score === null) return null;
@@ -105,7 +102,6 @@ export function toFhirObservation(entry: FhirClinicalEntryInput, patientReferenc
     };
 }
 
-/* @Codex */
 export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientReference: string): MedicationStatement {
     return {
         resourceType: "MedicationStatement",
@@ -126,7 +122,6 @@ export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientRefe
     };
 }
 
-/* @Codex */
 export function toFhirStructuredObservation(observation: FhirObservationInput, patientReference: string): Observation {
     const numericValue = Number(observation.value);
     const isNumeric = Number.isFinite(numericValue);

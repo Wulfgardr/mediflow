@@ -1,4 +1,4 @@
-/* @Codex — public identity constants; these are not runtime authority. */
+/* public identity constants; these are not runtime authority. */
 export const REDACTION_RUNTIME_SCHEMA = 'mediflow.redaction-runtime-binding.v1' as const;
 export const REDACTION_RUNTIME_ADAPTER = 'mediflow.layer1-gliner.runtime.v1' as const;
 export const REDACTION_RUNTIME_MODEL = 'gliner2-pii' as const;

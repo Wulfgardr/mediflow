@@ -1,4 +1,3 @@
-/* @Codex */
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
@@ -28,7 +27,6 @@ const EXIT_SIGNAL = new Map<number, AnyDocLocalFailureSignal>([
     [24, 'resourceLimit'], [25, 'missingPart'], [26, 'io'],
 ]);
 
-/* @Codex */
 export const ANYDOC_PAGE_ROUTING_SCHEMA_VERSION = 'mediflow.anydoc_page_routing.v1' as const;
 export const ANYDOC_PAGE_ROUTING_MAX_PAGE_COUNT = 500;
 
@@ -146,7 +144,7 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
-            // @Codex: owned byte copies do not outlive the parsed result. Strings remain GC-managed.
+            // owned byte copies do not outlive the parsed result. Strings remain GC-managed.
             for (const chunk of output) chunk.fill(0); output.length = 0;
             resolve(value);
         };

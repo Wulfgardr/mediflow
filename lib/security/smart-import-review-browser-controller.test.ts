@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSmartImportReviewBrowserController } from './smart-import-review-browser-controller.ts';

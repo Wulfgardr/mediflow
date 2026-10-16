@@ -1,4 +1,4 @@
-/* @Codex WUL-678: one reading plane; disclosure belongs to the content it reveals. */
+/* WUL-678: one reading plane; disclosure belongs to the content it reveals. */
 .documents { display: grid; gap: 24px; color: var(--lume-ink); min-width: 0; }
 .upload { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 6px 12px; padding: 16px; border: 1px dashed var(--lume-rule); border-radius: var(--lume-radius-control, 12px); cursor: pointer; }
 .uploadIcon { grid-row: 1 / 3; color: var(--lume-ink-muted); }
@@ -10,7 +10,7 @@
 .documentHead { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .documentTitle { font-size: 0.875rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .documentActions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-/* @Codex: named actions stay quiet until focus or interaction. */
+/* named actions stay quiet until focus or interaction. */
 .documentAction { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 8px 10px; border: 0; border-radius: var(--lume-radius-control); background: transparent; color: var(--lume-ink); font: inherit; font-size: 0.875rem; line-height: 1.5; cursor: pointer; }
 .documentAction svg { flex-shrink: 0; }
 .documentAction:hover:not(:disabled) { background: var(--lume-surface-field); }
@@ -20,7 +20,7 @@
 .synthesis { min-width: 0; padding-block: 12px; font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
 .synthesisSection { padding-block: 16px; border-bottom: 1px solid var(--lume-rule); }
 .citation { min-width: 0; padding: 4px 0 4px 16px; border-left: 2px solid var(--lume-rule); }
-/* @Codex: archived titles and dates remain readable before opening the source. */
+/* archived titles and dates remain readable before opening the source. */
 .archive { min-width: 0; }
 .archiveToolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding-block: 8px 16px; }
 .archiveRow { min-width: 0; border-top: 1px solid var(--lume-rule); }
@@ -59,12 +59,12 @@
 .records span { font-size: 0.875rem; color: var(--lume-ink-muted); }
 @media (max-width: 600px) { .facts { grid-template-columns: minmax(0, 1fr); } .documentActions { flex-basis: 100%; } }
 
-/* @Codex WUL-678: spacing belongs to composition; AI card internals retain their owner. */
+/* WUL-678: spacing belongs to composition; AI card internals retain their owner. */
 .clinicalSupport { margin-top: 24px; min-width: 0; }
-/* @Codex WUL-678: readable domain headings in both themes, scoped to these destinations. */
+/* WUL-678: readable domain headings in both themes, scoped to these destinations. */
 .domainSection > h3 :global(.text-ink) { color: var(--lume-ink); }
 
-/* @Codex: exact counters and full context, including narrow rails and text zoom. */
+/* exact counters and full context, including narrow rails and text zoom. */
 .signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.375rem), 1fr)); gap: 12px; min-width: 0; margin: 0; }
 .signal { min-width: 0; overflow-wrap: anywhere; }
 .signalLabel { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--lume-ink-muted); font-size: 0.875rem; line-height: 1.5; font-weight: 600; }

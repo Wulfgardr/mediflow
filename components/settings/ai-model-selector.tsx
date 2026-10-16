@@ -1,10 +1,8 @@
 'use client';
 
-/* @Codex: installed inventory and explicit model choices for local settings. */
 
 import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
-/* @Codex */
 import { isInstalledOllamaModel, parseInstalledOllamaModels } from '@/lib/installed-ollama-models';
 import styles from './guided-local-models.module.css';
 import { Check, RefreshCw } from 'lucide-react';
@@ -14,9 +12,7 @@ import {
     SETTINGS_SECONDARY_BUTTON_CLASS,
 } from '@/components/settings/settings-ui';
 
-// --- Model Selector Component ---
 export interface ModelSelectorProps {
-    /* @Codex */
     selectorId: 'clinical' | 'reasoning';
     label: string;
     description: string;
@@ -29,7 +25,6 @@ export interface ModelSelectorProps {
 }
 
 export function ModelSelector({ selectorId, label, description, icon, value, onChange, recommended, provider, targetUrl }: ModelSelectorProps) {
-    /* @Codex */
     const [inventory, setInventory] = useState<{ url: string; provider: string; models: string[]; error: string | null; loading: boolean } | null>(null);
     const [refresh, setRefresh] = useState(0);
     const currentInventory = inventory?.url === targetUrl && inventory?.provider === provider ? inventory : null;
@@ -38,7 +33,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
     const error = currentInventory?.error;
     const [showCustom, setShowCustom] = useState(false);
 
-    /* @Codex: each refresh owns an abort signal; ignored completions cannot replace a newer URL. */
     const checkInstalled = useCallback(() => { setRefresh(previous => previous + 1); }, []);
     useEffect(() => {
         if (provider !== 'ollama' || !targetUrl) return;
@@ -77,7 +71,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
 
     return (
         <div className={cn("mf-section space-y-4", styles.selector)} data-testid={`ai-model-selector-${selectorId}`}>
-            {/* @Codex WUL-229: selector header now uses MediFlow icon disc + ink/muted typography */}
             <div className="flex items-start gap-2">
                 <div className="rounded-xl p-2" style={c.iconStyle}>
                     {icon}
@@ -88,7 +81,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                 </div>
             </div>
 
-            {/* @Codex: installed inventory is distinct from recommendations and saved selection. */}
             <div className={styles.stack}>
                 <label htmlFor={`installed-model-${selectorId}`}>Modelli installati · {label}</label>
                 <select id={`installed-model-${selectorId}`} className={SETTINGS_INPUT_CLASS}
@@ -126,7 +118,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                     const selected = isInstalledOllamaModel([value], model.name);
 
                                     return (
-                                        // @Codex WUL-229: option card switches to mf-option-card primitive with style-driven selection accent
                                         <div
                                             key={model.name}
                                             className={cn('mf-option-card relative flex flex-wrap items-center justify-between gap-2 !p-4', selected && 'is-active z-10')}
@@ -169,7 +160,6 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                             </div>
                         </details>
 
-                        {/* @Codex WUL-229: secondary toggles use mf-btn-secondary */}
                         <button
                             type="button"
                             onClick={() => setShowCustom(true)}

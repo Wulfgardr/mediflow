@@ -17,12 +17,12 @@ import type {
 
 interface PatientReviewQueueSummaryProps {
     summary: PatientReviewQueueSummary;
-    /* @Codex WUL-UIUX: senza card e header propri, per vivere dentro una
+    /* WUL-UIUX: senza card e header propri, per vivere dentro una
        CollapsibleSection che fornisce gia superficie e intestazione. */
     embedded?: boolean;
 }
 
-/* @Codex WUL-UIUX (STREAM W2-B): le sette tinte legacy mappate 1:1 sulla
+/* WUL-UIUX (STREAM W2-B): le sette tinte legacy mappate 1:1 sulla
    dimensione `palette` di Badge (stessa resa, dark-mode inclusa). */
 const STATE_TONE: Record<ReviewQueueRowState, BadgeTone> = {
     'da-rivedere': 'warning',
@@ -35,7 +35,7 @@ const STATE_TONE: Record<ReviewQueueRowState, BadgeTone> = {
 };
 
 function ReviewQueueRow({ row }: { row: PatientReviewQueueRow }) {
-    /* @Codex: one line per state; the full reason stays one disclosure away. */
+    /* one line per state; the full reason stays one disclosure away. */
     const { proposal } = useRuntimeTwinDesign();
     if (proposal) return <li className="border-b border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] py-2" data-testid={`review-queue-row-${row.id}`}>
         <details>

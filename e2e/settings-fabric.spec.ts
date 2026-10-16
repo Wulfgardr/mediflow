@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 

@@ -1,4 +1,4 @@
-/* @Codex — thin native ingress. No DB, prompt construction, grants or clinical writes. */
+/* thin native ingress. No DB, prompt construction, grants or clinical writes. */
 import 'server-only';
 import { requirePairedNativeSession } from '../security/paired-native-session';
 import * as native from '../security/native-inference-lifecycle';

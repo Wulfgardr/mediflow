@@ -1,4 +1,4 @@
-/* @Codex MF085 combined review: normal editor behavior, synthetic SQLite only. */
+/* MF085 combined review: normal editor behavior, synthetic SQLite only. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHarness } from './test-support/checkup-parent-lifecycle-harness.mjs';

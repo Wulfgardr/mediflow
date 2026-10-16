@@ -1,18 +1,15 @@
 import type { PatientDetail } from './api/v1/types';
 import type { ValidatePatientExportResponse } from './fse-validate-patient-contract';
 
-/* @Codex */
 type NetworkFseValidationDeps = {
     getNetworkScopedPatientDetail: (patientId: string, scopeAmbulatoryId: string) => Promise<PatientDetail | null>;
     validatePatientExport: (patientId: string) => Promise<ValidatePatientExportResponse | null>;
 };
 
-/* @Codex */
 export type NetworkFseValidatePatientResult =
     | { status: 200; value: ValidatePatientExportResponse }
     | { status: 400 | 404; value: { error: string } };
 
-/* @Codex */
 export async function validateNetworkScopedPatientExport(
     patientId: string | null,
     scopeAmbulatoryId: string,

@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: WUL-720 synthetic SQLite and real patient PUT route envelope regression. */
+/* WUL-720 synthetic SQLite and real patient PUT route envelope regression. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

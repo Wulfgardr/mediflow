@@ -1,5 +1,5 @@
-void import.meta.url; // @Codex: explicit ESM for top-level mock setup.
-/* @Codex — synthetic integration only. NER + external owner are TEST DOUBLES.
+void import.meta.url; // explicit ESM for top-level mock setup.
+/* synthetic integration only. NER + external owner are TEST DOUBLES.
  * Positive transport tests additionally replace the CLOSED egress module using
  * the process-local synchronous test loader. This is not production admission or Mac/runtime proof. */
 import assert from 'node:assert/strict';
@@ -267,7 +267,7 @@ test('private registrations are reclaimed in test owner; no callback re-enters o
     await tick(); assert.equal(owner.stats.reentries, 0); assert.equal(owner.stats.mints, owner.stats.releases);
 });
 
-// @Codex: the synthetic URL exception must never broaden runtime egress.
+// the synthetic URL exception must never broaden runtime egress.
 test('ordinary fixture URL exception is exact to one inert response line', async () => {
     const { isExternalUrlLiteralAllowed } = await import('../../scripts/check-never-regress.mjs');
     const source = readFileSync(new URL('./ordinary-integration.test.ts', import.meta.url), 'utf8');

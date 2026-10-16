@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX: dialogo di conferma accessibile e tematizzato, con campo
+/* WUL-UIUX: dialogo di conferma accessibile e tematizzato, con campo
    motivazione opzionale (sostituisce prompt() per l'eliminazione clinica). Riusa
    useDialogA11y (Escape, focus trap, restore) e lo stile mf-modal. useConfirm()
    ritorna una Promise e richiede il provider tematizzato. */
@@ -49,7 +49,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     useDialogA11y(options !== null, dialogRef, () => close({ confirmed: false }));
 
     const confirm = useCallback<ConfirmFn>((opts) => {
-        /* @Codex WUL-UIUX: se un dialogo e gia aperto, risolvi la Promise pendente
+        /* WUL-UIUX: se un dialogo e gia aperto, risolvi la Promise pendente
            come annullata prima di rimpiazzarla, altrimenti resterebbe irrisolta. */
         resolverRef.current?.({ confirmed: false });
         resolverRef.current = null;
@@ -83,7 +83,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                         tabIndex={-1}
                         className="mf-modal-shell lume-overlay-shadow relative w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-[var(--lume-dur-fuoco)]"
                     >
-                        {/* @Codex WUL-678: danger retains its signal; ordinary confirmations have no decorative stripe. */}
+                        {/* WUL-678: danger retains its signal; ordinary confirmations have no decorative stripe. */}
                         {isDanger ? <div aria-hidden className="h-1.5 w-full" style={{ background: 'var(--lume-signal-critical)' }} /> : null}
                         <div className="p-6">
                             <div className="mb-4 flex items-start justify-between gap-4">
@@ -148,6 +148,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 export function useConfirm(): ConfirmFn {
     const context = useContext(ConfirmContext);
     if (context) return context;
-    /* @Codex: fail closed invece di degradare a una conferma nativa non tematizzata. */
+    /* fail closed invece di degradare a una conferma nativa non tematizzata. */
     throw new Error('useConfirm deve essere usato dentro ConfirmProvider');
 }

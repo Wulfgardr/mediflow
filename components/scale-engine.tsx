@@ -1,14 +1,14 @@
 'use client';
 
-/* @Codex: native exclusive choices preserve the canonical answer values. */
+/* native exclusive choices preserve the canonical answer values. */
 import { useState, useRef, useEffect, useId } from 'react';
 import styles from '@/components/scales/scale-workspace.module.css';
-/* @Codex: keep answered scales within the prototype navigation guard. */
+/* keep answered scales within the prototype navigation guard. */
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
-/* @Codex: button-driven cancellation needs the same explicit draft decision as links. */
+/* button-driven cancellation needs the same explicit draft decision as links. */
 import { useConfirm } from '@/components/ui/confirm-dialog';
 
-// @Codex MF085-003: neutral types keep validators executable without React.
+// MF085-003: neutral types keep validators executable without React.
 import { calculateScaleResult, isScaleAnswerValid, type ScaleDefinition } from '@/lib/scale-validation';
 export type { ScaleQuestion, ScaleDefinition } from '@/lib/scale-validation';
 
@@ -28,10 +28,10 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     const [currentStep, setCurrentStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [validationError, setValidationError] = useState<string | null>(null);
-    /* @Codex WUL-UIUX: il ref blocca anche il doppio click nello stesso tick,
+    /* WUL-UIUX: il ref blocca anche il doppio click nello stesso tick,
        prima che lo stato isSubmitting si propaghi al disabled del bottone. */
     const submittingRef = useRef(false);
-    /* @Codex: orient keyboard users on each question without changing answers. */
+    /* orient keyboard users on each question without changing answers. */
     const questionRef = useRef<HTMLHeadingElement>(null);
     useEffect(() => { questionRef.current?.focus(); }, [currentStep]);
 
@@ -41,7 +41,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
         setAnswers(prev => ({ ...prev, [questionId]: value }));
     };
 
-    /* @Codex: retaining a draft must leave answers, question and context mounted. */
+    /* retaining a draft must leave answers, question and context mounted. */
     const handleCancel = async () => {
         if (submittingRef.current) return;
         if (Object.keys(answers).length > 0) {
@@ -95,7 +95,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     }
 
     return (
-        /* @Codex WUL-678: one readable question on the workspace plane. */
+        /* WUL-678: one readable question on the workspace plane. */
         <div className={`${styles.workspace} ${styles.engine}`} aria-busy={isSubmitting}>
             {showHeading && <header><h2>{scale.title}</h2><p>{scale.description}</p></header>}
             {validationError && <p role="alert">{validationError}</p>}
@@ -107,7 +107,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                     <h3 ref={questionRef} tabIndex={-1} className={styles.question}>{currentQuestion.text}</h3>
                 </legend>
                 <div key={currentQuestion.id} className={styles.answers}>
-                    {/* @Codex: Tab enters the group; arrow keys select one exact answer. */}
+                    {/* Tab enters the group; arrow keys select one exact answer. */}
                     {(currentQuestion.type === 'choice' || currentQuestion.type === 'boolean') && (
                         currentQuestion.type === 'boolean'
                             ? [{ label: 'Sì / corretto', value: 1 }, { label: 'No / non corretto', value: 0 }]
@@ -129,7 +129,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                         </label>
                     ))}
 
-                    {/* @Codex: blank numeric fields remain unanswered; text is not coerced to points. */}
+                    {/* blank numeric fields remain unanswered; text is not coerced to points. */}
                     {(currentQuestion.type === 'number' || currentQuestion.type === 'text') && (
                         <input
                             className={styles.input}

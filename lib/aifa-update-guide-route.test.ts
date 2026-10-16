@@ -1,4 +1,4 @@
-/* @Codex: actual update route, writer, SQLite and lifecycle owner; entirely invented data.
+/* actual update route, writer, SQLite and lifecycle owner; entirely invented data.
  * Only the request cookie boundary and external AIFA transport are synthetic.
  * Status readback uses the actual catalog service: /api/drugs GET is NOT exercised here.
  */

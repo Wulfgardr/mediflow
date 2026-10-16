@@ -1,4 +1,3 @@
-/* @Codex */
 /* PROPOSED Mac host-only WHO bridge. F3 topology; F4 BusyBox compatibility. No Web import. */
 import http from 'node:http';
 import { spawn } from 'node:child_process';

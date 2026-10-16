@@ -19,7 +19,6 @@ import type { Kree8Patient } from '@/lib/patient-workspace';
 import styles from '../kree8-clinical-cockpit-handoff.module.css';
 
 
-/* @Codex */
 function isSissPatientContextHandoffResult(
   payload: unknown,
 ): payload is SissPatientContextHandoffResult {
@@ -33,7 +32,6 @@ function isSissPatientContextHandoffResult(
     && typeof candidate.message === 'string';
 }
 
-/* @Codex */
 function LiveHandoffArea({
   patient,
   onOpenArea,

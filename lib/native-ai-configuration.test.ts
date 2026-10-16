@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, chmodSync, rmSync, symlinkSync, renameSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -35,7 +34,7 @@ test('explicit private grant: exact operator/device/admin, expiry, permissions, 
         writeFileSync(f.file, 'x'.repeat(16_385)); assert.throws(() => readNativeConfigurationGrant(f.file, principal));
     } finally { f.cleanup(); }
 });
-// @Codex: malformed synthetic configuration is validation input, never installed on a host.
+// malformed synthetic configuration is validation input, never installed on a host.
 test('grant strict JSON rejects duplicate root and record properties including escaped keys', () => {
     const f = grantFixture();
     try {
@@ -54,7 +53,7 @@ test('grant strict JSON rejects duplicate root and record properties including e
         assert.equal(readNativeConfigurationGrant(f.file, principal).length, 64);
     } finally { f.cleanup(); }
 });
-// @Codex: normal host publication of a synthetic file preserves content but changes its version.
+// normal host publication of a synthetic file preserves content but changes its version.
 test('grant currentness is stable for reads and changes on replacement or metadata update', () => {
     const f = grantFixture();
     try {

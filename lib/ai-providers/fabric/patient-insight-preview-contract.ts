@@ -1,5 +1,4 @@
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from '../../chatgpt-product/ordinary-wire';
-/* @Codex */
 import type { PatientInsightCanonicalHostSources } from './patient-insight-host-projection';
 
 export type PatientInsightPreviewRequest = Readonly<{

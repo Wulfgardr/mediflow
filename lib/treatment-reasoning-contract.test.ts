@@ -7,7 +7,6 @@ import {
     parseTreatmentReasoningResponse,
 } from './treatment-reasoning-contract';
 
-/* @Codex */
 test('named ChatGPT prompt keeps source bindings and describes the actual channel without classifying input', () => {
     const input = { question: 'Revisione sintetica?', patientContext: 'Contesto di collaudo.', sources: [{ id: 'src-synthetic', sourceKind: 'clinical-entry' as const, label: 'Nota sintetica' }] };
     const remote = buildChatGptTreatmentReasoningPrompt(input);

@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
@@ -103,7 +102,7 @@ export function Kree8CommandCenter({
     return commands.filter((command) => `${command.label} ${command.hint}`.toLocaleLowerCase('it-IT').includes(normalized));
   }, [commands, query]);
 
-  /* @Codex: il dialog riceve focus nello stesso layout commit in cui compare;
+  /* il dialog riceve focus nello stesso layout commit in cui compare;
      cosi Escape e il focus trap sono operativi appena la modale e visibile. */
   useLayoutEffect(() => {
     if (!mode) return;

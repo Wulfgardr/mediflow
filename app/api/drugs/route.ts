@@ -17,7 +17,6 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 
 const CATALOG_STATUS_HEADER = 'X-MediFlow-Aifa-Catalog';
 
-/* @Codex */
 function toDrugPayload(
     row: Awaited<ReturnType<typeof searchAifaCatalog>>['rows'][number],
     priceStoredAsCents: boolean,
@@ -34,7 +33,6 @@ function toDrugPayload(
     };
 }
 
-/* @Codex */
 function manifestInputFromForm(form: FormData): AifaCatalogManifestInput {
     return {
         sourceUrl: String(form.get('sourceUrl') || ''),

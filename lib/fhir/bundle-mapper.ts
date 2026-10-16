@@ -12,7 +12,6 @@ import type { FhirBundleInput } from './types';
 
 type BundleResource = NonNullable<NonNullable<Bundle['entry']>[number]['resource']>;
 
-/* @Codex */
 export function buildFhirBundleFromRecords(input: FhirBundleInput): Bundle {
     const patientResource = toFhirPatient(input.patient, input.generatedAt);
     const patientReference = toFhirFullUrl(patientResource.resourceType, patientResource.id!);

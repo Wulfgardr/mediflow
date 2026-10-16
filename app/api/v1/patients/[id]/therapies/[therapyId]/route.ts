@@ -7,11 +7,8 @@ import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { TherapySummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { normalizeTherapyUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
-/* @Codex */
 import { normalizeTherapyStatus } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 import { updateTherapyOperation } from '@/lib/therapy-write-operation';
 import { parseTherapyDeleteInput, readTherapyJsonObject, safeTherapyExpectedVersion, therapyChangedFields, validateTherapyInput } from '@/lib/therapy-write-input';
@@ -43,9 +40,7 @@ export async function GET(
             id: therapy.id,
             patientId: therapy.patientId,
             drugName: therapy.drugName,
-            /* @Codex */
             aic: therapy.aic ?? null,
-            /* @Codex */
             atc: therapy.atc ?? null,
             activePrinciple: therapy.activePrinciple ?? null,
             dosage: therapy.dosage,
@@ -71,7 +66,6 @@ export async function GET(
     }
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; therapyId: string }> }
@@ -85,7 +79,7 @@ export async function PUT(
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
         const expectedVersion = safeTherapyExpectedVersion(parsed.body.version);
         if (expectedVersion === null) return NextResponse.json({ error: 'Version is required' }, { status: 400 });
-        /* @Codex: retain v1's 404-before-field-validation wire precedence; the IMMEDIATE core rechecks identity. */
+        /* retain v1's 404-before-field-validation wire precedence; the IMMEDIATE core rechecks identity. */
         const exists = dbServer.select({ id: therapies.id }).from(therapies)
             .where(and(eq(therapies.id, therapyId), eq(therapies.patientId, id))).get();
         if (!exists) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -110,7 +104,6 @@ export async function PUT(
     }
 }
 
-/* @Codex */
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string; therapyId: string }> }

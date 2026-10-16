@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildUpdateAwarenessPayload, compareReleaseVersions, parseLatestChangelog } from './update-awareness.ts';

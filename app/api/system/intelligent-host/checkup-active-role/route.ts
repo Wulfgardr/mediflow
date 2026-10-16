@@ -1,5 +1,4 @@
 import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
-/* @Codex */
 import { createHeadlessCheckupActiveRoleHttpHandlersV1 } from '@/lib/security/headless-checkup-active-role-http';
 import { enrollHeadlessCheckupActiveRoleAttestation,
   revokeHeadlessCheckupActiveRoleAttestation } from '@/lib/security/headless-checkup-active-role-enrollment-production';

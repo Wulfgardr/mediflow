@@ -1,16 +1,12 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     deleteHostProstheticPrescription,
     updateHostProstheticPrescription,
 } from '@/lib/prosthetic-prescription-write';
-/* @Codex */
 import { requireExpectedVersion } from '@/lib/version-concurrency';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 type RouteContext = { params: Promise<{ id: string }> };

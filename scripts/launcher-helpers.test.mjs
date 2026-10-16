@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';

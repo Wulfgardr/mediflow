@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -152,7 +151,7 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [prostheticAuditContract('POST', 'network', 'create')] },
     { route: 'app/api/v1/network/prosthetic-prescriptions/[id]/route.ts', events: ['prosthetic.prescription.updated'],
         writerContracts: [prostheticAuditContract('PUT', 'network', 'update')] },
-    /* @Codex: ten existing ordinary service parent/item writers. */
+    /* ten existing ordinary service parent/item writers. */
     { route: 'app/api/service-prescriptions/route.ts', events: ['service.prescription.created'],
         writerContracts: [serviceAuditContract('POST', 'host', 'create', 'parent')] },
     { route: 'app/api/service-prescriptions/[id]/route.ts', events: ['service.prescription.updated', 'service.prescription.deleted'],
@@ -169,7 +168,7 @@ const REQUIRED_ROUTE_AUDIT = [
         writerContracts: [serviceAuditContract('POST', 'network', 'create', 'item')] },
     { route: 'app/api/v1/network/service-prescription-items/[id]/route.ts', events: ['service.prescription_item.updated'],
         writerContracts: [serviceAuditContract('PUT', 'network', 'update', 'item')] },
-    /* @Codex: eight ordinary ambulatory writers, including test-container clear. */
+    /* eight ordinary ambulatory writers, including test-container clear. */
     { route: 'app/api/ambulatories/route.ts', events: ['ambulatory.created'],
         writerContracts: [ambulatoryAuditContract('POST', 'host', 'create')] },
     { route: 'app/api/ambulatories/[id]/route.ts', events: ['ambulatory.updated', 'ambulatory.deleted'],
@@ -190,7 +189,7 @@ const REQUIRED_ROUTE_AUDIT = [
 
 const REQUIRED_EVENT_TYPES = new Set(REQUIRED_ROUTE_AUDIT.flatMap((entry) => entry.events));
 
-/* @Codex: explicit eight-handler roster; no exemption for delegated diary writes. */
+/* explicit eight-handler roster; no exemption for delegated diary writes. */
 function diaryAuditContract(handler, mode, operation) {
     return {
         handler, mode, operation, transactionalDiary: true,
@@ -201,7 +200,7 @@ function diaryAuditContract(handler, mode, operation) {
         bridgeExport: `${operation}NetworkScopedEntry`,
     };
 }
-/* @Codex: therapy roster is explicit; runtime policy is not inherited from diary. */
+/* therapy roster is explicit; runtime policy is not inherited from diary. */
 function therapyAuditContract(handler, mode, operation) {
     return {
         handler, mode, operation, transactionalTherapy: true,
@@ -211,7 +210,7 @@ function therapyAuditContract(handler, mode, operation) {
         bridgeFile: 'lib/network-therapy-write.ts', bridgeExport: `${operation}NetworkScopedTherapy`,
     };
 }
-/* @Codex: eight ordinary observation handlers, without extending link or input authority. */
+/* eight ordinary observation handlers, without extending link or input authority. */
 function observationAuditContract(handler, mode, operation) {
     return {
         handler, mode, operation, transactionalObservation: true,
@@ -221,7 +220,7 @@ function observationAuditContract(handler, mode, operation) {
         bridgeFile: 'lib/network-observation-write.ts', bridgeExport: `${operation}NetworkScopedObservation`,
     };
 }
-/* @Codex: eight ordinary checkup handlers, without transferring input or status policies. */
+/* eight ordinary checkup handlers, without transferring input or status policies. */
 function checkupAuditContract(handler, mode, operation) {
     return {
         handler, mode, operation, transactionalCheckup: true,
@@ -415,7 +414,6 @@ function isReachableStandaloneCall(call, owner) {
     return ts.isExpressionStatement(current.parent) && isReachableCall(call, owner);
 }
 
-/* @Codex */
 function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
     const problems = [];
     const statements = owner.body ? [...owner.body.statements] : [];
@@ -449,7 +447,7 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
         const calls = identifierCalls(root, callee, argument);
         return calls.length === 1 && isReachableStandaloneCall(calls[0], root);
     };
-    // @Codex: both native admission checks must return before preparing/mutating
+    // both native admission checks must return before preparing/mutating
     // credentials; the second check also burns the two prepared capabilities.
     const nativeCurrentGuard = (statement, abortPrepared = false) => {
         if (!statement || !ts.isIfStatement(statement) || statement.elseStatement
@@ -461,7 +459,7 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
             && ts.isReturnStatement(body.at(-1))
             && compact(body.at(-1).expression) === "{ kind: 'unauthorized' }";
     };
-    // @Codex: inspect executable statements, so comments cannot impersonate a
+    // inspect executable statements, so comments cannot impersonate a
     // commit. A failed post-CAS commit retains its fence and never calls abort.
     const retirementCommit = (outcome, commit, capability) => findIndex((statement) =>
         ts.isTryStatement(statement) && !statement.finallyBlock && statement.catchClause
@@ -579,7 +577,6 @@ function validatePinRetirementAuditOrder(sourceFile, owner, writerCall) {
     return problems;
 }
 
-/* @Codex */
 export function validateAuditWriterControlFlow({
     source,
     fileName = 'fixture.ts',
@@ -685,7 +682,6 @@ function bindingCalls(root, checker, target) {
     return calls;
 }
 
-/* @Codex */
 export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }) {
     const problems = [];
     const route = checkedSource('route.ts', routeSource);
@@ -721,7 +717,7 @@ export function validateDelegatedRouteAudit({ spec, routeSource, serviceSource }
     return problems;
 }
 
-/* @Codex: owner and adapter names for the ten ordinary service mutations. */
+/* owner and adapter names for the ten ordinary service mutations. */
 export function serviceAuditContract(handler, mode, operation, resource) {
     const suffix = resource === 'item' ? 'ServicePrescriptionItem' : 'ServicePrescription';
     const serviceExport = `${operation}${mode === 'host' ? 'Host' : 'NetworkScoped'}${suffix}`;
@@ -736,7 +732,7 @@ export function serviceAuditContract(handler, mode, operation, resource) {
     };
 }
 
-/* @Codex: structural wiring and DML/audit order; SQLite tests establish behavior. */
+/* structural wiring and DML/audit order; SQLite tests establish behavior. */
 export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) {
     const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
@@ -799,7 +795,7 @@ export function validateRequiredServiceAudit({ spec, routeSource, coreSource }) 
     return problems;
 }
 
-/* @Codex: explicit host and paired adapter roster for the eight ambulatory writes. */
+/* explicit host and paired adapter roster for the eight ambulatory writes. */
 export function ambulatoryAuditContract(handler, mode, operation) {
     const coreName = `${operation}Ambulatory`;
     const serviceExport = mode === 'network' ? `${operation}NetworkAmbulatory` : coreName;
@@ -812,7 +808,7 @@ export function ambulatoryAuditContract(handler, mode, operation) {
     };
 }
 
-/* @Codex: source order and delegation guard; SQLite tests establish actual rollback. */
+/* source order and delegation guard; SQLite tests establish actual rollback. */
 export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource, adapterSource = null, clearSource = null }) {
     const problems = validateDelegatedRouteAudit({
         spec, routeSource, serviceSource: spec.mode === 'network' ? adapterSource ?? '' : coreSource,
@@ -968,7 +964,7 @@ export function validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource,
     return problems;
 }
 
-/* @Codex: the five existing ordinary prosthetic mutations; no paired DELETE. */
+/* the five existing ordinary prosthetic mutations; no paired DELETE. */
 export function prostheticAuditContract(handler, mode, operation) {
     const serviceExport = `${operation}${mode === 'host' ? 'Host' : 'NetworkScoped'}ProstheticPrescription`;
     return {
@@ -981,7 +977,7 @@ export function prostheticAuditContract(handler, mode, operation) {
     };
 }
 
-/* @Codex: bounded wiring and transaction-order guard. Real SQLite tests decide
+/* bounded wiring and transaction-order guard. Real SQLite tests decide
  * identity, scope, parent, CAS and persisted-value correctness. */
 export function validateRequiredProstheticAudit({ spec, routeSource, coreSource }) {
     const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
@@ -1093,24 +1089,24 @@ export function validateRequiredProstheticAudit({ spec, routeSource, coreSource 
     return problems;
 }
 
-/* @Codex: bounded diary wiring/order guard, complementary to real SQLite rollback and scope tests.
+/* bounded diary wiring/order guard, complementary to real SQLite rollback and scope tests.
  * The required audit writer itself is checked by the patient contracts in the same gate.
  * This does not claim to prove parent admission, CAS or cipher semantics statically. */
 export function validateRequiredDiaryAudit(input) {
     return validateRequiredClinicalRowAudit(input, 'entry');
 }
 
-/* @Codex: reuse only the structural proof, not date/cap/idempotency policy. */
+/* reuse only the structural proof, not date/cap/idempotency policy. */
 export function validateRequiredTherapyAudit(input) {
     return validateRequiredClinicalRowAudit(input, 'therapy');
 }
 
-/* @Codex: structural proof only; link/currentness/value semantics require real SQLite tests. */
+/* structural proof only; link/currentness/value semantics require real SQLite tests. */
 export function validateRequiredObservationAudit(input) {
     return validateRequiredClinicalRowAudit(input, 'observation');
 }
 
-/* @Codex: structural proof only; parent/currentness/status semantics require real SQLite tests. */
+/* structural proof only; parent/currentness/status semantics require real SQLite tests. */
 export function validateRequiredCheckupAudit(input) {
     return validateRequiredClinicalRowAudit(input, 'checkup');
 }
@@ -1210,7 +1206,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     const guard = statements[auditIndex - 1];
     const throws = ts.isIfStatement(guard) && (ts.isBlock(guard.thenStatement)
         ? [...guard.thenStatement.statements] : [guard.thenStatement]);
-    // @Codex: follow receivers, not source containment (a nested callback is not a write).
+    // follow receivers, not source containment (a nested callback is not a write).
     let receiver = mutation;
     let directChain = true;
     for (const [method, arity] of spec.operation === 'create'
@@ -1256,7 +1252,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     return problems;
 }
 
-/* @Codex: bounded C04 patient-update contract; this source guard complements the real transaction tests. */
+/* bounded C04 patient-update contract; this source guard complements the real transaction tests. */
 export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource }) {
     const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
@@ -1427,7 +1423,7 @@ export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSour
     return problems;
 }
 
-/* @Codex: bounded C05 DELETE contract; runtime tests remain the authority for rollback behavior. */
+/* bounded C05 DELETE contract; runtime tests remain the authority for rollback behavior. */
 export function validateRequiredPatientDeleteAudit({ spec, routeSource, coreSource, auditSource }) {
     const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
@@ -2221,7 +2217,6 @@ function auditLiteralSyntaxIsExactAndSafe(root) {
     return safe;
 }
 
-/* @Codex */
 export function validateLogoutAuditModes({ spec, routeSource, serviceSource = null }) {
     const problems = [];
     const route = checkedSource('route.ts', routeSource);

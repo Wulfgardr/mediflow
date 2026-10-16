@@ -1,9 +1,7 @@
-// @Codex
 import CryptoKit
 import Foundation
 import Security
 
-/* @Codex */
 struct HomeBasePatientCacheContext: Codable, Equatable, Sendable {
     let serverURL: String
     let ambulatoryId: String?
@@ -30,7 +28,6 @@ struct HomeBasePatientCacheContext: Codable, Equatable, Sendable {
     }
 }
 
-/* @Codex */
 struct HomeBasePatientCacheMetadata: Equatable, Sendable {
     enum ExpiryReason: Equatable, Sendable { case ttlExceeded, clockMovedBackwards }
     let cachedAt: Date
@@ -52,19 +49,16 @@ struct HomeBasePatientCacheMetadata: Equatable, Sendable {
     }
 }
 
-/* @Codex */
 struct HomeBasePatientListCacheSnapshot: Equatable, Sendable {
     let metadata: HomeBasePatientCacheMetadata
     let patients: [HomeBasePatientSummary]
 }
 
-/* @Codex */
 struct HomeBasePatientDetailCacheSnapshot: Equatable, Sendable {
     let metadata: HomeBasePatientCacheMetadata
     let patient: HomeBasePatientDetail?
 }
 
-/* @Codex */
 enum HomeBasePatientCacheStoreError: LocalizedError, Equatable {
     case applicationSupportUnavailable
     case keychainRead(OSStatus)
@@ -85,7 +79,6 @@ enum HomeBasePatientCacheStoreError: LocalizedError, Equatable {
     }
 }
 
-/* @Codex */
 struct HomeBasePatientCacheStore {
     static let shared = HomeBasePatientCacheStore()
     private static let defaultService = "com.mediflow.home-base-patient-cache"
@@ -267,12 +260,10 @@ struct HomeBasePatientCacheStore {
 
 }
 
-/* @Codex */
 private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-/* @Codex */
 private struct CachePayload: Codable {
     let version: Int
     let context: HomeBasePatientCacheContext
@@ -281,13 +272,11 @@ private struct CachePayload: Codable {
     let detail: CachedDetail?
 }
 
-/* @Codex */
 private struct CachedDetail: Codable {
     let cachedAt: Date
     let patient: HomeBasePatientDetail
 }
 
-/* @Codex */
 private struct EncryptedCacheEnvelope: Codable {
     let version: Int
     let nonce: Data

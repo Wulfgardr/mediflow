@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { assertArchiveRequestAfterAdmission } from './archive-request-context';

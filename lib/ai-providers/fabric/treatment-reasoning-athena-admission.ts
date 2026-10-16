@@ -2,7 +2,6 @@ import 'server-only';
 
 import { types } from 'node:util';
 
-/* @Codex */
 export const TREATMENT_REASONING_ATHENA_ADMISSION_SCHEMA = 'mediflow.ai.treatment-reasoning-athena-admission.v1' as const;
 type Binding = Readonly<{ receiptRef: string; provenanceRef: string; evidenceCount: number }>;
 export type TreatmentReasoningAthenaAdmissionResult = Readonly<{ status: 'admitted'; code: null; admission: Readonly<{ schema: typeof TREATMENT_REASONING_ATHENA_ADMISSION_SCHEMA; capability: 'treatment_reasoning'; stage: 'preview'; review: 'required'; uncertainty: Readonly<{ level: 'low'; source: 'degraded_default' }>; evidence: Readonly<{ source: 'host_minimized'; count: number }>; provenanceRef: string; receiptRef: string }>; writesPerformed: 0; applyPolicy: 'none' }> | Readonly<{ status: 'denied'; code: 'input_invalid'; admission: null; writesPerformed: 0; applyPolicy: 'none' }>;

@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 
 public struct VisitRecordingSelectionReference: Equatable, Sendable {

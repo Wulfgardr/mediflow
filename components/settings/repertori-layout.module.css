@@ -1,4 +1,4 @@
-/* @Codex: keep the full catalog status clear of its detail action. */
+/* keep the full catalog status clear of its detail action. */
 .row.row {
     grid-template-columns: 24px minmax(0, 1fr) minmax(0, 0.5fr) minmax(0, 12rem) max-content;
     gap: 0.75rem;

@@ -1,6 +1,6 @@
 import Foundation
 
-/* @Codex: Typed inline editing; persistence remains the existing transcoder render. */
+/* Typed inline editing; persistence remains the existing transcoder render. */
 public struct ClinicalRichTextEditorBlock: Identifiable, Equatable, Sendable {
     public enum EditableKind: Equatable, Hashable, Sendable, CaseIterable {
         case paragraph, heading2, heading3, bulletItem, numberedItem, blockquote
@@ -60,7 +60,6 @@ public struct ClinicalRichTextEditorBlock: Identifiable, Equatable, Sendable {
     }
 }
 
-/* @Codex */
 public struct ClinicalRichTextEditorDocument: Equatable, Sendable {
     public var blocks: [ClinicalRichTextEditorBlock]
     // A no-op save (including a style change undone by the user) retains the

@@ -5,20 +5,15 @@ import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-/* @Codex */
 import {
     auditContextFromSession,
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/security/audit';
-/* @Codex */
 import { dbServer } from '@/lib/db-server';
-/* @Codex */
 import { users } from '@/lib/schema';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { validateKdfRewrapPayload } from '@/lib/security/kdf-rewrap-validation';
 import { persistKdfRewrap } from '@/lib/security/kdf-rewrap-service';
 

@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX: hook condiviso per l'accessibilita dei dialoghi, estratto dal
+/* WUL-UIUX: hook condiviso per l'accessibilita dei dialoghi, estratto dal
    pattern gia collaudato di patient-action-modal.tsx: Escape per chiudere,
    autofocus sul primo campo utile, focus trap sul Tab, ripristino del focus alla
    chiusura. onClose viene tenuto in un ref perche i parent lo passano spesso come
@@ -59,7 +59,7 @@ export function useDialogA11y(
         document.addEventListener('keydown', onKeyDown);
         return () => {
             document.removeEventListener('keydown', onKeyDown);
-            /* @Codex WUL-UIUX: ripristina il focus solo se l'elemento e ancora nel
+            /* WUL-UIUX: ripristina il focus solo se l'elemento e ancora nel
                DOM; se e stato smontato (es. la riga che ha aperto il dialogo),
                evita che il focus cada sul body. */
             const previous = previouslyFocused.current;

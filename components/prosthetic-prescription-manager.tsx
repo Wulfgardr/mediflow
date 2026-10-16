@@ -58,7 +58,7 @@ const CATEGORY_OPTIONS: Array<{ value: ProstheticPrescriptionCategory; label: st
 ];
 
 function todayInputValue(): string {
-    // @Codex: the form asks for the operator's calendar day, not the UTC day.
+    // the form asks for the operator's calendar day, not the UTC day.
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
@@ -123,7 +123,7 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
     const [error, setError] = useState<string | null>(null);
     const [form, setForm] = useState<FormState>(() => emptyForm());
 
-    /* @Codex: the conditional form's open state is the pending-form signal. */
+    /* the conditional form's open state is the pending-form signal. */
     useRuntimeTwinPendingForm(isFormOpen);
 
     const prescriptions = useLiveQuery(

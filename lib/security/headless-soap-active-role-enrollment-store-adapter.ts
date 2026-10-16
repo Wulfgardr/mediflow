@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import type { HeadlessSoapActiveRoleEnrollmentLifecycleResult } from './headless-soap-active-role-enrollment';

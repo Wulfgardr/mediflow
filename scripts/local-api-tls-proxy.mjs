@@ -16,12 +16,10 @@ if (!certPath || !keyPath) {
     console.error('Missing MEDIFLOW_TLS_CERT_PATH or MEDIFLOW_TLS_KEY_PATH.');
     process.exit(1);
 }
-// @Codex
 if (!loopbackHosts.has(target.hostname)) {
     console.error(`Invalid MEDIFLOW_HTTP_TARGET host: ${target.hostname}`);
     process.exit(1);
 }
-// @Codex
 if (!loopbackHosts.has(bindHost) && networkMode !== 'network-home-base') {
     console.error(
         `Refusing LAN TLS bind on ${bindHost} while MEDIFLOW_TLS_NETWORK_MODE is ${networkMode}. ` +
@@ -70,7 +68,6 @@ const server = https.createServer(options, (req, res) => {
     req.pipe(proxyRequest, { end: true });
 });
 
-// @Codex
 server.listen(port, bindHost, () => {
     console.log(`TLS proxy listening on https://${bindHost}:${port}`);
     console.log(`Forwarding to ${target.toString()}`);

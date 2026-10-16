@@ -1,6 +1,5 @@
 import 'server-only';
 
-/* @Codex */
 import { types } from 'node:util';
 import { createDocumentSynthesisSourceBindingOwner, type DocumentSynthesisSourceBindingResult } from './document-synthesis-source-binding';
 import { createDocumentSynthesisSourceMapContract, type DocumentSynthesisSourceMapResult } from './document-synthesis-source-map-contract';

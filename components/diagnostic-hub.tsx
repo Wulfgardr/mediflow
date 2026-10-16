@@ -3,7 +3,6 @@
 
 import { useState } from 'react';
 import { CheckCircle, XCircle, Loader2, Play, Server, Database, Activity, Globe } from 'lucide-react';
-/* @Codex */
 import { getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
 import { checkAuthHealthRequest } from '@/lib/security/client-auth-api';
 import { cn } from '@/lib/utils'; // Assuming cn exists, else use template literals
@@ -30,7 +29,6 @@ export default function DiagnosticHub() {
                 const start = performance.now();
                 // We use auth/check as a proxy for DB health since it reads from DB
                 const { response: res, payload: data, controlState } = await checkAuthHealthRequest();
-                /* @Codex */
                 if (controlState !== 'accepted') throw new Error('Controllo autenticazione non verificabile');
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 if (data?.status === 'error' || data?.error) {

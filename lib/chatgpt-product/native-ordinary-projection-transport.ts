@@ -1,4 +1,4 @@
-/* @Codex — bounded, revocable JSON admission after the authentic grant claim. */
+/* bounded, revocable JSON admission after the authentic grant claim. */
 import { parseStrictJson } from '../bounded-request-body';
 import { NATIVE_PROJECTION_MAX_BYTES } from './native-ordinary-projection-wire';
 import { ProductError } from './product-contract';

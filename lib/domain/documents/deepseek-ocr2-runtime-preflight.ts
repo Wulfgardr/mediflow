@@ -1,4 +1,3 @@
-/* @Codex */
 import { createHash } from 'node:crypto';
 import { statfsSync } from 'node:fs';
 import { cpus, tmpdir, totalmem } from 'node:os';

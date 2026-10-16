@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import path from 'node:path';
@@ -88,7 +87,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
     } finally { releaseFirstPost(); await browser?.close(); server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });
 
-/* @Codex: same production component, with delayed synthetic HTTP and StrictMode. */
+/* same production component, with delayed synthetic HTTP and StrictMode. */
 test('mounted guide: cancel, explicit read-only resume, new confirmation, conflict, lock, revocation and unmount', async () => {
     const bundle = buildSync({ stdin: { contents: `import React, {useState} from 'react'; import {createRoot} from 'react-dom/client';
         import {LocalProviderOnboardingPanel} from './components/settings/local-provider-onboarding-panel';

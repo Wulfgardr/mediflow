@@ -1,5 +1,4 @@
-/* @Codex
- * Test-only scenario for the coordinator's real authenticated synthetic Page.
+/* * Test-only scenario for the coordinator's real authenticated synthetic Page.
  * Does not log in, read credentials/storageState, seed a patient, intercept routes,
  * instantiate a substitute component, change settings or manufacture readiness.
  * NOT auto-discovered as a spec: the authoritative bootstrap fixture is absent

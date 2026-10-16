@@ -1,5 +1,4 @@
 #!/bin/bash
-# @Codex
 # Relocate and validate the six WebRuntime Mach-O dependencies in MediFlow.app.
 set -euo pipefail
 
@@ -87,7 +86,7 @@ first_physical_macho() {
   ' "$@"
 }
 
-# @Codex: do not turn a caller alias (including an ancestor symlink) into a root.
+# do not turn a caller alias (including an ancestor symlink) into a root.
 canonical_directory() {
   node -e '
     const fs = require("node:fs"), path = require("node:path"), value = process.argv[1];
@@ -210,7 +209,7 @@ package_web_runtime_machos() {
   canonical_directory "$frameworks"
   [[ "$(real_path "$frameworks")" == "$(real_path "$contents")/Frameworks" ]] || \
     fail "Contents/Frameworks resolves outside the app bundle"
-  # @Codex: reject escaping or native symlinks before moving or rewriting any
+  # reject escaping or native symlinks before moving or rewriting any
   # file through the copied dependency tree.
   validate_resource_symlinks "$resources"
 
@@ -231,7 +230,7 @@ package_web_runtime_machos() {
     "$frameworks/mediflow-web-libvips.dylib" "$frameworks/mediflow-web-canvas.node"
     "$frameworks/mediflow-web-better-sqlite3.node" "$frameworks/mediflow-web-fsevents.node"
   )
-  # @Codex: a second normalization of a complete relocated tree is read-only.
+  # a second normalization of a complete relocated tree is read-only.
   # A partial tree still fails the full validation below; do not delete its targets.
   if [[ "$normalize" == "1" && -z "$(find "$web_runtime" -type f \( -name '*.node' -o -name '*.dylib' \) -print -quit)" ]]; then
     normalize=0
@@ -284,14 +283,14 @@ package_web_runtime_machos() {
       physical_count=$((physical_count + 1))
     done < <(find "$web_runtime" -type f \( -name '*.node' -o -name '*.dylib' \) -print0)
     [[ "$physical_count" == "6" ]] || fail "expected exactly six physical WebRuntime Mach-O artifacts, found $physical_count"
-    # @Codex: preflight every package loader before moving any native payload.
+    # preflight every package loader before moving any native payload.
     for index in 0 1 2 3 4 5; do
       [[ "$(literal_count "${loaders[$index]}" "${before[$index]}")" == "1" ]] || \
         fail "loader pattern must occur exactly once before relocation: ${loaders[$index]}"
       [[ "$(literal_count "${loaders[$index]}" "${after[$index]}")" == "0" ]] || \
         fail "loader already contains packaged target before relocation: ${loaders[$index]}"
     done
-    # @Codex: detect the original extensionless-Codex conflict BEFORE touching
+    # detect the original extensionless-Codex conflict BEFORE touching
     # any of the six dependencies. Only their exact source paths are exempt.
     native="$(first_physical_macho "$resources" "${sources[@]}")"
     [[ -z "$native" ]] || fail "unexpected physical Mach-O below Contents/Resources: $native"
@@ -329,7 +328,7 @@ package_web_runtime_machos() {
     while IFS= read -r rpath; do
       [[ -n "$rpath" ]] && install_name_tool -delete_rpath "$rpath" "${targets[1]}"
     done < <(macho_references "${targets[1]}" | awk -F '\t' '$1 == "LC_RPATH" { print $2 }')
-    # @Codex: Apple Silicon needs ad-hoc signatures here; the outer app stays unsigned unless opted in.
+    # Apple Silicon needs ad-hoc signatures here; the outer app stays unsigned unless opted in.
     for index in 2 0 1 3 4 5; do
       codesign --force --sign - "${targets[$index]}"
       codesign --verify --strict "${targets[$index]}"

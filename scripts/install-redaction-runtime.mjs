@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex — WUL-697/689. Explicit, local, offline installation only. */
+/* WUL-697/689. Explicit, local, offline installation only. */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { demand, InstallError } from './redaction-install/guards.mjs';

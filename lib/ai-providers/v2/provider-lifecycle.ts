@@ -1,4 +1,3 @@
-/* @Codex */
 
 export const PROVIDER_BINDING_V2_SCHEMA = 'mediflow.ai.provider-binding.v2' as const;
 export const PROVIDER_LIFECYCLE_V2_SCHEMA = 'mediflow.ai.provider-lifecycle.v2' as const;

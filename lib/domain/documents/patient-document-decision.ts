@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,
@@ -9,9 +8,7 @@ import {
     type DocumentDecisionDomainItem,
     type DocumentDecisionEvidenceRef,
 } from './document-decision';
-/* @Codex */
 import type { PatientDocumentReviewDraft } from './patient-document-review';
-/* @Codex */
 import { buildPatientImportDecision } from './patient-import-decision';
 
 function compact(value: string | undefined): string {
@@ -85,7 +82,6 @@ function actionFromDomain(item: DocumentDecisionDomainItem): DocumentDecisionAct
     };
 }
 
-/* @Codex */
 export function buildPatientDocumentDecision(draft: PatientDocumentReviewDraft): DocumentDecision {
     const importDecision = buildPatientImportDecision(draft);
     const evidenceRefs = buildEvidence(draft);

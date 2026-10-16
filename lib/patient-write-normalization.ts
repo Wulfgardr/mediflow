@@ -1,4 +1,3 @@
-/* @Codex */
 import { patients } from '@/lib/schema';
 import { normalizePrimaryAmbulatoryIdInput } from './patient-ambulatory-membership';
 
@@ -66,7 +65,6 @@ function normalizeBirthDateForUpdate(value: unknown): ValueResult<Date | null | 
     return { ok: true, value: parsed };
 }
 
-/* @Codex */
 // Nullable string columns (per PatientMutationRequest in the OpenAPI contract): a
 // string sets the value, an explicit `null` clears it, anything else is a no-op.
 function normalizeNullableStringField(value: unknown): string | null | undefined {
@@ -75,7 +73,6 @@ function normalizeNullableStringField(value: unknown): string | null | undefined
     return undefined;
 }
 
-/* @Codex */
 // Timestamp opzionale (es. aiSummaryGeneratedAt): stringa ISO/numero/Date -> Date,
 // null azzera, undefined e no-op. Un valore non valido viene ignorato (no-op)
 // perche e metadato derivato, non un campo critico che deve far fallire la PUT.
@@ -92,7 +89,6 @@ function hasPatientUpdatableField(values: PatientUpdateValues): boolean {
     );
 }
 
-/* @Codex */
 export function normalizePatientCreateInput(
     body: Record<string, unknown>,
     options: NormalizePatientCreateOptions
@@ -138,7 +134,6 @@ export function normalizePatientCreateInput(
     };
 }
 
-/* @Codex */
 export function normalizePatientUpdateInput(
     body: Record<string, unknown>,
     options: NormalizePatientUpdateOptions

@@ -1,7 +1,7 @@
 // A10: clinical scales ported from lib/scale-definitions.ts. A completed scale is
 // stored exactly as the web stores it: a diary entry of type "scale" whose
 // encrypted metadata carries { title, scaleId, score, interpretation, answers }.
-// @Codex MF085-002: source-bound instruments additionally carry nested instrument provenance.
+// MF085-002: source-bound instruments additionally carry nested instrument provenance.
 // Pure and unit-tested; the view drives the questions and the model submits.
 import Foundation
 
@@ -18,7 +18,7 @@ public struct ClinicalScaleQuestion: Identifiable, Equatable, Sendable {
     public let id: String
     public let text: String
     public let options: [ClinicalScaleOption]
-    // @Codex MF085-003: all current catalog items are required; optional stays explicit.
+    // MF085-003: all current catalog items are required; optional stays explicit.
     public let isRequired: Bool
 
     public init(id: String, text: String, options: [ClinicalScaleOption], isRequired: Bool = true) {
@@ -81,7 +81,7 @@ public struct ClinicalScaleDefinition: Identifiable, Equatable, Sendable {
             && lhs.instrument == rhs.instrument && lhs.isRetired == rhs.isRetired
     }
 
-    /// @Codex MF085-003: no result for partial, foreign or invalid answers; explicit zero is valid.
+    /// MF085-003: no result for partial, foreign or invalid answers; explicit zero is valid.
     public func result(from answers: [String: Int]) throws -> ClinicalScaleResult {
         guard !isRetired else { throw ClinicalScaleValidationError.inactiveInstrument }
         let ids = Set(questions.map(\.id))
@@ -157,7 +157,7 @@ public enum ClinicalScales {
             q("g7", "Tronco", [("0. Oscillazione/Flessione", 0), ("1. Stabile", 1)]),
             q("g8", "Cammino (Talloni)", [("0. Distanziati", 0), ("1. Quasi si toccano", 1)]),
         ],
-        isRetired: true, // @Codex MF085-002: preserved legacy semantics, never resubmitted.
+        isRetired: true, // MF085-002: preserved legacy semantics, never resubmitted.
         interpret: { score in
             if score <= 18 { return "ALTO Rischio di Caduta (< 19)" }
             if score <= 24 { return "MEDIO Rischio di Caduta (19-24)" }
@@ -259,7 +259,7 @@ public enum ClinicalScales {
         }
     )
 
-    // @Codex: Web/native active catalogs use only the new source-bound Tinetti ID.
+    // Web/native active catalogs use only the new source-bound Tinetti ID.
     public static let all: [ClinicalScaleDefinition] = [tinettiPOMA28V1, adl, iadl, mmse, gds]
 
     // Multi-option question factory (Tinetti/MMSE have 3/4-way options; GDS inverts
@@ -281,7 +281,7 @@ public enum ClinicalScales {
         )
     }
 
-    /// @Codex: metadata is emitted only for a canonical, complete result.
+    /// metadata is emitted only for a canonical, complete result.
     public static func metadataJSON(definition: ClinicalScaleDefinition, result: ClinicalScaleResult) throws -> String {
         let canonical = try activeDefinition(matching: definition)
         let checked = try canonical.result(from: result.answers)

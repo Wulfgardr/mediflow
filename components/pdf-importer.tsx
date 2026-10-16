@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 import type { ComponentType } from 'react';

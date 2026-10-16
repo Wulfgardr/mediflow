@@ -1,4 +1,4 @@
-/* @Codex: encrypted browser payload against the authoritative creation schema. */
+/* encrypted browser payload against the authoritative creation schema. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { db, type Attachment } from './db';

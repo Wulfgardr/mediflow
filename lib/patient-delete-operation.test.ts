@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: WUL-720 real synthetic SQLite and real Web/API-v1 DELETE route checks. */
+/* WUL-720 real synthetic SQLite and real Web/API-v1 DELETE route checks. */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';

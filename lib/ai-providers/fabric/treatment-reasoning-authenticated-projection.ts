@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../../chatgpt-product/ordinary-flow';
 
@@ -195,7 +194,7 @@ export function createTreatmentReasoningAuthenticatedProjectionBroker(sources: S
                     let projection: TreatmentReasoningProjectionAttachment;
                     try { projection = snapshotTreatmentReasoningProjectionAttachment(input.projection, clock(sources)); }
                     catch { return fail('input_invalid'); }
-                    // @Codex — never mint/read a lease port inside the owner's critical section.
+                    // never mint/read a lease port inside the owner's critical section.
                     // The original anti-reentry guard remains intact for Web and native callers.
                     const selected = selection(context, (pair) => {
                         const version = patientVersion(sources, pair.patientId, pair.ambulatoryId);

@@ -20,14 +20,10 @@ export default function SettingsAccessPage() {
     const { user, changePin, lock, unlockCredential, preparePassphraseChange } = useSecurity();
     // ADR 0143: on an account that unlocks with a passphrase the PIN no longer rotates the key wrapping.
     const passphrase = unlockCredential === 'passphrase';
-    /* @Codex */
     const [pinForm, setPinForm] = useState({ currentPin: '', newPin: '', confirmPin: '' });
-    /* @Codex */
     const [isChangingPin, setIsChangingPin] = useState(false);
-    /* @Codex */
     const [pinFeedback, setPinFeedback] = useState<null | { tone: 'success' | 'error'; message: string }>(null);
 
-    /* @Codex */
     const handleChangePin = async () => {
         setPinFeedback(null);
 
@@ -90,7 +86,7 @@ export default function SettingsAccessPage() {
                 </div>
                 ) : (
                 <div className={SETTINGS_CARD_CLASS}>
-                    {/* @Codex WUL-229: security card icon switches to MediFlow warning tone */}
+                    {/* WUL-229: security card icon switches to MediFlow warning tone */}
                     <div className="mb-5 flex items-start gap-3">
                         <div className="rounded-2xl p-2" style={{ background: 'color-mix(in srgb, var(--lume-ink) 6%, transparent)', color: 'var(--lume-ink)' }}>
                             <KeyRound className="h-4 w-4" />
@@ -158,7 +154,7 @@ export default function SettingsAccessPage() {
                         </div>
 
                         {pinFeedback && (
-                            // @Codex WUL-229: PIN feedback now uses the mf-alert tone primitives
+                            // WUL-229: PIN feedback now uses the mf-alert tone primitives
                             <div className={cn('mf-alert text-xs', pinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
                                 {pinFeedback.message}
                             </div>

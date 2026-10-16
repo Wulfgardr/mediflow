@@ -1,4 +1,4 @@
-/* @Codex — shared Lume primitives, with readable page-local sizing. */
+/* shared Lume primitives, with readable page-local sizing. */
 .panel.panel {
     display: grid;
     gap: 1.5rem;

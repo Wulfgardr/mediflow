@@ -1,4 +1,3 @@
-/* @Codex */
 
 declare const PERMIT_BRAND: unique symbol;
 declare const EXECUTION_BRAND: unique symbol;

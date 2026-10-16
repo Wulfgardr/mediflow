@@ -1,4 +1,4 @@
-/* @Codex: WUL-720 patient PUT envelope only; field validation remains with existing normalizers. */
+/* WUL-720 patient PUT envelope only; field validation remains with existing normalizers. */
 export async function parsePatientJsonObject(read: () => Promise<unknown>): Promise<
     | { ok: true; body: Record<string, unknown> }
     | { ok: false }
@@ -16,7 +16,7 @@ export async function parsePatientJsonObject(read: () => Promise<unknown>): Prom
         : { ok: false };
 }
 
-/* @Codex: WUL-720 patient-only bounded transport, after existing admission gates. */
+/* WUL-720 patient-only bounded transport, after existing admission gates. */
 import { readBoundedJsonBody } from './bounded-request-body';
 export const PATIENT_JSON_MAX_BYTES = 4_194_304;
 

@@ -1,6 +1,6 @@
 import { bindSyntheticArchiveSessions, syntheticArchiveRequest } from '../../lib/security/web-auth-lifecycle-owner-test-fixture';
 import { currentArchiveGeneration } from '../../lib/security/archive-session-generation';
-/* @Codex: invented test identities, issued by the real in-process lifecycle owner. */
+/* invented test identities, issued by the real in-process lifecycle owner. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { bootstrapControl, begin, issue, resolve } from '../../lib/security/web-auth-lifecycle-owner-adapter';

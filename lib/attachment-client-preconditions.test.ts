@@ -1,3 +1,4 @@
+import { sourceVariableDeclaration } from '../scripts/test-support/source-structure.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -64,7 +65,7 @@ test('seeder reports attachment cleanup failure after the earlier patient deleti
 
 test('document delete wiring captures before confirmation and provides explicit reread on failure', () => {
     const source = fs.readFileSync('components/document-upload.tsx', 'utf8');
-    const handler = source.slice(source.indexOf('const handleDelete ='), source.indexOf('/* @Codex: extraction-only'));
+    const handler = sourceVariableDeclaration(source, 'handleDelete');
     assert.ok(handler.indexOf('captureAttachmentWritePrecondition(file)') < handler.indexOf('await confirm('));
     assert.match(handler, /db\.attachments\.delete\(file\.id, \{ attachmentPrecondition \}\)/);
     assert.doesNotMatch(handler, /db\.attachments\.get|fetch\(/);

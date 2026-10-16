@@ -1,11 +1,10 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedPatientArchiveSheet: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: PairedPatientsWorkspaceModel
     let isArchived: Bool
-    @State private var saveFailed = false // @Codex: draft values stay in the lock-cleared model.
+    @State private var saveFailed = false // draft values stay in the lock-cleared model.
 
     var body: some View {
         NavigationStack {
@@ -40,7 +39,7 @@ struct PairedPatientArchiveSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") {
-                        model.cancelPatientArchive() // @Codex
+                        model.cancelPatientArchive()
                         dismiss()
                     }
                     .disabled(model.isWorking)
@@ -65,10 +64,10 @@ struct PairedPatientArchiveSheet: View {
                 }
             }
             .onAppear { model.startPatientArchive() }
-            // @Codex: a picker/rotation can hide this content temporarily. Only
+            // a picker/rotation can hide this content temporarily. Only
             // explicit cancel, confirmed save or the shared context clear ends it.
             .onChange(of: model.isEditingPatientArchive) { isEditing in
-                if !isEditing { dismiss() } // @Codex: lock/revocation clears and closes both views.
+                if !isEditing { dismiss() } // lock/revocation clears and closes both views.
             }
             .interactiveDismissDisabled()
         }
@@ -80,7 +79,7 @@ struct PairedPatientArchiveSheet: View {
     }
 }
 
-/* @Codex: shared form; no default cause is inferred for an archive transition. */
+/* shared form; no default cause is inferred for an archive transition. */
 struct PatientArchiveFields: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
 

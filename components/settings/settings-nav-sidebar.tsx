@@ -56,7 +56,7 @@ function NavGroups({
     );
 }
 
-/* @Codex LUME-110/68 */
+/* LUME-110/68 */
 export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () => void }) {
     const pathname = usePathname();
     return (
@@ -80,7 +80,7 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         className={styles.searchButton}
                     >
                         <span><Search aria-hidden="true" /> Cerca impostazione</span>
-                        {/* @Codex: mostra entrambi i modificatori già supportati. */}
+                        {/* mostra entrambi i modificatori già supportati. */}
                         <kbd className="lume-registro whitespace-nowrap">⌘/Ctrl + K</kbd>
                     </button>
                 ) : null}

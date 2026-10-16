@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { afterEach, test } from 'node:test';
@@ -157,7 +156,7 @@ test('production resolver has no provider, apply, Smart Import, or owner-install
     assert.doesNotMatch(source, /\.install\s*\(/u);
 });
 
-/* @Codex: post-fix ADR 0066; retained membership never makes a tombstone live. */
+/* post-fix ADR 0066; retained membership never makes a tombstone live. */
 test('canonical context denies a tombstoned patient and observes an explicit restore', (context) => {
     const { sqlite, resolve } = fixture(); context.after(() => sqlite.close());
     const session = webSession();

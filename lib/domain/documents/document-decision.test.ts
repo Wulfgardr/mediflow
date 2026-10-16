@@ -1,8 +1,5 @@
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import {
     DOCUMENT_DECISION_SCHEMA_VERSION,
     DOCUMENT_DECISION_UNSPECIFIED_GENERATED_AT,

@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type SemanticSignal = 'neutral' | 'success' | 'warning' | 'critical' | 'plum';
 

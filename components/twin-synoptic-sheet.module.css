@@ -1,4 +1,4 @@
-/* @Codex: typographic reading hierarchy, no dashboard of empty metrics. */
+/* typographic reading hierarchy, no dashboard of empty metrics. */
 .sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; color: var(--lume-ink); }
 .main { min-width: 0; }
 .sectionHead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); }
@@ -35,7 +35,7 @@
 @media (max-width: 950px) { .sheet { grid-template-columns: minmax(0, 1fr); gap: 28px; } .context { border-left: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); padding: 24px 0 0; } .fact { justify-content: flex-start; } .measure, .followup { max-width: 400px; } }
 @media (max-width: 600px) { .sheet[data-layout='stream'] .context { grid-template-columns: minmax(0,1fr); } .therapies li { grid-template-columns: minmax(0,1fr); gap: 3px; } .diagnosis { font-size: 0.9375rem; } }
 
-/* @Codex WUL-678: counts share the heading baseline and UI typeface. */
+/* WUL-678: counts share the heading baseline and UI typeface. */
 .sectionHead h2 { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
 .count { font: inherit; font-variant-numeric: tabular-nums; color: var(--lume-ink); }
 .fact :is(a,strong) { font-size: 0.9375rem; font-variant-numeric: tabular-nums; }

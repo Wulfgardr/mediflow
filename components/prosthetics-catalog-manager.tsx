@@ -1,5 +1,4 @@
 'use client';
-/* @Codex */
 import { useEffect, useRef, useState } from 'react';
 import { PROSTHETICS_COLUMNS, type ProstheticsStatus, type ProstheticsPreview, type ProstheticsReceipt, type ProstheticsManifest } from '@/lib/reference-data/prosthetics-catalog-contract';
 import { ProstheticsClientError, prostheticsRequest, readProstheticsSource, type ProstheticsSource } from '@/lib/reference-data/prosthetics-catalog-client';

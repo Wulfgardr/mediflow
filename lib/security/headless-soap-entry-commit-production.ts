@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { headlessSoapEntryCommitProductionService } from './headless-soap-entry-commit-production-internal';

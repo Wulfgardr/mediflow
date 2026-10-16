@@ -1,5 +1,4 @@
 // Codex: created 2026-05-02
-// @Codex
 import Foundation
 
 public struct HomeBaseOptionalServiceStatus: Identifiable, Equatable, Sendable {

@@ -1,4 +1,4 @@
-/* @Codex: real browser client -> HTTP -> session registry -> owner -> service;
+/* real browser client -> HTTP -> session registry -> owner -> service;
    only the external account transport is synthetic. No listener or live login. */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';

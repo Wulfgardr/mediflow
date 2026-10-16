@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -7,12 +6,10 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract, verifyNativeBinding } from './node-runtime-contract.mjs';
 
-/* @Codex */
 function cleanDiagnostic(value) {
     return String(value || '').trim().replace(/[|\t\r\n]+/g, ' ').slice(0, 240);
 }
 
-/* @Codex */
 function occupiedFromLines(lines, port, pattern) {
     for (const line of lines.split(/\r?\n/)) {
         const match = line.trim().match(pattern);
@@ -24,7 +21,6 @@ function occupiedFromLines(lines, port, pattern) {
 }
 
 /** Inspect a TCP port without conflating an inspection failure with a free port. */
-/* @Codex */
 export function inspectPort(port, options = {}) {
     if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
         return { state: 'unknown', pid: '', reason: 'invalid-port' };
@@ -81,7 +77,6 @@ export function inspectPort(port, options = {}) {
 }
 
 /** Return the listener PID when known. Kept for backwards-compatible CLI use. */
-/* @Codex */
 export function portListenerPid(port) {
     const result = inspectPort(port);
     return result.state === 'occupied' ? result.pid : '';
@@ -123,7 +118,6 @@ export function hashWorktreeStatus(status) {
     return crypto.createHash('sha1').update(normalized).digest('hex').slice(0, 12);
 }
 
-/* @Codex */
 function readGitValue(args, cwd, fallback = 'unknown', whenEmpty = fallback) {
     const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
     if (result.status !== 0) return fallback;
@@ -137,7 +131,7 @@ export function knownMainUpdates(cwd = process.cwd()) {
     return Number.isSafeInteger(count) && count > 0 ? count : 0;
 }
 
-/* @Codex: keep this algorithm identical to lib/app-revision.ts. */
+/* keep this algorithm identical to lib/app-revision.ts. */
 export function readProductIdentity(cwd = process.cwd()) {
     const resolvedCwd = path.resolve(cwd);
     const checkoutPath = path.resolve(
@@ -157,7 +151,6 @@ export function readProductIdentity(cwd = process.cwd()) {
     return { version: manifest.version.trim(), checkoutPath, revision, branch, worktreeHash, sourceFingerprint };
 }
 
-/* @Codex */
 export function classifyRevisionPayload(payload, expectedSourceFingerprint) {
     if (!payload || typeof payload !== 'object'
         || typeof payload.revision !== 'string' || !payload.revision
@@ -171,7 +164,6 @@ export function classifyRevisionPayload(payload, expectedSourceFingerprint) {
     return { ok: true, revision: payload.revision, sourceFingerprint: payload.sourceFingerprint };
 }
 
-/* @Codex */
 export async function probeRunningInstance(baseUrl, expectedSourceFingerprint, fetchImpl = globalThis.fetch) {
     try {
         const parsed = new URL(baseUrl);
@@ -190,7 +182,6 @@ export async function probeRunningInstance(baseUrl, expectedSourceFingerprint, f
     }
 }
 
-/* @Codex */
 function normalizeWaitNumber(value, fallback, minimum, maximum) {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
@@ -198,7 +189,6 @@ function normalizeWaitNumber(value, fallback, minimum, maximum) {
 }
 
 /** Poll until the exact expected MediFlow source is serving requests. */
-/* @Codex */
 export async function waitForRunningInstance(baseUrl, expectedSourceFingerprint, options = {}) {
     const timeoutMs = normalizeWaitNumber(options.timeoutMs, 30_000, 0, 120_000);
     const intervalMs = normalizeWaitNumber(options.intervalMs, 250, 1, 5_000);
@@ -228,7 +218,6 @@ export async function waitForRunningInstance(baseUrl, expectedSourceFingerprint,
 }
 
 /** Open the browser only after the exact expected instance has become ready. */
-/* @Codex */
 export async function waitForInstanceAndOpen(baseUrl, expectedSourceFingerprint, options = {}) {
     const result = await waitForRunningInstance(baseUrl, expectedSourceFingerprint, options);
     if (!result.ok) return { ...result, browserOpened: false };
@@ -241,14 +230,12 @@ export async function waitForInstanceAndOpen(baseUrl, expectedSourceFingerprint,
     return { ...result, browserOpened: true };
 }
 
-/* @Codex */
 function printIdentitySummary(identity) {
     console.log(`  Versione prodotto: ${identity.version}`);
     console.log(`  Checkout: ${identity.checkoutPath}`);
     console.log(`  Sorgente: ${identity.sourceFingerprint}`);
 }
 
-/* @Codex */
 export async function runCli(argv = process.argv.slice(2)) {
     const [cmd, ...args] = argv;
     switch (cmd) {
@@ -308,7 +295,6 @@ export async function runCli(argv = process.argv.slice(2)) {
     }
 }
 
-/* @Codex */
 const invokedAsScript = process.argv[1]
     && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 if (invokedAsScript) {

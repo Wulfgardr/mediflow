@@ -1,4 +1,3 @@
-/* @Codex */
 // WUL-747: isolated, synthetic-only descriptive projection. No production data adapter.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

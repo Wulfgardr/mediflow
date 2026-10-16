@@ -1,4 +1,4 @@
-/* @Codex — named host composition. No caller settings, readiness callback or grant. */
+/* named host composition. No caller settings, readiness callback or grant. */
 import 'server-only';
 import { createHash } from 'node:crypto';
 import { constants, openSync, closeSync, fstatSync, readSync, realpathSync } from 'node:fs';

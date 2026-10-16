@@ -1,4 +1,3 @@
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { OllamaLocalityError } from './ollama-locality';
 

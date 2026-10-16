@@ -1,4 +1,3 @@
-/* @Codex */
 export type DbChangeTable = string;
 export type DbChangeScope = readonly DbChangeTable[] | undefined;
 
@@ -19,7 +18,6 @@ type DbChangeSubscription = {
     resolveScope: () => DbChangeScope;
 };
 
-/* @Codex */
 export function createDbChangeBus() {
     const subscriptions = new Set<DbChangeSubscription>();
 

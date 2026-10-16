@@ -1,4 +1,4 @@
-/* @Codex — ONLY THIS TEST FILE supplies fake protocol/OS observations. The root,
+/* ONLY THIS TEST FILE supplies fake protocol/OS observations. The root,
  * routes, owner 0.8.7, consent and synthesis binding are the actual source. */
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';

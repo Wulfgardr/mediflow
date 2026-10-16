@@ -2,11 +2,9 @@ import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -38,7 +36,6 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 

@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { setImmediate as nextTurn } from 'node:timers/promises';

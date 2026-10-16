@@ -1,12 +1,12 @@
 'use client';
 
-/* @Codex ADR 0123: one official UI, two navigation arrangements. The isolated
+/* ADR 0123: one official UI, two navigation arrangements. The isolated
    comparison can still show Original without remounting clinical forms. */
 import { createContext, useCallback, useContext, useEffect, useId, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 export type TwinComposition = 'workbench' | 'stream';
 const DesignContext = createContext({ enabled: false, proposal: false, setProposal: (_value: boolean) => {}, composition: 'stream' as TwinComposition, setComposition: (_value: TwinComposition) => {}, pendingForms: false, registerPending: (_id: string, _pending: boolean) => {} });
-// @Codex: browser-local presentation preference only; no record identifiers.
+// browser-local presentation preference only; no record identifiers.
 const COMPOSITION_KEY = 'mediflow.runtime-twin.composition';
 const COMPOSITION_EVENT = 'mediflow:twin-composition';
 const defaultComposition = (): TwinComposition => 'stream';
@@ -35,7 +35,7 @@ export const RuntimeTwinFolderContext = createContext<string | null>(null);
 export const useRuntimeTwinDesign = () => useContext(DesignContext);
 export const useRuntimeTwinFolder = () => useContext(RuntimeTwinFolderContext);
 
-/* @Codex: form owners report only a pending bit, never clinical contents. */
+/* form owners report only a pending bit, never clinical contents. */
 export function useRuntimeTwinPendingForm(pending: boolean) {
     const { enabled, registerPending } = useRuntimeTwinDesign();
     const id = useId();

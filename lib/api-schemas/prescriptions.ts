@@ -1,4 +1,3 @@
-/* @Codex */
 import { z } from 'zod';
 import {
     dateInputSchema,
@@ -7,7 +6,6 @@ import {
     optionalTextSchema,
     requiredTextSchema,
 } from './common';
-/* @Codex */
 import {
     PROSTHETIC_PRESCRIPTION_CATEGORIES,
     PROSTHETIC_PRESCRIPTION_SOURCES,
@@ -62,7 +60,6 @@ export const prostheticPrescriptionCreateSchema = z.object({
 
 export const prostheticPrescriptionUpdateSchema = z.object({
     catalogSelection: catalogSelectionSchema.nullable().optional(),
-    /* @Codex */
     version: z.number().int().positive(),
     prescribedAt: optionalDateInputSchema,
     status: prostheticStatusSchema.optional(),
@@ -103,7 +100,6 @@ export const servicePrescriptionCreateSchema = z.object({
 });
 
 export const servicePrescriptionUpdateSchema = z.object({
-    /* @Codex */
     version: z.number().int().positive(),
     prescribedAt: optionalDateInputSchema,
     status: serviceStatusSchema.optional(),
@@ -146,7 +142,6 @@ export const servicePrescriptionItemCreateSchema = z.object({
 });
 
 export const servicePrescriptionItemUpdateSchema = z.object({
-    /* @Codex */
     version: z.number().int().positive(),
     ordinal: prescriptionOrdinalSchema,
     status: serviceStatusSchema.optional(),

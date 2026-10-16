@@ -1,4 +1,3 @@
-/* @Codex */
 import { prostheticsIdentity, prostheticsSourceId, type ProstheticsRow } from './prosthetics-catalog-contract';
 import type Database from 'better-sqlite3';
 export const PROSTHETICS_CATALOG_SQL = `

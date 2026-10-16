@@ -78,7 +78,6 @@ export type FabricDataClass =
 // proiezioni deterministiche che non producono candidati di scrittura.
 export type FabricReviewPolicy = 'review_first' | 'informational';
 
-/* @Codex */
 export type FabricAvailabilityDisposition =
     | 'available'
     | 'proposal_only'

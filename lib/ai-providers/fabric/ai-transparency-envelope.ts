@@ -1,4 +1,3 @@
-/* @Codex */
 import { CLINICAL_REVIEW_STATES, type ClinicalReviewState } from './clinical-interaction';
 import { FABRIC_CAPABILITY_DESCRIPTORS } from './catalog';
 import { assertLocalOllamaModelReference } from '../ollama-locality';

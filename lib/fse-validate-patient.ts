@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
@@ -16,14 +15,12 @@ import type {
     ValidationSummary,
 } from './fse-validate-patient-contract';
 
-/* @Codex */
 export function getFseValidatePatientId(request: Request): string | null {
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId')?.trim() ?? '';
     return patientId.length > 0 ? patientId : null;
 }
 
-/* @Codex */
 export function buildFseValidationSummary(items: ValidationItem[]): ValidationSummary {
     return {
         total: items.length,
@@ -36,7 +33,6 @@ export function buildFseValidationSummary(items: ValidationItem[]): ValidationSu
     };
 }
 
-/* @Codex */
 export async function validatePatientExport(patientId: string): Promise<ValidatePatientExportResponse | null> {
     const patient = await dbServer
         .select({ id: patients.id })

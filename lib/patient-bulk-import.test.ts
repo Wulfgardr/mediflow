@@ -1,4 +1,4 @@
-/* @Codex: synthetic fixtures only; parser tests perform no I/O. */
+/* synthetic fixtures only; parser tests perform no I/O. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {

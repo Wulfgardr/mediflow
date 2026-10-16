@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 export const CHECKUP_STATUS_TRANSITION_IPC_SCHEMA_V1 = 'mediflow.checkup-status.ipc.v1' as const;

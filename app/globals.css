@@ -3,21 +3,21 @@
 @source "../app";
 @source "../components";
 
-/* @Codex WUL-UIUX: Tailwind v4 e CSS-first e senza questa riga la variante dark:
+/* WUL-UIUX: Tailwind v4 e CSS-first e senza questa riga la variante dark:
    ricade sul default @media (prefers-color-scheme), scollegata dal toggle a classe
    del theme-provider (applyThemeClass aggiunge .dark/.light su <html>, anche per
    'system'). Legando dark: alla classe .dark, le utility dark: e i token :root.dark
    seguono la stessa sorgente: dark mode coerente per costruzione. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* @Codex: skeleton condiviso, statico e quieto. La penombra comunica attesa
+/* skeleton condiviso, statico e quieto. La penombra comunica attesa
    senza introdurre una pulsazione ambientale. */
 .mf-skeleton {
   border-radius: var(--lume-radius-card);
   background: var(--lume-surface-field);
 }
 
-/* @Codex WUL-UIUX: riga maestra densa per le liste cliniche (parametri, farmaci).
+/* WUL-UIUX: riga maestra densa per le liste cliniche (parametri, farmaci).
    Una riga = un'entita; si espande in place. Nessun bordo proprio: le righe sono
    separate da hairline dal contenitore. Focus da tastiera di prima classe. */
 .mf-listrow {
@@ -64,7 +64,7 @@
   --background: var(--lume-surface-canvas);
   --foreground: var(--lume-ink);
 
-  /* @Codex WUL-UIUX: stack tipografico unico, consumato da body e dai module
+  /* WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
   --lume-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
   --lume-font-voice: var(--font-voce), Georgia, serif;
@@ -88,7 +88,7 @@ body {
   --lume-font-voice: var(--font-voce), Georgia, serif;
   background: var(--background);
   color: var(--foreground);
-  /* @Codex: use an Apple-adjacent system stack for a calmer, more native reading rhythm */
+  /* use an Apple-adjacent system stack for a calmer, more native reading rhythm */
   font-family: var(--lume-font-sans);
   font-size: 0.875rem;
   font-weight: 400;
@@ -283,7 +283,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   min-width: 0;
 }
 
-/* @Codex WUL-229: Il workbench reale segue la composizione di riferimento:
+/* WUL-229: Il workbench reale segue la composizione di riferimento:
    command chrome first, a dominant selected-patient lens, then the operational stream. */
 :root[data-ui-style='redesign'] .patient-liquid-commandbar {
   border-radius: 28px;
@@ -531,24 +531,18 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
     background-color: color-mix(in srgb, var(--lume-ink) 5%, var(--lume-surface-field));
     transform: none;
   }
-
-  /* @Codex */
   .seeder-panel {
     @apply rounded-[var(--lume-radius-panel)] border;
     background: var(--lume-surface-field);
     border-color: color-mix(in srgb, var(--lume-ink) 12%, transparent);
     box-shadow: var(--lume-shadow-resting);
   }
-
-  /* @Codex */
   .seeder-subsection {
     @apply rounded-[var(--lume-radius-card)] border;
     background: var(--lume-surface-field);
     border-color: color-mix(in srgb, var(--lume-ink) 12%, transparent);
     box-shadow: var(--lume-shadow-resting);
   }
-
-  /* @Codex */
   .seeder-subsection-danger {
     border-color: color-mix(in srgb, var(--lume-signal-critical) 30%, transparent);
     background: color-mix(in srgb, var(--lume-signal-critical) 10%, var(--lume-surface-field));
@@ -574,15 +568,13 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
     background-color: color-mix(in srgb, var(--lume-accent) 90%, var(--lume-ink));
   }
 
-  /* @Codex WUL-UIUX: la CTA primaria piu usata non aveva alcun anello di focus. */
+  /* WUL-UIUX: la CTA primaria piu usata non aveva alcun anello di focus. */
   .ui-btn-primary:focus-visible {
     outline: none;
     box-shadow:
       0 0 0 2px var(--lume-surface-canvas),
       0 0 0 4px var(--lume-accent);
   }
-
-  /* @Codex */
   .clinical-rich-text,
   .clinical-rich-editor {
     font: var(--type-prose);
@@ -663,8 +655,6 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
     white-space: pre-wrap;
     pointer-events: none;
   }
-
-  /* @Codex */
   .clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -687,7 +677,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   width: var(--prog-width, 0%);
 }
 
-/* @Codex: Graphite patient/SISS reusable surfaces: dense, dark-mode aware,
+/* Graphite patient/SISS reusable surfaces: dense, dark-mode aware,
    no decorative gradients. Built on the same surface language as
    .patient-detail-section so the SISS panel scans like sibling content. */
 
@@ -727,7 +717,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   line-height: 1.2;
 }
 
-/* @Codex WUL-515: ricette semantiche Lume condivise dai registri giorno e grafite. */
+/* WUL-515: ricette semantiche Lume condivise dai registri giorno e grafite. */
 .graphite-chip-tone-info {
   border-color: color-mix(in srgb, var(--lume-accent) 24%, transparent);
   background-color: color-mix(in srgb, var(--lume-accent) 8%, var(--lume-surface-field));
@@ -980,7 +970,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   color: color-mix(in srgb, var(--lume-signal-warning) 60%, var(--lume-ink));
 }
 
-/* @Codex: Patient identity lens: code pills that work in dark too. */
+/* Patient identity lens: code pills that work in dark too. */
 .patient-code-pill {
   display: inline-flex;
   align-items: center;
@@ -1005,7 +995,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   color: var(--lume-ink);
 }
 
-/* @Codex: superfici Lume opache per chrome, workspace e chip. */
+/* superfici Lume opache per chrome, workspace e chip. */
 :root[data-ui-style='redesign'] .mediflow-sidebar-shell,
 :root[data-ui-style='redesign'] .mediflow-mobile-header {
   background-color: var(--lume-surface-chrome);
@@ -1088,11 +1078,11 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   }
 }
 
-/* @Codex WUL-229: Primitive Lume riusabili applicate a form,
+/* WUL-229: Primitive Lume riusabili applicate a form,
    modals, dropdowns, secondary buttons and semantic alert blocks so individual
    pages avoid hand-rolled palette utilities. */
 
-/* @Codex WUL-UIUX: .input-field era usata in form prestazioni/protesica/SISS
+/* WUL-UIUX: .input-field era usata in form prestazioni/protesica/SISS
    ma non definita da nessuna parte (input nativi senza superficie ne focus ring).
    La si allinea a .mf-input cosi decine di campi rientrano nel sistema. */
 .mf-input,
@@ -1137,7 +1127,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   cursor: not-allowed;
 }
 
-/* @Codex Le textarea che usano .input-field devono poter crescere verticalmente. */
+/* Le textarea che usano .input-field devono poter crescere verticalmente. */
 textarea.input-field {
   resize: vertical;
 }
@@ -1148,7 +1138,7 @@ textarea.input-field {
   border-radius: var(--lume-radius-control);
 }
 
-/* @Codex WUL-339: ICD autocomplete uses inset icons, so compact input padding
+/* WUL-339: ICD autocomplete uses inset icons, so compact input padding
    must not place the typed diagnosis under the search glyph. */
 .icd-autocomplete-input.mf-input-sm {
   padding-left: 2.35rem;
@@ -1210,7 +1200,7 @@ textarea.input-field {
 }
 
 /* Secondary button: calm chrome companion to .ui-btn-primary */
-/* @Codex WUL-UIUX: '.ui-btn-secondary' era usata in service-/prosthetic-
+/* WUL-UIUX: '.ui-btn-secondary' era usata in service-/prosthetic-
    prescription-manager ma non definita (bottoni nativi non stilizzati). Stesso
    approccio di '.input-field': la si allinea a '.mf-btn-secondary'. */
 .mf-btn-secondary,
@@ -1371,7 +1361,7 @@ textarea.input-field {
   color: var(--lume-ink);
 }
 
-/* @Codex WUL-UIUX: anello di focus da tastiera per le righe dei popover risultati
+/* WUL-UIUX: anello di focus da tastiera per le righe dei popover risultati
    (autocomplete). Prima mancava e alcuni consumer azzeravano l'outline. */
 .mf-popover-row:focus-visible {
   outline: none;
@@ -1392,7 +1382,7 @@ textarea.input-field {
   line-height: 1.5;
 }
 
-/* @Codex WUL-515: stessi pesi misurati per testo e tinta dei chip graphite. */
+/* WUL-515: stessi pesi misurati per testo e tinta dei chip graphite. */
 .mf-alert-info {
   border-color: color-mix(in srgb, var(--lume-accent) 24%, transparent);
   background-color: color-mix(in srgb, var(--lume-accent) 8%, var(--lume-surface-field));
@@ -1512,7 +1502,7 @@ textarea.input-field {
   box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 10%, transparent);
 }
 
-/* @Codex WUL-UIUX: le option-card (scale da 30+ domande) erano operabili da
+/* WUL-UIUX: le option-card (scale da 30+ domande) erano operabili da
    tastiera ma senza indicatore di focus visibile. */
 .mf-option-card:focus-visible {
   outline: none;
@@ -1550,7 +1540,7 @@ textarea.input-field {
 .mf-eyebrow {
   margin: 0;
   font-size: 0.75rem;
-  /* @Codex WUL-UIUX: 800 faceva pesare l'etichetta piu del valore che introduce. */
+  /* WUL-UIUX: 800 faceva pesare l'etichetta piu del valore che introduce. */
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -1579,7 +1569,7 @@ textarea.input-field {
   margin-top: 0.3rem;
 }
 
-/* @Codex WUL-273: legacy tone modifiers now inherit the neutral CTA language. */
+/* WUL-273: legacy tone modifiers now inherit the neutral CTA language. */
 .ui-btn-primary.mf-tone-success {
   background: var(--lume-signal-success);
   box-shadow: none;
@@ -1600,7 +1590,7 @@ textarea.input-field {
   background: var(--lume-signal-success);
 }
 
-/* @Codex WUL-UIUX: le varianti di tono (.mf-tone-*) sono unlayered e il loro
+/* WUL-UIUX: le varianti di tono (.mf-tone-*) sono unlayered e il loro
    box-shadow statico copriva l'anello :focus-visible definito nel layer. Questa
    regola unlayered, dopo le varianti, garantisce l'anello di focus da tastiera su
    tutti i primari, toni inclusi (es. la CTA distruttiva "elimina paziente"). */
@@ -1611,7 +1601,7 @@ textarea.input-field {
     0 0 0 4px var(--lume-accent);
 }
 
-/* @Codex WUL-229: workbench Lume opaco, con chrome, fuoco e campo distinti. */
+/* WUL-229: workbench Lume opaco, con chrome, fuoco e campo distinti. */
 :root[data-ui-style='redesign'] .patient-liquid-workbench {
   isolation: isolate;
   position: relative;
@@ -1741,7 +1731,7 @@ textarea.input-field {
   background: var(--lume-signal-warning);
 }
 
-/* @Codex WUL-273: neutral adapter for legacy Tailwind chroma.
+/* WUL-273: neutral adapter for legacy Tailwind chroma.
    State should be carried by copy, hierarchy and enabled/disabled controls first.
    Red critical states remain untouched; older blue/green/amber/purple accents are
    mapped to the graphite redesign language. A component may opt out with the

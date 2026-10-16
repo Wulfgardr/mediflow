@@ -1,4 +1,4 @@
-/* @Codex — named host orchestration. Original function handlers own acquisition
+/* named host orchestration. Original function handlers own acquisition
  * and publication. This registry never turns a prompt/source/DTO into authority. */
 import 'server-only';
 import { nativeOrdinaryHostSourceSignal, nativeOrdinarySourceMatchesGrant, nativeOrdinarySourceAcquisition, nativeOrdinaryHostSourcesAreCurrent, readNativeOrdinaryHostSource, closeNativeOrdinaryHostSources,

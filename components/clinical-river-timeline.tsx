@@ -2,7 +2,7 @@
 
 import { CalendarClock, FileText, ScanText, Stethoscope } from 'lucide-react';
 
-/* @Codex WUL-678: substrate rows share the node center with the chronological axis. */
+/* WUL-678: substrate rows share the node center with the chronological axis. */
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
 import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
@@ -34,7 +34,7 @@ const ENTRY_TYPE_LABELS: Record<string, string> = {
 };
 
 /*
- * @Codex Niente meta-testo: il riassunto usa SEMPRE il contenuto reale della voce
+ * Niente meta-testo: il riassunto usa SEMPRE il contenuto reale della voce
  * (compactClinicalRichText). Il tipo viaggia come etichetta, non sostituisce il
  * testo, cosi un esame patologico non appare identico a uno normale.
  */
@@ -121,7 +121,7 @@ export function ClinicalRiverTimeline({
     documentInsights,
 }: ClinicalRiverTimelineProps) {
     const items = buildRiverItems(entries, checkups, documentInsights);
-    /* @Codex Conteggio onesto: la river e una anteprima, non l'elenco completo. */
+    /* Conteggio onesto: la river e una anteprima, non l'elenco completo. */
     const totalAvailable =
         entries.filter((entry) => !entry.deletedAt).length + checkups.length + documentInsights.length;
     const hiddenCount = Math.max(totalAvailable - items.length, 0);

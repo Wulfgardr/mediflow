@@ -1,4 +1,4 @@
-/* @Codex Issue 109, riferimento 68 */
+/* Issue 109, riferimento 68 */
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 

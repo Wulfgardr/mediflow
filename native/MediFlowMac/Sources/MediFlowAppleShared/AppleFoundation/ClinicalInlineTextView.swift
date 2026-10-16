@@ -4,7 +4,7 @@ import MediFlowCore
 #if os(macOS)
 import AppKit
 
-/* @Codex: One native text surface per supported block, with a local undo stack. */
+/* One native text surface per supported block, with a local undo stack. */
 final class ClinicalNativeTextView: NSTextView, ClinicalInlineEditingSurface {
     let inlineUndoManager = UndoManager()
     var onFocus: (() -> Void)?
@@ -50,7 +50,6 @@ final class ClinicalNativeTextView: NSTextView, ClinicalInlineEditingSurface {
     }
 }
 
-/* @Codex */
 struct ClinicalInlineTextView: NSViewRepresentable {
     @Binding var document: ClinicalRichTextEditorDocument
     let blockID: UUID
@@ -122,7 +121,6 @@ struct ClinicalInlineTextView: NSViewRepresentable {
 #else
 import UIKit
 
-/* @Codex */
 final class ClinicalNativeTextView: UITextView, ClinicalInlineEditingSurface {
     let inlineUndoManager = UndoManager()
     var onStyle: ((ClinicalInlineStyle) -> Void)?
@@ -159,7 +157,6 @@ final class ClinicalNativeTextView: UITextView, ClinicalInlineEditingSurface {
     @objc private func requestUnderline() { onStyle?(.underline) }
 }
 
-/* @Codex */
 struct ClinicalInlineTextView: UIViewRepresentable {
     @Binding var document: ClinicalRichTextEditorDocument
     let blockID: UUID

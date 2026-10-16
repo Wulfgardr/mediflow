@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: synthetic real-SQLite characterization of eight ambulatory writes. */
+/* synthetic real-SQLite characterization of eight ambulatory writes. */
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -111,7 +111,7 @@ function snapshot() {
         audit: sql.prepare('SELECT * FROM audit_events ORDER BY rowid').all(),
     };
 }
-/* @Codex: reset only this test's synthetic domain rows; audit remains append-only. */
+/* reset only this test's synthetic domain rows; audit remains append-only. */
 function resetSyntheticDomain() {
     dbServer.delete(schema.entries).run();
     dbServer.delete(schema.patientsToAmbulatories).run();
@@ -262,7 +262,7 @@ test('clear faults at second patient audit, second tombstone and membership remo
     }
 });
 
-/* @Codex: admission failures do not write domain rows or audit events. */
+/* admission failures do not write domain rows or audit events. */
 test('stale versions, denial, linked patients, duplicate ID, and retry have no side effects', async () => {
     if (baseline) return;
     for (const op of operations.filter(value => !value.endsWith('create'))) {
@@ -307,7 +307,7 @@ test('stale versions, denial, linked patients, duplicate ID, and retry have no s
     assert.deepEqual(snapshot(), linkedBefore);
 });
 
-/* @Codex: preserve current input representation and ignore caller-selected audit surface. */
+/* preserve current input representation and ignore caller-selected audit surface. */
 test('omission, null, ignored fields, and actor surface retain their meaning', async () => {
     if (baseline) return;
     resetSyntheticDomain();
@@ -336,7 +336,7 @@ test('omission, null, ignored fields, and actor surface retain their meaning', a
     assert.ok(!(snapshot().audit as Array<Record<string, unknown>>).some(event => JSON.stringify(event).includes('ENC:synthetic:note')));
 });
 
-/* @Codex: a process barrier proves default promotion on separate SQLite connections. */
+/* a process barrier proves default promotion on separate SQLite connections. */
 function launchContender(targetId: string) {
     const child = spawn(process.execPath, ['scripts/run-strip-types.mjs', 'scripts/fixtures/ambulatory-atomic-process.ts', targetId],
         { cwd: process.cwd(), env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir } });

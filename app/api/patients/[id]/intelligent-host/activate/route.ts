@@ -1,5 +1,4 @@
 import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
-/* @Codex */
 import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { createPortableSupervisorWebSessionActivationHttpHandlerV1 } from '@/lib/security/portable-supervisor-web-session-http';
 import { activatePortableSupervisorWebSessionV1 } from '@/lib/security/portable-supervisor-web-session-controller';

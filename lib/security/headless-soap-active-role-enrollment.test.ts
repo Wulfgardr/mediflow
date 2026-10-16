@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { test } from 'node:test';
@@ -15,7 +14,7 @@ const USERNAME = 'synthetic-soap-admin';
 const SESSION_ID = 'a'.repeat(64);
 const NOW = Math.floor(Date.now() / 1_000) * 1_000;
 const TTL_MS = 8 * 60 * 60 * 1_000;
-// @Codex: future fixtures must remain future under full-suite CI scheduling.
+// future fixtures must remain future under full-suite CI scheduling.
 const FUTURE = NOW + TTL_MS;
 const baseSession = { id: SESSION_ID, userId: ACTOR, username: USERNAME, role: 'admin', authChannel: 'web', createdAt: NOW - 2_000, expiresAt: NOW + TTL_MS };
 function session(change: Record<string, unknown> = {}): unknown {

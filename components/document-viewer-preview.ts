@@ -1,4 +1,4 @@
-/* @Codex — only caller-owned in-memory bytes; never fetch an input URL. */
+/* only caller-owned in-memory bytes; never fetch an input URL. */
 import { assertSourceSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
 import { inspectRaster, previewMagic, type RasterMime } from './document-viewer-image-header.ts';
 import { PreviewScope } from './document-viewer-scope.ts';

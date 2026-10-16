@@ -10,7 +10,6 @@ export { HeadlessSoapActiveRoleAttestationSchemaError, HeadlessSoapEntryCommitSc
 export type { HeadlessSoapActiveRoleAttestationSchemaErrorCode, HeadlessSoapEntryCommitSchemaErrorCode } from '@/lib/sqlite-schema';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
-/* @Codex */
 import fs from 'fs';
 import path from 'path';
 import { resolveDataPath } from '@/lib/data-dir';
@@ -36,7 +35,6 @@ export function openDbServer(): Database.Database {
     openState = 'opening';
     try {
         const isNextProductionBuild = process.env.NEXT_PHASE === 'phase-production-build';
-        /* @Codex */
         dbPath = isNextProductionBuild ? ':memory:' : resolveDataPath('medical.db');
         const legacyDbPath = path.join(process.cwd(), 'medical.db');
 
@@ -135,7 +133,6 @@ const sqliteHandle = new Proxy({} as Database.Database, {
 // Explicit config avoids Drizzle inspecting proxy.constructor during import.
 export const dbServer = drizzle({ client: sqliteHandle });
 
-/* @Codex */
 /** Runs a bounded DB mutation under SQLite's writer lock so stale readers cannot race a CAS decision. */
 export function runDbServerImmediateTransaction<T>(operation: () => T): T {
     return openDbServer().transaction(operation).immediate();

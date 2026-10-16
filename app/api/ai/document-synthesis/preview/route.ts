@@ -1,5 +1,4 @@
 import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
-/* @Codex */
 import { withFunctionModelDispatch } from '@/lib/ai-providers/fabric/function-model-preferences-production';
 import { acquireDocumentSynthesisProductionOperation } from '@/lib/ai-providers/fabric/document-synthesis-production-operation';
 import { createDocumentSynthesisPreviewHttpHandler } from '@/lib/ai-providers/fabric/document-synthesis-production-http';

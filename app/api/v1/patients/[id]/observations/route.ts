@@ -1,5 +1,4 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
@@ -7,28 +6,23 @@ import { observations } from '@/lib/schema';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
 import type { ObservationSummary } from '@/lib/api/v1/types';
-/* @Codex */
 import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
-/* @Codex */
 import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
 import { createObservationOperation } from '@/lib/observation-write-operation';
 import { observationChangedFields, observationCreateId, readObservationJsonObject, validateObservationInput } from '@/lib/observation-write-input';
 
-/* @Codex */
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value as string | number);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-/* @Codex */
 function parseDateParam(value: string | null): Date | null {
     if (!value) return null;
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/* @Codex */
 function parseLimit(value: string | null): number | null {
     if (!value) return null;
     const parsed = Number.parseInt(value, 10);

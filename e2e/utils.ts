@@ -1,10 +1,9 @@
-/* @Codex */
 import { expect, Locator, Page } from '@playwright/test';
 import { generateMasterKey, wrapMasterKeyVersioned } from '../lib/security/security';
 import { checkPassphrase } from '../lib/security/unlock-credential';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
-/* @Codex The widths exercise responsive reflow only. They are intentionally
+/* The widths exercise responsive reflow only. They are intentionally
    not labelled as browser zoom: Playwright does not provide a reliable
    page-zoom primitive for layout assertions in this harness. */
 export const REFLOW_PROXY_VIEWPORTS = [
@@ -18,7 +17,7 @@ export type ReflowProxyViewport = (typeof REFLOW_PROXY_VIEWPORTS)[number];
 
 type OverflowTarget = { label: string; selector: string };
 
-/* @Codex ADR 0123: reach a clinical pane through the ordinary section menu,
+/* ADR 0123: reach a clinical pane through the ordinary section menu,
    including sections disclosed under "Altre sezioni". */
 export async function openPatientSection(page: Page, id: string): Promise<void> {
   const navigation = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
@@ -29,13 +28,12 @@ export async function openPatientSection(page: Page, id: string): Promise<void> 
   await expect(link).toBeVisible();
   await link.click();
   await expect(link).toHaveAttribute('aria-current', 'location');
-  // @Codex: ordinary sections use navigation state and visibility; the twin-only
+  // ordinary sections use navigation state and visibility; the twin-only
   // data-folder-active attribute is not part of their contract.
   const pane = page.locator(`#${id}`);
   await expect(pane).toBeVisible();
 }
 
-/* @Codex */
 export async function assertNoHorizontalOverflow(page: Page, targets: readonly OverflowTarget[]): Promise<void> {
   const evidence = await page.evaluate((requestedTargets) => requestedTargets.map(({ label, selector }) => {
     const element = selector === 'document' ? document.documentElement : document.querySelector<HTMLElement>(selector);
@@ -50,7 +48,6 @@ export async function assertNoHorizontalOverflow(page: Page, targets: readonly O
   }
 }
 
-/* @Codex */
 export async function assertNotClippedInViewport(locator: Locator, label: string): Promise<void> {
   const box = await locator.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -61,7 +58,6 @@ export async function assertNotClippedInViewport(locator: Locator, label: string
   expect(box.right, `${label}: bordo destro fuori viewport`).toBeLessThanOrEqual(box.viewportWidth + 1);
 }
 
-/* @Codex */
 export async function assertKeyboardFocusProgresses(page: Page, origin: Locator, label: string): Promise<void> {
   await origin.focus();
   await expect(origin, `${label}: focus iniziale`).toBeFocused();
@@ -70,7 +66,6 @@ export async function assertKeyboardFocusProgresses(page: Page, origin: Locator,
   expect(await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement !== document.body), `${label}: Tab deve raggiungere un controllo`).toBe(true);
 }
 
-/* @Codex */
 export async function isVisible(locator: Locator, timeout = 1200): Promise<boolean> {
   try {
     await locator.first().waitFor({ state: 'visible', timeout });
@@ -80,7 +75,6 @@ export async function isVisible(locator: Locator, timeout = 1200): Promise<boole
   }
 }
 
-/* @Codex */
 async function hasSecurityOverlay(page: Page): Promise<boolean> {
   // WUL-274/Kree8: the lock chrome moved to the Kree8 lock shell
   // (components/lock-screen.tsx). The unlock title is now "Sblocca MediFlow"
@@ -96,7 +90,6 @@ async function hasSecurityOverlay(page: Page): Promise<boolean> {
   return surfaces.some(Boolean);
 }
 
-/* @Codex */
 async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   if (await hasSecurityOverlay(page)) return false;
 
@@ -145,7 +138,6 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
   await page.reload();
 }
 
-/* @Codex */
 export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
   if (!(await isVisible(lockHeading))) return;
@@ -153,7 +145,7 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   const pinInput = page.getByLabel('PIN operatore').first();
   const unlockButton = page.getByRole('button', { name: /Sblocca/ }).first();
 
-  /* @Codex: a tab without its local key first offers explicit session renewal.
+  /* a tab without its local key first offers explicit session renewal.
      Observe that real UI state and its receipt before entering the PIN. */
   const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
   if (await renew.isVisible() && await renew.isEnabled()) await renew.click();
@@ -172,7 +164,6 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   }
 }
 
-/* @Codex */
 export async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<void> {
   const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
   if (!(await isVisible(setupHeading))) return;
@@ -188,14 +179,13 @@ export async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<v
   await page.waitForTimeout(300);
 }
 
-/* @Codex */
 export async function bootstrapUnlockedSession(page: Page, pin: string): Promise<void> {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     if (await hasStableUnlockedShell(page)) {
-      // @Codex: unrelated E2E flows use the always-available manual entry.
+      // unrelated E2E flows use the always-available manual entry.
       if (await isVisible(page.getByTestId('work-profile-onboarding'))) {
         await page.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
       }
@@ -212,7 +202,6 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
   }
 }
 
-/* @Codex */
 async function openAiSettingsPage(page: Page, route: 'funzioni' | 'modelli'): Promise<void> {
   await page.goto(`/settings/ai/${route}`);
   await expect(page).toHaveURL(new RegExp(`/settings/ai/${route}$`));
@@ -229,7 +218,6 @@ export async function openAiModelsSettings(page: Page): Promise<void> {
   await openAiSettingsPage(page, 'modelli');
 }
 
-/* @Codex */
 export async function setAiLaneKillSwitch(page: Page, key: string, value: 'enabled' | 'disabled'): Promise<void> {
   await page.evaluate(async ({ settingKey, settingValue }) => {
     const response = await fetch('/api/settings', {
@@ -243,7 +231,6 @@ export async function setAiLaneKillSwitch(page: Page, key: string, value: 'enabl
   }, { settingKey: key, settingValue: value });
 }
 
-/* @Codex */
 export async function waitForUnlockedInteractiveShell(page: Page): Promise<void> {
   // WUL-274/Kree8: the lock shell is identified by aria-label="MediFlow lock screen"
   // (components/lock-screen.tsx). The setup and onboarding surfaces are keyed by their

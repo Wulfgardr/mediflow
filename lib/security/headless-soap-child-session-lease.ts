@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { types } from 'node:util';
 import type { HeadlessSoapActiveRoleDependentRegistrationV1, HeadlessSoapActiveRoleSessionGrantV1 } from './headless-soap-active-role-session-grant';

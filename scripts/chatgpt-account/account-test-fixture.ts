@@ -1,4 +1,4 @@
-/* @Codex: synthetic transport only; never used by production composition. */
+/* synthetic transport only; never used by production composition. */
 import type { AccountNotice } from '../../lib/chatgpt-account/account-contract';
 import type { AccountMethod, AccountNotification, AccountTransport } from '../../lib/chatgpt-account/account-protocol';
 export const syntheticLogin = { type: 'chatgpt', loginId: 'synthetic-login-1', authUrl: 'https://auth.openai.com/oauth/authorize?state=synthetic-state' };

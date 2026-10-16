@@ -1,4 +1,4 @@
-/* @Codex — same authenticated projection lease; no local/ATHENA attestation. */
+/* same authenticated projection lease; no local/ATHENA attestation. */
 import 'server-only';
 import { types } from 'node:util';
 import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata, ordinaryApplicationIsCurrent } from '../../chatgpt-product/ordinary-flow';

@@ -1,4 +1,4 @@
-/* @Codex: Focused FD hygiene regression. No downloads, provider, account or production issuer.
+/* Focused FD hygiene regression. No downloads, provider, account or production issuer.
  * node --test native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs
  * Compiles exact function excerpts, not a portable production custodian.
  * Linux uses a TEST-ONLY /proc/self/fd enumerator; Darwin uses real libproc.

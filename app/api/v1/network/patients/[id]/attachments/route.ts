@@ -1,21 +1,15 @@
-/* @Codex */
 import { withNetworkAttachmentJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_ATTACHMENT_READ_CAPABILITY,
     listNetworkScopedAttachments,
 } from '@/lib/network-attachment-read';
-/* @Codex */
 import {
     NETWORK_ATTACHMENT_WRITE_CAPABILITY,
     createNetworkScopedAttachment,
 } from '@/lib/network-attachment-write';
-/* @Codex */
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
 
-/* @Codex */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -30,7 +24,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 }
 
-/* @Codex */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -45,7 +38,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             return NextResponse.json(result.value, { status: result.status });
         });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API POST /api/v1/network/patients/[id]/attachments error:', error);

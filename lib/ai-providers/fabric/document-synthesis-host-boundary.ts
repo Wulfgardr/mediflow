@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 
 export const DOCUMENT_SYNTHESIS_HOST_BOUNDARY_SCHEMA_VERSION = 'mediflow.document-synthesis.host-boundary.v1' as const;

@@ -1,4 +1,3 @@
-/* @Codex */
 import type {
     PatientDocumentReviewDiagnosis,
     PatientDocumentReviewDraft,
@@ -8,10 +7,8 @@ import type {
     ReviewedPatientImportDefaults,
 } from './patient-document-review';
 
-/* @Codex */
 export const PATIENT_IMPORT_DECISION_SCHEMA_VERSION = 'mediflow.patient_import_decision.v1';
 
-/* @Codex */
 export interface ExistingPatientIdentityCandidate {
     id: string;
     taxCode?: string;
@@ -20,7 +17,6 @@ export interface ExistingPatientIdentityCandidate {
     birthDate?: Date | string | null;
 }
 
-/* @Codex */
 export interface DecidePatientImportTargetInput {
     taxCode?: string;
     firstName?: string;
@@ -29,7 +25,6 @@ export interface DecidePatientImportTargetInput {
     candidates: ExistingPatientIdentityCandidate[];
 }
 
-/* @Codex */
 export type PatientImportTargetDecision =
     | {
         action: 'create_new_patient';
@@ -48,7 +43,6 @@ export type PatientImportTargetDecision =
         rationale: string;
     };
 
-/* @Codex */
 export interface PatientImportFieldDecision {
     key: PatientDocumentReviewField['key'];
     label: string;
@@ -59,7 +53,6 @@ export interface PatientImportFieldDecision {
     rationale: string;
 }
 
-/* @Codex */
 export interface PatientImportDiagnosisDecision {
     id: string;
     code: string;
@@ -71,7 +64,6 @@ export interface PatientImportDiagnosisDecision {
     rationale: string;
 }
 
-/* @Codex */
 export interface PatientImportTherapyDecision {
     id: string;
     drugName: string;
@@ -88,7 +80,6 @@ export interface PatientImportTherapyDecision {
     rationale: string;
 }
 
-/* @Codex */
 export interface PatientImportServicePrescriptionDecision {
     id: string;
     serviceName: string;
@@ -116,7 +107,6 @@ export interface PatientImportServicePrescriptionDecision {
     }>;
 }
 
-/* @Codex */
 export interface PatientImportDecision {
     schemaVersion: typeof PATIENT_IMPORT_DECISION_SCHEMA_VERSION;
     generatedAt: string;
@@ -141,13 +131,11 @@ export interface PatientImportDecision {
     };
 }
 
-/* @Codex */
 export interface BuildPatientImportDecisionOptions {
     generatedAt?: Date;
     target?: PatientImportTargetDecision;
 }
 
-/* @Codex */
 function normalizeText(value: string | undefined): string {
     return (value || '')
         .normalize('NFKD')
@@ -157,12 +145,10 @@ function normalizeText(value: string | undefined): string {
         .trim();
 }
 
-/* @Codex */
 function normalizeTaxCode(value: string | undefined): string {
     return (value || '').replace(/\s+/g, '').toUpperCase();
 }
 
-/* @Codex */
 function normalizeDate(value: Date | string | null | undefined): string {
     if (!value) return '';
     const date = value instanceof Date ? value : new Date(value);
@@ -170,7 +156,6 @@ function normalizeDate(value: Date | string | null | undefined): string {
     return date.toISOString().slice(0, 10);
 }
 
-/* @Codex */
 function isStructuredTherapyCandidate(
     medication: Pick<PatientDocumentReviewMedication, 'drugName' | 'dosage' | 'therapyState'>,
 ): boolean {
@@ -179,7 +164,6 @@ function isStructuredTherapyCandidate(
         && Boolean(medication.dosage?.trim());
 }
 
-/* @Codex */
 function buildTherapyAppendReason(medication: PatientDocumentReviewMedication): string {
     if (medication.blockedReason?.trim()) return medication.blockedReason.trim();
     if (medication.therapyState !== 'active') {
@@ -194,7 +178,6 @@ function buildTherapyAppendReason(medication: PatientDocumentReviewMedication): 
     return 'Terapia da riconciliare manualmente prima di una write strutturata.';
 }
 
-/* @Codex */
 function buildMedicationNoteBlock(therapies: PatientImportTherapyDecision[]): string | undefined {
     if (therapies.length === 0) return undefined;
 
@@ -211,7 +194,6 @@ function buildMedicationNoteBlock(therapies: PatientImportTherapyDecision[]): st
     ].join('\n');
 }
 
-/* @Codex */
 function buildFieldDecision(field: PatientDocumentReviewField): PatientImportFieldDecision {
     return {
         key: field.key,
@@ -226,7 +208,6 @@ function buildFieldDecision(field: PatientDocumentReviewField): PatientImportFie
     };
 }
 
-/* @Codex */
 function buildDiagnosisDecision(diagnosis: PatientDocumentReviewDiagnosis): PatientImportDiagnosisDecision {
     if (!diagnosis.included) {
         return {
@@ -267,7 +248,6 @@ function buildDiagnosisDecision(diagnosis: PatientDocumentReviewDiagnosis): Pati
     };
 }
 
-/* @Codex */
 function buildTherapyDecision(medication: PatientDocumentReviewMedication): PatientImportTherapyDecision {
     if (!medication.included) {
         return {
@@ -322,7 +302,6 @@ function buildTherapyDecision(medication: PatientDocumentReviewMedication): Pati
     };
 }
 
-/* @Codex */
 function buildServicePrescriptionDecision(item: PatientDocumentReviewServicePrescription): PatientImportServicePrescriptionDecision {
     return {
         id: item.id,
@@ -354,7 +333,6 @@ function buildServicePrescriptionDecision(item: PatientDocumentReviewServicePres
     };
 }
 
-/* @Codex */
 export function decidePatientImportTarget(input: DecidePatientImportTargetInput): PatientImportTargetDecision {
     const normalizedTaxCode = normalizeTaxCode(input.taxCode);
     const taxCodeMatches = normalizedTaxCode
@@ -418,7 +396,6 @@ export function decidePatientImportTarget(input: DecidePatientImportTargetInput)
     };
 }
 
-/* @Codex */
 export function buildPatientImportDecision(
     draft: PatientDocumentReviewDraft,
     options: BuildPatientImportDecisionOptions = {},
@@ -459,7 +436,6 @@ export function buildPatientImportDecision(
     };
 }
 
-/* @Codex */
 export function applyPatientImportDecision(
     decision: PatientImportDecision,
 ): ReviewedPatientImportDefaults {
@@ -570,7 +546,6 @@ export function applyPatientImportDecision(
     return nextDefaults;
 }
 
-/* @Codex */
 export function serializePatientImportDecision(decision: PatientImportDecision): string {
     return JSON.stringify(decision);
 }

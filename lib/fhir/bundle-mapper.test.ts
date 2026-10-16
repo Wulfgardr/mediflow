@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
-/* @Codex */
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { buildFhirBundleFromRecords } from './bundle-mapper';
 import type { FhirBundleInput } from './types';
 
-/* @Codex: reuse the synthetic legacy fixture; it is not a v2 parity gate. */
+/* reuse the synthetic legacy fixture; it is not a v2 parity gate. */
 function readLegacyFixture(): FhirBundleInput {
     return JSON.parse(readFileSync(
         new URL('../../native/contracts/fhir-golden-input.v1.json', import.meta.url),
@@ -14,7 +13,6 @@ function readLegacyFixture(): FhirBundleInput {
     )) as FhirBundleInput;
 }
 
-/* @Codex */
 test('Bundle.timestamp preserves the supplied export instant for string and Date inputs', () => {
     const input = readLegacyFixture();
     for (const generatedAt of ['2026-09-06T14:30:00+02:00', new Date('2026-09-06T12:30:00Z')]) {
@@ -25,7 +23,6 @@ test('Bundle.timestamp preserves the supplied export instant for string and Date
     }
 });
 
-/* @Codex */
 test('legacy fixture exports selected identity, diagnoses, therapy details and observations', () => {
     const input = readLegacyFixture();
     const resources = buildFhirBundleFromRecords(input).entry?.map(({ resource }) => resource) ?? [];
@@ -66,7 +63,6 @@ test('legacy fixture exports selected identity, diagnoses, therapy details and o
     assert.equal(numeric?.note?.[0].text, input.observations[0].notes);
 });
 
-/* @Codex */
 test('FHIR v0 omits diary prose, exemptions and checkups and filters deleted diary entries', () => {
     const input = readLegacyFixture();
     input.entries.push({ ...input.entries[0], id: 'deleted-entry', deletedAt: input.generatedAt });
@@ -84,7 +80,6 @@ test('FHIR v0 omits diary prose, exemptions and checkups and filters deleted dia
         resource?.resourceType === 'Encounter' && resource.id === input.entries[0].id));
 });
 
-/* @Codex */
 test('buildFhirBundleFromRecords maps a minimal patient fixture deterministically', () => {
     const input: FhirBundleInput = {
         generatedAt: '2026-07-08T09:00:00.000Z',
@@ -164,7 +159,6 @@ test('buildFhirBundleFromRecords maps scale metadata to an Observation resource'
     assert.deepEqual(observation?.code, { text: 'ADL (Indice di Katz)' });
 });
 
-/* @Codex */
 test('diagnoses without persisted ids keep unique deterministic Condition ids', () => {
     const input: FhirBundleInput = {
         generatedAt: '2026-07-08T09:00:00.000Z',

@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import {
     SmartImportSelectionBrowserAdapterError,
@@ -75,7 +74,7 @@ function selectionError(error: unknown): never {
     return fail('selection_unavailable');
 }
 
-/* @Codex One-shot boundary: the authoritative selection yields the sole epoch
+/* One-shot boundary: the authoritative selection yields the sole epoch
    sent to the host route, and no unknown outcome is retried automatically. */
 export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
     const request = sources.fetch ?? globalThis.fetch;

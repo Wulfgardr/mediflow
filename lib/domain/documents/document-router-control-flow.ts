@@ -1,10 +1,6 @@
-/* @Codex */
 import { buildDocumentFallbackSummary } from '../../ai-task-contracts';
-/* @Codex */
 import { assertAiDocumentSynthesisEnabledValue } from '../../ai-document-synthesis-kill-switch';
-/* @Codex */
 import type { DocumentStructuredAnalysis } from './document-synthesis-parser';
-/* @Codex */
 import {
     isDeterministicSynthesisRoute,
     type DocumentClassRouterResult,

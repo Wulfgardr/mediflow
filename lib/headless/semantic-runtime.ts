@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 
-/* @Codex */
 export type SemanticOutcome = 'discovery' | 'read' | 'query' | 'orchestration' | 'preview' | 'proposal';
 type DenialCode = 'reentry' | 'registry_invalid' | 'invalid_plan' | 'invalid_session' | 'session_inactive' | 'session_revoked' | 'lease_stale' | 'operation_limit' | 'operation_unbound' | 'operation_unauthorized' | 'stage_exceeded' | 'forbidden_input' | 'idempotency_conflict' | 'host_threw' | 'host_result_invalid';
 

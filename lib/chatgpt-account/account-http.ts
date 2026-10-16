@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { isTrustedWebMutationRequest } from '../security/request-transport';
 import type { AccountHttpError, AccountOperation } from './account-contract';

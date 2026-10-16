@@ -1,5 +1,5 @@
 'use client';
-/* @Codex: presets are proposals; only a second explicit gesture persists settings. */
+/* presets are proposals; only a second explicit gesture persists settings. */
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { notifyDbChange } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
@@ -19,7 +19,7 @@ function PreferenceCard({ row, disabled, account, activationSupported, preview }
     const remote = channel === 'chatgpt_subscription';
     const [enabled, setEnabled] = useState(row.enabled);
     const [model, setModel] = useState<string | null>(row.defaultSource === 'host_configuration' ? null : row.defaultModelOptionId);
-    // @Codex: a disabled function may still save an explicit local default.
+    // a disabled function may still save an explicit local default.
     const localModelChanged = model !== (row.defaultSource === 'host_configuration' ? null : row.defaultModelOptionId);
     const selected = model === null && row.defaultSource !== 'host_configuration' ? undefined : row.options.find(o => o.modelOptionId === (model ?? row.defaultModelOptionId));
     const computerDefault = row.defaultSource === 'host_configuration' ? row.options.find(o => o.modelOptionId === row.defaultModelOptionId) : undefined;

@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# @Codex
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
@@ -38,7 +37,7 @@ prepare_workspace() {
     fi
   done
 
-  # @Codex: reuse the clean install pinned by the checkout; Next must not install into this copy.
+  # reuse the clean install pinned by the checkout; Next must not install into this copy.
   if [[ ! -d "$ROOT_DIR/node_modules/next" || ! -d "$ROOT_DIR/node_modules/typescript" || ! -d "$ROOT_DIR/node_modules/@types/react" || ! -d "$ROOT_DIR/node_modules/@types/node" ]]; then
     echo "Install the checkout dependencies with npm ci before the network smoke." >&2
     exit 1

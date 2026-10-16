@@ -1,4 +1,4 @@
-/* @Codex — owned backend attempt for the four named ordinary profiles.
+/* owned backend attempt for the four named ordinary profiles.
  * The original application owners acquire context and commit publication;
  * ordinary-flow retains those handlers across the explicit UI interactions.
  * The named egress chokepoint verifies current governance on exact bytes. */

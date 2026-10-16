@@ -1,4 +1,4 @@
-/* @Codex: real authenticated reads and lock; only response delivery is delayed. */
+/* real authenticated reads and lock; only response delivery is delayed. */
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
@@ -18,7 +18,7 @@ test('locking retires the pending model footer read before its response or fallb
     const baseline = await page.request.get(`/api/patients/${patient.id}`);
     expect(baseline.status()).toBe(200);
     const { version } = await baseline.json() as { version: number };
-    // @Codex: persisted insights belong to the versioned update contract;
+    // persisted insights belong to the versioned update contract;
     // patient creation intentionally does not accept this field.
     const updated = await page.request.put(`/api/patients/${patient.id}`, { headers: archiveHeaders, data: {
         version, documentInsights: JSON.stringify([{

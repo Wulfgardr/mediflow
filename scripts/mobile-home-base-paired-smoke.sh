@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# @Codex
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
@@ -58,7 +57,7 @@ SIM_INFO="$(
 SIMULATOR_ID="${SIM_INFO%%$'\t'*}"
 SIMULATOR_NAME="${SIMULATOR_NAME:-${SIM_INFO#*$'\t'}}"
 
-# @Codex: finish build/install before backend setup or temporary pairing changes.
+# finish build/install before backend setup or temporary pairing changes.
 echo "Building and installing simulator app for $SIMULATOR_NAME ..."
 APP_PATH="$(MEDIFLOW_IOS_SIMULATOR_ID="$SIMULATOR_ID" bash scripts/build-mobile-sim-app.sh --install)"
 echo "Simulator app: $APP_PATH"

@@ -1,4 +1,4 @@
-/* @Codex: one ordinary checkup create/update authority; no generic clinical CRUD or headless path. */
+/* one ordinary checkup create/update authority; no generic clinical CRUD or headless path. */
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
 import { activePatients } from './patient-lifecycle';
@@ -30,7 +30,7 @@ function activeParentExists(tx: Tx, patientId: string): boolean {
         .where(and(eq(patients.id, patientId), activePatients())).get());
 }
 
-/* @Codex: IMMEDIATE serializes the admission, row insert and required audit. */
+/* IMMEDIATE serializes the admission, row insert and required audit. */
 export function createCheckupOperation(input: CreateInput): Result {
     return dbServer.transaction((tx): Result => {
         const admitted = input.mode === 'network'
@@ -58,7 +58,7 @@ export function createCheckupOperation(input: CreateInput): Result {
     }, { behavior: 'immediate' });
 }
 
-/* @Codex: a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
+/* a matched UPDATE IGNORE is an integrity fault, not an optimistic 409. */
 export function updateCheckupOperation(input: UpdateInput): Result {
     return dbServer.transaction((tx): Result => {
         const existing = input.mode === 'network'
