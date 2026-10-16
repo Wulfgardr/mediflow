@@ -89,7 +89,7 @@ test('real component and routes: preview, acceptance, invalid rows, CAS, lost re
         for (const button of await page.getByRole('button').all()) {
             const box = await button.boundingBox(); if (box) assert.ok(box.height >= 44);
         }
-        assert.equal(await page.getByLabel('Import repertorio protesica', { exact: true }).evaluate(el => getComputedStyle(el).borderRadius), '12px');
+        assert.equal(await page.getByLabel('Import repertorio protesica', { exact: true }).evaluate(el => getComputedStyle(el).borderRadius), '10px');
         assert.deepEqual(errors, []);
     } finally { await browser.close(); }
 });
