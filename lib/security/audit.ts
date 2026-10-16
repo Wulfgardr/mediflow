@@ -1,3 +1,4 @@
+import { buildAifaCatalogManifest, parseStoredAifaCatalogManifest, type AifaCatalogManifest } from '../aifa-catalog';
 import { assertArchiveRequestInTransaction } from './archive-request-context';
 import crypto from 'crypto';
 import { and, desc, eq, gte } from 'drizzle-orm';
@@ -57,6 +58,7 @@ export const AUDIT_EVENT_TYPES = [
     'siss.handoff.deleted',
     'patient.siss.prescription.launch',
     'settings.updated',
+    'reference_data.aifa.updated',
     'ambulatory.created',
     'ambulatory.updated',
     'ambulatory.deleted',
@@ -92,7 +94,15 @@ export type AuditContext = {
 /* @Codex */
 export const AUDIT_SOURCE_SURFACE_HEADER = 'x-mediflow-source-surface';
 
+export type AifaAuditChange = {
+    mode: 'remote' | 'manual';
+    before: AifaCatalogManifest | null;
+    after: AifaCatalogManifest | null;
+    forcedReduction: boolean;
+};
+
 export type AuditRedactedMetadata = {
+    aifaCatalog?: AifaAuditChange;
     changedFields?: string[];
     resourceVersion?: number;
     counts?: number;
@@ -309,6 +319,15 @@ export function sanitizeAuditMetadata(value: AuditRedactedMetadata | null | unde
     const counts = normalizeCount(value.counts);
 
     const sanitized: AuditRedactedMetadata = {};
+    const change = value.aifaCatalog;
+    if (change && (change.mode === 'remote' || change.mode === 'manual') && typeof change.forcedReduction === 'boolean') {
+        const canonical = (manifest: AifaCatalogManifest | null): AifaCatalogManifest | null => {
+            if (!manifest) return null;
+            const parsed = parseStoredAifaCatalogManifest(JSON.stringify(manifest));
+            return parsed ? buildAifaCatalogManifest(parsed, parsed) : null;
+        };
+        sanitized.aifaCatalog = { mode: change.mode, before: canonical(change.before), after: canonical(change.after), forcedReduction: change.forcedReduction };
+    }
     if (changedFields.length > 0) sanitized.changedFields = changedFields;
     if (flags.length > 0) sanitized.flags = flags;
     if (reasonCode) sanitized.reasonCode = reasonCode;
