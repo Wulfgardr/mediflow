@@ -178,8 +178,7 @@
         "lib/ai-rollout-model-guard.test.ts",
         "lib/ai-patient-insight-kill-switch.test.ts",
         "lib/ai-smart-import-kill-switch.test.ts",
-        "lib/ai-document-synthesis-kill-switch.test.ts",
-        "lib/ai-ocr-kill-switch.test.ts"
+        "lib/ai-document-synthesis-kill-switch.test.ts"
       ],
       "prerequisites": "Existing test:ai-rollout-readiness command; retain its platform, tool and synthetic-fixture prerequisites. Local selection only, no CI execution claim."
     },

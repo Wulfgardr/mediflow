@@ -15,7 +15,9 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-09-30. Le voci storiche conservano date, conteggi, revisioni e limiti:
+2026-10-16. I verbali di luglio e le proposte superate rimossi dall’albero
+restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
+Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
 
 ## Preparazione indipendente delle future 0.9.x
@@ -255,12 +257,8 @@ implementata perché è stata recuperata nell’inventario.
 | [docs/analysis/2026-09-01-mediflow-0.8.5-final-verification.md](./analysis/2026-09-01-mediflow-0.8.5-final-verification.md) | Verbale finale locale 0.8.5 con matrice feature, percorsi verificati, evidenze ripetibili, prestazioni, esclusioni e gate nativi o tri-OS residui. | Quando si valuta il candidato sorgente locale 0.8.5 senza confonderlo con release, CI remota o certificazione. |
 | [docs/analysis/2026-09-01-mediflow-0.8.5-reopened-program-ledger.md](./analysis/2026-09-01-mediflow-0.8.5-reopened-program-ledger.md) | Ledger operativo della riapertura 0.8.5 con coda, ownership, routing card, worktree, gate ambientali e registro delle prove legate allo SHA. | Quando si coordina il rush finale senza confondere split del programma, implementazione, integrazione e release. |
 | [docs/analysis/2026-08-23-web-lume-recomposition-r0.md](./analysis/2026-08-23-web-lume-recomposition-r0.md) | Decision basis locale R0 per ancestry, equivalenza, collisioni e ordine depth-first della futura ricomposizione Web Lume. | Quando si riconciliano baseline Lume, Web #209 e tastiera #200 senza confondere candidato, integrazione e rilascio. |
-| [docs/analysis/2026-07-27-parity-0.8-recovery-run.md](./analysis/2026-07-27-parity-0.8-recovery-run.md) | Verbale della recovery UI/parity 0.8, con candidata locale, contratti, prove e impedimenti. | Quando si valuta il candidato locale 0.8 o si ricostruisce l'ownership del lavoro UI recente. |
-| [docs/analysis/2026-07-28-provider-program-post-0.8-run.md](./analysis/2026-07-28-provider-program-post-0.8-run.md) | Verbale del programma provider intelligenti post-0.8, con stato reale, trust boundary, matrice superfici, auth, packet e gate. | Quando si pianificano provider AI, egress, credenziali o parity intelligente senza ampliare la release 0.8. |
 | [docs/analysis/2026-07-26-openminis-intelligent-scaffold-audit.md](./analysis/2026-07-26-openminis-intelligent-scaffold-audit.md) | Audit clean-room dei pattern OpenMinis per lo scaffold intelligente, con confini di riuso e divieti di importazione. | Quando si progetta lo scaffold provider o si valuta il riuso di pattern esterni senza importarne autorità o egress. |
-| [docs/analysis/2026-07-29-intelligence-fabric-run.md](./analysis/2026-07-29-intelligence-fabric-run.md) | Verbale del programma Intelligence Fabric WUL-522: consolidamento stack provider, ADR 0089, lane, verifiche e decision audit. | Quando si riprende, verifica o promuove il programma Intelligence Fabric post-0.8. |
-| [docs/analysis/2026-07-30-intelligence-fabric-horizon-run.md](./analysis/2026-07-30-intelligence-fabric-horizon-run.md) | Run record del checkpoint Horizon: giudizio congelato, slice di prima adozione Fabric su document_synthesis, DAG, ownership e falsificatori. | Quando si riprende o verifica il checkpoint Horizon della Intelligence Fabric. |
-| [docs/analysis/2026-08-06-pk1-patient-insight-fabric-run.md](./analysis/2026-08-06-pk1-patient-insight-fabric-run.md) | Run record della wave PK-1: adozione Fabric su patient insight, quattro round writer/verifica, GO — VERIFIED, HOLD_REMOTE_PROMOTION invariato. | Quando si riprende o verifica l'adozione Fabric di patient insight o si prepara PK-2. |
+| [docs/analysis/2026-08-06-pk1-patient-insight-fabric-run.md](./analysis/2026-08-06-pk1-patient-insight-fabric-run.md) | Run record della wave PK-1: adozione Fabric su patient insight, quattro round writer/verifica, GO: VERIFIED, HOLD_REMOTE_PROMOTION invariato. | Quando si riprende o verifica l'adozione Fabric di patient insight o si prepara PK-2. |
 | [docs/capability-mapping/mediflow-0.8.5-crosswalk.md](./capability-mapping/mediflow-0.8.5-crosswalk.md) | Vista derivata del mapping WUL-522, con provenance congelata, copertura, conflitti residui e claim ceiling candidate-only. | Quando si verifica il mapping 0.8.5 senza trasformare inventari o gap in parity. |
 | [docs/analysis/2026-07-05-audit-esterno-v2-triage.md](./analysis/2026-07-05-audit-esterno-v2-triage.md) | Triage secondario dell'audit esterno V2, collegato a `WUL-470` e figlie `WUL-471`..`WUL-475`, con separazione tra obiezioni misframed e residui azionabili su PIN, FHIR, MDR, sync futuro e drift ADR. | Quando si rivedono le issue nate dall'audit esterno V2 o serve recuperare il razionale completo dietro il tracker Linear. |
 | [docs/analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md](./analysis/2026-07-12-evoluzione-stack-intelligente-euristiche-scaffold-roadmap.md) | Verbale secondario sul consolidamento di scaffold, flusso di controllo, attese e roadmap, riferito a `main` alla data della registrazione. | Quando si pianifica una nuova slice AI/euristica o si verifica cosa resta oltre le PR #39, #41, #42 e #43. |
@@ -301,8 +299,6 @@ implementata perché è stata recuperata nell’inventario.
 | [docs/design/lume/10-superficie-e-materiale.md](./design/lume/10-superficie-e-materiale.md) | Proposta misurata per la convergenza tra superfici Lume e materiali Apple. | Quando si valuta materiale, contrasto o gerarchia delle superfici; non trattarla come canone adottato. |
 | [docs/design/wul-271-kree8-visual-translation.md](./design/wul-271-kree8-visual-translation.md) | Traduzione visiva Kree8 → MediFlow per PIN gate, root entry live `/`, first real-patient cockpit slice e alias review `/mockups/kree8` (WUL-271/WUL-272/WUL-273/WUL-274). | Per ricostruire l’ingresso Kree8 e la migrazione delle superfici legacy; la voce non autorizza nuove prove con dati clinici reali. |
 | [docs/analysis/2026-07-30-smart-import-clinical-series-run.md](./analysis/2026-07-30-smart-import-clinical-series-run.md) | Run record sintetico del contratto provider-neutral, serie temporali e collegamento prescrizioni per Smart Import.  | Per ricostruire contratto, serie temporali e collegamento delle prescrizioni nelle prove sintetiche Smart Import. |
-| [docs/analysis/2026-07-24-ai-envelope-codex-consolidation-run.md](./analysis/2026-07-24-ai-envelope-codex-consolidation-run.md) | Run record storico del consolidamento AI/envelope e Codex Operator di luglio 2026 (recuperato, percorsi sanificati). | Quando si ricostruisce la storia del consolidamento AI/envelope pre-0.8. |
-| [docs/analysis/2026-07-24-mediflow-0.8-release-program.md](./analysis/2026-07-24-mediflow-0.8-release-program.md) | Run record storico del programma release 0.8: packet, gate, hold e prove al 2026-07-24 (recuperato, percorsi sanificati). | Quando si ricostruisce la storia del programma release 0.8 o dei packet Operator. |
 
 ## 🧱 ADR (decisioni architetturali)
 
@@ -444,9 +440,5 @@ di ciascuna proposta e il limite di autorità dell’host.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
-| [ADR-WUL-689-MAC-EXECUTION-CUSTODIAN.md](../proposals/ADR-WUL-689-MAC-EXECUTION-CUSTODIAN.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
-| [ADR-WUL-689-OPENAI-PRODUCT.md](../proposals/ADR-WUL-689-OPENAI-PRODUCT.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
-| [PATIENT-BULK-IMPORT-CONTRACT.md](../proposals/PATIENT-BULK-IMPORT-CONTRACT.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
 | [TREATMENT-PORTABLE-ADR.md](../proposals/TREATMENT-PORTABLE-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
-| [WHO-TRIOS-ADR.md](../proposals/WHO-TRIOS-ADR.md) | Proposta tecnica recuperata della candidata 0.8.6; accettazione e qualifica restano distinte. | Riesame del relativo contributo. |
 | [docs/adr/0076-macos-ordinary-proposal-only-addendum.md](./adr/0076-macos-ordinary-proposal-only-addendum.md) | Deroga candidata Mac per quattro proposte ordinarie, senza apply o persistenza document-derived. | Per verificare l’eccezione Mac circoscritta, senza estenderla ai client mobili o alle scritture cliniche. |

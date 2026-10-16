@@ -95,12 +95,9 @@ Adottiamo un guard testuale repo-local, senza dipendenze nuove:
 - allowlist: esplicita, per file/rule/snippet, con rationale;
 - fallimento: stampa `CLAIM-*`, file, riga, categoria e snippet.
 
-La prima fase `WUL-354` applica le nuove regole alle superfici documentali
-tracciate. La root publication `whitepaper/` resta temporaneamente attivabile
-con `npm run check:claims -- --include-publication` finche la Phase B, posseduta
-dalla lane visuale, non riallinea il copy e abilita lo scan nel percorso di
-default. Il guard stampa questa dipendenza: l'esclusione non deve essere
-silenziosa ne diventare un'allowlist permanente.
+La prima fase `WUL-354` applicava le nuove regole alle superfici documentali
+tracciate. Il [whitepaper storico](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/whitepaper/index.html)
+è conservato nel tag v0.9.0 ed è stato rimosso dall’albero corrente.
 
 Il guard non sostituisce review umana o valutazione regolatoria. Serve come
 freno deterministico contro claim drift evidenti.
@@ -112,3 +109,9 @@ freno deterministico contro claim drift evidenti.
 
 La verifica usa solo file del repo e stringhe sintetiche. Non legge database,
 mail, allegati o materiale clinico privato.
+
+## Emendamento 2026-10
+
+Il whitepaper non è più una radice del guard: lo scan copre le superfici
+presenti nell’albero corrente. La copia storica nel tag non viene verificata
+da questo scan e non descrive automaticamente il prodotto corrente.

@@ -8,7 +8,7 @@ Related:
 [docs/adr/0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md](./0036-network-identity-thin-slice-node-credentials-and-ambulatory-scope.md),
 [docs/NATIVE.md](../NATIVE.md),
 [ARCHITETTURA.md](../ARCHITETTURA.md),
-[lib/icd-codes.ts](../../lib/icd-codes.ts),
+[lib/icd-codes.ts](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/lib/icd-codes.ts),
 [lib/scale-definitions.ts](../../lib/scale-definitions.ts)
 
 ## Problema
@@ -17,7 +17,7 @@ MediFlow e local-first e deve restare funzionante in autonomia, anche
 sull'app Apple paired, senza dipendere da servizi esterni opzionali (container
 Docker, proxy locali separati, cloud). Alcune capacita clinicamente utili sono
 oggi delegate a dipendenze esterne: per esempio la ricerca ICD e stata spostata
-"in favore del proxy ICD-11" su container Docker ([lib/icd-codes.ts](../../lib/icd-codes.ts):
+"in favore del proxy ICD-11" su container Docker ([lib/icd-codes.ts](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/lib/icd-codes.ts):
 `searchICD` ritorna `[]`), quindi sull'app paired la codifica diagnosi non
 funziona se quel container non gira. Lo stesso rischio vale per i "moduli
 intelligenti" futuri se appoggiati a runtime esterni.
