@@ -1,5 +1,5 @@
 /* Mac lifecycle reconciliation; synthetic transport only, no provider/authority claim. */
-#if os(macOS)
+#if canImport(MediFlowAppleShared)
 import Foundation
 import CryptoKit
 import MediFlowCore

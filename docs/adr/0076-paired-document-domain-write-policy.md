@@ -173,3 +173,39 @@ Fermarsi e aprire ADR o issue separata se una proposta:
 - rimuove la validazione client-side di ownership dei riferimenti di
   Classe B o ammette riferimenti in chiaro nella colonna cifrata;
 - aggira o ignora lo stato dei kill switch letti dal boundary.
+
+
+## Emendamento 16 ottobre 2026 — quattro flussi ordinary sui client Apple (WUL-589)
+
+La richiesta di parità WUL-589 estende ai client iOS e iPadOS la sola lane
+ordinary già presente sul Mac per Patient Insight, Smart Import, Document
+Synthesis e Treatment Reasoning. Questa eccezione sostituisce il divieto della
+Classe D soltanto per le route nominate
+`/api/v1/network/ai/chatgpt/ordinary/*`. Non espone chat o generazione generica,
+non sposta modelli sul telefono e non autorizza scritture AI/document-derived.
+
+L'host resta responsabile di preparazione, fonti correnti, runtime qualificato,
+catalogo, consenso per singolo contenuto, esecuzione e chiusura. Il client deve
+avere pairing confermato, token corrente, capability esplicite
+`network.ai.central-runtime` e `network.replica.readonly-patients`, sessione
+operatore nativa legata allo stesso client/platform/token e ruolo corrente
+`admin` o `user`. iOS e iPadOS conservano la propria identità nel binding:
+non vengono rappresentati come Mac. Le verifiche di currentness, scadenza,
+revoca, selezione, revisione paziente e fonti sono le stesse della lane Mac.
+Il solo tipo di dispositivo non concede accesso.
+
+La proiezione per la decifratura del client riusa l'adapter originario e il suo
+grant monouso; non introduce chiavi server, provider, prompt o autorità forniti
+dalla UI. La proposta torna soltanto alla vista di revisione: nessun apply o
+commit clinico. Lock, cambio paziente/sessione, uscita dalla vista e background
+invalidano la presentazione e richiedono chiusura dell'operazione pendente;
+una chiusura non confermata impedisce un nuovo invio. L'accesso OpenAI su iOS
+usa una pagina Safari interna all'app, così il vero background resta
+invalidante anche durante il login. La qualifica del runtime host, il consenso
+e l'ammissione dell'egress restano gate separati: compilazione o pairing non li
+soddisfano.
+
+`native.ai.configure` resta un grant amministrativo separato per le preferenze
+host (ADR0135); non concede inferenza e non viene esteso da questo adapter.
+Le prove su dispositivi fisici e l'accettazione della parità complessiva
+rimangono in WUL-589/WUL-694, distinte dalle prove sintetiche del contratto.

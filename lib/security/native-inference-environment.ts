@@ -19,7 +19,8 @@ export function withCurrentNativeInferenceEnvironment(
             .find(value => value.clientId === binding.clientId);
         const user = dbServer.select({ username: users.username, role: users.role })
             .from(users).where(eq(users.id, binding.principalRef)).get();
-        return Boolean(client && client.clientPlatform === 'macos' && client.tokenHash === binding.tokenHash
+        return Boolean(client && ['macos', 'ios', 'ipados'].includes(client.clientPlatform)
+            && client.clientPlatform === binding.clientPlatform && client.tokenHash === binding.tokenHash
             && client.grantedCapabilities.includes('network.ai.central-runtime')
             && client.grantedCapabilities.includes('network.replica.readonly-patients')
             && user && user.username === binding.username && user.role === binding.role

@@ -21,8 +21,7 @@ public actor HomeBasePatientsClient {
     }
 
     /* named ADR0135 configuration services, native credentials only. */
-    #if os(macOS)
-    /* named paired Mac ordinary routes, distinct from account/configuration. */
+    /* named paired Apple ordinary routes, distinct from account/configuration. */
     public func prepareNativeOrdinary(_ preparation: NativeOrdinaryPreparation, credentials: HomeBasePairedCredentials,
                                       sessionCookie: String) async throws -> NativeOrdinaryResponse {
         let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/chatgpt/ordinary/prepare")
@@ -70,7 +69,6 @@ public actor HomeBasePatientsClient {
             headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId))
         return try decode(NativeOrdinaryResponse.self, from: data)
     }
-    #endif
 
     public func readNativeFunctionPreferences(credentials: HomeBasePairedCredentials, sessionCookie: String) async throws -> NativeAIFunctionPreferences {
         let url = try configuration.apiBaseURL().appendingPathComponent("network/ai/functions")
@@ -1475,7 +1473,6 @@ public actor HomeBasePatientsClient {
                 throw HomeBaseClientError.contract
             }
             guard 200..<300 ~= httpResponse.statusCode else {
-                #if os(macOS)
                 // Only this exact native operation may preserve a pending device login.
                 if method == "POST", url.path == "/api/v1/network/ai/chatgpt/ordinary/login/complete",
                    httpResponse.statusCode == 503,
@@ -1490,7 +1487,6 @@ public actor HomeBasePatientsClient {
                 if url.path.hasPrefix("/api/v1/network/ai/chatgpt/ordinary/") {
                     throw HomeBaseClientError.httpStatus(httpResponse.statusCode, nil)
                 }
-                #endif
                 // WUL-308: a 409 carries a structured VERSION_CONFLICT body; surface
                 // it as a typed error so the UI can show expected-vs-current version.
                 if httpResponse.statusCode == 409,

@@ -1,4 +1,3 @@
-#if os(macOS)
 import SwiftUI
 
 struct TreatmentReasoningProposalView: View {
@@ -125,7 +124,11 @@ struct TreatmentReasoningProposalView: View {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(values, id: \.self) { reference in
                     Button(sourceIndex.label(reference)) { showsSources = true }
+                        #if os(macOS)
                         .buttonStyle(.link).font(.caption).frame(minHeight: 32)
+                        #else
+                        .buttonStyle(.plain).foregroundStyle(Color.accentColor).font(.caption).frame(minHeight: 44)
+                        #endif
                         .accessibilityHint("Espande i riferimenti della proposta, senza aprire o modificare la cartella.")
                 }
             }
@@ -180,4 +183,3 @@ struct TreatmentReasoningSourceIndex {
         return "\(kind) · Fonte \(index + 1)"
     }
 }
-#endif

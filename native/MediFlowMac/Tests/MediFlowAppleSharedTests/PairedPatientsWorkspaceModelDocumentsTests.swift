@@ -95,7 +95,8 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         await model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
 
         let rawBytes = Data("hello referto".utf8)
-        await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "referto.pdf", mimeType: "application/pdf", rawData: rawBytes)
+        let outcome = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "referto.pdf", mimeType: "application/pdf", rawData: rawBytes)
+        if case .uploaded = outcome {} else { XCTFail("Expected a confirmed upload and refresh") }
 
         let payload = await source.lastCreatePayload
         let unwrapped = try XCTUnwrap(payload)
@@ -134,7 +135,8 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
         let oversizedRawByteCount = 20 * 1024 * 1024
         let rawBytes = Data(count: oversizedRawByteCount)
 
-        await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "scan.pdf", mimeType: "application/pdf", rawData: rawBytes)
+        let outcome = await model.uploadAttachmentForSelectedPatient(patientId: patient.id, fileName: "scan.pdf", mimeType: "application/pdf", rawData: rawBytes)
+        if case .unconfirmed = outcome {} else { XCTFail("Oversized document must not be acknowledged") }
 
         let createCount = await source.createAttachmentCalls
         XCTAssertEqual(createCount, 0)
@@ -620,5 +622,66 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
 
     func validateFseDocument(payload: HomeBaseFseDocumentValidationPayload, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseFseDocumentValidationResponse {
         HomeBaseFseDocumentValidationResponse(ok: true, profile: payload.profile, errors: [], warnings: [])
+    }
+}
+
+
+@MainActor
+final class PairedAttachmentImportBatchTests: XCTestCase {
+    private let urls = ["one.pdf", "two.pdf", "three.pdf"].map { URL(fileURLWithPath: "/synthetic/" + $0) }
+    private func settle(_ batch: PairedAttachmentImportBatch) async {
+        for _ in 0..<1000 where batch.isRunning { await Task.yield() }
+        XCTAssertFalse(batch.isRunning)
+    }
+    func testUploadsSequentiallyAndKeepsIndividualAcknowledgements() async {
+        let batch = PairedAttachmentImportBatch()
+        var calls: [String] = [], active = 0, maximumActive = 0
+        batch.start(urls, isCurrent: { true }) { url in
+            active += 1; maximumActive = max(maximumActive, active)
+            calls.append(url.lastPathComponent)
+            await Task.yield(); active -= 1
+            return .uploaded
+        }
+        await settle(batch)
+        XCTAssertEqual(calls, urls.map(\.lastPathComponent)); XCTAssertEqual(maximumActive, 1)
+        XCTAssertEqual(batch.results.map(\.message), ["Caricato", "Caricato", "Caricato"])
+    }
+    func testUnconfirmedResultStopsBatchWithoutRetryOrCallingRemainingFiles() async {
+        let batch = PairedAttachmentImportBatch(); var calls = 0
+        batch.start(urls, isCurrent: { true }) { _ in calls += 1; return calls == 1 ? .uploaded : .unconfirmed }
+        await settle(batch)
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(batch.results[0].message, "Caricato")
+        XCTAssertTrue(batch.results[1].message.contains("non confermato"))
+        XCTAssertEqual(batch.results[2].message, "Non avviato")
+    }
+    func testAcknowledgedUploadWithRefreshFailureIsNotReportedAsUnconfirmedOrRetried() async {
+        let batch = PairedAttachmentImportBatch(); var calls = 0
+        batch.start(urls, isCurrent: { true }) { _ in calls += 1; return .uploadedNeedsRefresh }
+        await settle(batch)
+        XCTAssertEqual(calls, 1); XCTAssertTrue(batch.results[0].message.hasPrefix("Caricato;"))
+        XCTAssertEqual(batch.results[1].message, "Non avviato")
+    }
+    func testCancellationClearsFilenamesAndLateCompletionCannotRestartOrPublish() async {
+        let batch = PairedAttachmentImportBatch()
+        var pending: CheckedContinuation<PairedAttachmentUploadOutcome, Never>?, calls = 0
+        batch.start(urls, isCurrent: { true }) { _ in
+            calls += 1
+            return await withCheckedContinuation { pending = $0 }
+        }
+        for _ in 0..<1000 where pending == nil { await Task.yield() }
+        XCTAssertNotNil(pending)
+        batch.cancel()
+        batch.start(urls, isCurrent: { true }) { _ in calls += 1; return .uploaded }
+        XCTAssertTrue(batch.results.isEmpty); XCTAssertEqual(calls, 1)
+        pending?.resume(returning: .uploaded)
+        for _ in 0..<100 { await Task.yield() }
+        XCTAssertTrue(batch.results.isEmpty); XCTAssertEqual(calls, 1)
+    }
+    func testContextChangeAfterUploadDiscardsResultsAndNeverStartsNextFile() async {
+        let batch = PairedAttachmentImportBatch(); var current = true, calls = 0
+        batch.start(urls, isCurrent: { current }) { _ in calls += 1; current = false; return .uploaded }
+        await settle(batch)
+        XCTAssertTrue(batch.results.isEmpty); XCTAssertEqual(calls, 1)
     }
 }
