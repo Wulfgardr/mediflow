@@ -11,9 +11,9 @@ export type OllamaLocalityFailure =
 
 export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
 export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
-// 0.9.0: retain the qualified 0.32 line and the observed 0.33.3/0.34.2/0.40.4 releases.
-const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4)$/;
-export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4';
+// Versioni osservate per il confine locale: ADR 0136, qualifica WUL-694.
+const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4|0\.40\.5)$/;
+export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5';
 export type OllamaVersionMismatch = Readonly<{ serverVersion: string; supportedVersions: string }>;
 
 export class OllamaLocalityError extends Error {

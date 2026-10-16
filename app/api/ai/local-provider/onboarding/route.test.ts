@@ -226,7 +226,7 @@ for (const serverVersion of ['0.40.4', '0.41.0']) test(`route con attestazione c
     } else {
         assert.equal(response.status, 409);
         assert.deepEqual(await response.json(), { error: 'provider_version_unsupported',
-            versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' } });
+            versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5' } });
         assert.deepEqual(paths, ['/api/version']);
         assert.equal(fs.existsSync(path.join(root, 'ai')), false);
     }
