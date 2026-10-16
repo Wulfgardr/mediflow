@@ -27,8 +27,19 @@ conferma.
 
 - script: `scripts/check-ai-clinical-write-gate.mjs` (`npm run check:ai-clinical-writes`).
 
-Il gate verifica che `lib/domain/documents/document-synthesis-service.ts` scriva solo
-`documentInsights`: una scrittura su `patients.diagnoses` da quel modulo fallisce in CI.
+Il gate scansiona il percorso Fabric e i moduli documentali: una scrittura clinica
+non dichiarata, anche su `patients.diagnoses` o `therapies`, fallisce in CI.
+
+Dal ritiro dei backend legacy senza caller runtime (WUL-774), la sintesi corrente
+passa da `lib/ai-providers/fabric/document-synthesis-production-operation.ts` e
+restituisce una proposta `reviewOnly`, `writesPerformed: 0`, `applyPolicy: none`.
+Il contratto di output e il binding alle fonti sono verificati da
+`document-synthesis-output-contract.test.ts` e
+`document-synthesis-contract-regression.test.ts` nella stessa directory.
+La prova di produzione conserva diagnosi, terapie e versione del paziente;
+la validità corrente delle fonti resta governata dall'owner host.
+`documentInsights` resta il formato delle proiezioni storiche, non un'autorizzazione
+alla scrittura automatica delle diagnosi.
 
 ## Conseguenze
 

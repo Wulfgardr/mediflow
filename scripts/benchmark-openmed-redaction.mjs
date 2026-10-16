@@ -335,8 +335,8 @@ function buildDecision(extractLane, deidentifyDefaultLane, deidentifyTunedLane, 
       : `OpenMed defaults are already sufficient on this corpus (${defaultRecall} critical recall); keep the benchmark-only lane and defer runtime integration.`,
     futureHooks: [
       'lib/ai-context.ts',
-      'lib/domain/documents/patient-smart-import-service.ts',
-      'lib/domain/documents/document-synthesis-service.ts',
+      'lib/domain/documents/patient-smart-import-projection-capture.ts',
+      'lib/ai-providers/fabric/document-synthesis-multi-source-prompt.ts',
     ],
   };
 }

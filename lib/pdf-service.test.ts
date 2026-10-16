@@ -311,3 +311,37 @@ test('mergeExtractedPatientDataWithTextFallback replaces an invalid AI tax code 
 
     assert.equal(merged.taxCode, 'RSSMRA94T57A271J');
 });
+
+test('pdf import parses explicit surname-first hospital identity labels', () => {
+    const parsed = parsePatientData([
+        'Cognome/Nome: ROSSI MARIA nata il 17/02/1958',
+        'Codice fiscale RSSMRA58B57F205X',
+        'Diagnosi: fibrillazione atriale persistente',
+    ].join('\n'));
+
+    assert.equal(parsed.firstName, 'MARIA');
+    assert.equal(parsed.lastName, 'ROSSI');
+    assert.equal(parsed.taxCode, 'RSSMRA58B57F205X');
+    assert.equal(parsed.birthDate?.toISOString().slice(0, 10), '1958-02-17');
+});
+
+test('pdf import merges high-confidence OCR patient data with server text fallback fields', () => {
+    const merged = mergeExtractedPatientDataWithTextFallback({
+        rawText: 'Paziente: MARIA ROSSI',
+        source: 'ai',
+        confidence: 0.92,
+        firstName: 'MARIA',
+        lastName: 'ROSSI',
+    }, [
+        'Cognome/Nome: ROSSI MARIA nata il 17/02/1958',
+        'Codice fiscale RSSMRA58B57F205X',
+        'Diagnosi: fibrillazione atriale persistente',
+    ].join('\n'));
+
+    assert.equal(merged.firstName, 'MARIA');
+    assert.equal(merged.lastName, 'ROSSI');
+    assert.equal(merged.taxCode, 'RSSMRA58B57F205X');
+    assert.equal(merged.birthDate?.toISOString().slice(0, 10), '1958-02-17');
+    assert.equal(merged.source, 'hybrid');
+    assert.match(merged.rawText, /Codice fiscale/i);
+});
