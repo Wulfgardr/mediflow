@@ -219,6 +219,7 @@ public actor HomeBasePatientsClient {
                 "x-mediflow-paired-client-id": credentials.clientId,
                 "x-mediflow-paired-client-token": credentials.clientToken,
                 "Cookie": Self.cookieHeader(sessionCookie: sessionCookie, ambulatoryId: ambulatoryId),
+                "Cache-Control": "no-store",
             ]
         )
         return try decode([HomeBasePatientSummary].self, from: data)

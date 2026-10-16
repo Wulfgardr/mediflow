@@ -186,6 +186,7 @@ struct PairedPatientsWorklistView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showingCSVImport = false
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var patientQuery: String
     @Binding var patientViewMode: PatientListViewMode
@@ -233,12 +234,30 @@ struct PairedPatientsWorklistView: View {
                     mobileResultCount
                 }
             }
+            csvImportAction
             worklistContent
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Elenco pazienti")
         #endif
+    }
+
+    private var csvImportAction: some View {
+        Button {
+            model.preparePatientCSVImport()
+            showingCSVImport = model.patientCSVImport != nil
+        } label: {
+            Label("Importa CSV", systemImage: "tablecells.badge.ellipsis")
+        }
+        .disabled(!model.canStartPatientCSVImport)
+        .accessibilityIdentifier("patient-csv-open")
+        .sheet(isPresented: $showingCSVImport) {
+            if let csv = model.patientCSVImport {
+                PairedPatientCSVImportSheet(model: csv, startNew: { model.resetPatientCSVImport() })
+                    .id(ObjectIdentifier(csv))
+            }
+        }
     }
 
     #if !os(macOS)
@@ -286,6 +305,7 @@ struct PairedPatientsWorklistView: View {
                     .accessibilityIdentifier("patient-worklist-count")
             }
             Spacer(minLength: 4)
+            csvImportAction
             patientSortMenu
                 .labelsHidden()
                 .controlSize(.small)
@@ -978,9 +998,14 @@ struct PairedPatientCreateView: View {
                         .accessibilityIdentifier("new-patient-caregiver")
                 }
                 Text("Crea in locale quando l'autorità on-device è attiva, oppure tramite l'home-base collegato se il permesso è concesso. Richiede il PIN operatore per cifrare i campi.")
-                    .font(.caption2)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle("Nuovo paziente")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -994,6 +1019,9 @@ struct PairedPatientCreateView: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 520, idealWidth: 620, minHeight: 480, idealHeight: 640)
+        #endif
     }
 
 }
