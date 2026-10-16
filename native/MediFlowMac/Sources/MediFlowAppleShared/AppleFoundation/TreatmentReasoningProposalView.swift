@@ -7,15 +7,7 @@ struct TreatmentReasoningProposalView: View {
 
     private var data: NativeOrdinaryJSON { result["value"]["data"] }
     private var bindings: [NativeOrdinaryJSON] { result["sourceBindings"].array }
-    private var references: [String] {
-        var found: [String] = []
-        for binding in bindings {
-            for reference in binding["evidenceRefs"].array.compactMap(\.string) where !found.contains(reference) {
-                found.append(reference)
-            }
-        }
-        return found
-    }
+    private var sourceIndex: TreatmentReasoningSourceIndex { TreatmentReasoningSourceIndex(result: result) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -81,11 +73,18 @@ struct TreatmentReasoningProposalView: View {
             }
             DisclosureGroup("Fonti della proposta", isExpanded: $showsSources) {
                 VStack(alignment: .leading, spacing: 16) {
+                    ForEach(sourceIndex.references, id: \.self) { reference in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(sourceIndex.label(reference)).inkRegister(weight: .semibold)
+                            Text(reference).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }.padding(.vertical, 8).overlay(alignment: .bottom) { Divider() }
+                    }
                     ForEach(Array(bindings.enumerated()), id: \.offset) { _, binding in
                         VStack(alignment: .leading, spacing: 8) {
                             proposalText(binding["claim"])
                             ForEach(binding["evidenceRefs"].array.compactMap(\.string), id: \.self) { reference in
-                                Text("Fonte \(referenceLabel(reference)) · \(reference)")
+                                Text(sourceIndex.label(reference))
                                     .font(.caption).foregroundStyle(.secondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -120,17 +119,16 @@ struct TreatmentReasoningProposalView: View {
         }
     }
 
-    private func referenceLabel(_ reference: String) -> String {
-        references.firstIndex(of: reference).map { String($0 + 1) } ?? reference
-    }
-
     @ViewBuilder private func sourceLinks(for value: NativeOrdinaryJSON) -> some View {
         let values = value.array.compactMap(\.string)
         if !values.isEmpty {
-            Button("Fonti: " + values.map(referenceLabel).joined(separator: ", ")) {
-                showsSources = true
-            }.buttonStyle(.link).font(.caption).frame(minHeight: 32)
-                .accessibilityHint("Espande i riferimenti della proposta, senza aprire o modificare la cartella.")
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(values, id: \.self) { reference in
+                    Button(sourceIndex.label(reference)) { showsSources = true }
+                        .buttonStyle(.link).font(.caption).frame(minHeight: 32)
+                        .accessibilityHint("Espande i riferimenti della proposta, senza aprire o modificare la cartella.")
+                }
+            }
         }
     }
 
@@ -148,6 +146,38 @@ struct TreatmentReasoningProposalView: View {
                 }
             }
         }
+    }
+}
+struct TreatmentReasoningSourceIndex {
+    let references: [String]
+
+    init(result: NativeOrdinaryJSON) {
+        let data = result["value"]["data"]
+        let groups = result["sourceBindings"].array + data["keyEvidence"].array
+            + data["safetyFlags"].array + data["suggestedActions"].array
+        var found: [String] = []
+        for group in groups {
+            for reference in group["evidenceRefs"].array.compactMap(\.string) where !found.contains(reference) {
+                found.append(reference)
+            }
+        }
+        references = found
+    }
+
+    func label(_ reference: String) -> String {
+        let kind: String
+        switch reference.split(separator: ":", maxSplits: 1).first.map(String.init) {
+        case "profile": kind = "Profilo clinico"
+        case "diagnosis": kind = "Diagnosi"
+        case "therapy": kind = "Terapia"
+        case "observation": kind = "Parametro"
+        case "entry": kind = "Diario"
+        case "insight": kind = "Sintesi documento"
+        case "attachment": kind = "Allegato"
+        default: kind = "Riferimento"
+        }
+        guard let index = references.firstIndex(of: reference) else { return kind }
+        return "\(kind) · Fonte \(index + 1)"
     }
 }
 #endif
