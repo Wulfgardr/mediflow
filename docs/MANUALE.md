@@ -178,7 +178,6 @@ organizzative e operative con cui usi il sistema.
 ---
 Per supporto, apri una issue o consulta la documentazione tecnica.
 
-<<<<<<< HEAD
 
 ## Fonti personali della protesica
 
@@ -229,7 +228,7 @@ proprio import. I nuovi allegati appartengono all'import corrente della fonte.
 Ridurre il limite configurato per gli upload non impedisce di scaricare gli
 originali già conservati. Il client Apple attuale ignora lo snapshot di
 provenienza e non offre la gestione delle fonti.
-=======
+
 ## Catalogo farmaci AIFA
 
 In **Impostazioni > Repertori**, abilita **Consenti verifiche e download del
@@ -269,4 +268,3 @@ Il CSV deve contenere AIC, denominazione, ATC e principi attivi. La copertura
 fascia e prezzo non sono presenti nel feed corrente. I dati non certificano
 rimborsabilità, disponibilità o appropriatezza. Ogni sostituzione AIFA riuscita
 conserva provenienza e audit locale. Nessun dato clinico viene inviato ad AIFA.
->>>>>>> f4b43fca8fbd471efc42f1cbc445b5cad95f5517
