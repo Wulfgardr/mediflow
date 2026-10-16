@@ -561,7 +561,8 @@
   box-sizing: border-box;
   min-width: var(--lume-control-height);
   min-height: var(--lume-control-height);
-  padding: 10px 14px;
+  padding: 8px 14px;
+  white-space: nowrap;
   border-radius: var(--lume-control-radius);
   font-size: 0.875rem;
   font-weight: 600;

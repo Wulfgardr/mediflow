@@ -17,7 +17,7 @@
 .rowButton { display: block; width: 100%; min-height: 40px; padding: 8px 4px; text-align: left; font-weight: 600; }
 .rowButton:focus-visible, .formDisclosure > summary:focus-visible, .recordDetails > summary:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.controls > :is(button,a), .control { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: transparent; font: 600 0.875rem/1.5 var(--lume-font-sans); }
+.controls > :is(button,a), .control { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--lume-control-height, 40px); padding: 8px 14px; border: 1px solid var(--lume-rule-strong); border-radius: var(--lume-control-radius, 10px); background: transparent; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .controls [aria-pressed='true'] { color: var(--lume-ink-fresh); background: var(--lume-surface-selected); }
 .controls button:disabled { opacity: .5; }
 .controls > :is(button,a):hover:not(:disabled), .control:hover:not(:disabled) { border-color: var(--lume-ink-fresh); background: var(--lume-surface-selected); }
