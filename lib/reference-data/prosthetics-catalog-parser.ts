@@ -1,33 +1,15 @@
+import { normalizeProstheticsImportOptions } from './prosthetics-import-options';
 /* @Codex */
 import { createHash } from 'node:crypto';
 import {
     PROSTHETICS_COLUMNS, PROSTHETICS_CONTRACT, PROSTHETICS_MAX_BYTES, PROSTHETICS_MAX_ROWS,
     isProstheticsDate, isProstheticsText, prostheticsIdentity,
-    type ProstheticsDiagnostic, type ProstheticsManifest, type ProstheticsRow,
+    type ProstheticsImportOptions, type ProstheticsDiagnostic, type ProstheticsManifest, type ProstheticsRow,
 } from './prosthetics-catalog-contract';
 
-// Single-line CSV cells are deliberate: a physical row is always the reported row.
-function parseLine(line: string): string[] | null {
-    const cells: string[] = [];
-    let cell = '', quoted = false, closed = false;
-    for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (quoted) {
-            if (c === '"' && line[i + 1] === '"') { cell += '"'; i++; }
-            else if (c === '"') { quoted = false; closed = true; }
-            else cell += c;
-        } else if (c === ',') { cells.push(cell); cell = ''; closed = false; }
-        else if (c === '"' && cell === '' && !closed) quoted = true;
-        else if (c === '"' || closed) return null;
-        else cell += c;
-        if (cell.length > 2000 || cells.length > PROSTHETICS_COLUMNS.length) return null;
-    }
-    if (quoted) return null;
-    cells.push(cell);
-    return cells;
-}
+import { parseProstheticsLine } from './prosthetics-csv-line';
 
-export function parseProstheticsCsv(bytes: Uint8Array, sourceName: string) {
+export function parseProstheticsCsv(bytes: Uint8Array, sourceName: string, options?: ProstheticsImportOptions) {
     const diagnostics: ProstheticsDiagnostic[] = [], rows: ProstheticsRow[] = [];
     const invalidRows = new Set<number>(), duplicateRows = new Set<number>();
     let errorCount = 0, assessedRows = 0;
@@ -37,7 +19,7 @@ export function parseProstheticsCsv(bytes: Uint8Array, sourceName: string) {
     };
     const manifest: ProstheticsManifest = {
         contract: PROSTHETICS_CONTRACT, sourceName, sha256: createHash('sha256').update(bytes).digest('hex'),
-        bytes: bytes.byteLength, metadata: null,
+        bytes: bytes.byteLength, metadata: null, ...(options ? { options } : {}),
         counts: { total: 0, valid: 0, invalid: 0, duplicates: 0, errors: 0 },
     };
     const finish = () => {
@@ -56,14 +38,32 @@ export function parseProstheticsCsv(bytes: Uint8Array, sourceName: string) {
     if (lines.at(-1) === '') lines.pop();
     manifest.counts.total = Math.max(0, lines.length - 1);
     if (lines.length > PROSTHETICS_MAX_ROWS + 1) { error(0, 'file', 'ROW_LIMIT', 'Il limite è 20.000 righe dati.'); return finish(); }
-    if (lines[0] !== PROSTHETICS_COLUMNS.join(',')) error(1, 'header', 'HEADER', `Header richiesto: ${PROSTHETICS_COLUMNS.join(',')}`);
+    const validatedOptions = options === undefined ? undefined : normalizeProstheticsImportOptions(options);
+    if (options !== undefined && !validatedOptions) { error(0, 'file', 'OPTIONS', 'Mappatura o metadati non validi.'); return finish(); }
+    if (validatedOptions) { options = validatedOptions; manifest.options = options; }
+    const mapping = options?.mapping;
+    const delimiter = mapping?.delimiter ?? ',';
+    const header = parseProstheticsLine(lines[0] ?? '', delimiter);
+    if (mapping && (!header || ![',', ';'].includes(delimiter) || !mapping.columns
+        || Object.keys(mapping.columns).length !== 8 || new Set(Object.values(mapping.columns)).size !== 8
+        || PROSTHETICS_COLUMNS.some(k => !Number.isSafeInteger(mapping.columns[k]) || mapping.columns[k] < 0 || mapping.columns[k] >= header.length))) {
+        error(1, 'header', 'MAPPING', 'Scegli otto colonne distinte presenti nel file.'); return finish();
+    }
+    const details = options?.sourceDetails;
+    if (details && ((details.authority !== '' && !isProstheticsText(details.authority)) || (details.date !== null && !isProstheticsDate(details.date))
+        || typeof details.notes !== 'string' || details.notes.length > 2000 || /[\u0000-\u001f\u007f]/u.test(details.notes)
+        || (details.id !== undefined && !isProstheticsText(details.id, 1024)))) {
+        error(0, 'fonte', 'SOURCE', 'Metadati della fonte non validi.'); return finish();
+    }
+    if (!mapping && lines[0] !== PROSTHETICS_COLUMNS.join(',')) error(1, 'header', 'HEADER', `Header richiesto: ${PROSTHETICS_COLUMNS.join(',')}`);
     if (!manifest.counts.total) error(0, 'file', 'EMPTY', 'Il file non contiene righe dati.');
     const seen = new Map<string, number>();
     for (let index = 1; index < lines.length; index++) {
         assessedRows++;
         const rowNumber = index + 1;
-        const cells = parseLine(lines[index]);
-        if (!cells || cells.length !== PROSTHETICS_COLUMNS.length) { error(rowNumber, 'riga', 'CSV_STRUCTURE', 'Sono richiesti 8 campi CSV; controlla virgole, virgolette e limite di 2.000 caratteri.'); continue; }
+        const raw = parseProstheticsLine(lines[index], delimiter);
+        const cells = raw && mapping ? PROSTHETICS_COLUMNS.map(k => raw[mapping.columns[k]]) : raw;
+        if (!cells || (mapping && raw?.length !== header?.length) || cells.length !== PROSTHETICS_COLUMNS.length) { error(rowNumber, 'riga', 'CSV_STRUCTURE', 'Sono richiesti 8 campi CSV; controlla virgole, virgolette e limite di 2.000 caratteri.'); continue; }
         for (let i = 0; i < 6; i++) {
             if (!isProstheticsText(cells[i], i === 2 ? 2000 : 200)) error(rowNumber, PROSTHETICS_COLUMNS[i], 'FIELD', 'Campo obbligatorio, senza controlli o spazi esterni; massimo 200 caratteri (descrizione 2.000).');
         }

@@ -159,6 +159,18 @@ e conserva il file in un luogo sicuro, per esempio un disco esterno.
 In caso di guasto, il ripristino richiede di reinstallare MediFlow e recuperare
 backup e PIN.
 
+Verifica e ripristino accettano il backup completo anche quando supera la
+dimensione di un singolo allegato. Il file viene elaborato interamente in
+memoria: per archivi grandi serve memoria libera sufficiente sul computer.
+
+All'apertura su macOS e Linux, MediFlow limita al proprietario l'accesso a
+`medical.db` e ai file di lavoro SQLite `-wal` e `-shm`. Non modifica file
+di altri utenti o collegamenti simbolici, che impediscono l'apertura.
+Se non riesce a verificare o correggere questi permessi, l'apertura si ferma:
+conserva l'archivio e i file di lavoro, senza eliminarli per forzare l'avvio.
+Se hai scelto una cartella dati personalizzata, assicurati che sia accessibile
+solo al tuo utente prima di allegare originali al repertorio protesico.
+
 **È a norma GDPR?**
 Cifratura e gestione locale dei dati sono misure tecniche, non una garanzia
 complessiva di conformità. La conformità legale dipende anche dalle misure
@@ -166,6 +178,57 @@ organizzative e operative con cui usi il sistema.
 
 ---
 Per supporto, apri una issue o consulta la documentazione tecnica.
+
+
+## Fonti personali della protesica
+
+In Repertori, Protesica e ausili mostra il numero di fonti e voci locali.
+Apri Gestisci fonti per importare un listino o nomenclatore della tua ATS/ASL
+oppure un elenco aziendale. Non è un catalogo normativo completo e MediFlow
+non verifica eleggibilità, validità prescrittiva o attualità della fonte.
+
+1. Esporta l’eventuale foglio Excel in CSV UTF-8. XLSX non è letto direttamente.
+2. Scegli il file (massimo 2 MiB e 20.000 righe), indica virgola o punto e virgola
+   e associa esplicitamente le otto colonne. Le colonne delle date possono
+   contenere celle vuote. Codifica, codice, descrizione, versione, fonte e ambito
+   sono obbligatori; ogni file dichiara una sola fonte/versione/ambito/codifica.
+3. Indica ente, data e note se utili. Genera una nuova anteprima dopo qualsiasi
+   modifica alla mappatura o ai metadati. Controlla campione, errori e conteggi,
+   accetta la fonte e conferma. Duplicati o errori bloccano tutto il file.
+4. In Fonti e originali allega PDF o altri documenti senza dati dei pazienti.
+   Puoi indicare pagina o sezione. Massimo 25 MiB per originale, 100 MiB e 1.000
+   documenti complessivi. Gli originali sono aggiuntivi e non sostituibili dalla UI.
+   Il collegamento scarica il documento per aprirlo con l’applicazione locale.
+
+Fonti diverse con lo stesso codice convivono. A parità di nome, versione e
+ambito l’import aggiorna la fonte esistente; una versione diversa crea una
+fonte distinta. I codici assenti dal file restano. I dati precedenti sono
+migrati in fonti derivate dai campi già presenti, senza recuperare voci che
+fossero state sovrascritte prima dell’aggiornamento.
+
+Nella nuova prescrizione cerca e filtra per fonte, poi premi Usa voce nella
+bozza. Il codice mantiene la propria codifica e non compila automaticamente
+il campo ISO. Salva solo dopo la revisione clinica. Una revisione cambiata
+richiede una nuova scelta. Modificare manualmente la descrizione nella bozza
+annulla la selezione dal catalogo. La prescrizione conserva uno snapshot della
+voce, dei metadati del suo import e dei riferimenti agli originali allegati a
+quell’import al momento del salvataggio; gli import successivi non lo modificano. Le prescrizioni precedenti restano
+leggibili e non ricevono provenienze ricostruite automaticamente.
+
+Originali, catalogo e snapshot di provenienza sono in chiaro nel database
+locale; la descrizione clinica segue la cifratura dei campi esistenti. Il backup
+web e quello schedulato includono gli originali conservati come BLOB SQLite;
+il ripristino è atomico. Se un originale referenziato manca o non corrisponde
+a fonte, import, hash o dimensione dichiarati, il backup e il ripristino sono
+rifiutati prima di modificare l’archivio di destinazione.
+Un originale mancante o alterato non viene restituito come verificato. Gli
+aggiornamenti degli originali richiedono una nuova allegazione esplicita.
+
+I codici assenti da un nuovo import conservano i metadati e gli originali del
+proprio import. I nuovi allegati appartengono all'import corrente della fonte.
+Ridurre il limite configurato per gli upload non impedisce di scaricare gli
+originali già conservati. Il client Apple attuale ignora lo snapshot di
+provenienza e non offre la gestione delle fonti.
 
 ### Catalogo ICD-11 incorporato
 

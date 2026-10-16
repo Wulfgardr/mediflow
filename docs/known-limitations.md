@@ -257,6 +257,31 @@ La `0.8.5` non consegna:
 - invocazione AI dai client paired;
 - app complete Windows o Linux.
 
+
+## Fonti personali protesica
+
+Verifica e ripristino web del backup completo non usano la clonazione del proxy
+Next limitata al singolo upload. Il caso riguarda anche gli allegati paziente,
+non solo i 100 MiB ammessi per gli originali protesici. Export e lettura JSON
+richiedono comunque memoria proporzionale al backup; non è garantita una
+dimensione arbitraria. I test HTTP dedicati richiedono un server sintetico
+isolato e un ambiente che consenta un listener loopback.
+
+Su macOS e Linux il bootstrap normalizza a `0600` soltanto i file SQLite
+regolari dell'utente corrente. Non corregge file non propri, symlink o i permessi
+di una cartella dati personalizzata; l'apertura di file non sicuri resta
+bloccata. Non è una verifica degli ACL Windows né una cifratura del database.
+La correzione avviene per percorso, senza aprire i file, cosi' non rilascia i
+lock delle connessioni SQLite attive; un file sostituito durante la correzione
+viene rifiutato.
+
+- Import diretto XLSX non disponibile: esportare in CSV UTF-8, con virgola o punto e virgola e mappatura esplicita.
+- Nessuna estrazione AI, attestazione normativa o aggiornamento clinico automatico.
+- Fonti derivate da nome/versione/ambito; una versione differente crea una fonte distinta. La migrazione non recupera collisioni già avvenute nelle versioni precedenti.
+- Originali aggiuntivi nel database locale, in chiaro, fino a 25 MiB ciascuno e 100 MiB totali (massimo 1.000). Nessuna cancellazione o sostituzione dalla UI.
+- Snapshot di provenienza in chiaro e additivo nei DTO web/network; nessuna provenienza automatica per prescrizioni esistenti. Il client Apple attuale ignora lo snapshot di provenienza: non lo visualizza e non offre la gestione delle fonti.
+- Il collegamento all’originale richiede una sessione web autenticata e scarica il documento; non è un visualizzatore integrato. Il riferimento a pagina è dichiarato dall’operatore e non validato contro il contenuto.
+
 ## Catalogo ICD-11 incorporato (2026-10)
 
 La ricerca tabellare MMS 2026-01 usa il bundle WHO ufficiale incluso, verificato
