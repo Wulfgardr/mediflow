@@ -5,51 +5,33 @@ read_when:
   - "Updating documentation structure, canonical indices, or repository governance."
 ---
 
-# Documentazione MediFlow: Indice Canonico
+# Documentazione MediFlow
 
-Chi arriva dal prodotto cerca di capire a che cosa serva MediFlow; chi deve
-modificarlo deve anche sapere quali decisioni lo vincolino. Questo indice
-collega le due esigenze: orienta la lettura, indica il documento da aggiornare
-per ciascun tema e chiarisce quale riferimento prevalga in caso di divergenza.
-L’[indice completo](./markdown-index.md) serve invece a trovare i singoli file.
+Per conoscere il prodotto e avviarlo dai sorgenti, parti dal
+[README](../README.md) o da [Inizia qui](./start-here.md).
+Questa mappa indica i documenti di riferimento per ogni tema e il loro ordine
+di precedenza. L'[indice completo](./markdown-index.md) elenca i singoli file.
 
-La mappa precedente era aggiornata al 2026-09-08. Questa revisione editoriale
-è del 2026-09-20; le date, le revisioni e gli esiti contenuti nei verbali
-restano quelli delle prove originarie.
+## Versione pubblicata: 0.9.0
 
-<!-- reconciliation-20260912 -->
-La candidatura ricostruita il 12 settembre 2026 non era ancora una release.
-In quel piano Windows, Linux, Mini, iPhone e iPad erano rinviati alla 1.0, con
-ATHENA opzionale: era l’indicazione di quella fase, non una nuova scadenza
-o una qualifica delle piattaforme.
-**La 0.8.6 è stata pubblicata come codice sorgente**, per runtime locale/headless
-sul Mac e browser localhost. Il percorso nativo è separato; gli archivi ZIP e
-TAR.GZ non attestano installer firmati o notarizzati né app complete su altri
-sistemi. Le prove storiche Windows/Linux e il raccordo Mini WUL-696 non sono
-cancellati da questa delimitazione, ma nemmeno diventano qualifiche generali.
+La 0.9.0 distribuisce codice sorgente per l'applicazione Web locale e
+l'accesso per agenti (Headless), con Node 24. I profili provati sono macOS
+Apple Silicon, Windows 11 ARM con Node x64 emulato e Omarchy/Arch ARM su
+Parallels. L'avvio verificato richiede un checkout Git pulito del tag
+`v0.9.0`; gli archivi ZIP e TAR.GZ di GitHub non includono `.git` e il loro
+avvio non è qualificato. App native e installer firmati non sono inclusi.
 
-Le sezioni sulla `0.8.5` descrivono i propri sorgenti e le proprie prove.
-La pubblicazione corrente è ricostruita nello
-[stato del sistema](./STATE_OF_THE_SYSTEM.md) e lo storico delle versioni nel
-[CHANGELOG](../CHANGELOG.md). La valutazione del deployment clinico resta aperta
-in WUL-685–688. Il coordinamento della consegna sorgente e del passaggio alla
-0.9.0 [WUL-669](https://linear.app/wulfgardr/issue/WUL-669) è concluso dal
-23 settembre, come riletto il 26 settembre 2026: questo non adotta le
-procedure organizzative né qualifica servizi solo configurati.
+La [release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
+riporta commit, verifiche e limiti, comprese le prove delegate accettate e
+le quarantene fino al 23 ottobre 2026 alle 00:00 UTC. Le prove su dati
+sintetici non autorizzano l'uso clinico. L'ammissione dell'installazione e
+dei flussi resta una decisione del professionista o dell'organizzazione.
 
-## Consegna sorgente 0.9.0
-
-MediFlow 0.9.0 è una release sorgente per runtime locale Web e Headless. Le
-[note di rilascio](../CHANGELOG.md#090---2026-10-15) e lo
-[stato corrente](./STATE_OF_THE_SYSTEM.md#supporto-capacità-e-protezione-correnti)
-distinguono profili sorgente, prove delegate accettate C15/C20 e quarantene
-fino al 23 ottobre 2026 alle 00:00 UTC. La [pagina della release GitHub](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0)
-riporta stato di pubblicazione, commit, artefatti ed esiti CI della consegna;
-app native e ammissione clinica restano separate. GitHub fornisce ZIP/TAR.GZ
-sorgenti; l'avvio qualificato richiede un checkout Git pulito del tag `v0.9.0`
-con Node 24, sui profili macOS ARM, Windows 11 ARM con Node x64 emulato e
-Omarchy/Arch ARM su Parallels. Gli archivi privi di `.git` non sono un profilo
-di avvio qualificato.
+Lo [stato del sistema](./STATE_OF_THE_SYSTEM.md#supporto-capacità-e-protezione-correnti)
+descrive l'implementazione corrente. Il [CHANGELOG](../CHANGELOG.md)
+distingue la versione pubblicata dalle modifiche successive su `main`.
+I documenti delle versioni precedenti conservano date, revisioni, prove e
+limiti originari; non attestano lo stato delle versioni successive.
 
 ## Pianificazione corrente
 
@@ -82,19 +64,16 @@ non sostituisce i prerequisiti 0.9.0/0.9.1 né autorizza una migrazione runtime.
 
 ## Percorsi di lettura
 
-Per una prima visita, [Inizia qui](./start-here.md) e il [README del progetto](../README.md) spiegano
-il bisogno, il lavoro senza AI e le ragioni della modularità. Quando la
-domanda riguarda dati e responsabilità, partire da
-[privacy, GDPR e governance AI](./privacy-and-ai-governance.md) e proseguire nelle policy e nei contratti
-richiamati: l’introduzione non sostituisce quei vincoli.
-
-Per valutare la candidatura 0.8.5, [readiness e canali Apple](./release-085-readiness.md) conserva le
-prove e i gate aperti di quella revisione. Per contribuire ai sorgenti,
-servono [topologia repository](./repository-topology.md), [architettura](../ARCHITECTURE.md) e poi il contratto del
-componente. [Get MediFlow e linea editoriale](./getmediflow-editorial-proposal.md) riguarda il racconto
-pubblico, mentre il [gemello web navigabile e confronto visuale](./design/2026-09-05-086-runtime-twin.md) conserva
-le prove sintetiche WUL-676 precedenti alla promozione UI: nessuno dei due
-sostituisce il runtime.
+- **Prodotto e uso:** [Inizia qui](./start-here.md),
+  [README](../README.md) e [manuale](./MANUALE.md).
+- **Dati e responsabilità:** [privacy, GDPR e governance AI](./privacy-and-ai-governance.md),
+  [sicurezza](../SECURITY.md) e contratti richiamati.
+- **Contribuzione:** [topologia della repository](./repository-topology.md),
+  [architettura](../ARCHITECTURE.md), [guida ai contributi](../CONTRIBUTING.md)
+  e contratto del componente.
+- **Presentazione pubblica:** [sito e linea editoriale](./getmediflow-editorial-proposal.md).
+- **Prove storiche:** [valutazione della candidata 0.8.5](./release-085-readiness.md)
+  e [confronto visuale 0.8.6](./design/2026-09-05-086-runtime-twin.md).
 
 ## Trasparenza sullo sviluppo
 

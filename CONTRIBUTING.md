@@ -1,9 +1,7 @@
 # Contribuire a MediFlow
 
-Contribuire a MediFlow significa lavorare su un gestionale che tratta
-**dati sanitari**. Privacy e sicurezza non sono quindi aspetti da aggiungere
-alla fine: orientano il cambiamento, i materiali usati per provarlo e il modo
-in cui lo si consegna.
+MediFlow tratta **dati sanitari**. Ogni contributo deve proteggere dati,
+accessi e storico delle modifiche. Per le prove usa solo dati sintetici.
 
 ---
 
