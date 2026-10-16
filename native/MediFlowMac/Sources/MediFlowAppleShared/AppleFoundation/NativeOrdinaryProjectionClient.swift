@@ -1,5 +1,4 @@
 /* fresh paired HTTP reads; the key is read only from the current unlocked client. */
-#if os(macOS)
 import Foundation
 import MediFlowCore
 
@@ -132,4 +131,3 @@ enum NativeOrdinaryProjectionClient {
             sessionCookie: submitting.sessionCookie, ambulatoryId: preparation.ambulatoryId)
     }
 }
-#endif

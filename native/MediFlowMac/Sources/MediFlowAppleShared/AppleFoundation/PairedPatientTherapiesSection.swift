@@ -35,10 +35,8 @@ struct PairedPatientTherapiesSection: View {
                 }
             }
 
-            #if os(macOS)
             Divider()
             NativeTreatmentReasoningView(workspaceModel: model)
-            #endif
 
             if model.isEditingTherapy {
                 Divider()

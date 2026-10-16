@@ -19,6 +19,8 @@ struct PairedPatientDocumentsSection: View {
     @Binding var selectedFseObservationId: String?
     @Binding var expandedInsightId: String?
 
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var importBatch = PairedAttachmentImportBatch()
     @State private var isShowingUpload = false
     var usesInlinePreview = false
 
@@ -39,6 +41,10 @@ struct PairedPatientDocumentsSection: View {
                 }
             } else { archiveColumn }
         }
+        .onDisappear { importBatch.cancel() }
+        .onChange(of: model.selectedPatientID) { _ in importBatch.cancel() }
+        .onReceive(model.clinicalWorkspaceInvalidations) { _ in importBatch.cancel() }
+        .onChange(of: scenePhase) { phase in if phase == .background { importBatch.cancel() } }
     }
 
     private func original(_ attachment: HomeBaseAttachmentSummary) -> some View {
@@ -68,12 +74,10 @@ struct PairedPatientDocumentsSection: View {
                 .accessibilityIdentifier("documents-insights-disclosure")
             }
 
-            #if os(macOS)
             if capabilities.hasCapability("network.replica.readonly-documents") {
                 Divider()
                 NativeDocumentSynthesisView(workspaceModel: model)
             }
-            #endif
 
             followupSuggestionsSection
 
@@ -138,13 +142,25 @@ struct PairedPatientDocumentsSection: View {
                     .foregroundStyle(.secondary)
             }
 
+            if !importBatch.results.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(importBatch.results) { result in
+                        Text("\(result.fileName): \(result.message)").font(.caption)
+                    }
+                    if importBatch.isRunning {
+                        Button(importBatch.isStopping ? "Verifica esito in corso…" : "Interrompi importazione") { importBatch.stop() }
+                            .disabled(importBatch.isStopping)
+                    }
+                }.accessibilityIdentifier("attachment-import-results")
+            }
+
             if let pickerError = attachmentPickerError {
                 Text(pickerError)
                     .font(.caption)
                     .foregroundStyle(LumePalette.critical)
             }
         }
-        .fileImporter(isPresented: $isPickingAttachmentFile, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+        .fileImporter(isPresented: $isPickingAttachmentFile, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
             handlePickedAttachmentFile(result)
         }
         .onChange(of: pickedPhotoItem) { newItem in
@@ -203,14 +219,14 @@ struct PairedPatientDocumentsSection: View {
             Label("Scegli file", systemImage: "folder")
                 .frame(minHeight: 44)
         }
-        .disabled(!model.canUploadAttachment)
+        .disabled(!model.canUploadAttachment || importBatch.isRunning)
         .accessibilityIdentifier("attachment-upload-file-button")
 
         PhotosPicker(selection: $pickedPhotoItem, matching: .images) {
             Label("Scegli foto", systemImage: "photo")
                 .frame(minHeight: 44)
         }
-        .disabled(!model.canUploadAttachment)
+        .disabled(!model.canUploadAttachment || importBatch.isRunning)
         .accessibilityIdentifier("attachment-upload-photo-button")
     }
 
@@ -218,25 +234,24 @@ struct PairedPatientDocumentsSection: View {
         attachmentPickerError = nil
         switch result {
         case .failure(let error):
-            attachmentPickerError = "Selezione del file non riuscita: \(error.localizedDescription)"
+            attachmentPickerError = "Selezione dei file non riuscita: \(error.localizedDescription)"
         case .success(let urls):
-            guard let url = urls.first, let patientId = model.selectedPatient?.id else { return }
-            let accessedScopedResource = url.startAccessingSecurityScopedResource()
-            defer { if accessedScopedResource { url.stopAccessingSecurityScopedResource() } }
-            do {
-                let rawData = try Data(contentsOf: url)
-                let mimeType = Self.mimeType(forPathExtension: url.pathExtension)
-                let fileName = url.lastPathComponent
-                Task {
-                    await model.uploadAttachmentForSelectedPatient(
-                        patientId: patientId,
-                        fileName: fileName,
-                        mimeType: mimeType,
-                        rawData: rawData
-                    )
+            guard let patientId = model.selectedPatientID, let identity = model.clinicalWorkspaceConnection?.identity else { return }
+            let current = {
+                model.selectedPatientID == patientId && model.clinicalWorkspaceConnection?.identity == identity
+            }
+            importBatch.start(urls, isCurrent: current) { url in
+                guard current(), model.canUploadAttachment else { throw CancellationError() }
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                if let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                   HomeBaseAttachmentWirePrecheck.check(rawByteCount: size).exceedsLimit {
+                    throw CocoaError(.fileReadTooLarge)
                 }
-            } catch {
-                attachmentPickerError = "Lettura del file non riuscita: \(error.localizedDescription)"
+                var bytes = try Data(contentsOf: url)
+                defer { bytes.resetBytes(in: 0..<bytes.count) }
+                return await model.uploadAttachmentForSelectedPatient(patientId: patientId,
+                    fileName: url.lastPathComponent, mimeType: Self.mimeType(forPathExtension: url.pathExtension), rawData: bytes)
             }
         }
     }
@@ -600,4 +615,86 @@ struct PairedPatientDocumentsSection: View {
         return formatter
     }()
 
+}
+
+enum PairedAttachmentUploadOutcome { case uploaded, uploadedNeedsRefresh, unconfirmed }
+
+@MainActor
+final class PairedAttachmentImportBatch: ObservableObject {
+    struct Result: Identifiable {
+        let id: Int
+        let fileName: String
+        var message: String
+    }
+    @Published private(set) var results: [Result] = []
+    @Published private(set) var isRunning = false
+    @Published private(set) var isStopping = false
+    private var currentIndex: Int?
+    private var generation: UInt = 0
+    private var inFlight = false
+    private var task: Task<Void, Never>?
+
+    func start(_ urls: [URL], isCurrent: @escaping () -> Bool,
+               upload: @escaping (URL) async throws -> PairedAttachmentUploadOutcome) {
+        guard !isRunning, !inFlight, !urls.isEmpty, isCurrent() else { return }
+        generation &+= 1
+        let epoch = generation
+        results = urls.enumerated().map { Result(id: $0.offset, fileName: $0.element.lastPathComponent, message: "Non avviato") }
+        isRunning = true; inFlight = true; isStopping = false
+        task = Task {
+            defer {
+                inFlight = false
+                if generation == epoch { isRunning = false; isStopping = false; currentIndex = nil }
+            }
+            for (index, url) in urls.enumerated() {
+                guard generation == epoch, isCurrent() else {
+                    if generation == epoch { cancel() }
+                    return
+                }
+                guard !isStopping, !Task.isCancelled else { return }
+                currentIndex = index
+                results[index].message = "Caricamento in corso…"
+                do {
+                    let outcome = try await upload(url)
+                    guard generation == epoch, isCurrent() else {
+                        if generation == epoch { cancel() }
+                        return
+                    }
+                    switch outcome {
+                    case .uploaded:
+                        results[index].message = "Caricato"
+                        if isStopping || Task.isCancelled { return }
+                    case .uploadedNeedsRefresh:
+                        results[index].message = "Caricato; ricarica l’archivio prima di proseguire."
+                        return
+                    case .unconfirmed:
+                        results[index].message = "Esito non confermato: verifica l’archivio prima di riprovare."
+                        return
+                    }
+                } catch {
+                    guard generation == epoch, isCurrent() else {
+                        if generation == epoch { cancel() }
+                        return
+                    }
+                    results[index].message = isStopping || error is CancellationError
+                        ? "Esito non confermato: verifica l’archivio prima di riprovare."
+                        : "Importazione interrotta: \(error.localizedDescription)"
+                    return
+                }
+            }
+        }
+    }
+    func stop() {
+        guard inFlight, !isStopping else { return }
+        isStopping = true
+        if let currentIndex {
+            results[currentIndex].message = "Interruzione richiesta: esito non ancora confermato."
+        }
+        task?.cancel()
+    }
+    func cancel() {
+        generation &+= 1
+        task?.cancel(); task = nil
+        results = []; isRunning = false; isStopping = false; currentIndex = nil
+    }
 }

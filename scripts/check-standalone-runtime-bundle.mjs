@@ -39,7 +39,7 @@ const PDF_ROUTE_DIRECTORY = path.join('server', 'app', 'api', 'pdf-extract');
 const PDF_RUNTIME_REFERENCE = /(?:pdf-inspector-worker\.mjs|pdf-inspector-router|(?:node_modules[\\/])?@firecrawl[\\/]pdf-inspector(?:[-/]|$))/i;
 const SYNTHETIC_RTF = Buffer.from('{\\rtf1\\ansi Synthetic standalone note.}', 'utf8');
 const WEB_AUTH_OWNER_PACKAGE = '@mediflow/web-auth-lifecycle-owner';
-const WEB_AUTH_OWNER_VERSION = '0.8.9-local.3f2e6f2a';
+const WEB_AUTH_OWNER_VERSION = '0.8.10';
 const WEB_AUTH_OWNER_KEYS = Object.freeze([
   'abort', 'abortAdminReset', 'abortResourceUse', 'abortUserRetirement', 'begin', 'beginResourceUse',
   'bootstrapControl', 'commitAdminReset', 'commitResourceUse', 'commitUserRetirement', 'issue',
@@ -48,10 +48,10 @@ const WEB_AUTH_OWNER_KEYS = Object.freeze([
   'unregisterPrivateResource', 'withCurrentResourceBinding',
 ]);
 const WEB_AUTH_OWNER_FILES = Object.freeze([
-  ['index.d.ts', '5c773e27aaba97bac89227ef6fc5f147a9eff8c48c04ab5183fe8339baaabdfd'],
+  ['index.d.ts', '7451ae1f78ead28d706a48694bdf0f12c9ab048926d100d92adca6e27f6c5b3b'],
   ['index.js', '1abc52ee8abe9fd25b28046f1f00ecc2f09d699ba220c61e6222730c22ca44c5'],
   ['internal/control-record.cjs', '3d443096679799ffde96e744060de5be59c9a86ddb383bdd975de75c913b9aa4'],
-  ['internal/native-session.cjs', '43ab1842cab49cf37619621313237beb3728925470bc683b465d5b3c6633dc26'],
+  ['internal/native-session.cjs', '91dc4fdc14dde4d883aaa2383a6acd1bd5d5b754ea48c9e1882effaf6edebc49'],
   ['internal/owner.cjs', 'fa76bdc81e46c5fc3f3de2d54ad7f2d64041e63974f9d7a3354b122d8b668a10'],
   ['internal/session-activation.cjs', '5ed4c9543f8bc15903c0915a8565b997d697d004e9ccfaaa54a3da6236a2aa96'],
   ['internal/session-cell.cjs', '4cd0c2e9f8b40b346d43a93de561e20e85c5662fc8a2f9a0a170403fc80c2e31'],
@@ -60,7 +60,7 @@ const WEB_AUTH_OWNER_FILES = Object.freeze([
   ['internal/session-retirement.cjs', '8848c92cb88635c6c09baf685839e7c6f1aca40d667ea6580e84e275349f1516'],
   ['internal/support/successor-fence.cjs', '7e36178331d5f899d81d877603acb0100eef1436d1873287ad4b27ccc227e7ff'],
   ['internal/support/value.cjs', '9f0968a0290c6184c898f06de2c408540d4eda1ecd0e3e80ae013bb37a782be1'],
-  ['package.json', 'ce1c7e461a95b8b939ff02317673a2c652b9ffcc5d2a7525a77134d1a99bb3d2'],
+  ['package.json', '6e97525e4e606a8ba1204193ac9c4567d99de32c257d3f68b482f2c6521906b7'],
 ]);
 
 /* P12 proves that the externalized final owner is a physical standalone copy

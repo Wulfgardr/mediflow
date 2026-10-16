@@ -1,6 +1,6 @@
 {
   "name": "@mediflow/web-auth-lifecycle-owner",
-  "version": "0.8.9-local.3f2e6f2a",
+  "version": "0.8.10",
   "private": true,
   "type": "commonjs",
   "main": "./index.js",
