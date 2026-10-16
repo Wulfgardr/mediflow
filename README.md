@@ -179,6 +179,11 @@ valido non viene sostituito automaticamente.
 Ollama può eseguire le prime tre funzioni. ATHENA/MLX è facoltativa e
 riservata al ragionamento terapeutico, con modello e configurazione locali.
 
+Nelle prove su dati inventati, le tre funzioni Ollama hanno prodotto proposte
+valide; un primo tentativo di Patient Insight è fallito. La prova locale di
+ragionamento terapeutico con ATHENA non ha prodotto una proposta utilizzabile.
+[Esiti e limiti delle prove](./docs/parity-matrix.md#tre-funzioni-ollama-prove-reali-e-limiti).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./docs/images/getmediflow-090/modelli-locali-dark.png">
   <img src="./docs/images/getmediflow-090/modelli-locali-light.png" alt="Impostazioni dei modelli locali con indirizzo di Ollama e verifica della connessione">
