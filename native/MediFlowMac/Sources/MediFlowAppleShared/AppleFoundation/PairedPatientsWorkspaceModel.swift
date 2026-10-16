@@ -1667,6 +1667,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     func startCreatingPatient() {
         patientCreateGeneration = UUID()
+        errorMessage = nil
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
