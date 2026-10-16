@@ -237,6 +237,121 @@ final class PairedPatientsWorkspaceModelDocumentsTests: XCTestCase {
     }
 
     @MainActor
+    func testDiaryUploadLinksConfirmedIdWithoutReplacingTextOrExistingReferences() async {
+        let patient = detail(id: "p1")
+        let source = DocumentsMockDataSource(details: ["p1": patient])
+        let model = makeModel(source: source)
+        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        model.newEntryTitle = "Bozza sintetica"
+        model.newEntryEditorDocument = ClinicalRichTextEditorDocument(blocks: [
+            ClinicalRichTextEditorBlock(kind: .paragraph, span: ClinicalRichTextTextRun(text: "Testo da mantenere"))
+        ])
+        let document = model.newEntryEditorDocument
+        model.newEntryAttachmentIds = ["existing"]
+        _ = await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
+            mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true })
+        XCTAssertEqual(model.newEntryAttachmentIds, ["existing", "attachment"])
+        XCTAssertEqual(model.newEntryTitle, "Bozza sintetica")
+        XCTAssertEqual(model.newEntryEditorDocument, document)
+        let calls = await source.createAttachmentCalls
+        XCTAssertEqual(calls, 1)
+    }
+
+    @MainActor
+    func testDiaryUploadConfirmedReferenceIsSealedIntoTheExplicitEntryWrite() async throws {
+        let patient = detail(id: "p1")
+        let source = DocumentsMockDataSource(details: ["p1": patient],
+            attachments: [attachmentSummary(id: "attachment", name: sealedField("nuovo.txt"))])
+        let model = makeModel(source: source)
+        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        model.newEntryTitle = "Bozza sintetica"
+        model.newEntryEditorDocument = ClinicalRichTextEditorDocument(blocks: [
+            ClinicalRichTextEditorBlock(kind: .paragraph, span: ClinicalRichTextTextRun(text: "Testo da mantenere"))
+        ])
+        _ = await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
+            mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true })
+        let beforeExplicitSave = await source.lastEntryPayload
+        XCTAssertNil(beforeExplicitSave)
+        await model.createEntryForSelectedPatient()
+        let payload = await source.lastEntryPayload
+        let sealed = try XCTUnwrap(payload?.attachments)
+        let json = try XCTUnwrap(CryptoService.decryptField(sealed, masterKey: masterKey))
+        XCTAssertEqual(try JSONDecoder().decode([String].self, from: Data(json.utf8)), ["attachment"])
+        XCTAssertTrue(model.newEntryAttachmentIds.isEmpty)
+    }
+
+    @MainActor
+    func testDiaryUploadRefreshFailureKeepsConfirmedReferenceWithoutRetry() async {
+        let patient = detail(id: "p1")
+        let source = DocumentsMockDataSource(details: ["p1": patient], failAttachmentList: true)
+        let model = makeModel(source: source)
+        model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+        let outcome = await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
+            mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true })
+        if case .uploadedNeedsRefresh = outcome {} else { XCTFail("Creation was acknowledged") }
+        XCTAssertEqual(model.newEntryAttachmentIds, ["attachment"])
+        let calls = await source.createAttachmentCalls
+        XCTAssertEqual(calls, 1)
+    }
+
+    @MainActor
+    func testDiaryUploadDeniedOrUncertainNeverLinksOrRetries() async {
+        for denied in [true, false] {
+            let patient = detail(id: "p1")
+            let source = DocumentsMockDataSource(details: ["p1": patient], failCreate: true, denyCreate: denied)
+            let model = makeModel(source: source)
+            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            model.newEntryAttachmentIds = ["existing"]
+            let outcome = await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
+                mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true })
+            if case .unconfirmed = outcome {} else { XCTFail("No positive receipt") }
+            XCTAssertEqual(model.newEntryAttachmentIds, ["existing"])
+            let calls = await source.createAttachmentCalls
+            XCTAssertEqual(calls, 1)
+        }
+    }
+
+    @MainActor
+    func testDiaryUploadLateAcknowledgementCannotAttachAfterPatientOrSessionChange() async {
+        for changesSession in [false, true] {
+            let patient = detail(id: "p1")
+            let source = DocumentsMockDataSource(details: ["p1": patient], suspendCreate: true)
+            let model = makeModel(source: source)
+            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            let uploading = Task { await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
+                mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { true }) }
+            for _ in 0..<1000 { if await source.createAttachmentCalls > 0 { break }; await Task.yield() }
+            if changesSession {
+                model.configurePairedOnlineForTests(sessionCookie: "sid=replaced", masterKey: masterKey, selectedPatient: patient)
+            } else {
+                model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: detail(id: "p2"))
+            }
+            await source.resumeCreate()
+            _ = await uploading.value
+            XCTAssertFalse(model.newEntryAttachmentIds.contains("attachment"))
+        }
+    }
+
+    @MainActor
+    func testDiaryUploadContextInvalidationSuppressesLateReceiptWhileVoluntaryStopKeepsIt() async {
+        for invalidatesContext in [false, true] {
+            let patient = detail(id: "p1")
+            let source = DocumentsMockDataSource(details: ["p1": patient], suspendCreate: true)
+            let model = makeModel(source: source)
+            model.configurePairedOnlineForTests(masterKey: masterKey, selectedPatient: patient)
+            var current = true
+            let uploading = Task { await model.uploadAttachmentForNewEntryDraft(patientId: "p1", fileName: "nuovo.txt",
+                mimeType: "text/plain", rawData: Data("sintetico".utf8), isCurrent: { current }) }
+            for _ in 0..<1000 { if await source.createAttachmentCalls > 0 { break }; await Task.yield() }
+            if invalidatesContext { current = false }
+            uploading.cancel()
+            await source.resumeCreate()
+            _ = await uploading.value
+            XCTAssertEqual(model.newEntryAttachmentIds.contains("attachment"), !invalidatesContext)
+        }
+    }
+
+    @MainActor
     private func makeModel(source: DocumentsMockDataSource) -> PairedPatientsWorkspaceModel {
         let suiteName = "PairedPatientsWorkspaceModelDocumentsTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -353,6 +468,12 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     private let capabilitiesFixture: [NetworkCapability]
     private let fetchAttachmentDelayNanoseconds: UInt64
     private let fetchCapabilitiesDelayNanoseconds: UInt64
+    private let failAttachmentList: Bool
+    private let failCreate: Bool
+    private let denyCreate: Bool
+    private let suspendCreate: Bool
+    private var createContinuation: CheckedContinuation<Void, Never>?
+    private(set) var lastEntryPayload: HomeBaseEntryCreatePayload?
     private(set) var lastCreatePayload: HomeBaseAttachmentCreatePayload?
     private(set) var lastCreatePatientId: String?
     private(set) var createAttachmentCalls = 0
@@ -365,8 +486,14 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         checkups: [HomeBaseCheckupSummary] = [],
         capabilities: [NetworkCapability] = [],
         fetchAttachmentDelayNanoseconds: UInt64 = 0,
-        fetchCapabilitiesDelayNanoseconds: UInt64 = 0
+        fetchCapabilitiesDelayNanoseconds: UInt64 = 0,
+        failAttachmentList: Bool = false, failCreate: Bool = false, denyCreate: Bool = false,
+        suspendCreate: Bool = false
     ) {
+        self.failAttachmentList = failAttachmentList
+        self.failCreate = failCreate
+        self.denyCreate = denyCreate
+        self.suspendCreate = suspendCreate
         self.details = details
         self.attachments = attachments
         self.attachmentDetailFixture = attachmentDetail
@@ -472,7 +599,8 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     }
 
     func createEntry(patientId: String, payload: HomeBaseEntryCreatePayload, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseCreatedResource {
-        HomeBaseCreatedResource(id: payload.id, version: 1)
+        lastEntryPayload = payload
+        return HomeBaseCreatedResource(id: payload.id, version: 1)
     }
 
     func updateEntry(patientId: String, entryId: String, payload: HomeBaseEntryUpdatePayload, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseMutationAcknowledgement {
@@ -480,7 +608,8 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
     }
 
     func fetchAttachments(patientId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> [HomeBaseAttachmentSummary] {
-        attachments
+        if failAttachmentList { throw URLError(.networkConnectionLost) }
+        return attachments
     }
 
     func fetchAttachment(patientId: String, attachmentId: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseAttachmentDetail {
@@ -496,7 +625,17 @@ actor DocumentsMockDataSource: HomeBasePatientsDataSource {
         createAttachmentCalls += 1
         lastCreatePatientId = patientId
         lastCreatePayload = payload
+        if suspendCreate { await withCheckedContinuation { createContinuation = $0 } }
+        if failCreate {
+            if denyCreate { throw HomeBaseClientError.httpStatus(403, "Forbidden") }
+            throw URLError(.networkConnectionLost)
+        }
         return HomeBaseCreatedResource(id: "attachment", version: nil)
+    }
+
+    func resumeCreate() {
+        createContinuation?.resume()
+        createContinuation = nil
     }
 
     func computeVisitDraft(input: HomeBaseVisitDraftInput, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?) async throws -> HomeBaseVisitDraftResponse {
