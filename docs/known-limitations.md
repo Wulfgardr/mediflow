@@ -29,7 +29,7 @@ plugin MediFlow per Codex sono due integrazioni distinte.
 **ChatGPT dentro MediFlow.** Il percorso di esecuzione è predisposto solo sul
 Mac che supera i controlli previsti per sistema, processo e configurazione.
 Windows e Linux non hanno un'esecuzione locale ChatGPT verificata. La
-[PR #541](https://github.com/Wulfgardr/mediflow/pull/541), aperta, aggiunge il
+[PR #541](https://github.com/Wulfgardr/mediflow/pull/541), aggiunge il
 collegamento dei client iPhone e iPad all'host Mac: l'elaborazione resta
 sull'host, senza eseguire ChatGPT sul dispositivo mobile. Le prove descritte
 nella PR non attestano generazioni o uso su dispositivi fisici.
@@ -37,7 +37,7 @@ nella PR non attestano generazioni o uso su dispositivi fisici.
 Sul Mac sono stati osservati un nuovo accesso ufficiale, il catalogo reale e
 l'annullamento del tentativo di accesso, con chiusura del processo e rimozione
 dei temporanei. Un modello assente dal catalogo è stato rifiutato senza sostituzioni.
-Le quattro generazioni ordinarie non sono state eseguite: le prove UI con
+La generazione nelle quattro funzioni non è ancora stata verificata: le prove UI con
 risposte simulate non dimostrano che il servizio abbia generato una proposta.
 Non è stata concessa l'ammissione all'uso clinico. Dettagli e riferimenti sono
 nella [nota WUL-778](./adr/0134-chatgpt-subscription-synthesis-execution.md#riqualifica-del-substrato-e-piano-prolite--wul-778).

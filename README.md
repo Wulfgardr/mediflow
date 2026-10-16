@@ -201,8 +201,8 @@ sui dati da inviare. Collegare un account ChatGPT non fornisce accesso alle
 API OpenAI e non attesta l'idoneità all'uso con dati clinici reali.
 
 Per ChatGPT sono stati verificati accesso, catalogo e annullamento del tentativo
-di accesso su un Mac controllato. Le quattro generazioni ordinarie non sono
-state eseguite. Windows e Linux non hanno un'esecuzione locale ChatGPT verificata.
+di accesso su un Mac di prova. La generazione nelle quattro funzioni non è
+ancora stata verificata. Windows e Linux non hanno un'esecuzione locale ChatGPT verificata.
 [Prove e limiti per piattaforma](./docs/known-limitations.md#chatgpt-e-plugin-stato-delle-prove).
 
 <details>
