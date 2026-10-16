@@ -92,3 +92,25 @@ rotazione e Dynamic Type; su entrambi verificare VoiceOver e copertura nel
 selettore app. Simulatori e test Mac non sostituiscono i dispositivi fisici
 richiesti da WUL-589; la qualifica totale rimane in WUL-694. Lo smoke ChatGPT
 reale e la disponibilità del modello appartengono a WUL-778, non alla build.
+
+## Allegati nuovi dalla bozza diario
+
+Il compositore di una nuova voce Apple consente di scegliere più file e usa lo
+stesso writer cifrato dei Documenti, con i permessi documentali paired esistenti.
+Ogni ID confermato dall’host viene aggiunto ai riferimenti della bozza senza
+sostituire testo o riferimenti precedenti. La voce viene scritta soltanto con
+**Registra**; i documenti caricati rimangono nell’archivio anche se la bozza viene
+abbandonata. Non è una transazione unica tra caricamenti e voce diario.
+
+Un errore successivo alla conferma di creazione non annulla il documento:
+l’esito invita ad aggiornare l’elenco. Una risposta incerta interrompe la
+sequenza, senza retry automatico. L’interruzione volontaria conserva gli esiti
+confermati; cambio paziente/sessione, background e uscita dal compositore
+invalidano il contesto e rimuovono i nomi dei file dalla presentazione. Una
+risposta tardiva non può aggiungere riferimenti alla nuova sessione o cartella.
+
+Le prove mirate del modello coprono il payload cifrato, il collegamento dell’ID
+confermato, la successiva scrittura esplicita della voce, rifiuto e risultato
+incerto, refresh fallito e risposte tardive dopo interruzione o invalidazione.
+Il test del client HTTP verifica la proiezione sealed e le credenziali paired.
+La prova UI su Mac, iPhone e iPad resta distinta da questi controlli.

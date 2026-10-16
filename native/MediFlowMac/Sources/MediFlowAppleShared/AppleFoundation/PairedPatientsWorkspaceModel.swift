@@ -3682,7 +3682,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// OCR queue as `pending`/`paired_upload` server-side (D2): the refreshed list
     /// shows that state with the existing Italian label, not a new one.
     @discardableResult
-    func uploadAttachmentForSelectedPatient(patientId: String, fileName: String, mimeType: String, rawData: Data) async -> PairedAttachmentUploadOutcome {
+    func uploadAttachmentForSelectedPatient(patientId: String, fileName: String, mimeType: String, rawData: Data,
+                                            onAcknowledged: ((String) -> Void)? = nil) async -> PairedAttachmentUploadOutcome {
         guard selectedPatient?.id == patientId else {
             errorMessage = "Il paziente selezionato e cambiato: scegli di nuovo il documento."
             return .unconfirmed
@@ -3702,9 +3703,17 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
             errorMessage = precheck.message
             return .unconfirmed
         }
+        let identity = clinicalWorkspaceConnection?.identity
+        let capturedAmbulatoryId = ambulatoryId.trimmedOrNil
+        var isCurrent: () -> Bool = { false }
         var acknowledged = false
         var refreshed = false
-        await runTask {
+        await runTask({
+            let generation = self.workspaceGeneration
+            isCurrent = {
+                self.selectedPatient?.id == patientId && self.workspaceGeneration == generation
+                    && self.clinicalWorkspaceConnection?.identity == identity
+            }
             guard let masterKey = self.masterKey else { throw PairedCryptoError.keyUnavailable }
             let dataURL = HomeBaseAttachmentDataURL.encode(mimeType: mimeType, bytes: rawData)
             let payload = try ClinicalFieldCrypto.sealAttachmentCreatePayload(
@@ -3723,31 +3732,36 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 self.errorMessage = bodyPrecheck.message
                 return
             }
-            guard self.selectedPatient?.id == patientId else {
+            guard isCurrent(), !Task.isCancelled else {
                 self.errorMessage = "Il paziente selezionato e cambiato: scegli di nuovo il documento."
                 return
             }
-            _ = try await self.makeClient().createAttachment(
+            let created = try await self.makeClient().createAttachment(
                 patientId: patientId,
                 payload: payload,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: capturedAmbulatoryId
             )
+            guard !created.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw HomeBaseClientError.contract
+            }
             acknowledged = true
+            guard isCurrent() else { return }
+            onAcknowledged?(created.id)
             let fetchedAttachments = try await self.fetchDecryptedAttachments(
                 patientId: patientId,
                 credentials: credentials,
                 sessionCookie: sessionCookie,
-                ambulatoryId: self.ambulatoryId.trimmedOrNil
+                ambulatoryId: capturedAmbulatoryId
             )
-            guard self.selectedPatient?.id == patientId else { return }
+            guard isCurrent(), !Task.isCancelled else { return }
             self.attachments = fetchedAttachments
             self.attachmentsPatientId = patientId
             self.attachmentsLoadState = .loaded
             refreshed = true
             self.statusMessage = "Documento caricato: in coda per elaborazione sull'home-base."
-        }
+        }, canApplyFailure: { isCurrent() })
         return acknowledged ? (refreshed ? .uploaded : .uploadedNeedsRefresh) : .unconfirmed
     }
 
