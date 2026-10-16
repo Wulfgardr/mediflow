@@ -24,6 +24,7 @@ export type LocalProviderOnboardingStatus = Readonly<{
     state: string; revision: string; version: number; receipt: string | null;
     canActivate: boolean; inference: 'not_run'; qualification: 'not_assessed';
 }>;
+const LOCAL_VERIFICATION_TIMEOUT_MS = 60_000;
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 /** Host composition seam only. No source, authority or target comes from the HTTP body. */
@@ -87,8 +88,8 @@ export function createLocalProviderOnboardingService(sources: Sources) {
             const use = owner.beginResourceUse(port);
             if (!use) { owner.releaseResourcePort(port); deny('owner_locked'); }
             const controller = new AbortController();
-            const deadline = performance.now() + 30_000;
-            const timeout = setTimeout(() => controller.abort(), 30_000);
+            const deadline = performance.now() + LOCAL_VERIFICATION_TIMEOUT_MS;
+            const timeout = setTimeout(() => controller.abort(), LOCAL_VERIFICATION_TIMEOUT_MS);
             const abortRequest = () => controller.abort();
             requestSignal?.addEventListener('abort', abortRequest, { once: true });
             if (requestSignal?.aborted) controller.abort();

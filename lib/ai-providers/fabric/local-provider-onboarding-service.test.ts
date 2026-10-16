@@ -131,7 +131,7 @@ test('timeout is bounded even if an ordinary transport finishes late; no lifecyc
     const f = fixture(async () => { started(); return new Promise(resolve => { complete = resolve; }); });
     const operation = f.service.activate((await f.service.inspect()).revision);
     const rejected = assert.rejects(operation, /verification_interrupted/);
-    await waiting; context.mock.timers.tick(30_001); await rejected;
+    await waiting; context.mock.timers.tick(60_001); await rejected;
     complete({} as Awaited<ReturnType<typeof attestLocalOllamaModel>>);
     await Promise.resolve();
     assert.equal(f.lifecycle.service.read().status, 'denied');
@@ -207,14 +207,14 @@ test('the existing verification budget also bounds final reauthentication and it
     });
     const operation = f.service.activate((await f.service.inspect()).revision);
     const rejected = assert.rejects(operation, /verification_interrupted/);
-    await started; context.mock.timers.tick(30_001); await rejected;
+    await started; context.mock.timers.tick(60_001); await rejected;
     finish(); await Promise.resolve();
     assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
 });
 
 test('elapsed monotonic deadline denies commit even before the timeout callback runs', async context => {
     let now = 0; context.mock.method(performance, 'now', () => now);
-    const f = fixture(async () => { now = 30_000; return {} as Awaited<ReturnType<typeof attestLocalOllamaModel>>; });
+    const f = fixture(async () => { now = 60_000; return {} as Awaited<ReturnType<typeof attestLocalOllamaModel>>; });
     await assert.rejects(f.service.activate((await f.service.inspect()).revision), /verification_interrupted/);
     assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
 });
@@ -315,4 +315,23 @@ test('versione non ammessa conserva i dettagli e non ammette il provider', async
     });
     assert.deepEqual(paths, ['/api/version']);
     assert.equal(f.lifecycle.service.read().status, 'denied');
+});
+
+
+test('cold verification may finish after thirty seconds while the same owner remains active', async context => {
+    let now = 0; context.mock.method(performance, 'now', () => now);
+    const f = fixture(async () => { now = 55_000; return {} as Awaited<ReturnType<typeof attestLocalOllamaModel>>; });
+    const admitted = await f.service.activate((await f.service.inspect()).revision);
+    assert.equal(admitted.state, 'available_unqualified'); assert.equal(f.calls(), 1);
+    assert.equal(f.lifecycle.service.read().status, 'available');
+});
+
+test('additional verification time cannot outlive owner retirement', async context => {
+    let now = 0; context.mock.method(performance, 'now', () => now);
+    const f = fixture(async () => {
+        now = 45_000; owner.retireForUser(f.session);
+        return {} as Awaited<ReturnType<typeof attestLocalOllamaModel>>;
+    });
+    await assert.rejects(f.service.activate((await f.service.inspect()).revision), /owner_locked/);
+    assert.equal(f.calls(), 1); assert.equal(f.lifecycle.service.read().status, 'denied');
 });
