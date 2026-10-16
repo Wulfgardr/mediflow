@@ -58,7 +58,7 @@ test('parseLatestChangelog joins wrapped bullet lines', () => {
 
 - Un solo lanciatore per macOS, Windows e Linux: \`MediFlow.command\`,
   \`MediFlow.cmd\` e \`MediFlow.sh\`.
-- Seconda voce con **Aggiorna ora** ([#525](https://github.com/Wulfgardr/mediflow/pull/525)).
+- Seconda voce con **Aggiorna ora** ([#525](./pull/525)).
 
   Paragrafo dopo una riga vuota.
 
