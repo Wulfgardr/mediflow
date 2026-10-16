@@ -47,6 +47,8 @@ const BACKUP_TABLES = {
     exemptionImportReceipts: 'exemption_import_receipts',
     prostheticsCatalogEntries: 'prosthetics_catalog_entries',
     prostheticsCatalogReceipts: 'prosthetics_catalog_receipts',
+    prostheticsCatalogSources: 'prosthetics_catalog_sources',
+    prostheticsCatalogDocuments: 'prosthetics_catalog_documents',
     messages: 'messages',
     observations: 'observations',
     patients: 'patients',
@@ -365,9 +367,10 @@ function primaryKeyColumns(db: Database.Database, table: string): string[] {
 function readOrderedRows(db: Database.Database, table: string): Array<Record<string, unknown>> {
     const primaryKey = primaryKeyColumns(db, table);
     assert.ok(primaryKey.length > 0, `${table} must expose a primary key for record-by-record comparison`);
-    return db.prepare(
+    const rows = db.prepare(
         `SELECT * FROM ${quoteIdentifier(table)} ORDER BY ${primaryKey.map(quoteIdentifier).join(', ')}`,
     ).all() as Array<Record<string, unknown>>;
+    return rows.map(row => typeof row.catalog_snapshot === 'string' ? { ...row, catalog_snapshot: stableStringify(JSON.parse(row.catalog_snapshot)) } : row);
 }
 
 type RestoreFenceMode = 'complete' | 'throw' | 'async' | 'missing';
@@ -921,6 +924,18 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
             const catalogPreview = prosthetics.preview(catalogBytes, 'synthetic-roundtrip.csv', 'synthetic-backup');
             prosthetics.commit({ bytes: catalogBytes, sourceName: 'synthetic-roundtrip.csv', proof: catalogPreview.proof!, acceptSubset: true }, 'synthetic-backup', () => {});
+            if (process.platform !== 'win32') {
+                fs.chmodSync(sourceDataDir, 0o700);
+                for (const suffix of ['', '-wal', '-shm']) {
+                    const file = path.join(sourceDataDir, `medical.db${suffix}`);
+                    if (fs.existsSync(file)) fs.chmodSync(file, 0o600);
+                }
+            }
+            const sourceId = prosthetics.sources().sources[0].id;
+            prosthetics.addDocument({ sourceId, revision: prosthetics.status().revision, name: 'originale-sintetico.pdf',
+                base64: Buffer.from('%PDF-1.4 Originale sintetico').toString('base64'), page: '2' }, () => {});
+            const selection = { entryId: prosthetics.search('').entries[0].id, revision: prosthetics.status().revision };
+            sourceDb.prepare('UPDATE prosthetic_prescriptions SET catalog_snapshot=? WHERE id=?').run(JSON.stringify(prosthetics.snapshot(selection)), 'w7-prosthetic');
             const headlessSoapReplay = seedHeadlessSoapCommit(sourceDataDir);
 
             for (const table of clinicalTables) {

@@ -236,6 +236,13 @@ uno sviluppo separato. Il principio locale va letto insieme ai percorsi
 espliciti di pairing, cache, esportazione e backup, non come promessa che
 ogni dato sia confinato per sempre a un solo dispositivo.
 
+All'apertura su macOS e Linux, i file del database appartenenti all'utente
+sono resi accessibili solo a quell'utente. Se il controllo dei permessi fallisce,
+l'apertura si ferma e l'archivio va conservato per la verifica. Verifica e ripristino web ricevono
+il backup completo, inclusi originali e allegati paziente, senza il limite
+del proxy previsto per un singolo upload. Il JSON viene elaborato in memoria:
+la dimensione gestibile dipende dalle risorse del computer.
+
 ```mermaid
 flowchart LR
     web[Browser locale] --> host[Host MediFlow: servizi e API]
@@ -397,6 +404,13 @@ Il codice è pubblicato sotto [licenza MIT](./LICENSE), perché sia possibile
 esaminarlo e contribuire al suo sviluppo. Dataset, terminologie, modelli e
 fonti esterne conservano le rispettive condizioni d’uso: la licenza di
 MediFlow non le sostituisce. [Crediti e attribuzioni](./CREDITS.md).
+
+
+Il repertorio protesica supporta fonti personali distinte, originali locali e
+snapshot di provenienza nelle nuove prescrizioni scelte dal catalogo. Importa
+CSV UTF-8 con virgola o punto e virgola e mappatura colonne; per XLSX occorre
+prima esportare in CSV. Catalogo, originali e snapshot di provenienza sono in
+chiaro nel database locale. Vedi [manuale](docs/MANUALE.md#fonti-personali-della-protesica).
 
 Il [catalogo ICD-11 incorporato](docs/icd-who-setup.md) cerca categorie per codice
 o titolo inglese in SQLite. Dati WHO CC BY-ND 3.0 IGO, separati dalla licenza MIT:
