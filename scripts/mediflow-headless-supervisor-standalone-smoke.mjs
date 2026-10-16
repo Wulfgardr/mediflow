@@ -19,7 +19,16 @@ assert.ok(args.length === 0 || (args.length === 2 && args[0] === '--app'),
   'Usage: mediflow-headless-supervisor-standalone-smoke.mjs [--app <physical.app>]');
 const APP = args[1] ?? null;
 const layout = APP ? appLayout(APP) : null;
+let expectedWebIdentity;
 const ownedPids = new Set();
+async function verifyBackendIdentity(url) {
+  const response = await fetch(new URL('/api/system/revision', url), { headers: { 'Cache-Control': 'no-store' } });
+  assert.equal(response.status, 200, 'Backend revision must be available before login');
+  const identity = await response.json();
+  assert.equal(identity.revision, expectedWebIdentity.revision.slice(0, 12), 'Backend revision must match the verified Web build');
+  assert.equal(identity.sourceFingerprint, expectedWebIdentity.sourceFingerprint, 'Backend source must match the verified Web build');
+  assert.equal(identity.fingerprint, expectedWebIdentity.sourceFingerprint);
+}
 function snapshotApp() {
   if (!APP) return null;
   const records = [];
@@ -81,6 +90,7 @@ async function prebindShutdown(dataDir, foreignCwd, kind) {
   const rpc = rpcClient(child);
   try {
     BASE_URL = await waitForHeadlessReady(() => stderr, child);
+    await verifyBackendIdentity(BASE_URL);
     assert.ok(rememberDescendants(child.pid) >= 2, 'Expected real Web and MCP children');
     await rpc.send('server/discover');
     const denied = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
@@ -241,6 +251,7 @@ async function concurrentSupervisors(foreignCwd) {
     const generations = [];
     for (const [index, instance] of instances.entries()) {
       assert.ok(rememberDescendants(instance.child.pid) >= 2);
+      await verifyBackendIdentity(urls[index]);
       const login = await loginWithWebAuthControl(urls[index], { username: USERNAME, password: '1234' });
       assert.equal(login.response.status, 200, 'Login must use the announced backend');
       assert.ok(login.cookieHeader);
@@ -385,11 +396,16 @@ async function main() {
   fs.writeFileSync(path.join(foreignCwd, 'node'), `#!/bin/sh\n: > '${marker}'\nexit 99\n`, { mode: 0o755 });
   let child = null, ordinary = null, stderr = '', before = null; try {
     if (APP) { await checkHeadlessRuntime(APP); before = snapshotApp(); }
+    expectedWebIdentity = JSON.parse(fs.readFileSync(path.join(layout?.web ?? path.join(ROOT, '.next/standalone'), 'mediflow-build-identity.json'), 'utf8'));
     await concurrentSupervisors(foreignCwd);
     prepareSyntheticDatabase(dataDir);
     ordinary = spawn(process.execPath, [path.join(layout?.web ?? path.join(ROOT, '.next/standalone'), 'server.js')], {
       cwd: ROOT, env: { NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: '3001',
         MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
+        MEDIFLOW_APP_REVISION: expectedWebIdentity.revision.slice(0, 12), MEDIFLOW_APP_BRANCH: expectedWebIdentity.branch,
+        MEDIFLOW_APP_WORKTREE_HASH: expectedWebIdentity.worktreeHash,
+        MEDIFLOW_APP_SOURCE_FINGERPRINT: expectedWebIdentity.sourceFingerprint,
+        MEDIFLOW_APP_FINGERPRINT: expectedWebIdentity.sourceFingerprint,
         MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0' },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -398,6 +414,7 @@ async function main() {
       stream.setEncoding('utf8'); stream.on('data', chunk => { ordinaryOutput += chunk; });
     }
     await waitForReady(() => ordinaryOutput, ordinary);
+    await verifyBackendIdentity(ORDINARY_URL);
     const ordinaryLogin = await loginWithWebAuthControl(ORDINARY_URL, { username: USERNAME, password: '1234' });
     assert.equal(ordinaryLogin.response.status, 200);
     assert.ok(ordinaryLogin.cookieHeader);
@@ -407,6 +424,7 @@ async function main() {
     child.stderr.on('data', (chunk) => { stderr += chunk; });
     const rpc = rpcClient(child);
     BASE_URL = await waitForHeadlessReady(() => stderr, child);
+    await verifyBackendIdentity(BASE_URL);
     if (APP) assert.ok(rememberDescendants(child.pid) >= 2, 'Expected real Web and MCP children');
     const discovery = await rpc.send('server/discover');
     assert.deepEqual(discovery.result.supportedVersions, ['2026-07-28']);
