@@ -98,9 +98,14 @@ async function collectSelections(root) {
   };
 }
 
+/** Git still lists a deleted but not yet staged file: only paths present in the worktree count. */
+export function existingListedPaths(listed, exists) {
+  return listed.split('\0').filter((file) => file && exists(file));
+}
+
 async function main(root) {
   const listed = execFileSync('git', ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], { maxBuffer: 32 * 1024 * 1024, encoding: 'utf8' });
-  const paths = listed.split('\0').filter((file) => file && fs.existsSync(path.join(root, file)));
+  const paths = existingListedPaths(listed, (file) => fs.existsSync(path.join(root, file)));
   const testFiles = discoverTestFiles(paths, (file) => fs.readFileSync(path.join(root, file), 'utf8'));
   const exclusions = JSON.parse(fs.readFileSync(path.join(root, EXCLUSIONS), 'utf8'));
   const result = checkTestSelection(testFiles, await collectSelections(root), exclusions);
