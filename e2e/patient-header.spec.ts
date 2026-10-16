@@ -81,7 +81,7 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   await expect(quadro).toHaveCount(1);
   await expect(quadro).toBeVisible();
   await expect(quadro.getByRole('heading', { name: 'Quadro clinico', exact: true })).toBeVisible();
-  await expect(quadro.getByText('EF00 · ICD-11 · altre 1 diagnosi', { exact: true })).toHaveCount(1);
+  await expect(quadro.getByText('EF00 · ICD-11 · un’altra diagnosi', { exact: true })).toHaveCount(1);
   await expect(quadro.getByText(diagnosisDescription, { exact: true })).toHaveCount(1);
 
   await openPatientSection(page, 'clinica');
