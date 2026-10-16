@@ -127,22 +127,26 @@ public enum ClinicalRichText {
             case .opening(let tag) where tag == .unorderedList || tag == .orderedList:
                 index += 1
                 var count = 0
-                while opens(.listItem) {
-                    index += 1
-                    if opens(.paragraph) {
+                while opens(.listItem) || opens(.unorderedList) || opens(.orderedList) {
+                    if opens(.listItem) {
                         index += 1
-                        guard inlines(until: .paragraph), close(.paragraph) else { return false }
-                    } else if !inlines(until: .listItem) { return false }
-                    guard close(.listItem) else { return false }
+                        while index < tokens.count, !closes(.listItem) {
+                            let start = index
+                            guard block(), index > start else { return false }
+                        }
+                        guard close(.listItem) else { return false }
+                    } else {
+                        guard count > 0, block() else { return false }
+                    }
                     count += 1
                 }
                 return count > 0 && close(tag)
             case .opening(.blockquote):
                 index += 1
-                if opens(.paragraph) {
-                    index += 1
-                    guard inlines(until: .paragraph), close(.paragraph) else { return false }
-                } else if !inlines(until: .blockquote) { return false }
+                while index < tokens.count, !closes(.blockquote) {
+                    let start = index
+                    guard block(), index > start else { return false }
+                }
                 return close(.blockquote)
             default:
                 let start = index
@@ -159,7 +163,7 @@ public enum ClinicalRichText {
                     index += 1
                     guard inlines(until: tag), close(tag) else { return false }
                 case .closing(let tag):
-                    return tag == end
+                    return tag == end || (end == nil && (tag == .listItem || tag == .blockquote))
                 case .opening:
                     return end == nil
                 }
@@ -169,6 +173,11 @@ public enum ClinicalRichText {
 
         func opens(_ tag: Tag) -> Bool {
             guard index < tokens.count, case .opening(let actual) = tokens[index] else { return false }
+            return actual == tag
+        }
+
+        func closes(_ tag: Tag) -> Bool {
+            guard index < tokens.count, case .closing(let actual) = tokens[index] else { return false }
             return actual == tag
         }
 
@@ -327,6 +336,11 @@ public enum ClinicalRichText {
                 if case .opening(.listItem) = tokens[index] {
                     index += 1
                     items.append(ClinicalRichTextListItem(blocks: parseBlocks(until: .listItem)))
+                } else if case .opening(let nestedTag) = tokens[index],
+                          nestedTag == .unorderedList || nestedTag == .orderedList, !items.isEmpty {
+                    index += 1
+                    let nested = parseList(isOrdered: nestedTag == .orderedList, tag: nestedTag)
+                    items[items.count - 1].blocks.append(.list(nested))
                 } else {
                     index += 1
                 }
