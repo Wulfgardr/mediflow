@@ -87,3 +87,15 @@ sessione attiva, il resource-use corrente e la stessa revisione del binding e
 del lifecycle. La scadenza monotona è verificata anche se il callback del timer
 è ritardato. Un risultato dopo 60 secondi o dopo cancellazione non ammette il
 provider. Non vengono omessi controlli di versione, località o digest.
+
+La prova reale riguarda il candidato integrato `68d5e688985b`, comprensivo
+del supporto Ollama 0.40.5 proposto nella PR #548; non attesta il runtime della
+modifica isolata su main e non cambia qui le versioni ammesse. Quel candidato
+ha completato l'attivazione HTTP a freddo con `qwen3.5:35b-a3b`:
+nessun modello inizialmente caricato,
+una sola conferma attraverso il workflow della pagina, senza precaricamento
+manuale o retry. Il percorso completo ha richiesto circa 30,3 secondi;
+la verifica del server circa 27. Lo stato finale è `available_unqualified`,
+con digest invariato. Questa prova non esercita l'intervallo aggiunto oltre
+30 secondi, coperto dai test a 55 e 60 secondi. Non include UI renderizzata
+o generazione di testo. Il modello caricato dalla prova è stato rilasciato.
