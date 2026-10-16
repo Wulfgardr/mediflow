@@ -345,12 +345,16 @@ async function activateSyntheticSelection() {
   });
   assert.equal(selectionResponse.status, 200);
   const selection = await selectionResponse.json();
+  const activationStartedAt = performance.now();
   const activationResponse = await fetch(
     new URL(`/api/patients/${PATIENT_ID}/intelligent-host/activate`, BASE_URL),
     { method: 'POST', headers: jsonHeaders,
       body: JSON.stringify({ selectionEpoch: selection.selection.selectionEpoch }) },
   );
-  assert.equal(activationResponse.status, 200);
+  const activationResult = await activationResponse.json();
+  assert.equal(activationResponse.status, 200, JSON.stringify({
+    elapsedMs: Math.round(performance.now() - activationStartedAt), response: activationResult,
+  }));
   const enrollmentResponse = await fetch(
     new URL('/api/system/intelligent-host/checkup-active-role', BASE_URL),
     { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ candidatePin: '1234' }) },
