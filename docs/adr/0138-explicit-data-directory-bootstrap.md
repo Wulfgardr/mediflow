@@ -44,3 +44,57 @@ L'allineamento del primo avvio nativo verifica anche una destinazione non
 vuota senza database in presenza di un legacy: deve restare bloccata e intatta.
 La correzione estende esplicitamente il contratto runtime oltre ADR 0130;
 non modifica il tag pubblicato `v0.8.6` né ammette un deployment clinico.
+
+
+## Emendamento 2026-10
+
+Il lanciatore unificato conserva preferenze e ricevute per cartella sorgente
+nella configurazione utente, con una chiave derivata dal percorso reale:
+
+- macOS: `~/Library/Application Support/MediFlow/launcher`;
+- Windows: `%APPDATA%\MediFlow\launcher` (fallback nella cartella
+  `AppData/Roaming` dell'utente);
+- Linux: `$XDG_CONFIG_HOME/mediflow/launcher`, oppure
+  `~/.config/mediflow/launcher`.
+
+Su POSIX le directory hanno modo `0700` e i file nuovi `0600`. Su Windows la
+configurazione sta nel profilo utente (`%APPDATA%`) e ne eredita la ACL, già
+riservata all'utente: il lanciatore non la riscrive.
+La risoluzione della configurazione non crea la cartella selezionata con
+`MEDIFLOW_DATA_DIR`. Il lanciatore non vi salva più preferenze o lock.
+Su macOS il percorso richiesto resta sotto la stessa radice predefinita di
+MediFlow: la sottocartella `launcher` è riconosciuta soltanto in quella
+posizione canonica, mai in una cartella dati arbitraria. Altre sovrapposizioni
+fra configurazione e cartella dati sono rifiutate prima di creare directory.
+
+La migrazione silenziosa riguarda solo `launcher-preferences.json` con lo
+schema esatto del lanciatore e `.mediflow-launcher-<chiave>/instance.json`
+con ricevuta della stessa sorgente, processo terminato e nessun altro file
+nella directory. Non segue symlink o file con hard link, non sposta file
+sconosciuti e non sostituisce preferenze già presenti. Conserva eventuali
+copie in conflitto nella nuova configurazione. Un proprietario ancora vivo
+impedisce la migrazione e richiede di arrestare quell'avvio. Non cancella
+ricorsivamente directory dell'archivio.
+
+Per `/api/auth/check`, in assenza sia del database selezionato sia del legacy,
+il primo avvio ammette esclusivamente directory vuote o queste voci di servizio:
+
+- directory `pm2`;
+- file regolari `local-api-token`, `local-web-backend.pid`,
+  `local-api-tls-proxy.pid`, `runtime-status.json`;
+- directory `launcher` soltanto nella radice predefinita macOS sopra descritta.
+
+I tipi devono corrispondere e i collegamenti simbolici non sono ammessi.
+Qualsiasi altra voce, compresi backup, residui `*.db*`, directory sconosciute
+o lock di manutenzione SQLite, mantiene `DB_MISSING` e richiede recupero
+esplicito. Questa eccezione non cambia il preparatore del primo avvio nativo,
+che riserva il database prima di scrivere i propri metadati, né autorizza
+adozione di un archivio o scritture cliniche automatiche.
+
+L'import del gestore PM2 e del modulo token locale è inerte rispetto al
+filesystem. La home PM2, il controllo della lunghezza dei socket e il
+caricamento di PM2 avvengono solo al suo primo uso runtime. Restano validi
+isolamento dal daemon globale, rifiuto degli override esterni, controlli di
+sessione e serializzazione delle connessioni. Un percorso dati troppo lungo
+può ancora impedire MLX quando richiesto, ma non deve impedire la build o
+il primo avvio senza MLX.

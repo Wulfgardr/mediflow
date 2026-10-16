@@ -26,6 +26,115 @@ function seed(file: string, missingColumn = false) {
 function originals(directory: string) { return fs.readdirSync(directory).filter(name => name.includes('.schema-original-')); }
 function columns(db: Database.Database) { return (db.pragma('table_info(patients)') as { name: string }[]).map(row => row.name); }
 
+test('permission admission preserves live WAL locks, cross-process writes and audit fault triggers', { skip: process.platform === 'win32' }, () => {
+    const w = workspace();
+    let writer: Database.Database | undefined;
+    let opened: Database.Database | undefined;
+    try {
+        writer = openVersionedSqliteDatabase(w.file);
+        writer.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('wal-before-admission', 'committed');
+        for (const suffix of ['', '-wal', '-shm']) fs.chmodSync(`${w.file}${suffix}`, 0o644);
+        opened = openVersionedSqliteDatabase(w.file);
+        const wal = fs.statSync(`${w.file}-wal`);
+        const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+            import Database from 'better-sqlite3';
+            const db = new Database(process.env.SYNTHETIC_SCHEMA_FILE, { fileMustExist: true });
+            try {
+                db.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('wal-from-child', 'committed');
+                db.exec("CREATE TRIGGER synthetic_settings_fault BEFORE INSERT ON settings WHEN NEW.key='audit-required' BEGIN SELECT RAISE(IGNORE); END");
+            } finally { db.close(); }
+        `], { cwd: process.cwd(), env: { ...process.env, SYNTHETIC_SCHEMA_FILE: w.file }, encoding: 'utf8', timeout: 10_000 });
+        assert.equal(child.status, 0, child.stderr || child.stdout);
+        assert.equal(fs.existsSync(`${w.file}-wal`), true, 'another process must not unlink the live WAL');
+        assert.equal(fs.statSync(`${w.file}-wal`).ino, wal.ino, 'all connections must retain the same WAL');
+        assert.equal(writer.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-from-child'), 'committed');
+        assert.equal(opened.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-before-admission'), 'committed');
+        assert.equal(writer.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run('audit-required', 'refused').changes, 0);
+        opened.close(); opened = undefined;
+        writer.close(); writer = undefined;
+        const readback = new Database(w.file, { readonly: true, fileMustExist: true });
+        try {
+            assert.equal(readback.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-before-admission'), 'committed');
+            assert.equal(readback.prepare('SELECT value FROM settings WHERE key=?').pluck().get('wal-from-child'), 'committed');
+            assert.equal(readback.prepare('SELECT value FROM settings WHERE key=?').get('audit-required'), undefined);
+            assert.equal(readback.pragma('integrity_check', { simple: true }), 'ok');
+        } finally { readback.close(); }
+    } finally { opened?.close(); writer?.close(); w.cleanup(); }
+});
+
+test('opening an older owner-owned archive makes the database and live WAL sidecars private without losing data', { skip: process.platform === 'win32' }, () => {
+    const w = workspace();
+    let writer: Database.Database | undefined;
+    let opened: Database.Database | undefined;
+    try {
+        writer = openVersionedSqliteDatabase(w.file);
+        writer.prepare('INSERT INTO settings(key, value) VALUES (?, ?)').run('permission-fixture', 'preserved in WAL');
+        const files = [w.file, `${w.file}-wal`, `${w.file}-shm`];
+        for (const file of files) fs.chmodSync(file, 0o644);
+        opened = openVersionedSqliteDatabase(w.file);
+        for (const file of files) assert.equal(fs.statSync(file).mode & 0o777, 0o600, path.basename(file));
+        assert.equal(opened.prepare('SELECT value FROM settings WHERE key=?').pluck().get('permission-fixture'), 'preserved in WAL');
+    } finally { opened?.close(); writer?.close(); w.cleanup(); }
+});
+
+test('opening refuses symlinked archive files before SQLite and leaves their targets untouched', { skip: process.platform === 'win32' }, () => {
+    for (const suffix of ['', '-wal', '-shm']) {
+        const w = workspace();
+        try {
+            openVersionedSqliteDatabase(w.file).close();
+            const target = path.join(w.directory, 'untouched');
+            fs.writeFileSync(target, 'synthetic target', { mode: 0o644 });
+            if (!suffix) fs.unlinkSync(w.file);
+            fs.symlinkSync(target, `${w.file}${suffix}`);
+            let opens = 0;
+            assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
+            assert.equal(opens, 0);
+            assert.equal(fs.statSync(target).mode & 0o777, 0o644);
+            assert.equal(fs.readFileSync(target, 'utf8'), 'synthetic target');
+        } finally { w.cleanup(); }
+    }
+});
+
+test('opening does not chmod archive files owned by another user', { skip: process.platform === 'win32' }, () => {
+    const w = workspace(), stat = fs.lstatSync;
+    try {
+        openVersionedSqliteDatabase(w.file).close();
+        fs.chmodSync(w.file, 0o644);
+        Reflect.set(fs, 'lstatSync', ((...args: Parameters<typeof stat>) => {
+            const info = stat(...args);
+            assert.ok(info);
+            return Object.assign(info, { uid: Number(info.uid) + 1 });
+        }) as typeof stat);
+        let opens = 0;
+        assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /SQLITE_SCHEMA_RECOVERY_REQUIRED/u);
+        assert.equal(opens, 0);
+        assert.equal(fs.statSync(w.file).mode & 0o777, 0o644);
+    } finally { Reflect.set(fs, 'lstatSync', stat); w.cleanup(); }
+});
+
+test('permission admission refuses a file replaced with a symlink while it is fixed', { skip: process.platform === 'win32' }, () => {
+    const w = workspace(), stat = fs.lstatSync;
+    try {
+        openVersionedSqliteDatabase(w.file).close();
+        fs.chmodSync(w.file, 0o644);
+        const target = path.join(w.directory, 'untouched');
+        fs.writeFileSync(target, 'synthetic target', { mode: 0o644 });
+        let inspections = 0;
+        Reflect.set(fs, 'lstatSync', ((...args: Parameters<typeof stat>) => {
+            const info = stat(...args);
+            if (String(args[0]) === w.file && ++inspections === 1) {
+                fs.renameSync(w.file, `${w.file}.original`);
+                fs.symlinkSync(target, w.file);
+            }
+            return info;
+        }) as typeof stat);
+        let opens = 0;
+        assert.throws(() => openVersionedSqliteDatabase(w.file, () => { opens++; throw new Error('SQLite must not open'); }), /archive file (changed during permission admission|is not a regular owner-owned file)/u);
+        assert.equal(opens, 0);
+        assert.equal(fs.readFileSync(target, 'utf8'), 'synthetic target');
+    } finally { Reflect.set(fs, 'lstatSync', stat); w.cleanup(); }
+});
+
 test('fresh and reserved archives consume admission atomically; repeated open does not migrate', () => {
     for (const reserved of [false, true]) {
         const w = workspace();
@@ -223,4 +332,33 @@ test('process interruption before schema stamp rolls back and the next start saf
         }
         w.cleanup();
     }
+});
+
+test('migrazione da versione 3 conserva originali verificati, ricevute e fonte derivata protesica', async () => {
+    const w = workspace();
+    try {
+        const db = seed(w.file);
+        const { createProstheticsCatalog } = await import('./reference-data/prosthetics-catalog-service.ts');
+        const { PROSTHETICS_TEMPLATE } = await import('./reference-data/prosthetics-catalog-contract.ts');
+        const catalog = createProstheticsCatalog(db), bytes = Buffer.from(PROSTHETICS_TEMPLATE);
+        const p = catalog.preview(bytes, 'inventato.csv', 'synthetic');
+        catalog.commit({ bytes, sourceName: 'inventato.csv', proof: p.proof!, acceptSubset: true }, 'synthetic', () => {});
+        const receipt = db.prepare('SELECT * FROM prosthetics_catalog_receipts').get();
+        const entry = catalog.search('').entries[0];
+        db.prepare('UPDATE prosthetics_catalog_entries SET id=? WHERE id=?').run(JSON.stringify([entry.codeSystem, entry.code, entry.scope]), entry.id);
+        db.exec('ALTER TABLE prosthetics_catalog_entries DROP COLUMN source_id; DROP TABLE prosthetics_catalog_sources; DROP TABLE prosthetics_catalog_documents; ALTER TABLE prosthetic_prescriptions DROP COLUMN catalog_snapshot; PRAGMA user_version=3;');
+        db.close();
+        const opened = openVersionedSqliteDatabase(w.file);
+        assert.equal(opened.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
+        assert.equal((opened.prepare('PRAGMA table_info(prosthetics_catalog_documents)').all() as { name: string; type: string }[]).find(column => column.name === 'bytes')?.type, 'BLOB');
+        const migrated = createProstheticsCatalog(opened);
+        assert.equal(migrated.status().sourceCount, 1); assert.equal(migrated.search('').entries[0].code, entry.code);
+        assert.deepEqual(opened.prepare('SELECT * FROM prosthetics_catalog_receipts').get(), receipt);
+        assert.equal(originals(w.directory).length, 1);
+        const old = new Database(path.join(w.directory, originals(w.directory)[0]), { readonly: true });
+        assert.equal(old.pragma('user_version', { simple: true }), 3);
+        assert.equal(old.prepare("SELECT count(*) n FROM sqlite_master WHERE name='prosthetics_catalog_sources'").pluck().get(), 0);
+        old.close(); opened.close();
+        openVersionedSqliteDatabase(w.file).close(); assert.equal(originals(w.directory).length, 1);
+    } finally { w.cleanup(); }
 });

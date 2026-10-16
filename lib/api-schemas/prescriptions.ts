@@ -30,6 +30,7 @@ const prescriptionOrdinalSchema = z.union([
 
 const prostheticStatusSchema = z.enum(PROSTHETIC_PRESCRIPTION_STATUSES);
 const prostheticCategorySchema = z.enum(PROSTHETIC_PRESCRIPTION_CATEGORIES);
+const catalogSelectionSchema = z.object({ entryId: z.string().min(1).max(2048), revision: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 const prostheticSourceSchema = z.enum(PROSTHETIC_PRESCRIPTION_SOURCES);
 
 const serviceStatusSchema = z.enum(SERVICE_PRESCRIPTION_STATUSES);
@@ -40,6 +41,7 @@ const serviceMatchStatusSchema = z.enum(SERVICE_PRESCRIPTION_ITEM_MATCH_STATUSES
 const serviceConfidenceSchema = z.enum(SERVICE_PRESCRIPTION_ITEM_CONFIDENCES);
 
 export const prostheticPrescriptionCreateSchema = z.object({
+    catalogSelection: catalogSelectionSchema.optional(),
     id: prescriptionCreateIdSchema,
     patientId: requiredTextSchema,
     prescribedAt: dateInputSchema,
@@ -59,6 +61,7 @@ export const prostheticPrescriptionCreateSchema = z.object({
 });
 
 export const prostheticPrescriptionUpdateSchema = z.object({
+    catalogSelection: catalogSelectionSchema.nullable().optional(),
     /* @Codex */
     version: z.number().int().positive(),
     prescribedAt: optionalDateInputSchema,

@@ -41,6 +41,14 @@ export function discoverTestFiles(paths, readSource) {
   }).sort();
 }
 
+export function readCheckoutSource(root, file) {
+  try { return fs.readFileSync(path.join(root, file), 'utf8'); }
+  catch (error) {
+    if (error.code === 'ENOENT') return '';
+    throw error;
+  }
+}
+
 /** `selections` maps a suite to `{ files, errors }`; `exclusions` is the hand-kept list. */
 export function checkTestSelection(testFiles, selections, exclusions) {
   const errors = [];
@@ -106,7 +114,7 @@ export function existingListedPaths(listed, exists) {
 async function main(root) {
   const listed = execFileSync('git', ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], { maxBuffer: 32 * 1024 * 1024, encoding: 'utf8' });
   const paths = existingListedPaths(listed, (file) => fs.existsSync(path.join(root, file)));
-  const testFiles = discoverTestFiles(paths, (file) => fs.readFileSync(path.join(root, file), 'utf8'));
+  const testFiles = discoverTestFiles(paths, (file) => readCheckoutSource(root, file));
   const exclusions = JSON.parse(fs.readFileSync(path.join(root, EXCLUSIONS), 'utf8'));
   const result = checkTestSelection(testFiles, await collectSelections(root), exclusions);
   for (const error of result.errors) process.stderr.write(`${error}\n`);

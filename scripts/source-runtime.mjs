@@ -177,6 +177,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (['web', 'headless'].includes(command) && (process.execArgv.length
       || ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']
         .some(key => process.env[key] !== undefined))) throw new Error('Source runtime invocation invalid');
+    if (['web', 'headless'].includes(command) && process.connected) {
+      process.on('message', message => {
+        if (message?.type !== 'mediflow-launcher-stop') return;
+        if (process.listenerCount('SIGTERM')) process.emit('SIGTERM');
+        else process.exit(0);
+      });
+      process.once('disconnect', () => {
+        if (process.listenerCount('SIGTERM')) process.emit('SIGTERM');
+        else process.exit(1);
+      });
+    }
     if (command === 'build') await buildSourceRuntime(ROOT, process.argv.slice(3));
     else if (process.argv[2] === 'prepare') await prepareSourceRuntime();
     else await startSourceRuntime(process.argv[2]);

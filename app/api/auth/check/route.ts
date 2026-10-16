@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 /* @Codex */
 import fs from 'fs';
 import path from 'path';
+import os from 'node:os';
 import { resolveDataPath } from '@/lib/data-dir';
 import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
 import { parseWrappedMasterKey } from '@/lib/security/security';
@@ -28,10 +29,18 @@ const getDbHealth = () => {
     const dbExists = fs.existsSync(dbPath);
     const legacyExists = fs.existsSync(legacyDbPath);
 
-    // @Codex: a genuinely empty data directory is a first installation. A
-    // missing database beside existing files still requires explicit recovery.
+    const directory = path.dirname(dbPath);
+    const serviceFiles = new Set(['local-api-token', 'local-web-backend.pid', 'local-api-tls-proxy.pid', 'runtime-status.json']);
     const firstInstallation = !dbExists && !legacyExists
-        && fs.readdirSync(path.dirname(dbPath)).length === 0;
+        && fs.readdirSync(directory, { withFileTypes: true }).every(entry => {
+            if (entry.isSymbolicLink()) return false;
+            if (entry.isDirectory()) {
+                if (entry.name === 'pm2') return true;
+                return entry.name === 'launcher' && process.platform === 'darwin'
+                    && path.resolve(directory) === path.join(os.homedir(), 'Library/Application Support/MediFlow');
+            }
+            return entry.isFile() && serviceFiles.has(entry.name);
+        });
 
     return {
         dbExists,
