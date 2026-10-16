@@ -93,7 +93,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                                             <AlertTriangle className="h-5 w-5" />
                                         </span>
                                     ) : null}
-                                    <h3 id={titleId} className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
+                                    <h3 id={titleId} className="type-threshold text-[color:var(--lume-ink)]">
                                         {options.title}
                                     </h3>
                                 </div>

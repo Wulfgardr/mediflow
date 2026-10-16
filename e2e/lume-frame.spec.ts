@@ -86,7 +86,9 @@ for (const frameCase of FRAME_CASES) {
       patientsNav.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
       turnNav.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
     ]);
-    expect(weights[0]).toBeGreaterThan(weights[1]);
+    expect(weights).toEqual([600, 400]);
+    await expect(page.locator('aside strong').filter({ hasText: 'MediFlow' })).toHaveCSS('font-weight', '500');
+    await expect(page.locator('aside strong').filter({ hasText: 'MediFlow' })).toHaveCSS('font-size', '21px');
 
     const selectedGeometry = await patientsNav.evaluate((element) => {
       const style = getComputedStyle(element);

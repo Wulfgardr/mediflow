@@ -2,40 +2,40 @@
 .sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; color: var(--lume-ink); }
 .main { min-width: 0; }
 .sectionHead { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); }
-.sectionHead h2 { margin: 0; font: 600 12px/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
-.sectionHead a { font-size: var(--twin-type-caption, 0.8125rem); color: var(--lume-ink-muted); font-weight: 450; letter-spacing: 0; }
+.sectionHead h2 { margin: 0; font: 600 0.75rem/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
+.sectionHead a { font-size: var(--twin-type-caption, 0.8125rem); color: var(--lume-ink-muted); font-weight: 400; letter-spacing: 0; }
 .sectionHead a:hover, .more:hover { color: var(--lume-ink); text-decoration: underline; text-underline-offset: 4px; }
-.diagnosis { font: 600 14px/1.5 var(--lume-font-sans); letter-spacing: 0; max-width: 36ch; }
-.meta { font-size: 12px; color: var(--lume-ink-muted); margin-top: 6px; }
+.diagnosis { font: 600 0.875rem/1.5 var(--lume-font-sans); letter-spacing: 0; max-width: 36ch; }
+.meta { font-size: 0.75rem; color: var(--lume-ink-muted); margin-top: 6px; }
 .notes { margin-top: 24px; }
-.notes h3, .context h3 { font: 600 12px/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 9px; }
-.notes p { font: 400 17px/1.5 var(--lume-font-voice); max-width: 64ch; white-space: pre-line; }
-.notes details { margin-top: 8px; font-size: 12px; }
+.notes h3, .context h3 { font: 600 0.75rem/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 9px; }
+.notes p { font: var(--type-prose); max-width: 64ch; white-space: pre-line; }
+.notes details { margin-top: 8px; font-size: 0.75rem; }
 .notes summary { cursor: pointer; color: var(--lume-ink-muted); padding-block: 4px; }
 .therapies { margin-top: 32px; padding-top: 25px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); }
-.therapies li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 8%, transparent); font-size: 14px; line-height: 1.5; }
-.therapies strong { font-weight: 550; }
+.therapies li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 8%, transparent); font-size: 0.875rem; line-height: 1.5; }
+.therapies strong { font-weight: 600; }
 .therapies li span { color: var(--lume-ink-muted); }
-.more { display: inline-block; margin-top: 12px; color: var(--lume-ink-muted); font-size: 12px; }
+.more { display: inline-block; margin-top: 12px; color: var(--lume-ink-muted); font-size: 0.75rem; }
 .context { border-top: 1px solid var(--lume-rule); padding-top: 20px; }
-.fact { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 0 0 16px; font-size: 12px; }
+.fact { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 0 0 16px; font-size: 0.75rem; }
 .fact > span { color: var(--lume-ink-muted); }
-.fact :is(a,strong) { font-weight: 550; }
+.fact :is(a,strong) { font-weight: 600; }
 .measure, .followup { padding-top: 22px; margin-top: 5px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); }
 .measure .sectionHead { margin-bottom: 8px; }
-.measure p, .followup p { font-size: 13px; }
-.measure > strong { display: block; font-size: 14px; margin: 7px 0; font-variant-numeric: tabular-nums; }
-.measure > :is(span,small), .followup p { display: block; font-size: 12px; line-height: 1.55; color: var(--lume-ink-muted); }
-.followup > a { font-size: 15px; font-weight: 550; display: block; margin-bottom: 6px; }
-.muted { font-size: 14px; color: var(--lume-ink-muted); }
+.measure p, .followup p { font-size: 0.8125rem; }
+.measure > strong { display: block; font-size: 0.875rem; margin: 7px 0; font-variant-numeric: tabular-nums; }
+.measure > :is(span,small), .followup p { display: block; font-size: 0.75rem; line-height: 1.55; color: var(--lume-ink-muted); }
+.followup > a { font-size: 0.9375rem; font-weight: 600; display: block; margin-bottom: 6px; }
+.muted { font-size: 0.875rem; color: var(--lume-ink-muted); }
 .sheet[data-layout='stream'] { grid-template-columns: minmax(0, 1fr); gap: 24px; }
 .sheet[data-layout='stream'] .context { border-left: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); padding: 20px 0 0; display: grid; grid-template-columns: minmax(0,1fr); gap: 24px; }
 .sheet[data-layout='stream'] .fact { display: none; }
 .sheet[data-layout='stream'] .measure, .sheet[data-layout='stream'] .followup { margin: 0; padding: 0; border: 0; }
 @media (max-width: 950px) { .sheet { grid-template-columns: minmax(0, 1fr); gap: 28px; } .context { border-left: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); padding: 24px 0 0; } .fact { justify-content: flex-start; } .measure, .followup { max-width: 400px; } }
-@media (max-width: 600px) { .sheet[data-layout='stream'] .context { grid-template-columns: minmax(0,1fr); } .therapies li { grid-template-columns: minmax(0,1fr); gap: 3px; } .diagnosis { font-size: 20px; } }
+@media (max-width: 600px) { .sheet[data-layout='stream'] .context { grid-template-columns: minmax(0,1fr); } .therapies li { grid-template-columns: minmax(0,1fr); gap: 3px; } .diagnosis { font-size: 0.9375rem; } }
 
 /* @Codex WUL-678: counts share the heading baseline and UI typeface. */
 .sectionHead h2 { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
 .count { font: inherit; font-variant-numeric: tabular-nums; color: var(--lume-ink); }
-.fact :is(a,strong) { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.fact :is(a,strong) { font-size: 0.9375rem; font-variant-numeric: tabular-nums; }

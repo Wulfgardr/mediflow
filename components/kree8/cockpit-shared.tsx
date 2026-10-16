@@ -35,6 +35,7 @@ import {
 } from '@/lib/patient-workspace';
 /* @Codex WUL-362 C1: il candidato AI passa dal view-model canonico condiviso. */
 import { coerceInsightToReadable } from '@/lib/patient-insight-view-model';
+import { stripMarkdownMarks } from '@/lib/clinical-rich-text';
 import styles from './kree8-clinical-cockpit-foundation.module.css';
 import shellStyles from './kree8-clinical-cockpit-shell.module.css';
 
@@ -603,7 +604,7 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
 
 /* @Codex */
 function compactClinicalText(value: string | null | undefined): string {
-  const plain = (value ?? '')
+  const plain = stripMarkdownMarks(value ?? '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')

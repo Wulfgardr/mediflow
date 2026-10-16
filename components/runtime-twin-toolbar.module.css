@@ -12,10 +12,10 @@
     border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent);
     background: var(--lume-surface-chrome);
     color: var(--lume-ink);
-    font: 12px/1.3 var(--lume-font-sans);
+    font: 0.75rem/1.3 var(--lume-font-sans);
 }
 .identity, .destinations { display: flex; align-items: center; gap: 16px; }
-.identity strong { font-weight: 650; }
+.identity strong { font-weight: 600; }
 .identity span { color: var(--lume-ink-muted); }
 .destinations a { padding: 6px 0; color: var(--lume-ink-muted); text-decoration: none; }
 .destinations a:hover { color: var(--lume-ink); text-decoration: underline; text-underline-offset: 4px; }
@@ -26,7 +26,7 @@
 @media (max-width: 900px) { .destinations { display: none; } }
 @media (max-width: 540px) {
     .toolbar { padding: 0 12px; gap: 8px; }
-    .identity { flex-direction: column; align-items: flex-start; gap: 3px; font-size: 11px; }
-    .comparison button { padding: 6px; font-size: 11px; }
+    .identity { flex-direction: column; align-items: flex-start; gap: 3px; font-size: 0.75rem; }
+    .comparison button { padding: 6px; font-size: 0.75rem; }
 }
-@media (max-width: 540px) { .identity span { display: none; } .identity strong { font-size: 11px; white-space: nowrap; } .comparison { gap: 0; padding: 2px; } .comparison button { padding: 8px 6px; white-space: nowrap; } }
+@media (max-width: 540px) { .identity span { display: none; } .identity strong { font-size: 0.75rem; white-space: nowrap; } .comparison { gap: 0; padding: 2px; } .comparison button { padding: 8px 6px; white-space: nowrap; } }

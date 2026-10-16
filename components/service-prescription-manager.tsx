@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import styles from './clinical-register.module.css';
 import { type FormEvent, useMemo, useState } from 'react';
 import {
@@ -408,10 +409,10 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
 
     const headerActions = (
         <>
-            <span className="apple-chip">{prescriptions?.length ?? 0} prestazioni</span>
-            <span className="apple-chip">{prescriptionItems?.length ?? 0} voci</span>
-            <span className="apple-chip">{openCount} aperte</span>
-            <span className="apple-chip">{reportCount} referti</span>
+            <span className="apple-chip">{formatCountLabel(prescriptions?.length ?? 0, 'prestazione', 'prestazioni')}</span>
+            <span className="apple-chip">{formatCountLabel(prescriptionItems?.length ?? 0, 'voce', 'voci')}</span>
+            <span className="apple-chip">{formatCountLabel(openCount, 'aperta', 'aperte')}</span>
+            <span className="apple-chip">{formatCountLabel(reportCount, 'referto', 'referti')}</span>
             <button
                 type="button"
                 onClick={() => setIsFormOpen((value) => !value)}
@@ -431,7 +432,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="section-kicker">Prestazioni</p>
-                        <h2 className="mt-1 flex items-center gap-2 text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold text-[color:var(--lume-ink)]">
                             <Stethoscope className="h-5 w-5 text-[color:var(--lume-accent)]" />
                             Prestazioni prescritte
                         </h2>
@@ -449,7 +450,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                     className={styles.form}
                 >
                     <div className="grid gap-3 md:grid-cols-2">
-                        <div className="md:col-span-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                        <div className="md:col-span-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <Stethoscope className="h-3.5 w-3.5" aria-hidden />
                             Prestazione e voci richieste
                         </div>
@@ -469,18 +470,18 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 Voci richieste - una per riga, opzionale CODICE NOME
                             </span>
                             <textarea
-                                className="input-field min-h-28 font-mono text-xs"
+                                className="input-field min-h-28 type-code"
                                 value={form.itemsText}
                                 onChange={(event) => updateForm('itemsText', event.target.value)}
                                 placeholder={`EMOCROMO\nD-DIMERO\nLDH\nAST\nALT\nVITAMINA D`}
                             />
-                            <p className="text-[11px] font-normal text-[color:var(--lume-ink-muted)]">
+                            <p className="text-xs font-normal text-[color:var(--lume-ink-muted)]">
                                 {form.itemsText.trim().length === 0
                                     ? 'Lascia vuoto per una singola voce con il nome della prestazione.'
-                                    : `${parsedItemsPreview.length} voci pronte al salvataggio.`}
+                                    : `${formatCountLabel(parsedItemsPreview.length, 'voce pronta', 'voci pronte')} al salvataggio.`}
                             </p>
                         </label>
-                        <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                        <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
                             Inquadramento e pianificazione
                         </div>
@@ -529,7 +530,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 ))}
                             </select>
                         </label>
-                        <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                        <div className="md:col-span-2 mt-1 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                             <FileText className="h-3.5 w-3.5" aria-hidden />
                             Codifica, contesto e note
                         </div>
@@ -684,7 +685,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                         const priority = item.priority ?? 'unknown';
                         const childItems = itemsByPrescription.get(item.id) ?? [];
                         return <tr key={item.id}>
-                            <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${childItems.length} voci` : ''}</small>
+                            <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${formatCountLabel(childItems.length, 'voce', 'voci')}` : ''}</small>
                                 <details className={styles.recordDetails}><summary>Dettagli, referti e documenti</summary>
                                     <p>Prescritta il {formatDate(item.prescribedAt) ?? '–'}</p>
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
@@ -734,7 +735,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                         )}
                                         {childItems.length > 0 && (
                                             <div className="mt-3 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-3">
-                                                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
+                                                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--lume-ink-muted)]">
                                                     <ListChecks className="h-3.5 w-3.5" aria-hidden />
                                                     Voci richieste · {childItems.length}
                                                 </p>
@@ -756,7 +757,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                                                 <div className="min-w-0 flex-1">
                                                                     <span className="font-medium text-[color:var(--lume-ink)]">{child.serviceName}</span>
                                                                     {child.serviceCode && (
-                                                                        <span className="lume-code ml-2 text-xs text-[color:var(--lume-ink-muted)]">
+                                                                        <span className="lume-code ml-2 text-[color:var(--lume-ink-muted)]">
                                                                             {child.serviceCode}
                                                                             {child.codeSystem ? ` · ${child.codeSystem}` : ''}
                                                                         </span>

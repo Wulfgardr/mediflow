@@ -17,8 +17,8 @@
     gap: 16px;
 }
 
-.header h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
-.header p, .footer p { margin: 4px 0 0; font-size: 14px; line-height: 22px; color: var(--lume-ink-muted); }
+.header h2 { margin: 0; font-size: 0.9375rem; line-height: 1.5; font-weight: 600; }
+.header p, .footer p { margin: 4px 0 0; font-size: 0.875rem; line-height: 1.5; color: var(--lume-ink-muted); }
 .footer p { flex: 1 1 280px; }
 .services { list-style: none; margin: 24px 0; padding: 0; }
 .service {
@@ -34,8 +34,8 @@
 .identity { display: flex; gap: 12px; min-width: 0; }
 .identity > div { min-width: 0; }
 .icon { width: 24px; height: 24px; flex-shrink: 0; color: var(--lume-ink-muted); }
-.identity h3 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; }
-.identity p { margin: 4px 0 0; font-size: 14px; line-height: 22px; }
+.identity h3 { margin: 0; font-size: 0.9375rem; line-height: 1.5; font-weight: 600; }
+.identity p { margin: 4px 0 0; font-size: 0.875rem; line-height: 1.5; }
 .detail { color: var(--lume-ink-muted); overflow-wrap: anywhere; }
 .status {
     display: inline-flex;
@@ -47,8 +47,8 @@
     padding: 5px 10px;
     min-height: 32px;
     border-radius: var(--lume-control-radius, 12px);
-    font-size: 13px;
-    line-height: 20px;
+    font-size: 0.8125rem;
+    line-height: 1.5;
     font-weight: 600;
 }
 .status svg { width: 16px; height: 16px; flex-shrink: 0; }

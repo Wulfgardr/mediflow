@@ -2,6 +2,13 @@
 
 > Guida pratica all'avvio locale e alle prime operazioni.
 
+La versione web distingue titoli e nomi dei pazienti dal testo dei comandi
+e dai codici. La dimensione dei caratteri segue quella scelta nelle
+preferenze del browser; puoi anche usare lo zoom del browser per ingrandire
+la pagina. Newsreader e IBM Plex Mono sono inclusi nell'applicazione e non
+richiedono download durante l'uso. Le verifiche visuali e i loro limiti
+sono distinti dalla disponibilità di queste impostazioni.
+
 Per orientarti prima dell'avvio o approfondire una scelta:
 - [README.md](../README.md) presenta il progetto e il primo accesso;
 - [docs/COMPLIANCE.md](./COMPLIANCE.md) raccoglie il quadro privacy/GDPR/FHIR;

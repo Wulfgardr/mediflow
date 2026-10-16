@@ -249,7 +249,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
                         >
                             <span className="font-medium text-sm truncate" style={{ color: 'var(--lume-ink)' }}>{item.description}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                                <span className="patient-code-pill patient-code-pill-primary lume-registro text-[10px]">
+                                <span className="patient-code-pill patient-code-pill-primary lume-registro text-xs">
                                     <Server className="w-3 h-3 mr-1" />
                                     {item.system} {item.code}
                                 </span>

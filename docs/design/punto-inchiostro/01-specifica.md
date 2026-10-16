@@ -88,6 +88,19 @@ Regole di armonia:
 - Con il testo regolabile del sistema ogni corpo scala con la preferenza
   dell'utente; oltre il 200% le colonne affiancate diventano una.
 
+Nel web i ruoli pubblici sono `type-page-title`, `type-person`,
+`type-person-preview`, `type-prose`, `type-brand`, `type-body`, `type-strong`,
+`type-threshold`, `type-meta`, `type-section` e `type-code`. Le proprietà
+`--type-*` corrispondenti permettono ai CSS module di riusare la stessa
+definizione. Tutti i corpi sono in rem, con riferimento di 16 px. Per i
+titoli di pagina il punto finale è decorativo; non si aggiunge ai nomi
+delle persone. Le utility `text-xs/sm/base/lg` corrispondono a 12/13/14/15 px;
+un titolo richiede il proprio ruolo, non una utility di corpo maggiore.
+Il [guard statico](../../../scripts/check-type-scale.mjs) e lo
+[spec sul testo renderizzato](../../../e2e/type-scale.spec.ts) verificano
+aspetti distinti del contratto. Copertura e limiti sono nell'emendamento
+all'[ADR 0144](../../adr/0144-punto-inchiostro.md).
+
 ## Forma e spazio
 
 Ogni distanza è un multiplo di un'unità di 4 px. Cambiando l'unità, tutta

@@ -441,6 +441,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             setUser(session.userData);
             setIsAuthenticated(true);
             setIsLocked(false);
+            updateAuthRecoveryState('ready');
             return true;
         } catch (e) {
             console.error("Failed to restore session", e);

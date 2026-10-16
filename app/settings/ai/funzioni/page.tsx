@@ -87,11 +87,11 @@ export default function SettingsAiFunctionsPage() {
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Lettura locale degli allegati</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    <p className="mt-1 text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
                                         AnyDoc estrae il testo; sui PDF supportati il percorso locale puo usare Apple Vision per le pagine scansionate. Le immagini singole restano da rivedere manualmente. Questo percorso e separato dal registro OCR di Fabric.
                                     </p>
                                 </div>
-                                <span className="rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>
+                                <span className="rounded-full border px-2 py-1 text-xs font-semibold uppercase tracking-[0.16em]" style={{ borderColor: 'color-mix(in srgb, var(--lume-signal-critical) 32%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-signal-critical)' }}>
                                     Revisione richiesta
                                 </span>
                             </div>
@@ -105,7 +105,7 @@ export default function SettingsAiFunctionsPage() {
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0">
                                     <p className="text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>Instradamento documentale deterministico</p>
-                                    <p className="mt-1 text-[11px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    <p className="mt-1 text-xs leading-5" style={{ color: 'var(--lume-ink-muted)' }}>
                                         Decide quando le classi a estrazione certa possono usare la sintesi deterministica invece del modello.
                                     </p>
                                 </div>
@@ -123,7 +123,7 @@ export default function SettingsAiFunctionsPage() {
                                     </select>
                                 </label>
                             </div>
-                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink-muted)' }}>
+                            <p className="mt-3 rounded-[14px] border px-3 py-2 text-xs leading-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-focal)', color: 'var(--lume-ink-muted)' }}>
                                 {documentRouterControlFlowMode === 'off'
                                     ? 'Spento: il modello analizza tutti i documenti.'
                                     : documentRouterControlFlowMode === 'shadow'
@@ -164,17 +164,17 @@ export default function SettingsAiFunctionsPage() {
                                     style={selected ? { borderColor: 'color-mix(in srgb, var(--lume-ink) 22%, transparent)', background: 'var(--lume-surface-field)' } : undefined}
                                 >
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="text-xs font-bold" style={{ color: 'var(--lume-ink)' }}>{option.title}</span>
+                                        <span className="text-xs font-semibold" style={{ color: 'var(--lume-ink)' }}>{option.title}</span>
                                         {selected ? <CheckCircle className="h-4 w-4" style={{ color: 'var(--lume-ink)' }} /> : null}
                                     </div>
-                                    <p className="mt-1 text-[11px]" style={{ color: 'var(--lume-ink-muted)' }}>{option.description}</p>
+                                    <p className="mt-1 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>{option.description}</p>
                                 </button>
                             );
                         })}
                     </div>
 
                     <p
-                        className="mt-3 rounded-[14px] border px-3 py-2 text-[11px] leading-5"
+                        className="mt-3 rounded-[14px] border px-3 py-2 text-xs leading-5"
                         style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 12%, transparent)', background: 'var(--lume-surface-field)', color: 'var(--lume-ink-muted)' }}
                     >
                         {aiInsightSettings.mode === 'full_auto'
@@ -182,15 +182,15 @@ export default function SettingsAiFunctionsPage() {
                             : selectedInsightMode.description}
                     </p>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
                         <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
-                            <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Profilo hardware</span>
+                            <span className="block text-xs uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Profilo hardware</span>
                             <span className="font-semibold" style={{ color: 'var(--lume-ink)' }}>
                                 {hardwareProfile === 'low' ? 'Leggero' : hardwareProfile === 'medium' ? 'Bilanciato' : 'Avanzato'}
                             </span>
                         </div>
                         <div className="mf-section mf-section-tight !rounded-lg px-3 py-2">
-                            <span className="block text-[10px] uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Budget AI</span>
+                            <span className="block text-xs uppercase tracking-wide" style={{ color: 'var(--lume-ink-muted)' }}>Budget AI</span>
                             <span className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{insightRuntimePreview}</span>
                         </div>
                     </div>

@@ -19,6 +19,11 @@ Cartelle, documenti e attività da seguire, anche senza intelligenza artificiale
 
 </div>
 
+La tipografia web segue [Punto d'inchiostro](./docs/design/punto-inchiostro/01-specifica.md):
+caratteri inclusi localmente e corpi proporzionali alla preferenza del browser.
+I [limiti delle verifiche](./docs/known-limitations.md#nota-successiva-tipografia-web-ottobre-2026)
+restano distinti dalla disponibilità dei sorgenti.
+
 MediFlow nasce per tenere insieme ciò che, nel lavoro di ambulatorio, tende a
 disperdersi: la storia del paziente, i documenti che la raccontano e le attività
 che restano da seguire. Diario, terapie, misure e dati strutturati sono il punto

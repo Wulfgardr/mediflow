@@ -63,7 +63,7 @@ export function AifaRemoteNotice({ status, checking, error, setNetwork, disabled
                         : remote.outcome === 'unchanged' ? `Nessuna variazione segnalata da AIFA. ${remote.lastModified ? `Versione del ${date(remote.lastModified)}` : 'Data di pubblicazione non disponibile'}.`
                             : remote.reason === 'local_metadata_absent' ? `${publication}. La versione locale non ha metadati AIFA confrontabili; puoi aggiornarla.`
                                 : 'Verifica AIFA non disponibile. Il catalogo locale resta consultabile.';
-    return <div className="space-y-2 text-sm" style={{ fontSize: 13, fontWeight: 400, color: 'var(--lume-ink-muted)' }} data-testid="aifa-remote-notice">
+    return <div className="type-meta space-y-2" style={{ color: 'var(--lume-ink-muted)' }} data-testid="aifa-remote-notice">
         <p role="status" aria-live="polite">{message}</p>
         {remote?.checkedAt && <p>Ultimo tentativo: {new Date(remote.checkedAt).toLocaleString('it-IT')}. Controllo al massimo ogni 24 ore.</p>}
         {settings && <label className="flex min-h-11 items-center gap-2">

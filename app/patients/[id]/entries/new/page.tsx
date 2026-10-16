@@ -1,5 +1,6 @@
 'use client';
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -498,7 +499,7 @@ export default function NewEntryPage() {
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p className="section-kicker">Sessione visita</p>
-                        <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
                             Bozza dettata e revisione
                         </h2>
                     </div>
@@ -651,7 +652,7 @@ export default function NewEntryPage() {
                         <div className="space-y-2 border-t border-[color:color-mix(in_srgb,var(--lume-ink)_10%,transparent)] pt-4">
                             <div className="flex items-center justify-between gap-3">
                                 <p className="section-kicker">Farmaci rilevati</p>
-                                <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] px-2.5 py-1 text-[11px] font-semibold text-[color:var(--lume-ink-muted)]">
+                                <span className="rounded-full border border-[color:color-mix(in_srgb,var(--lume-ink)_16%,transparent)] bg-[color:color-mix(in_srgb,var(--lume-ink)_5%,var(--lume-surface-field))] px-2.5 py-1 text-xs font-semibold text-[color:var(--lume-ink-muted)]">
                                     Non importati
                                 </span>
                             </div>
@@ -715,7 +716,7 @@ export default function NewEntryPage() {
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p className="section-kicker">Resoconto clinico</p>
-                        <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
                             Scrivi la voce
                         </h2>
                     </div>
@@ -743,7 +744,7 @@ export default function NewEntryPage() {
             {!proposal ? (
                 <div className="mb-4">
                     <p className="section-kicker">Allegati</p>
-                    <h2 className="mt-1 text-xl font-semibold text-[color:var(--lume-ink)]">
+                    <h2 className="mt-1 text-lg font-semibold text-[color:var(--lume-ink)]">
                         Documenti e referti collegati
                     </h2>
                 </div>
@@ -913,7 +914,7 @@ export default function NewEntryPage() {
                         Torna alla scheda paziente
                     </Link>
                     <div className={composerStyles.titleRow}>
-                        <h1>Nuova voce clinica</h1>
+                        <h1 className="type-page-title">Nuova voce clinica<span aria-hidden="true">.</span></h1>
                         <p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : 'Caricamento paziente…'}</p>
                     </div>
                 </header>
@@ -943,7 +944,7 @@ export default function NewEntryPage() {
                 >
                     <div className="min-w-0">
                         <p className="section-kicker">Contesto paziente</p>
-                        <h2 id="entry-context-title" className="mt-1 break-words text-xl font-semibold text-[color:var(--lume-ink)]">
+                        <h2 id="entry-context-title" className="mt-1 break-words text-lg font-semibold text-[color:var(--lume-ink)]">
                             Sessione ancorata a {patient ? `${patient.lastName} ${patient.firstName}` : 'un paziente in caricamento'}
                         </h2>
                         <p className="mt-2 max-w-[72ch] text-sm leading-6 text-[color:var(--lume-ink-muted)]">
@@ -957,7 +958,7 @@ export default function NewEntryPage() {
                                 {patient ? `${patient.lastName} ${patient.firstName}` : 'Caricamento...'}
                             </p>
                             <p className="lume-registro mt-2 text-xs text-[color:var(--lume-ink-muted)]">
-                                {visitEntryCount} visite · {sourceCount} fonti
+                                {formatCountLabel(visitEntryCount, 'visita', 'visite')} · {formatCountLabel(sourceCount, 'fonte', 'fonti')}
                             </p>
                             {patient?.diagnoses?.length ? (
                                 <p className="mt-2 text-xs leading-5 text-[color:var(--lume-ink-muted)]">

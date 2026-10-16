@@ -6,6 +6,7 @@ import {
     clinicalRichTextToPlainText,
     compactClinicalRichText,
     sanitizeClinicalRichTextHtml,
+    stripMarkdownMarks,
 } from './clinical-rich-text.ts';
 
 test('sanitizeClinicalRichTextHtml keeps the supported subset and strips unsafe payloads', () => {
@@ -53,4 +54,11 @@ test('compactClinicalRichText truncates sanitized content', () => {
     const result = compactClinicalRichText(input, 32);
 
     assert.equal(result, 'Visita di controllo con andamen...');
+});
+
+test('stripMarkdownMarks keeps the words of a Markdown entry for one-line previews', () => {
+    assert.equal(
+        stripMarkdownMarks('Prosa con **enfasi** e `SC00`.\n## Valutazione\nControllo.\n- punto uno\n*corsivo*, snake_case_name e 2*3*4'),
+        'Prosa con enfasi e SC00.\nValutazione\nControllo.\npunto uno\ncorsivo, snake_case_name e 2*3*4',
+    );
 });

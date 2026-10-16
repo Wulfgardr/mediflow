@@ -253,7 +253,7 @@ export default function NewPatientPage() {
                         </div>
                         <div className="space-y-1">
                             <p className="mf-eyebrow">Documento clinico</p>
-                            <h2 className="text-xl font-semibold tracking-tight text-[color:var(--lume-ink)]">
+                            <h2 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
                                 Usa un documento quando è utile
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
@@ -305,7 +305,7 @@ export default function NewPatientPage() {
                                             : 'Il documento è stato letto, ma non contiene dati clinici abbastanza strutturati da proporre automaticamente.'}
                                 </p>
                                 {importMeta.quality?.reason && (
-                                    <p className="mt-2 text-[11px] font-bold uppercase" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    <p className="mt-2 text-xs font-semibold uppercase" style={{ color: 'var(--lume-ink-muted)' }}>
                                         Qualità documento: {importMeta.quality.reason}
                                     </p>
                                 )}

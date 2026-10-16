@@ -375,7 +375,7 @@ export default function ObservationManager({
                         ))}
                     </select>
                     {selectedLoinc ? (
-                        <span className="block text-xs lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                        <span className="block lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                             LOINC {selectedLoinc.code}
                         </span>
                     ) : null}
@@ -424,7 +424,7 @@ export default function ObservationManager({
                             </option>
                         ))}
                     </select>
-                    <span className="block text-xs lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                    <span className="block lume-code uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                         UCUM {unitCode}
                     </span>
                 </label>

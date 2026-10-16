@@ -10,7 +10,7 @@ import { SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
 const steps = ['Prepara', 'Licenza', 'Installa e avvia', 'Verifica', 'Recupera'];
 const hostCommands = { node: 'node scripts/who-local-onboarding.mjs', darwin: './Setup_WHO.command', win32: '.\\Setup_WHO.ps1', linux: 'bash ./Setup_WHO.sh' } as const;
 type SetupHost = keyof typeof hostCommands;
-const commandStyle = { minHeight: 44, minWidth: 44 };
+const commandStyle = { minHeight: 'var(--lume-control-height, 44px)', minWidth: 'var(--lume-control-height, 44px)' };
 export function WhoLocalSetupGuide({ status, onRefresh }: { status?: string; onRefresh?: () => void }) {
     const [step, setStep] = useState(0);
     const [host, setHost] = useState<SetupHost>('node');

@@ -267,7 +267,7 @@ function DocumentSynthesisFabricReviewCardSession({
                             <dl className="grid min-w-0 gap-x-4 gap-y-2 sm:grid-cols-[auto_minmax(0,1fr)]">
                                 <dt>Binding</dt><dd className="break-words">{providerBindingReceipt.provider} · {providerBindingReceipt.model}</dd>
                                 <dt>Esecuzione</dt><dd className="break-words">{providerBindingReceipt.venue} · egress {providerBindingReceipt.egress} · fallback {providerBindingReceipt.fallback}</dd>
-                                <dt>Output SHA-256</dt><dd className="break-all font-mono">{publication.receipt.outputSha256}</dd>
+                                <dt>Output SHA-256</dt><dd className="break-all type-code">{publication.receipt.outputSha256}</dd>
                                 <dt>Provenienza</dt><dd className="break-all">{publication.provenance.sourceSetAuthority} · {publication.provenance.citationSupport}</dd>
                                 <dt>Causalità del modello</dt><dd>{modelCausality}</dd>
                             </dl>

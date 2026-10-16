@@ -2,6 +2,7 @@
 
 /* @Codex: installed inventory and explicit model choices for local settings. */
 
+import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useCallback, type ReactNode } from 'react';
 /* @Codex */
 import { isInstalledOllamaModel, parseInstalledOllamaModels } from '@/lib/installed-ollama-models';
@@ -83,7 +84,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                 </div>
                 <div className="min-w-0">
                     <h4 className="text-sm font-semibold" style={c.titleStyle}>{label}</h4>
-                    <p className="mt-1 text-[13px] leading-5" style={c.descriptionStyle}>{description}</p>
+                    <p className="mt-1 text-sm leading-5" style={c.descriptionStyle}>{description}</p>
                 </div>
             </div>
 
@@ -98,14 +99,14 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                     {installedModels.map(model => <option key={model} value={model}>{model}</option>)}
                 </select>
                 <button type="button" onClick={checkInstalled} disabled={loading || !targetUrl}
-                    className={SETTINGS_SECONDARY_BUTTON_CLASS}>
+                    className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-self-start')}>
                     <RefreshCw aria-hidden="true" className="h-4 w-4" />
                     {loading ? 'Lettura modelli…' : 'Aggiorna modelli installati'}
                 </button>
                 <p id={`installed-status-${selectorId}`} role="status" className={styles.notice}>
                     {!targetUrl ? 'Inserisci prima l’indirizzo di Ollama.' : loading ? 'Lettura da Ollama in corso…'
                         : error ? error : installedModels.length === 0 ? 'Nessun modello installato in Ollama.'
-                            : installedModels.length === 1 ? '1 modello presente in Ollama.' : `${installedModels.length} modelli presenti in Ollama.`}
+                            : `${formatCountLabel(installedModels.length, 'modello presente', 'modelli presenti')} in Ollama.`}
                 </p>
                 {value && !loading && !error && currentInventory && !installedSelection && (
                     <p className={styles.hint}>La selezione attuale «{value}» non è presente nell’elenco. Scegli un modello installato o consulta i consigli.</p>
@@ -143,7 +144,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                                                 </div>
                                                 <div className="min-w-0">
                                                     <span className="lume-registro block truncate text-sm font-semibold" style={{ color: 'var(--lume-ink)' }}>{model.name}</span>
-                                                    <span className="mt-0.5 block text-[13px] leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
+                                                    <span className="mt-0.5 block text-sm leading-5" style={{ color: 'var(--lume-ink-muted)' }}>{model.desc}</span>
                                                 </div>
                                             </button>
 
@@ -172,7 +173,7 @@ export function ModelSelector({ selectorId, label, description, icon, value, onC
                         <button
                             type="button"
                             onClick={() => setShowCustom(true)}
-                            className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-center border-dashed')}
+                            className={cn(SETTINGS_SECONDARY_BUTTON_CLASS, 'justify-self-start border-dashed')}
                         >
                             Usa un modello personalizzato
                         </button>

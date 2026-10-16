@@ -2,7 +2,7 @@
 
 .insightBody {
   margin-top: 12px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--ink-strong);
   line-height: 1.6;
   background: var(--surface-soft);
@@ -17,7 +17,7 @@
   gap: 10px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--ink-strong);
 }
 
@@ -27,7 +27,7 @@
   width: 90px;
   font-variant-numeric: tabular-nums;
   color: var(--ink-subtle);
-  font-size: 11px;
+  font-size: 0.75rem;
 }
 
 /* ───────────── patient inbox ───────────── */
@@ -102,7 +102,7 @@
   background: transparent;
   color: var(--lume-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 .patientSearchField input::placeholder {
@@ -116,7 +116,7 @@
   border-radius: 10px;
   padding: 8px 12px;
   font: inherit;
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
 }
 
@@ -133,7 +133,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--lume-ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   cursor: pointer;
   border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
   transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
@@ -151,7 +151,7 @@
 
 .resultCount {
   color: var(--lume-ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .patientListViewport {
@@ -210,15 +210,15 @@
 }
 
 .patientName {
-  font-size: 14px;
+  font-size: 0.875rem;
   color: var(--lume-ink);
-  font-weight: 570;
+  font-weight: 600;
   letter-spacing: -0.008em;
 }
 
 .patientSubline {
   min-width: 0;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--lume-ink-muted);
   display: flex;
   flex-wrap: wrap;
@@ -229,7 +229,7 @@
 
 .patientCode {
   color: var(--lume-ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -263,7 +263,7 @@
 
 .patientWhen {
   color: var(--lume-ink-muted);
-  font-size: 11px;
+  font-size: 0.75rem;
   text-align: right;
   white-space: nowrap;
 }
@@ -300,10 +300,9 @@
 
 .caseLensName {
   margin: 0;
-  font-size: 21px;
-  font-weight: 640;
   letter-spacing: -0.02em;
   color: var(--lume-ink);
+  font: var(--type-person-preview);
 }
 
 .caseLensAtoms {
@@ -313,7 +312,7 @@
   flex-wrap: wrap;
   gap: 5px 10px;
   color: var(--lume-ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .caseLensDiagnoses {
@@ -331,7 +330,7 @@
   align-items: center;
   gap: 7px;
   color: var(--lume-ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 .caseLensSummary {
@@ -341,7 +340,7 @@
   border-radius: 14px;
   background: var(--lume-surface-field);
   color: var(--lume-ink-muted);
-  font-size: 13px;
+  font-size: 0.8125rem;
   line-height: 1.6;
 }
 
@@ -352,7 +351,7 @@
   border-radius: 14px;
   background: var(--lume-surface-field);
   color: var(--lume-ink-muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.55;
 }
 
@@ -426,7 +425,7 @@
   background: transparent;
   color: var(--lume-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -477,7 +476,7 @@
     min-height: 44px;
     gap: 5px;
     padding: 6px 8px;
-    font-size: 11px;
+    font-size: 0.75rem;
   }
 
   .patientScopeActions {
@@ -500,7 +499,7 @@
 
   .worklistPanelHeader > h2 {
     min-width: 0;
-    font-size: 17px;
+    font-size: 0.9375rem;
     white-space: nowrap;
   }
 
@@ -534,11 +533,11 @@
   .patientSubline {
     column-gap: 5px;
     row-gap: 0;
-    font-size: 11px;
+    font-size: 0.75rem;
     line-height: 1.35;
   }
 
-  .patientCode { font-size: 11px; }
+  .patientCode { font-size: 0.75rem; }
 
   .patientSide {
     flex-direction: row;
@@ -555,7 +554,6 @@
 
 /* @Codex #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
 .quadroFocal {
-  --lume-registro-family: "IBM Plex Mono", var(--font-registro), "SF Mono", monospace;
   min-width: 0; padding: 10px; color: var(--lume-ink);
   display: flex; flex-direction: column; gap: 16px;
 }
@@ -565,19 +563,19 @@
 }
 .quadroHeading { min-width: 0; }
 .quadroCaption {
-  margin: 0 0 4px; color: var(--lume-ink-muted); font-size: 10px;
-  font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  margin: 0 0 4px; color: var(--lume-ink-muted); font-size: 0.75rem;
+  font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
 }
 .quadroName {
-  margin: 0; color: var(--lume-ink); font-size: 21px; font-weight: 640;
-  letter-spacing: -0.02em; text-wrap: balance;
+  margin: 0; color: var(--lume-ink);
+  letter-spacing: -0.02em; text-wrap: balance; font: var(--type-person);
 }
 .quadroAtoms {
-  margin: 4px 0 0; color: var(--lume-ink-muted); font-size: 12px;
+  margin: 4px 0 0; color: var(--lume-ink-muted); font-size: 0.75rem;
   display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px;
 }
 .quadroAtomGroup { min-width: 0; display: inline-flex; align-items: center; gap: 10px; }
-.quadroAtom { font-family: var(--lume-registro-family); }
+.quadroAtom { font-family: var(--lume-font-sans); }
 .quadroDot { opacity: 0.45; }
 .quadroMetrics {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -589,16 +587,16 @@
 }
 .quadroMetricLabel, .quadroMetricValue, .quadroMetricNote { margin: 0; }
 .quadroMetricLabel {
-  color: var(--lume-ink-muted); font-size: 10px; font-weight: 700;
+  color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600;
   letter-spacing: 0.09em; text-transform: uppercase;
 }
 .quadroMetricValue {
-  margin-top: 5px; color: var(--lume-ink); font-size: 19px;
-  font-family: var(--lume-registro-family); font-weight: 600; overflow-wrap: anywhere;
+  margin-top: 5px; color: var(--lume-ink); font-size: 0.9375rem;
+  font-family: var(--lume-font-sans); font-weight: 600; overflow-wrap: anywhere;
 }
 .quadroMetricWarning { color: color-mix(in srgb, var(--lume-signal-warning) 62%, var(--lume-ink)); }
 .quadroMetricCritical { color: color-mix(in srgb, var(--lume-signal-critical) 66%, var(--lume-ink)); }
-.quadroMetricNote { margin-top: 2px; color: var(--lume-ink-muted); font-size: 11px; line-height: 1.45; }
+.quadroMetricNote { margin-top: 2px; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.45; }
 .quadroSectionGrid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px; min-width: 0;
@@ -608,25 +606,25 @@
   border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
 }
 .quadroSectionLabel {
-  margin: 0 0 9px; color: var(--lume-ink-muted); font-size: 10px;
-  font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  margin: 0 0 9px; color: var(--lume-ink-muted); font-size: 0.75rem;
+  font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
 }
 .quadroDiagnoses { margin: 0; padding: 0; list-style: none; }
 .quadroDiagnosis {
   min-width: 0; display: grid; grid-template-columns: minmax(78px, auto) minmax(0, 1fr);
-  gap: 10px; align-items: baseline; padding: 7px 0; color: var(--lume-ink); font-size: 13px;
+  gap: 10px; align-items: baseline; padding: 7px 0; color: var(--lume-ink); font-size: 0.8125rem;
   border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
 }
 .quadroDiagnosis:last-child, .quadroTherapy:last-child, .quadroRow:last-child { border-bottom: 0; }
-.quadroDiagnosisCode { color: var(--lume-ink-muted); font-size: 12px; overflow-wrap: anywhere; }
+.quadroDiagnosisCode { color: var(--lume-ink-muted); font-size: 0.75rem; overflow-wrap: anywhere; }
 .quadroStatus {
   margin: 10px 0 0; display: flex; align-items: baseline;
-  gap: 8px; color: var(--lume-ink-muted); font-size: 12px;
+  gap: 8px; color: var(--lume-ink-muted); font-size: 0.75rem;
 }
-.quadroStatus strong { color: var(--lume-ink); font-weight: 570; }
+.quadroStatus strong { color: var(--lume-ink); font-weight: 600; }
 .quadroSummary {
   margin: 8px 0 0; max-width: 70ch; color: var(--lume-ink-muted);
-  font-size: 13px; line-height: 1.6; text-wrap: pretty;
+  font-size: 0.8125rem; line-height: 1.6; text-wrap: pretty;
 }
 .quadroTherapies, .quadroRows { display: flex; flex-direction: column; }
 .quadroTherapy {
@@ -634,8 +632,8 @@
   align-items: center; justify-content: space-between; gap: 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent);
 }
-.quadroTherapyName { min-width: 0; color: var(--lume-ink); font-size: 13px; font-weight: 540; }
-.quadroTherapyDose { flex: none; color: var(--lume-ink-muted); font-size: 12px; text-align: right; }
+.quadroTherapyName { min-width: 0; color: var(--lume-ink); font-size: 0.8125rem; font-weight: 600; }
+.quadroTherapyDose { flex: none; color: var(--lume-ink-muted); font-size: 0.75rem; text-align: right; }
 .quadroRow {
   min-width: 0; display: grid; grid-template-columns: 9px minmax(0, 1fr) auto;
   gap: 9px; align-items: start; padding: 8px 0;
@@ -648,21 +646,21 @@
 .quadroSignalWarning { background: var(--lume-signal-warning); visibility: visible; }
 .quadroSignalCritical { background: var(--lume-signal-critical); visibility: visible; }
 .quadroRowBody { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.quadroRowTitle { color: var(--lume-ink); font-size: 13px; font-weight: 540; overflow-wrap: anywhere; }
-.quadroRowNote { color: var(--lume-ink-muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.quadroRowTitle { color: var(--lume-ink); font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
+.quadroRowNote { color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.45; overflow-wrap: anywhere; }
 .quadroRowValue {
-  max-width: 16ch; color: var(--lume-ink-muted); font-size: 11px;
+  max-width: 16ch; color: var(--lume-ink-muted); font-size: 0.75rem;
   text-align: right; overflow-wrap: anywhere;
 }
 .quadroEmpty {
   margin: 0; padding: 12px; background: var(--lume-surface-field);
   border: 1px solid color-mix(in srgb, var(--lume-ink) 10%, transparent); border-radius: 14px;
-  color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55;
+  color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.55;
 }
 .quadroPrimaryAction, .quadroQuietAction {
   min-height: 34px; max-width: 100%; padding: 7px 12px;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  border-radius: 10px; font: inherit; font-size: 12px; font-weight: 570;
+  border-radius: 10px; font: inherit; font-size: 0.75rem; font-weight: 600;
   line-height: 1.2; text-align: center; text-decoration: none; cursor: pointer;
   transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
 }
@@ -714,37 +712,38 @@
 
 /* Punto d'inchiostro: a continuous register with a selected-record inspector. */
 .directoryToolbar { display: flex; align-items: center; gap: 12px; padding: 0 0 20px; }
-.directoryToolbar h1 { margin: 0; font-size: 26px; line-height: 1.1; flex: none; }
+.directoryToolbar h1 { margin: 0; line-height: 1.1; flex: none; font: var(--type-page-title); }
 .directoryToolbar > a { flex: none; }
 .directoryToolbar .patientSearchField { flex: 1; min-width: 140px; min-height: 40px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-focal); padding: 0 12px; }
-.directoryToolbar .patientSearchField input { width: 100%; font-size: 14px; background: transparent; }
+.directoryToolbar .patientSearchField input { width: 100%; font-size: 0.875rem; background: transparent; }
 .directoryToolbar .inboxScope { display: flex; gap: 0; padding: 3px; border-radius: 10px; background: var(--lume-surface-canvas); margin: 0; }
-.directoryToolbar .scopeChip { min-height: 40px; padding: 6px 12px; border: 0; border-radius: 8px; font: 14px/1.4 var(--lume-font-sans); }
+.directoryToolbar .scopeChip { min-height: 40px; padding: 6px 12px; border: 0; border-radius: 8px; font: 0.875rem/1.4 var(--lume-font-sans); }
 .directoryToolbar .scopeChipActive { background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 600; }
 :global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: grid; grid-template-columns: minmax(0, 1fr) 304px; gap: 28px; align-items: stretch; }
 :global(html[data-runtime-twin-design='proposal']) .worklistPanel { padding: 0; border: 0; border-radius: 0; background: transparent; min-width: 0; }
-.worklistPanelHeader { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8px; color: var(--lume-ink-muted); font-size: 13px; }
+.worklistPanelHeader { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8px; color: var(--lume-ink-muted); font-size: 0.8125rem; }
 .resultCount { font: inherit; }
-.keyboardHint { font-size: 12px; }
+.keyboardHint { font-size: 0.75rem; }
 .columnHeadings, :global(html[data-runtime-twin-design='proposal']) .patientRow { display: grid; grid-template-columns: minmax(120px, 1.15fr) 52px minmax(140px, 1.4fr) 96px minmax(80px, .75fr); gap: 12px; align-items: center; }
-.columnHeadings { padding: 8px 10px; font-size: 12px; line-height: 1.5; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--lume-ink-muted); border-bottom: 1px solid var(--lume-rule-strong); }
+.columnHeadings { padding: 8px 10px; font-size: 0.75rem; line-height: 1.5; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--lume-ink-muted); border-bottom: 1px solid var(--lume-rule-strong); }
 :global(html[data-runtime-twin-design='proposal']) .patientListViewport { max-height: none; height: calc(100dvh - 300px); min-height: 240px; margin: 0; scrollbar-width: thin; scrollbar-color: var(--lume-ink-muted) transparent; }
 :global(html[data-runtime-twin-design='proposal']) .patientRowWrap { padding: 0; }
-:global(html[data-runtime-twin-design='proposal']) .patientRow { width: 100%; min-height: 40px; padding: 9px 10px; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; box-shadow: none; background: transparent; text-align: left; font: 14px/1.5 var(--lume-font-sans); transform: none; transition: none; }
+:global(html[data-runtime-twin-design='proposal']) .patientRow { width: 100%; min-height: 40px; padding: 9px 10px; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; box-shadow: none; background: transparent; text-align: left; font: 0.875rem/1.5 var(--lume-font-sans); transform: none; transition: none; }
 :global(html[data-runtime-twin-design='proposal']) .patientRow:hover { background: var(--lume-surface-hover); }
 :global(html[data-runtime-twin-design='proposal']) .patientRowSelected { background: var(--lume-surface-selected); }
 :global(html[data-runtime-twin-design='proposal']) .patientRow:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: -2px; }
 .recordIdentity { min-width: 0; }
 .recordIdentity strong { font-weight: 600; }
-.recordAge, .patientWhen { color: var(--lume-ink-muted); font: 13px/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
+.recordAge, .patientWhen { color: var(--lume-ink-muted); font: 0.8125rem/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
 .recordDiagnosis { min-width: 0; overflow-wrap: anywhere; }
 .compactDiagnosis { display: none; }
-.patientStatusText { font-size: 13px; }
+.patientStatusText { font-size: 0.8125rem; }
 :global(html[data-runtime-twin-design='proposal']) .caseLens { display: flex; flex-direction: column; gap: 16px; position: static; align-self: stretch; padding: 20px; border: 0; border-left: 1px solid var(--lume-rule); border-radius: 0; background: var(--lume-surface-hover); box-shadow: none; animation: none; }
-.caseLensName { font: 400 22px/1.2 var(--lume-font-voice); }
-.caseLensAtoms { font: 13px/1.5 var(--lume-font-sans); }
-.caseLensSummary { padding: 0; border: 0; background: transparent; font: 400 17px/1.5 var(--lume-font-voice); }
-.caseLensStatus { font: 14px/1.5 var(--lume-font-sans); }
+.caseLensName {
+  font: var(--type-person-preview); }
+.caseLensAtoms { font: 0.8125rem/1.5 var(--lume-font-sans); }
+.caseLensSummary { padding: 0; border: 0; background: transparent; font: var(--type-prose); }
+.caseLensStatus { font: 0.875rem/1.5 var(--lume-font-sans); }
 .caseLensDiagnoses { display: grid; gap: 8px; }
 .patientDiagnosisPill { padding: 8px 0; border-bottom: 1px solid var(--lume-rule); }
 .patientDiagnosisPill > span { white-space: normal; }
@@ -768,7 +767,7 @@
   .columnHeadings { display: none; }
   :global(html[data-runtime-twin-design='proposal']) .patientRow { grid-template-columns: minmax(0, 1fr) auto; min-height: 60px; padding: 10px 4px; }
   .recordIdentity strong { display: block; }
-  .compactDiagnosis { display: block; margin-top: 2px; font-size: 13px; color: var(--lume-ink-muted); }
+  .compactDiagnosis { display: block; margin-top: 2px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
   .patientRow .recordDiagnosis { display: none; }
   .keyboardHint { display: none; }
   :global(html[data-runtime-twin-design='proposal']) .patientListViewport { height: calc(100dvh - 320px); }

@@ -20,6 +20,18 @@ stessa SHA, firma, tag, GitHub Release, distribuzione o installazione su un host
 esterno. Per questi esiti occorrono i controlli e le ricevute di chiusura
 pertinenti. Lo storico delle versioni è nel [CHANGELOG](../CHANGELOG.md).
 
+## Nota successiva: tipografia web, ottobre 2026
+
+Il riallineamento a Punto d'inchiostro usa corpi in rem e un guard statico.
+Lo spec `e2e/type-scale.spec.ts` controlla le pagine ordinarie, i pannelli
+paziente e le impostazioni nei due temi; non copre ogni dialogo, ogni stato
+di errore o servizio esterno, né il contenuto originale dei documenti
+incorporati. L'aumento della radice CSS è una prova di scala del testo,
+non una certificazione dello zoom reale o delle tecnologie assistive.
+Le misure nel browser sono state eseguite il 16 ottobre 2026 su dati
+sintetici, su tutte le pagine dello spec e nei due temi.
+Questo intervento non modifica né verifica le app Apple.
+
 ## Avvio unificato, aggiornamento 15 ottobre 2026
 
 Gli ingressi del sorgente corrente richiedono Node 24 installato; non sono

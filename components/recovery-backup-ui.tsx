@@ -9,7 +9,7 @@ export function RecoveryBackupUI() {
     const [message, setMessage] = useState('');
     const allowed = unlockCredential === 'passphrase' && user?.role === 'admin';
     return <section className="mf-section space-y-4 p-6 md:p-7" aria-labelledby="recovery-backup-heading">
-        <h2 id="recovery-backup-heading" className="text-lg font-bold">Backup completo di recupero</h2>
+        <h2 id="recovery-backup-heading" className="text-lg font-semibold">Backup completo di recupero</h2>
         <p>Copia cifrata dell’intero archivio, compresi account, chiavi protette e storico. Per recuperarla servono il kit corrispondente a questo backup e la sua chiave su carta, conservata separatamente. Limite: {MAX_RECOVERY_DATABASE_BYTES / (1024 * 1024)} MiB.</p>
         {!allowed && <p>Prima passa alla passphrase e salva il kit nelle impostazioni di sicurezza, usando l’account amministratore.</p>}
         <div className="flex flex-wrap gap-3">

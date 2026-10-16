@@ -26,17 +26,17 @@
 .sectionIntro h2 {
     margin: 0.45rem 0 0;
     color: var(--lume-ink);
-    font-size: 1.2rem;
-    font-weight: 650;
+    font-size: 0.9375rem;
+    font-weight: 600;
     line-height: 1.35;
     text-wrap: balance;
 }
 .overviewValue {
     margin: 1rem 0 0;
     color: var(--lume-ink);
-    font-size: clamp(2.1rem, 5vw, 3.25rem);
+    font-size: 0.9375rem;
     font-variant-numeric: tabular-nums;
-    font-weight: 650;
+    font-weight: 600;
     letter-spacing: -0.035em;
     line-height: 1;
 }
@@ -45,7 +45,7 @@
     margin: 0;
     color: var(--lume-ink-muted);
     font-family: var(--lume-font-sans);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     letter-spacing: 0.02em;
@@ -54,7 +54,7 @@
     max-width: 70ch;
     margin: 0.75rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.82rem;
+    font-size: 0.8125rem;
     line-height: 1.55;
 }
 .focusActions {
@@ -77,8 +77,8 @@
     gap: 0.55rem;
     border-radius: var(--lume-radius-control);
     padding: 0.65rem 1rem;
-    font-size: 0.8rem;
-    font-weight: 650;
+    font-size: 0.8125rem;
+    font-weight: 600;
     text-decoration: none;
     transition: background-color 150ms cubic-bezier(0.22, 0.61, 0.36, 1), color 150ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
@@ -132,13 +132,13 @@
     background: var(--lume-surface-focal);
     padding: 0.9rem 1rem;
     color: var(--lume-ink-muted);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
 }
 .previewField strong {
     grid-row: span 2;
     align-self: center;
     color: var(--lume-ink);
-    font-size: 1.1rem;
+    font-size: 0.9375rem;
     font-variant-numeric: tabular-nums;
 }
 .previewActions {
@@ -161,7 +161,7 @@
     max-width: 70ch;
     margin: 0.35rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     line-height: 1.55;
 }
 .indexGroups {
@@ -178,7 +178,7 @@
     margin: 0.75rem 0 0;
     color: var(--lume-ink-muted);
     font-size: 0.75rem;
-    font-weight: 650;
+    font-weight: 600;
 }
 .indexList,
 .navItems {
@@ -216,13 +216,13 @@
     display: block;
 }
 .indexLink strong {
-    font-size: 0.8rem;
-    font-weight: 650;
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 .indexLink small {
     margin-top: 0.2rem;
     color: var(--lume-ink-muted);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     line-height: 1.4;
 }
 .indexLink > svg {
@@ -238,7 +238,7 @@
     max-width: 70ch;
     margin: 0.2rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.82rem;
+    font-size: 0.8125rem;
     line-height: 1.55;
 }
 .settingSurface {
@@ -264,7 +264,7 @@
     background: var(--lume-surface-field);
     color: var(--lume-ink);
     padding: 0.65rem 0.8rem;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
 }
 .settingInput:focus {
     border-color: var(--lume-ink-fresh);
@@ -275,8 +275,8 @@
     display: block;
     margin-bottom: 0.4rem;
     color: var(--lume-ink);
-    font-size: 0.78rem;
-    font-weight: 650;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 /* @Codex WUL-522: read-only Intelligence Fabric registry. */
 .fabricBlockHeader {
@@ -289,12 +289,12 @@
 .fabricStateTitle {
     margin: 0;
     color: var(--lume-ink);
-    font-weight: 650;
+    font-weight: 600;
     line-height: 1.35;
     text-wrap: balance;
 }
 .fabricBlockHeader h2 {
-    font-size: 1.05rem;
+    font-size: 0.9375rem;
 }
 .fabricBlockHeader p,
 .fabricRegistryGroup header p,
@@ -302,7 +302,7 @@
     max-width: 70ch;
     margin: 0;
     color: var(--lume-ink-muted);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     line-height: 1.55;
     text-wrap: pretty;
 }
@@ -332,7 +332,7 @@
 .fabricGuarantee code {
     align-self: center;
     color: var(--lume-ink-muted);
-    font-size: 0.64rem;
+    font-size: 0.75rem;
 }
 .fabricGuaranteeMarker,
 .fabricEgressMarker {
@@ -364,14 +364,14 @@
 .fabricVenueRow dt strong,
 .fabricEgressRow dt strong {
     color: var(--lume-ink);
-    font-size: 0.82rem;
-    font-weight: 650;
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 .fabricVenueRow dt span,
 .fabricEgressRow dt code {
     margin-top: 0.25rem;
     color: var(--lume-ink-muted);
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     line-height: 1.45;
 }
 .fabricVenueRow dd,
@@ -382,7 +382,7 @@
 .fabricEgressRow dd p {
     margin: 0.45rem 0 0;
     color: var(--lume-ink-muted);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     line-height: 1.5;
 }
 .fabricStatusPill,
@@ -395,8 +395,8 @@
     background: var(--lume-surface-field);
     color: var(--lume-ink);
     padding: 0.25rem 0.55rem;
-    font-size: 0.65rem;
-    font-weight: 650;
+    font-size: 0.75rem;
+    font-weight: 600;
     line-height: 1.2;
 }
 .fabricStatusPill > span {
@@ -458,7 +458,7 @@
     margin-bottom: 0.75rem;
 }
 .fabricRegistryGroup h3 {
-    font-size: 0.92rem;
+    font-size: 0.9375rem;
 }
 .fabricRegistryGroup header p {
     margin-top: 0.25rem;
@@ -483,8 +483,8 @@
 }
 .fabricCapabilityName strong {
     color: var(--lume-ink);
-    font-size: 0.8rem;
-    font-weight: 650;
+    font-size: 0.8125rem;
+    font-weight: 600;
     line-height: 1.4;
 }
 .fabricCapabilityName code,
@@ -492,7 +492,7 @@
     margin-top: 0.25rem;
     overflow-wrap: anywhere;
     color: var(--lume-ink-muted);
-    font-size: 0.63rem;
+    font-size: 0.75rem;
     line-height: 1.4;
 }
 .fabricCapabilityFacts {
@@ -506,24 +506,24 @@
 }
 .fabricCapabilityFacts dt {
     color: var(--lume-ink-muted);
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     font-weight: 600;
 }
 .fabricCapabilityFacts dd {
     margin: 0.15rem 0 0;
     color: var(--lume-ink);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     line-height: 1.45;
 }
 .fabricKillSwitch {
     display: grid;
     justify-items: start;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     line-height: 1.45;
 }
 .fabricKillSwitch a {
     color: var(--lume-ink-fresh);
-    font-weight: 650;
+    font-weight: 600;
     text-underline-offset: 0.18rem;
 }
 .fabricKillSwitch a:focus-visible {
@@ -535,7 +535,7 @@
     color: var(--lume-ink-muted);
 }
 .fabricStateTitle {
-    font-size: 0.9rem;
+    font-size: 0.875rem;
 }
 .fabricSkeleton {
     display: grid;
@@ -596,14 +596,14 @@
 }
 .mobileCurrent span {
     color: var(--lume-ink-muted);
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
 }
 .mobileCurrent strong {
     overflow: hidden;
     margin-top: 0.15rem;
-    font-size: 0.8rem;
-    font-weight: 650;
+    font-size: 0.8125rem;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -703,7 +703,7 @@
     border-radius: 4px;
     background: var(--lume-surface-chrome);
     color: var(--lume-ink);
-    font-size: 0.625rem;
+    font-size: 0.75rem;
 }
 :global(html[data-runtime-twin-design='proposal']) .searchButton { min-height: 42px; font-size: 0.75rem; }
 .navItemLabel,
@@ -712,19 +712,19 @@
 }
 .navItemLabel {
     color: var(--lume-ink);
-    font-size: 0.77rem;
-    font-weight: 620;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 .navItemDescription {
     margin-top: 0.15rem;
     color: var(--lume-ink-muted);
-    font-size: 0.67rem;
+    font-size: 0.75rem;
     line-height: 1.35;
 }
 .currentLabel {
     flex: 0 0 auto;
     color: var(--lume-ink-muted);
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
 }
 .searchButton {
@@ -735,7 +735,7 @@
     gap: 0.75rem;
     padding: 0.6rem 0.7rem;
     color: var(--lume-ink-muted);
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     text-align: left;
 }
 .searchButton span {
@@ -752,7 +752,7 @@
     border-block: 1px solid var(--lume-rule);
     border-radius: 0.35rem;
     padding: 0.1rem 0.35rem;
-    font-size: 0.62rem;
+    font-size: 0.75rem;
 }
 @media (min-width: 1024px) {
     .mobileBar,
@@ -814,11 +814,11 @@
 /* @Codex WUL-676: the index is navigation, not a second stack of cards. */
 :global(html[data-runtime-twin-design='proposal']) .navItem { min-height: 44px; padding: 8px 12px; border: 0; border-radius: 12px; box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .navItemDescription { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 11px; }
+:global(html[data-runtime-twin-design='proposal']) .navGroupLabel { font-family: var(--lume-font-sans); font-size: 0.75rem; }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive :is(strong, span, svg) { color: inherit; }
 :global(html[data-runtime-twin-design='proposal']) .currentLabel { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .searchButton { background: var(--lume-surface-focal); font-size: 12px; }
+:global(html[data-runtime-twin-design='proposal']) .searchButton { background: var(--lume-surface-focal); font-size: 0.75rem; }
 :global(html[data-runtime-twin-design='proposal']) .overviewFocus { padding: 0 0 28px; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; }
 :global(html[data-runtime-twin-design='proposal']) .sectionLabel { display: none; }
 
@@ -826,10 +826,11 @@
 /* @Codex: command text shares the same weight as the clinical actions. */
 :global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) {
     min-height: var(--lume-control-height);
-    padding: 10px 14px;
+    padding: 8px 14px;
+    border-radius: var(--lume-control-radius);
     gap: var(--lume-control-gap);
-    font-size: 14px;
-    line-height: 22px;
+    font-size: 0.875rem;
+    line-height: 1.5;
     font-weight: 600;
 }
 :global(html[data-runtime-twin-design='proposal']) .settingSurface { padding: 28px 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); border-radius: 0; box-shadow: none; background: transparent; }
@@ -848,7 +849,7 @@
     padding: 10px 12px;
     border-radius: var(--lume-control-radius, 12px);
     color: var(--lume-ink);
-    font-size: .9375rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     line-height: 1.5;
     overflow-wrap: anywhere;
@@ -859,25 +860,25 @@
 .returnLink:hover { background: var(--lume-surface-field); }
 .returnLink:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
 
-.sectionIntro h2 { font: 600 14px/1.5 var(--lume-font-sans); }
+.sectionIntro h2 { font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .settingSurface { padding-inline: 0; }
 .settingLayer { background: transparent; }
 .navRoot { font-family: var(--lume-font-sans); }
-.navItemLabel, .indexLink strong { font-size: 14px; font-weight: 600; }
-.navItemDescription, .indexLink small { font-size: 13px; }
+.navItemLabel, .indexLink strong { font-size: 0.875rem; font-weight: 600; }
+.navItemDescription, .indexLink small { font-size: 0.8125rem; }
 .navItemActive { background: var(--lume-surface-selected); }
 .fabricCount, .fabricStatusPill { border: 0; border-radius: 0; background: transparent; padding-inline: 0; }
-:global(html[data-runtime-twin-design='proposal']) .sectionIntro h2 { font: 600 14px/1.5 var(--lume-font-sans); }
+:global(html[data-runtime-twin-design='proposal']) .sectionIntro h2 { font: 600 0.875rem/1.5 var(--lume-font-sans); }
 :global(html[data-runtime-twin-design='proposal']) .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); }
 .navRoot.navRoot .navItemActive { background: var(--lume-surface-selected); color: var(--lume-ink); }
 .navRoot.navRoot .navItemActive :is(strong, span, svg) { color: inherit; }
 
 .settingsRows { min-width: 0; margin: 28px 0; padding: 0; border: 0; }
-.settingsRows > legend, .settingsRows > h3 { width: 100%; margin: 0; padding: 0 0 12px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 14px/1.5 var(--lume-font-sans); }
-.settingsWorkspace .settingRow { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 64px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; background: transparent; color: var(--lume-ink); text-align: left; font: 14px/1.5 var(--lume-font-sans); }
+.settingsRows > legend, .settingsRows > h3 { width: 100%; margin: 0; padding: 0 0 12px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 0.875rem/1.5 var(--lume-font-sans); }
+.settingsWorkspace .settingRow { display: flex; align-items: center; justify-content: space-between; gap: 24px; width: 100%; min-height: 64px; padding: 14px 0; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; background: transparent; color: var(--lume-ink); text-align: left; font: 0.875rem/1.5 var(--lume-font-sans); }
 .settingRow > span:first-child { min-width: 0; display: grid; gap: 4px; }
-.settingRow strong { font-weight: 500; }
-.settingRow > span:first-child > span { color: var(--lume-ink-muted); font-size: 13px; }
+.settingRow strong { font-weight: 600; }
+.settingRow > span:first-child > span { color: var(--lume-ink-muted); font-size: 0.8125rem; }
 .settingRow > span:last-child, .settingRow > input { flex-shrink: 0; }
 .settingRow > input { width: 18px; height: 18px; accent-color: var(--lume-ink-fresh); }
 .settingRow:hover { background: var(--lume-surface-field); }
@@ -885,14 +886,14 @@
 .settingsWorkspace :is(.settingSurface, .settingLayer) { padding: 24px 0; border: 0; border-top: 1px solid var(--lume-rule); background: transparent; }
 .settingsWorkspace :global(.mf-section) { padding: 20px 0; border: 0; border-top: 1px solid var(--lume-rule); border-radius: 0; background: transparent; box-shadow: none; }
 .settingsWorkspace :is(div, section, article):is(:global(.rounded-xl), :global(.rounded-2xl), :global(.rounded-lg)):not([role]) { border-radius: 0; box-shadow: none; }
-.settingsWorkspace :global(.section-kicker) { font-size: 12px; letter-spacing: 0; text-transform: none; }
+.settingsWorkspace :global(.section-kicker) { font-size: 0.75rem; letter-spacing: 0; text-transform: none; }
 .settingsWorkspace .navItem, :global(html[data-runtime-twin-design='proposal']) .settingsWorkspace .navItem { min-height: 40px; padding: 8px 10px; border: 0; border-radius: 0; }
 .settingsWorkspace .navItemDescription { display: none; }
 .settingsWorkspace .navGroups { gap: 24px; }
 .settingsWorkspace .searchButton { background: transparent; border-radius: 0; padding-inline: 0; }
 .settingsWorkspace .searchButton kbd { display: none; }
 .settingsWorkspace .navItemActive { box-shadow: inset 2px 0 var(--lume-ink-fresh); }
-.settingsWorkspace .navGroupLabel { padding: 0 10px 8px; font-size: 12px; font-weight: 400; }
+.settingsWorkspace .navGroupLabel { padding: 0 10px 8px; font-size: 0.75rem; font-weight: 400; }
 @media(pointer:coarse) { .settingsWorkspace .navItem { min-height: 44px; } }
 
 .mobileStrip { display: flex; min-width: 0; max-width: 100%; overflow-x: auto; gap: 4px; border-bottom: 1px solid var(--lume-rule); scrollbar-width: thin; }
@@ -912,14 +913,15 @@
 
 .siteForm { border-block: 1px solid var(--lume-rule-strong); padding-block: 20px; }
 .siteFormHeading { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 24px; margin-bottom:16px; }
-.siteFormHeading h3, .siteIdentity h3 { margin:0; font:600 14px/1.5 var(--lume-font-sans); }
-.siteFormHeading p { display:flex; align-items:center; gap:6px; margin:0; font-size:13px; color:var(--lume-ink-muted); }
+.siteFormHeading h3, .siteIdentity h3 { margin:0; font:600 0.875rem/1.5 var(--lume-font-sans); }
+.siteFormHeading p { display:flex; align-items:center; gap:6px; margin:0; font-size:0.8125rem; color:var(--lume-ink-muted); }
 .siteRegister { padding-block:20px; }
 .siteRow { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:center; border-top:1px solid var(--lume-rule); padding-block:16px; }
 .siteIdentity { min-width:0; }
-.siteIdentity p { margin:4px 0 0; font-size:12px; color:var(--lume-ink-muted); overflow-wrap:anywhere; }
+.siteIdentity p { margin:4px 0 0; font-size:0.75rem; color:var(--lume-ink-muted); overflow-wrap:anywhere; }
 .siteIdentity p:empty { display:none; }
 .siteActions { display:flex; flex-wrap:wrap; gap:8px; }
-.siteActions button { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:6px 10px; border:1px solid var(--lume-rule-strong); border-radius:var(--lume-radius-control); color:var(--lume-ink); background:transparent; font:500 12px/1.5 var(--lume-font-sans); }
+.siteActions button { display:inline-flex; align-items:center; gap:6px; min-height:36px; padding:6px 10px; border:1px solid var(--lume-rule-strong); border-radius:var(--lume-radius-control); color:var(--lume-ink); background:transparent; font:600 0.75rem/1.5 var(--lume-font-sans); }
 .siteActions button:disabled { color:var(--lume-ink-muted); border-color:transparent; }
 @media(max-width:1000px) { .siteRow { grid-template-columns:minmax(0,1fr); gap:12px; } }
+@media (pointer: fine) and (min-width: 701px) { :global(html[data-runtime-twin-design='proposal']) :is(.primaryAction, .secondaryAction) { white-space: nowrap; } }

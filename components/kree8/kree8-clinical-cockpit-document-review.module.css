@@ -30,31 +30,31 @@
   background: var(--lume-surface-focal);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent);
   color: var(--lume-ink);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.55;
 }
 
 .docPaper b { color: var(--lume-ink); font-weight: 600; }
-.docHighlight { display: inline-block; padding: 0 4px; border-radius: 4px; background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 500; }
+.docHighlight { display: inline-block; padding: 0 4px; border-radius: 4px; background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 600; }
 .docCounters { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 0 0; }
-.docCounter { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--lume-radius-control); background: var(--lume-surface-focal); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent); color: var(--lume-ink-muted); font-size: 11px; }
+.docCounter { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--lume-radius-control); background: var(--lume-surface-focal); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent); color: var(--lume-ink-muted); font-size: 0.75rem; }
 .docCounter b { color: var(--lume-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .fieldRow { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); }
 .fieldRow:first-child { padding-top: 4px; }
 .fieldRow:last-child { padding-bottom: 4px; border-bottom: 0; }
-.fieldHead { display: flex; align-items: center; gap: 8px; color: var(--lume-ink-muted); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
-.fieldValue { color: var(--lume-ink); font-size: 14px; font-weight: 500; }
-.fieldEvidence { margin: 2px 0; padding: 6px 10px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); background: var(--lume-surface-field); color: var(--lume-ink-muted); font-size: 11px; line-height: 1.5; }
-.fieldBlocked { padding: 6px 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent); border-radius: var(--lume-radius-control); background: var(--lume-surface-field); color: var(--lume-ink-muted); font-size: 11px; }
+.fieldHead { display: flex; align-items: center; gap: 8px; color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.fieldValue { color: var(--lume-ink); font-size: 0.875rem; font-weight: 600; }
+.fieldEvidence { margin: 2px 0; padding: 6px 10px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); background: var(--lume-surface-field); color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.5; }
+.fieldBlocked { padding: 6px 10px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent); border-radius: var(--lume-radius-control); background: var(--lume-surface-field); color: var(--lume-ink-muted); font-size: 0.75rem; }
 .fieldActions { display: inline-flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-.fieldBtn { padding: 5px 10px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: var(--lume-radius-control); background: var(--lume-surface-focal); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent); color: var(--lume-ink-muted); font-size: 11px; font-weight: 500; cursor: pointer; transition: transform var(--lume-dur-riga) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease); }
+.fieldBtn { padding: 5px 10px; display: inline-flex; align-items: center; gap: 5px; border: 0; border-radius: var(--lume-radius-control); background: var(--lume-surface-focal); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent); color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: transform var(--lume-dur-riga) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease); }
 .fieldBtn:hover { transform: translateY(-1px); }
 .fieldBtn:active { transform: scale(0.96); }
 .fieldBtnActiveAccept,
 .fieldBtnActiveCorrect { background: var(--lume-surface-focal); color: var(--lume-ink); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 20%, transparent); }
 .fieldBtnActiveIgnore { background: var(--lume-surface-field); color: var(--lume-ink-muted); box-shadow: 0 0 0 1px color-mix(in srgb, var(--lume-ink) 16%, transparent); }
-.fieldKind { color: var(--lume-ink-muted); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+.fieldKind { color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
 
 @media (max-width: 1100px) {
   .docGrid { grid-template-columns: 1fr; }
@@ -63,29 +63,29 @@
 .area { min-width: 0; display: flex; flex-direction: column; gap: 18px; color: var(--lume-ink); }
 .header { min-width: 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; padding: 4px 10px 0; }
 .caption,
-.sectionLabel { margin: 0; color: var(--lume-ink-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
-.title { margin: 4px 0 0; color: var(--lume-ink); font-size: 24px; font-weight: 640; letter-spacing: -0.02em; text-wrap: balance; }
-.subtitle { max-width: 72ch; margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55; text-wrap: pretty; }
+.sectionLabel { margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; }
+.title { margin: 4px 0 0; color: var(--lume-ink);   letter-spacing: -0.02em; text-wrap: balance;  font: var(--type-page-title); }
+.subtitle { max-width: 72ch; margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.55; text-wrap: pretty; }
 .caseFlow { min-width: 0; display: flex; flex-direction: column; gap: 0; padding: 2px 10px 10px; }
 .section { min-width: 0; padding: 16px 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent); }
 .section:first-child { padding-top: 8px; border-top: 0; }
-.sectionHeading { margin: 5px 0 0; color: var(--lume-ink); font-size: 16px; font-weight: 620; }
+.sectionHeading { margin: 5px 0 0; color: var(--lume-ink); font-size: 0.9375rem; font-weight: 600; }
 .sectionCopy,
-.empty { max-width: 72ch; margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 12px; line-height: 1.55; }
-.register { margin: 6px 0 0; color: var(--lume-ink-muted); font: 11px "IBM Plex Mono", "SF Mono", "Cascadia Code", monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.empty { max-width: 72ch; margin: 5px 0 0; color: var(--lume-ink-muted); font-size: 0.75rem; line-height: 1.55; }
+.register { margin: 6px 0 0; color: var(--lume-ink-muted); font: 0.75rem var(--lume-font-sans); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .rows { margin-top: 10px; display: flex; flex-direction: column; }
 .row { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 9%, transparent); }
 .rowMain { min-width: 0; display: flex; align-items: flex-start; gap: 8px; }
 .rowMain :global(svg) { flex: none; margin-top: 2px; color: var(--lume-ink-muted); }
-.rowTitle { color: var(--lume-ink); font-size: 13px; font-weight: 560; overflow-wrap: anywhere; }
-.status { border: 1px solid color-mix(in srgb, var(--lume-signal-warning) 28%, transparent); border-radius: var(--lume-radius-control); padding: 4px 8px; color: color-mix(in srgb, var(--lume-signal-warning) 62%, var(--lume-ink)); background: color-mix(in srgb, var(--lume-signal-warning) 10%, var(--lume-surface-field)); font-size: 10px; font-weight: 650; white-space: nowrap; }
+.rowTitle { color: var(--lume-ink); font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
+.status { border: 1px solid color-mix(in srgb, var(--lume-signal-warning) 28%, transparent); border-radius: var(--lume-radius-control); padding: 4px 8px; color: color-mix(in srgb, var(--lume-signal-warning) 62%, var(--lume-ink)); background: color-mix(in srgb, var(--lume-signal-warning) 10%, var(--lume-surface-field)); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
 .decisionGrid { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
-.decisionTerm { margin: 0; color: var(--lume-ink-muted); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-.decisionValue { margin: 3px 0 0; color: var(--lume-ink); font-size: 12px; line-height: 1.5; }
+.decisionTerm { margin: 0; color: var(--lume-ink-muted); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.decisionValue { margin: 3px 0 0; color: var(--lume-ink); font-size: 0.75rem; line-height: 1.5; }
 .actions { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .actions .primaryAction { margin-left: auto; }
 .primaryAction,
-.quietAction { min-height: 36px; max-width: 100%; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: var(--lume-radius-control); font: inherit; font-size: 12px; font-weight: 580; line-height: 1.2; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
+.quietAction { min-height: 36px; max-width: 100%; padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: var(--lume-radius-control); font: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1.2; text-decoration: none; cursor: pointer; transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease); }
 .primaryAction { border: 1px solid var(--lume-ink); background: var(--lume-ink); color: var(--lume-surface-focal); }
 .quietAction { border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent); background: var(--lume-surface-field); color: var(--lume-ink); }
 .primaryAction:hover,

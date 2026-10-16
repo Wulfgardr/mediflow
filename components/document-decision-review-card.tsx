@@ -23,17 +23,17 @@ function ActionList({
 
     return (
         <section className="space-y-2">
-            <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">{title}</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">{title}</h4>
             <div className="space-y-2">
                 {items.length > 0 ? items.map((item) => (
                     <div key={item.id} className={`rounded-2xl border p-3 ${toneClass}`}>
                         <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-bold">{item.label}</p>
-                            <span className="rounded-full bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                            <p className="text-sm font-semibold">{item.label}</p>
+                            <span className="rounded-full bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                 {confidenceLabel(item.confidence)}
                             </span>
                             {item.blockedReason && (
-                                <span className="rounded-full bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                                <span className="rounded-full bg-[color:var(--lume-surface-field)] px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                     {item.blockedReason}
                                 </span>
                             )}
@@ -62,15 +62,15 @@ export default function DocumentDecisionReviewCard({ decision }: { decision: Doc
                         <FileSearch className="h-5 w-5" />
                     </div>
                     <div className="space-y-1">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">{view.documentType}</p>
-                        <h3 className="text-lg font-black tracking-tight text-[color:var(--lume-ink)]">{view.title}</h3>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">{view.documentType}</p>
+                        <h3 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">{view.title}</h3>
                         <p className="text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
                             {view.patientCandidate}
                         </p>
                     </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide">
+                <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
                     <span className="rounded-full bg-[color:color-mix(in_srgb,var(--lume-ink)_6%,var(--lume-surface-field))] px-3 py-1 text-[color:var(--lume-ink-muted)]">
                         confidence {view.confidence}
                     </span>
@@ -100,7 +100,7 @@ export default function DocumentDecisionReviewCard({ decision }: { decision: Doc
             <section className="mt-5 space-y-2">
                 <div className="flex items-center gap-2">
                     <UserRound className="h-4 w-4 text-[color:var(--lume-ink-muted)]" />
-                    <h4 className="text-[11px] font-bold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Evidenze cliccabili</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--lume-ink-muted)]">Evidenze cliccabili</h4>
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
                     {view.evidence.length > 0 ? view.evidence.map((evidence) => (
@@ -110,7 +110,7 @@ export default function DocumentDecisionReviewCard({ decision }: { decision: Doc
                             className="rounded-2xl border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-field)] p-3 text-left text-xs leading-relaxed text-[color:var(--lume-ink-muted)] transition-[border-color,background-color] hover:border-[color:color-mix(in_srgb,var(--lume-accent)_30%,transparent)] hover:bg-[color:var(--lume-surface-focal)]"
                             aria-label={`Evidenza ${evidence.id}`}
                         >
-                            <span className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
+                            <span className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--lume-ink-muted)]">
                                 <CheckCircle2 className="h-3 w-3" />
                                 {evidence.id}
                             </span>

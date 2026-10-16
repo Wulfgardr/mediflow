@@ -71,6 +71,8 @@ test('UI selects, previews without writing, confirms, rereads, reports invalid r
         await confirm.click();
         await expect(page.getByText('Import registrato e stato del repertorio riletto.', { exact: true })).toBeVisible();
         await expect(page.getByLabel('Ricevuta import')).toContainText('Rilettura confermata.');
+        await expect(page.getByText('1 codice nel repertorio', { exact: true })).toBeVisible();
+        await expect(page.getByLabel('Ricevuta import')).toContainText('1 codice applicato: 1 nuovo, 0 aggiornati.');
         assert.equal(commits, 1);
         await upload.setInputFiles(inventedFile(['ZZ_DUP', 'ZZ_DUP']));
         await expect(page.getByText('Import bloccato', { exact: true })).toBeVisible();
