@@ -1,7 +1,7 @@
 /* browser-only controller; no authority, automatic inference or storage. */
 import { PRODUCT_NAMESPACE, PRODUCT_OPERATION, PRODUCT_DATA_CLASS, ProductError,
     type ProductResponse, type ProductSnapshot, type ProductLoginChallenge, type ProductOperation, type ProductRequest } from './product-contract';
-import type { SynthesisRequest } from '../chatgpt-execution/execution-contract';
+import { isSupportedChatGptPlan, type SynthesisRequest } from '../chatgpt-execution/execution-contract';
 import { selectProductOption } from './product-dispatch-seam';
 export type ProductBrowserView = Readonly<{
     active: boolean; snapshot: ProductSnapshot | null; login: ProductLoginChallenge | null;
@@ -33,7 +33,7 @@ function parse(value: unknown, operation: ProductOperation): ProductResponse {
     const response = object(value), row = object(response.snapshot), disclosure = object(row.disclosure), qualification = object(row.qualification);
     if (row.schema !== 'mediflow.chatgpt-product.v1' || !states.includes(String(row.state)) || row.clinicalAdmission !== 'held'
         || row.accountControlAdmitsExecution !== false || row.manualGenerationOnly !== true || !uuid(row.contextRevision)
-        || !['none', 'dedicated_execution'].includes(String(row.authenticatedProcess)) || ![null, 'plus', 'pro'].includes(row.plan as null | string)
+        || !['none', 'dedicated_execution'].includes(String(row.authenticatedProcess)) || row.plan !== null && !isSupportedChatGptPlan(row.plan)
         || (row.notice !== null && !text(row.notice, 80)) || !text(qualification.platform, 80) || !text(qualification.revision, 256)
         || !Array.isArray(qualification.missing) || qualification.missing.length > 32 || qualification.missing.some(item => !text(item, 256))
         || !['qualified', 'unqualified', 'unsupported'].includes(String(qualification.state))

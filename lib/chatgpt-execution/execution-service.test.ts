@@ -309,11 +309,11 @@ test('account is re-read before generation and changed plan blocks the turn', as
     assert.equal(transport.calls.some(call => call.method === 'thread/start'), false);
 });
 
-test('pro account preserves ultra without remapping', async () => {
+for (const planType of ['pro', 'prolite']) test(`${planType} account preserves catalog effort without remapping`, async () => {
     const { service, transport } = setup();
-    transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType: 'pro', email: 'fixture-account@example.invalid' } } : undefined;
+    transport.override = method => method === 'account/read' ? { account: { type: 'chatgpt', planType, email: 'fixture-account@example.invalid' } } : undefined;
     const catalog = await service.readCatalog(); const choice = catalog.choices.find(choice => choice.effort === 'ultra')!;
-    transport.onTurn = () => { transport.final(); transport.complete(); };
+    transport.onTurn = () => { transport.listener('account/updated', { authMode: 'chatgpt', planType }); transport.final(); transport.complete(); };
     const result = await service.generate({ modelOptionId: choice.optionId, expectedCatalogRevision: catalog.revision });
     assert.equal(result.provenance.effort, 'ultra');
     assert.equal(transport.calls.find(call => call.method === 'turn/start')!.params.effort, 'ultra');
