@@ -1695,7 +1695,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         // rejects plaintext with 400) and the local store (sealOrPassthrough,
         // never double-encrypts) receive ENC: values.
         guard masterKey != nil else {
-            errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
+            errorMessage = "Cifratura non disponibile: accedi di nuovo prima di creare la cartella."
             return
         }
         let draft = patientCreateDraft

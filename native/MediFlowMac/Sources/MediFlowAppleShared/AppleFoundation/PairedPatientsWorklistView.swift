@@ -977,7 +977,7 @@ struct PairedPatientCreateView: View {
                     TextField("Caregiver (opzionale)", text: $model.newPatientCaregiver)
                         .accessibilityIdentifier("new-patient-caregiver")
                 }
-                Text("Crea in locale quando l'autorità on-device è attiva, oppure tramite l'home-base collegato se il permesso è concesso. Richiede il PIN operatore per cifrare i campi.")
+                Text("Crea la cartella nell’archivio attivo. I campi protetti vengono cifrati sul dispositivo.")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
