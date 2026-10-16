@@ -340,7 +340,7 @@
 
 .brand {
     color: var(--lume-ink);
-    font: 500 1.3125rem/1 var(--lume-font-voice);
+    font: var(--type-brand);
 }
 
 .brand b {
