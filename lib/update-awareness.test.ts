@@ -49,3 +49,27 @@ test('parseLatestChangelog extracts the first release section bullets', () => {
     assert.equal(result.title, '[Unreleased] - 2026-05-01');
     assert.deepEqual(result.notes, ['First change.', 'Second change.']);
 });
+
+test('parseLatestChangelog joins wrapped bullet lines', () => {
+    const result = parseLatestChangelog(`
+## [Non ancora rilasciato]
+
+### Avvio
+
+- Un solo lanciatore per macOS, Windows e Linux: \`MediFlow.command\`,
+  \`MediFlow.cmd\` e \`MediFlow.sh\`.
+- Seconda voce con **Aggiorna ora** ([#525](./pull/525)).
+
+  Paragrafo dopo una riga vuota.
+
+## [0.9.0] - 2026-10-15
+
+- Old change.
+`);
+
+    assert.equal(result.title, '[Non ancora rilasciato]');
+    assert.deepEqual(result.notes, [
+        'Un solo lanciatore per macOS, Windows e Linux: MediFlow.command, MediFlow.cmd e MediFlow.sh.',
+        'Seconda voce con Aggiorna ora (#525).',
+    ]);
+});

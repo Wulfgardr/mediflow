@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 2,
+  "synthetic": true,
+  "capture": "Runtime Web locale di produzione (build standalone) con dodici persone inventate e il catalogo AIFA pubblico importato. Viewport 1440x900 a densita 2x, compressione PNG con pngquant, nessun ritocco dei pixel. Le funzioni AI risultano spente: nessuna esecuzione AI e nessuna parita nativa sono implicate.",
+  "files": [
+    {
+      "file": "agenda-dark.png",
+      "sha256": "5311bfc056ebb57d203f697ec97288be4251e62f6ecfe00e7087d5e6a6cd8ae9",
+      "width": 2880,
+      "height": 1800,
+      "title": "Agenda",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "agenda-light.png",
+      "sha256": "1a0dc6e4d27059abae55e6166a14f9e37a805f82fae75e1c3a0518aea23c6854",
+      "width": 2880,
+      "height": 1800,
+      "title": "Agenda",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "analisi-dark.png",
+      "sha256": "3ae97aedeaa57e68d6f9d36f02949398adcf8b2ccb374d4bf465ca3d0b79bad1",
+      "width": 2880,
+      "height": 1800,
+      "title": "Analisi",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "analisi-light.png",
+      "sha256": "9dd39f40a8f68516450e6148394f6af12c433e69d1e948eed9a04bae7f67218a",
+      "width": 2880,
+      "height": 1800,
+      "title": "Analisi",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "diario-dark.png",
+      "sha256": "8189dd42c6e57fe82a2f6611b1a5c1e905425561b5d3dc7680cdcc3771d4a44b",
+      "width": 2880,
+      "height": 1800,
+      "title": "Diario",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "diario-light.png",
+      "sha256": "28cdf1de3cda11ac6baa6317b3fa9df95a46dcfe381fbbb0d49bb1bcc072f38b",
+      "width": 2880,
+      "height": 1800,
+      "title": "Diario",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "modelli-locali-dark.png",
+      "sha256": "d801960eedbd72940c6e4a8caed46bed5d16aa39e60b7cf0dafc9794dadd388b",
+      "width": 2880,
+      "height": 1800,
+      "title": "Modelli locali",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "modelli-locali-light.png",
+      "sha256": "a5a1c83e5232020aadd434b4b6d28371464c5c6492414456036a35430e869018",
+      "width": 2880,
+      "height": 1800,
+      "title": "Modelli locali",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "pazienti-dark.png",
+      "sha256": "d187b596a965376c767a6c7bbf2b8baac22638fa8c1688b09a900f35fc5d709b",
+      "width": 2880,
+      "height": 1800,
+      "title": "Elenco pazienti",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "pazienti-light.png",
+      "sha256": "18dc25f83ed4df2c70e8829e0ee8441ac2f427c352dfa10d8c442fdcac2f8a21",
+      "width": 2880,
+      "height": 1800,
+      "title": "Elenco pazienti",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "primo-avvio-light.png",
+      "sha256": "9862c12438a078ed2eb37cc83d962fdcb77769a33325531b90f32753139f3add",
+      "width": 2880,
+      "height": 1800,
+      "title": "Primo avvio",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "repertori-dark.png",
+      "sha256": "19dd78bb65e57efd55f10dc7d0261a290bd1ba185cb9f635d76e4bd202a270aa",
+      "width": 2880,
+      "height": 1800,
+      "title": "Repertori",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "repertori-light.png",
+      "sha256": "e1810f77b0697daa41121da9c0fcb9cd6620b8d0490c1f0552ba2fa42032e93f",
+      "width": 2880,
+      "height": 1800,
+      "title": "Repertori",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "scheda-dark.png",
+      "sha256": "437c10cf9c128b7e3bd5f1218f23b3c0b2190b496ca2656e153d2bcc4395da33",
+      "width": 2880,
+      "height": 1800,
+      "title": "Scheda paziente",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "scheda-light.png",
+      "sha256": "02d77a29a962a5e0ed86539fd1a09e274b1e0e66044790b7a164e959e79d53dd",
+      "width": 2880,
+      "height": 1800,
+      "title": "Scheda paziente",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "terapie-dark.png",
+      "sha256": "68217054d7761ad4c32fb02dd60e8c10b108632bf9524230c1af68122d1b9260",
+      "width": 2880,
+      "height": 1800,
+      "title": "Registro terapie",
+      "theme": "grafite",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    },
+    {
+      "file": "terapie-light.png",
+      "sha256": "dfc2b43df454f8ad28523ae156ab774ed0891a6f4f3b4c5338b88bc7cecec3ea",
+      "width": 2880,
+      "height": 1800,
+      "title": "Registro terapie",
+      "theme": "giorno",
+      "sourceCommit": "30f97b90bac304dd70ec31461be54bb1e9cb7ce1",
+      "capturedAt": "2026-10-16"
+    }
+  ]
+}

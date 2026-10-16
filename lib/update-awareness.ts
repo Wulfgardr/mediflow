@@ -35,13 +35,27 @@ export function parseLatestChangelog(markdown: string) {
     if (start === -1) return { title: null as string | null, notes: [] as string[] };
 
     const notes: string[] = [];
+    let open = false;
     for (const line of lines.slice(start + 1)) {
         if (/^##\s+\[/.test(line)) break;
         const bullet = line.match(/^-\s+(.+)/)?.[1]?.trim();
-        if (bullet) notes.push(bullet);
-        if (notes.length >= 6) break;
+        if (bullet) {
+            if (notes.length >= 6) break;
+            notes.push(bullet);
+            open = true;
+            continue;
+        }
+        // A wrapped bullet continues on indented lines until a blank line or heading.
+        const continuation = open ? line.match(/^\s+(\S.*)$/)?.[1]?.trim() : undefined;
+        if (continuation) notes[notes.length - 1] += ` ${continuation}`;
+        else open = false;
     }
-    return { title: lines[start].replace(/^##\s+/, '').trim(), notes };
+    // The settings panel shows plain text: keep link labels, drop Markdown marks.
+    const plain = (note: string) => note
+        .replace(/\(?\[([^\]]+)\]\([^)]*\)\)?/g, (match, label: string) => (match.startsWith('(') && match.endsWith(')') ? `(${label})` : label))
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1');
+    return { title: lines[start].replace(/^##\s+/, '').trim(), notes: notes.map(plain) };
 }
 
 function readPackageVersion(cwd: string) {
