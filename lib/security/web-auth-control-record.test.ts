@@ -87,7 +87,7 @@ const sourceSha256 = (source: string) => crypto.createHash('sha256').update(sour
 // so an unresolvable path cannot gain the exception merely by sharing a diagnostic form.
 const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
     ['app/api/patients/route.test.ts', {
-        sha256: '0e29a25c408bd01e3aab8ace078f4bc167fdcadbe6eafbe027e733912564c71f',
+        sha256: 'c4c148e444c0831f8107c7ee02dff91135279ef1c1423d5af1240b2efbf152c9',
         diagnostics: ['reserved-loader-identity:*', 'protected-loader-unsupported:*'],
     }],
     ['e2e/chatgpt-synthesis-product.spec.ts', {
@@ -99,11 +99,11 @@ const REVIEWED_UNRELATED_LOADER_DIAGNOSTICS = new Map([
         diagnostics: ['reserved-loader-identity:*'],
     }],
     ['lib/patient-create-service.test.ts', {
-        sha256: '850792b8632283c053ec2ced49dd060cbb437722f2f4210065a3d33f1f60e7c3',
+        sha256: '207c2ade7c1c1e4173f8b0e4d7ed3a7af1c5557feea470323c4531d2cc27e7ac',
         diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
     }],
     ['lib/security/patient-create-context.test.ts', {
-        sha256: '77c0483e9b2408fc7a1a204eaa07f65775a30d7465ca4ce51ef10bf5eef1b98a',
+        sha256: '17266c7b9208bb591d250dd57af215d64ebc050fb8e63b8abd3dc86a033aca5e',
         diagnostics: ['protected-loader-unsupported:*', 'unsupported-expression:*'],
     }],
     ['components/settings/settings-presentation.test-support.ts', {
