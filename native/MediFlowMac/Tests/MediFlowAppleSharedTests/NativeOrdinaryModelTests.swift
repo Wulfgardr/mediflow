@@ -19,6 +19,56 @@ final class NativeOrdinaryModelTests: XCTestCase {
     private func settle(_ model: NativeOrdinaryModel) async {
         for _ in 0..<200 where model.isWorking { await Task.yield() }
     }
+    func testNeverPreparedInvalidationKeepsInitialMessageWithoutServiceCalls() {
+        var calls = 0
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
+            prepare: { _, _ in calls += 1; throw NativeOrdinaryContractError.invalid },
+            command: { _, _ in calls += 1; throw NativeOrdinaryContractError.invalid },
+            status: { _ in calls += 1; throw NativeOrdinaryContractError.invalid }))
+        let initialMessage = model.message
+        model.invalidate()
+        model.invalidate()
+        XCTAssertEqual(model.message, initialMessage)
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertFalse(model.isWorking)
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testFirstPatientWorkspacePublicationsKeepInitialMessageWithoutPreparing() {
+        let suite = "NativeOrdinaryInitialStateTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let pairedStore = HomeBasePairedStore(userDefaults: defaults,
+            keychainReader: { _, _ in .success(nil) }, keychainWriter: { _, _, _ in .success(()) },
+            keychainDeleter: { _, _ in .success(()) })
+        let cacheStore = HomeBasePatientCacheStore(cacheDirectory: directory,
+            keyProvider: { throw NativeOrdinaryContractError.invalid })
+        let workspace = PairedPatientsWorkspaceModel(pairedStore: pairedStore, cacheStore: cacheStore,
+            dataSourceFactory: { _ in S6MockDataSource(details: [:]) })
+        var calls = 0
+        let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
+            prepare: { _, _ in calls += 1; throw NativeOrdinaryContractError.invalid },
+            command: { _, _ in calls += 1; throw NativeOrdinaryContractError.invalid },
+            status: { _ in calls += 1; throw NativeOrdinaryContractError.invalid }))
+        let initialMessage = model.message
+        model.observe(workspace)
+        let patient = HomeBasePatientDetail(id: "synthetic-patient", firstName: "Ada", lastName: "Sintetica",
+            birthDate: nil, taxCode: "RSSMRA80A01H501U", address: nil, phone: nil, caregiver: nil,
+            exemptions: nil, diagnoses: nil, monitoringProfile: nil, statusReason: nil, notes: nil,
+            aiSummary: nil, documentInsights: nil, isAdi: false, isArchived: false, version: 1,
+            ambulatoryId: "synthetic-ambulatory", createdAt: nil, updatedAt: nil)
+        workspace.ambulatoryId = "synthetic-ambulatory"
+        workspace.configurePairedOnlineForTests(selectedPatient: patient)
+        XCTAssertEqual(workspace.selectedPatientID, patient.id)
+        XCTAssertEqual(model.message, initialMessage)
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertNil(model.proposal)
+        XCTAssertFalse(model.isWorking)
+        XCTAssertEqual(calls, 0)
+    }
+
     func testExplicitConsentLoginCatalogChoiceGenerateAndNoAutoApply() async throws {
         var commands: [String] = []
         let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
@@ -36,6 +86,7 @@ final class NativeOrdinaryModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .completed); XCTAssertNotNil(model.proposal)
         XCTAssertEqual(commands, ["consent", "login/start", "login/complete", "models", "generate"])
         model.invalidate(); XCTAssertNil(model.proposal); XCTAssertEqual(model.phase, .idle)
+        XCTAssertEqual(model.message, "Il contesto è cambiato. Prepara una nuova proposta.")
     }
     func testEverySharedFunctionDiscardsConsentAndProposalWhenContextIsInvalidated() async throws {
         for function in NativeOrdinaryFunction.allCases {
@@ -104,6 +155,10 @@ final class NativeOrdinaryModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .idle)
         XCTAssertEqual(model.message, "Operazione non completata (HTTP 503): servizio non disponibile o risposta non verificata. Operazione chiusa; nessuna modifica alla cartella.")
         XCTAssertFalse(model.message.contains("untrusted host payload"))
+        let failureMessage = model.message
+        model.invalidate()
+        XCTAssertEqual(model.message, failureMessage)
+        XCTAssertEqual(model.phase, .idle)
     }
     func testPrepareUpstreamFailureUsesNeutralPreparationReasonAfterConfirmedCleanup() async throws {
         let model = NativeOrdinaryModel(function: .patientInsight, snapshot: { self.source() }, services: .init(
