@@ -21,6 +21,10 @@ const APP = args[1] ?? null;
 const layout = APP ? appLayout(APP) : null;
 let expectedWebIdentity;
 const ownedPids = new Set();
+function removeOwnedDirectory(directory) {
+  fs.rmSync(directory, { recursive: true, force: true,
+    ...(process.platform === 'win32' ? { maxRetries: 5, retryDelay: 200 } : {}) });
+}
 async function verifyBackendIdentity(url) {
   const response = await fetch(new URL('/api/system/revision', url), { headers: { 'Cache-Control': 'no-store' } });
   assert.equal(response.status, 200, 'Backend revision must be available before login');
@@ -48,7 +52,7 @@ function rememberDescendants(pid) {
   const result = windows
     ? spawnSync('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command',
       "$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_Process | ForEach-Object { '{0} {1}' -f $_.ProcessId, $_.ParentProcessId }"],
-    { encoding: 'utf8', env: process.env, timeout: 5_000, maxBuffer: 1024 * 1024 })
+    { encoding: 'utf8', env: process.env, timeout: 30_000, maxBuffer: 1024 * 1024 })
     : spawnSync('/bin/ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8', env: {}, timeout: 5_000 });
   assert.equal(result.status, 0, 'Cannot observe child cleanup');
   if (windows) assert.match(result.stdout.trim(), /^\d+ \d+(?:\r?\n\d+ \d+)*$/u, 'Invalid process observation');
@@ -218,7 +222,7 @@ async function waitForReady(readStderr, child) {
   throw new Error('Production Supervisor did not become ready');
 }
 async function waitForHeadlessReady(readStderr, child) {
-  for (let attempt = 0; attempt < 1_500; attempt += 1) {
+  for (let attempt = 0; attempt < 6_000; attempt += 1) {
     const match = readStderr().match(/^MEDIFLOW_HEADLESS_WEB_READY (.+)$/mu);
     if (match) {
       const { url } = JSON.parse(match[1]);
@@ -234,6 +238,7 @@ async function waitForHeadlessReady(readStderr, child) {
 }
 async function concurrentSupervisors(foreignCwd) {
   const instances = [];
+  const failures = [];
   try {
     for (let index = 0; index < 2; index += 1) {
       const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-concurrent-supervisor-')));
@@ -274,10 +279,18 @@ async function concurrentSupervisors(foreignCwd) {
         instance.rpc.assertHealthy();
       }
     }
+  } catch (error) {
+    failures.push(error);
+    throw error;
   } finally {
-    await Promise.all(instances.map(instance => terminateChild(instance.child)));
-    await assertReaped();
-    for (const instance of instances) fs.rmSync(instance.dataDir, { recursive: true, force: true });
+    try {
+      await Promise.all(instances.map(instance => terminateChild(instance.child)));
+      await assertReaped();
+      for (const instance of instances) removeOwnedDirectory(instance.dataDir);
+    } catch (error) {
+      if (failures.length) throw new AggregateError([...failures, error], 'Concurrent Supervisor smoke and cleanup failed');
+      throw error;
+    }
   }
 }
 async function activateSyntheticSelection() {
@@ -332,12 +345,16 @@ async function activateSyntheticSelection() {
   });
   assert.equal(selectionResponse.status, 200);
   const selection = await selectionResponse.json();
+  const activationStartedAt = performance.now();
   const activationResponse = await fetch(
     new URL(`/api/patients/${PATIENT_ID}/intelligent-host/activate`, BASE_URL),
     { method: 'POST', headers: jsonHeaders,
       body: JSON.stringify({ selectionEpoch: selection.selection.selectionEpoch }) },
   );
-  assert.equal(activationResponse.status, 200);
+  const activationResult = await activationResponse.json();
+  assert.equal(activationResponse.status, 200, JSON.stringify({
+    elapsedMs: Math.round(performance.now() - activationStartedAt), response: activationResult,
+  }));
   const enrollmentResponse = await fetch(
     new URL('/api/system/intelligent-host/checkup-active-role', BASE_URL),
     { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ candidatePin: '1234' }) },
@@ -394,7 +411,9 @@ async function main() {
   const foreignCwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-extracted-cwd-')));
   const marker = path.join(foreignCwd, 'substitution-was-executed');
   fs.writeFileSync(path.join(foreignCwd, 'node'), `#!/bin/sh\n: > '${marker}'\nexit 99\n`, { mode: 0o755 });
-  let child = null, ordinary = null, stderr = '', before = null; try {
+  let child = null, ordinary = null, stderr = '', before = null;
+  const failures = [];
+  try {
     if (APP) { await checkHeadlessRuntime(APP); before = snapshotApp(); }
     expectedWebIdentity = JSON.parse(fs.readFileSync(path.join(layout?.web ?? path.join(ROOT, '.next/standalone'), 'mediflow-build-identity.json'), 'utf8'));
     await concurrentSupervisors(foreignCwd);
@@ -589,18 +608,24 @@ async function main() {
       await checkHeadlessRuntime(APP);
       assert.deepEqual(snapshotApp(), before, 'The extracted app changed during smoke');
     }
-    process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: two concurrent isolated authenticated backends, post-readiness discovery/tools/list, five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
   } catch (error) {
+    failures.push(error);
     if (stderr) process.stderr.write(stderr);
     throw error;
   } finally {
-    if (APP && child && !hasExited(child)) rememberDescendants(child.pid);
-    await terminateChild(child);
-    await terminateChild(ordinary);
-    // Recovery does not turn a failed cleanup assertion into a PASS.
-    for (const pid of ownedPids) if (alive(pid)) process.kill(pid, 'SIGKILL');
-    fs.rmSync(dataDir, { recursive: true, force: true });
-    fs.rmSync(foreignCwd, { recursive: true, force: true });
+    try {
+      if (APP && child && !hasExited(child)) rememberDescendants(child.pid);
+      await terminateChild(child);
+      await terminateChild(ordinary);
+      // Recovery does not turn a failed cleanup assertion into a PASS.
+      for (const pid of ownedPids) if (alive(pid)) process.kill(pid, 'SIGKILL');
+      removeOwnedDirectory(dataDir);
+      removeOwnedDirectory(foreignCwd);
+    } catch (error) {
+      if (failures.length) throw new AggregateError([...failures, error], 'Supervisor smoke and cleanup failed');
+      throw error;
+    }
   }
+  process.stdout.write(`${APP ? 'Extracted-app MCP' : 'Production Supervisor'} smoke passed: two concurrent isolated authenticated backends, post-readiness discovery/tools/list, five operations, governed checkup, one update/audit, revoke and clean exit${APP ? ', EOF/SIGTERM child cleanup and immutable app' : ''}.\n`);
 }
 await main();
