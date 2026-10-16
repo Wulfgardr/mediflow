@@ -56,7 +56,7 @@ switch (command) {
       save();
     } else if (args.join(' ') !== 'run check:standalone-runtime-bundle') throw new Error('Unexpected npm invocation');
     break;
-  case 'generate': case 'record-stager': break;
+  case 'generate': case 'structure-guard': case 'entitlement-guard': case 'record-stager': break;
   case 'scheduled-backup-order-only':
     if (args.length !== 2 || args[0] !== '--runtime-root'
       || target !== path.join(root, 'derived/Build/Products', process.env.MEDIFLOW_MAC_CONFIG, 'MediFlow.app/Contents/Resources/WebRuntime')
@@ -75,7 +75,7 @@ switch (command) {
     console.log('SYNTHETIC Xcode stub, no compilation'); break;
   }
   case 'lipo':
-    if (args[1] !== '-verify_arch' || path.basename(args[0]) !== 'mediflow-chatgpt-codex' || process.env.MEDIFLOW_PACKAGING_TEST_BAD_ARCH === '1') process.exit(88);
+    if (args[1] !== '-verify_arch' || !['mediflow-chatgpt-codex', 'MediFlow'].includes(path.basename(args[0])) || process.env.MEDIFLOW_PACKAGING_TEST_BAD_ARCH === '1') process.exit(88);
     break;
   case 'file': {
     const s = fs.statSync(target);
@@ -117,7 +117,7 @@ switch (command) {
 
 function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
-  for (const file of ['package.json', 'scripts/build-apple-macos-app.sh', 'scripts/check-macos-web-runtime-native-payload.sh',
+  for (const file of ['package.json', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
     'scripts/native-first-install.mjs', 'scripts/native-first-install-contract.json', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
@@ -131,8 +131,24 @@ function buildFixture(t) {
   write(path.join(root, 'scripts/local-api-tls-proxy.mjs'), '// synthetic proxy, never run\n');
   const driverPath = write(path.join(root, 'tool-driver.mjs'), driver);
   write(path.join(root, 'scripts/generate-apple-xcodeproj.sh'), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" generate "$@"\n`, 0o755);
+  for (const [file, command] of [['check-apple-structure.sh', 'structure-guard'], ['check-apple-network-entitlements.sh', 'entitlement-guard']]) {
+    write(path.join(root, 'scripts', file), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" ${command} "$@"\n`, 0o755);
+  }
   const bin = path.join(root, 'test-bin');
   installPlistTestTools(bin);
+  write(path.join(bin, 'ditto'), `#!/usr/bin/env python3
+import pathlib, sys, zipfile
+source, destination = pathlib.Path(sys.argv[-2]), pathlib.Path(sys.argv[-1])
+if '-c' in sys.argv:
+    with zipfile.ZipFile(destination, 'w') as archive:
+        for item in source.rglob('*'):
+            archive.write(item, item.relative_to(source.parent))
+else:
+    with zipfile.ZipFile(source) as archive:
+        archive.extractall(destination)
+        for entry in archive.infolist():
+            (destination / entry.filename).chmod((entry.external_attr >> 16) & 0o777)
+`, 0o755);
   for (const command of ['npm', 'xcodebuild', 'codesign', 'otool', 'install_name_tool', 'file', 'lipo']) {
     write(path.join(bin, command), `#!/bin/bash\nexec "${process.execPath}" "${driverPath}" ${command} "$@"\n`, 0o755);
   }
@@ -159,6 +175,7 @@ exec "${process.execPath}" "$@"
     MEDIFLOW_CHATGPT_EXECUTION_BINARY: input.binary, MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE: input.nativeSource,
     MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY: input.schemaDirectory, MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT: input.c1Receipt };
   delete env.MEDIFLOW_MAC_QA_NAMESPACE; // ordinary tests never inherit a QA build selection.
+  delete env.MEDIFLOW_MAC_PREBUILT_ARCHIVE;
   write(path.join(root, '.gitignore'), '.next/\nderived/\nevents.jsonl\ntool-state.json\n');
   const gitInit = spawnSync('git', ['init', '--initial-branch=main'], { cwd: root, encoding: 'utf8' });
   assert.equal(gitInit.status, 0, gitInit.stderr);
@@ -187,6 +204,62 @@ exec "${process.execPath}" "$@"
 }
 const pass = result => assert.equal(result.status, 0, `${result.error ?? ''}\n${result.stdout}\n${result.stderr}`);
 const deny = result => assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
+
+function prebuiltArtifact(input, overrides = {}) {
+  const raw = path.join(input.directory, 'raw/MediFlow.app');
+  write(path.join(raw, 'Contents/Info.plist'), '<?xml version="1.0"?><plist><dict><key>CFBundlePackageType</key><string>APPL</string><key>CFBundleExecutable</key><string>MediFlow</string><key>CFBundleIdentifier</key><string>com.mediflow.mobile</string></dict></plist>\n');
+  write(path.join(raw, 'Contents/MacOS/MediFlow'), Buffer.concat([Buffer.from([0xcf, 0xfa, 0xed, 0xfe]), Buffer.from('synthetic native executable, never run')]), 0o755);
+  const archive = path.join(input.directory, 'native.zip');
+  const revision = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: input.root, encoding: 'utf8' }).stdout.trim();
+  const result = spawnSync('python3', [path.join(input.root, 'scripts/macos-native-artifact.py'), 'export', '--app', raw,
+    '--output', archive, '--revision', overrides.revision ?? revision, '--configuration', 'Debug',
+    '--architecture', process.arch === 'arm64' ? 'arm64' : 'x86_64'], { encoding: 'utf8', env: input.env });
+  pass(result);
+  fs.rmSync(path.join(input.root, 'events.jsonl'), { force: true });
+  return archive;
+}
+
+test('prebuilt native import skips Xcode and retains guards, helper pins, Headless staging and outer sealing', t => {
+  const input = buildFixture(t), archive = prebuiltArtifact(input);
+  const result = input.run({ MEDIFLOW_MAC_PREBUILT_ARCHIVE: archive, MEDIFLOW_CODESIGN_IDENTITY: '-', DEVELOPER_DIR: '' });
+  pass(result);
+  assert.match(result.stdout, /Imported raw native app/);
+  assert.match(result.stdout, /Runnable macOS app candidate/);
+  const events = input.events();
+  assert.equal(events.some(e => ['generate', 'xcodebuild'].includes(e.command)), false);
+  assert.deepEqual(events.filter(e => e.command.endsWith('-guard')).map(e => e.command), ['structure-guard', 'entitlement-guard']);
+  assert.deepEqual(fs.readFileSync(path.join(input.app, 'Contents/Helpers/mediflow-chatgpt-codex')), syntheticFiles.codex);
+  assert.ok(events.some(e => e.command === 'lipo' && e.args[0] === path.join(input.app, 'Contents/Helpers/mediflow-chatgpt-codex')));
+  const seal = events.findIndex(e => e.command === 'codesign' && e.args[0] === '--force' && e.args.at(-1) === input.app);
+  assert.ok(events.findIndex(e => e.command === 'headless-order-only' && e.args[0] === '--stage') < seal);
+  assert.ok(events.findIndex(e => e.command === 'headless-order-only' && e.args[0] === '--check') > seal);
+  assert.ok(events.slice(seal + 1).some(e => e.command === 'codesign' && e.args[0] === '--verify' && e.args.at(-1).endsWith('/mediflow-chatgpt-codex')));
+});
+
+test('stale prebuilt artifact fails before Web build, app publication or Xcode', t => {
+  const input = buildFixture(t), archive = prebuiltArtifact(input, { revision: 'a'.repeat(40) });
+  const result = input.run({ MEDIFLOW_MAC_PREBUILT_ARCHIVE: archive, MEDIFLOW_SKIP_WEB_BUILD: '0' });
+  deny(result);
+  assert.match(result.stderr, /receipt does not match/);
+  assert.equal(input.events().some(e => ['npm', 'generate', 'xcodebuild', 'record-stager'].includes(e.command)), false);
+  assert.equal(fs.existsSync(input.app), false);
+});
+
+test('prebuilt import requires a clean checkout and fresh output', t => {
+  const input = buildFixture(t), archive = prebuiltArtifact(input);
+  fs.appendFileSync(path.join(input.root, 'package.json'), '\n');
+  const dirty = input.run({ MEDIFLOW_MAC_PREBUILT_ARCHIVE: archive });
+  deny(dirty);
+  assert.match(dirty.stderr, /clean checkout/);
+  assert.equal(input.events().length, 0);
+  assert.equal(fs.existsSync(input.app), false);
+  fs.writeFileSync(path.join(input.root, 'package.json'), fs.readFileSync(path.join(input.root, 'package.json'), 'utf8').slice(0, -1));
+  appRoot(path.dirname(input.app));
+  const before = snapshot(input.app), existing = input.run({ MEDIFLOW_MAC_PREBUILT_ARCHIVE: archive });
+  deny(existing);
+  assert.match(existing.stderr, /fresh MediFlow.app destination/);
+  assert.deepEqual(snapshot(input.app), before);
+});
 
 for (const identity of ['', '-', 'Synthetic Developer ID']) {
   test(`mocked build/signing pipeline (${identity || 'unsigned outer app'}) preserves pins and all six dependency targets`, t => {
