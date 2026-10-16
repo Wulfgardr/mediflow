@@ -30,8 +30,10 @@ test('actual route + guide: abort preserves the catalog, explicit retry succeeds
     let guide: ReturnType<typeof createAifaUpdateGuide> | undefined;
     try {
         t.mock.method(auth, 'requireSession', async () => current);
-        const oldCsv = 'CODICE_AIC;DENOMINAZIONE\n000000601;CONFEZIONE PRECEDENTE INVENTATA';
-        const nextCsv = 'CODICE_AIC;DENOMINAZIONE\n000000602;CONFEZIONE NUOVA INVENTATA';
+        const { settings } = await import('./schema.ts');
+        dbServer.insert(settings).values({ key: 'aifaNetworkAccess', value: 'enabled' }).run();
+        const oldCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000601;CONFEZIONE PRECEDENTE INVENTATA;A01AA01;Principio inventato';
+        const nextCsv = 'CODICE_AIC;DENOMINAZIONE;CODICE_ATC;PA_ASSOCIATI\n000000602;CONFEZIONE NUOVA INVENTATA;A01AA01;Principio inventato';
         await catalog.replaceAifaCatalog(new File([oldCsv], 'synthetic-old.csv'), {
             sourceUrl: 'https://www.aifa.gov.it/open-data', downloadedAt: '2026-09-01', version: 'synthetic-old',
         });

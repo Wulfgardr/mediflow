@@ -52,7 +52,28 @@ La lunghezza dei socket PM2 resta un limite del servizio MLX al suo utilizzo:
 un percorso dati lungo può richiedere un percorso locale più corto per MLX.
 Questo limite non deve impedire la build né l'uso senza quel servizio opzionale.
 I test dei percorsi di configurazione non attestano da soli il doppio clic
-reale, le ACL Windows o l'avvio su Linux.
+reale o l'avvio su Linux. Su Windows la configurazione eredita la ACL del
+profilo utente.
+
+## AIFA: controllo remoto nel sorgente successivo alla 0.9.0
+
+Il controllo dei metadati AIFA richiede il consenso Internet dedicato e
+l'apertura di Repertori o delle relative impostazioni. Non è un servizio
+continuo: senza aperture non controlla; un errore o un arresto durante HEAD
+può rinviare il tentativo successivo fino a 24 ore. ETag e Last-Modified sono
+dichiarazioni del server, non prove di autenticità. Senza validatori locali
+non si può attestare l'assenza di variazioni. L'applicazione è sempre esplicita.
+Le prove sintetiche non attestano l'acquisizione dell'intero feed live.
+
+Il feed confezioni_fornitura ha copertura parziale: non vengono conservati
+FORNITURA e STATO_AMMINISTRATIVO; fascia e prezzo sono assenti dalla fonte
+corrente. Il catalogo non certifica disponibilità, rimborsabilità o appropriatezza.
+La conferma di una riduzione sotto il 90% richiede un nuovo download e vale
+solo per lo stesso file e lo stesso catalogo locale. L'audit transazionale
+copre le sostituzioni AIFA, non la pulizia o il caricamento legacy. Questi
+ultimi condividono comunque l'esclusione con verifica e importazioni AIFA;
+il conflitto restituisce 409. L'esclusione è per processo, non tra più processi;
+il download remoto conserva anche il controllo dello snapshot in transazione.
 
 ## VoiceOver su iPhone e iPad
 

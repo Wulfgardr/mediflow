@@ -7,15 +7,18 @@ export type OllamaLocalityFailure =
     | 'model_not_local'
     | 'model_pull_disabled'
     | 'provider_unready'
+    | 'provider_version_unsupported'
     | 'response_not_local';
 
 export const OLLAMA_LOCAL_KEEP_ALIVE = '30m';
 export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
-// @Codex 0.8.6: retain the qualified 0.32 line and the observed 0.33.3/0.34.2 releases.
-const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2)$/;
+// @Codex 0.9.0: retain the qualified 0.32 line and the observed 0.33.3/0.34.2/0.40.4 releases.
+const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4)$/;
+export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4';
+export type OllamaVersionMismatch = Readonly<{ serverVersion: string; supportedVersions: string }>;
 
 export class OllamaLocalityError extends Error {
-    constructor(public readonly code: OllamaLocalityFailure) {
+    constructor(public readonly code: OllamaLocalityFailure, public readonly versionMismatch?: OllamaVersionMismatch) {
         super(`Ollama locality check failed: ${code}`);
         this.name = 'OllamaLocalityError';
     }
@@ -117,7 +120,11 @@ export function isLocalOllamaModelDescriptor(value: unknown): boolean {
 async function fetchJson(url: string, init?: RequestInit): Promise<Record<string, unknown>> {
     const response = await fetch(url, { ...init, redirect: 'error' });
     if (!response.ok) throw new OllamaLocalityError('provider_unready');
-    return response.json() as Promise<Record<string, unknown>>;
+    try {
+        const data: unknown = await response.json();
+        if (!data || typeof data !== 'object' || Array.isArray(data)) throw new OllamaLocalityError('provider_unready');
+        return data as Record<string, unknown>;
+    } catch { throw new OllamaLocalityError('provider_unready'); }
 }
 
 export async function attestLocalOllamaModel(
@@ -129,8 +136,11 @@ export async function attestLocalOllamaModel(
     const baseUrl = strictOllamaLoopbackBaseUrl(rawBaseUrl);
     const versionData = await fetchJson(`${baseUrl}/api/version`, { signal });
     const serverVersion = typeof versionData.version === 'string' ? versionData.version : '';
+    if (!serverVersion) throw new OllamaLocalityError('provider_unready');
     if (!SUPPORTED_OLLAMA_LOCALITY_VERSION.test(serverVersion)) {
-        throw new OllamaLocalityError('provider_unready');
+        throw new OllamaLocalityError('provider_version_unsupported', {
+            serverVersion: serverVersion.slice(0, 64), supportedVersions: SUPPORTED_OLLAMA_LOCALITY_VERSIONS,
+        });
     }
 
     const tagsData = await fetchJson(`${baseUrl}/api/tags`, { signal });
