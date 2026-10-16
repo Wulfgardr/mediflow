@@ -41,7 +41,7 @@ test('keeps the preview ephemeral, supersession-safe, and review-only', () => {
     assert.match(source, /publication\.capturedAt/u);
     assert.match(source, /publication\.attestation\.provider/u);
     assert.match(source, /ATHENA MLX/u);
-    assert.match(source, /review-only/u);
+    assert.match(source, /solo revisione/u);
     assert.doesNotMatch(source, /\.message\b|\bfetch\(|setInterval|setTimeout|localStorage|sessionStorage|\bapply\b|\bsave\b|\brefresh\w*\b/u);
 });
 
