@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "passphrase": "Synthetic ｃａｆｅ́ secret phrase",
+  "salt": "AAECAwQFBgcICQoLDA0ODw==",
+  "verifier": "Y7whYxCqZXk+Xem3jee0TMbGifHkQCpSvxat8FsPcXg=",
+  "rawMasterKeyHex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+  "wrappedMasterKey": "v3:CgsMDQ4PEBESExQVE4GvFowSjBnlDe+u5wWyu8VcVO8hfnyeeE+IDPfm5C9y+zlspSN79lI0zjVvh3J5"
+}

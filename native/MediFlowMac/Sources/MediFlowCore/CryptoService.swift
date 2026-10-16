@@ -1,9 +1,10 @@
 // Zero-knowledge field crypto for the paired Apple client, byte-compatible with
 // the web (lib/security.ts). The home-base stores ENC:base64(iv):base64(ct‖tag)
 // ciphertext; the server never holds the key. The operator PIN derives a KEK
-// (PBKDF2-HMAC-SHA256; v1=100k legacy, v2=600k for new wraps) that unwraps the
+// (PBKDF2-HMAC-SHA256; v1=100k legacy, v2=600k for PIN wraps) that unwraps the
 // AES-256-GCM master key, which then decrypts/encrypts clinical fields. Verified
-// against web-produced test vectors.
+// against web-produced test vectors. v3 uses a NFKC passphrase, PBKDF2 at 2m
+// and domain-separated HKDF keys for wrapping and the access verifier (ADR 0143).
 //
 // Plaintext convention (matches encryptData/decryptData): the value is
 // JSON.stringify-d before encryption. So a string field decrypts to a quoted
@@ -14,6 +15,9 @@ import Foundation
 // are the same types the rest of the Apple code uses; on Linux/Windows the same
 // API is BoringSSL-backed. The golden-vector gate proves byte-compatibility.
 import Crypto
+#if canImport(CommonCrypto)
+import CommonCrypto
+#endif
 
 public enum CryptoService {
     public static let encPrefix = "ENC:"
@@ -27,6 +31,31 @@ public enum CryptoService {
         2: 600_000,
     ]
     public static let currentKdfVersion = 2
+    public static let unlockKdfVersion = 3
+    public static let unlockKdfIterations = 2_000_000
+
+    public struct UnlockMaterial: Sendable {
+        public let kek: SymmetricKey
+        public let verifier: String
+    }
+
+    public static func normalizedPassphrase(_ value: String) -> String? {
+        let normalized = value.precomposedStringWithCompatibilityMapping
+        guard (15...128).contains(normalized.unicodeScalars.count) else { return nil }
+        return normalized
+    }
+
+    public static func deriveUnlockMaterial(passphrase: String, salt: Data) -> UnlockMaterial? {
+        guard let normalized = normalizedPassphrase(passphrase), salt.count >= 16 else { return nil }
+        let stretched = pbkdf2SHA256(password: Data(normalized.utf8), salt: salt,
+                                    iterations: unlockKdfIterations, keyLength: 32)
+        let root = SymmetricKey(data: stretched)
+        let kek = HKDF<SHA256>.deriveKey(inputKeyMaterial: root, salt: Data(),
+                                        info: Data("mediflow.unlock.kek.v3".utf8), outputByteCount: 32)
+        let verifier = HKDF<SHA256>.deriveKey(inputKeyMaterial: root, salt: Data(),
+                                             info: Data("mediflow.unlock.verifier.v3".utf8), outputByteCount: 32)
+        return UnlockMaterial(kek: kek, verifier: verifier.withUnsafeBytes { Data($0).base64EncodedString() })
+    }
 
     // MARK: AES-GCM field crypto
 
@@ -166,6 +195,10 @@ public enum CryptoService {
     /// returns the master key. Master key is identical across versions.
     public static func unwrapMasterKeyVersioned(blob: String, pin: String, salt: Data) -> SymmetricKey? {
         let parsed = parseWrappedMasterKey(blob)
+        if parsed.version == unlockKdfVersion {
+            guard let material = deriveUnlockMaterial(passphrase: pin, salt: salt) else { return nil }
+            return unwrapMasterKey(wrappedBase64: parsed.base64, kek: material.kek)
+        }
         guard let iterations = kdfIterations[parsed.version] else { return nil }
         let kek = deriveKEK(pin: pin, salt: salt, iterations: iterations)
         return unwrapMasterKey(wrappedBase64: parsed.base64, kek: kek)
@@ -212,12 +245,28 @@ public enum CryptoService {
         }
     }
 
-    // MARK: PBKDF2 (HMAC-SHA256), pure CryptoKit
+    // MARK: PBKDF2 (HMAC-SHA256)
 
     /// For a 32-byte output with SHA-256, PBKDF2 needs a single block T1 = XOR of
-    /// `iterations` HMAC chains. Implemented with CryptoKit HMAC (no CommonCrypto).
+    /// `iterations` HMAC chains. Apple uses CommonCrypto; the portable path uses Crypto HMAC.
     static func pbkdf2SHA256(password: Data, salt: Data, iterations: Int, keyLength: Int) -> Data {
         precondition(keyLength <= 32, "this PBKDF2 helper emits a single SHA-256 block")
+        #if canImport(CommonCrypto)
+        var output = Data(count: keyLength)
+        let status = output.withUnsafeMutableBytes { destination in
+            password.withUnsafeBytes { passwordBytes in
+                salt.withUnsafeBytes { saltBytes in
+                    CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2),
+                        passwordBytes.bindMemory(to: Int8.self).baseAddress, password.count,
+                        saltBytes.bindMemory(to: UInt8.self).baseAddress, salt.count,
+                        CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256), UInt32(iterations),
+                        destination.bindMemory(to: UInt8.self).baseAddress, keyLength)
+                }
+            }
+        }
+        precondition(status == kCCSuccess, "PBKDF2 failed")
+        return output
+        #else
         let key = SymmetricKey(data: password)
         var block = salt
         block.append(contentsOf: [0, 0, 0, 1])  // INT_32_BE(1)
@@ -228,5 +277,6 @@ public enum CryptoService {
             for i in 0..<result.count { result[i] ^= u[i] }
         }
         return result.prefix(keyLength)
+        #endif
     }
 }

@@ -10,8 +10,7 @@ export async function POST(request: Request) {
         if (!admission) return nativeLoginDeniedResponse();
         const body = await readNativeNetworkJson(request, NATIVE_BOOTSTRAP_JSON_MAX_BYTES) as Record<string, unknown> | null;
         const username = typeof body?.username === 'string' ? body.username.trim() : '';
-        const password = typeof body?.password === 'string' ? body.password : '';
-        return nativeLoginHttp(request, admission, { username, password });
+        return nativeLoginHttp(request, admission, { ...body, username });
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;

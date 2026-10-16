@@ -19,7 +19,7 @@ struct PairedHomeBaseCredentialsView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Collegamento MediFlow")
                 .font(.headline)
-            Text("Configura il collegamento al computer MediFlow e accedi con il PIN operatore.")
+            Text("Configura il collegamento al computer MediFlow e accedi con la passphrase o il PIN precedente.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Label(model.connectionState.title, systemImage: model.connectionState.symbolName)
@@ -46,7 +46,7 @@ struct PairedHomeBaseCredentialsView: View {
                 .accessibilityIdentifier("homebase-paired-client-token-field")
             TextField("Username (opzionale se utente unico)", text: $model.username)
                 .accessibilityIdentifier("homebase-username-field")
-            SecureField("PIN operatore", text: $model.password)
+            SecureField("Passphrase o PIN precedente", text: $model.password)
                 .accessibilityIdentifier("homebase-password-field")
             TextField("Ambulatorio attivo (opzionale)", text: $model.ambulatoryId)
                 .accessibilityIdentifier("homebase-ambulatory-field")
@@ -87,7 +87,7 @@ struct PairedHomeBaseCredentialsView: View {
                 .disabled(model.isWorking)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text("PIN operatore e sessione restano locali e vengono richiesti a ogni riapertura.")
+            Text("Credenziale e sessione non vengono salvate e sono richieste a ogni riapertura.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if let message = model.discoveryMessage {
@@ -997,11 +997,16 @@ struct PairedPatientCreateView: View {
                     TextField("Caregiver (opzionale)", text: $model.newPatientCaregiver)
                         .accessibilityIdentifier("new-patient-caregiver")
                 }
-                Text("Crea in locale quando l'autorità on-device è attiva, oppure tramite l'home-base collegato se il permesso è concesso. Richiede il PIN operatore per cifrare i campi.")
+                Text("Crea la cartella nell’archivio attivo. I campi protetti vengono cifrati sul dispositivo.")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.secondary)
+                if let error = model.errorMessage {
+                    Text(error)
+                        .foregroundStyle(LumePalette.critical)
+                        .accessibilityIdentifier("new-patient-error")
+                }
             }
             #if os(macOS)
             .formStyle(.grouped)
