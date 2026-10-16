@@ -148,7 +148,7 @@
   margin: 2px 0 0;
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 0;
   line-height: 1.2;
   letter-spacing: 0;
   font: var(--type-page-title);
