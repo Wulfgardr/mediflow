@@ -22,6 +22,40 @@ const binding = Object.freeze({ clientId: 'client.synthetic.a', clientPlatform: 
 const request = (headers: HeadersInit = {}) => new Request('http://127.0.0.1/api/auth/native/login', { method: 'POST', headers });
 const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { promise, resolve }; };
 
+test('native v3 sends only the verifier to the canonical unlock check, without accepting mixed credentials', async () => {
+    const verifier = Buffer.alloc(32, 7).toString('base64');
+    const state = fixture({ verify: async input => {
+        assert.deepEqual(input, { username: user.username, verifier });
+        return { kind: 'verified', account: user };
+    } });
+    const response = await state.handler(request(), state.admission, { username: user.username, verifier });
+    assert.equal(response.status, 200);
+    assert.equal(typeof (await response.json()).archiveGeneration, 'string');
+    for (const input of [{ username: user.username, verifier, password: pin }, { username: user.username, verifier, pin },
+        { username: user.username, verifier, kdfVersion: 3 }]) {
+        const denied = fixture();
+        assert.equal((await denied.handler(request(), denied.admission, input)).status, 401);
+        assert.equal(denied.calls().verificationCalls, 0);
+        assert.equal(denied.admissions.size, 0);
+    }
+});
+
+test('pending v3 verification cannot publish a session after pairing, credential or administrative retirement', async () => {
+    for (const reason of ['pairing', 'credential', 'reset']) {
+        const paused = deferred<{ kind: 'verified'; account: typeof user }>();
+        const state = fixture({ verify: () => paused.promise });
+        const pending = state.handler(request(), state.admission, { username: user.username, verifier: Buffer.alloc(32, 7).toString('base64') });
+        if (reason === 'pairing') state.admissions.delete(state.admission);
+        else if (reason === 'credential') commitNativeLegacyUserRetirement(prepareNativeLegacyUserRetirement(user.id)!);
+        else commitNativeSystemAdminReset(prepareNativeSystemAdminReset()!);
+        paused.resolve({ kind: 'verified', account: user });
+        const response = await pending;
+        assert.equal(response.status, 401, reason);
+        assert.equal(response.headers.get('set-cookie'), null);
+        assert.equal(state.calls().auditCalls, 0);
+    }
+});
+
 function fixture(overrides: Partial<Parameters<typeof createNativeLoginHttpHandler>[0]> = {}) {
     const admissions = new Map<object, typeof binding>(); let verificationCalls = 0; let auditCalls = 0;
     const admission = Object.freeze(Object.create(null)); admissions.set(admission, binding);

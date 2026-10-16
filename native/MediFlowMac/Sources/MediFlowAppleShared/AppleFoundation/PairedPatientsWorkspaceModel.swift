@@ -731,8 +731,8 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
 
     func login() async {
-        guard !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Inserisci il PIN operatore."
+        guard !password.isEmpty else {
+            errorMessage = "Inserisci la passphrase o il PIN precedente."
             return
         }
         guard let credentials = pairedCredentials else {
@@ -749,7 +749,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 password: password,
                 credentials: credentials
             )
-            guard self.loginGeneration == generation else { return }
+            guard self.loginGeneration == generation else {
+                _ = try? await client.logout(credentials: credentials, sessionCookie: result.sessionCookie)
+                return
+            }
             self.sessionCookie = result.sessionCookie
             self.operatorIdentity = result.id.map {
                 OperatorIdentity(
@@ -759,6 +762,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
                 )
             }
             self.unlockFieldCrypto(with: result, pin: password)
+            if result.masterKey != nil { self.password = "" }
             self.resetCatalogAvailability()
             self.statusMessage = self.masterKey == nil
                 ? "Sessione operatore attiva. Cifratura campi non disponibile."
@@ -931,6 +935,10 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     /// Derive the field-crypto master key from the operator PIN + the wrapped key
     /// material returned by login (same as the web client). Kept only in memory.
     private func unlockFieldCrypto(with result: HomeBaseLoginResult, pin: String) {
+        if let key = result.masterKey {
+            masterKey = key
+            return
+        }
         guard let wrapped = result.encryptedMasterKey,
               let saltB64 = result.salt,
               let salt = Data(base64Encoded: saltB64) else {
@@ -1709,6 +1717,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
 
     func startCreatingPatient() {
         patientCreateGeneration = UUID()
+        errorMessage = nil
         newPatientFirstName = ""
         newPatientLastName = ""
         newPatientTaxCode = ""
@@ -1737,7 +1746,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         // rejects plaintext with 400) and the local store (sealOrPassthrough,
         // never double-encrypts) receive ENC: values.
         guard masterKey != nil else {
-            errorMessage = "Cifratura non disponibile: riaccedi con il PIN operatore prima di creare."
+            errorMessage = "Cifratura non disponibile: accedi di nuovo prima di creare la cartella."
             return
         }
         let draft = patientCreateDraft
