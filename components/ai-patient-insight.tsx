@@ -120,7 +120,7 @@ export default function AIPatientInsight({ patient, stale = false }: AIPatientIn
             const result = root.preview;
             if (result.status !== 'available') { setError(safeError(result)); return; }
             if (result.writesPerformed !== 0 || result.apply !== 'denied' || result.proposal.reviewOnly !== true) {
-                setError('La proposta non rispetta il contratto review-only.'); return;
+                setError('La proposta non rispetta il formato di sola revisione.'); return;
             }
             setPreview({ patientKey, value: result });
         } catch {

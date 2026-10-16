@@ -275,7 +275,7 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   const panel = page.getByTestId('treatment-reasoning-panel');
   const generate = panel.getByRole('button', { name: 'Genera bozza' });
   await expect(panel).toBeVisible();
-  await expect(panel).toContainText('review-only');
+  await expect(panel).toContainText('solo revisione');
   await expect(panel).toContainText('Non modifica la scheda e richiede sempre revisione clinica.');
   await expect(generate).toBeEnabled();
   expect(calls).toEqual([]);

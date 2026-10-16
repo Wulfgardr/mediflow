@@ -649,7 +649,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                             <td className="lume-registro">{t.dosage}</td>
                             <td className={`${styles.secondaryColumn} ${styles.muted}`}>{group.status === 'completed' ? <>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</> : t.startDate ? <>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</> : '—'}</td>
                             <td className={`${styles.secondaryColumn} lume-code`}>{t.atc && <div>ATC {t.atc}</div>}{t.aic && <div>AIC {t.aic}</div>}{!t.atc && !t.aic && '—'}</td>
-                            <td><div className={styles.controls}>
+                            <td><div className={`${styles.controls} ${styles.rowControls}`}>
                                 {group.status === 'active' ? <>
                                     <button disabled={!!deleteRecovery} onClick={() => startEditing(t)} title="Modifica terapia"><Pencil size={14} aria-hidden />Modifica</button>
                                     <button disabled={!!deleteRecovery} onClick={() => updateStatus(t.id, 'suspended')} title="Sospendi temporaneamente"><Clock size={14} aria-hidden />Sospendi</button>
