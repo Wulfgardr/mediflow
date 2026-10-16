@@ -194,7 +194,7 @@ export function createPortableSupervisorProductionV1(
   agentKind: 'mcp' | 'mini' = 'mcp',
   // Trusted composition seam for synthetic cross-process tests, never exposed through CLI or IPC.
   childOptions: Pick<PortableSupervisorChildProcessesOptionsV1,
-    'spawnChild' | 'webDirectory' | 'webTargetPath'> = {},
+    'spawnChild' | 'webDirectory' | 'webTargetPath' | 'webBuildIdentity'> = {},
 ): PortableSupervisorProductionRuntimeV1 {
   if (agentKind !== 'mcp' && agentKind !== 'mini') throw new Error('agent_kind_invalid');
   const athenaMlxGenerateBin = resolveAthenaMlxGenerateBin(process.env.MEDIFLOW_ATHENA_MLX_GENERATE_BIN);
