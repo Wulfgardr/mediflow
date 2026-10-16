@@ -269,9 +269,11 @@ osservati scarti fra processi anche di 5 ms. La scadenza autoritativa della chal
 il consumo monouso e la revoca restano verificati dal parent sul proprio orologio.
 Nessun margine temporale viene aggiunto alle scadenze.
 
-Questo protocollo e interno ai figli dell'esatto bundle verificato, avviati insieme
-dallo stesso Supervisor; non e l'API pubblica `/api/v1` ne un protocollo fra versioni
-installate separatamente. Il record chiuso `v1` evolve insieme a questi due peer:
+Questo protocollo è interno ai figli dell'esatto bundle verificato, avviati insieme
+dallo stesso Supervisor; non è l'API pubblica `/api/v1` né un protocollo fra versioni
+installate separatamente. `scripts/source-runtime.mjs` e
+`scripts/launch-bundled-headless-supervisor.mjs` verificano l'identità della build
+e il payload tramite il ledger prima dell'avvio. Il record chiuso `v1` evolve insieme a questi due peer:
 `preparedAt` mancante o campi extra vengono rifiutati, senza fallback ai vecchi ACK.
 
 Il payload `activate` contiene soltanto:
