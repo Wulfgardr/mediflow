@@ -195,7 +195,7 @@ export function TimelineEntryCard({
                             onDelete && (
                                 <button
                                     onClick={() => onDelete(entry)}
-                                    className="mf-btn-secondary !p-1.5 hover:!text-[color:var(--lume-signal-critical)]"
+                                    className="mf-btn-secondary !border-transparent !bg-transparent !p-1.5 !text-[color:var(--lume-ink-muted)] hover:!text-[color:var(--lume-signal-critical)]"
                                     title="Elimina con motivazione"
                                     aria-label="Elimina voce clinica con motivazione"
                                 >
