@@ -1,4 +1,5 @@
 import { formatCountLabel as formatCatalogCount } from '@/lib/format-count';
+import { AifaCatalogQuickUpdate } from '@/components/settings/aifa-catalog-quick-update';
 import ink from '@/components/ink-secondary.module.css';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -207,6 +208,7 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
             <span className={repertoriStyles.catalogSub}>{c.age}</span>
             <PillBadge variant={catalogFreshnessSignal(c.freshness) as PillVariant}>{labelText}</PillBadge>
             <button type="button" className={styles.ghostBtnSm} aria-label={`Mostra dettaglio repertorio ${c.name}`} aria-pressed={c.id === selectedCatalog?.id} onClick={() => setSelectedCatalogId(c.id)}>Dettagli<ChevronRight size={13} /></button>
+            {c.id === 'aic' && !isReview && <AifaCatalogQuickUpdate />}
           </div>;
         })}
         {!catalogs.length && <p className={styles.emptyState}>{isLoading ? 'Caricamento repertori locali.' : 'Nessun repertorio disponibile.'}</p>}

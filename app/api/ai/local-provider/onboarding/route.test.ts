@@ -202,3 +202,42 @@ test('ambiguous duplicate intent is invalid JSON input, not a second activation 
     assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: 'input_invalid' });
     assert.equal(attest.mock.callCount(), 0); assert.equal(fs.existsSync(path.join(root, 'ai')), false);
 });
+
+for (const serverVersion of ['0.40.4', '0.41.0']) test(`route con attestazione canonica e Ollama ${serverVersion}`, async () => {
+    const canonicalAttestor = locality.attestLocalOllamaModel;
+    const attest = fixture();
+    attest.mock.mockImplementation(canonicalAttestor);
+    const paths: string[] = [];
+    mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+        const pathname = new URL(String(input)).pathname; paths.push(pathname);
+        const model = { name: 'synthetic-local', model: 'synthetic-local', size: 4096, digest: 'a'.repeat(64) };
+        if (pathname === '/api/version') return Response.json({ version: serverVersion });
+        if (pathname === '/api/tags' || pathname === '/api/ps') return Response.json({ models: [model] });
+        if (pathname === '/api/show') return Response.json({ details: { family: 'synthetic' } });
+        if (pathname === '/api/generate') return Response.json({ model: model.model });
+        throw new Error('Unexpected synthetic operation');
+    });
+    const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();
+    const response = await POST(request({ intent: 'verify_and_activate', expectedRevision: initial.revision }));
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    if (serverVersion === '0.40.4') {
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).state, 'available_unqualified');
+        assert.deepEqual(paths, ['/api/version', '/api/tags', '/api/show', '/api/generate', '/api/ps']);
+    } else {
+        assert.equal(response.status, 409);
+        assert.deepEqual(await response.json(), { error: 'provider_version_unsupported',
+            versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' } });
+        assert.deepEqual(paths, ['/api/version']);
+        assert.equal(fs.existsSync(path.join(root, 'ai')), false);
+    }
+});
+
+test('Ollama raggiungibile ma non pronto non viene dichiarato irraggiungibile', async () => {
+    const attest = fixture();
+    attest.mock.mockImplementation(async () => { throw new locality.OllamaLocalityError('provider_unready'); });
+    const initial = await (await GET(new Request('http://localhost:3000/api/ai/local-provider/onboarding'))).json();
+    const response = await POST(request({ intent: 'verify_and_activate', expectedRevision: initial.revision }));
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: 'provider_unready' });
+});

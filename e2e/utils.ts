@@ -218,7 +218,7 @@ async function openAiSettingsPage(page: Page, route: 'funzioni' | 'modelli'): Pr
   await expect(page).toHaveURL(new RegExp(`/settings/ai/${route}$`));
   // Controls become available only after the stored draft has been applied.
   await expect(page.getByTestId('ai-settings-controls')
-    .getByRole('button', { name: 'Salva Configurazione', exact: true })).toBeEnabled();
+    .getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva Configurazione', exact: true })).toBeEnabled();
 }
 
 export async function openAiFunzioniSettings(page: Page): Promise<void> {

@@ -42,7 +42,15 @@ Il record resta `local_model`, `available_unqualified`, con receipt e versione
 host. Il recupero da `degraded` richiede lo stesso gesto e nuova attestazione;
 `revoked` è terminale e non viene riparato o cancellato. Corruzione, conflitto,
 rete indisponibile e modello assente hanno esiti espliciti. La UI rilegge stato
-e funzioni dopo il successo. Nessun kill switch, preferenza o fallback cambia.
+e funzioni dopo il successo. Dopo un salvataggio riuscito della configurazione,
+il pannello rilegge automaticamente lo stato senza avviare l’attivazione.
+Una versione Ollama non ammessa produce `provider_version_unsupported` con
+HTTP 409, versione rilevata e versioni ammesse. La UI indica di aggiornare
+MediFlow o installare una versione ammessa. Il servizio irraggiungibile e
+quello raggiungibile ma non pronto restano distinti, entrambi con HTTP 503.
+La 0.9.0 ammette puntualmente anche la release osservata 0.40.4, mantenendo
+la linea 0.32.x e le release 0.33.3 e 0.34.2.
+Nessun kill switch, preferenza o fallback cambia.
 
 ## Limiti e alternative
 

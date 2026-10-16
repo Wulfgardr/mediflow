@@ -8,7 +8,8 @@ export function ollamaLocalityErrorResponse(error: unknown): NextResponse | null
         {
             error: 'Ollama local-only policy blocked the request',
             code: error.code,
+            ...(error.code === 'provider_version_unsupported' ? { versionMismatch: error.versionMismatch } : {}),
         },
-        { status: error.code === 'provider_unready' ? 503 : 400 },
+        { status: error.code === 'provider_unready' ? 503 : error.code === 'provider_version_unsupported' ? 409 : 400 },
     );
 }
