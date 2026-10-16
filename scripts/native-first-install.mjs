@@ -1,4 +1,4 @@
-/* @Codex: fresh native setup only; never recreate a missing database beside existing files. */
+/* fresh native setup only; never recreate a missing database beside existing files. */
 import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';

@@ -1,4 +1,4 @@
-/* @Codex: destructive auth tests own their process and initially empty data directory. */
+/* destructive auth tests own their process and initially empty data directory. */
 import { test as base, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';

@@ -103,7 +103,7 @@ export default function TreatmentReasoningPanel({
     const picker = useFunctionModelPicker('treatment_reasoning', `${patient.id}:${patient.version}`);
     const [controller] = useState(() => createTreatmentReasoningBrowserController({ fetch: picker.client.fetch }));
     const operation = useRef(0);
-    // @Codex: close same-render double activation before React can publish busy state.
+    // close same-render double activation before React can publish busy state.
     const handler = useRef(false);
     const contextRevision = `${patient.id}:${patient.version ?? 'unversioned'}`;
     const [publicationState, setPublicationState] = useState<ScopedValue<TreatmentReasoningPublication> | null>(null);

@@ -1,4 +1,4 @@
-/* @Codex: process-local test doubles using the project's synchronous loader.
+/* process-local test doubles using the project's synchronous loader.
  * Never imported by production. No source rewrite or runtime admission switch. */
 import * as nodeModule from 'node:module';
 import { randomUUID } from 'node:crypto';

@@ -8,7 +8,6 @@ import {
     parseBackupArtifact,
 } from './backup-artifact';
 
-/* @Codex */
 export type BackupRestorePreflightCheckId =
     | 'artifact-document-currentness'
     | 'artifact-json'
@@ -21,7 +20,6 @@ export type BackupRestorePreflightCheckId =
     | 'target-db-readable'
     | 'target-db-writable';
 
-/* @Codex */
 export type BackupRestorePreflightCheck = {
     id: BackupRestorePreflightCheckId;
     status: 'pass' | 'fail';
@@ -29,7 +27,6 @@ export type BackupRestorePreflightCheck = {
     remediation?: string;
 };
 
-/* @Codex */
 export type BackupRestorePreflightResult = {
     ok: boolean;
     error?: string;
@@ -60,7 +57,7 @@ type DataDirModule = {
 };
 
 function loadDataDirModule(): DataDirModule {
-    // @Codex Load server-only filesystem helpers lazily so injected test deps stay isolated.
+    // Load server-only filesystem helpers lazily so injected test deps stay isolated.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('./data-dir') as DataDirModule;
 }
@@ -142,7 +139,6 @@ function canAccess(targetPath: string, mode: number, deps: PreflightDeps): boole
     }
 }
 
-/* @Codex */
 export async function runBackupRestorePreflight(
     value: unknown,
     deps: PreflightDeps = defaultDeps,

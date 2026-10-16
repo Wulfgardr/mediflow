@@ -1,4 +1,4 @@
-/* @Codex — DEMO metadata and legacy non-authority trap. Ordinary functions use the authenticated named flow. */
+/* DEMO metadata and legacy non-authority trap. Ordinary functions use the authenticated named flow. */
 import type { SynthesisRequest } from '../chatgpt-execution/execution-contract';
 import { ProductError, type ProductSnapshot } from './product-contract';
 export const CHATGPT_PRODUCT_ENTRY = Object.freeze({

@@ -1,4 +1,4 @@
-/* @Codex: post-fix ADR 0066 reader tests, real Drizzle/better-sqlite3 only.
+/* post-fix ADR 0066 reader tests, real Drizzle/better-sqlite3 only.
  * Captures the production root's readPatientRevision callback, not a rewritten
  * query. Column mappings + activePatients are real. Assembly/auth/provider
  * dependencies are explicit, non-executable doubles; no real DB bootstrap.

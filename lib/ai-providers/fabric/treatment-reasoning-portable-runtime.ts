@@ -1,5 +1,5 @@
 import 'server-only';
-/* @Codex: bounded, one-shot, CPU-only local process. No package resolution. */
+/* bounded, one-shot, CPU-only local process. No package resolution. */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createPortableProvisioning, isVerifiedPortableArtifact, PortableProvisioningError,
     type PortableProvisioning, type VerifiedPortableArtifact } from './treatment-reasoning-portable-provisioning.ts';

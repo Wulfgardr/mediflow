@@ -1,4 +1,3 @@
-/* @Codex */
 export type SessionCookieOptions = {
     httpOnly: true;
     sameSite: 'lax';
@@ -37,7 +36,6 @@ function forwardedProtoValues(request: Request): string[] {
         .filter(Boolean);
 }
 
-/* @Codex */
 function isFromLocalTlsProxy(request: Request): boolean {
     // The proxy authoritatively overwrites this marker on every forwarded request
     // (it is set after ...req.headers is spread, so a client-supplied value cannot
@@ -47,7 +45,6 @@ function isFromLocalTlsProxy(request: Request): boolean {
     return marker?.trim().toLowerCase() === TLS_PROXY_MARKER_VALUE;
 }
 
-/* @Codex */
 export function isHttpsRequest(request: Request): boolean {
     // Trustworthy signal: the request URL itself is already https.
     if (new URL(request.url).protocol === HTTPS_PROTOCOL) {
@@ -65,7 +62,6 @@ export function isHttpsRequest(request: Request): boolean {
     return false;
 }
 
-/* @Codex */
 export function sessionCookieOptionsForRequest(request: Request): SessionCookieOptions {
     return {
         httpOnly: true,
@@ -75,7 +71,7 @@ export function sessionCookieOptionsForRequest(request: Request): SessionCookieO
     };
 }
 
-/* @Codex: Web-only mutations must prove exact same-origin browser transport.
+/* Web-only mutations must prove exact same-origin browser transport.
    Native/local API routes use their separate bearer and TLS boundaries. */
 export function isTrustedWebMutationRequest(request: Request, requireJsonBody = true): boolean {
     try {

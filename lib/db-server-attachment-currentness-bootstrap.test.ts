@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -147,7 +146,6 @@ test('serializes concurrent O1b workers without busy errors or duplicate renames
     } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
 });
 
-/* @Codex */
 // Historical installed schema: currentness exists, but created_at follows OCR
 // metadata and the counters have no safe-integer upper-bound constraint.
 function historicalCurrentness(dbPath: string): void {
@@ -178,7 +176,6 @@ function historicalCurrentness(dbPath: string): void {
     } finally { db.close(); }
 }
 
-/* @Codex */
 test('upgrades historical installed currentness preserving every value and replays without changes', async () => {
     const current = tempCase();
     try {
@@ -199,7 +196,6 @@ test('upgrades historical installed currentness preserving every value and repla
     } finally { fs.rmSync(current.dataDir, { recursive: true, force: true }); }
 });
 
-/* @Codex */
 test('historical currentness rejects invalid counters and schema drift atomically', () => {
     for (const mutation of [
         'UPDATE attachments SET document_revision = 9007199254740992',

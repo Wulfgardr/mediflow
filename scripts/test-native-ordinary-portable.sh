@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @Codex — portable Foundation DTO tests only; never substitutes for a Mac build.
+# portable Foundation DTO tests only; never substitutes for a Mac build.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"

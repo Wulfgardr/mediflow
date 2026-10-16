@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct MobilePairedStatusPresentation: Equatable {
     enum Phase: Equatable {
         case loading, error, online, cached, offline, stale, sessionExpired, notLoaded
@@ -22,7 +21,7 @@ struct MobilePairedStatusPresentation: Equatable {
         if isWorking {
             return Self(phase: .loading, title: "Aggiornamento in corso", detail: "Mantieni aperto MediFlow.", symbolName: "arrow.triangle.2.circlepath", actionTitle: nil)
         }
-        // @Codex: Session and expiry boundaries must remain visible even if the refresh failed.
+        // Session and expiry boundaries must remain visible even if the refresh failed.
         if connectionState == .sessionExpired {
             return Self(phase: .sessionExpired, title: "Sessione scaduta", detail: "Accedi di nuovo per leggere o modificare dati.", symbolName: "person.crop.circle.badge.exclamationmark", actionTitle: "Accedi")
         }
@@ -48,7 +47,6 @@ struct MobilePairedStatusPresentation: Equatable {
 }
 
 #if os(iOS)
-/* @Codex */
 struct MobilePairedStatusView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -64,12 +62,12 @@ struct MobilePairedStatusView: View {
                 // assistive technologies. Keeping only the state symbol and its
                 // action on screen preserves the first patient row at AX sizes.
                 statusSymbol
-                    .accessibilityHidden(true) // @Codex: Complete state is announced by the container.
+                    .accessibilityHidden(true) // Complete state is announced by the container.
                 Spacer(minLength: 8)
                 primaryActionButton(compact: true)
             } else {
                 statusSymbol
-                    .accessibilityHidden(true) // @Codex: Complete state is announced by the container.
+                    .accessibilityHidden(true) // Complete state is announced by the container.
                 VStack(alignment: .leading, spacing: 4) {
                     Text(presentation.title)
                         .font(.headline)

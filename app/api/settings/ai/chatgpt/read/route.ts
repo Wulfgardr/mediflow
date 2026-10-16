@@ -1,4 +1,3 @@
-/* @Codex */
 import { handleAccountRequest } from '@/lib/chatgpt-account/account-production';
 
 export const runtime = 'nodejs';

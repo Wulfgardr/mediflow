@@ -1,4 +1,3 @@
-/* @Codex */
 import { constants, openSync, fstatSync, readSync, closeSync, type BigIntStats } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -14,7 +13,7 @@ const exact = (value: unknown, keys: string[]): value is Record<string, unknown>
     && Object.keys(value).sort().join('|') === [...keys].sort().join('|');
 const identifier = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(v);
 
-// @Codex: observed file identity/version only; atime changes from reads are excluded.
+// observed file identity/version only; atime changes from reads are excluded.
 const fileVersion = (stat: BigIntStats): string =>
     [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs, stat.uid, stat.mode].join(':');
 

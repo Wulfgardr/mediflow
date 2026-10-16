@@ -3,7 +3,6 @@ import XCTest
 @testable import MediFlowCore
 @testable import MediFlowAppleShared
 
-/* @Codex */
 // S7 (Wave 5): model-level coverage for the diary entry editor -- WYSIWYG via
 // the transcoder (D11), attachment references validated before seal (D4), and
 // the visit-draft compute/review/insert flow (D5). Payload-reale checks per
@@ -217,7 +216,7 @@ final class PairedPatientsWorkspaceModelS7Tests: XCTestCase {
         XCTAssertEqual(ClinicalRichText.render(document: ClinicalRichText.parse(html: rendered)), expected)
     }
 
-    // @Codex MF085-003: exercises the real paired model -> createEntry writer, not just the validator.
+    // MF085-003: exercises the real paired model -> createEntry writer, not just the validator.
     func testInvalidScaleFormsNeverReachCreateEntry() async throws {
         let patient = detail(id: "p1")
         let source = S7MockDataSource(details: ["p1": patient])

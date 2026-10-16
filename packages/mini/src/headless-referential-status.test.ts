@@ -5,7 +5,6 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { MINI_HEADLESS_REFERENTIAL_STATUSES } from './headless-referential-status';
 
-/* @Codex */
 const COMMANDS = ['patient search', 'patient show', 'draft preview', 'open-loops', 'whoami', 'capabilities'] as const;
 const KEYS = [
   'schema', 'miniCommandId', 'status', 'availability', 'manualDisposition',

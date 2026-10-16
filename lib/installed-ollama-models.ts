@@ -1,4 +1,3 @@
-/* @Codex */
 /** Only an omitted tag and :latest identify the same installed model. */
 export function canonicalInstalledModel(name: string): string {
     const leaf = name.slice(name.lastIndexOf('/') + 1);

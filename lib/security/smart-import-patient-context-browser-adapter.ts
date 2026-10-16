@@ -1,4 +1,3 @@
-/* @Codex */
 'use client';
 
 /** Display candidates only. The authenticated selection endpoint owns membership and authority. */

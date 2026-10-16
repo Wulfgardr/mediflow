@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { parseItalianDate } from '../../italian-date';
-/* @Codex */
 import { extractDocumentWithAI, isOcrModelAvailable } from './ocr-service';
 
 function isoDate(value: Date | undefined): string | undefined {

@@ -1,4 +1,3 @@
-/* @Codex */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import {
@@ -8,7 +7,6 @@ import {
 } from '../lib/domain/documents/document-class-router';
 import type { DocumentDecisionClassification } from '../lib/domain/documents/document-decision';
 
-/* @Codex */
 export interface DocumentRouterBenchmarkEntry {
     file: string;
     expectedClass: DocumentDecisionClassification;
@@ -18,7 +16,6 @@ export interface DocumentRouterBenchmarkEntry {
     creator?: string;
 }
 
-/* @Codex */
 export interface DocumentRouterBenchmarkRow {
     file: string;
     expectedClass: DocumentDecisionClassification;
@@ -30,7 +27,6 @@ export interface DocumentRouterBenchmarkRow {
     wouldSkip: boolean;
 }
 
-/* @Codex */
 export interface DocumentRouterClassMetric {
     expectedClass: DocumentDecisionClassification;
     total: number;
@@ -38,21 +34,18 @@ export interface DocumentRouterClassMetric {
     accuracy: number;
 }
 
-/* @Codex */
 export interface DocumentRouterConfusion {
     expectedClass: DocumentDecisionClassification;
     predictedClass: DocumentDecisionClassification;
     count: number;
 }
 
-/* @Codex */
 export interface DocumentRouterSkipDecisionMetric {
     classification: DocumentDecisionClassification;
     total: number;
     wouldSkip: number;
 }
 
-/* @Codex */
 export interface DocumentRouterBenchmarkReport {
     schemaVersion: 'mediflow.document_router_benchmark.v1';
     total: number;
@@ -64,7 +57,6 @@ export interface DocumentRouterBenchmarkReport {
     rows: DocumentRouterBenchmarkRow[];
 }
 
-/* @Codex */
 export const DOCUMENT_ROUTER_SELF_TEST_FIXTURES: DocumentRouterBenchmarkEntry[] = [
     {
         file: '2026-01-12__laboratorio__emocromo_sintetico.pdf',
@@ -130,7 +122,6 @@ function readOptionalString(record: Record<string, unknown>, key: string, path: 
     return value;
 }
 
-/* @Codex */
 export function parseDocumentRouterManifest(payload: unknown): DocumentRouterBenchmarkEntry[] {
     const entries: unknown[] | null = Array.isArray(payload)
         ? payload
@@ -160,7 +151,6 @@ export function parseDocumentRouterManifest(payload: unknown): DocumentRouterBen
     });
 }
 
-/* @Codex */
 export async function loadDocumentRouterManifest(manifestPath: string): Promise<DocumentRouterBenchmarkEntry[]> {
     const raw = await readFile(manifestPath, 'utf8');
     return parseDocumentRouterManifest(JSON.parse(raw));
@@ -179,7 +169,6 @@ function roundMetric(value: number): number {
     return Number(value.toFixed(4));
 }
 
-/* @Codex */
 export function runDocumentRouterBenchmark(entries: DocumentRouterBenchmarkEntry[]): DocumentRouterBenchmarkReport {
     const rows = entries.map((entry): DocumentRouterBenchmarkRow => {
         const routed = routeDocumentClass(routerInputFor(entry));
@@ -256,7 +245,6 @@ function table(headers: string[], rows: string[][]): string {
     ].join('\n');
 }
 
-/* @Codex */
 export function formatDocumentRouterBenchmarkReport(report: DocumentRouterBenchmarkReport): string {
     const summary = [
         `schemaVersion: ${report.schemaVersion}`,

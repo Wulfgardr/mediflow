@@ -13,7 +13,6 @@ import type { PillVariant } from '@/lib/patient-workspace';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 
-/* @Codex */
 function LiveGovernanceArea({
   patientCount,
 }: {

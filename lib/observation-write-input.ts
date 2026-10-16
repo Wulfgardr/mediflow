@@ -1,4 +1,4 @@
-/* @Codex: ordinary observation JSON and own-key validation; shared clinical normalizers remain unchanged. */
+/* ordinary observation JSON and own-key validation; shared clinical normalizers remain unchanged. */
 import { v4 as uuidv4 } from 'uuid';
 import { readBoundedJsonBody } from './bounded-request-body';
 
@@ -19,7 +19,7 @@ export function observationJsonObject(value: unknown): Record<string, unknown> |
         ? value as Record<string, unknown> : null;
 }
 
-/* @Codex: only local ingress uses this NEW byte cap, after the route auth gate. */
+/* only local ingress uses this NEW byte cap, after the route auth gate. */
 export async function readObservationJsonObject(request: Request) {
     const parsed = await readBoundedJsonBody(request, LOCAL_OBSERVATION_JSON_MAX_BYTES, 'request-json');
     if (!parsed.ok) return parsed.status === 413

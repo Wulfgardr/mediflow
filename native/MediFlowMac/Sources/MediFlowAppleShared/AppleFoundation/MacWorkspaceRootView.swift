@@ -1,7 +1,6 @@
 #if os(macOS)
 import SwiftUI
 
-/* @Codex */
 @MainActor
 struct ClinicalWorkspaceNavigationAction {
     let section: ClinicalWorkspaceSection
@@ -15,7 +14,6 @@ struct ClinicalWorkspaceNavigationActionKey: FocusedValueKey {
     static var defaultValue: ClinicalWorkspaceNavigationAction? { nil }
 }
 
-/* @Codex */
 @MainActor
 struct ClinicalWorkspaceInspectorAction {
     let isEnabled: Bool
@@ -126,7 +124,7 @@ public final class MediFlowMacSceneModel: ObservableObject {
 
     public func createPatient() {
         guard canStartCreatingPatient else { return }
-        navigationRouter.cancel() // @Codex
+        navigationRouter.cancel()
         workspaceModel?.startCreatingPatient()
     }
 
@@ -137,16 +135,16 @@ public final class MediFlowMacSceneModel: ObservableObject {
 
     public func refresh() {
         guard section == .patients, canRefresh, let workspaceModel else { return }
-        navigationRouter.cancel() // @Codex
+        navigationRouter.cancel()
         Task { await workspaceModel.loadPatients() }
     }
 
     public func select(_ section: ClinicalWorkspaceSection) {
-        navigationRouter.cancel() // @Codex
+        navigationRouter.cancel()
         self.section = section
     }
 
-    // @Codex: Each scene owns its URL intent; no broadcast or persisted routing.
+    // Each scene owns its URL intent; no broadcast or persisted routing.
     let navigationRouter = ClinicalNavigationRouter()
 }
 
@@ -231,7 +229,6 @@ public struct MediFlowMacRootView: View {
         .inkRegister()
     }
 
-    /* @Codex */
     private var navigationAction: ClinicalWorkspaceNavigationAction {
         ClinicalWorkspaceNavigationAction(
             section: scene.section,
@@ -456,7 +453,6 @@ public struct MediFlowMacCommands: Commands {
     }
 }
 
-/* @Codex */
 private struct MacInspectorCommandBridge<Content: View>: View {
     @ObservedObject var workspaceModel: PairedPatientsWorkspaceModel
     let section: ClinicalWorkspaceSection

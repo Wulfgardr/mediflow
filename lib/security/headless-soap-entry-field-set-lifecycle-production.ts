@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { headlessSoapEntryFieldSetLifecycleProductionOwner } from './headless-soap-entry-field-set-lifecycle-production-internal';

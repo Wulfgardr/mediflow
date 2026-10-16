@@ -3,7 +3,7 @@ import type { ProstheticsCatalogSelection, ProstheticsSnapshot } from './referen
 // Replaces Dexie DB with Fetch calls
 
 import { encryptData, decryptData } from './security/security';
-import type { WhoReference } from './reference-data/icd11-reference'; // @Codex
+import type { WhoReference } from './reference-data/icd11-reference';
 import { notifyDbChange } from './live-query';
 import {
     LOCKED_DATA_PLACEHOLDER,
@@ -12,22 +12,14 @@ import {
     rememberLockedCiphertext,
     takeLockedCiphertext,
 } from './locked-field-guard';
-/* @Codex */
 import { isPatientVersionConflictPayload, type PatientVersionConflictPayload } from './patient-concurrency';
-/* @Codex */
 import type { EntryVersionConflictPayload } from './entry-concurrency';
-/* @Codex */
 import type { CheckupVersionConflictPayload } from './checkup-concurrency';
-/* @Codex */
 import { isVersionConflictPayload, type VersionConflictPayload } from './version-concurrency';
-/* @Codex */
 import { revivePatientStructuredFields } from './patient-structured-fields';
-/* @Codex */
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
-/* @Codex */
 import type { DocumentEvidencePack } from './domain/documents/document-evidence-pack';
 import type { HostDocumentOcrQueueReason, DocumentOcrQueueState } from './domain/documents/document-ocr-queue';
-/* @Codex */
 import { assertBackupReadableWithKey, BackupRestoreKeyError } from './backup-restore-key-check';
 import {
     buildApiTableFetchErrorMessage,
@@ -36,14 +28,12 @@ import {
     notifyApiAuthUnavailable,
 } from './api-table-response';
 
-/* @Codex */
 export type ApiVersionConflictPayload =
     | PatientVersionConflictPayload
     | EntryVersionConflictPayload
     | CheckupVersionConflictPayload
     | VersionConflictPayload;
 
-/* @Codex */
 function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflictPayload {
     if (isPatientVersionConflictPayload(value)) return true;
     if (isVersionConflictPayload(value)) return true;
@@ -55,10 +45,8 @@ function isApiVersionConflictPayload(value: unknown): value is ApiVersionConflic
         && typeof payload.recordId === 'string';
 }
 // Historical document insight persisted from local extraction and review-only synthesis
-/* @Codex */
 export type DocumentQualityLevel = 'green' | 'yellow' | 'red';
 
-/* @Codex */
 export interface DocumentDiagnosisSuggestion {
     code: string;
     description: string;
@@ -69,13 +57,11 @@ export interface DocumentDiagnosisSuggestion {
 
 export interface DocumentInsight {
     id: string;
-    /* @Codex */
     attachmentId?: string;
     date: Date;
     fileName: string;
     rawMarkdown: string;  // Immutable source text retained for historical compatibility
     summary: string;      // Historical review-only synthesis on locally extracted text
-    /* @Codex */
     evidencePack?: DocumentEvidencePack;
     quality?: {
         level: DocumentQualityLevel;
@@ -126,13 +112,11 @@ export interface Patient {
     aiSummaryGeneratedAt?: Date;
     aiSummaryContextHash?: string;
     documentInsights?: DocumentInsight[]; // Last 3 scanned docs
-    /* @Codex */
     exemptions?: string[];
     notes?: string;
     monitoringProfile?: string;
     diagnoses?: Diagnosis[];
     ambulatoryId?: string;
-    /* @Codex */
     version?: number;
 }
 
@@ -159,8 +143,8 @@ export interface Diagnosis {
     description: string;
     system: string;
     date: Date;
-    canonicalUri?: string; // @Codex
-    reference?: WhoReference; // @Codex
+    canonicalUri?: string;
+    reference?: WhoReference;
 }
 
 export interface ClinicalEntry {
@@ -174,17 +158,14 @@ export interface ClinicalEntry {
     updatedAt: Date;
     deletedAt?: Date | null;
     deletionReason?: string | null;
-    /* @Codex */
     version?: number;
     metadata?: Record<string, unknown>;
     attachments?: string[];
     setting?: 'home' | 'hospital' | 'ambulatory';
 }
 
-/* @Codex */
 export type SissHandoffOutcome = 'started' | 'completed' | 'blocked' | 'cancelled';
 
-/* @Codex */
 export interface SissHandoffEvent {
     version?: number;
     id: string;
@@ -204,24 +185,17 @@ export interface SissHandoffEvent {
 
 // Fields that should be encrypted for each table
 const ENCRYPTED_FIELDS: Record<string, string[]> = {
-    /* @Codex */
     patients: ['address', 'phone', 'caregiver', 'exemptions', 'diagnoses', 'statusReason', 'notes', 'aiSummary', 'documentInsights', 'archiveReason', 'archiveNote', 'deletionReason'],
     entries: ['title', 'content', 'metadata', 'attachments', 'deletionReason'],
     therapies: ['motivation', 'deletionReason'],
     checkups: ['notes', 'deletionReason'],
-    /* @Codex */
     observations: ['notes', 'deletionReason'],
-    /* @Codex */
     prosthetic_prescriptions: ['description', 'measures', 'clinicalReason', 'regionalPrescriptionId', 'supplier', 'collaudoOutcome', 'documentRefs', 'notes'],
-    /* @Codex */
     service_prescriptions: ['serviceName', 'clinicalQuestion', 'provider', 'outcomeNote', 'requestReference', 'documentRefs', 'notes'],
-    /* @Codex */
     service_prescription_items: ['serviceName', 'catalogDisplayName', 'evidence', 'notes', 'outcomeNote'],
-    /* @Codex */
     siss_handoff_events: ['reason', 'nextAction', 'notes', 'correlationId'],
     conversations: ['title'],
     messages: ['content', 'metadata', 'attachmentBase64'],
-    /* @Codex */
     attachments: ['name', 'path', 'data', 'summarySnapshot', 'parseEvidenceArtifactSnapshot']
 };
 
@@ -330,7 +304,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     private _filterFn?: (item: T) => boolean;
     private _limit?: number;
     private _reverse?: boolean;
-    /* @Codex */
     private _includeDeleted?: boolean;
     /* STREAM B: server-side query params (kill the full-table fetch). Only set via
        .query(); serialized into buildListEndpoint so the server filters/sorts and
@@ -347,7 +320,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return copy;
     }
 
-    /* @Codex */
     includeDeleted(): ApiTable<T> {
         const clone = this.clone();
         clone._includeDeleted = true;
@@ -370,7 +342,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         signal?.throwIfAborted();
         const res = await fetch(this.buildListEndpoint(), { cache: 'no-store', ...(signal ? { signal } : {}) });
         signal?.throwIfAborted();
-        /* @Codex */
         if (isApiTableAuthUnavailableStatus(res.status)) {
             notifyApiAuthUnavailable(res.status);
             if (options?.rejectAuthUnavailable) throw new Error('Authenticated list unavailable.');
@@ -406,7 +377,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return (await this.toArray()).length;
     }
 
-    /* @Codex */
     private buildListEndpoint(): string {
         const search = new URLSearchParams();
         const q = this._serverQuery;
@@ -437,12 +407,11 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
     }
 
     async get(id: string, options?: { signal?: AbortSignal }): Promise<T | undefined> {
-        // @Codex: opt-in readers can retire both the request and its continuation.
+        // opt-in readers can retire both the request and its continuation.
         const signal = options?.signal;
         signal?.throwIfAborted();
         const res = await fetch(`${this.endpoint}/${id}`, { cache: 'no-store', ...(signal ? { signal } : {}) });
         signal?.throwIfAborted();
-        /* @Codex */
         if (isApiTableAuthUnavailableStatus(res.status)) {
             notifyApiAuthUnavailable(res.status);
             signal?.throwIfAborted();
@@ -457,19 +426,16 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return item;
     }
 
-    /* @Codex */
     private buildVersionConflictError(payload: ApiVersionConflictPayload): ApiConflictError {
         return new ApiConflictError(payload);
     }
 
-    /* @Codex */
     // STREAM B: scope the notification to this table so useLiveQuery subscribers
     // scoped to other tables don't needlessly re-run.
     private emitChange() {
         notifyDbChange(this.tableName);
     }
 
-    /* @Codex */
     async add(item: T, options?: AddOptions): Promise<string> {
         const fenced = options != null && 'createContext' in options;
         const context = fenced ? (options as PatientAddOptions).createContext : undefined;
@@ -489,7 +455,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         assertCurrent();
         const encryptedItem = await this.encryptItem(item);
         assertCurrent();
-        // @Codex: attachment creation time remains owned by the host.
+        // attachment creation time remains owned by the host.
         if (this.tableName === 'attachments') {
             delete encryptedItem.createdAt;
             delete encryptedItem.currentness;
@@ -517,21 +483,17 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return data.id;
     }
 
-    /* @Codex */
     async prepareWritePayload(item: Partial<T>, isPartial = false): Promise<Partial<T>> {
         return this.encryptItem(item, isPartial);
     }
 
     // Alias for Dexie compatibility (Upsert-like behavior)
-    /* @Codex */
     async put(item: T, options?: { suppressNotify?: boolean }): Promise<string> {
         return this.add(item, options as AddOptions);
     }
 
-    /* @Codex */
     async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition }): Promise<void> {
         const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
-        /* @Codex */
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
         if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
             throw new Error(`Missing required version for ${this.versionedEntityLabel()} update`);
@@ -555,7 +517,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         if (!options?.suppressNotify) this.emitChange();
     }
 
-    /* @Codex */
     async delete(id: string, options?: ApiDeleteOptions): Promise<void> {
         const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
         const fenced = options != null && 'deleteContext' in options;
@@ -630,7 +591,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
 
     async bulkPut(items: T[]): Promise<void> {
         if (items.length === 0) return;
-        /* @Codex: never split a full exemption import into independent writes. */
+        /* never split a full exemption import into independent writes. */
         if (this.tableName === 'exemptions') {
             throw new Error('EXEMPTION_IMPORT_PREVIEW_REQUIRED');
         }
@@ -647,7 +608,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             return;
         }
 
-        /* @Codex */
         // Keep encryption path active for all other tables and avoid request storms on large imports.
         const chunkSize = 25;
         for (let i = 0; i < items.length; i += chunkSize) {
@@ -664,7 +624,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             return;
         }
 
-        // @Codex: fallback for resources that expose only item-level DELETE.
+        // fallback for resources that expose only item-level DELETE.
         if (res.status !== 404 && res.status !== 405) {
             throw new Error(`Failed to clear table: ${res.status} ${res.statusText}`);
         }
@@ -698,7 +658,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         }
     }
 
-    /* @Codex */
     private sissWritePayload(id: string, value?: SissHandoffWritePrecondition) {
         if (this.tableName !== 'siss_handoff_events') return undefined;
         if (!value || value.id !== id) throw new Error('Ricarica il diario SISS prima di modificare questa voce.');
@@ -721,14 +680,12 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return typeof candidate === 'string' && candidate.trim().length > 0 ? candidate : null;
     }
 
-    /* @Codex */
     private getRecordVersion(item: unknown): number | undefined {
         if (!this.requiresVersionedWrite() || !item || typeof item !== 'object') return undefined;
         const record = item as Record<string, unknown>;
         return typeof record.version === 'number' ? record.version : undefined;
     }
 
-    /* @Codex */
     private requiresVersionedWrite(): boolean {
         return this.tableName === 'patients'
             || this.tableName === 'ambulatories'
@@ -741,7 +698,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
             || this.tableName === 'prosthetic_prescriptions';
     }
 
-    /* @Codex */
     private versionedEntityLabel(): string {
         if (this.tableName === 'patients') return 'patient';
         if (this.tableName === 'ambulatories') return 'ambulatory';
@@ -755,7 +711,6 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return this.tableName;
     }
 
-    /* @Codex */
     private async getVersionsByIdForDelete(ids: string[]): Promise<Map<string, number>> {
         const requestedIds = new Set(ids);
         const versionsById = new Map<string, number>();
@@ -788,36 +743,23 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         if (obj.updatedAt) obj.updatedAt = new Date(obj.updatedAt);
         if (obj.birthDate) obj.birthDate = new Date(obj.birthDate);
         if (obj.date) obj.date = new Date(obj.date);
-        /* @Codex */
         if (obj.deletedAt) obj.deletedAt = new Date(obj.deletedAt);
-        /* @Codex */
         if (obj.startDate) obj.startDate = new Date(obj.startDate);
-        /* @Codex */
         if (obj.endDate) obj.endDate = new Date(obj.endDate);
-        /* @Codex */
         if (obj.observedAt) obj.observedAt = new Date(obj.observedAt);
-        /* @Codex */
         if (obj.prescribedAt) obj.prescribedAt = new Date(obj.prescribedAt);
-        /* @Codex */
         if (obj.collaudoAt) obj.collaudoAt = new Date(obj.collaudoAt);
-        /* @Codex */
         if (obj.startedAt) obj.startedAt = new Date(obj.startedAt);
-        /* @Codex */
         if (obj.completedAt) obj.completedAt = new Date(obj.completedAt);
-        /* @Codex */
         if (obj.scheduledAt) obj.scheduledAt = new Date(obj.scheduledAt);
-        /* @Codex */
         if (obj.performedAt) obj.performedAt = new Date(obj.performedAt);
-        /* @Codex */
         if (obj.reportReceivedAt) obj.reportReceivedAt = new Date(obj.reportReceivedAt);
-        /* @Codex */
         if (obj.importedAt) obj.importedAt = new Date(obj.importedAt);
         return obj;
     }
 
     // --- Encryption Helpers ---
 
-    /* @Codex */
     private async encryptDeleteField(field: string, value: string): Promise<string> {
         const fields = ENCRYPTED_FIELDS[this.tableName];
         const key = this.getMasterKey();
@@ -916,31 +858,24 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
 
 class MedicalApiClient {
     private masterKey: CryptoKey | null = null;
-    // @Codex: cancellation only; this signal grants no server authority or key access.
+    // cancellation only; this signal grants no server authority or key access.
     private sessionReads: AbortController | null = null;
 
     patients: ApiTable<Patient, PatientAddOptions>;
     ambulatories: ApiTable<Ambulatory>;
     entries: ApiTable<ClinicalEntry>;
     therapies: ApiTable<Therapy>;
-    /* @Codex */
     observations: ApiTable<Observation>;
-    /* @Codex */
     prostheticPrescriptions: ApiTable<ProstheticPrescription>;
-    /* @Codex */
     servicePrescriptions: ApiTable<ServicePrescription>;
-    /* @Codex */
     servicePrescriptionItems: ApiTable<ServicePrescriptionItem>;
-    /* @Codex */
     serviceCatalogEntries: ApiTable<ServiceCatalogEntry>;
-    /* @Codex */
     sissHandoffs: ApiTable<SissHandoffEvent>;
     conversations: ApiTable<Conversation>;
     messages: ApiTable<Message>;
     checkups: ApiTable<Checkup>;
     attachments: ApiTable<Attachment>;
     drugs: ApiTable<AifaDrug>;
-    /* @Codex */
     exemptions: ApiTable<ExemptionCode>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings: ApiTable<any>;
@@ -953,31 +888,23 @@ class MedicalApiClient {
         // ... (existing)
         this.entries = new ApiTable<ClinicalEntry>('/api/entries', 'entries', getKey);
         this.therapies = new ApiTable<Therapy>('/api/therapies', 'therapies', getKey);
-        /* @Codex */
         this.observations = new ApiTable<Observation>('/api/observations', 'observations', getKey);
-        /* @Codex */
         this.prostheticPrescriptions = new ApiTable<ProstheticPrescription>('/api/prosthetic-prescriptions', 'prosthetic_prescriptions', getKey);
-        /* @Codex */
         this.servicePrescriptions = new ApiTable<ServicePrescription>('/api/service-prescriptions', 'service_prescriptions', getKey);
-        /* @Codex */
         this.servicePrescriptionItems = new ApiTable<ServicePrescriptionItem>('/api/service-prescription-items', 'service_prescription_items', getKey);
-        /* @Codex */
         this.serviceCatalogEntries = new ApiTable<ServiceCatalogEntry>('/api/service-catalog', 'service_catalog_entries', getKey);
-        /* @Codex */
         this.sissHandoffs = new ApiTable<SissHandoffEvent>('/api/siss-handoffs', 'siss_handoff_events', getKey);
         this.conversations = new ApiTable<Conversation>('/api/conversations', 'conversations', getKey);
         this.messages = new ApiTable<Message>('/api/messages', 'messages', getKey);
         this.checkups = new ApiTable<Checkup>('/api/checkups', 'checkups', getKey);
         this.attachments = new ApiTable<Attachment>('/api/attachments', 'attachments', getKey);
         this.drugs = new ApiTable<AifaDrug>('/api/drugs', 'drugs', getKey);
-        /* @Codex */
         this.exemptions = new ApiTable<ExemptionCode>('/api/exemptions', 'exemptions', getKey);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey);
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey);
     }
 
-    /* @Codex */
     async applyPatientSmartImport(
         patientId: string,
         input: {
@@ -1014,7 +941,6 @@ class MedicalApiClient {
         if (input.therapies.length > 0) notifyDbChange('therapies');
     }
 
-    /* @Codex */
     async assertBackupReadable(artifactJson: string): Promise<void> {
         const key = this.masterKey;
         await assertBackupReadableWithKey(artifactJson, key, ENCRYPTED_FIELDS);
@@ -1026,11 +952,11 @@ class MedicalApiClient {
         const previousReads = this.sessionReads;
         this.masterKey = key;
         this.sessionReads = key ? new AbortController() : null;
-        // @Codex: runs synchronously before SecurityProvider sends the lock request.
+        // runs synchronously before SecurityProvider sends the lock request.
         previousReads?.abort();
     }
 
-    /* @Codex: a reader created while locked cannot start an HTTP request. */
+    /* a reader created while locked cannot start an HTTP request. */
     getSessionReadSignal(): AbortSignal {
         return this.sessionReads?.signal ?? AbortSignal.abort();
     }
@@ -1042,7 +968,6 @@ class MedicalApiClient {
 
 export const db = new MedicalApiClient();
 
-/* @Codex */
 export class ApiConflictError extends Error {
     readonly payload: ApiVersionConflictPayload;
 
@@ -1053,7 +978,6 @@ export class ApiConflictError extends Error {
     }
 }
 
-/* @Codex */
 export class BackupRestorePreflightError extends Error {
     readonly preflight: BackupRestorePreflightResult;
 
@@ -1148,28 +1072,20 @@ export interface Checkup {
     patientId: string;
     date: Date;
     title: string;
-    /* @Codex */
     type?: 'blood_pressure' | 'weight' | 'glycemia' | 'sp02' | 'heart_rate' | 'adl' | 'iadl' | 'tinetti' | 'pain';
-    /* @Codex */
     value?: number;
     maxValue?: number;
     unit?: string;
     notes?: string;
-    /* @Codex */
     status?: 'pending' | 'completed' | 'cancelled';
-    /* @Codex */
     source?: 'manual' | 'ai_suggestion';
     createdAt: Date;
-    /* @Codex */
     version?: number;
     updatedAt?: Date;
-    /* @Codex */
     deletedAt?: Date | null;
-    /* @Codex */
     deletionReason?: string | null;
 }
 
-/* @Codex */
 export interface Observation {
     id: string;
     patientId: string;
@@ -1205,7 +1121,6 @@ export interface Attachment {
     path: string;
     data?: string; // Base64 content for storage
     summarySnapshot?: string;
-    /* @Codex */
     parseEvidenceArtifactSnapshot?: string;
     ocrQueueState?: DocumentOcrQueueState;
     ocrQueueReason?: HostDocumentOcrQueueReason;
@@ -1215,13 +1130,10 @@ export interface Attachment {
     createdAt: Date;
 }
 
-/* @Codex */
 export type ProstheticPrescriptionStatus = 'draft' | 'prescribed' | 'submitted' | 'authorized' | 'delivered' | 'tested' | 'cancelled';
 
-/* @Codex */
 export type ProstheticPrescriptionCategory = 'standard' | 'oxygen' | 'repair' | 'replacement' | 'trial' | 'other';
 
-/* @Codex */
 export interface ProstheticPrescription {
     catalogSelection?: ProstheticsCatalogSelection;
     catalogSnapshot?: ProstheticsSnapshot | null;
@@ -1241,22 +1153,17 @@ export interface ProstheticPrescription {
     source: 'manual' | 'document_review';
     documentRefs?: string;
     notes?: string;
-    /* @Codex */
     version: number;
     createdAt: Date;
     updatedAt?: Date;
 }
 
-/* @Codex */
 export type ServicePrescriptionStatus = 'prescribed' | 'booked' | 'performed' | 'report_received' | 'cancelled';
 
-/* @Codex */
 export type ServicePrescriptionCategory = 'lab' | 'imaging' | 'visit' | 'rehab' | 'screening' | 'procedure' | 'other';
 
-/* @Codex */
 export type ServicePrescriptionPriority = 'U' | 'B' | 'D' | 'P' | 'routine' | 'unknown';
 
-/* @Codex */
 export interface ServicePrescription {
     id: string;
     patientId: string;
@@ -1277,16 +1184,13 @@ export interface ServicePrescription {
     source: 'manual' | 'document_review' | 'legacy_therapy_cleanup';
     documentRefs?: string;
     notes?: string;
-    /* @Codex */
     version: number;
     createdAt: Date;
     updatedAt?: Date;
 }
 
-/* @Codex */
 export type ServicePrescriptionItemMatchStatus = 'unmatched' | 'candidate' | 'matched' | 'manual' | 'not_found';
 
-/* @Codex */
 export interface ServicePrescriptionItem {
     id: string;
     patientId: string;
@@ -1307,13 +1211,11 @@ export interface ServicePrescriptionItem {
     performedAt?: Date;
     reportReceivedAt?: Date;
     outcomeNote?: string;
-    /* @Codex */
     version: number;
     createdAt: Date;
     updatedAt?: Date;
 }
 
-/* @Codex */
 export interface ServiceCatalogEntry {
     id: string;
     codeSystem: string;
@@ -1341,7 +1243,6 @@ export interface AifaDrug {
     updatedAt?: Date;
 }
 
-/* @Codex */
 export interface ExemptionCode {
     code: string;
     description: string;
@@ -1359,24 +1260,19 @@ export interface Therapy {
     id: string;
     patientId: string;
     drugName: string;
-    /* @Codex */
     aic?: string;
-    /* @Codex */
     atc?: string;
     activePrinciple?: string;
     dosage: string;
     motivation?: string;
     diagnosisCode?: string;
     diagnosisName?: string;
-    /* @Codex */
     status: 'active' | 'suspended' | 'completed';
     startDate: Date;
     endDate?: Date | null;
     createdAt: Date;
     updatedAt?: Date;
     version?: number;
-    /* @Codex */
     deletedAt?: Date | null;
-    /* @Codex */
     deletionReason?: string | null;
 }

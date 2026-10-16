@@ -1,8 +1,5 @@
-/* @Codex */
 import type { DocumentDiagnosisSuggestion, DocumentInsight, DocumentQualityLevel } from '../../db';
-/* @Codex */
 import type { DocumentIntelligenceCasePack } from './document-intelligence-case-pack';
-/* @Codex */
 import {
     DOCUMENT_EVIDENCE_PACK_SCHEMA_VERSION,
     buildDocumentEvidencePack,
@@ -11,13 +8,10 @@ import {
     type DocumentEvidencePack,
     type DocumentEvidenceSourceGovernance,
 } from './document-evidence-pack';
-/* @Codex */
 import { normalizeDocumentInput } from './document-input-normalization';
 
-/* @Codex */
 export const DOCUMENT_PARSE_EVIDENCE_ARTIFACT_SCHEMA_VERSION = 'mediflow.document_parse_evidence_artifact.v1';
 
-/* @Codex */
 export interface DocumentParseEvidenceArtifact {
     schemaVersion: typeof DOCUMENT_PARSE_EVIDENCE_ARTIFACT_SCHEMA_VERSION;
     source: {
@@ -43,13 +37,11 @@ export interface DocumentParseEvidenceArtifact {
     };
 }
 
-/* @Codex */
 export interface BuildDocumentParseEvidenceArtifactInput extends BuildDocumentEvidencePackInput {
     attachmentId?: string;
     qualityReason?: string;
 }
 
-/* @Codex */
 export type DocumentParseEvidenceSectionKind =
     | 'diagnosis'
     | 'discharge_medication'
@@ -61,7 +53,6 @@ export type DocumentParseEvidenceSectionKind =
     | 'other'
     | 'ambiguous';
 
-/* @Codex */
 export interface DocumentParseEvidenceSectionMap {
     sections: Array<{ id: string; order: number; page: number; title: string; kind: DocumentParseEvidenceSectionKind; snippet: string }>;
     factAnchors: Array<{
@@ -93,14 +84,12 @@ export interface DocumentParseEvidenceSectionMap {
 type DocumentParseEvidenceSection = DocumentParseEvidenceSectionMap['sections'][number];
 type DocumentParseEvidenceFactAnchor = DocumentParseEvidenceSectionMap['factAnchors'][number];
 
-/* @Codex */
 export interface DocumentParseEvidenceArtifactEvaluation {
     presentKinds: DocumentEvidenceFact['kind'][];
     missingKinds: DocumentEvidenceFact['kind'][];
     leakedNegativeAssertions: string[];
 }
 
-/* @Codex */
 function normalizeComparableText(value: string): string {
     return value
         .toLowerCase()
@@ -109,7 +98,6 @@ function normalizeComparableText(value: string): string {
         .trim();
 }
 
-/* @Codex */
 function countNonEmptyLines(value: string): number {
     return value
         .replace(/\r/g, '\n')
@@ -119,7 +107,6 @@ function countNonEmptyLines(value: string): number {
         .length;
 }
 
-/* @Codex */
 function isRecord(value: unknown): value is Record<string, unknown> {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -299,7 +286,6 @@ function buildConflicts(
     return conflicts;
 }
 
-/* @Codex */
 export function buildDocumentParseEvidenceSectionMap(
     rawMarkdown: string,
     facts: DocumentEvidenceFact[],
@@ -321,7 +307,6 @@ export function buildDocumentParseEvidenceSectionMap(
     };
 }
 
-/* @Codex */
 export function buildDocumentParseEvidenceArtifact(
     input: BuildDocumentParseEvidenceArtifactInput,
 ): DocumentParseEvidenceArtifact {
@@ -354,7 +339,6 @@ export function buildDocumentParseEvidenceArtifact(
     };
 }
 
-/* @Codex */
 export function projectDocumentEvidencePack(
     artifact: DocumentParseEvidenceArtifact,
 ): DocumentEvidencePack {
@@ -371,7 +355,6 @@ export function projectDocumentEvidencePack(
     };
 }
 
-/* @Codex */
 export function projectDocumentInsightFromArtifact(
     artifact: DocumentParseEvidenceArtifact,
 ): DocumentInsight {
@@ -397,14 +380,12 @@ export function projectDocumentInsightFromArtifact(
     };
 }
 
-/* @Codex */
 export function serializeDocumentParseEvidenceArtifact(
     artifact: DocumentParseEvidenceArtifact,
 ): string {
     return JSON.stringify(artifact);
 }
 
-/* @Codex */
 export function parseDocumentParseEvidenceArtifactSnapshot(
     value: unknown,
 ): DocumentParseEvidenceArtifact | undefined {
@@ -447,7 +428,6 @@ export function parseDocumentParseEvidenceArtifactSnapshot(
     return parsed as unknown as DocumentParseEvidenceArtifact;
 }
 
-/* @Codex */
 export function evaluateDocumentParseEvidenceArtifact(
     casePack: DocumentIntelligenceCasePack,
     artifact: DocumentParseEvidenceArtifact,
@@ -480,7 +460,6 @@ export function evaluateDocumentParseEvidenceArtifact(
     };
 }
 
-/* @Codex */
 export function toDocumentDiagnosisSuggestionsFromArtifactFacts(
     artifact: DocumentParseEvidenceArtifact,
 ): DocumentDiagnosisSuggestion[] {

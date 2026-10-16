@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { isOrdinaryFunctionSelected, bindOrdinaryApplicationContext } from '../chatgpt-product/ordinary-flow';
 

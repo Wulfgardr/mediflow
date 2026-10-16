@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     parseDocumentSynthesisExtractionResponse,
     type SmartImportDiagnosisExtraction,
@@ -8,13 +7,10 @@ import {
     type DocumentQualityLevel,
 } from '../../ai-task-contracts';
 
-/* @Codex */
 export type { DocumentQualityLevel };
 
-/* @Codex */
 export type DocumentDiagnosisSuggestion = DocumentDiagnosisSuggestionContract;
 
-/* @Codex */
 export type DocumentStructuredAnalysis = {
     validJson?: boolean;
     validTask?: boolean;
@@ -31,7 +27,6 @@ export type DocumentStructuredAnalysis = {
     servicePrescriptions: SmartImportServicePrescriptionExtraction[];
 };
 
-/* @Codex */
 export function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSuggestion['system'] | null {
     if (typeof value !== 'string') return null;
     const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
@@ -41,7 +36,6 @@ export function normalizeDiagnosisSystem(value: unknown): DocumentDiagnosisSugge
     return null;
 }
 
-/* @Codex */
 export function parseStructuredAnalysisResponse(response: string, rawMarkdown: string): DocumentStructuredAnalysis {
     const result = parseDocumentSynthesisExtractionResponse(response, rawMarkdown);
     const parsed = result.value;

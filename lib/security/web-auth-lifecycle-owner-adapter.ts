@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import * as owner from '@mediflow/web-auth-lifecycle-owner';
@@ -117,7 +116,6 @@ export function unregisterPrivateResource(port: unknown, registration: unknown):
     return owner.unregisterPrivateResource(port, registration);
 }
 
-/* @Codex */
 export const serverSessions = owner.serverSessions;
 export type NativeSessionResourcePort = owner.serverSessions.NativeSessionResourcePort;
 export type NativeSessionResourceUse = owner.serverSessions.NativeSessionResourceUse;

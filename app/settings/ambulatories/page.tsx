@@ -23,7 +23,7 @@ export default function AmbulatoryManagerPage() {
     const [newParentId, setNewParentId] = useState<string>('');
     const [newType, setNewType] = useState<'live' | 'test'>('live');
     const [isClearing, setIsClearing] = useState(false);
-    // @Codex: Keep hierarchy rendering linear even when the sede list grows.
+    // Keep hierarchy rendering linear even when the sede list grows.
     const ambulatoryById = useMemo(() => new Map(ambulatories.map((item) => [item.id, item])), [ambulatories]);
     const selectedParent = newParentId ? ambulatoryById.get(newParentId) : null;
 
@@ -92,7 +92,7 @@ export default function AmbulatoryManagerPage() {
                 body: JSON.stringify({ ambulatoryId: id, version: target.version })
             });
             if (!res.ok) throw new Error("Failed to clear");
-            // @Codex: preserve accepted currentness even when the following read fails.
+            // preserve accepted currentness even when the following read fails.
             const accepted = await res.json() as { version?: number };
             if (!Number.isSafeInteger(accepted.version) || accepted.version! <= target.version) {
                 throw new Error('Missing accepted ambulatory version');

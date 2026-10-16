@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -127,7 +126,6 @@ test('manifest remains a new runtime artifact, separate from the historical rece
   assert.notEqual(MANIFEST_PATH, manifest.historicalArtifacts[0].path);
 });
 
-/* @Codex */
 test('requires opaque catalog choice and preserves CLI admission and proposal-only authority', () => {
   const manifest = loadFabricGenerativeRuntimeCrosswalk();
   for (const [key, value] of [['mode', 'free_model_id'], ['providerAdmission', 'ui_query'], ['apply', 'allowed']]) {

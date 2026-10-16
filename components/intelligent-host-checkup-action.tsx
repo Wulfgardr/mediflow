@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import { Clipboard, ShieldCheck } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react';

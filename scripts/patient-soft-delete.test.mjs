@@ -69,7 +69,6 @@ test('primary patient list reads exclude soft-deleted patients', () => {
 // WUL-322 (ADR 0066 Slice 3): the test-container clear must select victims via the
 // M2M membership and tombstone them, never via the stale legacy patients.ambulatoryId
 // column (WUL-300 constraint), never as a hard delete.
-/* @Codex */
 test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
     const routeSource = read('app/api/ambulatories/clear/route.ts');
     const writeSource = read('lib/ambulatory-write.ts');
@@ -124,7 +123,7 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     // Admin purge previews tombstone/version in a read transaction and rereads them before cascade in the write transaction.
     ['app/api/system/purge-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 2],
     ['app/api/system/restore-patient/route.ts', 'dbServer .select({ id: patients.id, firstName: patients.firstName, lastName: patients.lastName, deletedAt: patients.deletedAt, deletionReason: patients.deletionReason, version: patients.version, }) .from(patients) .where(isNotNull(patients.deletedAt)) .orderBy(desc(patients.deletedAt))', 1],
-    // @Codex: admin restore reads this tombstone inside its IMMEDIATE transaction.
+    // admin restore reads this tombstone inside its IMMEDIATE transaction.
     ['app/api/system/restore-patient/route.ts', 'tx.select({ id: patients.id, version: patients.version, deletedAt: patients.deletedAt }) .from(patients).where(eq(patients.id, patientId)).get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx .select({ id: patients.id, version: patients.version, updatedAt: patients.updatedAt, isArchived: patients.isArchived, }) .from(patients) .where(and(eq(patients.id, patientId), isNotNull(patients.deletedAt))) .get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx .select({ patient: patients }) .from(patients) .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId)) .where(and(eq(patients.id, context.patientId), eq(patientsToAmbulatories.ambulatoryId, context.scopeAmbulatoryId), isNotNull(patients.deletedAt))) .get()', 1],
@@ -153,7 +152,6 @@ function* walkSources(directory) {
     }
 }
 
-// @Codex
 const AST_PRINTER = ts.createPrinter({ removeComments: true });
 
 function propertyName(call) {
@@ -183,7 +181,7 @@ function isActivePatientsPredicate(node) {
         && node.arguments.some(isActivePatientsPredicate);
 }
 
-/* @Codex: follow only a local const used exclusively as a direct where argument. */
+/* follow only a local const used exclusively as a direct where argument. */
 function isLocalConstantActivePredicate(node) {
     if (!ts.isIdentifier(node)) return false;
     let block = node.parent;
@@ -295,7 +293,6 @@ test('AST allowlist consumes fingerprints and rejects stale, substituted, or dup
     assert.throws(() => assertAllowlistedPatientReads(unfilteredPatientReads(path, 'db.select().from(patients).get(); db.select().from(patients).get();'), allowlist));
 });
 
-/* @Codex */
 test('AST guard follows a local immutable predicate without accepting aliases, mutation, or shadowing', () => {
     const query = 'db.select().from(patients).where(condition).get();';
     const active = 'const condition = and(eq(patients.id, id), activePatients());';

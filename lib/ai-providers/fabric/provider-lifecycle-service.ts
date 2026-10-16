@@ -1,4 +1,3 @@
-/* @Codex */
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { admitProvider, type ProviderLifecycleEvent, type ProviderLifecycleState } from './provider-lifecycle';

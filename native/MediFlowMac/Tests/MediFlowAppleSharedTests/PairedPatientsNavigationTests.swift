@@ -4,7 +4,6 @@ import MediFlowCore
 import XCTest
 @testable import MediFlowAppleShared
 
-/* @Codex */
 final class PairedPatientsNavigationTests: XCTestCase {
     @MainActor
     func testExistingPatientUsesScopedOrdinaryReadsBeforeReplacingTheChart() async throws {
@@ -346,7 +345,6 @@ final class PairedPatientsNavigationTests: XCTestCase {
     }
 }
 
-/* @Codex */
 private enum NavigationFixture {
     static let key = SymmetricKey(data: Data(repeating: 7, count: 32))
     static func summary() -> HomeBasePatientSummary {
@@ -444,7 +442,6 @@ private final class NavigationURLProtocol: URLProtocol, @unchecked Sendable {
     private static let lock = NSLock()
     private static var transports: [Int: NavigationTransport] = [:]
     private static var nextPort = 46000
-    /* @Codex */
     static func register(_ transport: NavigationTransport) -> URL {
         lock.withLock {
             let port = nextPort
@@ -458,7 +455,7 @@ private final class NavigationURLProtocol: URLProtocol, @unchecked Sendable {
         }
     }
     static func remove(endpoint: URL) { _ = lock.withLock { transports.removeValue(forKey: endpoint.port!) } }
-    // @Codex Every request stays in this protocol, including unknown fixture endpoints; no socket is opened.
+    // Every request stays in this protocol, including unknown fixture endpoints; no socket is opened.
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {

@@ -1,4 +1,4 @@
-/* @Codex WUL-674: configuration facts are not execution receipts. */
+/* WUL-674: configuration facts are not execution receipts. */
 import { OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES } from './ai-providers/ollama-locality';
 
 export const FUNCTION_STATUS_SCHEMA = 'mediflow.function-status.v1' as const;
@@ -18,7 +18,7 @@ export type FunctionStatusSources = Readonly<{
     enabled: Readonly<Record<'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning', boolean>>;
     ollamaLifecycle: string; athenaLifecycle: string;
     clinicalBinding: Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>;
-    /* @Codex: per-experience preferences override the historical shared role projection. */
+    /* per-experience preferences override the historical shared role projection. */
     functionBindings?: Readonly<Partial<Record<'patient_insight' | 'smart_import' | 'document_synthesis' | 'treatment_reasoning',
         Readonly<{ state: 'configured' | 'invalid' | 'unavailable'; model: string | null }>>>>;
     athenaArtifact: boolean;
@@ -78,7 +78,7 @@ export function buildFunctionStatus(sources: FunctionStatusSources, checkedAt: s
     return Object.freeze({ schemaVersion: FUNCTION_STATUS_SCHEMA, checkedAt, check: 'configuration_only', functions: Object.freeze(functions) });
 }
 
-/* @Codex: reject incomplete snapshots instead of presenting missing rows as off. */
+/* reject incomplete snapshots instead of presenting missing rows as off. */
 export function parseFunctionStatus(value: unknown): FunctionStatusSnapshot {
     if (!value || typeof value !== 'object') throw new Error('Invalid function status');
     const data = value as Partial<FunctionStatusSnapshot>;

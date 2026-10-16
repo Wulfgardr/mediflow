@@ -1,4 +1,3 @@
-/* @Codex */
 import type {
     DocumentDecisionActionKind,
     DocumentDecisionConfidence,
@@ -7,10 +6,8 @@ import type {
     DocumentDecisionProstheticItem,
 } from './document-decision';
 
-/* @Codex */
 export type DocumentServicePrescriptionKind = 'specialist' | 'lab' | 'imaging' | 'screening';
 
-/* @Codex */
 export interface DocumentDomainDecisionInput {
     id: string;
     label: string;
@@ -19,7 +16,6 @@ export interface DocumentDomainDecisionInput {
     rationale: string;
 }
 
-/* @Codex */
 export interface ProstheticDomainDecisionInput extends DocumentDomainDecisionInput {
     requiredFieldsPresent: string[];
     missingRequiredFields: string[];
@@ -54,12 +50,10 @@ function domainItem(input: DocumentDomainDecisionInput, action: DocumentDecision
     };
 }
 
-/* @Codex */
 export function createMedicationPrescriptionProposal(input: DocumentDomainDecisionInput): DocumentDecisionDomainItem {
     return domainItem(input, 'create_medication_prescription_proposal');
 }
 
-/* @Codex */
 export function createServicePrescriptionProposal(
     input: DocumentDomainDecisionInput,
     kind: DocumentServicePrescriptionKind,
@@ -67,17 +61,14 @@ export function createServicePrescriptionProposal(
     return domainItem(input, SERVICE_ACTION_BY_KIND[kind]);
 }
 
-/* @Codex */
 export function createDiagnosticQuestionArtifact(input: DocumentDomainDecisionInput): DocumentDecisionDomainItem {
     return domainItem(input, 'create_diagnostic_question');
 }
 
-/* @Codex */
 export function createExemptionProposal(input: DocumentDomainDecisionInput): DocumentDecisionDomainItem {
     return domainItem(input, 'create_exemption_proposal');
 }
 
-/* @Codex */
 export function createProstheticPrescriptionProposal(
     input: ProstheticDomainDecisionInput,
 ): DocumentDecisionProstheticItem {
@@ -94,7 +85,6 @@ export function createProstheticPrescriptionProposal(
     };
 }
 
-/* @Codex */
 export function buildReviewableDocumentDecisionDomains(input: Partial<DocumentDecisionDomains>): DocumentDecisionDomains {
     return {
         patientFields: input.patientFields ?? EMPTY_DOMAINS.patientFields,

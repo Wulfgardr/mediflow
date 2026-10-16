@@ -1,7 +1,5 @@
-/* @Codex */
 export const DOCUMENT_SOURCE_PROVENANCE_AUDIT_SCHEMA_VERSION = 'mediflow.document_source_provenance_audit.v1';
 
-/* @Codex */
 export type DocumentSourceProvenanceCategory =
     | 'stored_binary'
     | 'summary_only'
@@ -9,14 +7,12 @@ export type DocumentSourceProvenanceCategory =
     | 'ambiguous'
     | 'unrecoverable';
 
-/* @Codex */
 export type DocumentSourceProvenanceArchiveMatchKind =
     | 'hash'
     | 'filename'
     | 'metadata'
     | 'byte_size';
 
-/* @Codex */
 export interface DocumentSourceProvenanceArchiveCandidate {
     matchKind: DocumentSourceProvenanceArchiveMatchKind;
     patientScoped: boolean;
@@ -24,7 +20,6 @@ export interface DocumentSourceProvenanceArchiveCandidate {
     bytes?: number | null;
 }
 
-/* @Codex */
 export interface DocumentSourceProvenanceAttachmentInput {
     id: string;
     patientId: string;
@@ -37,12 +32,10 @@ export interface DocumentSourceProvenanceAttachmentInput {
     archiveCandidates?: DocumentSourceProvenanceArchiveCandidate[] | null;
 }
 
-/* @Codex */
 export interface DocumentSourceProvenanceAuditOptions {
     minSummaryChars?: number;
 }
 
-/* @Codex */
 export interface DocumentSourceProvenanceAuditItem {
     attachmentId: string;
     patientId: string;
@@ -68,7 +61,6 @@ export interface DocumentSourceProvenanceAuditItem {
         | 'mark_unrecoverable_without_new_source';
 }
 
-/* @Codex */
 export interface DocumentSourceProvenanceAuditReport {
     schemaVersion: typeof DOCUMENT_SOURCE_PROVENANCE_AUDIT_SCHEMA_VERSION;
     generatedAt: string;
@@ -200,7 +192,6 @@ function classifyAttachment(
     };
 }
 
-/* @Codex */
 export function buildDocumentSourceProvenanceAuditReport(
     attachments: DocumentSourceProvenanceAttachmentInput[],
     options: DocumentSourceProvenanceAuditOptions = {},

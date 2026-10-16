@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { and, asc, isNotNull, sql } from 'drizzle-orm';
@@ -10,19 +9,15 @@ import {
     type FseValidationResponse,
 } from './terminology';
 
-/* @Codex */
 export const PROFILE_THERAPY_MEDICATION = 'therapy-medication-v1';
-/* @Codex */
 export const PROFILE_OBSERVATION_VITALS = 'observation-vitals-v1';
 
-/* @Codex */
 export type TherapyDocumentPayload = {
     drugName?: unknown;
     aic?: unknown;
     atc?: unknown;
 };
 
-/* @Codex */
 export type ObservationDocumentPayload = {
     codeSystem?: unknown;
     code?: unknown;
@@ -31,17 +26,14 @@ export type ObservationDocumentPayload = {
     value?: unknown;
 };
 
-/* @Codex */
 export type TherapyAtcLookup = (code: string) => Promise<boolean>;
 
-/* @Codex */
 function asNonEmptyString(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
 }
 
-/* @Codex */
 async function hasAtcInCatalog(code: string): Promise<boolean> {
     const [{ dbServer }, { drugs }] = await Promise.all([
         import('./db-server'),
@@ -59,7 +51,6 @@ async function hasAtcInCatalog(code: string): Promise<boolean> {
     return Boolean(row?.atc);
 }
 
-/* @Codex */
 export async function validateTherapyDocumentWithLookup(
     payload: TherapyDocumentPayload,
     hasAtcLookup: TherapyAtcLookup,
@@ -115,12 +106,10 @@ export async function validateTherapyDocumentWithLookup(
     return { errors, warnings };
 }
 
-/* @Codex */
 export async function validateTherapyDocument(payload: TherapyDocumentPayload): Promise<{ errors: FseValidationIssue[]; warnings: FseValidationIssue[] }> {
     return validateTherapyDocumentWithLookup(payload, hasAtcInCatalog);
 }
 
-/* @Codex */
 export function validateObservationDocument(payload: ObservationDocumentPayload): { errors: FseValidationIssue[]; warnings: FseValidationIssue[] } {
     const errors: FseValidationIssue[] = [];
     const warnings: FseValidationIssue[] = [];
@@ -184,18 +173,15 @@ export function validateObservationDocument(payload: ObservationDocumentPayload)
     return { errors, warnings };
 }
 
-/* @Codex */
 function normalizePayload(payload: unknown): Record<string, unknown> {
     if (!payload || typeof payload !== 'object') return {};
     return payload as Record<string, unknown>;
 }
 
-/* @Codex */
 export async function validateProfileDocument(profile: string, payload: unknown): Promise<FseValidationResponse | null> {
     return validateProfileDocumentWithLookup(profile, payload, hasAtcInCatalog);
 }
 
-/* @Codex */
 export async function validateProfileDocumentWithLookup(
     profile: string,
     payload: unknown,

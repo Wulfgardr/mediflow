@@ -1,4 +1,3 @@
-/* @Codex */
 import { EXEMPTION_MAX_BYTES, type ExemptionCatalogStatus, type ExemptionImportPreview, type ExemptionImportReceipt } from './exemption-import-contract';
 
 export type ExemptionImportSource = { sourceName: string; base64: string };

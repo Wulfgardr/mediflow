@@ -1,9 +1,7 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getAttachmentPayloadByteSize } from './attachment-payload';
 
-/* @Codex */
 test('attachment payload validator accepts encrypted client envelopes', () => {
     const payload = 'ENC:abc+/=:def+/=';
 
@@ -13,7 +11,6 @@ test('attachment payload validator accepts encrypted client envelopes', () => {
     });
 });
 
-/* @Codex */
 test('attachment payload validator accepts plain base64 and data URLs', () => {
     assert.deepEqual(getAttachmentPayloadByteSize('YWJjZA=='), { ok: true, size: 8 });
 

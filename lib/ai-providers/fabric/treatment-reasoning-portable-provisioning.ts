@@ -1,4 +1,4 @@
-/* @Codex: host-only filesystem service; never import from a browser value graph. */
+/* host-only filesystem service; never import from a browser value graph. */
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';

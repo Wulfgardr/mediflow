@@ -1,4 +1,3 @@
-/* @Codex */
 import { BookOpenCheck, CircleAlert, FileCheck2, Scale } from 'lucide-react';
 
 import { SETTINGS_CARD_CLASS, SettingsSectionIntro } from '@/components/settings/settings-ui';

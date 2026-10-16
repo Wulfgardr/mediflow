@@ -1,4 +1,4 @@
-/* @Codex: synchronous transaction encloses ALL owner checks, including post-callback denial. */
+/* synchronous transaction encloses ALL owner checks, including post-callback denial. */
 import type { patients } from './schema.ts';
 import type { PatientCreateContextRegistry, PatientCreatePrecondition, PatientCreateSession } from './security/patient-create-context.ts';
 

@@ -1,4 +1,4 @@
-/* @Codex WUL-676: a workbench, with one application rail and one working plane. */
+/* WUL-676: a workbench, with one application rail and one working plane. */
 .workspace { --twin-rail: 192px; --twin-border: var(--lume-rule); display: grid; grid-template-columns: var(--twin-rail) minmax(0, 1fr); position: fixed; inset: var(--runtime-twin-inset, 0px) 0 0; padding: 12px 12px 12px 0; background: var(--lume-surface-canvas); color: var(--lume-ink); font-family: var(--lume-font-sans); }
 .rail { display: flex; flex-direction: column; min-height: 0; padding: 22px 12px 14px; background: var(--lume-surface-chrome); border-right: 0; }
 .brand { display: flex; align-items: center; gap: 9px; padding: 0 9px 26px; letter-spacing: 0; font: var(--type-brand); }
@@ -16,7 +16,7 @@
 .recordTab > a:first-child { font-size: 0.75rem; padding: 8px 7px 8px 12px; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recordTab > :last-child { display: grid; place-items: center; width: 40px; height: 40px; }
 .recordTab[data-active='true'] { color: var(--lume-ink); background: var(--lume-surface-field); }
-/* @Codex: preserve the shared toggle's touch target inside the 48px header. */
+/* preserve the shared toggle's touch target inside the 48px header. */
 .privacy { width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: 7px !important; border: 0 !important; padding: 0 !important; flex: none; }
 .page { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
 .workspace :is(a, button, summary):focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 2px; }

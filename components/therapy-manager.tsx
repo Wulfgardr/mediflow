@@ -53,7 +53,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
     const [editingId, setEditingId] = useState<string | null>(null);
     const [isGalenic, setIsGalenic] = useState(false); // Toggle for Free Text vs AIFA
     const [selectedDiagnosis, setSelectedDiagnosis] = useState<{ code: string; title: string } | null>(null);
-    /* @Codex WUL-UIUX: protezione doppio submit e nome farmaco corrente in edit. */
+    /* WUL-UIUX: protezione doppio submit e nome farmaco corrente in edit. */
     const [isSaving, setIsSaving] = useState(false);
     const saving = useRef(false);
     const [editingDrugName, setEditingDrugName] = useState('');
@@ -323,7 +323,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
             return;
         }
         const patch: { status: Therapy['status']; updatedAt: Date; endDate?: Date | null } = { status, updatedAt: new Date() };
-        /* @Codex WUL-UIUX: endDate esiste in schema ma non veniva mai valorizzata;
+        /* WUL-UIUX: endDate esiste in schema ma non veniva mai valorizzata;
            la conclusione la registra. Alla riattivazione va azzerata con null
            ESPLICITO: undefined verrebbe eliminato da JSON.stringify e il backend
            non lo cancellerebbe (la route pulisce endDate solo su null o ''). */
@@ -507,7 +507,7 @@ export default function TherapyManager({ patientId, embedded = false }: { patien
                                 ) : (
                                     <div className="relative">
                                         <DrugAutocomplete
-                                            /* @Codex WUL-UIUX: key legata alla riga in modifica: passando da
+                                            /* WUL-UIUX: key legata alla riga in modifica: passando da
                                                una terapia all'altra con form aperto, React rimonta il combobox
                                                e rilegge defaultValue (query e useState(defaultValue), letto solo
                                                al mount) evitando di mostrare il farmaco della terapia precedente. */

@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex: shared AIFA surface; real client functions and existing server authority only. */
+/* shared AIFA surface; real client functions and existing server authority only. */
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, Database, Server, Upload } from 'lucide-react';
 import { importAifaCsv, updateAifaCatalog, getDrugCatalogStatus, clearDrugDatabase } from '@/lib/aifa-importer';
@@ -155,7 +155,7 @@ export default function AifaCatalogManager() {
                 {drugCatalog?.state === 'not-imported' && <p className="text-sm">Nessun catalogo locale importato.</p>}
                 {drugCatalog === null && !state.reading && <p className="text-sm">Stato locale non disponibile.</p>}
 
-                {/* @Codex Keep the automatic route first; manual import remains available on demand. */}
+                {/* Keep the automatic route first; manual import remains available on demand. */}
                 <details className="rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] p-4">
                     <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">Carica un CSV già scaricato</summary>
                     <p className="mb-4 mt-2 text-sm leading-6 text-[color:var(--lume-ink-muted)]">Usa un file locale e indica la sua provenienza.</p>

@@ -1,15 +1,10 @@
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import { SISS_PORTAL_URLS } from './siss-adapter';
-/* @Codex */
 import {
     createSissPatientContextHandoff,
     SissPatientContextError,
 } from './siss-patient-context';
-/* @Codex */
 import {
     buildSissPatientContextSummary,
     resolveSissPatientContextAction,

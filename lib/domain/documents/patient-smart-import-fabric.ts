@@ -1,4 +1,3 @@
-/* @Codex */
 import { getFabricCapabilityDescriptor } from '../../ai-providers/fabric/catalog';
 import {
     routeCandidateCapability,

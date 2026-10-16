@@ -1,4 +1,3 @@
-/* @Codex */
 export type SmartImportProjectionErrorCode = 'projection_invalid' | 'projection_stale';
 export const SMART_IMPORT_PROJECTION_FRESHNESS_MS = 300_000;
 

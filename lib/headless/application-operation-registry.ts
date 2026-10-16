@@ -4,7 +4,6 @@ import {
   type HeadlessCanonicalCapabilityDescriptor,
 } from './canonical-capability-catalog';
 
-/* @Codex */
 export type ApplicationOperationDescriptor = Readonly<{
   schema: 'mediflow.headless.application-operation-descriptor.v1';
   anchorId: string; miniCommandId: string;

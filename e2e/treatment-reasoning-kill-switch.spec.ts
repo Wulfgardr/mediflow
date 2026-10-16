@@ -80,7 +80,7 @@ test('treatment reasoning kill switch blocks new drafts on the Scheda', async ({
     }
   }, patientId);
 
-  // @Codex: select the ordinary therapy pane before inspecting its disabled state.
+  // select the ordinary therapy pane before inspecting its disabled state.
   await page.goto(`/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'terapie');

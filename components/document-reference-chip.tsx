@@ -1,4 +1,3 @@
-/* @Codex */
 import { FileText } from 'lucide-react';
 import { LumeFilo } from '@/components/ui/lume-filo';
 
@@ -6,7 +5,6 @@ interface DocumentReferenceChipProps {
     references: string[];
 }
 
-/* @Codex */
 export function DocumentReferenceChip({ references }: DocumentReferenceChipProps) {
     if (references.length === 0) return null;
 

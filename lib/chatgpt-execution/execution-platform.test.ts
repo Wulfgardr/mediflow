@@ -1,4 +1,4 @@
-/* @Codex — source gating tests are not OS qualification. No probe or spawn. */
+/* source gating tests are not OS qualification. No probe or spawn. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 const { executionPlatformSnapshot, createProductionExecutionPlatform, createReviewedMacProductPlatform } = await import('./execution-platform.ts');

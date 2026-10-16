@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -337,7 +336,7 @@ test('new-form defaults and date transforms retain the normal create flow', () =
     assert.throws(() => patientFormDefaults({ birthDate: 'invalid-date' }));
 });
 
-/* @Codex: followup2 — compare editable values, not property insertion order. */
+/* followup2 — compare editable values, not property insertion order. */
 test('diagnosis property order alone causes zero writes', async () => {
     const memory = store(); const session = new PatientEditSession(fixture());
     const draft = session.getDefaultValues();

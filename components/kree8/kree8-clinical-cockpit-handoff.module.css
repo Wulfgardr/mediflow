@@ -1,4 +1,4 @@
-/* @Codex Issue 109, riferimento 68: evidenza, decisione e passo successivo. */
+/* Issue 109, riferimento 68: evidenza, decisione e passo successivo. */
 
 /* Selettori della review sintetica, condivisi con handoff-area. */
 .stageRow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; position: relative; }
@@ -93,7 +93,7 @@
   .quietAction { transition-duration: 0ms; }
 }
 
-/* @Codex WUL-UIUX: focus visibile su stage e launcher. */
+/* WUL-UIUX: focus visibile su stage e launcher. */
 .stageBtn:focus-visible,
 .launcherTile:focus-visible {
   outline: none;

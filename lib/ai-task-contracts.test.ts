@@ -21,7 +21,7 @@ import {
     buildSmartImportExtractionPrompt as buildSmartImportPromptDirect,
 } from './ai-task-contract-prompts';
 
-/* @Codex WUL-362 R5: il contatore misura visite di caratteri, non tempo. */
+/* WUL-362 R5: il contatore misura visite di caratteri, non tempo. */
 function assertFragmentScanWorkBound(text: string): void {
     const measured = __testMeasureJsonFragmentScanWork(text);
     assert.equal(measured.truncated, true);
@@ -35,7 +35,7 @@ test('fragment scan bounds character visits for many unclosed openers', () => {
     assertFragmentScanWorkBound('{'.repeat(4096));
 });
 
-/* @Codex WUL-362 R5b: invarianti verdi per due famiglie avverse della review. */
+/* WUL-362 R5b: invarianti verdi per due famiglie avverse della review. */
 test('fragment scan bounds character visits for alternating openers', () => {
     assertFragmentScanWorkBound('{['.repeat(2048));
 });
@@ -140,7 +140,6 @@ test('smart import extraction keeps only valid structured suggestions', () => {
     assert.equal(parsed.value.data.therapies[0].drugMention, 'Metformina 500 mg');
 });
 
-/* @Codex */
 test('smart import extraction marks missing confidence as low', () => {
     const parsed = parseSmartImportExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -160,7 +159,6 @@ test('smart import extraction marks missing confidence as low', () => {
     assert.equal(parsed.value.data.diagnoses[0]?.confidence, 'low');
 });
 
-/* @Codex */
 test('envelope with a mismatched task is not usable even when its JSON is valid', () => {
     const parsed = parseSmartImportExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -174,7 +172,7 @@ test('envelope with a mismatched task is not usable even when its JSON is valid'
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
-/* @Codex: WUL-362 duplicate-key JSON fail-closed contract */
+/* WUL-362 duplicate-key JSON fail-closed contract */
 test('duplicate ASCII task keys reject both last-wins task orders', () => {
     const smartImportLast = parseSmartImportExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","task":"smart_import","summary":"Non usare","data":{"diagnoses":[],"therapies":[],"servicePrescriptions":[]}}',
@@ -193,7 +191,6 @@ test('duplicate ASCII task keys reject both last-wins task orders', () => {
     assert.deepEqual(patientInsightLast.value.data, { currentState: [], alerts: [], nextSteps: [], gaps: [] });
 });
 
-/* @Codex */
 test('duplicate Unicode-escaped task and schemaVersion keys reject the envelope', () => {
     const duplicateTask = parsePatientInsightExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","ta\\u0073k":"smart_import","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
@@ -210,7 +207,6 @@ test('duplicate Unicode-escaped task and schemaVersion keys reject the envelope'
     }
 });
 
-/* @Codex */
 test('duplicate keys reject equal values and duplicates inside data', () => {
     const equalTask = parsePatientInsightExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
@@ -228,7 +224,6 @@ test('duplicate keys reject equal values and duplicates inside data', () => {
     }
 });
 
-/* @Codex */
 test('same keys in parent, child, sibling objects, and array objects remain usable', () => {
     const parentChild = parsePatientInsightExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","summary":"x","data":{"summary":"y","currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
@@ -241,7 +236,6 @@ test('same keys in parent, child, sibling objects, and array objects remain usab
     assert.equal(isEnvelopeUsable(separateScopes), true);
 });
 
-/* @Codex */
 test('all task parsers reject a duplicate task key for their own envelope', () => {
     const patientInsight = parsePatientInsightExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","task":"patient_insight","task":"patient_insight","summary":"Non usare","data":{"currentState":[],"alerts":[],"nextSteps":[],"gaps":[]}}',
@@ -261,7 +255,6 @@ test('all task parsers reject a duplicate task key for their own envelope', () =
     }
 });
 
-/* @Codex */
 test('a modern duplicate envelope never recovers through the document legacy contract', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(
         '{"schemaVersion":"mediflow.ai.extract.v1","task":"document_synthesis","task":"document_synthesis","summary_markdown":"Storico","quality":{"level":"green"},"diagnoses":[]}',
@@ -645,7 +638,6 @@ test('smart import prompt stays byte-identical through the compatible barrel', (
     assert.equal(createHash('sha256').update(prompt).digest('hex'), 'e0a67ae602f10e8d5e68b4dacfca678bdca72993a0597ebfe77b9bb038c6e430');
 });
 
-/* @Codex */
 test('document synthesis prompt stays byte-identical through the compatible barrel', () => {
     const rawText = 'REFERTO SINTETICO\nNessun dato reale';
     const prompt = buildDocumentSynthesisExtractionPrompt(rawText);
@@ -1275,7 +1267,6 @@ test('document synthesis preserves earlier fields after truncation inside a stri
     assert.equal(parsed.value.data.problemStatements.length, 0);
 });
 
-/* @Codex */
 test('document synthesis does not rescue a modern envelope with a mismatched task as legacy', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
         schemaVersion: AI_TASK_EXTRACTION_SCHEMA_VERSION,
@@ -1290,7 +1281,6 @@ test('document synthesis does not rescue a modern envelope with a mismatched tas
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
-/* @Codex */
 test('legacy rescue rejects case-variant modern envelope keys', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
         SchemaVersion: 'mediflow.ai.extract.v1',
@@ -1304,7 +1294,6 @@ test('legacy rescue rejects case-variant modern envelope keys', () => {
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
-/* @Codex */
 test('legacy rescue rejects a nested modern envelope declaration', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
         summary: 'Envelope moderno annidato',
@@ -1317,7 +1306,6 @@ test('legacy rescue rejects a nested modern envelope declaration', () => {
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
-/* @Codex */
 test('legacy rescue rejects a deeply nested modern envelope declaration', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
         summary: 'Envelope dichiarato in profondita',
@@ -1330,7 +1318,7 @@ test('legacy rescue rejects a deeply nested modern envelope declaration', () => 
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
-/* @Codex: tri-state del rescue legacy - solo absent consente il recupero */
+/* tri-state del rescue legacy - solo absent consente il recupero */
 test('legacy rescue is blocked by a modern envelope in a later fragment', () => {
     const response = '```json\n{"summary_markdown":"**Riassunto clinico:** testo storico","quality":{"level":"green"},"diagnoses":[]}\n```\n```json\n'
         + JSON.stringify({ schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import', summary: 'wrong task', data: {} })
@@ -1342,7 +1330,6 @@ test('legacy rescue is blocked by a modern envelope in a later fragment', () => 
     assert.equal(isEnvelopeUsable(parsed), false);
 });
 
-/* @Codex */
 test('legacy rescue is blocked when depth truncation makes evidence unknown', () => {
     let nested: unknown = { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import' };
     for (let index = 0; index < 8; index += 1) nested = { layer: nested };
@@ -1357,7 +1344,6 @@ test('legacy rescue is blocked when depth truncation makes evidence unknown', ()
     assert.equal(parsed.legacyContract, false);
 });
 
-/* @Codex */
 test('legacy rescue is blocked by present evidence at the exact depth limit', () => {
     let nested: unknown = { schemaVersion: 'mediflow.ai.extract.v1', task: 'smart_import' };
     for (let index = 0; index < 7; index += 1) nested = { layer: nested };
@@ -1372,7 +1358,6 @@ test('legacy rescue is blocked by present evidence at the exact depth limit', ()
     assert.equal(parsed.legacyContract, false);
 });
 
-/* @Codex */
 test('legacy rescue is blocked by a single-quoted pseudo envelope in a string field', () => {
     const parsed = parseDocumentSynthesisExtractionResponse(JSON.stringify({
         summary_markdown: '**Riassunto clinico:** storico',
@@ -1385,7 +1370,7 @@ test('legacy rescue is blocked by a single-quoted pseudo envelope in a string fi
     assert.equal(parsed.legacyContract, false);
 });
 
-/* @Codex: lo sniff pseudo-JSON deve riconoscere una chiave task con escape. */
+/* lo sniff pseudo-JSON deve riconoscere una chiave task con escape. */
 test('legacy rescue is blocked by an escaped task key in a single-quoted pseudo envelope', () => {
     const response = JSON.stringify({
         summary_markdown: '**Riassunto clinico:** testo storico sintetico',
@@ -1414,7 +1399,7 @@ test('legacy rescue is blocked by an escaped task key in a single-quoted pseudo 
     });
 });
 
-/* @Codex: anche schemaVersion escaped dichiara un envelope moderno. */
+/* anche schemaVersion escaped dichiara un envelope moderno. */
 test('legacy rescue is blocked by an escaped schemaVersion key in a single-quoted pseudo envelope', () => {
     const response = JSON.stringify({
         summary_markdown: '**Riassunto clinico:** testo storico sintetico',
@@ -1435,7 +1420,7 @@ test('legacy rescue is blocked by an escaped schemaVersion key in a single-quote
     });
 });
 
-/* @Codex: un escape senza dichiarazione moderna non deve bloccare il legacy. */
+/* un escape senza dichiarazione moderna non deve bloccare il legacy. */
 test('single-quoted pseudo JSON with escapes but no modern declaration stays absent', () => {
     const response = JSON.stringify({
         summary_markdown: '**Riassunto clinico:** testo storico sintetico',
@@ -1447,7 +1432,7 @@ test('single-quoted pseudo JSON with escapes but no modern declaration stays abs
     assert.equal(detectModernEnvelopeEvidence(response), 'absent');
 });
 
-/* @Codex: una sola passata copre gli escape JS ammessi senza trasformare gli
+/* una sola passata copre gli escape JS ammessi senza trasformare gli
    escape di controllo nelle lettere che li nominano. */
 test('single-quoted pseudo envelope sniff decodes JS escapes once', () => {
     for (const content of [
@@ -1469,7 +1454,7 @@ test('single-quoted pseudo envelope sniff decodes JS escapes once', () => {
     );
 });
 
-/* @Codex: extractor non appartiene al prefisso esatto o dotted del contratto. */
+/* extractor non appartiene al prefisso esatto o dotted del contratto. */
 test('legacy rescue accepts schemaVersion mediflow.ai.extractor as non-modern', () => {
     const response = JSON.stringify({
         schemaVersion: 'mediflow.ai.extractor',
@@ -1488,7 +1473,7 @@ test('legacy rescue accepts schemaVersion mediflow.ai.extractor as non-modern', 
     });
 });
 
-/* @Codex: il ramo pseudo-JSON usa lo stesso contratto ASCII exact-or-dotted. */
+/* il ramo pseudo-JSON usa lo stesso contratto ASCII exact-or-dotted. */
 test('legacy rescue accepts pseudo-JSON schemaVersion mediflow.ai.extractor as non-modern', () => {
     const response = JSON.stringify({
         summary_markdown: '**Riassunto clinico:** testo storico sintetico',
@@ -1507,7 +1492,7 @@ test('legacy rescue accepts pseudo-JSON schemaVersion mediflow.ai.extractor as n
     });
 });
 
-/* @Codex: lo schema esatto e le sole estensioni dotted restano moderne. */
+/* lo schema esatto e le sole estensioni dotted restano moderne. */
 test('exact and dotted schemaVersion values remain present without support keys', () => {
     for (const schemaVersion of [
         'mediflow.ai.extract',
@@ -1521,7 +1506,7 @@ test('exact and dotted schemaVersion values remain present without support keys'
     }
 });
 
-/* @Codex: schemaVersion resta una chiave di supporto anche con valore non moderno. */
+/* schemaVersion resta una chiave di supporto anche con valore non moderno. */
 test('known task with extractor schemaVersion support remains present', () => {
     assert.equal(detectModernEnvelopeEvidence(JSON.stringify({
         task: 'document_synthesis',
@@ -1529,7 +1514,6 @@ test('known task with extractor schemaVersion support remains present', () => {
     })), 'present');
 });
 
-/* @Codex */
 test('tri-state precedence: collected evidence wins over fragment truncation', () => {
     const text = [
         JSON.stringify({
@@ -1645,7 +1629,7 @@ test('no evidence with exhausted depth budget stays unknown, never absent', () =
     assert.equal(detectModernEnvelopeEvidence(JSON.stringify(nested)), 'unknown');
 });
 
-/* @Codex WUL-362 R5b: nove candidati reali su otto stringhe devono bloccare
+/* WUL-362 R5b: nove candidati reali su otto stringhe devono bloccare
    il rescue documentale legacy anche quando le citazioni non consumano budget. */
 test('legacy document rescue rejects nine candidates distributed over eight cited strings', () => {
     const citations = Object.fromEntries(

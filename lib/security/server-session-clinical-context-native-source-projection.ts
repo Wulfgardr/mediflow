@@ -1,4 +1,4 @@
-/* @Codex — pure minimization of host rows; not an ingress or authority issuer. */
+/* pure minimization of host rows; not an ingress or authority issuer. */
 import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 import { clinicalRichTextToPlainText } from '../clinical-rich-text';

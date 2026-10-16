@@ -1,6 +1,5 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { conversations, messages } from '@/lib/schema';
@@ -31,7 +30,6 @@ export async function PUT(
         if (body && typeof body === 'object') {
             if (typeof body.title === 'string') updateData.title = body.title;
             if (typeof body.isArchived === 'boolean') updateData.isArchived = body.isArchived;
-            /* @Codex */
             if (typeof body.isDeleted === 'boolean') updateData.isDeleted = body.isDeleted;
         }
 
@@ -56,7 +54,6 @@ export async function DELETE(
 
     try {
         const { id } = await params;
-        /* @Codex */
         dbServer.transaction((tx) => {
             tx.delete(messages).where(eq(messages.conversationId, id)).run();
             tx.delete(conversations).where(eq(conversations.id, id)).run();

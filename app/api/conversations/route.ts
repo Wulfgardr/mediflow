@@ -5,15 +5,11 @@ import { dbServer } from '@/lib/db-server';
 import { conversations } from '@/lib/schema';
 import { desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { conversationCreateSchema } from '@/lib/api-schemas/conversations';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
 export async function GET() {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
@@ -28,7 +24,6 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);
@@ -42,7 +37,6 @@ export async function POST(request: Request) {
         await dbServer.insert(conversations).values({
             id: body.id || uuidv4(),
             title: body.title,
-            /* @Codex */
             isDeleted: false,
             updatedAt: new Date(),
             createdAt: new Date()

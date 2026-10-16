@@ -1,4 +1,4 @@
-/* @Codex: post-fix route harness. Real Drizzle/better-sqlite3, production column
+/* post-fix route harness. Real Drizzle/better-sqlite3, production column
  * mappings, route/normalizers/journal; synthetic DDL/data in memory or an owned
  * disposable WAL database for two-connection writer-order tests.
  * Next/auth/audit are doubles. No production DB bootstrap, HTTP server or provider.

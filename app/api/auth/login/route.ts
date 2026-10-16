@@ -1,16 +1,12 @@
 import { NextResponse } from 'next/server';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
-/* @Codex */
 import {
     requestIdFromRequest,
     withAuditContextMetadata,
     writeAuditEvent,
 } from '@/lib/security/audit';
-/* @Codex */
 import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
-/* @Codex */
 import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
-/* @Codex */
 import {
     abortWebAuthControl,
     beginWebAuthControl,
@@ -19,12 +15,10 @@ import {
     webAuthControlMutationFromRequest,
     type WebAuthControlMutation,
 } from '@/lib/security/web-auth-control-transport';
-/* @Codex */
 import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 import { retirePendingPinEraResidues } from '@/lib/security/pin-era-residues';
 import { dbServer } from '@/lib/db-server';
 
-/* @Codex */
 function authFailureResponse(payload: Record<string, unknown>, status: number, etag?: string) {
     const response = NextResponse.json(payload, { status });
     const retryAfterSeconds = typeof payload.retryAfterSeconds === 'number' ? payload.retryAfterSeconds : null;

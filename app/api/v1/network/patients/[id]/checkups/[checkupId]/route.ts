@@ -1,21 +1,15 @@
-/* @Codex */
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_CHECKUP_READ_CAPABILITY,
     getNetworkScopedCheckup,
 } from '@/lib/network-checkup-read';
-/* @Codex */
 import {
     NETWORK_CHECKUP_WRITE_CAPABILITY,
     updateNetworkScopedCheckup,
 } from '@/lib/network-checkup-write';
-/* @Codex */
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
 
-/* @Codex */
 export async function GET(
     request: Request,
     { params }: { params: Promise<{ id: string; checkupId: string }> }
@@ -37,7 +31,6 @@ export async function GET(
     }
 }
 
-/* @Codex */
 export async function PUT(
     request: Request,
     { params }: { params: Promise<{ id: string; checkupId: string }> }
@@ -54,7 +47,6 @@ export async function PUT(
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        /* @Codex */
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         console.error('API PUT /api/v1/network/patients/[id]/checkups/[checkupId] error:', error);

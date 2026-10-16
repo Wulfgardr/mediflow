@@ -1,4 +1,4 @@
-/* @Codex: test-only, passive observation of one real keyboard activation.
+/* test-only, passive observation of one real keyboard activation.
  * No synthetic events, focus repair, input activation or application hooks.
  * The returned object remains in the page; snapshots contain passive state and bounded counts only.
  */

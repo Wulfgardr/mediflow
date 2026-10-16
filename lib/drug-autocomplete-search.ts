@@ -10,7 +10,7 @@ export type DrugAutocompleteResult = {
     catalogState: DrugAutocompleteCatalogState;
 };
 
-/* @Codex WUL-488 */
+/* WUL-488 */
 export async function fetchDrugAutocomplete(
     query: string,
     signal: AbortSignal,
@@ -31,7 +31,7 @@ export async function fetchDrugAutocomplete(
     return { items: (payload as AifaDrug[]).slice(0, RESULT_LIMIT), catalogState };
 }
 
-/* @Codex WUL-488 */
+/* WUL-488 */
 export function createDrugAutocompleteSearch(fetchImpl: FetchLike = fetch) {
     let revision = 0;
     let activeController: AbortController | null = null;
@@ -59,7 +59,7 @@ export function createDrugAutocompleteSearch(fetchImpl: FetchLike = fetch) {
     };
 }
 
-/* @Codex WUL-488 */
+/* WUL-488 */
 export function commitDrugAutocompleteQueryChange(
     search: Pick<ReturnType<typeof createDrugAutocompleteSearch>, 'abort'>,
     commit: (value: string) => void,

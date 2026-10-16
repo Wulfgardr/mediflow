@@ -1,24 +1,17 @@
-/* @Codex */
 import { and, desc, eq } from 'drizzle-orm';
-/* @Codex */
 import { buildAttachmentPath } from './attachment-path';
-/* @Codex */
 import { dbServer } from './db-server';
-/* @Codex */
 import type {
     AttachmentDetail,
     AttachmentSummary,
 } from './api/v1/types';
-/* @Codex */
 import {
     isDocumentOcrQueueReason,
     isDocumentOcrQueueState,
     type DocumentOcrQueueReason,
 } from './domain/documents/document-ocr-queue';
-/* @Codex */
 import { attachments, patientsToAmbulatories } from './schema';
 
-/* @Codex */
 const NETWORK_DOCUMENT_OCR_QUEUE_REASONS: ReadonlySet<string> = new Set<DocumentOcrQueueReason>([
     'text_layer_absent',
     'text_too_short',
@@ -28,17 +21,14 @@ const NETWORK_DOCUMENT_OCR_QUEUE_REASONS: ReadonlySet<string> = new Set<Document
     'paired_upload',
 ]);
 
-/* @Codex */
 export function toNetworkDocumentOcrQueueReason(value: unknown): AttachmentSummary['ocrQueueReason'] {
     return typeof value === 'string' && NETWORK_DOCUMENT_OCR_QUEUE_REASONS.has(value)
         ? value as AttachmentSummary['ocrQueueReason']
         : null;
 }
 
-/* @Codex */
 export const NETWORK_ATTACHMENT_READ_CAPABILITY = 'network.replica.readonly-documents';
 
-/* @Codex */
 export const NETWORK_ATTACHMENT_METADATA_COLUMNS = {
     id: attachments.id,
     patientId: attachments.patientId,
@@ -87,7 +77,6 @@ function toAttachmentSummary(row: AttachmentSummaryRow): AttachmentSummary {
     };
 }
 
-/* @Codex */
 export async function listNetworkScopedAttachments(
     patientId: string,
     scopeAmbulatoryId: string
@@ -105,7 +94,6 @@ export async function listNetworkScopedAttachments(
     return rows.map(toAttachmentSummary);
 }
 
-/* @Codex */
 export async function getNetworkScopedAttachment(
     patientId: string,
     attachmentId: string,

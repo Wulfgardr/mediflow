@@ -1,4 +1,4 @@
-/* @Codex — local provisioning transaction. A slot is staging until runtime.json
+/* local provisioning transaction. A slot is staging until runtime.json
  * is linked atomically. The slot pathname NEVER changes: venvs are not relocated.
  * This module's dependency seam is for synthetic tests, not a CLI/HTTP authority. */
 import fs from 'node:fs';
@@ -71,7 +71,7 @@ export function inventorySlot(slot, physical, { seal = false, publishedDescripto
       demand(stat.uid === process.getuid(), 'installed_owner_invalid');
       if (stat.isSymbolicLink()) {
         const resolved = fs.realpathSync(file), target = fs.readlinkSync(file);
-        // @Codex Python 3.14 on macOS also creates the documented Unicode
+        // Python 3.14 on macOS also creates the documented Unicode
         // `𝜋thon` launcher. Keep the allowlist exact and bind every alias to
         // the already verified physical interpreter.
         const interpreter = (/^venv\/bin\/python(?:3(?:\.\d+)?)?$/.test(rel)

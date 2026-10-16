@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { getEventListeners } from 'node:events';
@@ -159,7 +158,7 @@ for (const serverVersion of ['0.33.3', '0.40.4']) test(`canonical attestor ${ser
     assert.deepEqual(seen, ['/api/version', '/api/tags', '/api/show', '/api/generate', '/api/ps']);
 });
 
-/* @Codex: these tests require the canonical owner and real SQLite, as above.
+/* these tests require the canonical owner and real SQLite, as above.
    The attestation seam supplies synthetic metadata, never a model/inference claim. */
 test('a request cancelled before activation does not contact the provider or write lifecycle', async () => {
     const f = fixture(); const initial = await f.service.inspect();
@@ -231,7 +230,7 @@ test('successful activation removes caller cancellation listener and reactivatio
     assert.equal(f.calls(), 2);
 });
 
-/* @Codex round 2: explicit resume keeps the same real owner/SQLite/lifecycle fixtures. */
+/* round 2: explicit resume keeps the same real owner/SQLite/lifecycle fixtures. */
 test('cancelled attempt requires a fresh revision and fresh attestation for explicit resume', async () => {
     let first = true; let started!: () => void; let finish!: () => void;
     const waiting = new Promise<void>(resolve => { started = resolve; });

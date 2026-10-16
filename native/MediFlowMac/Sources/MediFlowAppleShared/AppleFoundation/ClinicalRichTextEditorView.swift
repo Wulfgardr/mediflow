@@ -1,7 +1,7 @@
 import SwiftUI
 import MediFlowCore
 
-/* @Codex: Native inline text selection; the same document is rendered before sealing. */
+/* Native inline text selection; the same document is rendered before sealing. */
 struct ClinicalRichTextEditorView: View {
     @Binding var document: ClinicalRichTextEditorDocument
     let accessibilityPrefix: String
@@ -201,7 +201,6 @@ struct ClinicalRichTextEditorView: View {
 
 // MARK: - Attachment references picker (D4, ADR 0076 Classe B)
 
-/* @Codex */
 struct EntryAttachmentReferencePicker: View {
     let attachments: [HomeBaseAttachmentSummary]
     @Binding var selectedIds: Set<String>
@@ -249,7 +248,6 @@ struct EntryAttachmentReferencePicker: View {
 
 // MARK: - Visit draft composer (D5, ADR 0076 Classe E)
 
-/* @Codex */
 struct VisitDraftComposerView: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
 

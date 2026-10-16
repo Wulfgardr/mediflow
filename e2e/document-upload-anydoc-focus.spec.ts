@@ -1,4 +1,3 @@
-/* @Codex */
 import { expect, test, type Page } from '@playwright/test';
 
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
@@ -98,7 +97,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   const patientId = await createSyntheticFixture(page);
   await openDocumentArchive(page, patientId);
 
-  // @Codex: one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
+  // one accessible chooser opens the native picker and Tab visits the viewer before local extraction.
   const chooser = page.getByRole('button', { name: 'Carica documenti', exact: true });
   await expect(chooser).toHaveCount(1);
   await expect(chooser).toBeVisible();
@@ -179,7 +178,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   await expect(extractButton).toHaveAccessibleName(`Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}`);
   let actionGroup = extractButton.locator('..');
   await page.mouse.move(0, 0);
-  // @Codex: named document actions remain visible before pointer or keyboard focus.
+  // named document actions remain visible before pointer or keyboard focus.
   await expect(actionGroup).toHaveCSS('opacity', '1');
 
   await extractButton.focus();
@@ -197,7 +196,7 @@ test('AnyDoc: le azioni allegato restano visibili al focus e sui viewport strett
   ]);
 
   await page.setViewportSize({ width: 390, height: 844 });
-  // @Codex: resize the same open document pane, as the user does; reloading
+  // resize the same open document pane, as the user does; reloading
   // would replace the UI whose responsive focus controls are being verified.
   await openPatientSection(page, 'documenti');
   extractButton = page.getByRole('button', { name: `Estrai testo localmente da ${SYNTHETIC_ATTACHMENT_NAME}` });
@@ -233,7 +232,7 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
 
   const preview = page.getByTestId('anydoc-local-extraction-preview');
   await expect(preview).toBeVisible();
-  // @Codex: the receipt is reachable only after the client strictly validates the acquired grant,
+  // the receipt is reachable only after the client strictly validates the acquired grant,
   // current canonical source, response provenance/digest and review-only contract (client lines 233-247).
   // CDP response-body retrieval is unavailable in both CI and the packaged runtime.
   await preview.locator('summary').click();
@@ -243,7 +242,7 @@ test('AnyDoc: il browser usa la route autenticata e mostra solo l’anteprima lo
   await expect(page.getByText('review_required · unsupported_local_extraction', { exact: false })).toHaveCount(0);
 });
 
-// @Codex: native options must conceal filenames while preserving source identity.
+// native options must conceal filenames while preserving source identity.
 test('Documenti: privacy nasconde i nomi nel selettore prima e dopo la scelta', async ({ page }) => {
   await establishSyntheticSession(page);
   const patientId = await createSyntheticFixture(page);

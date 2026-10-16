@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 
 public struct NativeAIFunctionPreferences: Codable, Equatable, Sendable {

@@ -1,13 +1,13 @@
 'use client';
 
-/* @Codex WUL-674 / WUL-684: presentation only; status/actions remain server-owned. */
+/* WUL-674 / WUL-684: presentation only; status/actions remain server-owned. */
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { FUNCTION_META, FUNCTION_STATE_LABELS, parseFunctionStatus, type FunctionId, type FunctionStatusRow, type FunctionStatusSnapshot } from '@/lib/function-status';
 import { SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
 import styles from './function-status-panel.module.css';
 
-/* @Codex: Fabric presents intelligent functions; ICD-11 belongs to Repertori.
+/* Fabric presents intelligent functions; ICD-11 belongs to Repertori.
    The complete seven-row API snapshot is still validated without modification. */
 const FUNCTION_GROUPS: readonly { id: string; title: string; functions: readonly FunctionId[] }[] = [
     { id: 'summaries', title: 'Sintesi, importazione e revisione del trattamento', functions: ['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] },

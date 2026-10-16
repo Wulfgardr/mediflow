@@ -1,4 +1,4 @@
-/* @Codex WUL-684: JSX structure and callback contracts on synthetic snapshots.
+/* WUL-684: JSX structure and callback contracts on synthetic snapshots.
    These tests do not attest browser rendering, React effects, keyboard or zoom. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

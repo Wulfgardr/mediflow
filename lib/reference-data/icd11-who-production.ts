@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { createWhoCatalogRuntime, type Icd11WhoCatalogRuntime } from './icd11-catalog-runtime';

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { inArray } from 'drizzle-orm';
-/* @Codex */
 import { dbServer } from '@/lib/db-server';
 import { settings } from '@/lib/schema';
 import {
@@ -43,7 +42,6 @@ async function observeLocalProcess(rawBaseUrl: string): Promise<VenueObservation
 }
 
 export async function GET(req: NextRequest) {
-    /* @Codex */
     const session = await requireSessionOrLocalToken(req);
     if (!session) return unauthorizedResponse();
 

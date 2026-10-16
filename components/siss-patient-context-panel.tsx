@@ -1,17 +1,11 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useState } from 'react';
 import styles from './siss-workspace.module.css';
-/* @Codex */
 import { Accessibility, BadgePercent, ChevronDown, Copy, ExternalLink, FolderOpen, IdCard, ListChecks, LoaderCircle, Pill, RefreshCcw, Search, ShieldAlert, ShieldCheck, SquareMenu, Stethoscope } from 'lucide-react';
-/* @Codex */
 import { completeSissPortalHandoff, prepareSissPortalWindow } from '@/lib/siss';
-/* @Codex */
 import { copyToClipboard } from '@/lib/clipboard';
-/* @Codex */
 import { buildSissPatientContextSummary, type SissPatientContextAction, type SissPatientContextTransportMode } from '@/lib/siss-patient-context-shared';
-/* @Codex */
 import {
     buildExemptionCopyFields,
     buildServicePrescriptionCopyFields,
@@ -22,15 +16,10 @@ import {
     selectRecentServicePrescriptions,
     type PrescriptiveCopyField,
 } from '@/lib/siss-prescriptive-context-projection';
-/* @Codex */
 import { type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
-/* @Codex */
 import { db, type ServicePrescriptionStatus } from '@/lib/db';
-/* @Codex */
 import { useLiveQuery, useLiveQueryState } from '@/lib/live-query';
-/* @Codex */
 import { useToast } from '@/components/ui/toast-provider';
-/* @Codex */
 import {
     SISS_SESSION_OBSERVED_MODULE_LABELS,
     type SissSessionHealth,
@@ -118,7 +107,6 @@ const ACTIONS: ContextActionConfig[] = [
     },
 ];
 
-/* @Codex */
 const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
     {
         label: 'Prescrittivo nativo',
@@ -142,16 +130,15 @@ const BLOCKED_CAPABILITIES: BlockedCapabilityConfig[] = [
     },
 ];
 
-/* @Codex */
 const TRANSPORT_MODE_LABEL: Record<SissPatientContextTransportMode, string> = {
     'portal-handoff': 'Apertura portali assistita',
     'certified-api': 'Integrazione regionale certificata',
 };
 
-/* @Codex S2: stessa etichetta usata nel form di TherapyManager per lo stato attivo. */
+/* S2: stessa etichetta usata nel form di TherapyManager per lo stato attivo. */
 const THERAPY_STATUS_LABEL = 'Attiva';
 
-/* @Codex S2: stesse etichette di STATUS_OPTIONS in service-prescription-manager.tsx
+/* S2: stesse etichette di STATUS_OPTIONS in service-prescription-manager.tsx
    (non esportate da li: piccola mappa statica duplicata qui per il solo display). */
 const SERVICE_PRESCRIPTION_STATUS_LABEL: Record<ServicePrescriptionStatus, string> = {
     prescribed: 'Prescritta',
@@ -161,7 +148,7 @@ const SERVICE_PRESCRIPTION_STATUS_LABEL: Record<ServicePrescriptionStatus, strin
     cancelled: 'Annullata',
 };
 
-/* @Codex S2: formattazione data compatta coerente con formatObservedAt qui sotto. */
+/* S2: formattazione data compatta coerente con formatObservedAt qui sotto. */
 function formatShortDate(value: Date | string | null | undefined): string {
     if (!value) return 'Data non disponibile';
     const date = new Date(value);
@@ -193,7 +180,6 @@ function isHandoffResponse(value: unknown): value is HandoffResponse {
     );
 }
 
-/* @Codex */
 function healthDotClassName(health: SissSessionHealth) {
     switch (health) {
         case 'recent':
@@ -205,7 +191,6 @@ function healthDotClassName(health: SissSessionHealth) {
     }
 }
 
-/* @Codex */
 function healthLabel(health: SissSessionHealth, recent: string, stale: string, absent: string) {
     if (health === 'recent') return recent;
     if (health === 'stale') return stale;
@@ -231,7 +216,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
 
     const { showToast } = useToast();
 
-    /* @Codex S2: query client-side esplicite (D2-bis): il pannello non riceve
+    /* S2: query client-side esplicite (D2-bis): il pannello non riceve
        piu' solo patientId/patientTaxCode, legge da solo terapie, prescrizioni
        specialistiche e record paziente (esenzioni, diagnosi) per la sezione
        "Contesto prescrittivo". Sola lettura: nessuna scrittura da qui. */
@@ -259,7 +244,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
     const principalDiagnoses = selectPrincipalDiagnoses(contextPatientQuery.data?.diagnoses);
     const prescriptiveExemptionCodes = normalizeExemptionCodes(contextPatientQuery.data?.exemptions);
 
-    /* @Codex S2: stesso pattern di risoluzione descrizione esenzione della
+    /* S2: stesso pattern di risoluzione descrizione esenzione della
        modules page (fetch /api/exemptions, nessuna route nuova); se la
        risoluzione fallisce restano solo i codici, mai descrizioni inventate. */
     const exemptionDescriptions = useLiveQuery(
@@ -605,7 +590,7 @@ export default function SissPatientContextPanel({ patientId, patientTaxCode, emb
                     </div>
                 </div>
             )}
-            {/* @Codex: checks are separate from commands and exposed on warnings/errors. */}
+            {/* checks are separate from commands and exposed on warnings/errors. */}
             <details className={styles.disclosure} open={Boolean(validation?.hasErrors || validation?.hasWarnings || fseReadiness.error) || undefined}>
                 <summary>Requisiti e controllo locale dei dati</summary>
             <div className={styles.support}>

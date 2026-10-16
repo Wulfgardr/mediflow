@@ -1,13 +1,9 @@
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import {
     buildDocumentDecision,
     createDocumentDecisionEvidenceRef,
 } from './document-decision';
-/* @Codex */
 import {
     DOCUMENT_DECISION_MODEL_GOVERNANCE_VERSION,
     documentDecisionModelPolicies,

@@ -1,5 +1,4 @@
 import { parseOrdinaryRemoteReceipt, parseOrdinaryRemoteProvenance, type OrdinaryRemoteReceipt, type OrdinaryRemoteProvenance } from './chatgpt-product/ordinary-wire';
-/* @Codex */
 import { EGRESS_PROFILE_VERSION } from './ai-providers/fabric/contract';
 import { assertLocalOllamaModelReference } from './ai-providers/ollama-locality';
 

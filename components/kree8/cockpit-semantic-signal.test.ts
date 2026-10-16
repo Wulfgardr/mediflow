@@ -1,11 +1,10 @@
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import Module from 'node:module';
 import test from 'node:test';
 
-/* @Codex: registerHooks esiste dal runtime Node 24 ma non ancora nei tipi del
+/* registerHooks esiste dal runtime Node 24 ma non ancora nei tipi del
    repo; stesso idioma di cast usato in lib/ai-context.test.ts per _resolveFilename. */
 type SyncModuleHooks = {
   resolve?: (specifier: string, context: unknown, nextResolve: (specifier: string, context: unknown) => unknown) => unknown;

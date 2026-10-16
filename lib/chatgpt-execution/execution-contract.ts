@@ -1,4 +1,3 @@
-/* @Codex */
 export type ExecutionCode = 'unqualified_boundary' | 'session_expired' | 'not_connected' | 'unsupported_account'
     | 'busy' | 'canceled' | 'revoked' | 'quota_exhausted' | 'limits_unavailable' | 'catalog_stale'
     | 'model_unavailable' | 'model_mismatch' | 'invalid_request' | 'invalid_output' | 'tool_use_denied'

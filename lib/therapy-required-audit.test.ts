@@ -1,5 +1,5 @@
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-/* @Codex: synthetic real-SQLite candidate oracle for required therapy audit and eight route contracts. */
+/* synthetic real-SQLite candidate oracle for required therapy audit and eight route contracts. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -456,7 +456,7 @@ test('all eight writes deny missing or tombstoned parent and allow archived pare
     }
 });
 
-/* @Codex: route-level reader tests use byte streams; no production hook or smaller production cap. */
+/* route-level reader tests use byte streams; no production hook or smaller production cap. */
 function streamedRequest(surface: Surface, operation: Operation, chunks: Uint8Array[], headers: Record<string, string> = {}) {
     let pulls = 0, cancels = 0;
     const stream = new ReadableStream<Uint8Array>({

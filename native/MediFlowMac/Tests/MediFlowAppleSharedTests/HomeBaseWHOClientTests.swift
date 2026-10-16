@@ -1,5 +1,5 @@
 #if os(macOS)
-// @Codex: WUL-673. URLProtocol fixtures exercise the real WHO client methods.
+// WUL-673. URLProtocol fixtures exercise the real WHO client methods.
 // These do not qualify real TLS, pairing, WHO availability or live UI.
 import Foundation
 import XCTest

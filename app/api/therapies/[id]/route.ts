@@ -1,15 +1,10 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-/* @Codex */
 import { parseTherapyStatus } from '@/lib/status-normalization';
-/* @Codex */
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
-/* @Codex */
 import { therapyUpdateSchema } from '@/lib/api-schemas/clinical-writes';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { normalizeTherapyUpdateInput } from '@/lib/api-v1-clinical-write-normalization';
 import { updateTherapyOperation } from '@/lib/therapy-write-operation';
@@ -46,18 +41,12 @@ export async function PUT(
         const body = parsedBody.data;
         const updateData: {
             drugName?: string;
-            /* @Codex */
             aic?: string | null;
-            /* @Codex */
             atc?: string | null;
-            /* @Codex */
             activePrinciple?: string | null;
             dosage?: string;
-            /* @Codex */
             motivation?: string | null;
-            /* @Codex */
             diagnosisCode?: string | null;
-            /* @Codex */
             diagnosisName?: string | null;
             status?: string;
             startDate?: Date;
@@ -66,38 +55,32 @@ export async function PUT(
 
         if (typeof body === 'object') {
             if (typeof body.drugName === 'string') updateData.drugName = body.drugName;
-            /* @Codex */
             if (body.aic === null || body.aic === '') {
                 updateData.aic = null;
             } else if (typeof body.aic === 'string') {
                 updateData.aic = body.aic;
             }
-            /* @Codex */
             if (body.atc === null || body.atc === '') {
                 updateData.atc = null;
             } else if (typeof body.atc === 'string') {
                 updateData.atc = body.atc;
             }
-            /* @Codex */
             if (body.activePrinciple === null || body.activePrinciple === '') {
                 updateData.activePrinciple = null;
             } else if (typeof body.activePrinciple === 'string') {
                 updateData.activePrinciple = body.activePrinciple;
             }
             if (typeof body.dosage === 'string') updateData.dosage = body.dosage;
-            /* @Codex */
             if (body.motivation === null || body.motivation === '') {
                 updateData.motivation = null;
             } else if (typeof body.motivation === 'string') {
                 updateData.motivation = body.motivation;
             }
-            /* @Codex */
             if (body.diagnosisCode === null || body.diagnosisCode === '') {
                 updateData.diagnosisCode = null;
             } else if (typeof body.diagnosisCode === 'string') {
                 updateData.diagnosisCode = body.diagnosisCode;
             }
-            /* @Codex */
             if (body.diagnosisName === null || body.diagnosisName === '') {
                 updateData.diagnosisName = null;
             } else if (typeof body.diagnosisName === 'string') {

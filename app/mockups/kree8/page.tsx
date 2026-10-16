@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 
 import { Kree8ClinicalCockpit } from '@/components/kree8/kree8-clinical-cockpit';
 

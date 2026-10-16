@@ -1,4 +1,3 @@
-/* @Codex */
 export type VersionedConflictEntity =
     | 'patient'
     | 'entry'
@@ -9,7 +8,6 @@ export type VersionedConflictEntity =
     | 'service_prescription_item'
     | 'prosthetic_prescription';
 
-/* @Codex */
 export type VersionConflictSnapshot = {
     id: string;
     patientId?: string;
@@ -18,7 +16,6 @@ export type VersionConflictSnapshot = {
     deletedAt?: string | null;
 };
 
-/* @Codex */
 export type VersionConflictPayload = {
     error: 'Conflict';
     code: 'VERSION_CONFLICT';
@@ -31,7 +28,6 @@ export type VersionConflictPayload = {
     currentSnapshot: VersionConflictSnapshot | null;
 };
 
-/* @Codex */
 export type VersionConflictSource = {
     id: string;
     patientId?: string | null;
@@ -40,7 +36,6 @@ export type VersionConflictSource = {
     deletedAt?: Date | string | number | null;
 };
 
-/* @Codex */
 export function parseExpectedVersion(value: unknown): number | null {
     return Number.isSafeInteger(value) && typeof value === 'number' && value > 0 ? value : null;
 }
@@ -55,7 +50,6 @@ export class VersionExhaustedError extends Error {
     constructor() { super('Version cannot advance safely'); }
 }
 
-/* @Codex */
 export function requireExpectedVersion(value: unknown):
     | { ok: true; expectedVersion: number }
     | { ok: false; status: 400; value: { error: 'Version is required' } } {
@@ -66,7 +60,6 @@ export function requireExpectedVersion(value: unknown):
     return { ok: true, expectedVersion };
 }
 
-/* @Codex */
 export function isVersionConflictPayload(value: unknown): value is VersionConflictPayload {
     if (!value || typeof value !== 'object') return false;
     const payload = value as Partial<VersionConflictPayload>;
@@ -75,7 +68,6 @@ export function isVersionConflictPayload(value: unknown): value is VersionConfli
         && typeof payload.recordId === 'string';
 }
 
-/* @Codex */
 export function buildVersionConflictPayload(
     entity: VersionedConflictEntity,
     expectedVersion: number,

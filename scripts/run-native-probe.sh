@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# @Codex
 
 set -euo pipefail
 

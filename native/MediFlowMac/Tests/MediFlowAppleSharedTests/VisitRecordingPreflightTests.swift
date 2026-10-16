@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 import XCTest
 @testable import MediFlowAppleShared

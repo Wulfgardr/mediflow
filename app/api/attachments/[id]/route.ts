@@ -6,15 +6,12 @@ import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { attachments } from '@/lib/schema';
 import { and, eq } from 'drizzle-orm';
-/* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
 import {
     type DocumentOcrQueueState,
 } from '@/lib/domain/documents/document-ocr-queue';
-/* @Codex */
 import { attachmentDeleteSchema, attachmentUpdateSchema, type AttachmentExpectedCurrentness } from '@/lib/api-schemas/attachments';
-/* @Codex */
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { isAttachmentCurrentnessHostError, isAttachmentMetadataCurrentnessHostError, transitionAttachmentMetadataCurrentness } from '@/lib/attachment-currentness-host';
 
@@ -160,7 +157,6 @@ export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    /* @Codex */
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
     const archiveDenial = archiveWriteRequestDenial(request, session);

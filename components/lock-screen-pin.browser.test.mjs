@@ -1,4 +1,4 @@
-/* @Codex WUL-675 — HTML-ONLY component projection, NOT an integrated login test.
+/* WUL-675 — HTML-ONLY component projection, NOT an integrated login test.
  * Real Chromium exercises input attributes read from the actual TSX AST.
  * React, SecurityProvider, callbacks, recovery state and crypto are NOT mounted.
  * Submission is recorded locally; it never represents an authenticated session.

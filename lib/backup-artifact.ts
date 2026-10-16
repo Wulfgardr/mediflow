@@ -1,8 +1,6 @@
 import { types } from 'node:util';
 import { assertBackupAuditSnapshots, backupAuditCoverage, canonicalizeBackupAuditRows, snapshotBackupAudit } from './backup-audit';
-/* @Codex */
 import { assertExemptionImportReceiptRows } from './exemption-import-receipt';
-/* @Codex */
 import { assertProstheticsCatalogBackup } from './reference-data/prosthetics-catalog-backup';
 
 import { validateHeadlessSoapEntryCommitSemanticChain } from './security/headless-soap-entry-commit-semantic-validator';
@@ -51,38 +49,36 @@ type AdditiveBackupCollection = 'prostheticsCatalogSources' | 'prostheticsCatalo
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
-/* @Codex */
 const DURABLE_REVIEW_AUTHORITY_COLLECTIONS = new Set<BackupCollectionName>([
     'durableReviewPatientLinks',
     'physicianReviewAttestations',
 ]);
-/* @Codex Artifacts created before H7b have no durable SOAP commit ledger. */
+/* Artifacts created before H7b have no durable SOAP commit ledger. */
 const PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS = BACKUP_COLLECTIONS.filter(
     (collection) => collection !== 'headlessSoapEntryCommits',
 );
-/* @Codex v1 also tolerates an explicitly empty H7b generation without the earlier H2a-S collection. */
+/* v1 also tolerates an explicitly empty H7b generation without the earlier H2a-S collection. */
 const WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = BACKUP_COLLECTIONS.filter(
     (collection) => collection !== 'headlessSoapActiveRoleAttestations',
 );
-/* @Codex Artifacts created before H2a-S have neither SOAP authority nor the later H7b ledger. */
+/* Artifacts created before H2a-S have neither SOAP authority nor the later H7b ledger. */
 const PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS = PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS.filter(
     (collection) => collection !== 'headlessSoapActiveRoleAttestations',
 );
-/* @Codex Artifacts created before durable review authority was added have no such collections. */
+/* Artifacts created before durable review authority was added have no such collections. */
 const PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
     (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
 );
-/* @Codex Known v1 omissions remain recognizable when a later producer adds an empty H7b ledger. */
+/* Known v1 omissions remain recognizable when a later producer adds an empty H7b ledger. */
 const WITHOUT_DURABLE_REVIEW_AUTHORITY_COLLECTIONS = WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter(
     (collection) => !DURABLE_REVIEW_AUTHORITY_COLLECTIONS.has(collection),
 );
-/* @Codex */
 const LEGACY_OMITTED_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ['durableReviewCommandStates', 'durableReviewCommandOperations'],
     ['durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
     ['documentDiagnosisProposals', 'durableReviewRecords', 'durableReviewOperations', 'durableReviewCommandStates', 'durableReviewCommandOperations'],
 ];
-/* @Codex v1 recognizes both the authority-era and pre-authority collection generations. */
+/* v1 recognizes both the authority-era and pre-authority collection generations. */
 const PRE_EXEMPTION_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     WITHOUT_HEADLESS_SOAP_ATTESTATION_COLLECTIONS,
     PRE_HEADLESS_SOAP_COMMIT_COLLECTIONS,
@@ -94,13 +90,13 @@ const PRE_EXEMPTION_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionN
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_HEADLESS_SOAP_ATTESTATION_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
     ...LEGACY_OMITTED_COLLECTION_SETS.map((omitted) => PRE_DURABLE_REVIEW_AUTHORITY_COLLECTIONS.filter((collection) => !omitted.includes(collection))),
 ];
-/* @Codex Preserve every previously recognized v1 generation, with or without import receipts. */
+/* Preserve every previously recognized v1 generation, with or without import receipts. */
 const PRE_PROSTHETICS_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS,
     BACKUP_COLLECTIONS.filter((collection) => collection !== 'exemptionImportReceipts'),
     ...PRE_EXEMPTION_LEGACY_COLLECTION_SETS.map((collections) => collections.filter((collection) => collection !== 'exemptionImportReceipts')),
 ];
-/* @Codex Both repertory collections form one additive generation; partial omission is invalid. */
+/* Both repertory collections form one additive generation; partial omission is invalid. */
 const AUDIT_ERA_LEGACY_COLLECTION_SETS: readonly (readonly BackupCollectionName[])[] = [
     ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS,
     ...[BACKUP_COLLECTIONS, ...PRE_PROSTHETICS_LEGACY_COLLECTION_SETS].map(collections => collections.filter(
@@ -130,7 +126,7 @@ const PATIENT_DEPENDENT_COLLECTIONS: readonly BackupCollectionName[] = [
     'sissHandoffs',
     'therapies',
 ];
-/* @Codex Backup validation mirrors the durable store without importing its server-only writer. */
+/* Backup validation mirrors the durable store without importing its server-only writer. */
 const DURABLE_REVIEW = /^review_[0-9a-f]{32}$/;
 const DURABLE_PATIENT = /^ptr_[0-9a-f]{32}$/;
 const DURABLE_RECEIPT = /^receipt_[0-9a-f]{32}$/;
@@ -267,7 +263,6 @@ async function sha256Hex(value: string): Promise<string> {
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/* @Codex */
 function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
     try {
         if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) return false;
@@ -282,7 +277,7 @@ function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<
     }
 }
 
-/* @Codex Authority rows retain dates as Date objects before serialization and canonical ISO strings after parsing. */
+/* Authority rows retain dates as Date objects before serialization and canonical ISO strings after parsing. */
 function timestampMilliseconds(value: unknown): number | null {
     if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.getTime() : null;
     if (typeof value !== 'string') return null;
@@ -290,14 +285,13 @@ function timestampMilliseconds(value: unknown): number | null {
     return Number.isFinite(date.getTime()) && date.toISOString() === value ? date.getTime() : null;
 }
 
-/* @Codex H2a-S persists whole Unix seconds and serializes only canonical, non-negative ISO timestamps. */
+/* H2a-S persists whole Unix seconds and serializes only canonical, non-negative ISO timestamps. */
 function headlessSoapTimestampMilliseconds(value: unknown, serialized: boolean): number | null {
     if (serialized && typeof value !== 'string') return null;
     const milliseconds = timestampMilliseconds(value);
     return milliseconds === null || milliseconds < 0 || milliseconds % 1000 !== 0 ? null : milliseconds;
 }
 
-/* @Codex */
 function assertDurableReviewAuthorityRows(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     durableReviewIds: ReadonlySet<string>,
@@ -343,7 +337,7 @@ function assertDurableReviewAuthorityRows(
     }
 }
 
-/* @Codex H2a-S backup accounting validates only persistent attestation facts; it never restores a session or grant. */
+/* H2a-S backup accounting validates only persistent attestation facts; it never restores a session or grant. */
 function assertHeadlessSoapActiveRoleAttestationRows(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     serialized: boolean,
@@ -394,7 +388,7 @@ function assertHeadlessSoapActiveRoleAttestationRows(
     }
 }
 
-/* @Codex H7b embeds only its own exact audit snapshot; audit_events never becomes a backup collection. */
+/* H7b embeds only its own exact audit snapshot; audit_events never becomes a backup collection. */
 function parseCanonicalSnapshot(value: unknown, keys?: readonly string[]): Record<string, unknown> | null {
     if (typeof value !== 'string') return null;
     try {
@@ -409,7 +403,7 @@ function parseCanonicalSnapshot(value: unknown, keys?: readonly string[]): Recor
     }
 }
 
-/* @Codex Backup preflight binds the ledger to its embedded audit and exported entry before target mutation. */
+/* Backup preflight binds the ledger to its embedded audit and exported entry before target mutation. */
 async function assertHeadlessSoapEntryCommitRows(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     serialized: boolean,
@@ -528,7 +522,6 @@ async function assertHeadlessSoapEntryCommitRows(
     }
 }
 
-/* @Codex */
 async function normalizeDurableReviewRecord(value: unknown): Promise<Record<string, unknown>> {
     if (!hasExactKeys(value, DURABLE_RECORD_KEYS)) throw new BackupArtifactError('invalid-manifest', 'Durable review record is invalid.');
     const patientRef = value.patientRef; const reviewId = value.reviewId; const reviewRevision = value.reviewRevision;
@@ -549,9 +542,8 @@ async function normalizeDurableReviewRecord(value: unknown): Promise<Record<stri
     return { patientRef, reviewId, reviewRevision, receiptRef, provenanceRef, receiptBinding, provenanceBinding, presentationVersion: DURABLE_PRESENTATION_VERSION, sealedCiphertext, sealedDigest };
 }
 
-/* @Codex */
 async function assertDurableReviewLedger(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): Promise<void> {
-    /* @Codex The v1 payload does not own the append-only audit ledger required by command replay. */
+    /* The v1 payload does not own the append-only audit ledger required by command replay. */
     if ((payload.durableReviewCommandStates?.length ?? 0) > 0 || (payload.durableReviewCommandOperations?.length ?? 0) > 0) {
         throw new BackupArtifactError('invalid-manifest', 'Durable review command state requires its append-only audit ledger.');
     }
@@ -646,7 +638,6 @@ function assertCollectionArrays(payload: Record<string, unknown>, collections: r
     }
 }
 
-/* @Codex */
 function parseAssignedAmbulatoryIds(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
     return Array.from(new Set(
@@ -654,7 +645,6 @@ function parseAssignedAmbulatoryIds(value: unknown): string[] {
     ));
 }
 
-/* @Codex */
 function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryId: string; assignedAt: unknown }> {
     if (!Array.isArray(value)) return [];
     return value.flatMap((item) => {
@@ -665,7 +655,7 @@ function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryI
     });
 }
 
-/* @Codex Backups carry only already-host-minted attachment currentness; they never mint, default, or rebase it. */
+/* Backups carry only already-host-minted attachment currentness; they never mint, default, or rebase it. */
 function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
     const sourceRefs = new Set<string>();
     for (const row of rows) {
@@ -773,10 +763,9 @@ async function assertCollectionReferences(
         }
     }
 
-    /* @Codex Reject unsupported or inconsistent exemption receipts before restore/export. */
+    /* Reject unsupported or inconsistent exemption receipts before restore/export. */
     try { assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Exemption import receipts are invalid or unsupported.'); }
-    /* @Codex */
     try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
     await assertDurableReviewLedger(payload);
@@ -793,7 +782,7 @@ async function assertCollectionReferences(
     }
 }
 
-/* @Codex Backup producers canonicalize the H2a-S collection after exact-row validation. */
+/* Backup producers canonicalize the H2a-S collection after exact-row validation. */
 function sortHeadlessSoapActiveRoleAttestations(rows: BackupRecord[]): BackupRecord[] {
     return [...rows].sort((left, right) => {
         const byAttestation = String(left.attestationRef).localeCompare(String(right.attestationRef));
@@ -801,13 +790,12 @@ function sortHeadlessSoapActiveRoleAttestations(rows: BackupRecord[]): BackupRec
     });
 }
 
-/* @Codex */
 function sortHeadlessSoapEntryCommits(rows: BackupRecord[]): BackupRecord[] {
     return [...rows].sort((left, right) => String(left.idempotencyKey).localeCompare(String(right.idempotencyKey)));
 }
 
 export async function createBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<BackupArtifact> {
-    /* @Codex Existing v1 producers add the audit-dependent collections as empty until audit restore is separately contracted. */
+    /* Existing v1 producers add the audit-dependent collections as empty until audit restore is separately contracted. */
     const currentPayload = { ...createEmptyDataset(), ...payload } as BackupDataset;
     const collections = backupAuditCoverage(payload) === 'included' ? BACKUP_COLLECTIONS : PRE_AUDIT_COLLECTIONS;
     if (backupAuditCoverage(payload) === 'omitted') delete currentPayload.auditEvents;

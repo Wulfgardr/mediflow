@@ -1,4 +1,3 @@
-/* @Codex */
 import { test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
 

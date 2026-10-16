@@ -1,4 +1,3 @@
-/* @Codex */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveOpenLoopProjection, deriveOpenLoops, MIN_TYPICAL_INTERVAL_DAYS } from './patient-open-loops';

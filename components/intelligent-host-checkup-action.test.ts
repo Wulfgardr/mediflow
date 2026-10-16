@@ -1,4 +1,4 @@
-/* @Codex WUL-684: source and callback contracts; browser/focus acceptance is separate. */
+/* WUL-684: source and callback contracts; browser/focus acceptance is separate. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';

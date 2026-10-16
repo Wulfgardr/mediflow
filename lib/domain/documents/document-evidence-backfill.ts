@@ -1,16 +1,12 @@
-/* @Codex */
 import type { DocumentQualityLevel } from '../../db';
-/* @Codex */
 import {
     buildDocumentParseEvidenceArtifact,
     parseDocumentParseEvidenceArtifactSnapshot,
     type DocumentParseEvidenceArtifact,
 } from './document-parse-evidence-artifact';
 
-/* @Codex */
 export const DOCUMENT_EVIDENCE_BACKFILL_PLAN_SCHEMA_VERSION = 'mediflow.document_evidence_backfill_plan.v1';
 
-/* @Codex */
 export type DocumentEvidenceBackfillDecision =
     | 'create_from_source'
     | 'create_from_summary'
@@ -18,10 +14,8 @@ export type DocumentEvidenceBackfillDecision =
     | 'skip_existing_artifact'
     | 'skip_no_usable_text';
 
-/* @Codex */
 export type DocumentEvidenceBackfillTextSource = 'rawMarkdown' | 'summarySnapshot';
 
-/* @Codex */
 export interface DocumentEvidenceBackfillAttachmentInput {
     id: string;
     patientId: string;
@@ -34,12 +28,10 @@ export interface DocumentEvidenceBackfillAttachmentInput {
     qualityReason?: string | null;
 }
 
-/* @Codex */
 export interface DocumentEvidenceBackfillPlanOptions {
     rebuildExisting?: boolean;
 }
 
-/* @Codex */
 export interface DocumentEvidenceBackfillCandidateMetrics {
     factCount: number;
     factKinds: string[];
@@ -48,7 +40,6 @@ export interface DocumentEvidenceBackfillCandidateMetrics {
     suppressedCandidateCount: number;
 }
 
-/* @Codex */
 export interface DocumentEvidenceBackfillPlanItem {
     attachmentId: string;
     patientId: string;
@@ -63,7 +54,6 @@ export interface DocumentEvidenceBackfillPlanItem {
     candidateMetrics?: DocumentEvidenceBackfillCandidateMetrics;
 }
 
-/* @Codex */
 export interface DocumentEvidenceBackfillPlan {
     schemaVersion: typeof DOCUMENT_EVIDENCE_BACKFILL_PLAN_SCHEMA_VERSION;
     generatedAt: string;
@@ -212,7 +202,6 @@ function planAttachment(
     };
 }
 
-/* @Codex */
 export function buildDocumentEvidenceBackfillPlan(
     attachments: DocumentEvidenceBackfillAttachmentInput[],
     options: DocumentEvidenceBackfillPlanOptions = {},

@@ -1,4 +1,4 @@
-/* @Codex — fixed authenticated operations, no prompt/source/policy input. */
+/* fixed authenticated operations, no prompt/source/policy input. */
 import 'server-only';
 import { requireSession } from '../security/server-auth';
 import * as owner from '../security/web-auth-lifecycle-owner-adapter';

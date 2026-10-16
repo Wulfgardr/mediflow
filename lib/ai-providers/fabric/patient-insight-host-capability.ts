@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { isOrdinaryFunctionSelected, executeOwnedOrdinaryProfile, ordinaryResultMetadata } from '../../chatgpt-product/ordinary-flow';
 import { createPatientInsightOrdinaryTaskProfile } from '../../chatgpt-execution/ordinary-task-profile';

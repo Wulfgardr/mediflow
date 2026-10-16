@@ -1,4 +1,3 @@
-/* @Codex */
 import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseRecoveryPayload } from './passphrase-adoption-validation';
 
 export type AuthHealthErrorCategory =
@@ -30,7 +29,6 @@ export function readUnlockParameters(value: unknown): UnlockParameters | null {
     return null;
 }
 
-/* @Codex */
 export type AuthHealthPayload = {
     archiveGeneration?: string;
     status: 'ok' | 'error';
@@ -49,7 +47,6 @@ export type AuthHealthPayload = {
     };
 };
 
-/* @Codex */
 export type LoginFailurePayload = {
     error?: string;
     code?: string;
@@ -114,22 +111,16 @@ type JsonRequestResult<T> = {
     payload: T | null;
 };
 
-/* @Codex */
 export type AuthControlResponseState = 'accepted' | 'stale' | 'invalid';
 
-/* @Codex */
 type AuthControlledJsonRequestResult<T> = JsonRequestResult<T> & {
     controlState: AuthControlResponseState;
 };
 
-/* @Codex */
 const AUTH_CONTROL_ETAG_MAX_LENGTH = 512;
-/* @Codex */
 let currentAuthControlEtag: string | null = null;
-/* @Codex */
 let authHealthRequestInFlight: Promise<AuthControlledJsonRequestResult<AuthHealthPayload>> | null = null;
 
-/* @Codex */
 function strongAuthControlEtag(response: Response): string | null {
     const value = response.headers.get('ETag');
     if (!value || value.length > AUTH_CONTROL_ETAG_MAX_LENGTH || value.startsWith('W/')) return null;
@@ -137,7 +128,6 @@ function strongAuthControlEtag(response: Response): string | null {
     return value;
 }
 
-/* @Codex */
 function retainAuthControlEtag(
     response: Response,
     expected: string | null,
@@ -149,7 +139,6 @@ function retainAuthControlEtag(
     return { etag: next, state: 'accepted' };
 }
 
-/* @Codex */
 function createAuthMutationKey(): string {
     const key = globalThis.crypto.randomUUID();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(key)) {
@@ -158,7 +147,6 @@ function createAuthMutationKey(): string {
     return key;
 }
 
-/* @Codex */
 function authMutationInit(init: RequestInit, etag: string, idempotencyKey: string): RequestInit {
     const headers = new Headers(init.headers);
     headers.set('If-Match', etag);
@@ -183,33 +171,22 @@ async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Pro
     return { response, payload };
 }
 
-/* @Codex */
 export const APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION = 'mediflow.application-lock-receipt.v1' as const;
 
-/* @Codex */
 const lockJsonParse = JSON.parse;
-/* @Codex */
 const lockObjectGetPrototypeOf = Object.getPrototypeOf;
-/* @Codex */
 const lockObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-/* @Codex */
 const lockObjectHasOwn = Object.hasOwn;
-/* @Codex */
 const lockReflectOwnKeys = Reflect.ownKeys;
-/* @Codex */
 const lockObjectPrototype = Object.prototype;
-/* @Codex */
 const lockObjectPrototypeKeys = Object.freeze(lockReflectOwnKeys(lockObjectPrototype).slice());
-/* @Codex */
 const forbiddenLockObjectPrototypeKeys = Object.freeze(['then', 'value', 'schemaVersion', 'state'] as const);
 
-/* @Codex */
 function hasForbiddenObjectPrototypeDescriptor(): boolean {
     try { return forbiddenLockObjectPrototypeKeys.some((key) => lockObjectGetOwnPropertyDescriptor(lockObjectPrototype, key) !== undefined); }
     catch { return true; }
 }
 
-/* @Codex */
 function hasUnchangedObjectPrototype(): boolean {
     try {
         const currentKeys = lockReflectOwnKeys(lockObjectPrototype);
@@ -223,7 +200,6 @@ function hasUnchangedObjectPrototype(): boolean {
     }
 }
 
-/* @Codex */
 function exactParsedApplicationLockReceiptState(value: unknown): 'server_invalidation_confirmed' | 'server_invalidation_unconfirmed' | null {
     if (typeof value !== 'object' || value === null || hasForbiddenObjectPrototypeDescriptor() || !hasUnchangedObjectPrototype()) return null;
 
@@ -250,7 +226,6 @@ function exactParsedApplicationLockReceiptState(value: unknown): 'server_invalid
     }
 }
 
-/* @Codex */
 export async function requestApplicationLockConfirmation(): Promise<boolean> {
     const initialEtag = currentAuthControlEtag;
     if (!initialEtag) return false;
@@ -290,12 +265,10 @@ export async function requestApplicationLockConfirmation(): Promise<boolean> {
     return retry.response.status === 200 && retry.state === 'server_invalidation_confirmed';
 }
 
-/* @Codex */
 export type ClientAuthorityNetworkBarrier = Readonly<{
     run: <T>(request: () => Promise<T>) => Promise<T>;
 }>;
 
-/* @Codex */
 export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBarrier {
     // Serializes login/setup starts. Application lock deliberately bypasses this barrier.
     let tail = Promise.resolve();
@@ -321,7 +294,6 @@ export function createClientAuthorityNetworkBarrier(): ClientAuthorityNetworkBar
     });
 }
 
-/* @Codex */
 export async function checkAuthHealthRequest(options: { fresh?: boolean } = {}) {
     // A caller that decides what to send needs an answer produced after its gesture: one already
     // on its way was produced before, so it is awaited and asked again.
@@ -349,7 +321,6 @@ export async function checkAuthHealthRequest(options: { fresh?: boolean } = {}) 
     }
 }
 
-/* @Codex */
 async function requestAuthMutationJson<T>(
     input: RequestInfo | URL,
     init: RequestInit,
@@ -373,7 +344,6 @@ async function requestAuthMutationJson<T>(
     return { response, payload, controlState };
 }
 
-/* @Codex */
 export function loginWithPinRequest(pin: string) {
     return requestAuthMutationJson<LoginSuccessPayload | LoginFailurePayload>('/api/auth/login', {
         method: 'POST',
@@ -391,7 +361,6 @@ export function loginWithVerifierRequest(verifier: string) {
     });
 }
 
-/* @Codex */
 export function setupSecurityRequest(payload: SetupRequestPayload) {
     return requestAuthMutationJson<SetupResponsePayload>('/api/auth/setup', {
         method: 'POST',
@@ -400,7 +369,6 @@ export function setupSecurityRequest(payload: SetupRequestPayload) {
     });
 }
 
-/* @Codex */
 export function changePinRequest(payload: PinChangeRequestPayload) {
     return requestJson<PinChangeFailurePayload>('/api/auth/change-pin', {
         method: 'POST',
@@ -427,7 +395,6 @@ export function recoverPassphraseRequest(payload: PassphraseRecoveryPayload) {
     });
 }
 
-/* @Codex */
 export function rewrapMasterKeyRequest(payload: { encryptedMasterKey: string; salt: string }) {
     return requestJson<{ success?: boolean; error?: string; code?: string }>('/api/auth/rewrap-master-key', {
         method: 'POST',
@@ -436,7 +403,6 @@ export function rewrapMasterKeyRequest(payload: { encryptedMasterKey: string; sa
     });
 }
 
-/* @Codex */
 export function repairLegacyDbRequest() {
     return requestJson<RepairDbPayload>('/api/system/repair-db', { method: 'POST' });
 }

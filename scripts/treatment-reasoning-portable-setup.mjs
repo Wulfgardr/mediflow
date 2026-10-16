@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* @Codex: explicit offline host CLI. No network, installer, user command or DB. */
+/* explicit offline host CLI. No network, installer, user command or DB. */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -26,7 +26,7 @@ export async function runPortableSetup(argv, options = {}) {
     return command === 'import' ? provisioning.importOffline({ consentDigest: value, signal: options.signal })
         : provisioning.activate({ consentDigest: value, signal: options.signal });
 }
-// @Codex: source closure only, never package Python distributions, weights or admission state.
+// source closure only, never package Python distributions, weights or admission state.
 export const TREATMENT_PORTABLE_SOURCE_CLOSURE = Object.freeze([
   "scripts/treatment-reasoning-portable-worker.py",
   "scripts/treatment-reasoning-portable-setup.mjs",

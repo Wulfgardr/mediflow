@@ -1,4 +1,3 @@
-/* @Codex */
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 

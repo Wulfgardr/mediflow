@@ -1,4 +1,3 @@
-/* @Codex */
 const objectFreeze = Object.freeze;
 const jsonParse = JSON.parse;
 const SetConstructor = Set;
@@ -93,7 +92,7 @@ function duplicateObjectKey(source: string): boolean {
     try { return value(); } catch { return false; }
 }
 
-/** @Codex: canonical synchronous strict JSON parsing for bounded body and file callers. */
+/** canonical synchronous strict JSON parsing for bounded body and file callers. */
 export function parseStrictJson(source: string): unknown {
     if (duplicateObjectKey(source)) throw new SyntaxError('Duplicate JSON object key');
     return jsonParse(source);

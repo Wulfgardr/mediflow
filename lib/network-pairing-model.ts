@@ -1,37 +1,28 @@
-/* @Codex */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-/* @Codex */
 import type {
     NetworkErrorResponse,
     NetworkPairedClientSummary,
     NetworkPairingConfirmationResponse,
     NetworkPairingIntentResponse,
 } from './api/v1/types';
-/* @Codex */
 import { createConfirmedPairingResponse } from './network-contract';
 
-/* @Codex */
 export const NETWORK_PAIRING_STATE_KEY = 'network.pairing.state';
-/* @Codex */
 export const NETWORK_PAIRED_CLIENT_ID_HEADER = 'x-mediflow-paired-client-id';
-/* @Codex */
 export const NETWORK_PAIRED_CLIENT_TOKEN_HEADER = 'x-mediflow-paired-client-token';
 
 type NetworkPairingErrorStatus = 404 | 409;
 
-/* @Codex */
 export type StoredNetworkPairedClient = NetworkPairedClientSummary & {
     sourceIntentId: string;
     tokenHash: string;
 };
 
-/* @Codex */
 export type NetworkPairingState = {
     intents: NetworkPairingIntentResponse[];
     clients: StoredNetworkPairedClient[];
 };
 
-/* @Codex */
 type ConfirmPairingSuccess = {
     ok: true;
     status: 201;
@@ -39,17 +30,14 @@ type ConfirmPairingSuccess = {
     nextState: NetworkPairingState;
 };
 
-/* @Codex */
 type ConfirmPairingFailure = {
     ok: false;
     status: NetworkPairingErrorStatus;
     value: NetworkErrorResponse;
 };
 
-/* @Codex */
 export type ConfirmPairingResult = ConfirmPairingSuccess | ConfirmPairingFailure;
 
-/* @Codex */
 type RemovePairedClientSuccess = {
     ok: true;
     status: 200;
@@ -57,14 +45,12 @@ type RemovePairedClientSuccess = {
     nextState: NetworkPairingState;
 };
 
-/* @Codex */
 type RemovePairedClientFailure = {
     ok: false;
     status: 404;
     value: Omit<NetworkErrorResponse, 'code'> & { code: 'PAIRING_CLIENT_NOT_FOUND' };
 };
 
-/* @Codex */
 export type RemovePairedClientResult = RemovePairedClientSuccess | RemovePairedClientFailure;
 
 const EMPTY_NETWORK_PAIRING_STATE: NetworkPairingState = {
@@ -158,7 +144,6 @@ function parsePairedClient(value: unknown): StoredNetworkPairedClient | null {
     };
 }
 
-/* @Codex */
 export function parseNetworkPairingState(
     rawValue: string | null | undefined,
     now: Date = new Date()
@@ -180,12 +165,10 @@ export function parseNetworkPairingState(
     }
 }
 
-/* @Codex */
 export function serializeNetworkPairingState(state: NetworkPairingState): string {
     return JSON.stringify(state);
 }
 
-/* @Codex */
 export function pruneExpiredPairingIntents(
     state: NetworkPairingState,
     now: Date = new Date()
@@ -197,7 +180,6 @@ export function pruneExpiredPairingIntents(
     };
 }
 
-/* @Codex */
 export function addPendingPairingIntent(
     state: NetworkPairingState,
     intent: NetworkPairingIntentResponse,
@@ -210,7 +192,6 @@ export function addPendingPairingIntent(
     };
 }
 
-/* @Codex */
 export function hashNetworkPairedClientToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
 }
@@ -239,7 +220,6 @@ function expiredError(): ConfirmPairingFailure {
     };
 }
 
-/* @Codex */
 export function confirmPendingPairingIntent(input: {
     state: NetworkPairingState;
     intentId: string;
@@ -286,7 +266,6 @@ export function confirmPendingPairingIntent(input: {
     };
 }
 
-/* @Codex */
 export function removePairedClient(
     state: NetworkPairingState,
     clientId: string,

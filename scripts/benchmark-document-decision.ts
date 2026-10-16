@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-/* @Codex */
 import { runDocumentDecisionFailureCounterBenchmark } from '../lib/domain/documents/document-decision-benchmark';
 
 const report = runDocumentDecisionFailureCounterBenchmark();

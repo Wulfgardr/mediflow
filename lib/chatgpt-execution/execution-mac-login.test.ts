@@ -1,4 +1,4 @@
-/* @Codex — synthetic bootstrap contract tests through the actual product wrapper.
+/* synthetic bootstrap contract tests through the actual product wrapper.
  * No object here can enter the private Mac qualification registry. */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

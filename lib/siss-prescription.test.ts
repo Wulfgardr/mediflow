@@ -1,4 +1,3 @@
-/* @Codex */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { SISS_PORTAL_URLS } from './siss-adapter';

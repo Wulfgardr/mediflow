@@ -1,4 +1,3 @@
-/* @Codex */
 
 export type ServicePrescriptionItemLink = {
     id: string;

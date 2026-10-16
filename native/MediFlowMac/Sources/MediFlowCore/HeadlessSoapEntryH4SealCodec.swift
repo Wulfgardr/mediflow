@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 import Crypto
 

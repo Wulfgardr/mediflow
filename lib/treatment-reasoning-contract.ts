@@ -1,11 +1,8 @@
-/* @Codex */
 import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from './chatgpt-execution/ordinary-emission-plan';
 export const TREATMENT_REASONING_SCHEMA_VERSION = 'mediflow.treatment_reasoning.v1';
 
-/* @Codex */
 export type TreatmentReasoningTaskKind = 'treatment_reasoning';
 
-/* @Codex */
 export type TreatmentReasoningEvidenceSourceKind =
     | 'patient-profile'
     | 'diagnosis'
@@ -17,7 +14,6 @@ export type TreatmentReasoningEvidenceSourceKind =
     | 'clinician-question'
     | 'external-tool-trace';
 
-/* @Codex */
 export type TreatmentReasoningActionIntent =
     | 'no_action'
     | 'review_only'
@@ -25,13 +21,10 @@ export type TreatmentReasoningActionIntent =
     | 'open_monitoring_form_prefill'
     | 'open_diagnosis_review';
 
-/* @Codex */
 export type TreatmentReasoningWritePolicy = 'no_write' | 'review_only' | 'form_prefill_only';
 
-/* @Codex */
 export type TreatmentReasoningSafetySeverity = 'info' | 'caution' | 'urgent_review';
 
-/* @Codex */
 export interface TreatmentReasoningEvidenceRef {
     id: string;
     sourceKind: TreatmentReasoningEvidenceSourceKind;
@@ -40,14 +33,12 @@ export interface TreatmentReasoningEvidenceRef {
     date?: string;
 }
 
-/* @Codex */
 export interface TreatmentReasoningKeyEvidence {
     id: string;
     statement: string;
     evidenceRefs: string[];
 }
 
-/* @Codex */
 export interface TreatmentReasoningSafetyFlag {
     id: string;
     severity: TreatmentReasoningSafetySeverity;
@@ -56,7 +47,6 @@ export interface TreatmentReasoningSafetyFlag {
     evidenceRefs: string[];
 }
 
-/* @Codex */
 export interface TreatmentReasoningSuggestedAction {
     id: string;
     intent: TreatmentReasoningActionIntent;
@@ -68,7 +58,6 @@ export interface TreatmentReasoningSuggestedAction {
     blockedReason?: string;
 }
 
-/* @Codex */
 export interface TreatmentReasoningTrace {
     mode: 'local_contract' | 'local_model' | 'athena_sidecar' | 'imported_shadow';
     model?: string;
@@ -76,7 +65,6 @@ export interface TreatmentReasoningTrace {
     limitations: string[];
 }
 
-/* @Codex */
 export interface TreatmentReasoningOutput {
     recommendation: string;
     keyEvidence: TreatmentReasoningKeyEvidence[];
@@ -87,7 +75,6 @@ export interface TreatmentReasoningOutput {
     trace: TreatmentReasoningTrace;
 }
 
-/* @Codex */
 export interface TreatmentReasoningEnvelope {
     schemaVersion: typeof TREATMENT_REASONING_SCHEMA_VERSION;
     task: TreatmentReasoningTaskKind;
@@ -95,12 +82,10 @@ export interface TreatmentReasoningEnvelope {
     data: TreatmentReasoningOutput;
 }
 
-/* @Codex */
 export interface TreatmentReasoningParseOptions {
     allowedEvidenceIds?: string[];
 }
 
-/* @Codex */
 export interface TreatmentReasoningParseResult {
     value: TreatmentReasoningEnvelope;
     rawJson: string | null;
@@ -109,7 +94,6 @@ export interface TreatmentReasoningParseResult {
     validEvidenceRefs: boolean;
 }
 
-/* @Codex */
 export interface TreatmentReasoningPromptInput {
     question: string;
     patientContext: string;
@@ -396,7 +380,6 @@ function extractJsonObject(response: string): string | null {
     return candidate.slice(start, end + 1);
 }
 
-/* @Codex */
 export function parseTreatmentReasoningResponse(
     response: string,
     options: TreatmentReasoningParseOptions = {}
@@ -464,12 +447,11 @@ function renderSourcePlan(source: TreatmentReasoningEvidenceRef): EmissionPart[]
         ...(source.excerpt ? [' :: ', emissionUnit(normalizeCompactText(source.excerpt, 260))] : [])];
 }
 
-/* @Codex */
 export function buildTreatmentReasoningPrompt(input: TreatmentReasoningPromptInput): string {
     return renderEmissionPlan(buildNamedTreatmentReasoningPlan(input, 'local_model'));
 }
 
-/* @Codex — content only; the host must separately qualify and admit the payload. */
+/* content only; the host must separately qualify and admit the payload. */
 export function buildChatGptTreatmentReasoningPrompt(input: TreatmentReasoningPromptInput): string {
     return renderEmissionPlan(buildChatGptTreatmentReasoningPlan(input));
 }

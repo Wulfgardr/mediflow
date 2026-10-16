@@ -1,4 +1,4 @@
-// @Codex MF085-002: source mapping and claim limits in ADR 0118. Not a validated translation.
+// MF085-002: source mapping and claim limits in ADR 0118. Not a validated translation.
 import { withValidatedScoring, type ScaleInstrumentProvenance } from '../scale-validation';
 
 export const TINETTI_POMA28_ID = 'tinetti-poma28-v1';

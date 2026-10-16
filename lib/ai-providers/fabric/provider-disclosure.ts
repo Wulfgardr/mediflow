@@ -1,4 +1,3 @@
-/* @Codex */
 import { snapshotProviderLifecycle } from './provider-lifecycle';
 
 export const PROVIDER_DISCLOSURE_SCHEMA_VERSION = 'mediflow.ai.provider-disclosure.v1' as const;

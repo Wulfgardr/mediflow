@@ -1,7 +1,7 @@
 import styles from './settings-lume.module.css';
 import proposalStyles from './settings-proposal.module.css';
 
-/* @Codex LUME-110/68 */
+/* LUME-110/68 */
 export const SETTINGS_CARD_CLASS = styles.settingSurface;
 export const SETTINGS_SECTION_CARD_CLASS = styles.settingLayer;
 export const SETTINGS_INPUT_CLASS = styles.settingInput;
@@ -9,7 +9,7 @@ export const SETTINGS_LABEL_CLASS = styles.settingLabel;
 export const SETTINGS_PRIMARY_BUTTON_CLASS = `${styles.primaryAction} lume-press disabled:opacity-50`;
 export const SETTINGS_SECONDARY_BUTTON_CLASS = styles.secondaryAction;
 
-/* @Codex WUL-676: proposal copy is explicit and presentation-only. The
+/* WUL-676: proposal copy is explicit and presentation-only. The
    original description remains available on every non-proposal surface and
    inside the proposal disclosure when the short copy differs. */
 const PROPOSAL_INTRO_COPY: Record<string, string> = {

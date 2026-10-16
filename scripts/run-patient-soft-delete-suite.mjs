@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { SOFT_DELETE_ROUTE_FILES } from './additional-test-selection.mjs';
 import { SOFT_DELETE_TS_FILES } from './additional-test-selection.mjs';
-/* @Codex: run the existing soft-delete tests with the canonical TypeScript loader and an isolated data root. */
+/* run the existing soft-delete tests with the canonical TypeScript loader and an isolated data root. */
 
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';

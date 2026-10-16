@@ -1,4 +1,3 @@
-/* @Codex */
 import { ATTACHMENT_EXTRACTION_MAX_SOURCE_BYTES } from './attachment-extraction-projection-protocol';
 
 /** Browser projections never leave the local authenticated application's origin. No forwarded-header trust. */

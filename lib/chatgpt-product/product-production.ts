@@ -1,4 +1,4 @@
-/* @Codex — actual production root; importing/GET cannot create a process. */
+/* actual production root; importing/GET cannot create a process. */
 import 'server-only';
 import type { WebSessionProjection } from '../security/web-auth-lifecycle-owner-adapter';
 import { createProductionExecutionPlatform, type ProductExecutionPlatform } from '../chatgpt-execution/execution-platform';

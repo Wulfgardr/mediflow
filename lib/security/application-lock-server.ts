@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 
 import { NextResponse } from 'next/server';
@@ -71,7 +70,6 @@ export function applicationLockHttpStatus(receipt: ApplicationLockReceipt): 200 
 }
 
 /** Audit is ancillary evidence and cannot retrograde a completed invalidation. */
-/* @Codex */
 export async function preserveApplicationLockReceipt(
     receipt: ApplicationLockReceipt,
     audit: () => PromiseLike<unknown> | unknown,

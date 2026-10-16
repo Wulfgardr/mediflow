@@ -1,6 +1,6 @@
 'use client';
 
-/* @Codex WUL-UIUX: striscia di segnali clinici sopra la piega. Su pazienti
+/* WUL-UIUX: striscia di segnali clinici sopra la piega. Su pazienti
    complessi dà i numeri che contano subito (problemi, terapie, parametri,
    referti, prossimo passaggio) senza scorrere i pannelli. Stile Lume invariato. */
 

@@ -1,9 +1,7 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { dbServer } from '@/lib/db-server';
-/* @Codex */
 import { readServiceCatalog } from '@/lib/service-prescription-write';
 import { serviceCatalogEntries } from '@/lib/schema';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';

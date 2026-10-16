@@ -1,4 +1,3 @@
-/* @Codex */
 import {
     createDocumentDecisionEvidenceRef,
     type DocumentDecisionEvidenceRef,
@@ -7,14 +6,12 @@ import {
     type DocumentDecisionTaxCodeRole,
 } from './document-decision';
 
-/* @Codex */
 export interface ResolveDocumentTaxCodeRolesInput {
     text: string;
     sourceId?: string;
     contextWindow?: number;
 }
 
-/* @Codex */
 export interface ResolveDocumentTaxCodeRolesResult {
     evidenceRefs: DocumentDecisionEvidenceRef[];
     taxCodes: DocumentDecisionTaxCodeRole[];
@@ -163,7 +160,6 @@ function inferRole(context: string, taxCodeIndex: number): Pick<DocumentDecision
     return { role: 'unknown_cf', confidence: 'low' };
 }
 
-/* @Codex */
 export function resolveDocumentTaxCodeRoles(
     input: ResolveDocumentTaxCodeRolesInput,
 ): ResolveDocumentTaxCodeRolesResult {
@@ -219,7 +215,6 @@ export function resolveDocumentTaxCodeRoles(
     };
 }
 
-/* @Codex */
 export function buildDocumentDecisionIdentityFromTaxCodes(
     result: ResolveDocumentTaxCodeRolesResult,
     action: DocumentDecisionIdentity['action'] = 'review_identity',

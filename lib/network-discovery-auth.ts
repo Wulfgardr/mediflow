@@ -1,23 +1,17 @@
-/* @Codex */
 import type { NextResponse } from 'next/server';
-/* @Codex */
 import type { StoredNetworkPairedClient } from './network-pairing-model';
-/* @Codex */
 import type { NetworkCapabilitiesResponse } from './api/v1/types';
 
-/* @Codex */
 export type NetworkDiscoveryAuthContext =
     | { authMode: 'local-token' }
     | { authMode: 'paired-client'; pairedClient: StoredNetworkPairedClient };
 
-/* @Codex */
 export type NetworkDiscoveryAuthDeps = {
     requireLocalApiToken: (request: Request) => NextResponse | null;
     authenticateNetworkPairedClient: (request: Request) => Promise<StoredNetworkPairedClient | null>;
     getNetworkModeGateResponse: () => Promise<NextResponse | null>;
 };
 
-/* @Codex */
 export function projectNetworkCapabilitiesForDiscoveryAuth(
     response: NetworkCapabilitiesResponse,
     context: NetworkDiscoveryAuthContext
@@ -38,7 +32,6 @@ export function projectNetworkCapabilitiesForDiscoveryAuth(
     };
 }
 
-/* @Codex */
 export async function resolveNetworkDiscoveryAuth(
     request: Request,
     deps: NetworkDiscoveryAuthDeps

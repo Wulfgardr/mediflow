@@ -1,55 +1,37 @@
-/* @Codex */
 import { parseCheckupStatus, parseTherapyStatus } from './status-normalization';
 
-/* @Codex */
 type WriteNormalizationResult<T> =
     | { ok: true; values: T }
     | { ok: false; error: string };
 
-/* @Codex */
 type EntryCreateValues = {
     id: string;
     patientId: string;
     type: string;
-    /* @Codex */
     title: string;
     date: Date;
     content: string;
-    /* @Codex */
     setting: string | null;
-    /* @Codex */
     metadata: string | null;
-    /* @Codex */
     attachments: string | null;
-    /* @Codex */
     version: number;
     createdAt: Date;
-    /* @Codex */
     updatedAt: Date;
 };
 
-/* @Codex */
 type EntryUpdateValues = {
     type?: string;
-    /* @Codex */
     title?: string;
     date?: Date;
     content?: string;
-    /* @Codex */
     setting?: string | null;
-    /* @Codex */
     metadata?: string | null;
-    /* @Codex */
     attachments?: string | null;
-    /* @Codex */
     deletedAt?: Date | null;
-    /* @Codex */
     deletionReason?: string | null;
-    /* @Codex */
     updatedAt?: Date;
 };
 
-/* @Codex */
 type TherapyCreateValues = {
     id: string;
     patientId: string;
@@ -64,18 +46,13 @@ type TherapyCreateValues = {
     status: 'active' | 'suspended' | 'completed';
     startDate: Date;
     endDate: Date | null;
-    /* @Codex */
     version: number;
     createdAt: Date;
-    /* @Codex */
     updatedAt: Date;
-    /* @Codex */
     deletedAt: Date | null;
-    /* @Codex */
     deletionReason: string | null;
 };
 
-/* @Codex */
 type TherapyUpdateValues = {
     drugName?: string;
     aic?: string | null;
@@ -88,15 +65,11 @@ type TherapyUpdateValues = {
     status?: 'active' | 'suspended' | 'completed';
     startDate?: Date;
     endDate?: Date | null;
-    /* @Codex */
     updatedAt?: Date;
-    /* @Codex */
     deletedAt?: Date | null;
-    /* @Codex */
     deletionReason?: string | null;
 };
 
-/* @Codex */
 type CheckupCreateValues = {
     id: string;
     patientId: string;
@@ -105,36 +78,26 @@ type CheckupCreateValues = {
     notes: string | null;
     status: 'pending' | 'completed' | 'cancelled';
     source: CheckupSource;
-    /* @Codex */
     version: number;
     createdAt: Date;
-    /* @Codex */
     updatedAt: Date;
-    /* @Codex */
     deletedAt: Date | null;
-    /* @Codex */
     deletionReason: string | null;
 };
 
-/* @Codex */
 type CheckupUpdateValues = {
     date?: Date;
     title?: string;
     notes?: string | null;
     status?: 'pending' | 'completed' | 'cancelled';
     source?: CheckupSource | null;
-    /* @Codex */
     updatedAt?: Date;
-    /* @Codex */
     deletedAt?: Date | null;
-    /* @Codex */
     deletionReason?: string | null;
 };
 
-/* @Codex */
 export type CheckupSource = 'manual' | 'ai_suggestion';
 
-/* @Codex */
 type ObservationCreateValues = {
     id: string;
     patientId: string;
@@ -158,7 +121,6 @@ type ObservationCreateValues = {
     deletionReason: string | null;
 };
 
-/* @Codex */
 type ObservationUpdateValues = {
     codeSystem?: 'LOINC';
     code?: string;
@@ -178,12 +140,10 @@ type ObservationUpdateValues = {
     deletionReason?: string | null;
 };
 
-/* @Codex */
 function isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim().length > 0;
 }
 
-/* @Codex */
 function parseRequiredString(value: unknown, field: string): WriteNormalizationResult<string> {
     if (!isNonEmptyString(value)) {
         return { ok: false, error: `Invalid ${field}` };
@@ -192,7 +152,6 @@ function parseRequiredString(value: unknown, field: string): WriteNormalizationR
     return { ok: true, values: value };
 }
 
-/* @Codex */
 function parseRequiredDate(value: unknown, field: string): WriteNormalizationResult<Date> {
     const parsed = parseDate(value);
     if (!parsed) {
@@ -202,7 +161,6 @@ function parseRequiredDate(value: unknown, field: string): WriteNormalizationRes
     return { ok: true, values: parsed };
 }
 
-/* @Codex */
 function parseDate(value: unknown): Date | null {
     if (!value) return null;
     if (typeof value !== 'string' && typeof value !== 'number' && !(value instanceof Date)) return null;
@@ -210,7 +168,6 @@ function parseDate(value: unknown): Date | null {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-/* @Codex */
 function parseNullableString(value: unknown, field: string): WriteNormalizationResult<string | null> {
     if (value === undefined || value === null) {
         return { ok: true, values: null };
@@ -223,7 +180,6 @@ function parseNullableString(value: unknown, field: string): WriteNormalizationR
     return { ok: true, values: value };
 }
 
-/* @Codex */
 function parseOptionalString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -236,7 +192,6 @@ function parseOptionalString(value: unknown, field: string): WriteNormalizationR
     return { ok: true, values: value };
 }
 
-/* @Codex */
 function parseOptionalRequiredString(value: unknown, field: string): WriteNormalizationResult<string | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -248,7 +203,6 @@ function parseOptionalRequiredString(value: unknown, field: string): WriteNormal
     return { ok: true, values: parsed.values };
 }
 
-/* @Codex */
 function parseOptionalNullableString(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -265,21 +219,20 @@ function parseOptionalNullableString(value: unknown, field: string): WriteNormal
     return { ok: true, values: value };
 }
 
-/* @Codex Service prescription item IDs are identifiers, never meaningful blank text. */
+/* Service prescription item IDs are identifiers, never meaningful blank text. */
 function parseNullableTrimmedString(value: unknown, field: string): WriteNormalizationResult<string | null> {
     const parsed = parseNullableString(value, field);
     if (!parsed.ok) return parsed;
     return { ok: true, values: parsed.values?.trim() || null };
 }
 
-/* @Codex Preserve omission on update while normalizing an explicit blank link to null. */
+/* Preserve omission on update while normalizing an explicit blank link to null. */
 function parseOptionalNullableTrimmedString(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
     const parsed = parseOptionalNullableString(value, field);
     if (!parsed.ok) return parsed;
     return { ok: true, values: parsed.values === undefined ? undefined : parsed.values?.trim() || null };
 }
 
-/* @Codex */
 function parseOptionalDate(value: unknown, field: string): WriteNormalizationResult<Date | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -293,7 +246,6 @@ function parseOptionalDate(value: unknown, field: string): WriteNormalizationRes
     return { ok: true, values: parsed };
 }
 
-/* @Codex */
 function parseOptionalNullableDate(value: unknown, field: string): WriteNormalizationResult<Date | null | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -310,7 +262,6 @@ function parseOptionalNullableDate(value: unknown, field: string): WriteNormaliz
     return { ok: true, values: parsed };
 }
 
-/* @Codex */
 function normalizeJsonText(value: unknown, field: string): WriteNormalizationResult<string | null> {
     if (value === undefined || value === null) {
         return { ok: true, values: null };
@@ -327,7 +278,6 @@ function normalizeJsonText(value: unknown, field: string): WriteNormalizationRes
     }
 }
 
-/* @Codex */
 function normalizeOptionalJsonText(value: unknown, field: string): WriteNormalizationResult<string | null | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -336,7 +286,6 @@ function normalizeOptionalJsonText(value: unknown, field: string): WriteNormaliz
     return normalizeJsonText(value, field);
 }
 
-/* @Codex */
 function normalizeEntrySetting(value: unknown): WriteNormalizationResult<string | null> {
     if (value === undefined || value === null || value === '') {
         return { ok: true, values: null };
@@ -349,7 +298,6 @@ function normalizeEntrySetting(value: unknown): WriteNormalizationResult<string 
     return { ok: false, error: 'Invalid setting' };
 }
 
-/* @Codex */
 function normalizeOptionalEntrySetting(value: unknown): WriteNormalizationResult<string | null | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -358,7 +306,6 @@ function normalizeOptionalEntrySetting(value: unknown): WriteNormalizationResult
     return normalizeEntrySetting(value);
 }
 
-/* @Codex */
 export function normalizeCheckupSource(value: unknown): WriteNormalizationResult<CheckupSource> {
     if (value === undefined || value === null || value === '') {
         return { ok: true, values: 'manual' };
@@ -371,7 +318,6 @@ export function normalizeCheckupSource(value: unknown): WriteNormalizationResult
     return { ok: false, error: 'Invalid source' };
 }
 
-/* @Codex */
 export function normalizeOptionalCheckupSource(value: unknown): WriteNormalizationResult<CheckupSource | null | undefined> {
     if (value === undefined) {
         return { ok: true, values: undefined };
@@ -384,7 +330,6 @@ export function normalizeOptionalCheckupSource(value: unknown): WriteNormalizati
     return normalizeCheckupSource(value);
 }
 
-/* @Codex */
 function normalizeObservationValue(value: unknown, allowClear = false): WriteNormalizationResult<string> {
     if (typeof value === 'number' && Number.isFinite(value)) {
         return { ok: true, values: String(value) };
@@ -399,7 +344,6 @@ function normalizeObservationValue(value: unknown, allowClear = false): WriteNor
     return { ok: false, error: 'Invalid value field' };
 }
 
-/* @Codex */
 function normalizeObservationCodeSystem(value: unknown): WriteNormalizationResult<'LOINC'> {
     const codeSystem = typeof value === 'string' ? value.trim().toUpperCase() : '';
     if (codeSystem !== 'LOINC') {
@@ -409,7 +353,6 @@ function normalizeObservationCodeSystem(value: unknown): WriteNormalizationResul
     return { ok: true, values: 'LOINC' };
 }
 
-/* @Codex */
 function normalizeObservationUnitSystem(value: unknown): WriteNormalizationResult<'UCUM'> {
     const unitSystem = typeof value === 'string' ? value.trim().toUpperCase() : '';
     if (unitSystem !== 'UCUM') {
@@ -419,7 +362,6 @@ function normalizeObservationUnitSystem(value: unknown): WriteNormalizationResul
     return { ok: true, values: 'UCUM' };
 }
 
-/* @Codex */
 export function normalizeEntryCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
@@ -469,7 +411,6 @@ export function normalizeEntryCreateInput(
     };
 }
 
-/* @Codex */
 export function normalizeEntryUpdateInput(
     input: Record<string, unknown>
 ): WriteNormalizationResult<EntryUpdateValues> {
@@ -533,7 +474,6 @@ export function normalizeEntryUpdateInput(
     };
 }
 
-/* @Codex */
 export function normalizeTherapyCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
@@ -602,7 +542,6 @@ export function normalizeTherapyCreateInput(
     };
 }
 
-/* @Codex */
 export function normalizeTherapyUpdateInput(
     input: Record<string, unknown>
 ): WriteNormalizationResult<TherapyUpdateValues> {
@@ -696,7 +635,6 @@ export function normalizeTherapyUpdateInput(
     };
 }
 
-/* @Codex */
 export function normalizeCheckupCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date }
@@ -738,7 +676,6 @@ export function normalizeCheckupCreateInput(
     };
 }
 
-/* @Codex */
 export function normalizeCheckupUpdateInput(
     input: Record<string, unknown>
 ): WriteNormalizationResult<CheckupUpdateValues> {
@@ -802,7 +739,6 @@ export function normalizeCheckupUpdateInput(
     };
 }
 
-/* @Codex */
 export function normalizeObservationCreateInput(
     input: Record<string, unknown>,
     context: { id: string; patientId: string; now?: Date; allowServicePrescriptionItemLink?: boolean }
@@ -874,7 +810,6 @@ export function normalizeObservationCreateInput(
     };
 }
 
-/* @Codex */
 export function normalizeObservationUpdateInput(
     input: Record<string, unknown>,
     options: { allowServicePrescriptionItemLink?: boolean } = {},

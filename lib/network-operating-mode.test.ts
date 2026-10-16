@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-/* @Codex */
 import { deriveNetworkOperatingModeViewModel, type NetworkOverviewPayload } from './network-operating-mode.ts';
 
 function createOverview(overrides: Partial<NetworkOverviewPayload> = {}): NetworkOverviewPayload {

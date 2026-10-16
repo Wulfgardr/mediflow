@@ -1,4 +1,4 @@
-/* @Codex: synthetic data only. Frame fixtures test the observer, never a PDF/OCR engine. */
+/* synthetic data only. Frame fixtures test the observer, never a PDF/OCR engine. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* @Codex */
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -190,7 +189,7 @@ async function seedCatalogs() {
 
     const exemptions = await request('POST', '/api/v1/exemptions', {
         headers: localApiHeaders(),
-        // @Codex: single manual fixture; full imports require preview/commit.
+        // single manual fixture; full imports require preview/commit.
         body: {
             code: 'E01',
             description: 'Esenzione catalog smoke',

@@ -1,4 +1,4 @@
-/* @Codex: synthetic engine matrix, NOT clean-install/NTFS/runtime evidence. Never invokes Docker. */
+/* synthetic engine matrix, NOT clean-install/NTFS/runtime evidence. Never invokes Docker. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, readFileSync, writeFileSync, chmodSync, copyFileSync, appendFileSync, unlinkSync, existsSync, mkdirSync, rmSync, realpathSync, readdirSync } from 'node:fs';
@@ -176,7 +176,7 @@ function fakeDocker(options = {}) {
 }
 
 test('new macOS container reads its default bridge identity after start before offline connect', async t => {
-    // @Codex: real Docker reports an empty NetworkID until the freshly created container starts.
+    // real Docker reports an empty NetworkID until the freshly created container starts.
     const f = fixture(t, 'darwin', { bridgeIdAssignedOnStart: true }, 'arm64');
     const result = await onboardWho('setup', f.deps);
     assert.equal(result.state, 'ready');
@@ -240,7 +240,7 @@ for (const platform of ['darwin', 'linux', 'win32']) for (const arch of ['x64', 
         assert.equal(f.reports.some(x => x.includes('Download immagine')), true);
         assert.equal(f.reports.some(x => x.includes('Qualifica in corso')), true);
         const corrections = f.docker.calls.filter(a => a.includes('chown') || a.includes('chmod'));
-        // @Codex: Docker Desktop preserves host metadata on both Mac and Windows copies.
+        // Docker Desktop preserves host metadata on both Mac and Windows copies.
         assert.equal(corrections.length, ['win32', 'darwin'].includes(platform) ? 10 : 0);
         for (const a of corrections) assert.equal(a[3], id('b'));
         f.docker.calls.length = 0;

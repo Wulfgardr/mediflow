@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import * as web from './web-auth-lifecycle-owner-adapter';
 import * as native from './native-inference-lifecycle';

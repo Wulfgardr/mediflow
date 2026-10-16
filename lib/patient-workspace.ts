@@ -1,4 +1,3 @@
-/* @Codex */
 /* WUL-UIUX Fase 7: pipeline dati del Quadro paziente estratta dal cockpit
    Kree8 (components/kree8/kree8-clinical-cockpit.tsx) in una lib condivisa,
    cosi la Scheda potra importare la stessa pipeline e mostrare numeri identici
@@ -46,7 +45,6 @@ export type Kree8Patient = {
 
 export type PillVariant = SemanticSignal | LegacySemanticSignalAlias;
 
-/* @Codex */
 export type Kree8PatientWorkspace = {
   entriesCount: number;
   latestEntry?: { title: string; date: string; type: string };
@@ -63,7 +61,7 @@ export type Kree8PatientWorkspace = {
 };
 
 export type Kree8AgendaRow = {
-  /* @Codex The checkup's own id, carried through so the list can be keyed by
+  /* The checkup's own id, carried through so the list can be keyed by
      identity. It used to be dropped here, and the agenda keyed its rows on
      `time + title` instead — which is not unique. Two patients seen at 09:00,
      both for a "Controllo", produce one key, and React's documented behaviour
@@ -157,7 +155,7 @@ export function mapCheckupsForKree8(
 ): Kree8AgendaRow[] {
   const patientById = new Map(patients.map((patient) => [patient.id, patient]));
 
-  /* @Codex WUL-UIUX: "Agenda di oggi" deve mostrare oggi e i prossimi passaggi,
+  /* WUL-UIUX: "Agenda di oggi" deve mostrare oggi e i prossimi passaggi,
      non i checkup piu vecchi dell'archivio. Escludiamo annullati e conclusi e le
      date anteriori a inizio giornata; l'ordine ascendente e lo slice arrivano dopo
      il filtro. Il conteggio "di oggi" si calcola sull'intero set filtrato. */
@@ -189,7 +187,7 @@ export function mapCheckupsForKree8(
     });
 }
 
-/* @Codex WUL-UIUX: appuntamenti di oggi (non annullati/conclusi) sull'intero set. */
+/* WUL-UIUX: appuntamenti di oggi (non annullati/conclusi) sull'intero set. */
 export function countTodayCheckups(checkups: Kree8CheckupSource[]): number {
   const now = new Date();
   return checkups.filter((checkup) => {
@@ -199,7 +197,7 @@ export function countTodayCheckups(checkups: Kree8CheckupSource[]): number {
   }).length;
 }
 
-/* @Codex WUL-UIUX: passaggi pianificati (oggi + futuri, non annullati/conclusi)
+/* WUL-UIUX: passaggi pianificati (oggi + futuri, non annullati/conclusi)
    sull'intero set, stesso filtro di mapCheckupsForKree8 ma senza lo slice(0,6),
    cosi la testata dichiara il carico reale della giornata e non solo le righe viste. */
 export function countPlannedCheckups(checkups: Kree8CheckupSource[]): number {
@@ -212,7 +210,6 @@ export function countPlannedCheckups(checkups: Kree8CheckupSource[]): number {
   }).length;
 }
 
-/* @Codex */
 export function formatWorkspaceDate(value: string | Date | null | undefined): string {
   if (!value) return 'n/d';
   const date = new Date(value);
@@ -225,7 +222,6 @@ export function formatWorkspaceDate(value: string | Date | null | undefined): st
   }).format(date);
 }
 
-/* @Codex */
 export function clinicalEntryTypeLabel(type: ClinicalEntry['type'] | undefined): string {
   switch (type) {
     case 'visit':
@@ -248,13 +244,11 @@ export function clinicalEntryTypeLabel(type: ClinicalEntry['type'] | undefined):
   }
 }
 
-/* @Codex */
 export function summarizeObservation(observation: Observation): string {
   const unit = observation.unitCode ? ` ${observation.unitCode}` : '';
   return `${observation.display || observation.code}: ${observation.value}${unit}`;
 }
 
-/* @Codex */
 function buildCodingHints(
   patient: Kree8Patient,
   therapies: Therapy[],
@@ -279,7 +273,7 @@ function buildCodingHints(
   return hints.slice(0, 3);
 }
 
-/* @Codex WUL-UIUX Fase 7 (innesto): adapter per la Scheda (/modules), che ha
+/* WUL-UIUX Fase 7 (innesto): adapter per la Scheda (/modules), che ha
    gia il record Patient di '@/lib/db' e gli array grezzi. Costruiamo il minimo
    Kree8Patient che buildPatientWorkspace legge davvero (solo `raw`, da cui
    arrivano diagnoses e documentInsights) e deleghiamo alla stessa pipeline del
@@ -329,7 +323,6 @@ export function buildPatientWorkspaceFromRecords({
   });
 }
 
-/* @Codex */
 export function buildPatientWorkspace({
   patient,
   entries,

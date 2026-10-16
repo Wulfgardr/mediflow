@@ -1,6 +1,5 @@
 import SwiftUI
 
-/* @Codex */
 struct PairedPatientTherapiesSection: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @Binding var therapyStatusFilter: TherapyStatusFilter
@@ -200,13 +199,11 @@ struct PairedPatientTherapiesSection: View {
         return toneColor(PairedTherapyStatus(rawValue: therapy.status)?.tone ?? .neutral)
     }
 
-    /* @Codex */
     private func toneColor(_ tone: LumeTone) -> Color {
         let palette = LumePalette.palette(for: colorScheme, isGuardia: isGuardia)
         return LumePalette.tint(for: tone, using: palette)
     }
 
-    /* @Codex */
     private func therapyRow(_ therapy: HomeBaseTherapySummary) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
@@ -287,7 +284,6 @@ struct PairedPatientTherapiesSection: View {
         .modifier(LumeRigaListaModifier(isSelected: false))
     }
 
-    /* @Codex */
     private func therapyForm(
         title: String,
         drugName: Binding<String>,
@@ -397,7 +393,6 @@ struct PairedPatientTherapiesSection: View {
         }
     }
 
-    /* @Codex */
     @ViewBuilder
     private func drugCatalogResultsList(
         results: [HomeBaseDrugSummary],
@@ -464,5 +459,4 @@ struct PairedPatientTherapiesSection: View {
         }
     }
 
-    /* @Codex */
 }

@@ -1,5 +1,4 @@
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
-/* @Codex */
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { apiInternalError } from '@/lib/api-error-response';

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/* @Codex: presentation only; drafts, validation and writes stay in the model. */
+/* presentation only; drafts, validation and writes stay in the model. */
 struct PairedDiaryComposerView: View {
     @ObservedObject var model: PairedPatientsWorkspaceModel
     @ObservedObject var capabilities: ClinicalWorkspaceCapabilitiesStore
@@ -47,7 +47,7 @@ struct PairedDiaryComposerView: View {
         .font(.body)
         .frame(maxWidth: .infinity, alignment: .leading)
         #if os(iOS)
-        // @Codex: Separate writing from the chronology without changing draft ownership.
+        // Separate writing from the chronology without changing draft ownership.
         .padding(.vertical, 12)
         .buttonStyle(.bordered)
         #endif
@@ -130,7 +130,7 @@ struct PairedDiaryComposerView: View {
         .onAppear { focusedTitle = .editedEntry }
     }
 
-    // @Codex: The latest host entry is a read-only comparison; confirmation only
+    // The latest host entry is a read-only comparison; confirmation only
     // adopts its version. The draft and the final Save stay under user control.
     private var reconciliationReview: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -290,7 +290,7 @@ struct PairedDiaryComposerView: View {
         .onAppear { focusedTitle = .newEntry }
     }
 
-    /* @Codex: disclosure changes visibility only; the selected IDs stay model-owned. */
+    /* disclosure changes visibility only; the selected IDs stay model-owned. */
     private func attachmentReferences(selectedIds: Binding<Set<String>>, accessibilityPrefix: String) -> some View {
         DisclosureGroup {
             EntryAttachmentReferencePicker(
@@ -318,7 +318,7 @@ struct PairedDiaryComposerView: View {
     }
 }
 
-/* @Codex: touch targets grow with text; macOS keeps native control density. */
+/* touch targets grow with text; macOS keeps native control density. */
 struct PairedDiaryControlLabel: ViewModifier {
     func body(content: Content) -> some View {
         #if os(iOS)
@@ -336,7 +336,7 @@ struct PairedDiaryControlLabel: ViewModifier {
     }
 }
 
-/* @Codex: controls can stack before accessibility sizes when the column is narrow. */
+/* controls can stack before accessibility sizes when the column is narrow. */
 struct PairedDiaryActions<Content: View>: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let content: Content

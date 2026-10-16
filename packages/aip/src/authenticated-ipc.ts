@@ -1,4 +1,3 @@
-/* @Codex */
 import { types } from 'node:util';
 import type { AipOwnerHandleV1 } from './owner-broker.ts';
 import {

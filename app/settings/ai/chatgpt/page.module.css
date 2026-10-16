@@ -1,4 +1,4 @@
-/* @Codex — page-local geometry; the shared shell, tokens and palette stay intact. */
+/* page-local geometry; the shared shell, tokens and palette stay intact. */
 .page {
     display: grid;
     gap: 1.5rem;

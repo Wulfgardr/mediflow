@@ -1,4 +1,3 @@
-/* @Codex */
 import Foundation
 
 /// Language-neutral H9 DTO codec for ADR 0103. The values decoded here are

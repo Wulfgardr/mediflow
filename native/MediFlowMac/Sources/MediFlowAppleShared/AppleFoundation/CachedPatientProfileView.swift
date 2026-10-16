@@ -1,7 +1,5 @@
-// @Codex
 import SwiftUI
 
-/* @Codex */
 struct CachedPatientProfileView: View {
     let profile: HomeBasePatientDetail
     let metadata: HomeBasePatientCacheMetadata?
@@ -36,7 +34,7 @@ struct CachedPatientProfileView: View {
 
     @ViewBuilder
     private func field(_ title: String, _ value: String?) -> some View {
-        // @Codex: Missing optional fields do not turn the historical profile into empty boxes.
+        // Missing optional fields do not turn the historical profile into empty boxes.
         if lockedFields.contains(title) || value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.subheadline.weight(.semibold))

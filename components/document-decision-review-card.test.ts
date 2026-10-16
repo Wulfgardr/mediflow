@@ -1,14 +1,8 @@
-/* @Codex */
 import test from 'node:test';
-/* @Codex */
 import assert from 'node:assert/strict';
-/* @Codex */
 import React from 'react';
-/* @Codex */
 import { renderToStaticMarkup } from 'react-dom/server';
-/* @Codex */
 import DocumentDecisionReviewCard from './document-decision-review-card';
-/* @Codex */
 import {
     applyDocumentDecisionGuardrails,
     buildDocumentDecision,

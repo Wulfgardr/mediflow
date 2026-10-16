@@ -2,7 +2,6 @@
 
 import { formatCountLabel } from '../format-count';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-/* @Codex */
 import { isInstalledOllamaModel } from '@/lib/installed-ollama-models';
 import { db } from '@/lib/db';
 import { useToast } from '@/components/ui/toast-provider';
@@ -57,7 +56,7 @@ type AIConfigState = {
 
 type AISettingsStore = Pick<typeof db.settings, 'put'>;
 
-/* @Codex: the ordinary clinical-functions save persists the fixed local binding required by ADR 0136. */
+/* the ordinary clinical-functions save persists the fixed local binding required by ADR 0136. */
 export async function saveLocalOllamaBinding(
     configuration: Pick<AIConfigState, 'model_clinical' | 'model_reasoning' | 'url'>,
     settings: AISettingsStore = db.settings,
@@ -76,7 +75,6 @@ type AIHealthState = {
     models: string[];
 };
 
-/* @Codex */
 export function useAiSettingsController() {
     const { showToast } = useToast();
     const [hardwareProfile, setHardwareProfile] = useState<HardwareProfile>('custom');
@@ -106,7 +104,7 @@ export function useAiSettingsController() {
         DEFAULT_DOCUMENT_ROUTER_CONTROL_FLOW_MODE,
     );
 
-    // @Codex: connection observations belong to one configuration and mounted instance.
+    // connection observations belong to one configuration and mounted instance.
     const connectionGeneration = useRef({ value: 0 });
     useLayoutEffect(() => {
         const generation = connectionGeneration.current;

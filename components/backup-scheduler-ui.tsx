@@ -1,6 +1,5 @@
 'use client';
 
-/* @Codex */
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, Clock3, FolderArchive, RefreshCw, Save } from 'lucide-react';
 import styles from '@/components/settings/settings-lume.module.css';
@@ -233,7 +232,7 @@ export default function BackupSchedulerUI() {
     };
 
     const lastRun = status?.state.run;
-    /* @Codex: scheduling registration is platform-specific; manual run and retention stay available everywhere */
+    /* scheduling registration is platform-specific; manual run and retention stay available everywhere */
     const schedulingUnsupported = Boolean(status && !status.supported);
 
     return (

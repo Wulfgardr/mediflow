@@ -1,15 +1,11 @@
-/* @Codex */
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
-/* @Codex */
 import { NextResponse } from 'next/server';
-/* @Codex */
 import {
     NETWORK_PROSTHETIC_PRESCRIPTION_READ_CAPABILITY,
     NETWORK_PROSTHETIC_PRESCRIPTION_WRITE_CAPABILITY,
     createNetworkScopedProstheticPrescription,
     listNetworkScopedProstheticPrescriptions,
 } from '@/lib/prosthetic-prescription-write';
-/* @Codex */
 import { requireNetworkCapabilityContext, requireNetworkWriteContext } from '@/lib/network-write-context';
 
 export async function GET(request: Request) {

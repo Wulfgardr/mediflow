@@ -1,4 +1,3 @@
-/* @Codex */
 /* Host-only transport regression tests. Synthetic pipes/peers, NEVER Docker/WHO qualification. */
 import assert from 'node:assert/strict';
 import test from 'node:test';

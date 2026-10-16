@@ -1,4 +1,3 @@
-/* @Codex */
 import { Buffer } from 'node:buffer';
 import { types } from 'node:util';
 import {

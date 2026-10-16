@@ -1,4 +1,3 @@
-/* @Codex */
 import 'server-only';
 import { resolveTextModel } from '@/lib/ai-model-selection';
 import { DEFAULT_OLLAMA_BASE_URL, resolveOllamaBaseUrl } from './base-url';

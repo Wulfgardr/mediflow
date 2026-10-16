@@ -1,4 +1,3 @@
-/* @Codex */
 import type { NetworkOperatingMode } from './api/v1/types';
 
 export const NETWORK_PAIRING_LIFECYCLE_SCHEMA_VERSION = 'mediflow.network.pairing-lifecycle.v1';

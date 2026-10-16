@@ -1,4 +1,4 @@
-/* @Codex: fixed host-only qualification of resources created by this installer. */
+/* fixed host-only qualification of resources created by this installer. */
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, chmodSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -83,7 +83,7 @@ export function createOwnedContainerArgs(state, name, network, publish) {
     return ['container', 'create', '--name', name, '--platform', platform, '--network', network,
         '--label', `${OWNER_LABEL}=${state.installationId}`, '--restart', 'no',
         ...(effectivePublish === true ? ['--publish', '127.0.0.1:8382:80'] : effectivePublish === 'ephemeral' ? ['--publish', '127.0.0.1::80'] : []),
-        // @Codex: fixed in-image CA bundle enables the pinned WHO image TLS verification.
+        // fixed in-image CA bundle enables the pinned WHO image TLS verification.
         '--env', 'SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt', '--env', 'acceptLicense=true',
         '--env', 'include=2026-01_en', '--env', 'saveAnalytics=false', '--env', 'enableDoris=false',
         '--env', 'fhirSupport=false', state.image];
@@ -458,7 +458,7 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
             if (record && Object.values(c.networks).some(n => n.NetworkID === record.id)) assertOwnedNetwork(state, record, command);
         }
         if (c.running) {
-            const output = command(['container', 'stop', '--timeout', '30', id], 40000); // @Codex: current Docker option, exact ID confirmation retained.
+            const output = command(['container', 'stop', '--timeout', '30', id], 40000); // current Docker option, exact ID confirmation retained.
             if (output !== id) deny('container_stop_unconfirmed');
             assertOwnedContainer(state, id, command, false);
         }
@@ -514,7 +514,7 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
             inventorySha256: result.snapshotInventorySha256, fileCount: metadata.length, bytes: metadata.reduce((sum, f) => sum + f.bytes, 0) }; save();
         check();
         if (command(['network', 'ls', '--filter', `name=^${networkName}$`, '--format', '{{.ID}}'])) deny('network_name_conflict');
-        // @Codex: explicit IPv4 prevents Docker's implicit option alias in the strict readback.
+        // explicit IPv4 prevents Docker's implicit option alias in the strict readback.
         const networkId = command(['network', 'create', '--driver', 'bridge', '--internal', '--ipv4=true', '--ipv6=false',
             ...Object.entries(networkOptions).flatMap(([key, value]) => ['--opt', `${key}=${value}`]),
             '--label', `${OWNER_LABEL}=${state.installationId}`, networkName]);
@@ -525,7 +525,7 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
         check(); assertOwnedNetwork(state, offlineNetwork, command);
         assertOwnedContainer(state, state.containerId, command, false);
         command(['container', 'start', state.containerId], 30000);
-        // @Codex: Docker can assign the default bridge ID only when a newly created container starts.
+        // Docker can assign the default bridge ID only when a newly created container starts.
         const beforeConnect = assertOwnedContainer(state, state.containerId, command, true);
         const currentPrior = assertOwnedTopology(state, beforeConnect, command, true);
         if (Boolean(prior) !== Boolean(currentPrior) || (prior && currentPrior.id !== prior.id)) deny('original_network_mismatch');
@@ -561,7 +561,7 @@ export async function qualifyOwnedDeployment(state, lock, directory, dependencie
         check(); assertOwnedContainer(state, restoreId, command, false); assertOwnedNetwork(state, offlineNetwork, command);
         command(['container', 'start', restoreId], 30000);
         if (['win32', 'darwin'].includes(state.engineBinding?.hostPlatform)) {
-            // @Codex: Docker cp can preserve host ownership on Mac as well as Windows.
+            // Docker cp can preserve host ownership on Mac as well as Windows.
             // Restore the existing root/0644 contract before the strict metadata readback.
             for (const file of metadata) {
                 check(); assertOffline(state, restoreId, offlineNetwork, command);
