@@ -77,7 +77,7 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 | Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Accesso v3 UI riuscito sui candidati `65da73735` e `9028b0772` | Accesso e cartella riusciti su iPhone simulato `65da73735` e iPad simulato `9028b0772`; hardware fisico da provare |
 | Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati su `65da73735`; CSV con due schede e un duplicato escluso su `9028b0772`, aggiornamento lista seguito in #552 | Cartella e indirizzo letti nei simulatori iPhone e iPad; iPad legge anche le schede importate dal Mac. Importazione CSV dal dispositivo e riavvio da provare |
 | Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Diario con due nuovi allegati e struttura annidata salvato e riletto su `9028b0772`; rientro in lettura seguito in #553 | iPad `9028b0772`: arresto aprendo Diario, seguito in #553. Editor e salvataggio da mobile da provare; niente scritture offline |
-| Documenti e OCR | Caricamento, estrazione locale e revisione da provare; Apple Vision sul Mac | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772` dopo aggiornamento della sezione; difetto UI seguito in #552. OCR non provato | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
+| Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772` dopo aggiornamento della sezione; difetto UI seguito in #552. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
 | Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
 | Conflitti, lock, backup e recupero | Conflitto, riavvio e ripristino completo sintetico da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
@@ -106,6 +106,7 @@ non ancora integrati sono descritti nelle PR sopra, non attribuiti alla base.
 | Ambiente e revisione | Risultato osservato | Ancora aperto |
 | --- | --- | --- |
 | Omarchy/Arch ARM, Node 24.21.0, base `a5420afa3e3eed7cf598a51e3d3dc52e3d132a6e` | Sei prove dell'harness ufficiale e tre prove di accesso riuscite; Supervisor Headless con cinque operazioni riuscito | Non è Ubuntu; non copre l'interazione completa, i nuovi contributi Apple o la generazione ChatGPT |
+| Omarchy/Arch ARM, Node 24.21.0, `main` a `35412087c50cf98df7cb7afa4b10a7b4641be6e7` | Nuova build e prova completa del Supervisor riuscite: due backend isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura. Cinque letture HTTP della revisione hanno confermato il candidato pulito. | Include la correzione #550; non prova UI, Ubuntu o Linux x86_64. Dati temporanei rimossi e porte liberate. |
 | Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo senza causa stabilita; trasporto di prova intermittente. Il successivo difetto di attivazione e la sua correzione sono descritti sotto. |
 | Windows 11 ARM con Node 24.21.0 Windows x64, candidato `b720ccfe7a30c88badd57e4f99830bed487347b2` | Attivazione HTTP 200 in 3,287 secondi; prova completa del Supervisor in 75,504 secondi: due processi isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura | Nessuna strumentazione nel prodotto; harness originale ripristinato e nessun processo Node residuo osservato. Non prova interazione UI o Windows 11 x64 nativo. |
 
@@ -129,6 +130,21 @@ riuso restano invariati. Sul candidato corretto sono riuscite sia
 l'attivazione singola sia la prova completa, senza strumentazione aggiunta.
 Questo risultato non spiega il primo errore del database né l'intermittenza
 del trasporto di prova.
+
+### OCR locale: PDF scansionato e Apple Vision
+
+Sul candidato `b8eb2ed6731459b57e335204c25af5a46dfb1a61`, con Node 24.21.0
+e Xcode 26.6, è riuscita in 21,1 secondi la prova della composizione locale:
+PDF sintetico contenente solo un'immagine, allegato cifrato, AnyDoc,
+rendering della pagina e riconoscimento Apple Vision reale. Il testo atteso
+è stato riconosciuto, con provenienza OCR su una pagina di una; l'allegato
+persistito è rimasto invariato. Nessun provider cloud o modello scaricato.
+
+La prova non passa da HTTP o UI e non attesta il bundle installato,
+Windows/Linux o l'accuratezza generale del riconoscimento. All'uscita il
+processo ha segnalato `SQLite lease release unverified`; le directory
+temporanee risultavano rimosse. L'ordine di pulizia del test è una possibile
+causa dell'avviso, non una chiusura del lease verificata.
 
 ### Tre funzioni Ollama: prove reali e limiti
 
@@ -249,7 +265,7 @@ Le prossime ricevute devono indicare SHA completa, revisione runtime letta da
 Build, prova HTTP, interazione UI e tecnologia assistiva sono risultati diversi.
 Restano da completare:
 
-- nuove build Apple dopo #552 e #553: aggiornamento della lista e dei permessi,
+- verifica UI delle nuove build Apple dopo #552 e #553: aggiornamento della lista e dei permessi,
   lettura del diario senza arresti e con rientri corretti; percorsi mobile,
   cambio paziente, revoca e conservazione degli esiti parziali;
 - causa del primo errore database Windows, intermittenza del trasporto di
