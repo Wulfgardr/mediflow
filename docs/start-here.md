@@ -1,63 +1,52 @@
 # Inizia qui
 
-MediFlow nasce per tenere vicine la storia del paziente, le fonti da cui la
-ricostruiamo e le attività ancora da seguire. È un gestionale aperto e gratuito:
-si può partire dalla cartella e restare lì, senza attivare alcuna funzione AI.
+MediFlow è un gestionale aperto e gratuito per cartelle cliniche, documenti
+e attività ambulatoriali. Funziona anche senza intelligenza artificiale (AI).
 
-## Capire il prodotto
+## Il lavoro in cartella
 
-Diario, documenti, terapie e misure rispondono a esigenze diverse. Il testo
-conserva il contesto; i dati strutturati aiutano a cercare e scambiare le
-informazioni; il documento originale permette di tornare alla fonte. La
-modularità serve a far convivere questi strumenti senza imporre quelli che
-non occorrano.
+Diario, diagnosi, terapie e misure raccolgono la storia del paziente.
+I documenti originali permettono di consultare le fonti; checkup,
+appuntamenti e attività aperte aiutano a organizzare i controlli successivi.
 
-Il [README](../README.md) presenta il progetto e l’avvio dai sorgenti; il
-[contratto prodotto](../PRODUCT.md) ne precisa finalità e confini. La 0.8.6 è
-pubblicata come codice sorgente per il runtime locale/headless sul Mac, con
-browser localhost. Non è una distribuzione di app native complete né una
-qualifica all’impiego clinico.
+Il [README](../README.md) presenta le funzioni e l'avvio dai sorgenti.
+Il [manuale](./MANUALE.md) descrive l'uso; il
+[contratto di prodotto](../PRODUCT.md) ne precisa finalità e limiti.
 
-## Capire come aiuta nel lavoro
+## La versione disponibile
 
-Una terapia descritta in un referto o un controllo rimasto fra le attività
-aperte sono informazioni utili solo se si riesce a ritrovarle nel loro
-contesto. Le funzioni intelligenti possono aiutare in questo passaggio, ma
-richiedono configurazione e revisione: non sostituiscono la fonte né decidono
-che cosa scrivere nella cartella.
+La [0.9.0](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0) è
+pubblicata come codice sorgente per l'applicazione Web locale e l'accesso
+per agenti (Headless), con Node 24. App native e installer firmati non sono
+inclusi. I profili supportati e le condizioni di avvio sono nel
+[README](../README.md#provalo) e nelle note della release.
+Le prove su dati sintetici non autorizzano l'uso clinico: l'ammissione
+spetta al professionista o all'organizzazione responsabile.
 
-Il filo è sempre lo stesso: riprendere **la persona**, con diagnosi, terapie,
-misure e contesto; consultare **la fonte**, anche dopo un’estrazione o una
-sintesi; preparare **il prossimo passo**, senza confonderne la proposta con
-l’esecuzione.
+Lo [stato del sistema](./STATE_OF_THE_SYSTEM.md) descrive l'implementazione;
+il [CHANGELOG](../CHANGELOG.md) distingue la versione pubblicata dalle
+modifiche successive.
 
-Il [walkthrough](./walkthrough.md) segue il percorso operativo. La
-[matrice AI](./ai-runtime-serving-matrix.md) distingue implementazioni, prove
-controllate e sviluppi; [privacy e governance AI](./privacy-and-ai-governance.md)
-chiariscono perché un controllo tecnico non esaurisca la responsabilità d’uso.
+## Le funzioni AI
 
-## Capire come è costruito
+Le funzioni AI sono facoltative: preparano sintesi e proposte da rivedere,
+senza modificare automaticamente la cartella. Si usano solo modelli ammessi
+dal sistema locale. I servizi esterni sono spenti per impostazione predefinita
+e richiedono configurazione, consenso e controlli sui dati da inviare.
 
-Il nodo che conserva i dati autorevoli e ospita i servizi è la **home base**.
-La struttura che coordina le funzioni intelligenti è la **Fabric**: permette
-di non usarle o di scegliere strumenti diversi per funzioni diverse, entro il
-catalogo e l’autorità dell’host. Le preferenze non rendono ammissibile qualunque
-modello e non attivano implicitamente servizi esterni.
+La [matrice AI](./ai-runtime-serving-matrix.md) riporta funzioni, prove e
+limiti; [privacy e governance AI](./privacy-and-ai-governance.md) descrivono
+le responsabilità d'uso.
 
-Alcune funzioni si possono raggiungere senza passare da ogni schermata: è
-l’accesso **headless**, che conserva autenticazione, permessi e controlli del
-sistema, senza aprire il database agli agenti. La guida iniziale orienta il
-profilo di lavoro; scegliere una modalità non equivale a collegare un agente
-o abilitare un modello.
+## Per chi sviluppa
 
-La [topologia dei dati](./topologia-dati-flussi.md) segue le informazioni; la
-[topologia repository](./repository-topology.md) indica dove vive il codice.
-Per contribuire, parti da [architettura](../ARCHITECTURE.md),
-[sicurezza](../SECURITY.md), [contribuzione](../CONTRIBUTING.md) e contratto del
-componente. L’[indice canonico](./README.md) precisa quale documento prevalga
-per ciascun tema.
+Il computer principale conserva il database e ospita i servizi. I client
+agente usano comandi autenticati con permessi specifici, senza aprire
+direttamente il database.
 
-La [readiness 0.8.5](./release-085-readiness.md) conserva le prove e le condizioni
-aperte di quella fase. Non è un’attestazione della release successiva: codice
-presente, comportamento verificato e disponibilità per un impiego concreto
-restano piani diversi.
+Per contribuire, consulta [architettura](../ARCHITECTURE.md),
+[sicurezza](../SECURITY.md), [guida ai contributi](../CONTRIBUTING.md) e
+contratto del componente. La [mappa della documentazione](./README.md)
+indica il riferimento per ogni tema; le topologie dei
+[dati](./topologia-dati-flussi.md) e della [repository](./repository-topology.md)
+descrivono flussi e organizzazione del codice.
