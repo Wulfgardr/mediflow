@@ -5,6 +5,7 @@ import { icdClientErrorMessage, searchICDHybrid } from '@/lib/icd-service';
 import type { ICDSearchResult } from '@/lib/icd-service';
 import { createLatestRequestGuard } from '@/lib/latest-request-guard'; // @Codex
 import { Search, X, Server } from 'lucide-react';
+import { WHO_EMBEDDED_BINDING, WHO_EMBEDDED_LABEL } from '@/lib/reference-data/icd11-embedded-contract';
 import { WHO_LOCAL_ATTRIBUTION } from '@/lib/reference-data/icd11-who-local-contract'; // @Codex
 
 /* @Codex: optional provenance is additive at the selection callback boundary. */
@@ -229,6 +230,7 @@ export default function ICDAutocomplete({ value, onChange, initialValue, onSelec
             {isOpen && results.some(item => item.canonicalUri) && <details className="mt-2 text-xs break-words">
                 <summary>Fonte e riferimenti WHO</summary>
                 <p>{WHO_LOCAL_ATTRIBUTION}</p>
+                <p>{results.some(item => item.reference?.bindingId === WHO_EMBEDDED_BINDING) ? WHO_EMBEDDED_LABEL : 'Servizio WHO locale'}</p>
                 {results.filter(item => item.canonicalUri).map(item => <p key={item.code}>{item.code} · {item.canonicalUri}</p>)}
                 {results.some(item => item.partial) && <p>Risultati parziali: affina il termine di ricerca.</p>}
             </details>}

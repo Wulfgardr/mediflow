@@ -1,7 +1,10 @@
+import type { WhoCatalogStatus } from './reference-data/icd11-embedded-store';
+import { parseWhoEmbeddedReadiness, parseWhoEmbeddedSearchResponse, type WhoEmbeddedReadiness, type WhoEmbeddedReceipt } from './reference-data/icd11-embedded-contract';
+import type { WhoReference } from './reference-data/icd11-reference';
 /* @Codex */
 import type { ICDCode } from './icd-codes';
 import { parseWhoLocalReadiness, parseWhoLocalSearchResponse,
-    type WhoLocalReadiness, type WhoLocalReceipt, type WhoLocalReference } from './reference-data/icd11-who-local-contract';
+    type WhoLocalReadiness, type WhoLocalReceipt } from './reference-data/icd11-who-local-contract';
 
 const ICD_PROXY_URL = '/api/icd/proxy';
 const QUERY_MAX_BYTES = 160;
@@ -21,7 +24,7 @@ export interface ICDSearchResult extends ICDCode {
     isLegacy: false;
     canonicalUri?: string;
     partial?: boolean;
-    reference?: WhoLocalReference;
+    reference?: WhoReference;
 }
 
 export type ICDReadinessStatus = 'disabled' | 'credentials_absent' | 'offline'
@@ -34,7 +37,7 @@ type LegacyICDReadiness = Readonly<{
     language: 'en';
 }>;
 
-export type ICDReadiness = LegacyICDReadiness | WhoLocalReadiness;
+export type ICDReadiness = LegacyICDReadiness | WhoLocalReadiness | WhoEmbeddedReadiness;
 
 type LegacyICDSearchReceipt = Readonly<{
     schemaVersion: 'mediflow.reference-data.icd11-search-receipt.v1';
@@ -47,7 +50,7 @@ type LegacyICDSearchReceipt = Readonly<{
     completedAt: string;
 }>;
 
-export type ICDSearchReceipt = LegacyICDSearchReceipt | WhoLocalReceipt;
+export type ICDSearchReceipt = LegacyICDSearchReceipt | WhoLocalReceipt | WhoEmbeddedReceipt;
 
 export type ICDClientErrorCode = 'unauthorized' | 'request_invalid' | 'service_unavailable'
     | 'upstream_response_invalid' | 'upstream_timeout' | 'response_invalid' | 'transport_unavailable';
@@ -116,6 +119,10 @@ function searchResponse(value: unknown): Readonly<{
     entries: ICDSearchResult[];
     receipt: ICDSearchReceipt;
 }> | null {
+    const embedded = parseWhoEmbeddedSearchResponse(value);
+    if (embedded) return { entries: embedded.entries.map(entry => ({ ...entry, isLegacy: false as const,
+        partial: embedded.partial, reference: { releaseId: embedded.receipt.releaseId, language: embedded.receipt.language,
+            bindingId: embedded.receipt.bindingId, datasetSnapshotId: embedded.receipt.datasetSnapshotId } })), receipt: embedded.receipt };
     const local = parseWhoLocalSearchResponse(value);
     if (local) return Object.freeze({
         entries: local.entries.map(entry => Object.freeze({ ...entry, isLegacy: false as const,
@@ -150,6 +157,8 @@ function searchResponse(value: unknown): Readonly<{
 }
 
 function readiness(value: unknown): ICDReadiness | null {
+    const embedded = parseWhoEmbeddedReadiness(value);
+    if (embedded) return embedded;
     const local = parseWhoLocalReadiness(value);
     if (local) return local;
     const candidate = exactRecord(value, READINESS_KEYS);
@@ -239,11 +248,21 @@ export function icdReadinessMessage(status: ICDReadinessStatus): string {
         case 'configuration_required': return 'Completa il provisioning del servizio WHO locale e i riferimenti agli artifact.';
         case 'offline': return 'Accesso di rete WHO ICD-11 disattivato.';
         case 'configured': return 'WHO ICD-11 configurato; disponibilità non ancora verificata.';
-        case 'available': return 'Ultima interrogazione WHO ICD-11 riuscita.';
+        case 'available': return 'Ricerca ICD-11 disponibile.';
         case 'unavailable': return 'Servizio WHO ICD-11 non disponibile.';
         default: {
             const exhaustive: never = status;
             return exhaustive;
         }
     }
+}
+
+export async function getICDCatalogStatus(signal?: AbortSignal): Promise<WhoCatalogStatus> {
+    const response = await fetch('/api/icd/catalog', { cache: 'no-store', signal });
+    if (!response.ok) throw new ICDClientError('service_unavailable');
+    const value = await parsedBody(response) as WhoCatalogStatus;
+    if (!value || !['ready', 'absent', 'unverified'].includes(value.state) || typeof value.enabled !== 'boolean'
+        || !Number.isSafeInteger(value.revision) || !['fts5', 'like'].includes(value.searchEngine)
+        || (value.state === 'ready' && (!value.manifest || value.manifest.releaseId !== '2026-01' || value.manifest.language !== 'en'))) throw new ICDClientError('response_invalid');
+    return value;
 }

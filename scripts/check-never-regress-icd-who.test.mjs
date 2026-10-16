@@ -167,3 +167,14 @@ test('cloud CodeInfo fixture URL exceptions are exact to file and inert source l
         assert.equal(isExternalUrlLiteralAllowed(cloudCodeInfoFixturePath, url, line + ' https://unapproved.invalid'), false);
     }
 });
+
+test('embedded catalog egress exception is limited to the fixed official 2026-01 asset declaration', () => {
+    const url = 'https://icdcdn.who.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en.zip';
+    const declaration = `export const WHO_CATALOG_URL = '${url}';`;
+    const file = 'lib/reference-data/icd11-embedded-parser.ts';
+    assert.equal(isExternalUrlLiteralAllowed(file, url, declaration), true);
+    assert.equal(isExternalUrlLiteralAllowed('lib/unrelated.ts', url, declaration), false);
+    for (const hostile of [url.replace('who.int', 'who.int.invalid'), url.replace('2026-01', '2025-01'), url + '?redirect=caller']) {
+        assert.equal(isExternalUrlLiteralAllowed(file, hostile, `export const WHO_CATALOG_URL = '${hostile}';`), false);
+    }
+});

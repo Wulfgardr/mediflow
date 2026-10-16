@@ -20,7 +20,8 @@ import type {
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
 import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
-import { getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
+import type { WhoCatalogStatus } from '@/lib/reference-data/icd11-embedded-store';
+import { getICDCatalogStatus, getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
 import type { ICDReadiness } from '@/lib/icd-service';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
@@ -96,6 +97,7 @@ function buildLiveCatalogState(
   drugCount: number,
   exemptionCount: number,
   icdReadiness: ICDReadiness | null,
+  icdCatalog: WhoCatalogStatus | null,
 ): Kree8CatalogClientState {
   const rows: Kree8CatalogRow[] = [
     {
@@ -123,17 +125,13 @@ function buildLiveCatalogState(
     {
       id: 'icd',
       name: 'ICD-11 WHO',
-      sub: icdReadiness
-        ? `Readiness governata: ${icdReadinessMessage(icdReadiness.status)}`
-        : 'Readiness governata non verificabile.',
-      freshness: icdReadiness?.status === 'available'
-        ? 'fresh'
-        : icdReadiness?.status === 'configured'
-          ? 'stale'
-          : 'off',
-      age: icdReadiness ? `release ${icdReadiness.releaseId}` : 'non verificato',
-      href: '/settings/diagnostica',
-      actionLabel: 'Diagnostica',
+      sub: icdCatalog
+        ? `Catalogo WHO incorporato: ${{ ready: 'pronto', absent: 'assente', unverified: 'non verificato' }[icdCatalog.state]}${!icdCatalog.enabled ? ', disattivato dal gestore' : ''}. Inglese. WHO, CC BY-ND 3.0 IGO.${icdReadiness && !('catalogState' in icdReadiness) ? ` Servizio locale opzionale: ${icdReadinessMessage(icdReadiness.status)}` : ''}`
+        : 'Stato del catalogo WHO non verificabile.',
+      freshness: icdReadiness?.status === 'available' ? 'fresh' : icdCatalog?.state === 'unverified' ? 'stale' : 'off',
+      age: `MMS 2026-01 · Inglese · ${icdCatalog ? { ready: 'Pronto', absent: 'Assente', unverified: 'Non verificato' }[icdCatalog.state] : 'Non verificato'}`,
+      href: '/settings/repertori#who-setup',
+      actionLabel: 'Gestisci catalogo',
     },
   ];
 
@@ -153,12 +151,13 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
     async () => {
       if (isReview) return REVIEW_CATALOG_STATE;
       try {
-        const [drugCount, exemptionCount, icdReadiness] = await Promise.all([
+        const [drugCount, exemptionCount, icdReadiness, icdCatalog] = await Promise.all([
           fetchCatalogCount('/api/drugs?count=1'),
           fetchCatalogCount('/api/exemptions?count=1'),
           getICDReadiness().catch(() => null),
+          getICDCatalogStatus().catch(() => null),
         ]);
-        return buildLiveCatalogState(drugCount, exemptionCount, icdReadiness);
+        return buildLiveCatalogState(drugCount, exemptionCount, icdReadiness, icdCatalog);
       } catch (error) {
         console.error('[MediFlow] Kree8 catalog status failed:', error);
         return {

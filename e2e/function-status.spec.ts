@@ -83,6 +83,7 @@ test('WHO local verification is explicit and separates direct response, cache an
     await expect(panel.getByRole('alert')).toContainText('Verifica non riuscita');
     await expect(panel.getByRole('status')).toHaveCount(0);
     expect(searches).toBe(3);
+    await panel.getByText('Opzionale: servizio locale WHO', { exact: true }).click();
     await panel.getByText('Per chi gestisce il server', { exact: true }).click();
     await expect(panel.getByTestId('who-local-setup-guide').locator('input, textarea')).toHaveCount(0);
     await expect(panel).toContainText('MEDIFLOW_ICD_WHO_LOCAL_IMAGE_DIGEST');
@@ -163,4 +164,52 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     const stored = await page.request.get(`/api/patients/${patientId}`);
     expect((await stored.json()).diagnoses).toMatch(/^ENC:/u);
     expect(searches).toBe(2);
+});
+
+test('embedded ICD catalog searches, checks and saves a diagnosis with the real backend and Docker absent', async ({ page, baseURL }) => {
+    const dataDir = process.env.MEDIFLOW_DATA_DIR;
+    if (!dataDir || !path.resolve(dataDir).startsWith(path.resolve(os.tmpdir()) + path.sep)
+        || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1'
+        || !['localhost', '127.0.0.1'].includes(new URL(baseURL!).hostname)
+        || !readFileSync(path.join(dataDir, 'SYNTHETIC_ONLY'), 'utf8').includes('WHO local sidecar')) throw new Error('Marked isolated synthetic database required');
+    // The server activates the bundled WHO release on first use; no fixture or Docker is involved.
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const readiness = await page.request.get('/api/icd/proxy');
+    expect(readiness.status()).toBe(200);
+    expect((await readiness.json()).deployment).toBe('embedded');
+    const search = await page.request.get('/api/icd/proxy?q=hypert');
+    expect(search.status()).toBe(200);
+    expect((await search.json()).receipt.source).toBe('embedded');
+    await page.goto('/settings/repertori#who-setup');
+    const catalog = page.getByTestId('who-embedded-catalog');
+    await expect(catalog).toContainText('Pronto');
+    await expect(catalog).toContainText('Inglese');
+    await expect(catalog).toContainText('CC BY-ND 3.0 IGO');
+    await catalog.getByRole('button', { name: 'Aggiorna dalla WHO', exact: true }).click();
+    await expect(page.getByRole('dialog')).toContainText('Non invia dati clinici');
+    await page.getByRole('dialog').getByRole('button', { name: 'Annulla', exact: true }).click();
+    await page.goto('/patients/new');
+    await page.locator('input[name="firstName"]').fill('Sintetico');
+    await page.locator('input[name="lastName"]').fill('CatalogoIncorporato');
+    await page.locator('input[name="taxCode"]').fill('WHOTEST000000002');
+    await page.locator('input[name="birthDate"]').fill('1980-01-01');
+    await page.getByRole('button', { name: 'Aggiungi diagnosi', exact: true }).click();
+    await page.getByPlaceholder('Cerca diagnosi (ICD-11 Official - English)').fill('essential hypert');
+    await page.getByText('Fonte e riferimenti WHO', { exact: true }).click();
+    await expect(page.getByText('Catalogo WHO incorporato, release 2026-01', { exact: true })).toBeVisible();
+    await page.getByRole('option').filter({ hasText: 'BA00' }).first().click();
+    await page.getByRole('button', { name: 'Verifica codice WHO', exact: true }).click();
+    await expect(page.getByText('BA00 riconosciuto da WHO · MMS 2026-01', { exact: true })).toBeVisible();
+    const savedResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/patients');
+    await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
+    const saved = await savedResponse;
+    expect(saved.ok()).toBe(true);
+    const written = saved.request().postDataJSON();
+    expect(written.diagnoses).toMatch(/^ENC:/u);
+    await expect(page).toHaveURL(new URL('/?area=incarico', baseURL!).href);
+    await page.goto(`/patients/${written.id}/edit`);
+    await expect(page.locator('input[name="diagnoses.0.code"]')).toHaveValue('BA00');
+    await expect(page.locator('input[name="diagnoses.0.description"]')).toHaveValue('Essential hypertension');
+    await page.getByText('Riferimento della selezione WHO', { exact: true }).click();
+    await expect(page.getByText('http:' + '//id.who.int/icd/release/11/2026-01/mms/761947693', { exact: true })).toBeVisible();
 });
