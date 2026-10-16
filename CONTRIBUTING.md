@@ -236,8 +236,8 @@ npm run test:patient-document-import
 Usalo quando tocchi:
 - `components/pdf-importer.tsx`
 - `components/patient-document-import-review.tsx`
-- `lib/patient-document-import-service.ts`
-- `lib/patient-document-review.ts`
+- `lib/domain/documents/patient-import-decision.ts`
+- `lib/domain/documents/patient-document-review.ts`
 - la persistenza prudente delle terapie nel create-flow
 
 ### Test document intelligence / parse-evidence
@@ -254,7 +254,7 @@ npm run test:anydoc-local-only
 ```
 
 Usalo quando tocchi:
-- `lib/domain/documents/document-synthesis-service.ts`
+- `lib/ai-providers/fabric/document-synthesis-production-operation.ts`
 - `lib/domain/documents/document-parse-evidence-artifact.ts`
 - `lib/ai-context.ts`
 - `lib/domain/documents/anydoc-*`

@@ -36,13 +36,13 @@ function resolution(chat: LocalProviderResolution['adapter']['chat']): LocalProv
         listModels: async () => [],
     }) };
 }
-type Stop = 'kill' | 'kill_unavailable' | 'broker' | 'lifecycle' | 'lifecycle_corrupt'
+type Stop = 'valid' | 'kill' | 'kill_unavailable' | 'broker' | 'lifecycle' | 'lifecycle_corrupt'
     | 'lifecycle_unavailable' | 'binding' | 'readiness' | 'model' | 'router' | 'chat' | 'parse' | 'source';
-function stoppedCapability(stop: Stop, calls: string[]) {
+function stoppedCapability(stop: Stop, calls: string[], response = RESPONSE) {
     const binding = resolution(async () => {
         calls.push('chat');
         if (stop === 'chat') throw new Error('synthetic provider marker');
-        return { content: stop === 'parse' ? 'synthetic invalid response' : RESPONSE,
+        return { content: stop === 'parse' ? 'synthetic invalid response' : response,
             stats: { latency: 1, tokensIn: 2, tokensOut: 3 } };
     });
     const record = stop === 'router' ? { ...lifecycleRecord,
@@ -135,5 +135,20 @@ test('uses failed only after chat and retains only PHI-safe routing evidence', a
         assert.equal(result.proposal, null); assert.equal(result.reviewRef, null);
         assert.notEqual(result.receipt, null); assert.notEqual(result.provenance, null);
         assert.equal(JSON.stringify(result).includes('synthetic provider marker'), false);
+    }
+});
+
+test('rejects wrong-task and ambiguous envelopes through the current host preview without an apply', async () => {
+    for (const content of [
+        RESPONSE.replace('"task":"smart_import"', '"task":"document_synthesis"'),
+        RESPONSE + RESPONSE.replace('"task":"smart_import"', '"task":"patient_insight"'),
+    ]) {
+        const calls: string[] = [];
+        const result = await stoppedCapability('valid', calls, content).preview({ handle: HANDLE, requestId: REQUEST_ID });
+        assert.equal(result.code, 'proposal_invalid');
+        assert.equal(calls.at(-1), 'chat');
+        assert.equal(result.writesPerformed, 0);
+        assert.equal(result.apply, 'denied');
+        assert.equal(result.proposal, null);
     }
 });
