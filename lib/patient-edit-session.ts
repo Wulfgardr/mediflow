@@ -1,12 +1,12 @@
 /* @Codex */
-import type { WhoLocalReference } from './reference-data/icd11-who-local-contract';
+import type { WhoReference } from './reference-data/icd11-reference';
 /** The editable projection is also the form's default-value source. No I/O. */
 type DateInput = Date | string;
 type CheckupStatus = 'pending' | 'completed' | 'cancelled';
 type CheckupSource = 'manual' | 'ai_suggestion';
 
 type DiagnosisInput = { code: string; description: string; system: string; date: DateInput;
-    canonicalUri?: string | null; reference?: WhoLocalReference | null };
+    canonicalUri?: string | null; reference?: WhoReference | null };
 export type CheckupFormInput = {
     id?: string;
     patientId?: string;
@@ -49,6 +49,13 @@ function isoDate(value: DateInput): string {
 }
 
 // Only fields owned by the form participate in equality; date representations share an instant.
+function referenceFormValue(reference: WhoReference): WhoReference {
+    if ('imageDigest' in reference) return { releaseId: reference.releaseId, language: reference.language,
+        bindingId: reference.bindingId, imageDigest: reference.imageDigest, datasetSnapshotId: reference.datasetSnapshotId };
+    return { releaseId: reference.releaseId, language: reference.language,
+        bindingId: reference.bindingId, datasetSnapshotId: reference.datasetSnapshotId };
+}
+
 function diagnosisFormValue(diagnosis: DiagnosisInput) {
     return {
         code: diagnosis.code,
@@ -56,9 +63,7 @@ function diagnosisFormValue(diagnosis: DiagnosisInput) {
         system: diagnosis.system,
         date: isoDate(diagnosis.date),
         ...(diagnosis.canonicalUri != null ? { canonicalUri: diagnosis.canonicalUri } : {}),
-        ...(diagnosis.reference != null ? { reference: { releaseId: diagnosis.reference.releaseId,
-            language: diagnosis.reference.language, bindingId: diagnosis.reference.bindingId,
-            imageDigest: diagnosis.reference.imageDigest, datasetSnapshotId: diagnosis.reference.datasetSnapshotId } } : {}),
+        ...(diagnosis.reference != null ? { reference: referenceFormValue(diagnosis.reference) } : {}),
     };
 }
 

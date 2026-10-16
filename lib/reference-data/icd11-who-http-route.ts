@@ -1,10 +1,12 @@
+import type { Icd11WhoCatalogRuntime } from './icd11-catalog-runtime';
+import { parseWhoEmbeddedReadiness } from './icd11-embedded-contract';
 /* @Codex */
 import { ICD11_WHO_BINDING, Icd11WhoServiceError } from './icd11-who-service.ts';
 import type { Icd11WhoProductionRuntime } from './icd11-who-production-runtime.ts';
 import type { Icd11WhoLocalRuntime } from './icd11-who-local-runtime.ts';
 import { parseWhoLocalReadiness } from './icd11-who-local-contract.ts';
 
-type Runtime = Icd11WhoProductionRuntime | Pick<Icd11WhoLocalRuntime, 'readiness' | 'search'>;
+type Runtime = Icd11WhoCatalogRuntime | Icd11WhoProductionRuntime | Pick<Icd11WhoLocalRuntime, 'readiness' | 'search'>;
 
 const encoder = new TextEncoder();
 const READINESS_STATUSES = new Set([
@@ -61,6 +63,10 @@ function readinessResponse(runtime: Runtime): Response {
     let readiness: ReturnType<Runtime['readiness']>;
     try { readiness = runtime.readiness(); }
     catch { return errorResponse('service_unavailable', 503); }
+    if (readiness.schemaVersion === 'mediflow.reference-data.icd11-who-readiness.v3') {
+        const parsed = parseWhoEmbeddedReadiness(readiness);
+        return parsed ? json(parsed, parsed.status === 'available' ? 200 : 503) : errorResponse('service_unavailable', 503);
+    }
     if (readiness.schemaVersion === 'mediflow.reference-data.icd11-who-readiness.v2') {
         const parsed = parseWhoLocalReadiness(readiness);
         return parsed ? json(parsed, parsed.status === 'available' ? 200 : 503) : errorResponse('service_unavailable', 503);
@@ -102,7 +108,7 @@ export function createIcd11WhoHttpRoute(dependencies: Dependencies) {
             const result = await runtime.search(query!, request.signal);
             if (!await authorized() || request.signal.aborted) return json({ error: 'Unauthorized' }, 401);
             if ('partial' in result) return json(Object.freeze({
-                schemaVersion: 'mediflow.reference-data.icd11-search-response.v2' as const,
+                schemaVersion: result.receipt.source === 'embedded' ? 'mediflow.reference-data.icd11-search-response.v3' as const : 'mediflow.reference-data.icd11-search-response.v2' as const,
                 entries: result.entries, partial: result.partial, receipt: result.receipt,
             }), 200);
             return json(Object.freeze({

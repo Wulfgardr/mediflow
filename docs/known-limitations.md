@@ -265,3 +265,26 @@ e nel [tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdo
 Non sono inclusi nell’albero corrente. Restano le immagini ottimizzate e il
 manifest con hash, dimensioni e collegamenti agli originali. Le prove
 storiche non attestano il funzionamento della versione corrente.
+
+## Catalogo ICD-11 incorporato (2026-10)
+
+La ricerca tabellare MMS 2026-01 usa il bundle WHO ufficiale incluso, verificato
+e importato al primo uso senza Docker, rete o credenziali: 35.664 categorie
+con codice. Un bundle assente, alterato o disabilitato non viene attivato.
+
+Copertura: solo categorie con codice e titoli inglesi SimpleTabulation, senza
+sinonimi, traduzione italiana o postcoordinazione dell'API. Il parser supporta
+tab-separated UTF-8 in ZIP, rifiuta XLSX e intestazioni non riconosciute. Lo schema
+dell'archivio reale è verificato, comprese le note multilinea. Le combinazioni
+postcoordinate non vengono verificate dal catalogo tabellare. Dati WHO CC BY-ND
+3.0 IGO, non MIT; nessuna garanzia clinica deriva dalla presenza di un codice.
+
+L'estrazione ZIP rifiuta una tabulazione che produca più di 64 MiB o più byte
+di quelli dichiarati nell'archivio; richiede dimensione esatta e CRC completo.
+La decompressione è sincrona e limitata a blocchi, senza un timer dedicato.
+
+Il catalogo pubblico usa un DB dedicato e conserva l'archivio originale e una
+versione precedente ripristinabile. Il backup clinico non lo include. Il contratto
+incorporato delle route web WHO è additivo. Le route v1 paired conservano il
+contratto sidecar precedente, senza impatto OpenAPI; i client Apple non sono
+ancora qualificati per il catalogo incorporato. Il sidecar esistente e Setup_WHO restano opzionali.

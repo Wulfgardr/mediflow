@@ -1,13 +1,17 @@
 /* @Codex */
 import 'server-only';
 
+import { createWhoCatalogRuntime, type Icd11WhoCatalogRuntime } from './icd11-catalog-runtime';
+import { getWhoCatalogStore, getWhoCatalogStatus, whoCatalogEnabled } from './icd11-embedded-production';
+import { parseWhoEmbeddedSearchResponse, type WhoEmbeddedReceipt } from './icd11-embedded-contract';
 import { writeAuditEvent } from '@/lib/security/audit';
 import { createIcd11WhoLocalRuntime, type Icd11WhoLocalRuntime } from './icd11-who-local-runtime';
 import { createIcd11WhoLocalNodeTransport, createIcd11WhoCodeCheckTransport } from './icd11-who-local-node-transport';
 import { parseWhoLocalReceipt, type WhoLocalReceipt } from './icd11-who-local-contract';
 import { parseWhoCodeCheckReceipt, type WhoCodeCheckReceipt } from './icd11-who-code-check-contract';
 
-let runtime: Icd11WhoLocalRuntime | null = null;
+let runtime: Icd11WhoCatalogRuntime | null = null;
+let sidecar: Icd11WhoLocalRuntime | null = null;
 
 /** Persist only the validated receipt fields, within the existing audit whitelist. */
 export async function writeWhoLocalReceiptAudit(receipt: WhoLocalReceipt): Promise<string> {
@@ -32,9 +36,9 @@ export async function writeWhoLocalReceiptAudit(receipt: WhoLocalReceipt): Promi
     });
 }
 
-export function getIcd11WhoProductionRuntime(): Icd11WhoLocalRuntime {
-    if (runtime) return runtime;
-    runtime = createIcd11WhoLocalRuntime(Object.freeze({
+export function getIcd11WhoSidecarRuntime(): Icd11WhoLocalRuntime {
+    if (sidecar) return sidecar;
+    sidecar = createIcd11WhoLocalRuntime(Object.freeze({
         transport: createIcd11WhoLocalNodeTransport(),
         codeCheckTransport: createIcd11WhoCodeCheckTransport(),
         now: () => Date.now(),
@@ -44,6 +48,14 @@ export function getIcd11WhoProductionRuntime(): Icd11WhoLocalRuntime {
         },
         auditCodeCheck: async (receipt: WhoCodeCheckReceipt) => { await writeWhoCodeCheckAudit(receipt); },
     }));
+    return sidecar;
+}
+
+export function getIcd11WhoProductionRuntime(): Icd11WhoCatalogRuntime {
+    if (runtime) return runtime;
+    const sidecar = getIcd11WhoSidecarRuntime();
+    runtime = createWhoCatalogRuntime({ store: { ...getWhoCatalogStore(), status: getWhoCatalogStatus }, sidecar, enabled: whoCatalogEnabled,
+        auditSearch: writeWhoEmbeddedSearchAudit, auditCodeCheck: writeWhoCodeCheckAudit });
     return runtime;
 }
 
@@ -51,10 +63,20 @@ export async function writeWhoCodeCheckAudit(receipt: WhoCodeCheckReceipt): Prom
     const r = parseWhoCodeCheckReceipt(receipt);
     if (!r) throw new Error('Invalid WHO code-check receipt');
     const flags = [`schema:${r.schemaVersion}`, `operation:${r.operation}`, `release:${r.releaseId}`,
-        `language:${r.language}`, `binding:${r.bindingId}`, `image:${r.imageDigest}`, `dataset:${r.datasetSnapshotId}`,
+        `language:${r.language}`, `binding:${r.bindingId}`, ...('imageDigest' in r ? [`image:${r.imageDigest}`] : []), `dataset:${r.datasetSnapshotId}`,
         `source:${r.source}`, `found:${r.found}`, `checkedAt:${r.checkedAt}`, `latencyMs:${r.latencyMs}`];
     if (flags.some(flag => flag.length > 80 || !/^[a-zA-Z0-9._:-]+$/u.test(flag))) throw new Error('Invalid WHO code-check receipt');
     return writeAuditEvent({ eventType: 'reference_data.icd11.code_check', outcome: 'success', actorType: 'system',
         actorRef: 'icd11-who-owner', subjectType: 'reference_data', sourceSurface: 'api',
         redactedMetadata: { counts: r.found ? 1 : 0, flags } });
+}
+
+export async function writeWhoEmbeddedSearchAudit(receipt: WhoEmbeddedReceipt): Promise<string> {
+    if (!parseWhoEmbeddedSearchResponse({ schemaVersion: 'mediflow.reference-data.icd11-search-response.v3',
+        entries: [], partial: false, receipt: { ...receipt, resultCount: 0 } })
+        || !Number.isSafeInteger(receipt.resultCount) || receipt.resultCount < 0 || receipt.resultCount > 25) throw new Error('Invalid WHO embedded audit receipt');
+    return writeAuditEvent({ eventType: 'reference_data.icd11.search', outcome: 'success', actorType: 'system',
+        actorRef: 'icd11-who-owner', subjectType: 'reference_data', sourceSurface: 'api',
+        redactedMetadata: { counts: receipt.resultCount, flags: [`source:embedded`, `release:${receipt.releaseId}`,
+            `language:${receipt.language}`, `dataset:${receipt.datasetSnapshotId}`, `completedAt:${receipt.completedAt}`] } });
 }
