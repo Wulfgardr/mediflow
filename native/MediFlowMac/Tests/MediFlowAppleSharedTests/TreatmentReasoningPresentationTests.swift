@@ -20,8 +20,24 @@ final class TreatmentReasoningPresentationTests: XCTestCase {
                     "trace": .object(["limitations": .array([.string("Nessuna generazione o connessione a un servizio.")])])
                 ])
             ]),
-            "sourceBindings": .array([.object(["claimPath": .string("data.recommendation"), "claim": .string("Rivedere la terapia sintetica con le fonti disponibili prima di ogni decisione."), "evidenceRefs": .array([.string("therapy:synthetic-one")])])])
+            "sourceBindings": .array([.object(["claimPath": .string("data.recommendation"), "claim": .string("Rivedere la terapia sintetica con le fonti disponibili prima di ogni decisione."), "evidenceRefs": .array([.string("profile:clinical-summary")])])])
         ])
+    }
+
+    func testSourceIndexIncludesReferencesUsedOnlyByEvidenceCautionsAndActions() {
+        let sourceContext = NativeOrdinaryJSON.object([
+            "sourceBindings": .array([.object(["claimPath": .string("summary"), "evidenceRefs": .array([.string("profile:source-a")])])]),
+            "value": .object(["data": .object([
+                "keyEvidence": .array([.object(["evidenceRefs": .array([.string("attachment:source-d")])])]),
+                "safetyFlags": .array([.object(["evidenceRefs": .array([.string("therapy:source-b")])])]),
+                "suggestedActions": .array([.object(["evidenceRefs": .array([.string("entry:source-c"), .string("therapy:source-b")])])])
+            ])])
+        ])
+        let index = TreatmentReasoningSourceIndex(result: sourceContext)
+        XCTAssertEqual(index.references, ["profile:source-a", "attachment:source-d", "therapy:source-b", "entry:source-c"])
+        XCTAssertEqual(index.label("profile:source-a"), "Profilo clinico · Fonte 1")
+        XCTAssertEqual(index.label("therapy:source-b"), "Terapia · Fonte 3")
+        XCTAssertEqual(index.label("entry:source-c"), "Diario · Fonte 4")
     }
 
     func testProposalRendersNarrowAndWideRegistersInAppearanceAndTextEnvironments() throws {

@@ -116,8 +116,8 @@ function publicationFor(projection: Projection) {
     },
     sourceBindings: [
       { claimPath: 'summary', claim: summary, evidenceRefs: [profileRef] },
-      { claimPath: 'data.recommendation', claim: recommendation, evidenceRefs: [therapyRef] },
-      { claimPath: 'data.reasoning.0', claim: reasoning, evidenceRefs: [therapyRef] },
+      { claimPath: 'data.recommendation', claim: recommendation, evidenceRefs: [profileRef] },
+      { claimPath: 'data.reasoning.0', claim: reasoning, evidenceRefs: [profileRef] },
       { claimPath: 'data.caveats.0', claim: caveat, evidenceRefs: [profileRef] },
     ],
     attestation: {
@@ -343,6 +343,9 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
   const bindings = panel.getByText('Fonti della proposta');
   await bindings.click();
   await expect(panel).toContainText('data.recommendation');
+  await expect(panel.getByRole('button', { name: 'Terapia · Fonte 2: espandi le fonti della proposta' }).first()).toBeVisible();
+  await expect(panel.locator('code').filter({ hasText: `therapy:${fixture.therapyId}` })).toHaveText(`therapy:${fixture.therapyId}`);
+  await expect(panel.locator('code').filter({ hasText: 'profile:clinical-summary' })).toHaveText('profile:clinical-summary');
   await expect(panel).toContainText('Terapia sintetica presente nel contesto corrente.');
 
   const governance = panel.getByText('Origine e dettagli della generazione');
@@ -396,6 +399,10 @@ test('Treatment Reasoning UI invia payload strict e mostra una proposta source-b
     'POST /api/ai/treatment-reasoning/preview',
   ]);
   await bindings.click(); await governance.click();
+  await expect(panel.locator('code').filter({ hasText: `therapy:${fixture.therapyId}` })).toBeHidden();
+  await panel.getByRole('button', { name: 'Terapia · Fonte 2: espandi le fonti della proposta' }).first().click();
+  await expect(panel.locator('code').filter({ hasText: `therapy:${fixture.therapyId}` })).toBeVisible();
+  await bindings.click();
   const published = panel.getByTestId('treatment-reasoning-proposal');
   await expect(published).toHaveAttribute('data-ink-state', 'proposal');
   const lead = published.getByText('Rivedere la terapia sintetica prima di ogni decisione clinica.', { exact: true }).first();

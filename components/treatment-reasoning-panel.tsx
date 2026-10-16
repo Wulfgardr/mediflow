@@ -3,10 +3,10 @@
 import { formatCountLabel } from '@/lib/format-count';
 import design from './treatment-reasoning.module.css';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RefreshCw } from 'lucide-react';
-import { DocumentReferenceChip } from '@/components/document-reference-chip';
+import { indexTreatmentReasoningSources } from './treatment-reasoning-sources';
 import PrivacyBlur from '@/components/privacy-blur';
 import {
     AI_TREATMENT_REASONING_KILL_SWITCH_KEY,
@@ -109,6 +109,21 @@ export default function TreatmentReasoningPanel({
         [patient, entries, therapies, observations, attachments],
     );
     const publication = picker.active && publicationState?.contextRevision === contextRevision ? publicationState.value : null;
+    const sourceDetails = useRef<HTMLDetailsElement>(null);
+    const sourceDetailsId = useId();
+    const proposalSources = useMemo(() => indexTreatmentReasoningSources(publication ? [
+        ...publication.sourceBindings.map(binding => binding.evidenceRefs),
+        ...publication.value.data.keyEvidence.map(evidence => evidence.evidenceRefs),
+        ...publication.value.data.safetyFlags.map(flag => flag.evidenceRefs),
+        ...publication.value.data.suggestedActions.map(action => action.evidenceRefs),
+    ] : []), [publication]);
+    const sourceReferences = (references: readonly string[]) => references.length > 0 && <div className={design.sources}>
+        {references.map(reference => <button key={reference} type="button" aria-controls={sourceDetailsId}
+            aria-label={`${proposalSources.find(source => source.reference === reference)?.label ?? 'Riferimento'}: espandi le fonti della proposta`}
+            onClick={() => { if (sourceDetails.current) sourceDetails.current.open = true; }}>
+            {proposalSources.find(source => source.reference === reference)?.label ?? 'Riferimento'}
+        </button>)}
+    </div>;
     const error = errorState?.contextRevision === contextRevision ? errorState.value : null;
     const isGenerating = runningRevision === contextRevision;
     const isBusy = loadingProposal || isGenerating;
@@ -287,10 +302,10 @@ export default function TreatmentReasoningPanel({
                 <div className={design.recommendation}>
                     <p className={design.groupLabel}>Indicazione da valutare</p>
                     <p className={design.pencil}><PrivacyBlur intensity="sm">{publication.value.data.recommendation || publication.value.summary}</PrivacyBlur></p>
-                    <DocumentReferenceChip references={[...(publication.sourceBindings.find(binding => binding.claimPath === 'data.recommendation')?.evidenceRefs ?? [])]} />
+                    {sourceReferences((publication.sourceBindings.find(binding => binding.claimPath === 'data.recommendation')?.evidenceRefs ?? []))}
                     {publication.value.summary !== publication.value.data.recommendation && <>
                         <p className={design.pencil}><PrivacyBlur intensity="sm">{publication.value.summary}</PrivacyBlur></p>
-                        <DocumentReferenceChip references={[...(publication.sourceBindings.find(binding => binding.claimPath === 'summary')?.evidenceRefs ?? [])]} />
+                        {sourceReferences((publication.sourceBindings.find(binding => binding.claimPath === 'summary')?.evidenceRefs ?? []))}
                     </>}
                 </div>
 
@@ -300,7 +315,7 @@ export default function TreatmentReasoningPanel({
                         <span aria-hidden="true">{flag.severity === 'urgent_review' ? '◆' : flag.severity === 'caution' ? '▲' : 'ℹ'}</span>
                         <div><p className={design.strong}>{flag.severity === 'urgent_review' ? 'Revisione urgente' : flag.severity === 'caution' ? 'Cautela' : 'Informazione'} · <PrivacyBlur intensity="sm">{flag.label}</PrivacyBlur></p>
                             <p><PrivacyBlur intensity="sm">{flag.rationale}</PrivacyBlur></p>
-                            <DocumentReferenceChip references={[...flag.evidenceRefs]} />
+                            {sourceReferences(flag.evidenceRefs)}
                         </div>
                     </div>)}
                     {publication.value.data.caveats.map((caveat, index) => <div key={`${index}-${caveat}`} className={`${design.signal} ${design.warning}`}>
@@ -314,7 +329,7 @@ export default function TreatmentReasoningPanel({
                         {publication.value.data.keyEvidence.length === 0 ? <p className={design.meta}>Nessuna evidenza chiave strutturata.</p>
                             : publication.value.data.keyEvidence.map(evidence => <div key={evidence.id} className={design.proposalRow}>
                                 <p className={design.pencil}><PrivacyBlur intensity="sm">{evidence.statement}</PrivacyBlur></p>
-                                <DocumentReferenceChip references={[...evidence.evidenceRefs]} />
+                                {sourceReferences(evidence.evidenceRefs)}
                             </div>)}
                     </section>
                     {publication.value.data.suggestedActions.length > 0 && <section className={design.group}>
@@ -322,7 +337,7 @@ export default function TreatmentReasoningPanel({
                         {publication.value.data.suggestedActions.map(action => <div key={action.id} className={design.proposalRow}>
                             <p className={design.strong}><PrivacyBlur intensity="sm">{action.label}</PrivacyBlur></p>
                             <p className={design.pencil}><PrivacyBlur intensity="sm">{action.rationale}</PrivacyBlur></p>
-                            <DocumentReferenceChip references={[...action.evidenceRefs]} />
+                            {sourceReferences(action.evidenceRefs)}
                             <p className={design.meta}>{actionPolicyLabel(action)}</p>
                         </div>)}
                     </section>}
@@ -332,12 +347,15 @@ export default function TreatmentReasoningPanel({
                     <summary>Come è stata formulata</summary>
                     <ol>{publication.value.data.reasoning.map((item, index) => <li key={`${index}-${item}`} className={design.pencil}><PrivacyBlur intensity="sm">{item}</PrivacyBlur></li>)}</ol>
                 </details>}
-                <details className={design.details}>
+                <details className={design.details} ref={sourceDetails} id={sourceDetailsId}>
                     <summary>Fonti della proposta</summary>
+                    <dl className={design.sourceIndex}>{proposalSources.map(source => <div key={source.reference}>
+                        <dt>{source.label}</dt><dd><code>{source.reference}</code></dd>
+                    </div>)}</dl>
                     <div>{publication.sourceBindings.map(binding => <div key={binding.claimPath} className={design.proposalRow}>
                         <p className={design.meta}>Passaggio <code>{binding.claimPath}</code></p>
                         <p className={design.pencil}><PrivacyBlur intensity="sm">{binding.claim}</PrivacyBlur></p>
-                        <DocumentReferenceChip references={[...binding.evidenceRefs]} />
+                        {sourceReferences(binding.evidenceRefs)}
                     </div>)}</div>
                 </details>
                 <details className={design.details}>

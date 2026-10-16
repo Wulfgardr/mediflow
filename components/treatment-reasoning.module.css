@@ -60,3 +60,11 @@
 @container (min-width: 54rem) { .reviewColumns { grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 40px; } .origin { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @container (max-width: 32rem) { .actionBar { align-items: stretch; } .actionBar > button, .actions, .actions button { width: 100%; } .actions { flex-direction: column-reverse; } }
 @media (prefers-contrast: more) { .pencil { color: var(--lume-ink-secondary); } }
+
+.sources { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.sources button { min-height: 32px; padding: 4px 0; border: 0; background: transparent; color: var(--lume-ink-fresh); font: var(--type-meta); text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.sourceIndex { display: grid; gap: 12px; padding-block: 12px; }
+.sourceIndex > div { display: grid; gap: 4px; min-width: 0; }
+.sourceIndex dt { font: var(--type-strong); }
+.sourceIndex dd { overflow-wrap: anywhere; }
+@media (pointer: coarse) { .sources button { min-height: 44px; } }
