@@ -198,7 +198,7 @@ for (const routePattern of ROUTES) {
             await expect(person).toHaveCSS('font-size', '28px');
             await expect(person).toHaveCSS('font-weight', '400');
           }
-          if (route === '/settings/ai/modelli') await expect(page.getByRole('button', { name: 'Salva Configurazione', exact: true })).toBeEnabled();
+          if (route === '/settings/ai/modelli') await expect(page.getByRole('button', { name: 'Salva configurazione', exact: true })).toBeEnabled();
           await assertType(page, route, info);
           await assertDetailMenus(page, route, info);
           if (route === '/patients/import') await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
