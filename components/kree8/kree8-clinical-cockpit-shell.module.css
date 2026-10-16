@@ -829,12 +829,12 @@
 :global(html[data-runtime-twin-design='proposal']) .canvas[data-lume-context='incarico'] .toolbar > a,
 :global(html[data-runtime-twin-design='proposal']) .canvas[data-lume-context='incarico'] .toolbar > button:not(.commandToolChip) { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 26px 30px 40px; background: transparent; }
-:global(html[data-runtime-twin-design='proposal']) .focusSurface { background: transparent; }
+:global(html[data-runtime-twin-design='proposal']) .focusSurface { background: transparent; overflow: visible; }
 @media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 20px 14px; } :global(html[data-runtime-twin-design='proposal']) .toolbar { padding-inline: 14px; } }
 
 :global(html[data-runtime-twin-design='proposal']) .canvas { padding: 0; }
-:global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 20px 28px 28px; }
-:global(html[data-runtime-twin-design='proposal']) .toolbar { padding: 6px 28px; min-height: 40px; }
+:global(html[data-runtime-twin-design='proposal']) .framePanel { flex: 1 0 auto; padding: 20px 28px 28px; }
+:global(html[data-runtime-twin-design='proposal']) .toolbar { flex-shrink: 0; padding: 6px 28px; min-height: 40px; }
 @media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .framePanel { padding: 16px; } }
 
 :global(html[data-runtime-twin-design='proposal']) .toolbar :is(button, input, a) { min-height: 40px; }
