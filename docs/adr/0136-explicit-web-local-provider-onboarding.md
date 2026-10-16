@@ -52,6 +52,36 @@ La 0.9.0 ammette puntualmente anche la release osservata 0.40.4, mantenendo
 la linea 0.32.x e le release 0.33.3 e 0.34.2.
 Nessun kill switch, preferenza o fallback cambia.
 
+## Attesa del caricamento a freddo — WUL-694, 16 ottobre 2026
+
+Una prova sul candidato di compatibilità Ollama della PR #548 ha negato
+l'attivazione al limite di 30 secondi; un successivo precaricamento esplicito
+e la verifica a caldo sono riusciti.
+Il solo aumento dell'attesa della pagina non potrebbe evitare quel diniego.
+Il budget locale dell'intera verifica passa a 60 secondi; quello della pagina
+a 70 secondi. La lettura conserva 10 secondi e il corpo HTTP 5 secondi.
+La pagina comunica il nuovo limite e resta annullabile, senza polling o retry.
+
+Il budget comprende attestazione, riautenticazione finale e commit; non è
+la durata di una sessione o di un grant. Non cambia le scadenze dell'owner,
+i suoi resource-use, lock o revoche. Il commit richiede ancora la medesima
+sessione attiva, il resource-use corrente e la stessa revisione del binding e
+del lifecycle. La scadenza monotona è verificata anche se il callback del timer
+è ritardato. Un risultato dopo 60 secondi o dopo cancellazione non ammette il
+provider. Non vengono omessi controlli di versione, località o digest.
+
+La prova reale riguarda il candidato integrato `68d5e688985b`, comprensivo
+del supporto Ollama 0.40.5 proposto nella PR #548; non attesta il runtime della
+modifica isolata su main e non cambia qui le versioni ammesse. Quel candidato
+ha completato l'attivazione HTTP a freddo con `qwen3.5:35b-a3b`:
+nessun modello inizialmente caricato,
+una sola conferma attraverso il workflow della pagina, senza precaricamento
+manuale o retry. Il percorso completo ha richiesto circa 30,3 secondi;
+la verifica del server circa 27. Lo stato finale è `available_unqualified`,
+con digest invariato. Questa prova non esercita l'intervallo aggiunto oltre
+30 secondi, coperto dai test a 55 e 60 secondi. Non include UI renderizzata
+o generazione di testo. Il modello caricato dalla prova è stato rilasciato.
+
 ## Limiti e alternative
 
 La receipt lifecycle attesta la transizione, non generazione riuscita,
