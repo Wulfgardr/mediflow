@@ -9,8 +9,7 @@ import {
 } from './security/audit';
 import { isSealedValue } from './network-patient-lifecycle';
 import { parseExpectedVersion } from './patient-concurrency';
-import { updatePatientOperation } from './patient-update-operation';
-import { normalizePatientUpdateInput } from './patient-write-normalization';
+import { updatePatientProfile } from './patient-profile-service';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 import type { ServerSession } from './security/server-session';
@@ -140,20 +139,12 @@ export async function updateNetworkScopedPatient(
 
     const profile = Object.fromEntries(NETWORK_PATIENT_PROFILE_FIELDS
         .filter((field) => hasOwn(body, field)).map((field) => [field, body[field]]));
-    const normalized = normalizePatientUpdateInput(profile, { expectedVersion });
-    if (!normalized.ok) {
-        return { status: 400, value: { error: normalized.error } };
-    }
-
-    const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_PATIENT_WRITE_CAPABILITY);
-    const commit = updatePatientOperation({
-        authorizeCommit,
+    const commit = await updatePatientProfile({
+        prepareCommitGuard: () => prepareNetworkPatientCommitGuard(context, NETWORK_PATIENT_WRITE_CAPABILITY),
         patientId: context.patientId,
         expectedVersion,
-        values: normalized.values,
-        setPrimaryAmbulatory: hasOwn(body, 'ambulatoryId'),
         scopeAmbulatoryId: context.scopeAmbulatoryId,
-        audit: {
+        audit: () => ({
             archiveGeneration: archiveGenerationForSession(context.session), actorType: 'user', actorRef: context.session.userId,
             sourceSurface: 'native', requestId: requestIdFromRequest(context.request),
             flags: [
@@ -161,8 +152,8 @@ export async function updateNetworkScopedPatient(
                 `paired-client:${context.pairedClient.clientId}`,
                 'scope:ambulatory',
             ],
-        },
-    });
+        }),
+    }, profile);
 
     if (commit.status !== 200) return commit;
 

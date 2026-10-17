@@ -336,7 +336,7 @@ export async function prepareMacProductQualification(options: MacPreparationOpti
                         // Never translate an incompatible request into an
                         // expected-config facade. Accept only the exact owned
                         // layered request and perform/validate it on raw here.
-                        const fields = params && typeof params === 'object' && !Array.isArray(params)
+                        const fields: PropertyDescriptorMap = params && typeof params === 'object' && !Array.isArray(params)
                             ? Object.getOwnPropertyDescriptors(params) : {};
                         if (Reflect.ownKeys(fields).length !== 2
                             || fields.includeLayers?.value !== true

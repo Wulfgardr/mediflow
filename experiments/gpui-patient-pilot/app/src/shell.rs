@@ -24,7 +24,7 @@ use crate::components::{
 use crate::documents::{self, Upload};
 use crate::editing;
 use crate::icons::{Icon, icon};
-use crate::navigation::{Area, Layout, PatientSection};
+use crate::navigation::{Area, Layout, PatientSection, adjacent_patient};
 use crate::patient_forms;
 use crate::references::{ReferenceKind, ReferenceRows};
 use crate::text_input::{InputChanged, TextInput};
@@ -36,6 +36,10 @@ actions!(
         NextFocus,
         PreviousFocus,
         Search,
+        SearchView,
+        NextPatient,
+        PreviousPatient,
+        NewEntry,
         Review,
         Escape,
         Refresh,
@@ -44,15 +48,31 @@ actions!(
 );
 
 pub fn bind_keys(cx: &mut App) {
-    cx.bind_keys([
+    cx.bind_keys(key_bindings());
+}
+
+fn key_bindings() -> Vec<KeyBinding> {
+    // Negative context checks inspect every ancestor. A text input within
+    // the worklist keeps its characters, arrows and IME input.
+    let outside_input = Some("MediFlowConnected && !MediFlowTextInput");
+    let worklist = Some("MediFlowWorklist && !MediFlowTextInput");
+    let rows = Some("MediFlowPatientList && !MediFlowTextInput");
+    vec![
         KeyBinding::new("tab", NextFocus, None),
         KeyBinding::new("shift-tab", PreviousFocus, None),
         KeyBinding::new("secondary-k", Search, None),
+        KeyBinding::new("/", SearchView, outside_input),
+        KeyBinding::new("j", NextPatient, worklist),
+        KeyBinding::new("k", PreviousPatient, worklist),
+        KeyBinding::new("down", NextPatient, rows),
+        KeyBinding::new("up", PreviousPatient, rows),
+        KeyBinding::new("secondary-n", NewEntry, outside_input),
         KeyBinding::new("secondary-enter", Review, None),
         KeyBinding::new("escape", Escape, None),
         KeyBinding::new("secondary-r", Refresh, None),
+        KeyBinding::new("secondary-l", Lock, None),
         KeyBinding::new("secondary-shift-l", Lock, None),
-    ]);
+    ]
 }
 
 enum Load<T> {
@@ -331,6 +351,7 @@ pub struct ClinicalApp {
     directory: bool,
     show_other: bool,
     show_sections: bool,
+    section_selector_focus: FocusHandle,
     archived: bool,
     query: String,
     search: Entity<TextInput>,
@@ -534,6 +555,7 @@ impl ClinicalApp {
             directory: true,
             show_other: false,
             show_sections: false,
+            section_selector_focus: cx.focus_handle().tab_stop(true),
             archived: false,
             query: String::new(),
             search,
@@ -1176,6 +1198,105 @@ impl ClinicalApp {
         }
     }
 
+    fn navigation_shortcuts_available(&self) -> bool {
+        self.session
+            .as_ref()
+            .is_some_and(|session| !session.is_locked())
+            && self.scope.is_some()
+            && self.form.is_none()
+            && self.discard.is_none()
+            && !self.edit_pending
+            && !self.document_busy
+            && !self.show_other
+    }
+
+    fn worklist_shortcuts_available(&self) -> bool {
+        self.navigation_shortcuts_available()
+            && self.area == Area::Patients
+            && self.directory
+            && self.patients.ready().is_some()
+    }
+
+    fn search_view(&mut self, cx: &mut Context<Self>) {
+        if !self.navigation_shortcuts_available()
+            || !matches!(self.area, Area::Agenda | Area::Diary | Area::References)
+                && !(self.area == Area::Patients && self.directory)
+        {
+            return;
+        }
+        // Unlike the global shortcut, slash never changes area or leaves a
+        // patient sheet. The binding excludes every TextInput, including IME.
+        self.focus_after_render = false;
+        self.focus_search_after_render = true;
+        cx.notify();
+    }
+
+    fn focused_patient_id(&self, window: &Window, cx: &App) -> Option<String> {
+        self.patient_targets
+            .iter()
+            .find(|(_, target)| target.focus.contains_focused(window, cx))
+            .map(|(id, _)| id.clone())
+    }
+
+    fn move_patient(&mut self, previous: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.worklist_shortcuts_available() {
+            return;
+        }
+        let visible_ids: Vec<_> = self
+            .patients
+            .ready()
+            .into_iter()
+            .flatten()
+            .filter(|patient| patient.matches_query(&self.query))
+            .map(|patient| patient.id.as_str())
+            .collect();
+        let focused_id = self.focused_patient_id(window, cx);
+        let Some(id) = adjacent_patient(
+            &visible_ids,
+            focused_id.as_deref(),
+            self.selected_id.as_deref(),
+            previous,
+        )
+        .map(str::to_owned) else {
+            return;
+        };
+        if self.selected_id.as_deref() != Some(&id) {
+            self.select_patient(&id, false, cx);
+        }
+        if let Some(target) = self.patient_targets.get(&id) {
+            window.focus(&target.focus, cx);
+            target.scroll_to(window, cx);
+        }
+        cx.notify();
+    }
+
+    fn new_entry_shortcut(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // A compact menu only blocks the shortcut while it is visible; the
+        // remembered toggle must not disable a desktop action after resize.
+        let section_menu_visible = self.show_sections
+            && !self.directory
+            && Layout::for_window(f32::from(window.viewport_size().width), self.text_scale).compact;
+        if !self.navigation_shortcuts_available()
+            || self.area != Area::Patients
+            || section_menu_visible
+        {
+            return;
+        }
+        let Some(patient) = self.patient.detail.ready() else {
+            return;
+        };
+        // A Tab-focused row can differ from the loaded preview. Do not create
+        // a draft for the previous patient while another row holds the focus.
+        if self.selected_id.as_deref() != Some(&patient.id)
+            || self
+                .focused_patient_id(window, cx)
+                .is_some_and(|id| id != patient.id)
+        {
+            return;
+        }
+        self.open_form(FormKind::Entry, window, cx);
+    }
+
     fn open_current(&mut self, path: &str, cx: &mut Context<Self>) {
         if let Some(session) = &self.session {
             // Paths originate only from our closed product navigation or loaded IDs.
@@ -1481,6 +1602,7 @@ impl ClinicalApp {
             state: FormState::Draft,
             _subscriptions: subscriptions,
         });
+        self.show_sections = false;
         // The first render populates the new ScrollAnchor before its scheduled
         // reveal runs. Scheduling here would use the anchor's initial origin.
         self.focus_after_render = true;
@@ -2392,151 +2514,151 @@ impl ClinicalApp {
                             .unwrap_or_else(|| "Lettura dell'elenco…".into())
                     )),
             );
-        let rows =
-            div()
-                .id("clinical-workspace-directory-scroll")
-                .accessibility_id("clinical-workspace-directory-scroll")
-                .role(Role::List)
-                .aria_label("Elenco dei pazienti")
-                .min_w_0()
-                .when(!layout.magnified, |el| {
-                    el.track_scroll(&self.directory_scroll)
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                })
-                .when(layout.magnified, |el| el.flex_shrink_0())
-                .px(px(layout.margin))
-                .pb(px(layout.margin))
-                .when(self.patients.message().is_some(), |el| {
-                    el.child(notice(
-                        "clinical-workspace-patients-state",
-                        self.patients.message().unwrap_or_default().to_owned(),
-                        theme,
-                        matches!(self.patients, Load::Failed(_)),
-                    ))
-                })
-                .when(count == Some(0), |el| {
-                    el.child(
-                        div()
-                            .py(px(40.))
-                            .flex()
-                            .flex_col()
-                            .gap(px(12.))
-                            .child(
-                                div()
-                                    .font_family(VOICE)
-                                    .text_size(px(theme.size(22.)))
-                                    .child(text!(if self.query.trim().is_empty() {
-                                        "Nessun paziente in questo elenco"
-                                    } else {
-                                        "Nessun paziente corrisponde alla ricerca"
-                                    })),
-                            )
-                            .child(div().text_color(theme.secondary).child(text!(
-                                "Controlla l'ambulatorio, l'archivio o il testo cercato."
-                            ))),
-                    )
-                })
-                .children(patients.into_iter().map(|patient| {
-                    let id = patient.id.clone();
-                    let selected = self.selected_id.as_deref() == Some(&id);
-                    let label = format!(
-                        "{}, nascita {}, {}",
-                        patient.display_name(),
-                        display_date(patient.birth_date.as_deref()),
-                        if patient.is_archived {
-                            "archiviato"
-                        } else {
-                            "attivo"
-                        }
-                    );
+        let rows = div()
+            .id("clinical-workspace-directory-scroll")
+            .accessibility_id("clinical-workspace-directory-scroll")
+            .key_context("MediFlowPatientList")
+            .role(Role::List)
+            .aria_label("Elenco dei pazienti")
+            .min_w_0()
+            .when(!layout.magnified, |el| {
+                el.track_scroll(&self.directory_scroll)
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+            })
+            .when(layout.magnified, |el| el.flex_shrink_0())
+            .px(px(layout.margin))
+            .pb(px(layout.margin))
+            .when(self.patients.message().is_some(), |el| {
+                el.child(notice(
+                    "clinical-workspace-patients-state",
+                    self.patients.message().unwrap_or_default().to_owned(),
+                    theme,
+                    matches!(self.patients, Load::Failed(_)),
+                ))
+            })
+            .when(count == Some(0), |el| {
+                el.child(
                     div()
-                        .id(SharedString::from(format!(
-                            "clinical-workspace-patient-{id}"
-                        )))
-                        .accessibility_id(SharedString::from(format!(
-                            "clinical-workspace-patient-{id}"
-                        )))
-                        .role(Role::Button)
-                        .aria_label(label)
-                        .aria_selected(selected)
-                        .focusable()
-                        .tab_stop(true)
-                        .when_some(self.patient_targets.get(&id), |el, target| {
-                            target.attach(el)
-                        })
-                        .min_h(px(layout.row))
-                        .px(px(12.))
-                        .py(px(12.))
+                        .py(px(40.))
                         .flex()
-                        .items_center()
-                        .gap(px(16.))
-                        .border_b_1()
-                        .border_color(theme.rule)
-                        .border_l_2()
-                        .border_color(if selected { theme.fresh } else { theme.rule })
-                        .bg(if selected {
-                            theme.selected
-                        } else {
-                            theme.paper
-                        })
-                        .cursor_pointer()
-                        .focus(move |s| s.border_color(theme.fresh).bg(theme.selected))
-                        .hover(move |s| s.bg(theme.hover))
+                        .flex_col()
+                        .gap(px(12.))
                         .child(
                             div()
-                                .flex_1()
-                                .min_w_0()
-                                .flex()
-                                .flex_col()
-                                .gap(px(4.))
-                                .child(
-                                    div()
-                                        .font_weight(if selected {
-                                            FontWeight::SEMIBOLD
-                                        } else {
-                                            FontWeight::MEDIUM
-                                        })
-                                        .child(text!(patient.display_name())),
-                                )
-                                .child(
-                                    div()
-                                        .text_size(px(theme.size(12.)))
-                                        .text_color(theme.secondary)
-                                        .child(text!(format!(
-                                            "{}{}{}",
-                                            display_date(patient.birth_date.as_deref()),
-                                            if patient.is_adi { " · ADI" } else { "" },
-                                            if patient.is_archived {
-                                                " · Archiviato"
-                                            } else {
-                                                ""
-                                            }
-                                        ))),
-                                ),
+                                .font_family(VOICE)
+                                .text_size(px(theme.size(22.)))
+                                .child(text!(if self.query.trim().is_empty() {
+                                    "Nessun paziente in questo elenco"
+                                } else {
+                                    "Nessun paziente corrisponde alla ricerca"
+                                })),
                         )
-                        .when(layout.wide && self.selected_id.is_none(), |el| {
-                            el.child(
+                        .child(div().text_color(theme.secondary).child(text!(
+                            "Controlla l'ambulatorio, l'archivio o il testo cercato."
+                        ))),
+                )
+            })
+            .children(patients.into_iter().map(|patient| {
+                let id = patient.id.clone();
+                let selected = self.selected_id.as_deref() == Some(&id);
+                let label = format!(
+                    "{}, nascita {}, {}",
+                    patient.display_name(),
+                    display_date(patient.birth_date.as_deref()),
+                    if patient.is_archived {
+                        "archiviato"
+                    } else {
+                        "attivo"
+                    }
+                );
+                div()
+                    .id(SharedString::from(format!(
+                        "clinical-workspace-patient-{id}"
+                    )))
+                    .accessibility_id(SharedString::from(format!(
+                        "clinical-workspace-patient-{id}"
+                    )))
+                    .role(Role::Button)
+                    .aria_label(label)
+                    .aria_selected(selected)
+                    .focusable()
+                    .tab_stop(true)
+                    .when_some(self.patient_targets.get(&id), |el, target| {
+                        target.attach(el)
+                    })
+                    .min_h(px(layout.row))
+                    .px(px(12.))
+                    .py(px(12.))
+                    .flex()
+                    .items_center()
+                    .gap(px(16.))
+                    .border_b_1()
+                    .border_color(theme.rule)
+                    .border_l_2()
+                    .border_color(if selected { theme.fresh } else { theme.rule })
+                    .bg(if selected {
+                        theme.selected
+                    } else {
+                        theme.paper
+                    })
+                    .cursor_pointer()
+                    .focus(move |s| s.border_color(theme.fresh).bg(theme.selected))
+                    .hover(move |s| s.bg(theme.hover))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_col()
+                            .gap(px(4.))
+                            .child(
                                 div()
-                                    .w(px(200.))
-                                    .font_family(CODES)
-                                    .text_size(px(theme.size(12.)))
-                                    .child(text!(patient.tax_code.clone())),
+                                    .font_weight(if selected {
+                                        FontWeight::SEMIBOLD
+                                    } else {
+                                        FontWeight::MEDIUM
+                                    })
+                                    .child(text!(patient.display_name())),
                             )
-                        })
-                        .when(!layout.compact, |el| {
-                            el.child(
+                            .child(
                                 div()
+                                    .text_size(px(theme.size(12.)))
                                     .text_color(theme.secondary)
-                                    .text_size(px(theme.size(12.)))
-                                    .child(text!(display_date(patient.updated_at.as_deref()))),
-                            )
-                        })
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.select_patient(&id, !layout.wide, cx)
-                        }))
-                }));
+                                    .child(text!(format!(
+                                        "{}{}{}",
+                                        display_date(patient.birth_date.as_deref()),
+                                        if patient.is_adi { " · ADI" } else { "" },
+                                        if patient.is_archived {
+                                            " · Archiviato"
+                                        } else {
+                                            ""
+                                        }
+                                    ))),
+                            ),
+                    )
+                    .when(layout.wide && self.selected_id.is_none(), |el| {
+                        el.child(
+                            div()
+                                .w(px(200.))
+                                .font_family(CODES)
+                                .text_size(px(theme.size(12.)))
+                                .child(text!(patient.tax_code.clone())),
+                        )
+                    })
+                    .when(!layout.compact, |el| {
+                        el.child(
+                            div()
+                                .text_color(theme.secondary)
+                                .text_size(px(theme.size(12.)))
+                                .child(text!(display_date(patient.updated_at.as_deref()))),
+                        )
+                    })
+                    .on_click(cx.listener(move |this, event: &gpui::ClickEvent, _, cx| {
+                        this.select_patient(&id, !layout.wide || event.is_keyboard(), cx)
+                    }))
+            }));
         div()
             .id("clinical-workspace-directory-page")
             .flex_1()
@@ -2874,6 +2996,7 @@ impl ClinicalApp {
                             false,
                             self.form.is_none(),
                         )
+                        .track_focus(&self.section_selector_focus)
                         .flex_1()
                         .aria_expanded(self.show_sections)
                         .when(self.form.is_none(), |el| {
@@ -4262,6 +4385,11 @@ impl Render for ClinicalApp {
             }
         }
         let layout = Layout::for_window(f32::from(window.viewport_size().width), self.text_scale);
+        // A focused compact selector disappears on desktop. Keep keyboard
+        // dispatch in the workspace without disturbing a surviving editor.
+        if !layout.compact && self.section_selector_focus.contains_focused(window, cx) {
+            window.focus(&self.focus, cx);
+        }
         let connected = self.session.is_some();
         self.sync_patient_targets(cx);
         if std::mem::take(&mut self.focus_search_after_render)
@@ -4274,16 +4402,17 @@ impl Render for ClinicalApp {
             match self.area {
                 Area::References => {
                     self.reference_search
-                        .update(cx, |input, cx| input.focus(window, cx));
+                        .update(cx, |input, cx| input.focus_and_select(window, cx));
                     self.reference_search_target.scroll_to(window, cx);
                 }
                 Area::Agenda | Area::Diary => {
                     self.global_search
-                        .update(cx, |input, cx| input.focus(window, cx));
+                        .update(cx, |input, cx| input.focus_and_select(window, cx));
                     self.global_search_target.scroll_to(window, cx);
                 }
                 Area::Patients if self.directory => {
-                    self.search.update(cx, |input, cx| input.focus(window, cx));
+                    self.search
+                        .update(cx, |input, cx| input.focus_and_select(window, cx));
                     if layout.magnified {
                         self.search_target.scroll_to(window, cx);
                     }
@@ -4314,7 +4443,11 @@ impl Render for ClinicalApp {
             .role(Role::Application)
             .aria_label("MediFlow, spazio di lavoro clinico")
             .track_focus(&self.focus)
-            .key_context("MediFlowConnected")
+            .key_context(if self.worklist_shortcuts_available() {
+                "MediFlowConnected MediFlowWorklist"
+            } else {
+                "MediFlowConnected"
+            })
             .on_action(cx.listener(|this, _: &NextFocus, window, cx| {
                 window.focus_next(cx);
                 this.reveal_focused(window, cx);
@@ -4326,6 +4459,7 @@ impl Render for ClinicalApp {
             .on_action(cx.listener(|this, _: &Search, _, cx| {
                 if this.session.is_some() && this.form.is_none() {
                     this.show_other = false;
+                    this.show_sections = false;
                     match this.area {
                         Area::References | Area::Agenda | Area::Diary => {}
                         _ => {
@@ -4340,6 +4474,18 @@ impl Render for ClinicalApp {
                     cx.notify();
                 }
             }))
+            .on_action(cx.listener(|this, _: &SearchView, _, cx| this.search_view(cx)))
+            .on_action(
+                cx.listener(|this, _: &NextPatient, window, cx| {
+                    this.move_patient(false, window, cx)
+                }),
+            )
+            .on_action(cx.listener(|this, _: &PreviousPatient, window, cx| {
+                this.move_patient(true, window, cx)
+            }))
+            .on_action(
+                cx.listener(|this, _: &NewEntry, window, cx| this.new_entry_shortcut(window, cx)),
+            )
             .on_action(cx.listener(|this, _: &Review, window, cx| this.review_form(window, cx)))
             .on_action(cx.listener(|this, _: &Escape, window, cx| {
                 if this.discard.take().is_some() {
@@ -4691,6 +4837,7 @@ impl ClinicalApp {
             state: FormState::Draft,
             _subscriptions: subscriptions,
         });
+        self.show_sections = false;
         self.directory = false;
         self.show_other = false;
         self.message = None;
@@ -4891,6 +5038,7 @@ impl ClinicalApp {
                             match result {
                                 Ok(Ok(upload)) if this.form.is_none() && this.can_write(FormKind::Document) => {
                                     this.form = Some(Form { kind: FormKind::Document, fields: vec![], upload: Some(upload), edit: None, patient_original: None, created_id: None, state: FormState::Draft, _subscriptions: vec![] });
+                                    this.show_sections = false;
                                     this.patient_section = PatientSection::Documents;
                                     this.directory = false;
                                     this.verified = None;
@@ -5453,6 +5601,110 @@ fn ui_error(error: impl std::fmt::Display) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn bindings_for_key(key: &str, contexts: &[&str]) -> Vec<KeyBinding> {
+        let contexts: Vec<_> = contexts
+            .iter()
+            .map(|context| gpui::KeyContext::parse(context).unwrap())
+            .collect();
+        let (bindings, pending) = gpui::Keymap::new(key_bindings())
+            .bindings_for_input(&[gpui::Keystroke::parse(key).unwrap()], &contexts);
+        assert!(!pending, "single key {key} must not wait for a chord");
+        bindings.into_iter().collect()
+    }
+
+    fn assert_key_action<A: gpui::Action>(key: &str, contexts: &[&str]) {
+        let bindings = bindings_for_key(key, contexts);
+        assert_eq!(bindings.len(), 1, "{key} in {contexts:?}");
+        assert!(
+            bindings[0].action().as_any().is::<A>(),
+            "wrong action for {key} in {contexts:?}"
+        );
+    }
+
+    fn secondary_modifier() -> &'static str {
+        if cfg!(target_os = "macos") {
+            "cmd"
+        } else {
+            "ctrl"
+        }
+    }
+
+    #[test]
+    fn worklist_keymap_keeps_characters_and_arrows_in_every_text_input() {
+        let worklist = "MediFlowConnected MediFlowWorklist";
+        assert_key_action::<SearchView>("/", &["MediFlowConnected"]);
+        assert_key_action::<NextPatient>("j", &[worklist]);
+        assert_key_action::<PreviousPatient>("k", &[worklist]);
+        assert_key_action::<NextPatient>("down", &[worklist, "MediFlowPatientList"]);
+        assert_key_action::<PreviousPatient>("up", &[worklist, "MediFlowPatientList"]);
+
+        // Check the actual GPUI predicate engine, including an input context
+        // between the root and a nested list context, not just the leaf node.
+        let contexts: &[&[&str]] = &[
+            &["MediFlowConnected", "MediFlowTextInput"],
+            &[worklist, "MediFlowTextInput"],
+            &[worklist, "MediFlowPatientList", "MediFlowTextInput"],
+            &[worklist, "MediFlowTextInput", "MediFlowPatientList"],
+            &["MediFlowConnected MediFlowWorklist MediFlowPatientList MediFlowTextInput"],
+        ];
+        for context in contexts {
+            for key in [
+                "/",
+                "j",
+                "k",
+                "down",
+                "up",
+                &format!("{}-n", secondary_modifier()),
+            ] {
+                assert!(
+                    bindings_for_key(key, context).is_empty(),
+                    "{key} in {context:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn worklist_keymap_does_not_capture_other_views_or_modified_characters() {
+        for context in [&[][..], &["MediFlowConnected"][..], &["OtherView"][..]] {
+            for key in ["j", "k", "down", "up"] {
+                assert!(
+                    bindings_for_key(key, context).is_empty(),
+                    "{key} in {context:?}"
+                );
+            }
+        }
+        let worklist = "MediFlowConnected MediFlowWorklist";
+        for key in ["down", "up"] {
+            assert!(bindings_for_key(key, &[worklist]).is_empty());
+        }
+        for key in [
+            "shift-j", "shift-k", "ctrl-j", "alt-j", "alt-k", "alt-/", "ctrl-/", "enter", "space",
+        ] {
+            assert!(
+                bindings_for_key(key, &[worklist, "MediFlowPatientList"]).is_empty(),
+                "{key}"
+            );
+        }
+        assert!(bindings_for_key("/", &["OtherView"]).is_empty());
+    }
+
+    #[test]
+    fn new_entry_is_a_separate_action_and_lock_stays_available_inside_inputs() {
+        let modifier = secondary_modifier();
+        let connected = "MediFlowConnected MediFlowWorklist";
+        assert_key_action::<NewEntry>(&format!("{modifier}-n"), &[connected]);
+        assert!(
+            bindings_for_key(&format!("{modifier}-n"), &[connected, "MediFlowTextInput"])
+                .is_empty()
+        );
+        for contexts in [&[connected][..], &[connected, "MediFlowTextInput"][..]] {
+            assert_key_action::<Lock>(&format!("{modifier}-l"), contexts);
+            assert_key_action::<Lock>(&format!("{modifier}-shift-l"), contexts);
+            assert_key_action::<Review>(&format!("{modifier}-enter"), contexts);
+        }
+    }
 
     #[test]
     fn calendar_intervals_include_whole_local_days_and_preserve_unbounded_ends() {

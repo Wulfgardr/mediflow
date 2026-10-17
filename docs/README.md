@@ -77,6 +77,10 @@ documenta l'integrazione reale, la matrice delle schermate, la revisione della
 UI e il confronto riproducibile JavaScript/Rust di letture e scritture.
 L'integrazione del client non equivale alla sostituzione del writer o delle
 superfici mobile.
+La [porta comune del profilo paziente](./analysis/2026-10-17-patient-profile-port.md)
+estrae lettura e preparazione dell'aggiornamento dai quattro adattatori,
+conservando il commit SQLite e l'audit nell'operazione autorevole esistente.
+Il verbale documenta le nuove prove di conformità e HTTP old/new sul delta.
 
 ## Percorsi di lettura
 

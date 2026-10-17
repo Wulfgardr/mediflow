@@ -141,7 +141,7 @@ senza introdurre candidati aggiuntivi.
 
 | ID iniziale | Disposizione corrente e fonte | Destinazione |
 | --- | --- | --- |
-| A01 | CONSOLIDATO: [patient-update-operation](../lib/patient-update-operation.ts) possiede update e membership nello stesso commit. | [WUL-718](https://linear.app/wulfgardr/issue/WUL-718). |
+| A01 | CONSOLIDATO: [patient-update-operation](../lib/patient-update-operation.ts) possiede update e membership nello stesso commit. Gli ingressi Web/v1/paired preparano il profilo tramite [patient-profile-service](../lib/patient-profile-service.ts); il writer resta quello esistente. | [WUL-718](https://linear.app/wulfgardr/issue/WUL-718); [porta comune del profilo](analysis/2026-10-17-patient-profile-port.md). |
 | A02 | CONSOLIDATO: sink required audit nella transazione dei core; classificazione in [audit-writers](./audit-writers.md). | [WUL-719](https://linear.app/wulfgardr/issue/WUL-719). |
 | A03 | KEEP: protezione per campo e custodia descritte nella [matrice dati a riposo](./data-at-rest-matrix.md), senza promessa whole-DB. | [WUL-721](https://linear.app/wulfgardr/issue/WUL-721). |
 | A04 | KEEP della migrazione recoverable corrente [ADR0143](./adr/0143-strong-unlock-credential.md); non ripristinare il contratto PIN storico. | [WUL-722](https://linear.app/wulfgardr/issue/WUL-722). |

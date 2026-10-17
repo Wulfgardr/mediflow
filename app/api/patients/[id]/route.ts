@@ -1,16 +1,10 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
-import { patients } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { parseExpectedVersion } from '@/lib/patient-concurrency';
-// WUL-306 (ADR 0066): soft-delete lifecycle helpers
-import { activePatients } from '@/lib/patient-lifecycle';
-import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-import { updatePatientOperation } from '@/lib/patient-update-operation';
+import { readPatientProfile, updatePatientProfile } from '@/lib/patient-profile-service';
 import { deletePatientOperation } from '@/lib/patient-delete-operation';
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 
@@ -26,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     try {
         const { id } = await params;
-        const patient = await dbServer.select().from(patients).where(and(eq(patients.id, id), activePatients())).get();
+        const patient = await readPatientProfile({ patientId: id, projection: 'web' });
         if (!patient) return NextResponse.json({ error: "Not found" }, { status: 404 });
         return NextResponse.json(patient);
     } catch (archiveError) {
@@ -52,30 +46,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        // WUL-306: a soft-deleted patient is gone for the wire contract: PUT answers 404.
-        const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const normalized = normalizePatientUpdateInput(body, {
-            expectedVersion,
-        });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        /* actor/correlation are resolved before the synchronous commit. */
-        const auditContext = auditContextFromSession(session);
-        const commit = updatePatientOperation({
-            patientId: id, expectedVersion, values: normalized.values,
-            setPrimaryAmbulatory: Object.prototype.hasOwnProperty.call(body, 'ambulatoryId'),
-            audit: {
-                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
-                sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
-                flags: [`auth:${auditContext.authContext}`],
+        const commit = await updatePatientProfile({
+            patientId: id, expectedVersion,
+            audit: () => {
+                const auditContext = auditContextFromSession(session);
+                return {
+                    archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                    sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
+                    flags: [`auth:${auditContext.authContext}`],
+                };
             },
-        });
+        }, body);
         if (commit.status !== 200) return NextResponse.json(commit.value, { status: commit.status });
 
         return NextResponse.json({ success: true });
