@@ -155,7 +155,7 @@ struct PairedDiaryComposerView: View {
                 if latest.lockedFields.contains(.content) {
                     Text("Contenuto non leggibile con la chiave corrente.")
                 } else {
-                    Text(ClinicalContentRendering.attributedString(from: latest.content))
+                    ClinicalContentText(latest.content)
                         .chartProse()
                         .accessibilityIdentifier("homebase-edit-entry-remote-content")
                 }
