@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "completedAt": "2026-10-17T20:49:26.244372+00:00",
+  "filesChecked": 28,
+  "privateValuesCompared": 20,
+  "matchingFiles": [],
+  "result": "pass",
+  "scope": "Three changed Rust sources, new analysis document, selected original PNGs and all current evidence files; byte scan against generated runtime/operator/pairing/recovery values from both synthetic runs. Generated metadata is separately constrained to public provenance.",
+  "visualReview": "All nine selected PNGs were inspected. No operator username, passphrase, PIN or pairing value is visible. The lock image was captured after clearing the username in the native input, without image editing.",
+  "seedAuthCredential": "Both seed receipts contain the constant public protocol label passphrase-v3, as written literally by comparison/prepare-runtime.mjs; not a credential.",
+  "privateConfigurationFilesPublished": false
+}

@@ -1,0 +1,11 @@
+{
+  "completedAt": "2026-10-17T20:44:27.972150+00:00",
+  "ownedProcessGroupsRetired": {
+    "appPid": 17551,
+    "serverPid": 17180,
+    "xvfbPid": 17548
+  },
+  "port43183Closed": true,
+  "x97SocketAbsent": true,
+  "privateDataRetainedUntilArtifactPrivacyCheck": true
+}

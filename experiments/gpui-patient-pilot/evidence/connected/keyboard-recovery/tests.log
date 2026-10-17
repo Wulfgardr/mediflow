@@ -1,0 +1,52 @@
+    Finished `test` profile [unoptimized] target(s) in 54.63s
+     Running unittests src/main.rs (/tmp/mediflow-recovery-keyboard-target/debug/deps/mediflow_gpui_patient_pilot-5bcf07c98e288fb5)
+
+running 45 tests
+test clinical_text::tests::malformed_or_unsupported_rich_content_is_retained_with_an_explicit_label ... ok
+test clinical_text::tests::nested_lists_and_blocks_keep_boundaries_numbering_and_continuations ... ok
+test clinical_text::tests::html_entities_decode_once_and_clinical_comparisons_remain_literal ... ok
+test demo::tests::conflict_preserves_other_postation_and_local_draft ... ok
+test clinical_text::tests::headings_quotes_aliases_and_depth_exhaustion_do_not_drop_original_content ... ok
+test components::tests::clinical_reading_keeps_paragraphs_and_does_not_render_markup ... ok
+test demo::tests::ordinary_save_is_only_saved_after_independent_service_reread ... ok
+test demo::tests::uncertain_commit_and_failed_reread_do_not_report_success ... ok
+test editing::tests::decrypted_and_live_record_is_required_before_constructing_any_update ... ok
+test editing::tests::dates_and_nullable_values_change_only_when_explicitly_edited ... ok
+test documents::tests::remote_metadata_cannot_supply_a_download_path ... ok
+test documents::tests::data_url_requires_exact_type_size_canonical_base64_and_raw_limit ... ok
+test navigation::tests::every_product_area_has_a_distinct_test_identifier_and_current_route ... ok
+test editing::tests::qualified_observation_results_and_reference_text_survive_unrelated_edits ... ok
+test clinical_text::tests::overlapping_emphasis_stays_disjoint_and_crossed_out_text_is_explicit_in_copy ... ok
+test navigation::tests::narrow_and_enlarged_text_reflow_without_hiding_navigation ... ok
+test editing::tests::title_edit_preserves_rich_body_setting_and_recorded_time_exactly ... ok
+test navigation::tests::worklist_navigation_stops_at_both_edges_and_accepts_an_empty_result ... ok
+test editing::tests::coded_therapy_name_cannot_diverge_from_its_preserved_identity ... ok
+test references::tests::copies_preserve_source_labels_and_distinguish_false_from_missing ... ok
+test patient_forms::tests::creation_keeps_missing_dates_missing_and_rejects_invalid_calendar_days ... ok
+test shell::tests::acknowledged_creation_never_becomes_resendable_when_reread_fails ... ok
+test patient_forms::tests::changing_a_name_emits_only_that_field_and_never_reserializes_notes ... ok
+test patient_forms::tests::clearing_a_field_differs_from_omitting_it_and_locked_fields_are_preserved ... ok
+test references::tests::only_systems_implemented_by_this_search_contract_are_offered ... ok
+test navigation::tests::worklist_navigation_uses_visible_order_and_focused_row_before_old_selection ... ok
+test shell::tests::agenda_groups_use_recorded_status_and_calendar_date_without_inventing_a_due_date ... ok
+test shell::tests::calendar_intervals_include_whole_local_days_and_preserve_unbounded_ends ... ok
+test shell::tests::clinical_dates_reject_invalid_days_without_normalizing_into_another_month ... ok
+test shell::tests::calendar_intervals_reject_invalid_or_reversed_dates_before_a_read ... ok
+test shell::tests::current_interface_links_cannot_inject_paths_queries_or_fragments ... ok
+test documents::tests::a_copy_never_overwrites_an_existing_file_and_round_trips_exact_bytes ... ok
+test shell::tests::new_observation_preserves_qualified_strings_and_decimal_punctuation ... ok
+test shell::tests::unreadable_diagnoses_are_distinct_from_an_empty_problem_list ... ok
+test tests::launch_does_not_treat_demo_as_a_connected_archive_or_accept_secret_flags ... ok
+test text_input::tests::committing_identical_preedit_leaves_the_next_character_after_it ... ok
+test text_input::tests::ime_highlights_are_disjoint_and_keep_both_styles_in_the_intersection ... ok
+test text_input::tests::native_surrounding_text_never_exports_passwords_or_stale_ranges ... ok
+test text_input::tests::caret_reveal_keeps_visible_lines_still_and_scrolls_large_lines_within_content ... ok
+test text_input::tests::malformed_offsets_never_slice_inside_a_character ... ok
+test text_input::tests::password_caret_maps_display_bullets_to_unicode_input_without_exposing_text ... ok
+test text_input::tests::platform_offsets_preserve_italian_and_surrogate_boundaries ... ok
+test shell::tests::new_entry_is_a_separate_action_and_lock_stays_available_inside_inputs ... ok
+test shell::tests::worklist_keymap_does_not_capture_other_views_or_modified_characters ... ok
+test shell::tests::worklist_keymap_keeps_characters_and_arrows_in_every_text_input ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

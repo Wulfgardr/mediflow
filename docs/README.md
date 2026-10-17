@@ -81,6 +81,12 @@ La [porta comune del profilo paziente](./analysis/2026-10-17-patient-profile-por
 estrae lettura e preparazione dell'aggiornamento dai quattro adattatori,
 conservando il commit SQLite e l'audit nell'operazione autorevole esistente.
 Il verbale documenta le nuove prove di conformità e HTTP old/new sul delta.
+La [verifica della tastiera GPUI](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md)
+registra ricerca contestuale, lista filtrata, revisione, blocco e ridimensionamento
+con una nuova build Linux e immagini originali attribuite alla loro esecuzione.
+Il [confronto dei compilatori TypeScript](./analysis/2026-10-17-tsc-ts-migration-review.md)
+misura il typecheck di uno snapshot preciso con TypeScript 5.9, TypeScript 7
+e tsc-ts, includendo driver, ricevuta e limiti dell'eventuale adozione.
 
 ## Percorsi di lettura
 

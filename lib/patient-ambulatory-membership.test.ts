@@ -186,19 +186,42 @@ test('network-scoped upsert inside a transaction leaves other memberships untouc
 });
 
 test('all patient PUT adapters wire one transactional set-primary operation without delete-all', () => {
-    // The old literal route-local upsert pattern is obsolete: the real-SQLite
-    // operation test verifies rollback and membership preservation on each path.
-    for (const file of [
-        'app/api/patients/[id]/route.ts',
-        'app/api/v1/patients/[id]/route.ts',
-        'lib/network-patient-write.ts',
-    ]) {
+    // Adapters share the explicit profile port; the operation remains the one
+    // transaction owner. Real-SQLite tests cover rollback and preservation.
+    const profileImports: Array<[string, RegExp]> = [
+        ['app/api/patients/[id]/route.ts', /import\s*\{[^}]*\bupdatePatientProfile\b[^}]*\}\s*from\s*'@\/lib\/patient-profile-service'/],
+        ['app/api/v1/patients/[id]/route.ts', /import\s*\{[^}]*\bupdatePatientProfile\b[^}]*\}\s*from\s*'@\/lib\/patient-profile-service'/],
+        ['lib/network-patient-write.ts', /import\s*\{\s*updatePatientProfile\s*\}\s*from\s*'\.\/patient-profile-service'/],
+    ];
+    const deleteMemberships = /delete\s*\(\s*patientsToAmbulatories\s*\)/;
+    for (const [file, profileImport] of profileImports) {
         const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
-        assert.match(source, /updatePatientOperation\(/, `${file} must use the shared operation`);
-        assert.doesNotMatch(source, /delete\(patientsToAmbulatories\)/, `${file} must not replace memberships`);
+        assert.match(source, profileImport, `${file} must import the approved profile port`);
+        assert.equal(source.match(/\bupdatePatientProfile\s*\(/g)?.length, 1, `${file} must invoke the profile port once`);
+        assert.match(source, /const commit = await updatePatientProfile\(\{/, `${file} must await the profile commit`);
+        assert.doesNotMatch(source, /\b(?:updatePatientOperation|upsertPrimaryAmbulatoryMembership)\s*\(/,
+            `${file} must not bypass the profile port`);
+        assert.doesNotMatch(source, deleteMemberships, `${file} must not replace memberships`);
     }
+    const profile = fs.readFileSync(path.join(process.cwd(), 'lib/patient-profile-service.ts'), 'utf8');
+    assert.match(profile, /import\s*\{[^}]*\bupdatePatientOperation\b[^}]*\}\s*from\s*'\.\/patient-update-operation'/);
+    assert.equal(profile.match(/\bupdatePatientOperation\s*\(/g)?.length, 1);
+    assert.match(profile, /return updatePatientOperation\(\{/);
+    assert.match(profile, /setPrimaryAmbulatory:\s*Object\.prototype\.hasOwnProperty\.call\(body, 'ambulatoryId'\)/);
+    assert.match(profile, /values:\s*normalized\.values/);
+    assert.match(profile, /audit:\s*context\.audit\(\),\s*\}\);/);
+    assert.doesNotMatch(profile, /\bupsertPrimaryAmbulatoryMembership\s*\(/);
+    assert.doesNotMatch(profile, deleteMemberships);
+
     const operation = fs.readFileSync(path.join(process.cwd(), 'lib/patient-update-operation.ts'), 'utf8');
-    assert.match(operation, /dbServer\.transaction\(/);
-    assert.match(operation, /upsertPrimaryAmbulatoryMembership\(tx,/);
-    assert.doesNotMatch(operation, /delete\(patientsToAmbulatories\)/);
+    assert.match(operation, /return dbServer\.transaction\(\(tx\)/);
+    assert.match(operation, /behavior:\s*'immediate'/);
+    assert.match(operation, /import\s*\{\s*upsertPrimaryAmbulatoryMembership\s*\}\s*from\s*'\.\/patient-ambulatory-membership'/);
+    assert.equal(operation.match(/\bupsertPrimaryAmbulatoryMembership\s*\(/g)?.length, 1);
+    assert.match(operation, /if\s*\(input\.setPrimaryAmbulatory\)\s*\{\s*upsertPrimaryAmbulatoryMembership\(tx, input\.patientId, input\.values\.ambulatoryId\);\s*\}\s*writeAuditEventInTransaction\(tx,/);
+    assert.match(operation, /import\s*\{[^}]*\bwriteAuditEventInTransaction\b[^}]*\}\s*from\s*'\.\/security\/audit'/);
+    assert.equal(operation.match(/\bwriteAuditEventInTransaction\s*\(/g)?.length, 1);
+    assert.doesNotMatch(operation, deleteMemberships);
+    const membership = fs.readFileSync(path.join(process.cwd(), 'lib/patient-ambulatory-membership.ts'), 'utf8');
+    assert.doesNotMatch(membership, deleteMemberships);
 });

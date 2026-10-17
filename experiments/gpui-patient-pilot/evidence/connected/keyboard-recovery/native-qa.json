@@ -1,0 +1,275 @@
+{
+  "schemaVersion": 1,
+  "result": "pass-with-separately-reported-interrupted-attempt",
+  "synthetic": true,
+  "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+  "sourceBaseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+  "sourceFiles": [
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/navigation.rs",
+      "sha256": "fb57dacfb88481bb41d266ecb5e9317463844ba9f8f5ead23ec225e4d6ba4c1f"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "sha256": "90e961184dcba6cba9ca2b37deb96e2a6ab24a906bb732bd8d9727e652ed92a0"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/text_input.rs",
+      "sha256": "d462cfc3f52602259c5ff4f6a51f2e756b8b8d62fcb2b9dcdfef2900183af0af"
+    }
+  ],
+  "sourcePatchSha256": "e5981c5c559a28c4bf5abdfbf9eaf8c87b43e31791a1fa95dfa0d98abca8ed21",
+  "platform": {
+    "os": "Ubuntu 24.04",
+    "target": "x86_64-unknown-linux-gnu",
+    "display": "private Xvfb :97",
+    "canvas": "1600x1100x24",
+    "rendering": "software",
+    "capture": "ImageMagick import -window",
+    "appearance": "day",
+    "textScale": 1
+  },
+  "corpusSource": "experiments/gpui-patient-pilot/comparison/corpus.json",
+  "preparerSource": "experiments/gpui-patient-pilot/comparison/prepare-runtime.mjs",
+  "runs": {
+    "initial": {
+      "ownedDirectory": "/tmp/mediflow-transition-keyboard-recovery-BlD3Fu",
+      "baseUrl": "http://127.0.0.1:43183",
+      "startedAt": "2026-10-17T20:23:56.817Z",
+      "hostSourceCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+      "hostSourceFilesManifestSha256": "384a498a8d85be14e79b7f55f89253fad770b265449595b95c3cad2f958d202f",
+      "hostSourceFileCount": 1932,
+      "node": "v24.19.0",
+      "authOwnerVersion": "0.8.11",
+      "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+      "seedReceipt": "initial-seed-receipt.json",
+      "authCredentialFieldIsPublicProtocolLabel": true,
+      "legacyCopyDisabled": true,
+      "providerExecutionDisabled": true,
+      "providerNetworkDisabled": true,
+      "cleanup": {
+        "at": "2026-10-17T20:35:26.055129+00:00",
+        "port43183Closed": true,
+        "x97SocketAbsent": true,
+        "retiredOwnedProcessGroups": {
+          "appPid": 15227,
+          "serverPid": 11815,
+          "xvfbPid": 14334
+        },
+        "dataRetainedPrivatelyForInterruptedAttempt": "/tmp/mediflow-transition-keyboard-recovery-BlD3Fu"
+      }
+    },
+    "replay": {
+      "ownedDirectory": "/tmp/mediflow-transition-keyboard-recovery-ppqjNn",
+      "baseUrl": "http://127.0.0.1:43183",
+      "startedAt": "2026-10-17T20:36:14.292Z",
+      "hostSourceCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+      "hostSourceFilesManifestSha256": "384a498a8d85be14e79b7f55f89253fad770b265449595b95c3cad2f958d202f",
+      "hostSourceFileCount": 1932,
+      "node": "v24.19.0",
+      "authOwnerVersion": "0.8.11",
+      "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+      "seedReceipt": "replay-seed-receipt.json",
+      "authCredentialFieldIsPublicProtocolLabel": true,
+      "legacyCopyDisabled": true,
+      "providerExecutionDisabled": true,
+      "providerNetworkDisabled": true,
+      "cleanup": {
+        "completedAt": "2026-10-17T20:44:27.972150+00:00",
+        "ownedProcessGroupsRetired": {
+          "appPid": 17551,
+          "serverPid": 17180,
+          "xvfbPid": 17548
+        },
+        "port43183Closed": true,
+        "x97SocketAbsent": true,
+        "privateDataRetainedUntilArtifactPrivacyCheck": true
+      }
+    }
+  },
+  "acceptedObservations": [
+    {
+      "run": "initial",
+      "checks": [
+        "Slash focuses Patients search; ajk/ remains input text.",
+        "With filter a: j selected Amina, Down selected Carlo, Up returned to Amina; k/k/Enter opened Elena.",
+        "Ctrl+N on focused Carlo with loaded Amina preview did not create a draft; before/after images identical.",
+        "Slash did not leave the patient sheet (identical frame) and stayed in Agenda, Diary and References while focusing each search.",
+        "Slash selected existing References text so prova replaced jk/."
+      ]
+    },
+    {
+      "run": "replay",
+      "checks": [
+        "Focused compact module menu at 390×844 → desktop 1440×960 → exactly one Ctrl+N, with no intervening click/key, opened the same New entry form path.",
+        "Title/body populated only after observing editor focus; accents and multiline content preserved through native clipboard paste.",
+        "Ctrl+N inside nonempty draft body did not replace it; before/after images identical.",
+        "Resize 1440→390 retained body focus/caret/text, left module menu closed and accepted an appended suffix without refocusing; return to 1440 preserved all content.",
+        "Two Ctrl+Enter actions left the same review image; no ordinary Enter/Space/click was sent to confirmation.",
+        "Escape returned to focused title; Ctrl+L locked from that input.",
+        "Snapshot before/after semantically identical and zero paired clinical write requests in host log."
+      ]
+    }
+  ],
+  "interruptedAttempt": "interrupted-attempt.json",
+  "acceptedReplaySnapshot": "snapshot-comparison.json",
+  "images": [
+    {
+      "file": "01-worklist-input.png",
+      "run": "initial",
+      "originalFile": "worklist-input-characters.png",
+      "sha256": "2f8f0a1becbf5b91c3a1d857b4376c2a2f9fe3da454d5eb9f75069ae3fea88f6",
+      "bytes": 50219,
+      "width": 1440,
+      "height": 960,
+      "capturedAt": "2026-10-17T20:27:51.391901+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Active Patients search contains ajk/; the input retains character shortcuts.",
+      "focusAndScroll": "Search editor focused; directory scroll at top.",
+      "transformations": []
+    },
+    {
+      "file": "02-wrong-patient-guard.png",
+      "run": "initial",
+      "originalFile": "worklist-wrong-row-after.png",
+      "sha256": "a731f841e6b85a75a252b5c2b0bd19b14b9eb434f818879ceb8346b139ef4d4b",
+      "bytes": 73723,
+      "width": 1440,
+      "height": 960,
+      "capturedAt": "2026-10-17T20:28:39.013116+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Filtered list: focused Carlo, loaded Amina preview; Ctrl+N has not opened a draft.",
+      "focusAndScroll": "Carlo row focused; filter a remains active. Before/after guard images were byte-identical.",
+      "transformations": []
+    },
+    {
+      "file": "03-search-active-view.png",
+      "run": "initial",
+      "originalFile": "references-search-selected.png",
+      "sha256": "d7e9553073ae901281f3087fd88d6632efc82f74e7cef65f7a5d2316382a8172",
+      "bytes": 71283,
+      "width": 1440,
+      "height": 960,
+      "capturedAt": "2026-10-17T20:30:12.151495+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Slash remains in References and selects the existing query before replacement with prova.",
+      "focusAndScroll": "Reference search editor focused; empty synthetic reference catalogue does not qualify search-result correctness.",
+      "transformations": []
+    },
+    {
+      "file": "04-compact-menu.png",
+      "run": "replay",
+      "originalFile": "compact-menu-open.png",
+      "sha256": "4e607f9d0056b3816931b8778804603d06338a803acf1f1c67a5063b115b18c1",
+      "bytes": 50752,
+      "width": 390,
+      "height": 844,
+      "capturedAt": "2026-10-17T20:39:19.479911+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Focused module selector is open at 390x844 before the desktop resize.",
+      "focusAndScroll": "Module selector focused; no draft exists.",
+      "transformations": []
+    },
+    {
+      "file": "05-new-entry-after-resize.png",
+      "run": "replay",
+      "originalFile": "desktop-single-new-entry.png",
+      "sha256": "ec6885d13bc6629aae8b9a3e8241e174c23835d7a31b7839bb645b4d5b4dffbf",
+      "bytes": 120169,
+      "width": 1440,
+      "height": 960,
+      "capturedAt": "2026-10-17T20:39:50.562129+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Exactly one Ctrl+N after resizing the focused compact selector to desktop opens the empty draft.",
+      "focusAndScroll": "Title editor focused; no click or navigation key between resize and Ctrl+N. Profile scroll has followed field focus; not scroll zero.",
+      "transformations": []
+    },
+    {
+      "file": "06-compact-draft.png",
+      "run": "replay",
+      "originalFile": "compact-draft-appended.png",
+      "sha256": "66995be12b2b09c65c9042df968b97bb5b57367871b74e432f190e21d11ae6bf",
+      "bytes": 58890,
+      "width": 390,
+      "height": 844,
+      "capturedAt": "2026-10-17T20:41:45.869066+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Existing body retains accents, text and caret at 390; suffix appended without refocusing; module menu remains closed.",
+      "focusAndScroll": "Body editor focused. Profile scroll retained from field reveal; heading is partly above the viewport. Not a scroll-zero image.",
+      "transformations": []
+    },
+    {
+      "file": "07-desktop-draft.png",
+      "run": "replay",
+      "originalFile": "desktop-draft-restored.png",
+      "sha256": "93ca705896accd95eebd1c84068b53501076833eca34a8c679e558295bdd8d03",
+      "bytes": 131705,
+      "width": 1440,
+      "height": 960,
+      "capturedAt": "2026-10-17T20:41:59.329407+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Returning to desktop preserves title, body, appended suffix and body caret.",
+      "focusAndScroll": "Body editor focused; profile scroll follows prior field focus, not scroll zero.",
+      "transformations": []
+    },
+    {
+      "file": "08-review-twice.png",
+      "run": "replay",
+      "originalFile": "review-twice.png",
+      "sha256": "526c6468cb9a6b58caea2058646bd84ad632f49051fa2cad2c56c6098e10b4a2",
+      "bytes": 126011,
+      "width": 1440,
+      "height": 960,
+      "capturedAt": "2026-10-17T20:42:51.114923+00:00",
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "caption": "Two Ctrl+Enter commands leave the same visible review; no confirm action sent.",
+      "focusAndScroll": "Review shown; first/second review images are byte-identical.",
+      "transformations": []
+    }
+  ],
+  "limits": [
+    "Native observations apply only to this Linux/X11 binary; no macOS, Windows, mobile or assistive-technology execution claimed here.",
+    "IME exclusion is checked in the actual GPUI keymap and existing unit tests; a live OS IME session was not repeated.",
+    "Reference catalogue is empty in this synthetic host; focus behavior does not qualify catalogue search results.",
+    "The stage_fields and document-upload menu resets were statically reviewed; their full form/upload paths were not replayed in this focused keyboard QA.",
+    "Historical lost screenshots/binaries/receipts are not recreated or attributed to this build.",
+    "The initial automated draft attempt created one synthetic entry and is excluded from the no-write and completed-resize acceptance."
+  ],
+  "publication": {
+    "note": "publication-note.json",
+    "originalManifestSha256": "0a09ef6a8bf070f3db2a86d024b9afc437eb9254e49d46ed0a00ed3bf144cdfd",
+    "observedPngCount": 9,
+    "pngCountSelectedForCommit": 8,
+    "withheldPngCount": 1,
+    "qaReexecuted": false,
+    "qualification": "The observed lock behavior remains part of QA; its ninth original PNG is retained locally and excluded from the commit after automatic approval review denied its publication."
+  },
+  "withheldArtifacts": [
+    {
+      "intendedRepositoryPath": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/09-locked-from-editor.png",
+      "sha256": "ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730",
+      "bytes": 45405,
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "sourceBaseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+      "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+      "status": "withheld-locally-pending-payload-specific-user-authorization",
+      "localOriginalRetained": true,
+      "includedInCommit": false,
+      "publicationNote": "publication-note.json",
+      "capture": {
+        "file": "09-locked-from-editor.png",
+        "run": "replay",
+        "originalFile": "locked-credentials-cleared.png",
+        "sha256": "ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730",
+        "bytes": 45405,
+        "width": 1440,
+        "height": 960,
+        "capturedAt": "2026-10-17T20:43:31.340615+00:00",
+        "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+        "caption": "Ctrl+L from the draft title editor locks the session; synthetic username cleared in the native login field before capture.",
+        "focusAndScroll": "Login field focused; username and passphrase fields empty. No image editing.",
+        "transformations": []
+      }
+    }
+  ]
+}
