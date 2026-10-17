@@ -18,7 +18,7 @@ type Options = Readonly<{
         expectedSyntheticPatientName: string;
     }>;
 }>;
-type ObservedRequest = Readonly<{ method: string; path: string; bodyKeys?: readonly string[] }>;
+type ObservedRequest = Readonly<{ method: string; path: string; metadataOnly?: boolean; bodyKeys?: readonly string[] }>;
 const PREFIX = '/api/ai/document-synthesis/';
 
 export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, options: Options): Promise<void> {
@@ -40,7 +40,8 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const method = request.method(); const path = requestUrl.pathname;
         if (!path.startsWith('/api/')) return;
         const keys = path.startsWith(PREFIX) && method === 'POST' ? Object.keys(request.postDataJSON() ?? {}).sort() : undefined;
-        requests.push({ method, path, ...(keys ? { bodyKeys: keys } : {}) });
+        requests.push({ method, path, ...(method === 'GET' && path === '/api/attachments'
+            ? { metadataOnly: requestUrl.searchParams.get('metadata') === 'true' } : {}), ...(keys ? { bodyKeys: keys } : {}) });
         if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return;
         const attachmentWrite = (method === 'POST' && path === '/api/attachments')
             || (method === 'DELETE' && /^\/api\/attachments\/[^/]+$/u.test(path));
@@ -62,6 +63,12 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
     const rows = docs.locator('[data-document-id]');
     const synthesisCalls = () => requests.filter((item) => item.path.startsWith(PREFIX) && item.method === 'POST');
     const writes = (method: string) => requests.filter((item) => item.method === method && item.path.startsWith('/api/attachments'));
+    const detailReads = () => requests.filter((item) => item.method === 'GET' && /^\/api\/attachments\/[^/]+$/u.test(item.path));
+    const assertMetadataLists = () => {
+        const lists = requests.filter((item) => item.method === 'GET' && item.path === '/api/attachments');
+        expect(lists.length, 'The page must actually read its attachment lists').toBeGreaterThan(0);
+        expect(lists.every((item) => item.metadataOnly), 'Attachment lists must omit original file data').toBe(true);
+    };
     const openDocuments = async () => {
         await openPatientSection(page, 'documenti');
         await expect(docs).toBeVisible();
@@ -81,6 +88,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         await expect(rows).toHaveCount(0); // Explicit fixture precondition; never delete unknown pre-existing files.
         await expect(docs.getByText('Nessun documento caricato.', { exact: false })).toBeVisible();
         expect(synthesisCalls()).toEqual([]);
+        assertMetadataLists(); expect(detailReads()).toEqual([]);
         await verifyHealth();
         await page.screenshot({ path: info.outputPath('document-flow-empty-desktop.png'), fullPage: false });
 
@@ -110,14 +118,20 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const first = rows.filter({ has: page.getByRole('heading', { name: names[0], exact: true }) });
         const second = rows.filter({ has: page.getByRole('heading', { name: names[1], exact: true }) });
         const firstId = await first.getAttribute('data-document-id');
-        expect(firstId).toBeTruthy();
+        const secondId = await second.getAttribute('data-document-id');
+        expect(firstId).toBeTruthy(); expect(secondId).toBeTruthy();
+        assertMetadataLists();
+        expect(detailReads(), 'Upload and navigation must not download originals').toEqual([]);
         await first.getByRole('button', { name: `Visualizza ${names[0]}`, exact: true }).click();
         await expect(page.getByTestId('document-preview-text')).toHaveText(files[0].buffer.toString('utf8'));
+        expect(detailReads().map((item) => item.path)).toEqual(['/api/attachments/' + firstId]);
         await expect(page.locator('iframe, object, embed')).toHaveCount(0);
         await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
         await expect(page.getByTestId('document-viewer')).toHaveCount(0);
         await first.getByRole('button', { name: `Prepara sintesi di ${names[0]}`, exact: true }).click();
         await expect(docs.getByLabel('Documento da sintetizzare')).toHaveValue(firstId!);
+        await expect(page.getByTestId('document-preview-text')).toHaveText(files[0].buffer.toString('utf8'));
+        expect(detailReads().map((item) => item.path)).toEqual(['/api/attachments/' + firstId, '/api/attachments/' + firstId]);
         expect(synthesisCalls()).toEqual([]);
         if (options.synthesis.mode === 'disabled') {
             await expect(docs.getByTestId('document-upload-synthesis-disabled-note')).toBeVisible();
@@ -173,6 +187,15 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
             await expect(docs.getByTestId('document-synthesis-fabric-result')).toHaveCount(0);
             expect(synthesisCalls()).toHaveLength(3);
         }
+        const synthesisCount = synthesisCalls().length;
+        await docs.getByLabel('Documento da sintetizzare').selectOption(secondId!);
+        await expect(page.getByTestId('document-preview-text')).toHaveText(files[1].buffer.toString('utf8'));
+        if (options.synthesis.mode === 'disabled') expect(detailReads().map((item) => item.path)).toEqual([
+            '/api/attachments/' + firstId, '/api/attachments/' + firstId, '/api/attachments/' + secondId,
+        ]);
+        else expect(detailReads().at(-1)?.path).toBe('/api/attachments/' + secondId);
+        expect(synthesisCalls()).toHaveLength(synthesisCount);
+        assertMetadataLists();
         await page.setViewportSize({ width: 390, height: 844 });
         await docs.scrollIntoViewIfNeeded();
         expect(await docs.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);

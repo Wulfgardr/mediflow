@@ -18,7 +18,7 @@ test('one synthesis composer follows the list rather than being repeated inside 
 
 test('initial list errors, refresh errors and empty state are distinct; retry is a real scoped read', async () => {
     const source = await upload();
-    assert.match(source, /db\.attachments\.query\(\{ patientId \}\)\.toArray\(\)/u);
+    assert.match(source, /db\.attachments\.query\(\{ patientId, metadataOnly: true \}\)\.toArray\(\)/u);
     assert.doesNotMatch(source, /db\.attachments\.filter/u);
     assert.match(source, /useLiveQueryState/u);
     assert.match(source, /const currentAttachments = listError \? undefined : attachments/u);
