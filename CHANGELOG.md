@@ -8,6 +8,9 @@ le versioni seguono [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Non ancora rilasciato]
 
 Cambiamenti già su `main`, che usciranno con la prossima versione.
+Le prove e i limiti dei singoli candidati sono nella
+[matrice di parità](./docs/parity-matrix.md); non si trasferiscono alla
+versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Avvio
 
@@ -17,6 +20,24 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
   cartella utente del sistema, fuori dall'archivio clinico. I vecchi `Start_MediFlow.command`
   e `Start-MediFlow.ps1` non esistono più
   ([#529](https://github.com/Wulfgardr/mediflow/pull/529)).
+- Il pacchetto Mac si può preparare senza Xcode completo usando il client
+  Debug ARM64 prodotto dalla CI e sorgenti puliti della stessa revisione.
+  L'artefatto CI è un componente; firma locale, notarizzazione e distribuzione
+  pubblica restano passaggi distinti
+  ([#537](https://github.com/Wulfgardr/mediflow/pull/537)).
+
+### Accesso per agenti
+
+- Mini offre l'anteprima del cambio di stato di un controllo tramite lo
+  stesso servizio di MCP. La conferma resta nel Web e l'agente non acquisisce
+  permessi di scrittura
+  ([#538](https://github.com/Wulfgardr/mediflow/pull/538)).
+- L'attivazione Headless verifica le durate con l'orologio del rispettivo
+  processo, evitando il rifiuto osservato su Windows per uno scarto tra
+  Supervisor e Web. Restano invariati scadenza, uso singolo e revoca; lo
+  smoke Windows conserva anche gli errori di avvio e pulizia
+  ([#550](https://github.com/Wulfgardr/mediflow/pull/550),
+  [#546](https://github.com/Wulfgardr/mediflow/pull/546)).
 
 ### Repertori
 
@@ -33,9 +54,49 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
 
 ### Funzioni AI
 
-- Ollama 0.40.4 è ammesso per le funzioni locali; una versione non supportata
-  viene indicata come tale, non come servizio irraggiungibile
-  ([#524](https://github.com/Wulfgardr/mediflow/pull/524)).
+- Ollama 0.40.4 e 0.40.5 sono ammessi esplicitamente per le funzioni locali;
+  una versione non supportata viene indicata come tale, non come servizio
+  irraggiungibile. Restano i controlli su località, modello e digest
+  ([#524](https://github.com/Wulfgardr/mediflow/pull/524),
+  [#548](https://github.com/Wulfgardr/mediflow/pull/548)).
+- La verifica del modello locale a freddo attende fino a 60 secondi sull'host
+  e 70 nella pagina, mantenendo annullamento e controllo della sessione,
+  senza tentativi automatici
+  ([#549](https://github.com/Wulfgardr/mediflow/pull/549)).
+- L'accesso ChatGPT riconosce il piano `prolite` e aggiorna i vincoli del
+  sistema Mac dopo la verifica prevista. Accesso e catalogo hanno prove
+  reali; la generazione nelle quattro funzioni resta da verificare
+  ([#540](https://github.com/Wulfgardr/mediflow/pull/540),
+  [esiti e limiti](./docs/known-limitations.md#chatgpt-e-plugin-stato-delle-prove)).
+
+### Client Apple
+
+- Accesso con passphrase v3 nei client abbinati, con derivazione locale e
+  verifica della generazione dell'archivio. Il preflight corrente ammette
+  gli account v3 solo negli archivi a utente unico; la qualifica delle app
+  resta distinta dalla presenza del protocollo
+  ([#539](https://github.com/Wulfgardr/mediflow/pull/539),
+  [ADR 0143](./docs/adr/0143-strong-unlock-credential.md#client-apple-v3--16-ottobre-2026-wul-777)).
+- iPhone e iPad includono le quattro viste AI e l'importazione di documenti
+  multipli con esiti per file. L'elaborazione resta sull'host qualificato;
+  le proposte richiedono revisione e le generazioni da mobile non sono
+  ancora provate ([#541](https://github.com/Wulfgardr/mediflow/pull/541)).
+- Importazione delle anagrafiche da CSV con anteprima, controllo dei
+  duplicati e conferma esplicita. La rilettura finale aggiorna l'elenco senza
+  ripetere gli invii; su Mac, sezioni e funzioni disponibili si aggiornano
+  dopo il collegamento ([#542](https://github.com/Wulfgardr/mediflow/pull/542),
+  [#552](https://github.com/Wulfgardr/mediflow/pull/552)).
+- Nuovi allegati dal compositore del diario, conservando testo, allegati
+  precedenti ed esiti confermati. Il salvataggio della voce resta esplicito
+  ([#543](https://github.com/Wulfgardr/mediflow/pull/543)).
+- Comandi di rientro, elenchi annidati e citazioni multiblocco nell'editor
+  ([#544](https://github.com/Wulfgardr/mediflow/pull/544)). Il rientro nella
+  vista di lettura e l'arresto osservato aprendo Diario su iPad simulato
+  restano seguiti nella [PR #553](https://github.com/Wulfgardr/mediflow/pull/553),
+  ancora aperta in attesa della prova UI della correzione.
+- Il messaggio AI iniziale resta visibile finché non parte un'operazione;
+  l'avviso di contesto cambiato segue solo un'attività o una proposta
+  ([#547](https://github.com/Wulfgardr/mediflow/pull/547)).
 
 ### Interfaccia
 
@@ -44,12 +105,33 @@ Cambiamenti già su `main`, che usciranno con la prossima versione.
   codici. Pulsanti alti 40 px con il mouse e 44 px sui dispositivi touch;
   azioni senza cornice nel diario e nella scheda
   ([#530](https://github.com/Wulfgardr/mediflow/pull/530)).
+- Azioni e colonne di Pazienti e Repertori si adattano allo spazio; i comandi
+  mobile sono nel menu Altro. La revisione del ragionamento terapeutico usa
+  la composizione Punto d'inchiostro su Web e Mac, con fonti leggibili e
+  identificativi consultabili
+  ([#535](https://github.com/Wulfgardr/mediflow/pull/535)).
 
 ### Manutenzione
 
-- Rimossi codice inutilizzato e materiale storico superato, per circa 8.000
-  righe. I collegamenti storici rimandano al tag `v0.9.0`
+- Rimossi `framer-motion`, l’SDK `openai` e due dipendenze transitive senza
+  consumatori, oltre al vecchio hook degli avvisi mai collegato all’interfaccia.
+  Il trasporto OpenAI corrente usa il collegamento HTTP già presente
+  ([WUL-779](https://linear.app/wulfgardr/issue/WUL-779)).
+- Rimossi codice inutilizzato e materiale storico superato. I collegamenti
+  storici rimandano al tag `v0.9.0`
   ([#531](https://github.com/Wulfgardr/mediflow/pull/531)).
+- Ritirati i backend documentali senza chiamanti runtime e i wrapper legacy
+  della sintesi; le regressioni ancora pertinenti verificano i percorsi
+  attivi. Le anteprime Fabric restano proposte da rivedere
+  ([#533](https://github.com/Wulfgardr/mediflow/pull/533)).
+- Rimossi marcatori di processo dai commenti e il parser Ollama pull senza
+  consumatori, conservando contratti, controlli e sorgenti fissati tramite
+  hash ([#534](https://github.com/Wulfgardr/mediflow/pull/534)).
+- Pagine introduttive più concise e prove ordinate per piattaforma, con
+  esiti AI e limiti distinti dalle funzioni presenti nei sorgenti
+  ([#536](https://github.com/Wulfgardr/mediflow/pull/536),
+  [#545](https://github.com/Wulfgardr/mediflow/pull/545),
+  [#551](https://github.com/Wulfgardr/mediflow/pull/551)).
 - [Riflessione sulle prestazioni](./docs/analysis/2026-10-15-riflessione-prestazioni.md)
   della 0.9.0, con le misure da cui partire
   ([#526](https://github.com/Wulfgardr/mediflow/pull/526)).
