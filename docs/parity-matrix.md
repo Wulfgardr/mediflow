@@ -74,8 +74,8 @@ una distribuzione installata o dispositivi fisici.
 
 Le prove su iPhone e iPad fisici restano da completare. La firma di sviluppo
 con Personal Team gratuito è possibile senza pagamento; il provisioning
-effettivo non è ancora verificato. Componenti Xcode e modalità sviluppatore
-dell'iPad restano prerequisiti da completare prima della prova fisica.
+effettivo non è ancora verificato. Per la prova su iPad serve anche la modalità
+sviluppatore.
 
 Nella prova Mac precedente mancavano tre permessi di lettura nella fixture.
 Il ripristino canonico dei permessi della fixture ha consentito di proseguire:
