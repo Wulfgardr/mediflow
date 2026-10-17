@@ -772,7 +772,7 @@ function createServerSessionOwner() {
             const clientId = ObjectGetOwnPropertyDescriptor(value, 'clientId');
             const clientPlatform = ObjectGetOwnPropertyDescriptor(value, 'clientPlatform');
             return Boolean(clientId && clientPlatform && 'value' in clientId && 'value' in clientPlatform && clientId.enumerable && clientPlatform.enumerable
-                && typeof clientId.value === 'string' && (clientPlatform.value === 'macos' || clientPlatform.value === 'ios' || clientPlatform.value === 'ipados'));
+                && typeof clientId.value === 'string' && (clientPlatform.value === 'macos' || clientPlatform.value === 'ios' || clientPlatform.value === 'ipados' || clientPlatform.value === 'windows' || clientPlatform.value === 'linux'));
         }
         catch {
             return false;
@@ -809,7 +809,7 @@ function createServerSessionOwner() {
         return Boolean(channel && 'value' in channel && channel.value === 'native'
             && expiry && 'value' in expiry && NumberIsSafeInteger(expiry.value) && expiry.value > DateNow()
             && cell.tagged === getWeakMapValue(nativeSessionBindings, session)
-            && (cell.tagged.clientPlatform === 'macos' || cell.tagged.clientPlatform === 'ios' || cell.tagged.clientPlatform === 'ipados')
+            && (cell.tagged.clientPlatform === 'macos' || cell.tagged.clientPlatform === 'ios' || cell.tagged.clientPlatform === 'ipados' || cell.tagged.clientPlatform === 'windows' || cell.tagged.clientPlatform === 'linux')
             && typeof cell.tagged.tokenHash === 'string'
             && /^[a-f0-9]{64}$/u.test(cell.tagged.tokenHash)
             && (cell.principal.role === 'admin' || cell.principal.role === 'user'));

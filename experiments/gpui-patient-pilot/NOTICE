@@ -1,4 +1,4 @@
-MediFlow Rust/GPUI patient pilot
+MediFlow Rust/GPUI connected client and patient demo
 
 The MediFlow-specific code is covered by the repository MIT license, except
 the portions identified below.
@@ -12,6 +12,15 @@ GPUI and gpui_platform are pinned Git dependencies. Their own licenses and
 transitive dependency licenses remain applicable. No Zed crates/ui widgets
 are copied into this pilot.
 
-The app embeds the existing repository Newsreader and IBM Plex Mono font
-assets. Their SIL Open Font License files remain with those assets; this
-experiment does not relicense them.
+The app embeds IBM Plex Mono and four real static Newsreader faces. Newsreader
+Regular/Bold are derived from the existing web font; Italic/BoldItalic are
+derived from the matching official Newsreader 1.003 Italic source. Provenance,
+source checksums and output checksums are in app/fonts/Newsreader-Native.manifest.json
+at the repository root. The reproducible instancing script is
+experiments/gpui-patient-pilot/scripts/build-newsreader-native.py. Both font
+families retain their SIL Open Font Licenses alongside the original assets.
+This experiment does not relicense them or replace the web font.
+
+app/src/icons.rs embeds paths from Lucide 0.562.0, matching the web client's
+icon family. The complete Lucide ISC and original Feather MIT notices are
+included in that source file. These paths retain those licenses.

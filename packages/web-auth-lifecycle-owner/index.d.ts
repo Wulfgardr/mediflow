@@ -71,7 +71,7 @@ type NativeAuthenticationGeneration = Readonly<{ readonly [nativeAuthenticationG
 type NativeSessionResourceBinding = Readonly<{
     principalRef: string; authenticationGeneration: NativeAuthenticationGeneration;
     sessionId: string; username: string; role: string; clientId: string;
-    clientPlatform: 'macos' | 'ios' | 'ipados'; tokenHash: string; expiresAt: number;
+    clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux'; tokenHash: string; expiresAt: number;
 }>;
 function mintNativeSessionResourcePort(session: unknown): NativeSessionResourcePort | null;
 function releaseNativeSessionResourcePort(port: unknown): boolean;
@@ -103,7 +103,7 @@ interface ServerSession {
 }
 type NativeServerSessionBinding = Readonly<{
     clientId: string;
-    clientPlatform: 'macos' | 'ios' | 'ipados';
+    clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
     tokenHash?: string;
 }>;
 const nativeSystemAdminResetCapability: unique symbol;

@@ -9,8 +9,8 @@ use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, ElementId, ElementInputHandler, Entity,
     EntityInputHandler, EventEmitter, FocusHandle, Focusable, GlobalElementId, HighlightStyle,
     InspectorElementId, KeyBinding, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, Pixels, Point, Role, SharedString, StyledText, TextLayout, UTF16Selection,
-    UnderlineStyle, Window, actions, fill, point, prelude::*, px, size,
+    MouseUpEvent, Pixels, Point, Role, ScrollHandle, SharedString, StyledText, Subscription,
+    TextLayout, UTF16Selection, UnderlineStyle, Window, actions, fill, point, prelude::*, px, size,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -67,8 +67,11 @@ pub struct TextInput {
     painted_content: SharedString,
     selecting: bool,
     autoscroll: bool,
+    scroll: ScrollHandle,
+    focus_subscription: Option<Subscription>,
     pub read_only: bool,
     multiline: bool,
+    secret: bool,
     theme: Theme,
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
@@ -98,8 +101,11 @@ impl TextInput {
             painted_content: "".into(),
             selecting: false,
             autoscroll: true,
+            scroll: ScrollHandle::new(),
+            focus_subscription: None,
             read_only: false,
             multiline,
+            secret: false,
             theme,
             undo: Vec::new(),
             redo: Vec::new(),
@@ -107,12 +113,40 @@ impl TextInput {
     }
 
     pub fn configure(&mut self, theme: Theme, read_only: bool, cx: &mut Context<Self>) {
-        if self.theme.ink == theme.ink && self.read_only == read_only {
+        if self.theme.ink == theme.ink
+            && self.theme.scale == theme.scale
+            && self.read_only == read_only
+        {
             return;
         }
         self.theme = theme;
         self.read_only = read_only;
         cx.notify();
+    }
+
+    pub fn secret(mut self) -> Self {
+        self.secret = true;
+        self
+    }
+
+    pub fn value(&self) -> &str {
+        &self.content
+    }
+
+    fn display_index(&self, byte: usize) -> usize {
+        if self.secret {
+            masked_index(&self.content, byte)
+        } else {
+            byte
+        }
+    }
+
+    fn content_index(&self, displayed: usize) -> usize {
+        if self.secret {
+            unmasked_index(&self.content, displayed)
+        } else {
+            floor_boundary(&self.content, displayed)
+        }
     }
 
     /// Authoritative reads replace editor content without emitting an edit.
@@ -123,6 +157,7 @@ impl TextInput {
         self.marked = None;
         self.layout = None;
         self.autoscroll = true;
+        self.scroll.set_offset(point(px(0.), px(0.)));
         self.undo.clear();
         self.redo.clear();
         cx.notify();
@@ -143,11 +178,17 @@ impl TextInput {
     fn changed(&mut self, window: &Window, cx: &mut Context<Self>) {
         self.autoscroll = true;
         window.notify_text_input_changed(&self.focus);
-        cx.emit(InputChanged(self.content.to_string()));
+        // Secret controls are read explicitly at submission, never broadcast.
+        if !self.secret {
+            cx.emit(InputChanged(self.content.to_string()));
+        }
         cx.notify();
     }
 
     fn checkpoint(&mut self) {
+        if self.secret {
+            return;
+        }
         if self.undo.len() == 64 {
             self.undo.remove(0);
         }
@@ -296,15 +337,17 @@ impl TextInput {
         let Some(layout) = &self.layout else {
             return;
         };
-        let Some(position) = layout.position_for_index(self.cursor()) else {
+        let Some(position) = layout.position_for_index(self.display_index(self.cursor())) else {
             return;
         };
         let target = point(
             position.x,
-            position.y + px(if self.multiline { 28. } else { 20. }) * direction + px(1.),
+            position.y
+                + px(self.theme.size(if self.multiline { 28. } else { 20. })) * direction
+                + px(1.),
         );
         let index = layout.index_for_position(target).unwrap_or_else(|i| i);
-        self.move_to(index, select, w, cx);
+        self.move_to(self.content_index(index), select, w, cx);
     }
     fn up(&mut self, _: &Up, w: &mut Window, cx: &mut Context<Self>) {
         self.vertical(-1., false, w, cx);
@@ -351,7 +394,7 @@ impl TextInput {
         }
     }
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
-        if !self.range.is_empty() {
+        if !self.secret && !self.range.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(
                 self.content[self.range.clone()].to_string(),
             ));
@@ -371,10 +414,7 @@ impl TextInput {
         self.layout
             .as_ref()
             .map(|layout| {
-                floor_boundary(
-                    &self.content,
-                    layout.index_for_position(position).unwrap_or_else(|i| i),
-                )
+                self.content_index(layout.index_for_position(position).unwrap_or_else(|i| i))
             })
             .unwrap_or(0)
     }
@@ -415,9 +455,7 @@ impl EntityInputHandler for TextInput {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<String> {
-        let bytes = self.byte_range_for_utf16(range);
-        *actual = Some(self.to_utf16(bytes.clone()));
-        Some(self.content[bytes].to_string())
+        platform_text_for_range(&self.content, self.secret, range, actual)
     }
     fn selected_text_range(
         &mut self,
@@ -533,8 +571,8 @@ impl EntityInputHandler for TextInput {
         }
         let range = self.byte_range_for_utf16(range);
         let layout = self.layout.as_ref()?;
-        let start = layout.position_for_index(range.start)?;
-        let end = layout.position_for_index(range.end)?;
+        let start = layout.position_for_index(self.display_index(range.start))?;
+        let end = layout.position_for_index(self.display_index(range.end))?;
         Some(Bounds::new(
             start,
             size((end.x - start.x).max(px(2.)), w.line_height()),
@@ -558,8 +596,8 @@ impl EntityInputHandler for TextInput {
         for (relative, grapheme) in self.content[range.clone()].grapheme_indices(true) {
             let index = range.start + relative;
             let (Some(start), Some(end)) = (
-                layout.position_for_index(index),
-                layout.position_for_index(index + grapheme.len()),
+                layout.position_for_index(self.display_index(index)),
+                layout.position_for_index(self.display_index(index + grapheme.len())),
             ) else {
                 continue;
             };
@@ -634,7 +672,27 @@ impl Element for InputElement {
         self.text.prepaint(id, inspector, bounds, layout, w, cx);
         let input = self.input.read(cx);
         if input.autoscroll && input.focus.is_focused(w) {
-            if let Some(position) = self.text.layout().position_for_index(input.cursor()) {
+            if let Some(position) = self
+                .text
+                .layout()
+                .position_for_index(input.display_index(input.cursor()))
+            {
+                let viewport = input.scroll.bounds();
+                let offset = input.scroll.offset();
+                let next_y = reveal_offset(
+                    f32::from(offset.y),
+                    f32::from(input.scroll.max_offset().y),
+                    f32::from(viewport.top() + px(12.)),
+                    f32::from(viewport.bottom() - px(12.)),
+                    f32::from(position.y),
+                    f32::from(position.y + w.line_height()),
+                );
+                if px(next_y) != offset.y {
+                    input.scroll.set_offset(point(offset.x, px(next_y)));
+                    // Div scroll offsets are applied before the child is prepainted.
+                    // Repaint once with the new offset; no timer or animation is used.
+                    w.on_next_frame(|window, _| window.refresh());
+                }
                 w.request_autoscroll(Bounds::new(position, size(px(4.), w.line_height())));
             }
             self.input.update(cx, |input, _| input.autoscroll = false);
@@ -652,7 +710,7 @@ impl Element for InputElement {
     ) {
         let input = self.input.read(cx);
         let focus = input.focus.clone();
-        let cursor = input.cursor();
+        let cursor = input.display_index(input.cursor());
         let caret = input.range.is_empty() && !input.read_only && focus.is_focused(w);
         let fresh = input.theme.fresh;
         w.handle_input(
@@ -677,35 +735,57 @@ impl Element for InputElement {
 }
 
 impl Render for TextInput {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.focus_subscription.is_none() {
+            self.focus_subscription = Some(cx.on_focus(&self.focus, window, |input, _, cx| {
+                input.autoscroll = true;
+                cx.notify();
+            }));
+        }
         let theme = self.theme;
         let empty = self.content.is_empty();
         let display: SharedString = if empty {
             self.placeholder.clone()
+        } else if self.secret {
+            "•".repeat(self.content.chars().count()).into()
         } else if self.content.ends_with('\n') {
             format!("{} ", self.content).into()
         } else {
             self.content.clone()
         };
         let highlights = input_highlights(
-            &self.content,
-            self.range.clone(),
-            self.marked.clone(),
+            &display,
+            self.display_index(self.range.start)..self.display_index(self.range.end),
+            self.marked
+                .clone()
+                .map(|r| self.display_index(r.start)..self.display_index(r.end)),
             theme,
         );
         gpui::div()
             .id(self.id)
             .accessibility_id(self.id)
-            .role(Role::TextInput)
+            .role(if self.secret {
+                Role::PasswordInput
+            } else if self.multiline {
+                Role::MultilineTextInput
+            } else {
+                Role::TextInput
+            })
             .aria_label(self.label)
-            .aria_value(self.content.clone())
+            .aria_value(if self.secret {
+                SharedString::from("•".repeat(self.content.chars().count()))
+            } else {
+                self.content.clone()
+            })
             .aria_placeholder(self.placeholder.clone())
-            .aria_description(if self.read_only {
+            .aria_description(if self.secret {
+                "Campo riservato. I caratteri sono nascosti."
+            } else if self.read_only {
                 "Testo selezionabile e copiabile. Sola lettura."
             } else if self.multiline {
                 "Testo su più righe. Le modifiche restano una bozza fino alla conferma."
             } else {
-                "Cerca per nome o codice di prova."
+                "Campo di testo."
             })
             .a11y_synthetic_children({
                 let read_only = self.read_only;
@@ -720,6 +800,9 @@ impl Render for TextInput {
             .tab_stop(true)
             .cursor(CursorStyle::IBeam)
             .w_full()
+            .max_h(px(256.))
+            .track_scroll(&self.scroll)
+            .overflow_y_scroll()
             .min_h(px(40.))
             .when(self.multiline, |el| el.min_h(px(160.)))
             .p(px(if self.multiline { 12. } else { 8. }))
@@ -729,8 +812,12 @@ impl Render for TextInput {
             .bg(theme.paper)
             .focus(|style| style.border_color(theme.fresh).border_2())
             .text_color(if empty { theme.secondary } else { theme.ink })
-            .text_size(px(if self.multiline { 17. } else { 14. }))
-            .line_height(px(if self.multiline { 28. } else { 20. }))
+            .text_size(px(if self.multiline {
+                theme.size(17.)
+            } else {
+                theme.body()
+            }))
+            .line_height(px(theme.size(if self.multiline { 28. } else { 20. })))
             .when(self.multiline, |el| el.font_family(VOICE))
             .on_action(cx.listener(Self::backspace))
             .on_action(cx.listener(Self::delete))
@@ -803,12 +890,44 @@ pub fn bind_keys(cx: &mut App) {
     ]);
 }
 
+// Move only enough to reveal the caret line, including large text. The offset
+// is bounded by the actual scrollable content, not by the input string length.
+fn reveal_offset(
+    offset: f32,
+    maximum: f32,
+    viewport_start: f32,
+    viewport_end: f32,
+    target_start: f32,
+    target_end: f32,
+) -> f32 {
+    let delta = if target_start < viewport_start
+        || target_end - target_start > viewport_end - viewport_start
+    {
+        viewport_start - target_start
+    } else if target_end > viewport_end {
+        viewport_end - target_end
+    } else {
+        0.
+    };
+    (offset + delta).clamp(-maximum.max(0.), 0.)
+}
+
 fn floor_boundary(text: &str, offset: usize) -> usize {
     let mut offset = offset.min(text.len());
     while !text.is_char_boundary(offset) {
         offset -= 1;
     }
     offset
+}
+
+fn masked_index(text: &str, byte: usize) -> usize {
+    text[..floor_boundary(text, byte)].chars().count() * '•'.len_utf8()
+}
+
+fn unmasked_index(text: &str, displayed: usize) -> usize {
+    text.char_indices()
+        .nth(displayed / '•'.len_utf8())
+        .map_or(text.len(), |(byte, _)| byte)
 }
 
 // Committing text always consumes the preedit, including an identical-byte commit.
@@ -881,9 +1000,43 @@ fn utf16_to_byte(text: &str, offset: usize) -> usize {
     text.len()
 }
 
+// Native input services may ask for surrounding text independently of the
+// accessible value and the painted bullets. Passwords must never leave this
+// editor through that channel, including a stale caller-provided actual range.
+fn platform_text_for_range(
+    text: &str,
+    secret: bool,
+    range: Range<usize>,
+    actual: &mut Option<Range<usize>>,
+) -> Option<String> {
+    *actual = None;
+    if secret {
+        return None;
+    }
+    let start = utf16_to_byte(text, range.start);
+    let end = utf16_to_byte(text, range.end);
+    let bytes = start.min(end)..start.max(end);
+    *actual =
+        Some(text[..bytes.start].encode_utf16().count()..text[..bytes.end].encode_utf16().count());
+    Some(text[bytes].to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn caret_reveal_keeps_visible_lines_still_and_scrolls_large_lines_within_content() {
+        assert_eq!(reveal_offset(-100., 500., 12., 244., 40., 68.), -100.);
+        assert_eq!(reveal_offset(-100., 500., 12., 244., 230., 258.), -114.);
+        assert_eq!(reveal_offset(-100., 500., 12., 244., -10., 18.), -78.);
+        // The multiline line height at 400% is 112 points.
+        assert_eq!(reveal_offset(-100., 500., 12., 244., 160., 272.), -128.);
+        assert_eq!(reveal_offset(-490., 500., 12., 244., 260., 372.), -500.);
+        assert_eq!(reveal_offset(0., 0., 12., 244., 300., 412.), 0.);
+        // A line taller than the available viewport exposes its beginning.
+        assert_eq!(reveal_offset(-100., 500., 12., 60., 80., 192.), -168.);
+    }
 
     #[test]
     fn platform_offsets_preserve_italian_and_surrogate_boundaries() {
@@ -904,6 +1057,34 @@ mod tests {
         for offset in 0..=10 {
             assert!(text.is_char_boundary(floor_boundary(text, offset)));
         }
+    }
+
+    #[test]
+    fn password_caret_maps_display_bullets_to_unicode_input_without_exposing_text() {
+        let value = "è🩺x";
+        for byte in value.char_indices().map(|(i, _)| i).chain([value.len()]) {
+            assert_eq!(unmasked_index(value, masked_index(value, byte)), byte);
+        }
+        assert_eq!(masked_index(value, value.len()), "•••".len());
+    }
+
+    #[test]
+    fn native_surrounding_text_never_exports_passwords_or_stale_ranges() {
+        let value = "è🩺x";
+        for range in [0..0, 0..4, 1..2, 2..4, 4..usize::MAX] {
+            let mut actual = Some(0..99);
+            assert_eq!(
+                platform_text_for_range(value, true, range, &mut actual),
+                None
+            );
+            assert_eq!(actual, None);
+        }
+        let mut actual = None;
+        assert_eq!(
+            platform_text_for_range(value, false, 2..4, &mut actual),
+            Some("🩺x".to_owned()),
+        );
+        assert_eq!(actual, Some(1..4));
     }
 
     #[test]

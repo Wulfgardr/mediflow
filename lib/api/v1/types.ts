@@ -586,7 +586,7 @@ export type NetworkCapabilitiesResponse = {
 /* @Codex */
 export type NetworkPairingIntentRequest = {
     deviceName: string;
-    clientPlatform: 'macos' | 'ios' | 'ipados';
+    clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
     appVersion?: string | null;
     requestedCapabilities?: string[];
 };
@@ -602,7 +602,7 @@ export type NetworkPairingIntentResponse = {
     expiresAt: string;
     requestedBy: {
         deviceName: string;
-        clientPlatform: 'macos' | 'ios' | 'ipados';
+        clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
         appVersion: string | null;
     };
     requestedCapabilities: string[];
@@ -612,7 +612,7 @@ export type NetworkPairingIntentResponse = {
 export type NetworkPairedClientSummary = {
     clientId: string;
     deviceName: string;
-    clientPlatform: 'macos' | 'ios' | 'ipados';
+    clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
     appVersion: string | null;
     grantedCapabilities: string[];
     pairedAt: string;

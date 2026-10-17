@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Real static Newsreader faces for GPUI face selection; no faux weight or slant",
+  "generator": {
+    "path": "experiments/gpui-patient-pilot/scripts/build-newsreader-native.py",
+    "sha256": "8bddd4f78ba2b7022297ec41ddadf681710ff1381bc3e44ab0fd4f43462a3024",
+    "fonttools": "4.61.1",
+    "axes": {
+      "opsz": 18,
+      "wght": [
+        400,
+        700
+      ]
+    },
+    "timestamps": "Original font timestamps retained; no wall clock input"
+  },
+  "origin": {
+    "designerRepository": "https://github.com/productiontype/Newsreader",
+    "distributionRepository": "https://github.com/google/fonts",
+    "commit": "8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5",
+    "version": "1.003",
+    "upright": {
+      "path": "app/fonts/Newsreader-Variable.ttf",
+      "url": "https://raw.githubusercontent.com/google/fonts/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/newsreader/Newsreader%5Bopsz%2Cwght%5D.ttf",
+      "sha256": "8a08d13f8a6c0d51be379a60af84f945f65369a67e509ee3c3bdcc421254d7c1"
+    },
+    "italic": {
+      "url": "https://raw.githubusercontent.com/google/fonts/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/newsreader/Newsreader-Italic%5Bopsz%2Cwght%5D.ttf",
+      "sha256": "796668611f80b64d5adf182fde3b6f29ed83b4e7cbec7b96937e84ac01364792"
+    }
+  },
+  "license": {
+    "spdx": "OFL-1.1",
+    "bundledPath": "app/fonts/Newsreader-OFL.txt",
+    "bundledSha256": "865f0949b59fab5925506f80102dff3d12e8666412daf52d212db969d40adc25",
+    "upstreamUrl": "https://raw.githubusercontent.com/google/fonts/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/newsreader/OFL.txt",
+    "upstreamSha256": "fdfad38143ec470553cae82a1e45320bdd1b9ec70415d37bd0171051d8a4ded8",
+    "bundledDifference": "Trailing whitespace removed and final newline added; same license text",
+    "copyright": "Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader)"
+  },
+  "outputs": [
+    {
+      "path": "app/fonts/Newsreader-Native-Regular.ttf",
+      "sha256": "386fd8d5ad0980708689a45129c7ff7f93baa3feb4c8ff4674acbad636016599",
+      "bytes": 118408,
+      "weight": 400,
+      "style": "normal",
+      "family": "Newsreader",
+      "postscriptName": "NewsreaderNative-Regular",
+      "version": "Version 1.003",
+      "glyphCount": 658,
+      "sampleOutlineMsha256": "25800a500cd2490db7b23c40120c7cbc1a82c5b7abcdb5a4444f46a1fe34880e",
+      "variable": false
+    },
+    {
+      "path": "app/fonts/Newsreader-Native-Bold.ttf",
+      "sha256": "3bab353e796f52aa630f83dd11859cae2e219c8b4a0745f2e138dde44eeded61",
+      "bytes": 118728,
+      "weight": 700,
+      "style": "normal",
+      "family": "Newsreader",
+      "postscriptName": "NewsreaderNative-Bold",
+      "version": "Version 1.003",
+      "glyphCount": 658,
+      "sampleOutlineMsha256": "012f458c05007d5c1103d3f007dcea2afc523129975bbe5895150383ed51f217",
+      "variable": false
+    },
+    {
+      "path": "app/fonts/Newsreader-Native-Italic.ttf",
+      "sha256": "dd7b80c14bbe9182d7284ed40637e8684f8bdba8fccfed0c505bb78421fa872a",
+      "bytes": 129284,
+      "weight": 400,
+      "style": "italic",
+      "family": "Newsreader",
+      "postscriptName": "NewsreaderNative-Italic",
+      "version": "Version 1.003",
+      "glyphCount": 658,
+      "sampleOutlineMsha256": "f613ca73e8383a5ea2b3c0b874d43a993910a2e656fcf0ec5e1c7492dfc4c695",
+      "variable": false
+    },
+    {
+      "path": "app/fonts/Newsreader-Native-BoldItalic.ttf",
+      "sha256": "13de5d2ddffdfa431e274f2e9c64ca0834a5ca0a50cfe99294e76ee4248c52f7",
+      "bytes": 131144,
+      "weight": 700,
+      "style": "italic",
+      "family": "Newsreader",
+      "postscriptName": "NewsreaderNative-BoldItalic",
+      "version": "Version 1.003",
+      "glyphCount": 658,
+      "sampleOutlineMsha256": "26df58010c8de124f156e40ad4a1862bd9884464403cf6762525e78421d192d2",
+      "variable": false
+    }
+  ]
+}

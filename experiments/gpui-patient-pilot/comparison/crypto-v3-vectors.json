@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "construction": "ADR 0143: NFKC UTF-8; PBKDF2-HMAC-SHA256 2000000; HKDF-SHA256 independent KEK/verifier; AES-256-GCM",
+  "note": "Public deterministic test values only; never use these credentials, keys or IVs in an archive.",
+  "vectors": [
+    {
+      "id": "nfkc-italian-emoji",
+      "passphrase": "caffè Ａ prova sicura 🩺",
+      "normalizedPassphrase": "caffè A prova sicura 🩺",
+      "salt": "AAECAwQFBgcICQoLDA0ODw==",
+      "masterKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "wrappingIvHex": "505152535455565758595a5b",
+      "kekHex": "30f23e0b928bc4218edfecf18a9ade9df165e873f80426fabe616d96a905e720",
+      "verifier": "feViqqVaIw7Lq+1tPg26lNMunhBdgiqZV4sj6mtalHE=",
+      "wrappedMasterKey": "v3:UFFSU1RVVldYWVpbTigCGV0DDFpFyu9K92CSP5aP+tqIupX//q1K42nUCGdZ8AQqsqYjYPKeQDPY/Pcr",
+      "sealedFields": [
+        {
+          "plaintext": "Visita sintetica — città e 🩺.",
+          "ivHex": "6e6f70717273747576777879",
+          "envelope": "ENC:bm9wcXJzdHV2d3h5:m8dIome33h+XxdxmBgU4bPe+K4iM2m/we64Gr9q5AI1MqxmrO9kVnGiwi+NfinD612SJ/+s="
+        },
+        {
+          "plaintext": [
+            {
+              "code": "I10",
+              "description": "Diagnosi di prova",
+              "active": true
+            },
+            null
+          ],
+          "ivHex": "7e7f80818283848586878889",
+          "envelope": "ENC:fn+AgYKDhIWGh4iJ:vFZnd5yVepxuc1YAH6x7R2ZuVJHsea6S1v3dk1dWZfM+cxZV2Q6gS2edAp0JOth/iABe1TrYqt/s8XkahZI6wBFn/rQMTip8hv372aiQwp0DbxIH1g=="
+        }
+      ]
+    },
+    {
+      "id": "ascii",
+      "passphrase": "confronto sintetico rust javascript",
+      "normalizedPassphrase": "confronto sintetico rust javascript",
+      "salt": "EBESExQVFhcYGRobHB0eHw==",
+      "masterKeyHex": "303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+      "wrappingIvHex": "606162636465666768696a6b",
+      "kekHex": "128b71adb6ee422c387b8c7ad7f7e9935cf677400a0b166d4e033a02c79ae89c",
+      "verifier": "TS5WTmWQPUwzGj71FZNRxuuZafNbVQl6YFwvhS2+Wb4=",
+      "wrappedMasterKey": "v3:YGFiY2RlZmdoaWpryNd3uHtQIIg9bles1qe28W99e4hjKKhWGzBvO3dMN86vGOLtOQyoRwMvKijdwXAU",
+      "sealedFields": [
+        {
+          "plaintext": "Visita sintetica — città e 🩺.",
+          "ivHex": "7e7f80818283848586878889",
+          "envelope": "ENC:fn+AgYKDhIWGh4iJ:0mdxtP9kA/St+pmlbfbXIw5UL9F3UbWF8uJ+Gndndvchq76vkzbtM0scFNut6wKPrYs1YH0="
+        },
+        {
+          "plaintext": [
+            {
+              "code": "I10",
+              "description": "Diagnosi di prova",
+              "active": true
+            },
+            null
+          ],
+          "ivHex": "8e8f90919293949596979899",
+          "envelope": "ENC:jo+QkZKTlJWWl5iZ:YumeKJK4WkUHXSfv815SUM0VoQ6Lsup2zGno45q9aF/+UMw+/qa9G/rlDCp16KOOrW20BlSId3gsepoa4XclBLY6T5eFRyjl+h4aIMcp/jh4GeSmSw=="
+        }
+      ]
+    }
+  ]
+}

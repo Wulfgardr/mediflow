@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "construction": "Node 24 encodeURIComponent and installed Next RequestCookies; no normalization of opaque identifiers",
+  "vectors": [
+    { "id": "checkup.v1", "cookie": "checkup.v1" },
+    { "id": " opaque-web ", "cookie": "%20opaque-web%20" },
+    { "id": "controllo città 🩺", "cookie": "controllo%20citt%C3%A0%20%F0%9F%A9%BA" },
+    { "id": "record/../second", "cookie": "record%2F..%2Fsecond" },
+    { "id": "record%2Fid", "cookie": "record%252Fid" },
+    { "id": "scope; injected=x", "cookie": "scope%3B%20injected%3Dx" },
+    { "id": "punctuation !~*'()_-. +,?#=%", "cookie": "punctuation%20!~*'()_-.%20%2B%2C%3F%23%3D%25" }
+  ]
+}

@@ -68,8 +68,15 @@ con stato del client in Rust, revisione e rilettura su dati inventati.
 La [baseline cifrata delle note](./analysis/2026-10-17-patient-notes-pilot.md)
 caratterizza separatamente i due ingressi Web/API v1 correnti per WUL-574.
 Le prove e i limiti di entrambe le attività sono nei rispettivi verbali;
-il collegamento alla stessa autorità e la decisione IPC/FFI restano nel
-percorso 0.9.1/0.9.2.
+la migrazione del writer e la decisione IPC/FFI restano nel percorso
+0.9.1/0.9.2. Il successivo [ADR 0145](./adr/0145-rust-gpui-connected-client.md)
+definisce il client Rust/GPUI collegato: interfaccia coerente con la release,
+sessione paired v3, piattaforme Windows/Linux esplicite e confronto old/new.
+Il [verbale del client collegato](./analysis/2026-10-17-rust-gpui-connected-client.md)
+documenta l'integrazione reale, la matrice delle schermate, la revisione della
+UI e il confronto riproducibile JavaScript/Rust di letture e scritture.
+L'integrazione del client non equivale alla sostituzione del writer o delle
+superfici mobile.
 
 ## Percorsi di lettura
 

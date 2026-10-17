@@ -80,7 +80,7 @@ function parsePairingIntent(value: unknown): NetworkPairingIntentResponse | null
 
     const deviceName = typeof requestedBy.deviceName === 'string' ? requestedBy.deviceName.trim() : '';
     const clientPlatform = requestedBy.clientPlatform;
-    if (!deviceName || (clientPlatform !== 'macos' && clientPlatform !== 'ios' && clientPlatform !== 'ipados')) {
+    if (!deviceName || (clientPlatform !== 'macos' && clientPlatform !== 'ios' && clientPlatform !== 'ipados' && clientPlatform !== 'windows' && clientPlatform !== 'linux')) {
         return null;
     }
 
@@ -121,7 +121,7 @@ function parsePairedClient(value: unknown): StoredNetworkPairedClient | null {
     if (
         typeof value.clientId !== 'string'
         || typeof value.deviceName !== 'string'
-        || (clientPlatform !== 'macos' && clientPlatform !== 'ios' && clientPlatform !== 'ipados')
+        || (clientPlatform !== 'macos' && clientPlatform !== 'ios' && clientPlatform !== 'ipados' && clientPlatform !== 'windows' && clientPlatform !== 'linux')
         || !isIsoDateTime(value.pairedAt)
         || typeof value.sourceIntentId !== 'string'
         || typeof value.tokenHash !== 'string'

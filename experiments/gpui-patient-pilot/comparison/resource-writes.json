@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "protocolId": "paired-v3-resource-writes-1",
+  "parentVersion": 2,
+  "parentNotes": "Confronto sintetico JS/Rust: aggiornamento verificato. Città e 🩺.",
+  "therapies": {
+    "create": {
+      "drugName": "Prodotto esclusivamente sintetico JS/Rust", "dosage": "Schema sintetico iniziale",
+      "status": "active", "startDate": "2026-11-02T09:00:00.000Z", "endDate": null,
+      "motivation": "Motivazione sintetica iniziale. Città e 🩺.",
+      "aic": null, "atc": null, "activePrinciple": null, "diagnosisCode": null, "diagnosisName": null
+    },
+    "update": {
+      "drugName": "Prodotto esclusivamente sintetico JS/Rust", "dosage": "Schema sintetico aggiornato",
+      "status": "active", "startDate": "2026-11-02T09:00:00.000Z", "endDate": null,
+      "motivation": "Motivazione sintetica aggiornata. Città e 🩺.",
+      "aic": null, "atc": null, "activePrinciple": null, "diagnosisCode": null, "diagnosisName": null
+    }
+  },
+  "observations": {
+    "create": {
+      "codeSystem": "LOINC", "code": "8480-6", "display": "Pressione sistolica sintetica",
+      "unitSystem": "UCUM", "unitCode": "mm[Hg]", "value": "128",
+      "notes": "Misura sintetica iniziale. Città e 🩺.",
+      "refLow": null, "refHigh": null, "refText": null,
+      "observedAt": "2026-11-02T09:00:00.000Z", "source": "manual"
+    },
+    "update": {
+      "codeSystem": "LOINC", "code": "8480-6", "display": "Pressione sistolica sintetica",
+      "unitSystem": "UCUM", "unitCode": "mm[Hg]", "value": "132",
+      "notes": "Misura sintetica aggiornata. Città e 🩺.",
+      "refLow": null, "refHigh": null, "refText": null,
+      "observedAt": "2026-11-02T09:00:00.000Z", "source": "manual"
+    }
+  },
+  "checkups": {
+    "create": {
+      "date": "2026-11-02T09:00:00.000Z", "title": "Controllo sintetico JS/Rust",
+      "notes": "Controllo sintetico iniziale. Città e 🩺.", "status": "pending", "source": "manual"
+    },
+    "update": {
+      "date": "2026-11-02T09:00:00.000Z", "title": "Controllo sintetico JS/Rust",
+      "notes": "Controllo sintetico aggiornato. Città e 🩺.", "status": "completed", "source": "manual"
+    }
+  },
+  "attachment": {
+    "name": "confronto-sintetico-js-rust.txt", "type": "text/plain",
+    "text": "Documento sintetico JS/Rust. Città e 🩺.\n"
+  }
+}

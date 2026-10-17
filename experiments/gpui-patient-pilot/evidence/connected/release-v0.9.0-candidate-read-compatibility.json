@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "protocolId": "release-candidate-read-compatibility-1",
+  "release": {
+    "baseUrl": "http://127.0.0.1:43180",
+    "archiveGeneration": "e40a1ef4-382b-493d-a4e3-f7a25c5cc164",
+    "protocolId": "release-web-pin-snapshot-1"
+  },
+  "candidate": {
+    "baseUrl": "http://127.0.0.1:38027",
+    "archiveGeneration": "c4f884bb-6a15-48a9-a353-6902f2aa6a1d",
+    "protocolId": "paired-v3-snapshot-1"
+  },
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "snapshotCanonicalSha256": "ada5e5c1d4ecbe3aaf9207690e4049208387c5b5861a7ad350eb1c7f7c365ffa",
+  "projectionEqual": true,
+  "qualification": "Exact declared decrypted resource projections agree across separately seeded release and candidate archives. Authentication protocols and generations differ. This is read compatibility, not same-host paired-v3 equivalence, UI qualification, or a performance comparison.",
+  "releaseTag": "v0.9.0",
+  "releaseSha": "9c7b3adf2eb18551b7c03b61e0fa6ee2303d31d0",
+  "inputSha256": {
+    "release": "3a80391f3e812a8aa5a07d984960fd6c1fc2095130e21590ed737c741336e1d7",
+    "candidate": "3ef759204df783b6134fd9a885d8ef9e31edc449ce0ef97d7041dde722dfa86b"
+  }
+}

@@ -219,7 +219,7 @@ test('standalone checker proves web auth owner physical copy and restart denial'
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 
   const source = fs.readFileSync(checker, 'utf8');
-  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.10'/);
+  assert.match(source, /WEB_AUTH_OWNER_VERSION = '0\.8\.11'/);
   assert.match(source, /['"]withCurrentResourceBinding['"]/);
   assert.match(source, /root is not the frozen exact owner API with native session namespace/);
   // the local 0.8.9 owner extends the native session surface without widening the root API.

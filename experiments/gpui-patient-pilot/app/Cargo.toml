@@ -12,7 +12,11 @@ path = "src/main.rs"
 
 [dependencies]
 mediflow-patient-client.workspace = true
+mediflow-runtime-client.workspace = true
 gpui.workspace = true
 gpui_platform.workspace = true
 serde_json.workspace = true
 unicode-segmentation = "1.12"
+chrono = "0.4"
+zeroize = "1.8"
+base64 = "0.22"

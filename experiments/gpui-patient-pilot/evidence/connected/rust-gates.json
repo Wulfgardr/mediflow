@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "scope": "Complete workspace Rust tests, formatting, Clippy with denied warnings, debug app build. This is not installed product or GUI qualification.",
+  "baseHead": "d0cd18f1b4d1e96ac37712415ae9b42fd059d062",
+  "toolchain": "1.98.1",
+  "target": "x86_64-unknown-linux-gnu",
+  "commands": [
+    "cargo fmt --manifest-path experiments/gpui-patient-pilot/Cargo.toml --all -- --check",
+    "cargo clippy --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+    "cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked",
+    "cargo build --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-gpui-patient-pilot --locked",
+    "cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-gpui-patient-pilot --all-targets --locked"
+  ],
+  "tests": {
+    "app": 40,
+    "client": 20,
+    "transport": 29,
+    "total": 89,
+    "failed": 0,
+    "ignored": 0
+  },
+  "sourceManifestSha256": "5d455e24077883b92d599a3f233b89bd9c9aa0d8a9fc65d6c1a196dea694c955",
+  "debugAppSha256": "900120a6f94aab983294014ece77d90487b0651f081302a33e370d658b1307f4",
+  "releaseProbeSha256": "a44cedface32e41a62339f694614cd0994c07f4bfc0be9fb97fe7c1711c10fd5",
+  "followup": "The 40 app tests, workspace Clippy/fmt and debug app build were repeated after shared-label wrapping, search/row scroll anchors, the magnified threshold, distinct primary-button focus and constrained clinical/catalog headers. The 29 transport and 20 client tests were unchanged; total counts are unique tests, not repeated executions.",
+  "recordedAt": "2026-10-17T18:02:02.865650+00:00",
+  "finalWhitespaceCleanup": {
+    "path": "experiments/gpui-patient-pilot/transport/Cargo.toml",
+    "change": "Removed one empty line at EOF; package semantics unchanged.",
+    "beforeSourceManifestSha256": "60dc6c4f4d95cfc3d6ec8804991c54138fe9fe77ff3a834cb393b0a2613dc71b",
+    "afterSourceManifestSha256": "5d455e24077883b92d599a3f233b89bd9c9aa0d8a9fc65d6c1a196dea694c955",
+    "rebuildResult": "pass",
+    "binarySha256Unchanged": true
+  }
+}

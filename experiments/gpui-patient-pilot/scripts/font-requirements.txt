@@ -1,0 +1,2 @@
+# Build-time only. The native app embeds the committed static faces offline.
+fonttools==4.61.1

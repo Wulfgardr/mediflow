@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "protocolId": "paired-v3-resource-writes-1",
+  "baseUrl": "http://127.0.0.1:37743",
+  "archiveGeneration": "ea82b941-e21c-4c55-8c0b-cb1c23f76d90",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "fixtureSha256": "5a3bbfa8fb1b4054afaaa1dfa5ba5f4ee04f2d615626c6d18abe803f168e5103",
+  "snapshotProtocolId": "paired-v3-snapshot-2",
+  "snapshotCanonicalSha256": "f29750364416db67b7eaee5180712fb482c245a3194943dde45bef21c00e1e43",
+  "resources": {
+    "protocolId": "paired-v3-resource-writes-1",
+    "fixtureSha256": "5a3bbfa8fb1b4054afaaa1dfa5ba5f4ee04f2d615626c6d18abe803f168e5103",
+    "therapies": {
+      "createdVersion": 1,
+      "updatedVersion": 2,
+      "createdProjectionSha256": "922fa6e6df282ed96eeb865c31aadbebd9912e3d227b7ffa52575f983d0a3eed",
+      "updatedProjectionSha256": "191c874510901c6be3fac4b4e60bd3a76696a385349b6d93bd3cffe153c8d186",
+      "readback": true,
+      "staleStatus": 409,
+      "stalePreserved": true
+    },
+    "observations": {
+      "createdVersion": 1,
+      "updatedVersion": 2,
+      "createdProjectionSha256": "9b1842d2f1c12e9475bab955c3bca8e0f327284631e464fa7e67eef2bcba3f67",
+      "updatedProjectionSha256": "cd2d3f1c3d1a69b75993524bc363dd0e79ac3bfa238c1ee361fc3e3fad4e2500",
+      "readback": true,
+      "staleStatus": 409,
+      "stalePreserved": true
+    },
+    "checkups": {
+      "createdVersion": 1,
+      "updatedVersion": 2,
+      "createdProjectionSha256": "aafbe603165ac1288403c19a1fedf40162fdf14db1073c64c5bd9f88b5af3a2e",
+      "updatedProjectionSha256": "dd59d86ab3387d21be7354822aa15a06281aede9d9a79d47e5e5a02985222a26",
+      "readback": true,
+      "staleStatus": 409,
+      "stalePreserved": true
+    },
+    "attachment": {
+      "created": true,
+      "size": 44,
+      "nameSha256": "d4707678d7526959ff32eed7d9365bc9733d15354fd545bda46796beaec120bc",
+      "dataSha256": "94b9569bf67d17870d282597265c6bb31fbde565ab85fe9a9c5723283fa9d9d1",
+      "bytesSha256": "7e33b9beda70bec9cb3aaabac9d222f9782860cb7e38b2da7cfdc8c92abf23e2",
+      "listPayloadOmitted": true,
+      "readback": true
+    }
+  },
+  "scope": "Observed create/read/update/read and independent stale HTTP409 for therapy, observation and checkup; document create, payload-free list and verified detail. No deletion, document update, UI or product performance qualification."
+}
