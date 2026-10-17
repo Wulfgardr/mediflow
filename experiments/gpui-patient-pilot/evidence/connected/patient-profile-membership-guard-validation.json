@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-17T20:58:14.490487+00:00",
+  "result": "pass",
+  "scope": "Update one existing source-topology test to follow the Web, API-v1 and paired patient profile port while retaining transactional set-primary and no-delete-all assertions.",
+  "base": {
+    "commit": "670d36d154b98d84ddbc0d68a70b9ba3ef996e2a",
+    "tree": "0f33f12009c14f1c6f29d46a935a9dfac54b3a49"
+  },
+  "triggeringCi": {
+    "workflow": "Web Core",
+    "runId": 39067596444,
+    "jobId": 117498374849,
+    "jobUrl": "https://github.com/Wulfgardr/mediflow/actions/runs/39067596444/job/117498374849",
+    "effectiveMerge": "6088e2162e6c77552bddcf2e6929f3c0fd54411f",
+    "counts": {
+      "tests": 7087,
+      "pass": 7049,
+      "fail": 4,
+      "skipped": 34
+    },
+    "testFile": "lib/patient-ambulatory-membership.test.ts",
+    "testName": "all patient PUT adapters wire one transactional set-primary operation without delete-all",
+    "assertion": "app/api/patients/[id]/route.ts must use the shared operation",
+    "staleExpectation": "A direct updatePatientOperation call in every adapter.",
+    "relationship": "This local fix addresses one of the four failures; the other three concern the audit topology fixture and reviewed Web Auth loader digests."
+  },
+  "sourceChange": {
+    "file": "lib/patient-ambulatory-membership.test.ts",
+    "sha256": "fdd72911bc5c516d27117e239633f6f38569a4c38a4592af3e583af3546e4e33",
+    "bytes": 10630,
+    "productionCodeChanged": false,
+    "preexistingSevenRuntimeTestsAndFixturesByteUnchanged": true
+  },
+  "checksAddedOrRetained": [
+    "Each of the three adapters must import updatePatientProfile from its exact approved module, await one call and avoid direct operation/upsert bypasses.",
+    "The profile service must import and directly return exactly one updatePatientOperation call.",
+    "setPrimaryAmbulatory must derive from the own ambulatoryId body property; operation values remain the normalized values.",
+    "The mandatory audit callback must be the final operation input property.",
+    "The operation must retain an immediate dbServer transaction, one conditional upsert on the same tx/patient/value, immediately followed by the required audit call.",
+    "The operation must import the actual membership helper and transaction audit writer, with one call to each.",
+    "No delete(patientsToAmbulatories) is allowed in any adapter, the profile port, transaction owner or membership helper."
+  ],
+  "productionInputs": {
+    "app/api/patients/[id]/route.ts": {
+      "sha256": "679b8fe79f05e4301b21a6c835cfe7f6ffb84dd2d6bf279ecb928e1b15f24aff",
+      "bytes": 5457,
+      "unchangedFromBase": true
+    },
+    "app/api/v1/patients/[id]/route.ts": {
+      "sha256": "dced582f81e67864faf0374980d1629ffa6f896c73684a532394703cbdac956d",
+      "bytes": 5651,
+      "unchangedFromBase": true
+    },
+    "lib/network-patient-write.ts": {
+      "sha256": "f2149d96f509593e69a8b11c2ecadfecb5000dbb3288137c34a73c6f2c9845d3",
+      "bytes": 5961,
+      "unchangedFromBase": true
+    },
+    "lib/patient-profile-service.ts": {
+      "sha256": "864d5b9904799043796d75eac1902240b46cea56f0c8802ab8648998caf83912",
+      "bytes": 5375,
+      "unchangedFromBase": true
+    },
+    "lib/patient-update-operation.ts": {
+      "sha256": "6d77aadacf42cd7c01145656759166a8bd51389203fdd114244971b226e974b1",
+      "bytes": 4770,
+      "unchangedFromBase": true
+    },
+    "lib/patient-ambulatory-membership.ts": {
+      "sha256": "3f6e6bdfb99ede350f75b82d696aacba0e70961793c0add12b3106af3e05dde9",
+      "bytes": 1850,
+      "unchangedFromBase": true
+    },
+    "lib/security/audit.ts": {
+      "sha256": "8912b24b02dc66e4b12fe88bcef80355917b1a2087a1caf5266c3ff83216963f",
+      "bytes": 18652,
+      "unchangedFromBase": true
+    }
+  },
+  "tests": {
+    "command": [
+      "node",
+      "scripts/run-strip-types.mjs",
+      "--test",
+      "--test-concurrency=1",
+      "--test-reporter=tap",
+      "lib/patient-ambulatory-membership.test.ts"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.9996470890000637,
+    "counts": {
+      "tests": 8,
+      "pass": 8,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "log": "/tmp/mediflow-patient-profile-membership-tests.log",
+    "ownedTemporaryDataRemoved": true,
+    "updatedTopLevelTests": 1,
+    "unchangedTopLevelTests": 7,
+    "logSha256": "569f71a000dce63fd39bb7ee2034db53203b7cbc925b684f1be278057b136c3e",
+    "compactLog": [
+      "ok 1 - resolvePrimaryAmbulatoryId accepts non-empty strings only",
+      "ok 2 - normalizePrimaryAmbulatoryIdInput sets, clears, or ignores the primary column",
+      "ok 3 - profile PUT with ambulatoryId preserves multi-membership and updates the primary column",
+      "ok 4 - upsert is idempotent for an already associated ambulatory",
+      "ok 5 - invalid ambulatoryId neither wipes memberships nor touches the primary column",
+      "ok 6 - explicit null clears the primary column but keeps memberships intact",
+      "ok 7 - network-scoped upsert inside a transaction leaves other memberships untouched",
+      "ok 8 - all patient PUT adapters wire one transactional set-primary operation without delete-all",
+      "# tests 8",
+      "# pass 8",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "# duration_ms 664.198622"
+    ]
+  },
+  "lint": {
+    "command": [
+      "./node_modules/.bin/eslint",
+      "lib/patient-ambulatory-membership.test.ts",
+      "--format",
+      "json"
+    ],
+    "exitCode": 0,
+    "results": [
+      {
+        "filePath": "/workspace/scratch/40b5a2cd37a4/mediflow-audit-profile-guard/lib/patient-ambulatory-membership.test.ts",
+        "errorCount": 0,
+        "fatalErrorCount": 0,
+        "warningCount": 0,
+        "messages": []
+      }
+    ]
+  },
+  "environment": {
+    "node": "v24.19.0",
+    "testExecution": "Outside the restrictive sandbox; canonical run-strip-types runner; owned temporary MEDIFLOW_DATA_DIR removed after the run.",
+    "database": "The existing focused SQLite fixtures use :memory:."
+  },
+  "review": {
+    "decision": "The test now follows the concrete new application-port topology while retaining the same transaction owner and expanding the no-delete-all check to the intermediate port and helper.",
+    "companionAuditProof": "experiments/gpui-patient-pilot/evidence/connected/patient-profile-audit-guard-validation.json",
+    "limits": [
+      "These are bounded source-topology assertions; the companion AST audit guard and existing runtime transaction tests carry the control-flow and rollback proof.",
+      "This changed test belongs to tsconfig.typecheck.json and is outside the compiler benchmark pinned to the earlier670 tree. The benchmark is not attributed to this delta.",
+      "The quoted CI totals precede the final guard/fixture fixes. This receipt reports only the actual local 8-test validation."
+    ]
+  }
+}

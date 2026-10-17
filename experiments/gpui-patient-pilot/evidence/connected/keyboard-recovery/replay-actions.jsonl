@@ -1,0 +1,13 @@
+{"at": "2026-10-17T20:37:16.423760+00:00", "event": "synthetic-login", "details": "New independently seeded archive; private pairing and operator values inserted through native fields, without logging or capturing their values."}
+{"at": "2026-10-17T20:39:19.483565+00:00", "event": "compact-menu", "details": "Module selector opened and focused at 390x844; no draft exists."}
+{"at": "2026-10-17T20:39:38.048266+00:00", "event": "desktop-resize", "details": "Resized to 1440x960 from focused compact selector; no click or key between resize and this frame."}
+{"at": "2026-10-17T20:39:50.567987+00:00", "event": "new-entry-once", "details": "Exactly one Ctrl+N after compact-selector→desktop, with no intervening click or navigation key; observe resulting form before any text input."}
+{"at": "2026-10-17T20:40:35.354928+00:00", "event": "draft-filled", "details": "Title and UTF-8 multiline body pasted only after observing each focused editor; no Return/Space activation of a form command."}
+{"at": "2026-10-17T20:40:57.694445+00:00", "event": "draft-preserved-on-new-entry", "details": "Ctrl+N pressed with body editor focused; this checkpoint is compared with the populated draft frame."}
+{"at": "2026-10-17T20:41:20.458388+00:00", "event": "draft-resize-compact", "details": "Existing nonempty draft resized to 390x844 with body focus and caret retained; no click or text insertion after resize before this frame."}
+{"at": "2026-10-17T20:41:45.875910+00:00", "event": "compact-caret-input", "details": "Without clicking after resize, pasted suffix at the existing body caret; verify text and menu state in this frame."}
+{"at": "2026-10-17T20:41:59.335892+00:00", "event": "draft-resize-desktop", "details": "Returned to 1440x960 without clicks; verify same title/body, suffix and caret. Profile scroll follows prior field focus; this is not a scroll-zero capture."}
+{"at": "2026-10-17T20:42:27.475025+00:00", "event": "review-once", "details": "One Ctrl+Enter from body editor, with no click/Space/ordinary Enter on registration controls."}
+{"at": "2026-10-17T20:42:51.117198+00:00", "event": "review-twice", "details": "Repeated only Ctrl+Enter on the visible review; ordinary Enter, Space and confirmation click were not sent."}
+{"at": "2026-10-17T20:43:01.977033+00:00", "event": "back-to-editor", "details": "Escape returned from review to the existing draft; observe input focus before Ctrl+L."}
+{"at": "2026-10-17T20:43:29.421524+00:00", "event": "lock-from-editor", "details": "Ctrl+L sent while existing draft title editor visibly held focus. Next capture is made after clearing the synthetic username in the native login field."}

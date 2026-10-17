@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "kind": "reviewed-owner-loader-source-digests",
+  "recordedAtUtc": "2026-10-17T20:48:43.910327+00:00",
+  "sourceBase": "670d36d154b98d84ddbc0d68a70b9ba3ef996e2a",
+  "observedFailure": {
+    "commit": "fb94c9a2fed54b14ca3943856a4850532c03cf23",
+    "workflowRun": 39066608693,
+    "job": 117495500590,
+    "tests": 7081,
+    "pass": 7045,
+    "fail": 2,
+    "skipped": 34,
+    "reason": "Reviewed loader source hashes still describe the three fixtures before the owner version was changed from 0.8.10 to 0.8.11."
+  },
+  "fix": {
+    "path": "lib/security/web-auth-control-record.test.ts",
+    "beforeSha256": "055ee1a3a9f2b1b9a6450902ca068829d0f1bfbe8f1f10bc0aaf437c9d31b93d",
+    "afterSha256": "9d424692360951c61454392652b4f4f9de8cc9bfc005134ab06581467af546c6",
+    "bytes": 81059,
+    "exactChange": "Only the three reviewed source SHA-256 literals change. Diagnostic rosters and their exact-cardinality/source checks are unchanged.",
+    "unchangedOutsideThreeDigestLiterals": true
+  },
+  "reviewedFixtures": [
+    {
+      "path": "app/api/patients/route.test.ts",
+      "beforeSha256": "c4c148e444c0831f8107c7ee02dff91135279ef1c1423d5af1240b2efbf152c9",
+      "afterSha256": "cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8",
+      "beforeBytes": 16737,
+      "afterBytes": 16737,
+      "onlyChange": "0.8.10 -> 0.8.11"
+    },
+    {
+      "path": "lib/patient-create-service.test.ts",
+      "beforeSha256": "207c2ade7c1c1e4173f8b0e4d7ed3a7af1c5557feea470323c4531d2cc27e7ac",
+      "afterSha256": "be162f903a5d8076a7f8de87a0c7cf618d2db832f7b0a302b237fb7b84a12bcd",
+      "beforeBytes": 12220,
+      "afterBytes": 12220,
+      "onlyChange": "0.8.10 -> 0.8.11"
+    },
+    {
+      "path": "lib/security/patient-create-context.test.ts",
+      "beforeSha256": "17266c7b9208bb591d250dd57af215d64ebc050fb8e63b8abd3dc86a033aca5e",
+      "afterSha256": "a1e5da8287c9c863b55d8e422c28c54180499ae3cc05dc5a2a6c6cb845d6f0f5",
+      "beforeBytes": 7251,
+      "afterBytes": 7251,
+      "onlyChange": "0.8.10 -> 0.8.11"
+    }
+  ],
+  "unchangedRuntimeAndInventorySources": [
+    {
+      "path": "lib/security/web-auth-control-record.ts",
+      "sha256": "1cfb2ba44b04dd04031b1bfa945e10cdfe7199e46b8c448ce2420cd096d21218",
+      "bytes": 34702
+    },
+    {
+      "path": "lib/security/web-auth-control-owner.ts",
+      "sha256": "3358cb48abb0cc9e187c951c53ea0040dd2cb2c52a3dce3c1031703944588d68",
+      "bytes": 11705
+    },
+    {
+      "path": "lib/security/module-import-inventory.test-support.ts",
+      "sha256": "121a445b125b3897c473cbbf888d917f87dd20a11b7d2e43bf7766daedf0cc3b",
+      "bytes": 54426
+    }
+  ],
+  "unit": {
+    "command": [
+      "node",
+      "scripts/run-strip-types.mjs",
+      "--test",
+      "--test-concurrency=1",
+      "--test-reporter=tap",
+      "lib/security/web-auth-control-record.test.ts"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 23.949790477752686,
+    "syntheticDataDir": "/tmp/mediflow-owner-loader-guard-9a121lea",
+    "syntheticDataDirRemoved": true,
+    "disableLegacyCopy": "1",
+    "totals": {
+      "tests": 34,
+      "pass": 34,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 23614.24704
+    },
+    "log": {
+      "bytes": 8435,
+      "sha256": "b7dbe0f1237cd5d8c00d8a6a8585fa2722f2aa85523e322d65db050403386752"
+    },
+    "includesExistingNegativeAssertions": [
+      "dynamic imports appended to a reviewed loader remain rejected",
+      "ambiguous loader calls appended to a reviewed route fixture remain rejected",
+      "historical owner exports, aliases, unresolved paths and protected loader identities remain bounded by the exact inventory"
+    ]
+  },
+  "lint": {
+    "command": [
+      "node",
+      "node_modules/eslint/bin/eslint.js",
+      "lib/security/web-auth-control-record.test.ts"
+    ],
+    "exitCode": 0,
+    "diagnosticBytes": 0
+  },
+  "diffCheck": {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0
+  },
+  "incompleteAttempts": [
+    {
+      "command": [
+        "node",
+        "scripts/run-strip-types.mjs",
+        "--test",
+        "--test-concurrency=1",
+        "--test-reporter=tap",
+        "lib/security/web-auth-control-record.test.ts"
+      ],
+      "exitCode": 2,
+      "outcome": "Runner rejected execution before importing tests because an explicit synthetic MEDIFLOW_DATA_DIR was missing. Retried with an owned temporary directory; not counted as an executed test failure."
+    }
+  ],
+  "limits": [
+    "This qualifies the exact reviewed test-fixture source update; it does not change runtime authentication ownership.",
+    "The final combined branch still requires its own CI result.",
+    "Previously published owner package validation remains a separate 46-test execution and is not rerun or relabeled here."
+  ]
+}

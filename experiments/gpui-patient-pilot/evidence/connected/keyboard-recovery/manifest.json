@@ -1,0 +1,220 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-17T21:00:06.233217+00:00",
+  "purpose": "Published subset of recovered GPUI keyboard evidence: nine original PNGs were observed, eight are selected for the commit, and one is retained locally after automatic approval review denied its publication. QA results are unchanged.",
+  "sourceBaseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+  "sourcePatchSha256": "e5981c5c559a28c4bf5abdfbf9eaf8c87b43e31791a1fa95dfa0d98abca8ed21",
+  "sourceFiles": [
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/navigation.rs",
+      "sha256": "fb57dacfb88481bb41d266ecb5e9317463844ba9f8f5ead23ec225e4d6ba4c1f",
+      "bytes": 7904
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "sha256": "90e961184dcba6cba9ca2b37deb96e2a6ab24a906bb732bd8d9727e652ed92a0",
+      "bytes": 250042
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/text_input.rs",
+      "sha256": "d462cfc3f52602259c5ff4f6a51f2e756b8b8d62fcb2b9dcdfef2900183af0af",
+      "bytes": 39259
+    }
+  ],
+  "binary": {
+    "sha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+    "target": "x86_64-unknown-linux-gnu",
+    "rustVersion": "1.98.1 (48a229cea 2026-09-01)",
+    "gpuiRevision": "56934ec0560bce8929025497411de7f5322fb6ca",
+    "checksReceipt": "checks.json"
+  },
+  "publicSyntheticCorpus": {
+    "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+    "canonicalSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+    "seedReceipts": [
+      "initial-seed-receipt.json",
+      "replay-seed-receipt.json"
+    ],
+    "legacyCopyDisabled": true,
+    "preparer": "experiments/gpui-patient-pilot/comparison/prepare-runtime.mjs"
+  },
+  "nativeReceipt": "native-qa.json",
+  "privacyReceipt": "privacy-check.json",
+  "acceptedReplay": {
+    "snapshotComparison": "snapshot-comparison.json",
+    "pairedClinicalWriteRequestCount": 0
+  },
+  "interruptedAttempt": {
+    "receipt": "interrupted-attempt.json",
+    "requestLog": "interrupted-request.log",
+    "syntheticEntriesCreated": 1
+  },
+  "artifactCountExcludingManifest": 26,
+  "pngCount": 8,
+  "pngBytes": 682752,
+  "files": [
+    {
+      "path": "docs/analysis/2026-10-17-rust-gpui-keyboard-recovery.md",
+      "sha256": "14e726cb387aea157dc774618478b55644a6fd4be7ca328b369b728a4f8d87c3",
+      "bytes": 12309
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/01-worklist-input.png",
+      "sha256": "2f8f0a1becbf5b91c3a1d857b4376c2a2f9fe3da454d5eb9f75069ae3fea88f6",
+      "bytes": 50219
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/02-wrong-patient-guard.png",
+      "sha256": "a731f841e6b85a75a252b5c2b0bd19b14b9eb434f818879ceb8346b139ef4d4b",
+      "bytes": 73723
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/03-search-active-view.png",
+      "sha256": "d7e9553073ae901281f3087fd88d6632efc82f74e7cef65f7a5d2316382a8172",
+      "bytes": 71283
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/04-compact-menu.png",
+      "sha256": "4e607f9d0056b3816931b8778804603d06338a803acf1f1c67a5063b115b18c1",
+      "bytes": 50752
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/05-new-entry-after-resize.png",
+      "sha256": "ec6885d13bc6629aae8b9a3e8241e174c23835d7a31b7839bb645b4d5b4dffbf",
+      "bytes": 120169
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/06-compact-draft.png",
+      "sha256": "66995be12b2b09c65c9042df968b97bb5b57367871b74e432f190e21d11ae6bf",
+      "bytes": 58890
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/07-desktop-draft.png",
+      "sha256": "93ca705896accd95eebd1c84068b53501076833eca34a8c679e558295bdd8d03",
+      "bytes": 131705
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/08-review-twice.png",
+      "sha256": "526c6468cb9a6b58caea2058646bd84ad632f49051fa2cad2c56c6098e10b4a2",
+      "bytes": 126011
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/build.log",
+      "sha256": "f97e1533b10e72fec119692336bf190ef2f9c9d350c3a2278f7e46f6a0a8d34d",
+      "bytes": 60
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/checks.json",
+      "sha256": "d37c592529d84c4251ed8c97d7ab5d0863130bcd777ae4f91f50d499e02391b5",
+      "bytes": 2752
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/cleanup.json",
+      "sha256": "8b45d3bacf729d7a3bac3439a2e5af67856d44e2abb2accf663c82984ce07493",
+      "bytes": 270
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/clippy.log",
+      "sha256": "1fa2df2ec6b60c1a3ea1ec571040dcd5d644f93531b50fa06a4ac2f7933db611",
+      "bytes": 61
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/initial-seed-receipt.json",
+      "sha256": "2cb846de115a077d71c51d2f26e9afe504d1148635e8483db2fcb91742b3c22b",
+      "bytes": 6672
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/interrupted-attempt.json",
+      "sha256": "2e833942144a35b8c9a2891bbeb3ca77b5835c62e66b93bbb9e9b1666b8529ee",
+      "bytes": 1562
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/interrupted-request.log",
+      "sha256": "9927a7faa4171067251c7f19125beba01867aaff2b8a0a87b54fbfd727d61346",
+      "bytes": 296
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/native-qa.json",
+      "sha256": "8c3383e33274b0debf4bb1a5959034adfce698399dd5319ae75f9cb0f6995374",
+      "bytes": 13362
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/privacy-check.json",
+      "sha256": "aee27caddd9ef6e21a6b5b5df82e98f372cf7cd3966a81a8b1b9653d0d000746",
+      "bytes": 908
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/publication-note.json",
+      "sha256": "80d7a8833a4cd507a32e89f76eddf98ad020d1bfffa6272b971e2c9ab1bd8d5e",
+      "bytes": 6585
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/replay-actions.jsonl",
+      "sha256": "85efe7ce23146a038a008cad87044393b6348916dcd3acef3c254f2bbbab2f33",
+      "bytes": 2644
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/replay-seed-receipt.json",
+      "sha256": "f5b7561b44b29400efd17c5a83f9b790689275ecafdbb3179ecee5e4d0b751d4",
+      "bytes": 6672
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/snapshot-after.json",
+      "sha256": "4a1a3b23d8f01f0c4fedf04993722d2e013846f1b5fc39639971eff2d6fce184",
+      "bytes": 3192
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/snapshot-before.json",
+      "sha256": "35704dde63b89cf40857d612431a21a2add5ad0b67a81daa074f54ab1dfa76b0",
+      "bytes": 3187
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/snapshot-comparison.json",
+      "sha256": "012bc2b205e85c289d0f92321fa2c180321e62fbaf29f8f21fa6469e61913656",
+      "bytes": 607
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/tests.log",
+      "sha256": "2b108371dc59cd8a4f1eae686e542ca3ee15cd29df09ad0cf75c322a349506c9",
+      "bytes": 4616
+    }
+  ],
+  "selfHashPolicy": "This published-file manifest excludes itself and all withheld image payloads; its SHA-256 is supplied in the external editorial delivery list.",
+  "originalManifestSha256": "0a09ef6a8bf070f3db2a86d024b9afc437eb9254e49d46ed0a00ed3bf144cdfd",
+  "publicationNote": "publication-note.json",
+  "observedPngCount": 9,
+  "withheldArtifacts": [
+    {
+      "intendedRepositoryPath": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/09-locked-from-editor.png",
+      "sha256": "ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730",
+      "bytes": 45405,
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "sourceBaseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+      "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+      "status": "withheld-locally-pending-payload-specific-user-authorization",
+      "localOriginalRetained": true,
+      "includedInCommit": false,
+      "publicationNote": "publication-note.json",
+      "capture": {
+        "file": "09-locked-from-editor.png",
+        "run": "replay",
+        "originalFile": "locked-credentials-cleared.png",
+        "sha256": "ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730",
+        "bytes": 45405,
+        "width": 1440,
+        "height": 960,
+        "capturedAt": "2026-10-17T20:43:31.340615+00:00",
+        "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+        "caption": "Ctrl+L from the draft title editor locks the session; synthetic username cleared in the native login field before capture.",
+        "focusAndScroll": "Login field focused; username and passphrase fields empty. No image editing.",
+        "transformations": []
+      }
+    }
+  ],
+  "publishedArtifactCountIncludingManifest": 27
+}

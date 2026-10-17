@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Fresh verification of reconstructed keyboard parity sources after workspace reset",
+  "baseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+  "sourceFiles": [
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/navigation.rs",
+      "sha256": "fb57dacfb88481bb41d266ecb5e9317463844ba9f8f5ead23ec225e4d6ba4c1f"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "sha256": "90e961184dcba6cba9ca2b37deb96e2a6ab24a906bb732bd8d9727e652ed92a0"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/text_input.rs",
+      "sha256": "d462cfc3f52602259c5ff4f6a51f2e756b8b8d62fcb2b9dcdfef2900183af0af"
+    }
+  ],
+  "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+  "rustVersion": "1.98.1 (48a229cea 2026-09-01)",
+  "target": "x86_64-unknown-linux-gnu",
+  "gpuiRevision": "56934ec0560bce8929025497411de7f5322fb6ca",
+  "checks": [
+    {
+      "check": "fmt",
+      "command": "cargo fmt --manifest-path experiments/gpui-patient-pilot/Cargo.toml --all --check",
+      "exitCode": 0,
+      "result": "pass",
+      "log": "fmt.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "completedAt": "2026-10-17T20:24:26.882686+00:00"
+    },
+    {
+      "check": "tests",
+      "command": "cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-gpui-patient-pilot --all-targets --locked --offline",
+      "exitCode": 0,
+      "result": "pass",
+      "log": "tests.log",
+      "logSha256": "2b108371dc59cd8a4f1eae686e542ca3ee15cd29df09ad0cf75c322a349506c9",
+      "completedAt": "2026-10-17T20:23:30.193240+00:00",
+      "testsPassed": 45,
+      "testsFailed": 0
+    },
+    {
+      "check": "clippy",
+      "command": "cargo clippy --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-gpui-patient-pilot --all-targets --locked --offline -- -D warnings",
+      "exitCode": 0,
+      "result": "pass",
+      "log": "clippy.log",
+      "logSha256": "1fa2df2ec6b60c1a3ea1ec571040dcd5d644f93531b50fa06a4ac2f7933db611",
+      "completedAt": "2026-10-17T20:24:57.199459+00:00"
+    },
+    {
+      "check": "build",
+      "command": "cargo build --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-gpui-patient-pilot --locked --offline",
+      "exitCode": 0,
+      "result": "pass",
+      "log": "build.log",
+      "logSha256": "f97e1533b10e72fec119692336bf190ef2f9c9d350c3a2278f7e46f6a0a8d34d",
+      "completedAt": "2026-10-17T20:25:15.875935+00:00"
+    }
+  ],
+  "qualification": "Fresh Linux build and automated app tests only. Native QA is recorded separately; historical lost screenshots or binaries are not attributed to these sources."
+}

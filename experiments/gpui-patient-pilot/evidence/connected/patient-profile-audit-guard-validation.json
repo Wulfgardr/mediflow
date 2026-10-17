@@ -1,0 +1,341 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-17T20:52:54.707611+00:00",
+  "result": "pass",
+  "scope": "Explicit audit delegation guard for the Web and API-v1 patient profile port; no production source changes.",
+  "base": {
+    "commit": "670d36d154b98d84ddbc0d68a70b9ba3ef996e2a",
+    "tree": "0f33f12009c14f1c6f29d46a935a9dfac54b3a49"
+  },
+  "triggeringCi": {
+    "workflow": "Repository Guards",
+    "runId": 39067596483,
+    "jobId": 117498375222,
+    "step": "Audit quality gate",
+    "effectiveMerge": "6088e2162e6c77552bddcf2e6929f3c0fd54411f",
+    "effectiveBase": "2dde0c0503abf828b99d73d7129cb7beed733044",
+    "jobUrl": "https://github.com/Wulfgardr/mediflow/actions/runs/39067596483/job/117498375222",
+    "findings": [
+      "AUDIT_ROUTE_DELEGATION: app/api/patients/[id]/route.ts: approved service import is missing or ambiguous",
+      "AUDIT_ROUTE_DELEGATION: app/api/v1/patients/[id]/route.ts: approved service import is missing or ambiguous"
+    ]
+  },
+  "implementation": {
+    "routes": [
+      "app/api/patients/[id]/route.ts",
+      "app/api/v1/patients/[id]/route.ts"
+    ],
+    "chain": [
+      "PUT route",
+      "updatePatientProfile",
+      "updatePatientOperation",
+      "writeAuditEventInTransaction"
+    ],
+    "transactionOwner": "lib/patient-update-operation.ts",
+    "newChecks": [
+      "Resolve the approved profile service and operation imports by TypeScript binding.",
+      "Require one reachable direct synchronous return to the operation, with no shadowing, optional call, duplicate, deferred work or rewritten context.",
+      "Forward the same patient/version/scope context and invoke context.audit() as the last literal commit property.",
+      "Require each route to provide a synchronous callback that derives archive generation, actor, surface, request ID and auth flag from the existing host audit helpers.",
+      "Reject missing profile source, forged audit context, body-supplied identity, spreads and asynchronous/deferred audit."
+    ],
+    "existingTransactionValidator": {
+      "existingTransactionAuditValidatorUnchanged": true,
+      "sha256": "35f40c0f8ac10b0b9e1aab6fcfa93e9d6d21be7659f02db3aedfb58d6edea922",
+      "bytes": 11813
+    },
+    "preservedChecks": [
+      "Immediate SQLite transaction.",
+      "Patient DML, ambulatory membership and mandatory audit on the same transaction, in order.",
+      "Patient event classifier and the same patient subject.",
+      "Required auditEvents insertion and failure on non-unit insertion cardinality."
+    ],
+    "isolatedFixture": "Copy the explicit profileFile dependency alongside ownerFile/bridgeFile/adapterFile so the main-gate test evaluates the full real chain."
+  },
+  "modifiedSourceFiles": {
+    "scripts/audit-quality-gate.mjs": {
+      "sha256": "aae7e9609f2b5d5d5cc2940cabac82983a3163c0c832465f88f94831f48ec054",
+      "bytes": 195102
+    },
+    "scripts/audit-quality-gate.test.mjs": {
+      "sha256": "b0c2acf3b834c83b513e20bba12a51506823fbaa06eb1bce372e1281d65a7530",
+      "bytes": 74109
+    }
+  },
+  "productionInputs": {
+    "lib/patient-profile-service.ts": {
+      "sha256": "864d5b9904799043796d75eac1902240b46cea56f0c8802ab8648998caf83912",
+      "bytes": 5375,
+      "unchangedFromBase": true
+    },
+    "lib/patient-update-operation.ts": {
+      "sha256": "6d77aadacf42cd7c01145656759166a8bd51389203fdd114244971b226e974b1",
+      "bytes": 4770,
+      "unchangedFromBase": true
+    },
+    "lib/security/audit.ts": {
+      "sha256": "8912b24b02dc66e4b12fe88bcef80355917b1a2087a1caf5266c3ff83216963f",
+      "bytes": 18652,
+      "unchangedFromBase": true
+    },
+    "app/api/patients/[id]/route.ts": {
+      "sha256": "679b8fe79f05e4301b21a6c835cfe7f6ffb84dd2d6bf279ecb928e1b15f24aff",
+      "bytes": 5457,
+      "unchangedFromBase": true
+    },
+    "app/api/v1/patients/[id]/route.ts": {
+      "sha256": "dced582f81e67864faf0374980d1629ffa6f896c73684a532394703cbdac956d",
+      "bytes": 5651,
+      "unchangedFromBase": true
+    }
+  },
+  "environment": {
+    "node": "v24.19.0",
+    "npm": "11.9.0",
+    "os": "Linux",
+    "architecture": "x86_64",
+    "worktree": "codex/recovery-audit-profile-guard",
+    "testExecution": "Local execution outside the restrictive sandbox to retain real individual node:test cases."
+  },
+  "tests": {
+    "command": [
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      "scripts/audit-quality-gate.test.mjs"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 113.26581701800023,
+    "counts": {
+      "tests": 20,
+      "pass": 20,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "log": "/tmp/mediflow-audit-profile-guard-tests.log",
+    "existingTopLevelTests": 18,
+    "addedTopLevelTests": 2,
+    "negativeMutationsPerRoute": 33,
+    "newNegativeChecks": 66,
+    "newNegativeMutations": [
+      "missing profile source",
+      "route imports another profile service",
+      "route removes the profile call",
+      "route shadows the profile import",
+      "route uses an optional profile call",
+      "route obtains audit from the decoded body",
+      "route spreads untrusted context",
+      "route creates an asynchronous audit callback",
+      "route imports a fake audit constructor",
+      "route fabricates the audit identity",
+      "route replaces the audited actor",
+      "route detaches archive generation",
+      "route fabricates request identity",
+      "profile imports another operation",
+      "profile removes the writer hop",
+      "profile shadows the writer",
+      "profile duplicates the writer",
+      "profile defers the writer",
+      "profile awaits the writer",
+      "profile uses an optional writer",
+      "profile conditionally skips the writer",
+      "profile changes the patient subject",
+      "profile changes the admitted version",
+      "profile omits mandatory audit",
+      "profile reads audit from decoded body",
+      "profile makes audit optional",
+      "profile defers audit",
+      "profile yields after audit resolution",
+      "profile rewrites the admitted callback",
+      "operation loses mandatory audit",
+      "operation changes transaction behavior",
+      "operation changes audit subject",
+      "audit writer no longer executes insert"
+    ],
+    "logSha256": "ff2852f467a2992f112bae5ae807574b1fd3bb155198e73d204c55410dce9d3e",
+    "compactLog": [
+      "ok 1 - diary required-audit guard follows all eight handlers and rejects detached or bypassed audit",
+      "ok 2 - therapy required-audit guard follows all eight handlers and rejects detached or bypassed audit",
+      "ok 3 - observation required-audit guard follows all eight handlers and rejects detached or bypassed audit",
+      "ok 4 - checkup required-audit guard follows all eight handlers and rejects detached or bypassed audit",
+      "ok 5 - accepts parse-valid direct, alias, fallback, conditional, and current-service shapes",
+      "ok 6 - rejects parse-valid unreachable, nested, shadowed, duplicate, and wrong-event mutations",
+      "ok 7 - main checks the real direct and transactional writer contracts and rejects a mutated service",
+      "ok 8 - accepts TypeScript-valid aliases for route delegates and the configured update hop",
+      "ok 9 - rejects TypeScript-valid route and hop false-green mutations",
+      "ok 10 - rejects mutable aliases and numerically unreachable delegated calls",
+      "ok 11 - accepts the final package-owner delegated terminal logout",
+      "ok 12 - rejects route cookie, delegation, and terminal-response drift",
+      "ok 13 - rejects package owner transport and exact bearer-control drift",
+      "ok 14 - rejects retirement, ETag, audit-order, and terminality drift",
+      "ok 15 - rejects alternate, unsafe, shadowed, and deferred logout audit writers",
+      "ok 16 - PIN guard accepts both canonical channels and rejects retirement/currentness drift",
+      "ok 17 - patient-update audit guard binds the PUT delegate, patient subject and required tx writer",
+      "ok 18 - patient-profile audit guard follows app/api/patients/[id]/route.ts and rejects a broken intermediate hop",
+      "ok 19 - patient-profile audit guard follows app/api/v1/patients/[id]/route.ts and rejects a broken intermediate hop",
+      "ok 20 - patient-delete audit guard binds both DELETE routes to one tombstone and required tx writer",
+      "# tests 20",
+      "# suites 0",
+      "# pass 20",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "# duration_ms 113224.773885"
+    ]
+  },
+  "gate": {
+    "command": [
+      "node",
+      "scripts/audit-quality-gate.mjs",
+      "--out",
+      "../../../../tmp/mediflow-audit-profile-gate-report.json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 1.3895569080000314,
+    "report": {
+      "schemaVersion": 1,
+      "generatedAt": "2026-10-17T20:47:56.586Z",
+      "status": "pass",
+      "checked": {
+        "routes": 60,
+        "requiredEvents": 36,
+        "auditControlFlowTargets": 4,
+        "auditControlFlowFiles": 1,
+        "metadataKeys": [
+          "changedFields",
+          "resourceVersion",
+          "counts",
+          "flags",
+          "reasonCode"
+        ],
+        "forbiddenMetadataKeys": [
+          "address",
+          "attachment",
+          "base64",
+          "birthDate",
+          "cf",
+          "clinicalReason",
+          "codiceFiscale",
+          "content",
+          "dateOfBirth",
+          "description",
+          "diagnosis",
+          "document",
+          "email",
+          "firstName",
+          "fiscalCode",
+          "lastName",
+          "masterKey",
+          "name",
+          "note",
+          "notes",
+          "ocr",
+          "password",
+          "patientName",
+          "phone",
+          "pin",
+          "prompt",
+          "raw",
+          "salt",
+          "summary",
+          "text",
+          "token"
+        ]
+      },
+      "findings": []
+    }
+  },
+  "lint": {
+    "command": [
+      "./node_modules/.bin/eslint",
+      "scripts/audit-quality-gate.mjs",
+      "scripts/audit-quality-gate.test.mjs",
+      "--format",
+      "json"
+    ],
+    "exitCode": 0,
+    "results": [
+      {
+        "filePath": "/workspace/scratch/40b5a2cd37a4/mediflow-audit-profile-guard/scripts/audit-quality-gate.mjs",
+        "errorCount": 0,
+        "fatalErrorCount": 0,
+        "warningCount": 1,
+        "messages": [
+          {
+            "ruleId": "@typescript-eslint/no-unused-vars",
+            "severity": 1,
+            "message": "'metadata' is assigned a value but never used.",
+            "line": 2587,
+            "column": 11,
+            "nodeType": null,
+            "messageId": "unusedVar",
+            "endLine": 2587,
+            "endColumn": 19
+          }
+        ]
+      },
+      {
+        "filePath": "/workspace/scratch/40b5a2cd37a4/mediflow-audit-profile-guard/scripts/audit-quality-gate.test.mjs",
+        "errorCount": 0,
+        "fatalErrorCount": 0,
+        "warningCount": 0,
+        "messages": []
+      }
+    ],
+    "baseline": {
+      "command": "eslint --stdin --stdin-filename scripts/audit-quality-gate.mjs --format json < git show 670d36d:scripts/audit-quality-gate.mjs",
+      "exitCode": 0,
+      "results": [
+        {
+          "filePath": "/workspace/scratch/40b5a2cd37a4/mediflow-audit-profile-guard/scripts/audit-quality-gate.mjs",
+          "errorCount": 0,
+          "fatalErrorCount": 0,
+          "warningCount": 1,
+          "messages": [
+            {
+              "ruleId": "@typescript-eslint/no-unused-vars",
+              "severity": 1,
+              "message": "'metadata' is assigned a value but never used.",
+              "line": 2485,
+              "column": 11,
+              "nodeType": null,
+              "messageId": "unusedVar",
+              "endLine": 2485,
+              "endColumn": 19
+            }
+          ]
+        }
+      ]
+    },
+    "interpretation": "Zero errors. One pre-existing unused metadata warning in unchanged logout validation, independently observed on base670; no new warning."
+  },
+  "initialAttempt": {
+    "result": "failed_fixture_dependency_omitted",
+    "counts": {
+      "tests": 20,
+      "pass": 19,
+      "fail": 1,
+      "skipped": 0
+    },
+    "failedTest": "main checks the real direct and transactional writer contracts and rejects a mutated service",
+    "cause": "The isolated main-gate fixture did not yet copy profileFile. Both new real-route negative tests passed. The fixture dependency was added, then the complete 20-test suite passed.",
+    "logSha256": "164d799ea9c2e2841541ace9cdd6692732a5d1e6f29541227dbc0ac2f305e5a9"
+  },
+  "review": {
+    "decision": "The added profile hop is explicitly inspected while all existing transaction and mandatory audit checks remain active.",
+    "productionDelta": "None; the profile port, four callers, transaction owner, audit writer and package inputs remain unchanged.",
+    "limits": [
+      "This bounded AST guard proves the admitted source topology and rejects the covered drift patterns; it is not a general proof of arbitrary TypeScript behavior.",
+      "Runtime rollback and concurrency behavior remain covered by the existing clinical tests, not re-executed for this guard-only change.",
+      "The cited CI failure belongs to670/6088. This receipt records local validation of the guard fix and does not claim a later CI result."
+    ],
+    "independentReview": {
+      "reviewer": "rust_core_transition agent",
+      "mode": "read-only review of the final code delta",
+      "result": "No concrete blocker identified. Route binding, synchronous host audit callback, profile operation binding and mandatory transaction/audit checks remain connected. No source edits or test reruns by the reviewer."
+    }
+  }
+}
