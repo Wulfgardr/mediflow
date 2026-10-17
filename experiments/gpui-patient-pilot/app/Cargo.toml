@@ -1,0 +1,18 @@
+[package]
+name = "mediflow-gpui-patient-pilot"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mediflow-gpui-patient-pilot"
+path = "src/main.rs"
+
+[dependencies]
+mediflow-patient-client.workspace = true
+gpui.workspace = true
+gpui_platform.workspace = true
+serde_json.workspace = true
+unicode-segmentation = "1.12"

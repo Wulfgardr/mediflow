@@ -1,0 +1,71 @@
+name: Rust GPUI synthetic pilot
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/gpui-patient-pilot/**'
+      - 'app/fonts/**'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
+      - 'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json'
+      - 'scripts/native-tool-test-selection.mjs'
+      - 'scripts/check-test-selection.test.mjs'
+      - '.github/workflows/rust-gpui-pilot.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'experiments/gpui-patient-pilot/**'
+      - 'app/fonts/**'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
+      - 'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json'
+      - 'scripts/native-tool-test-selection.mjs'
+      - 'scripts/check-test-selection.test.mjs'
+      - '.github/workflows/rust-gpui-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-gpui-pilot-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  native-tests:
+    name: Rust GPUI pilot (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    env:
+      RUSTUP_TOOLCHAIN: '1.98.1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install source-pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+      - name: Install Linux GPUI build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y clang pkg-config libfontconfig-dev libglib2.0-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev
+      - name: Ensure macOS Metal compiler is available
+        if: runner.os == 'macOS'
+        run: |
+          if ! xcrun --find metal >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+      - name: Check workspace formatting
+        run: cargo fmt --manifest-path experiments/gpui-patient-pilot/Cargo.toml --all --check
+      - name: Check native targets with Clippy
+        run: cargo clippy --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked -- -Dwarnings
+      # Cargo compiles every native target and runs pure synthetic tests. These
+      # checks do not exercise a window, input methods, accessibility or GPU UI.
+      - name: Compile all native targets and run synthetic tests
+        run: cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked
