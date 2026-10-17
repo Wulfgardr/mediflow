@@ -72,10 +72,12 @@ L'host di queste prove resta `9028b0772d0b5415e749e22f730e31cfcc3bf6fa`.
 Gli esiti del client `b8eb2ed67` non attestano il runtime finale `32437e7c5`,
 una distribuzione installata o dispositivi fisici.
 
-Le prove su iPhone e iPad fisici restano da completare. La firma di sviluppo
-con Personal Team gratuito è possibile senza pagamento; il provisioning
-effettivo non è ancora verificato. Per la prova su iPad serve anche la modalità
-sviluppatore.
+In una prova separata, firma automatica e provisioning di sviluppo sono
+riusciti; l'app QA è stata installata e avviata su iPhone fisico, con processo
+osservato stabile per 14,5 secondi. Non erano configurati archivi: accesso e
+flussi dell'app sul dispositivo restano da provare. Personal Team consente la
+firma di sviluppo gratuita. La prova su iPad fisico resta fuori da questa
+sessione e richiede anche la modalità sviluppatore.
 
 Nella prova Mac precedente mancavano tre permessi di lettura nella fixture.
 Il ripristino canonico dei permessi della fixture ha consentito di proseguire:
