@@ -4,7 +4,7 @@
 import styles from './clinical-register.module.css';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
-import { Eye, FileText, Loader2, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { Eye, Loader2, RefreshCw, Trash2, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import DocumentSynthesisFabricReviewCard from '@/components/document-synthesis-fabric-review-card';
@@ -23,6 +23,7 @@ import { db, captureAttachmentWritePrecondition, type Attachment } from '@/lib/d
 import { requestAnyDocDecryptedLocalExtractionPreview, type AnyDocLocalExtractionPreview } from '@/lib/domain/documents/anydoc-local-extraction-client';
 import { createDocumentUploadQueue, readDocumentDataUrl, type DocumentUploadResult } from '@/lib/domain/documents/document-upload-queue';
 import { useLiveQueryState } from '@/lib/live-query';
+import { isEncryptedFieldValue, isLockedDataPlaceholder } from '@/lib/locked-field-guard';
 import { sharedKillSwitchSignal } from '@/lib/ui-semantic-signal';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,66 @@ function rejectionMessages(rejected: FileRejection[]): string[] {
         if (entry.errors.some((error) => error.code === 'file-too-large')) return `${entry.file.name}: supera il limite di 25 MB.`;
         return `${entry.file.name}: file non accettato.`;
     }))];
+}
+
+type OriginalResult = Readonly<{ metadata: Attachment; signal: AbortSignal }> &
+    (Readonly<{ file: Attachment }> | Readonly<{ error: string; refreshList?: boolean }>);
+
+function DocumentOriginal({ patientId, attachment, onClose, onRefreshList }: {
+    patientId: string; attachment: Attachment; onClose: () => void; onRefreshList: () => void;
+}) {
+    const [result, setResult] = useState<OriginalResult | null>(null);
+    const [attempt, setAttempt] = useState(0);
+    const sessionSignal = db.getSessionReadSignal();
+    useEffect(() => {
+        const controller = new AbortController();
+        const signal = AbortSignal.any([controller.signal, sessionSignal]);
+        const clear = () => setResult(null);
+        const retire = () => controller.abort();
+        signal.addEventListener('abort', clear, { once: true });
+        window.addEventListener('pagehide', retire);
+        const fail = (error: string, refreshList = false) => setResult({ metadata: attachment, signal, error, refreshList });
+        void (async () => {
+            try {
+                const { expected } = captureAttachmentWritePrecondition(attachment);
+                if (attachment.patientId !== patientId) throw new Error('Attachment unavailable');
+                const file = await db.attachments.get(attachment.id, { signal });
+                if (signal.aborted) return;
+                if (!file) { fail('Originale non disponibile. Rileggi l’elenco prima di riprovare.', true); return; }
+                if (file.id !== attachment.id || file.patientId !== patientId
+                    || file.currentness?.sourceRef !== expected.sourceRef
+                    || file.currentness.revision !== expected.revision
+                    || file.currentness.freshnessEpoch !== expected.freshnessEpoch) {
+                    fail('Il documento è cambiato. Rileggi l’elenco prima di aprirlo.', true); return;
+                }
+                if (isLockedDataPlaceholder(file.data) || isEncryptedFieldValue(file.data)) {
+                    fail('Originale non leggibile con la chiave di questa sessione.'); return;
+                }
+                if (!file.data) { fail('Contenuto originale non disponibile. Puoi riprovare o rileggere l’elenco.', true); return; }
+                setResult({ metadata: attachment, signal, file });
+            } catch {
+                if (!signal.aborted) fail('Impossibile caricare l’originale. Riprova.');
+            }
+        })();
+        return () => {
+            window.removeEventListener('pagehide', retire);
+            signal.removeEventListener('abort', clear);
+            controller.abort();
+        };
+    }, [attachment, patientId, sessionSignal, attempt]);
+    // Hide the previous source during render, before the effect retires its request.
+    // A list refresh unmounts this view; it never promotes old bytes to new metadata.
+    const current = result?.metadata === attachment && !result.signal.aborted ? result : null;
+    if (current && 'file' in current)
+        return <DocumentViewer inline file={current.file.data!} fileName={current.file.name} onClose={onClose} />;
+    return <>
+        <p role={current ? 'alert' : 'status'} className={styles.empty}>{current?.error ?? 'Caricamento originale…'}</p>
+        {current && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
+            onClick={() => { setResult(null); setAttempt(value => value + 1); }}>Riprova originale</button>}
+        {current?.refreshList && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
+            onClick={onRefreshList}>Rileggi elenco</button>}
+        <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={onClose}>Chiudi</button>
+    </>;
 }
 
 function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
@@ -93,10 +154,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
     }, [uploadQueue]);
 
     const { data: attachments, error: listError, loading: listLoading, refresh: refreshAttachments } = useLiveQueryState(
-        async () => {
-            const items = await db.attachments.query({ patientId }).toArray();
-            return items.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-        },
+        () => db.attachments.query({ patientId, metadataOnly: true }).toArray(),
         [patientId], undefined, ['attachments'],
     );
     const { data: killSwitch, error: settingError, loading: settingLoading, refresh: refreshSetting } = useLiveQueryState(
@@ -270,8 +328,8 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
 
                     </td><td>
                             <div className={styles.documentActions}>
-                                <button type="button" onClick={() => setViewingId(file.id)} disabled={!file.data || deletingId === file.id}
-                                    className={disclosure.documentAction} data-lume-action="quiet" title={file.data ? 'Visualizza' : 'Contenuto file non disponibile'} aria-label={`Visualizza ${file.name}`}>
+                                <button type="button" onClick={() => setViewingId(file.id)} disabled={listLoading || deletingId === file.id}
+                                    className={disclosure.documentAction} data-lume-action="quiet" title="Visualizza" aria-label={`Visualizza ${file.name}`}>
                                     <Eye className="h-4 w-4" aria-hidden="true" />Apri
                                 </button>
                                 <button type="button" onClick={() => handleLocalExtractionPreview(file)} disabled={extractingId !== null || deletingId === file.id}
@@ -347,8 +405,11 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             </div>
             <aside className={styles.documentOriginal} aria-label="Originale del documento">
                 <h3>Originale</h3>
-                {viewingFile?.data ? <DocumentViewer key={viewingFile.id} inline file={viewingFile.data} fileName={viewingFile.name} onClose={() => setViewingId(null)} />
-                    : <p className={styles.empty}>Apri un documento dall’elenco per consultare l’originale accanto alle proposte.</p>}
+                {viewingFile && !listLoading ? <DocumentOriginal key={viewingFile.id} patientId={patientId} attachment={viewingFile}
+                    onClose={() => setViewingId(null)} onRefreshList={refreshAttachments} />
+                    : <p className={styles.empty}>{viewingId && listLoading ? 'Rilettura elenco documenti…'
+                        : viewingId && listError ? 'Rileggi l’elenco documenti per consultare l’originale.'
+                            : 'Apri un documento dall’elenco per consultare l’originale accanto alle proposte.'}</p>}
             </aside>
         </div>
     );
