@@ -18,7 +18,7 @@ type Options = Readonly<{
         expectedSyntheticPatientName: string;
     }>;
 }>;
-type ObservedRequest = Readonly<{ method: string; path: string; metadataOnly?: boolean; bodyKeys?: readonly string[] }>;
+type ObservedRequest = Readonly<{ method: string; path: string; metadataOnly?: boolean; patientId?: string | null; bodyKeys?: readonly string[] }>;
 const PREFIX = '/api/ai/document-synthesis/';
 
 export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, options: Options): Promise<void> {
@@ -40,7 +40,8 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const method = request.method(); const path = requestUrl.pathname;
         if (!path.startsWith('/api/')) return;
         const keys = path.startsWith(PREFIX) && method === 'POST' ? Object.keys(request.postDataJSON() ?? {}).sort() : undefined;
-        requests.push({ method, path, ...(method === 'GET' && path === '/api/attachments'
+        requests.push({ method, path, ...(method === 'GET' && ['/api/attachments', '/api/observations'].includes(path)
+            ? { patientId: requestUrl.searchParams.get('patientId') } : {}), ...(method === 'GET' && path === '/api/attachments'
             ? { metadataOnly: requestUrl.searchParams.get('metadata') === 'true' } : {}), ...(keys ? { bodyKeys: keys } : {}) });
         if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return;
         const attachmentWrite = (method === 'POST' && path === '/api/attachments')
@@ -64,10 +65,13 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
     const synthesisCalls = () => requests.filter((item) => item.path.startsWith(PREFIX) && item.method === 'POST');
     const writes = (method: string) => requests.filter((item) => item.method === method && item.path.startsWith('/api/attachments'));
     const detailReads = () => requests.filter((item) => item.method === 'GET' && /^\/api\/attachments\/[^/]+$/u.test(item.path));
-    const assertMetadataLists = () => {
+    const assertScopedMetadataReads = () => {
         const lists = requests.filter((item) => item.method === 'GET' && item.path === '/api/attachments');
         expect(lists.length, 'The page must actually read its attachment lists').toBeGreaterThan(0);
         expect(lists.every((item) => item.metadataOnly), 'Attachment lists must omit original file data').toBe(true);
+        const patientLists = requests.filter((item) => item.patientId !== undefined);
+        expect(patientLists.every((item) => item.patientId === url.pathname.split('/')[2]),
+            'Patient lists must not download another patient’s records for client filtering').toBe(true);
     };
     const openDocuments = async () => {
         await openPatientSection(page, 'documenti');
@@ -88,7 +92,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         await expect(rows).toHaveCount(0); // Explicit fixture precondition; never delete unknown pre-existing files.
         await expect(docs.getByText('Nessun documento caricato.', { exact: false })).toBeVisible();
         expect(synthesisCalls()).toEqual([]);
-        assertMetadataLists(); expect(detailReads()).toEqual([]);
+        assertScopedMetadataReads(); expect(detailReads()).toEqual([]);
         await verifyHealth();
         await page.screenshot({ path: info.outputPath('document-flow-empty-desktop.png'), fullPage: false });
 
@@ -120,7 +124,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         const firstId = await first.getAttribute('data-document-id');
         const secondId = await second.getAttribute('data-document-id');
         expect(firstId).toBeTruthy(); expect(secondId).toBeTruthy();
-        assertMetadataLists();
+        assertScopedMetadataReads();
         expect(detailReads(), 'Upload and navigation must not download originals').toEqual([]);
         await first.getByRole('button', { name: `Visualizza ${names[0]}`, exact: true }).click();
         await expect(page.getByTestId('document-preview-text')).toHaveText(files[0].buffer.toString('utf8'));
@@ -195,7 +199,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
         ]);
         else expect(detailReads().at(-1)?.path).toBe('/api/attachments/' + secondId);
         expect(synthesisCalls()).toHaveLength(synthesisCount);
-        assertMetadataLists();
+        assertScopedMetadataReads();
         await page.setViewportSize({ width: 390, height: 844 });
         await docs.scrollIntoViewIfNeeded();
         expect(await docs.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);

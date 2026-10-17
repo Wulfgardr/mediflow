@@ -115,6 +115,7 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 - Le sintesi della scheda paziente riusano le letture di terapie e osservazioni;
   gli elenchi documenti trasferiscono i metadati e l’originale viene letto quando lo apri.
+  Il pannello delle misure richiede soltanto le osservazioni del paziente aperto.
   Cambio documento, aggiornamento dell’elenco e blocco della sessione ritirano
   la consultazione precedente; caricamento ed errore permettono chiusura e riprova
   ([WUL-780](https://linear.app/wulfgardr/issue/WUL-780)).
