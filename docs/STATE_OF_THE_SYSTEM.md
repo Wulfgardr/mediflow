@@ -33,7 +33,8 @@ Vedi [README](../README.md), [manuale](MANUALE.md) e
 
 ## Supporto, capacità e protezione correnti
 
-Matrice generale aggiornata il 15 ottobre 2026; le fonti collegate mantengono i contratti del proprio confine.
+Matrice generale aggiornata il 17 ottobre 2026, compresi i contributi successivi
+al tag `v0.9.0`; le fonti collegate mantengono i contratti del proprio confine.
 
 **MediFlow 0.9.0 è una release sorgente per runtime locale Web e Headless**. Le prove
 delegate sostitutive C15/C20 sono state accettate per questa consegna;
@@ -51,7 +52,8 @@ un profilo di avvio qualificato.
 | Ambito | Contenuto e confine dei sorgenti correnti | Stato di consegna e fonte |
 | --- | --- | --- |
 | Profili 0.9.0 | Sorgente, browser localhost e headless con Node 24: macOS ARM, Windows 11 ARM con Node x64 emulato, Omarchy/Arch ARM su Parallels. | Le prove tecniche sui profili conservano revisione e ambiente; i runner CI non sostituiscono le macchine dichiarate. L'accettazione delle prove delegate sostitutive in [C20](https://linear.app/wulfgardr/issue/WUL-735) è una decisione distinta e non attesta una prova personale. |
-| App e installer nativi | Percorso separato; un archivio ZIP/TAR.GZ non è un installer firmato. | Previsti nella 0.9.6; gli account v3 non sono ammessi nei client nativi non qualificati. |
+| App e installer nativi | Percorso separato dalla release sorgente. Il builder Mac può usare il client Debug ARM64 della CI, con sorgenti della stessa revisione, senza Xcode completo. | Distribuzione prevista nella 0.9.6. L'artefatto CI è un componente, non un installer pubblico; firma e notarizzazione restano distinte. [Guida al confezionamento](./native-launch.md#compilazione-su-github), [PR #537](https://github.com/Wulfgardr/mediflow/pull/537). |
+| Accesso e flussi Apple | Protocollo v3 integrato con [PR #539](https://github.com/Wulfgardr/mediflow/pull/539); il preflight corrente ammette account v3 solo negli archivi a utente unico. Integrati anche CSV, documenti multipli, allegati del diario e comandi di rientro. | L'accesso v3 resta subordinato alla qualifica nativa prevista dalla [policy](../SECURITY.md#chiavi-passphrase-e-recupero) e dall'[ADR 0143](./adr/0143-strong-unlock-credential.md#client-apple-v3--16-ottobre-2026-wul-777). La [matrice di parità](./parity-matrix.md#riconciliazione-corrente--wul-694-16-ottobre-2026) distingue prove Mac, simulatori e hardware fisico. La correzione dell'arresto del Diario iPad [#553](https://github.com/Wulfgardr/mediflow/pull/553) resta aperta, con prova UI pendente. |
 | Cartella ordinaria | Ricerca, revisione e scritture nominate, con conflitti, validazione e audit. AI facoltativa, provider esterni spenti per impostazione predefinita. | [Roster clinico](./clinical-write-roster.md); flussi integrati e usabilità finale in C20, non dedotti dalla compilazione. |
 | Protezione locale | Cifratura applicativa dei soli campi dichiarati; passphrase v3 e kit separato. Identificativi, metadati e alcune copie restano in chiaro. | [Matrice dati a riposo](./data-at-rest-matrix.md) e [policy](../SECURITY.md#chiavi-passphrase-e-recupero); volume cifrato e recupero completo restano verifiche distinte. |
 | Backup | Export portabile clinico e recupero completo non sono sinonimi. I formati che non rappresentano lo storico durevole restano bloccati. | [Drill](./backup-restore-drill.md) e [C15](https://linear.app/wulfgardr/issue/WUL-730); la creazione del file non dimostra il recupero. |
