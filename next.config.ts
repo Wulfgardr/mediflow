@@ -60,6 +60,25 @@ const securityHeaders = [
     : []),
 ];
 
+// Shared exclusions; each route receives its own array.
+const commonTracingExcludes = [
+  "./*.db",
+  "./*.sqlite",
+  "./*.sqlite3",
+  "./tmp",
+  "./tmp/**/*",
+  "./tmp-*",
+  "./tmp-*/**/*",
+  "./docs/**/*",
+  "./oss-assets/**/*",
+  "./PLANS.md",
+  "./README.md",
+  "./ARCHITECTURE.md",
+  "./SECURITY.md",
+  "./CONTRIBUTING.md",
+  "./CHANGELOG.md",
+];
+
 const nextConfig: NextConfig = {
   /* @Codex */
   distDir,
@@ -156,39 +175,9 @@ const nextConfig: NextConfig = {
       "./**/site-packages/**",
       "./**/__pycache__/**",
       "./**/.env*",
-      "./*.db",
-      "./*.sqlite",
-      "./*.sqlite3",
-      "./tmp",
-      "./tmp/**/*",
-      "./tmp-*",
-      "./tmp-*/**/*",
-      "./docs/**/*",
-      "./oss-assets/**/*",
-      "./PLANS.md",
-      "./README.md",
-      "./ARCHITECTURE.md",
-      "./SECURITY.md",
-      "./CONTRIBUTING.md",
-      "./CHANGELOG.md",
+      ...commonTracingExcludes,
     ],
-    "/api/*": [
-      "./*.db",
-      "./*.sqlite",
-      "./*.sqlite3",
-      "./tmp",
-      "./tmp/**/*",
-      "./tmp-*",
-      "./tmp-*/**/*",
-      "./docs/**/*",
-      "./oss-assets/**/*",
-      "./PLANS.md",
-      "./README.md",
-      "./ARCHITECTURE.md",
-      "./SECURITY.md",
-      "./CONTRIBUTING.md",
-      "./CHANGELOG.md",
-    ],
+    "/api/*": [...commonTracingExcludes],
   },
   /* WUL-343 */
   async headers() {
