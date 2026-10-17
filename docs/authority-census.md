@@ -115,6 +115,8 @@ motivata, non un debito automaticamente assegnato a un'altra issue.
 
 | Candidato esistente | Disposizione e prova dei consumatori corrente | Destinazione |
 | --- | --- | --- |
+| `framer-motion` e SDK `openai` | RIMOSSI dal manifest e dal lock dopo verifica di import, script, loader e build. `motion-dom` e `motion-utils` erano transitive esclusive; il trasporto OpenAI corrente usa il `fetch` fornito dall’host. | [WUL-779](https://linear.app/wulfgardr/issue/WUL-779). |
+| `use-clinical-alerts` | RIMOSSO hook mai richiamato dal prodotto e test esclusivo del suo selettore. Nessun export di pacchetto, caricamento dinamico o altra prova lo consuma; non rappresentava avvisi mostrati dall’interfaccia corrente. | [WUL-779](https://linear.app/wulfgardr/issue/WUL-779). |
 | F1 builder macOS ritirato | RIMOSSO: `scripts/build-native-app.sh` non esiste; il manifest mantiene `scripts/build-apple-macos-app.sh`. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728); nessun nuovo intervento. |
 | F2 builder simulatore | KEEP: [build-mobile-sim-app](../scripts/build-mobile-sim-app.sh) è richiamato dagli harness mobile; usa Xcode, non lo stub ritirato. La prova live resta separata. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728). |
 | F3 clipboard paziente | RIMOSSO hook/helper senza consumer UI, export di pacchetto o caricamenti dinamici. I soli consumatori erano test e alias dedicato, ritirati insieme. Le route bulk mantengono i propri core e test negativi. | [WUL-728](https://linear.app/wulfgardr/issue/WUL-728); nessun nuovo intervento. |
