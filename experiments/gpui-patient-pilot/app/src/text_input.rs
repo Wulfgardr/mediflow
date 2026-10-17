@@ -167,6 +167,11 @@ impl TextInput {
         window.focus(&self.focus, cx);
     }
 
+    pub fn focus_and_select(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.focus(window, cx);
+        self.select_all(&SelectAll, window, cx);
+    }
+
     fn snapshot(&self) -> Snapshot {
         Snapshot {
             content: self.content.clone(),

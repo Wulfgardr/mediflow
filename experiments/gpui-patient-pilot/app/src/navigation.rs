@@ -143,9 +143,85 @@ impl Layout {
     }
 }
 
+/// Move through the visible worklist without wrapping or using a hidden row.
+/// A focused row wins over a previous preview selection; no anchor starts at
+/// the first visible patient, in either direction.
+pub fn adjacent_patient<'a>(
+    visible_ids: &[&'a str],
+    focused_id: Option<&str>,
+    selected_id: Option<&str>,
+    previous: bool,
+) -> Option<&'a str> {
+    let first = *visible_ids.first()?;
+    let index = focused_id
+        .and_then(|id| visible_ids.iter().position(|visible| *visible == id))
+        .or_else(|| {
+            selected_id.and_then(|id| visible_ids.iter().position(|visible| *visible == id))
+        });
+    let Some(index) = index else {
+        return Some(first);
+    };
+    let next = if previous {
+        index.saturating_sub(1)
+    } else {
+        (index + 1).min(visible_ids.len() - 1)
+    };
+    Some(visible_ids[next])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn worklist_navigation_uses_visible_order_and_focused_row_before_old_selection() {
+        let ids = ["elena/2", "carlo%3", "sara è"];
+        assert_eq!(adjacent_patient(&ids, None, None, false), Some("elena/2"));
+        assert_eq!(adjacent_patient(&ids, None, None, true), Some("elena/2"));
+        assert_eq!(
+            adjacent_patient(&ids, Some("carlo%3"), Some("sara è"), true),
+            Some("elena/2")
+        );
+        assert_eq!(
+            adjacent_patient(&ids, Some("elena/2"), Some("sara è"), false),
+            Some("carlo%3")
+        );
+        assert_eq!(
+            adjacent_patient(&ids, Some("filtered out"), Some("carlo%3"), false),
+            Some("sara è")
+        );
+        assert_eq!(
+            adjacent_patient(&ids, None, Some("filtered out"), false),
+            Some("elena/2")
+        );
+    }
+
+    #[test]
+    fn worklist_navigation_stops_at_both_edges_and_accepts_an_empty_result() {
+        let ids = ["first", "last"];
+        assert_eq!(
+            adjacent_patient(&ids, Some("first"), None, true),
+            Some("first")
+        );
+        assert_eq!(
+            adjacent_patient(&ids, Some("last"), None, false),
+            Some("last")
+        );
+        for previous in [false, true] {
+            assert_eq!(
+                adjacent_patient(&["only"], Some("only"), None, previous),
+                Some("only")
+            );
+            assert_eq!(
+                adjacent_patient(&[], Some("stale"), Some("stale"), previous),
+                None
+            );
+            assert_eq!(
+                adjacent_patient(&ids, Some("stale"), Some("stale"), previous),
+                Some("first")
+            );
+        }
+    }
 
     #[test]
     fn narrow_and_enlarged_text_reflow_without_hiding_navigation() {
