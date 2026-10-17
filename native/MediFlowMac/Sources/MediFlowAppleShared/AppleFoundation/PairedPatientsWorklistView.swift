@@ -225,8 +225,18 @@ struct PairedPatientsWorklistView: View {
     // Compact navigation belongs to the workspace, not to a row.
     var onOpenPatient: ((HomeBasePatientSummary) -> Void)? = nil
 
-    @ViewBuilder
     var body: some View {
+        platformWorklist
+            .sheet(isPresented: $showingCSVImport) {
+                if let csv = model.patientCSVImport {
+                    PairedPatientCSVImportSheet(model: csv, startNew: { model.resetPatientCSVImport() })
+                        .id(ObjectIdentifier(csv))
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var platformWorklist: some View {
         #if os(macOS)
         // Keep the heading and filters fixed above the native list.
         // Creation belongs to the workspace toolbar, which owns its capability gate.
@@ -265,7 +275,9 @@ struct PairedPatientsWorklistView: View {
                     mobileResultCount
                 }
             }
-            csvImportAction
+            if !usesCompactWorklistControls {
+                csvImportAction
+            }
             worklistContent
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -283,15 +295,36 @@ struct PairedPatientsWorklistView: View {
         }
         .disabled(!model.canStartPatientCSVImport)
         .accessibilityIdentifier("patient-csv-open")
-        .sheet(isPresented: $showingCSVImport) {
-            if let csv = model.patientCSVImport {
-                PairedPatientCSVImportSheet(model: csv, startNew: { model.resetPatientCSVImport() })
-                    .id(ObjectIdentifier(csv))
-            }
-        }
     }
 
     #if !os(macOS)
+    private var usesCompactWorklistControls: Bool {
+        verticalSizeClass == .compact && !dynamicTypeSize.isAccessibilitySize && !model.patients.isEmpty
+    }
+
+    @ViewBuilder
+    private var mobileWorklistControls: some View {
+        if usesCompactWorklistControls {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    patientSearchControls
+                        .fixedSize(horizontal: true, vertical: false)
+                    Spacer(minLength: 0)
+                    csvImportAction
+                        .fixedSize()
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                VStack(alignment: .leading, spacing: Self.mobileStackSpacing) {
+                    csvImportAction
+                    patientSearchControls
+                }
+            }
+        } else {
+            patientSearchControls
+        }
+    }
+
     /// Spacing of the mobile worklist stack, shared by the outer stack and by
     /// the patient rows so the two cannot drift apart.
     private static let mobileStackSpacing: CGFloat = 16
@@ -370,7 +403,7 @@ struct PairedPatientsWorklistView: View {
             // macOS hoists the filters above the list, so the column keeps them
             // in place while the list scrolls.
             #if !os(macOS)
-            patientSearchControls
+            mobileWorklistControls
             #endif
             let results = filteredPatients
             if results.isEmpty {

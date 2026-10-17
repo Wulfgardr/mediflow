@@ -83,7 +83,7 @@ struct MobilePairedStatusView: View {
                 primaryActionButton()
             }
         }
-        .padding(dynamicTypeSize.isAccessibilitySize ? 8 : 14)
+        .padding(dynamicTypeSize.isAccessibilitySize || isShortViewport ? 8 : 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .lumeSurface(zone: .field)
         .accessibilityElement(children: .contain)
