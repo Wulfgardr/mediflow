@@ -8,9 +8,9 @@ read_when:
 # Matrice di parità Web, Apple e Headless
 
 Stato documento: `CANONICAL`
-Ultimo aggiornamento: 2026-10-16 (inventario corrente WUL-694; baseline e prove storiche separate)
+Ultimo aggiornamento: 2026-10-17 (inventario corrente WUL-694; baseline e prove storiche separate)
 
-## Riconciliazione corrente — WUL-694, 16 ottobre 2026
+## Riconciliazione corrente — WUL-694, 17 ottobre 2026
 
 L'inventario comprende l'accesso v3 integrato in `main` a
 `4c69e4daa7163605765f8f7112d76dcf8e34cc02` e il successivo contributo ChatGPT
@@ -31,10 +31,10 @@ non prova Windows 11 x64; un simulatore non prova un dispositivo fisico.
 | Contributo | Stato e revisione | Limite della prova |
 | --- | --- | --- |
 | Accesso v3 nei client Apple abbinati | [PR #539](https://github.com/Wulfgardr/mediflow/pull/539) integrata in `main` a `4c69e4daa` | La prova UI Mac sul precedente candidato `65da737353e8b02d84e476299e5c4088d38aedab` ha completato accesso v3 e creazione di un paziente inventato, con indirizzo decifrato. Il client iPhone in simulatore ha poi eseguito accesso v3 e letto la stessa cartella e lo stesso indirizzo. Non copre tutte le interazioni native. |
-| Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Sul Mac, candidato `9028b0772`, selettore, anteprima e conferma hanno creato due schede inventate ed escluso un duplicato. La lista non si è aggiornata subito: correzione nella [PR #552](https://github.com/Wulfgardr/mediflow/pull/552). |
+| Importazione pazienti da CSV | [PR #542](https://github.com/Wulfgardr/mediflow/pull/542) integrata in `main` a `3980cb68de550366332f59fb29dfad51d79e8654` | Sul Mac, candidato `9028b0772`, selettore, anteprima e conferma hanno creato due schede inventate ed escluso un duplicato. La lista non si è aggiornata subito. La correzione [#552](https://github.com/Wulfgardr/mediflow/pull/552), integrata a `6236148dd`, è verificata nel client `b8eb2ed67`: lista da tre a cinque schede senza ricarica manuale e selezione conservata. |
 | Documenti multipli e quattro viste AI su iPhone/iPad | [PR #541](https://github.com/Wulfgardr/mediflow/pull/541) integrata in `main` a `65898d6a6ed1296a89850e19ce123791d37bb026` | Invii sequenziali con esiti per file e interruzione sulle risposte incerte. 113 test Node e 57 Swift riusciti; correzione dei tre hash CI inclusa nel contributo integrato. L'esistenza delle viste non prova una generazione o l'uso su dispositivi fisici. |
 | Nuovi allegati dal compositore del diario | [PR #543](https://github.com/Wulfgardr/mediflow/pull/543) integrata in `main` a `6bebafe9ac5d279313e15b3c746b2b41e5768caf` | Sul Mac, candidato `9028b0772`, caricati due file dal compositore senza perdere la bozza; voce registrata e riletta dall'host con entrambi gli allegati. |
-| Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | Sul Mac, candidato `9028b0772`, scritto e riletto un elenco annidato. Il contenuto salvato conserva la struttura; la vista di lettura perde il rientro. Aprendo lo stesso diario su iPad simulato, arresto dell'app durante la conversione HTML. Correzione nella [PR #553](https://github.com/Wulfgardr/mediflow/pull/553). |
+| Rientri e strutture annidate nell'editor | [PR #544](https://github.com/Wulfgardr/mediflow/pull/544) integrata in `main` a `f9f9626763038c48e2da5c5cc439d925b1634c1d` | Sul Mac, candidato `9028b0772`, scritto e riletto un elenco annidato. Il contenuto salvato conserva la struttura; la vista di lettura perde il rientro. Aprendo lo stesso diario su iPad simulato, arresto dell'app durante la conversione HTML. La correzione [#553](https://github.com/Wulfgardr/mediflow/pull/553), integrata a `32437e7c5` dalla head `f78eb9173`, è verificata nel client `b8eb2ed67`: rientri visibili su Mac e iPad simulato, senza l'arresto precedente. |
 
 Il candidato locale `cb3f66deac58b97ace6981f40cf50d2a6de64ca9` riunisce
 accesso, CSV, documenti multipli e allegati del diario: build Mac completa, build iOS Simulator e verifica rigorosa
@@ -45,7 +45,8 @@ candidato, Mac e iPad simulato hanno completato l'accesso v3 e letto la stessa
 cartella, con indirizzo decifrato. Sul Mac sono riusciti i flussi CSV, upload
 di due documenti e diario con due allegati descritti sopra. L'apertura della
 sezione Documenti ha richiesto un cambio di sezione per aggiornare i permessi
-mostrati: anche questo difetto è seguito nella PR #552. La prova di upload
+mostrati: difetto corretto dalla PR #552 e verificato nel client successivo
+descritto sotto. La prova di upload
 non attesta OCR o estrazione del contenuto. Questi esiti non attestano distribuzione,
 notarizzazione, tutte le interazioni o hardware mobile fisico.
 
@@ -54,14 +55,29 @@ riunisce le PR #552 e #553 sulla base `9538e4cecbccd462e4c82be6d00951b785d0b68f`
 build Mac e iOS Simulator e verifica rigorosa della firma Mac riuscite.
 La PR #552 è stata poi integrata a `6236148dd28fe896460d2a84c68185be56bc73e4`,
 con tutti i controlli CI riusciti al primo tentativo.
-La correzione del diario sposta la conversione HTML fuori dal disegno della
-vista e conserva i rientri nella lettura. La verifica UI del nuovo candidato
-resta pendente: il Mac si è bloccato durante le prove. La PR #553 non viene
-integrata prima di ripetere il percorso che ha causato l'arresto.
+La PR #553 è integrata a `32437e7c5646042d6f156113f3f0df0fd4640455`,
+dalla head `f78eb9173d68d86f2508287135ffc5900d3a66aa`.
 
-I dispositivi iPhone e iPad sono presenti, ma la firma di sviluppo disponibile
-è scaduta e la modalità sviluppatore dell'iPad è disattivata. Le prove fisiche
-restano da completare dopo il ripristino di questi prerequisiti.
+Il 17 ottobre la verifica UI del client `b8eb2ed67` è riuscita. Sul Mac:
+accesso v3, Documenti subito disponibili senza cambio di sezione, CSV con due
+nuove schede confermate e un duplicato escluso, lista da tre a cinque schede
+senza ricarica manuale e selezione conservata. Il diario mostra rientri
+annidati, due allegati e il titolo aggiornato dall'iPad. Su iPad Simulator
+26.5: accesso v3, lettura di tre schede sintetiche e apertura del Diario
+senza il precedente `SIGABRT`, con rientri e due collegamenti agli allegati.
+La modifica del titolo salvata dall'iPad è stata riletta separatamente via
+HTTPS: versione 2, HTML annidato identico e stessi due allegati.
+
+L'host di queste prove resta `9028b0772d0b5415e749e22f730e31cfcc3bf6fa`.
+Gli esiti del client `b8eb2ed67` non attestano il runtime finale `32437e7c5`,
+una distribuzione installata o dispositivi fisici.
+
+In una prova separata, firma automatica e provisioning di sviluppo sono
+riusciti; l'app QA è stata installata e avviata su iPhone fisico, con processo
+osservato stabile per 14,5 secondi. Non erano configurati archivi: accesso e
+flussi dell'app sul dispositivo restano da provare. Personal Team consente la
+firma di sviluppo gratuita. La prova su iPad fisico resta fuori da questa
+sessione e richiede anche la modalità sviluppatore.
 
 Nella prova Mac precedente mancavano tre permessi di lettura nella fixture.
 Il ripristino canonico dei permessi della fixture ha consentito di proseguire:
@@ -76,18 +92,19 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 
 | Funzione | Web macOS | Web Windows 11 ARM | Web Ubuntu | Nativo macOS | iPhone / iPad |
 | --- | --- | --- | --- | --- | --- |
-| Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Accesso v3 UI riuscito sui candidati `65da73735` e `9028b0772` | Accesso e cartella riusciti su iPhone simulato `65da73735` e iPad simulato `9028b0772`; hardware fisico da provare |
-| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati su `65da73735`; CSV con due schede e un duplicato escluso su `9028b0772`, aggiornamento lista seguito in #552 | Cartella e indirizzo letti nei simulatori iPhone e iPad; iPad legge anche le schede importate dal Mac. Importazione CSV dal dispositivo e riavvio da provare |
-| Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Diario con due nuovi allegati e struttura annidata salvato e riletto su `9028b0772`; rientro in lettura seguito in #553 | iPad `9028b0772`: arresto aprendo Diario, seguito in #553. Editor e salvataggio da mobile da provare; niente scritture offline |
-| Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772` dopo aggiornamento della sezione; difetto UI seguito in #552. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
+| Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Accesso v3 UI riuscito anche sul client `b8eb2ed67`, con host `9028b0772` | Accesso e cartella riusciti su iPhone simulato `65da73735` e iPad simulato `b8eb2ed67` con host `9028b0772`; hardware fisico da provare |
+| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati su `65da73735`; CSV nel client `b8eb2ed67`: due schede e un duplicato escluso, lista aggiornata da tre a cinque e selezione conservata; host `9028b0772` | Cartella e indirizzo letti nei simulatori iPhone e iPad; iPad legge anche le schede importate dal Mac. Importazione CSV dal dispositivo e riavvio da provare |
+| Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Client `b8eb2ed67`: rientri annidati, due allegati e titolo aggiornato da iPad visibili; host `9028b0772` | iPad simulato `b8eb2ed67`: Diario senza arresto, rientri visibili e modifica titolo salvata; versione 2 e due allegati riletti via HTTPS dall’host `9028b0772`. Altri flussi editor da provare; niente scritture offline |
+| Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772`; nel client `b8eb2ed67` Documenti è disponibile subito senza cambio di sezione. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
 | Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
 | Conflitti, lock, backup e recupero | Ripristino sintetico locale provato su `b8eb2ed67`; conflitto, riavvio e recupero dal file tramite UI da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
 annidati e citazioni multiblocco. La prova Mac conferma il salvataggio e la
-rilettura della struttura annidata; visualizzazione e stabilità iPad richiedono
-le correzioni indicate sopra. Le citazioni multiblocco restano da provare nella UI.
+rilettura della struttura annidata. Il client `b8eb2ed67` verifica inoltre i
+rientri in lettura su Mac e iPad simulato e il Diario senza arresto su iPad.
+Le citazioni multiblocco restano da provare nella UI.
 H1 è un contenuto legacy
 conservato in sola lettura; non è un comando disponibile nell'editor Web.
 La scheda AI non conferisce accesso a un account né autorizza un invio.
@@ -101,7 +118,7 @@ Fonti: [accesso nativo](../lib/security/native-login-http.ts),
 [viste AI](../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/NativeOrdinaryViews.swift),
 [editor](../native/MediFlowMac/Sources/MediFlowCore/ClinicalRichTextEditor.swift)
 e [roster delle scritture](./clinical-write-roster.md). I nuovi comportamenti
-non ancora integrati sono descritti nelle PR sopra, non attribuiti alla base.
+sono descritti nelle PR sopra; le prove restano riferite ai candidati indicati.
 
 ### Prove guest e loro limiti
 
