@@ -65,6 +65,76 @@ export function cargoTestCommand(root) {
   return { files, executable: 'cargo', args: ['test', '--manifest-path', cargoManifest] };
 }
 
+const gpuiDirectory = 'experiments/gpui-patient-pilot';
+const gpuiWorkflow = '.github/workflows/rust-gpui-pilot.yml';
+// Closed, single-line TOML tables for this pilot's explicit Cargo targets. A new
+// target/feature/overlay needs a modeled binding before it can select tests.
+function gpuiTables(root, file, allowed) {
+  const tables = Object.create(null);
+  let table;
+  for (const raw of read(root, file).split(/\r?\n/u)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const header = /^(\[\[?[^\]]+\]\]?)\s*(?:#.*)?$/u.exec(line)?.[1];
+    if (header) {
+      if (!allowed.includes(header) || Object.hasOwn(tables, header)) throw new Error(`Unsupported pilot Cargo table: ${file}: ${header}`);
+      table = tables[header] = Object.create(null);
+      continue;
+    }
+    const field = /^([\w.-]+)\s*=\s*(.+)$/u.exec(line);
+    if (!table || !field || Object.hasOwn(table, field[1]) || /"""|'''/u.test(field[2])) throw new Error(`Unsupported pilot Cargo field: ${file}`);
+    table[field[1]] = field[2].replace(/\s+#.*$/u, '').trim();
+  }
+  return tables;
+}
+function exactFields(actual, expected, label) {
+  if (!actual || Object.keys(actual).length !== Object.keys(expected).length
+    || Object.entries(expected).some(([key, value]) => actual[key] !== value)) throw new Error(`Pilot Cargo ${label} changed`);
+}
+export function cargoGpuiPilotTestCommand(root) {
+  const manifest = `${gpuiDirectory}/Cargo.toml`;
+  const workspace = gpuiTables(root, manifest, ['[workspace]', '[workspace.package]', '[workspace.dependencies]', '[patch.crates-io]', '[profile.dev]', '[profile.release]']);
+  exactFields(workspace['[workspace]'], { members: '["client", "app"]', 'default-members': '["client"]', resolver: '"3"' }, 'workspace membership');
+  const toolchain = /^"(\d+\.\d+\.\d+)"$/u.exec(workspace['[workspace.package]']?.['rust-version'])?.[1];
+  if (!toolchain) throw new Error('Pilot requires an exact Rust version');
+  const rust = gpuiTables(root, `${gpuiDirectory}/rust-toolchain.toml`, ['[toolchain]']);
+  exactFields(rust['[toolchain]'], { channel: `"${toolchain}"`, profile: '"minimal"', components: '["rustfmt", "clippy"]' }, 'toolchain');
+  const client = gpuiTables(root, `${gpuiDirectory}/client/Cargo.toml`, ['[package]', '[lib]', '[dependencies]', '[dev-dependencies]', '[[test]]']);
+  const app = gpuiTables(root, `${gpuiDirectory}/app/Cargo.toml`, ['[package]', '[[bin]]', '[dependencies]']);
+  for (const [tables, name] of [[client, 'mediflow-patient-client'], [app, 'mediflow-gpui-patient-pilot']]) {
+    exactFields(tables['[package]'], { name: `"${name}"`, 'version.workspace': 'true', 'edition.workspace': 'true',
+      'rust-version.workspace': 'true', 'license.workspace': 'true', 'publish.workspace': 'true' }, 'package');
+  }
+  exactFields(client['[lib]'], { path: '"src/lib.rs"' }, 'library target');
+  exactFields(client['[[test]]'], { name: '"flow"', path: '"tests/flow.rs"' }, 'integration test target');
+  exactFields(app['[[bin]]'], { name: '"mediflow-gpui-patient-pilot"', path: '"src/main.rs"' }, 'binary test target');
+  const main = read(root, `${gpuiDirectory}/app/src/main.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
+  // These first items cannot be hidden inside a comment, string, cfg or function.
+  if (!/^mod demo;\s*mod text_input;\s*mod theme;/u.test(main)) throw new Error('Pilot binary module binding changed');
+  const files = ['client/tests/flow.rs', 'app/src/demo.rs', 'app/src/text_input.rs'].map(file => `${gpuiDirectory}/${file}`);
+  for (const file of [...files, `${gpuiDirectory}/client/src/lib.rs`, `${gpuiDirectory}/Cargo.lock`]) read(root, file);
+  return { files, executable: 'cargo', args: ['test', '--manifest-path', manifest, '--workspace', '--all-targets', '--locked'], toolchain };
+}
+export function collectGpuiPilotSelection(root) {
+  const command = cargoGpuiPilotTestCommand(root);
+  const paths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**',
+    'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json', 'scripts/native-tool-test-selection.mjs',
+    'scripts/check-test-selection.test.mjs', gpuiWorkflow];
+  const suite = { workflow: gpuiWorkflow, job: 'native-tests',
+    triggers: { pull_request: { paths }, push: { branches: ['main'], paths }, workflow_dispatch: null } };
+  const binding = collectLiteralCiBinding(root, { ...suite, ciCall: [command.executable, ...command.args].join(' ') });
+  const install = collectLiteralCiBinding(root, { ...suite, ciCall: `rustup toolchain install ${command.toolchain} --profile minimal --component rustfmt --component clippy` });
+  const ci = yaml(root, gpuiWorkflow), job = ci.jobs['native-tests'];
+  const env = { ...ci.env, ...job.env, ...job.steps[binding.stepIndex].env };
+  if (env.RUSTUP_TOOLCHAIN !== command.toolchain || install.stepIndex >= binding.stepIndex
+    || binding.jobIf !== null || binding.stepIf !== null || install.stepIf !== null
+    || binding.runsOn !== '${{ matrix.os }}'
+    || JSON.stringify(binding.matrix) !== JSON.stringify({ os: ['ubuntu-24.04', 'macos-latest', 'windows-latest'] })) throw new Error('Pilot CI toolchain or platform binding changed');
+  return { files: command.files, errors: [], mode: 'conditional', conditional: true,
+    binding: { ...binding, command: [command.executable, ...command.args], toolchain: command.toolchain,
+      scope: 'Synthetic tests and native target compilation; no UI execution or product qualification' } };
+}
+
 const uiTarget = 'MediFlowMobileAppUITests';
 function swiftSources(root, folder) {
   const files = [];
@@ -127,6 +197,10 @@ export function collectNativeToolSelections(root) {
   if (fs.existsSync(path.join(root, cargoManifest))) {
     try { const command = cargoTestCommand(root); result['cargo:boundary:local'] = { files: command.files, errors: [], mode: 'local', binding: { command: [command.executable, ...command.args], prerequisites: 'Rust/Cargo and dependencies; synthetic research, no CI or product qualification' } }; }
     catch (error) { result['cargo:boundary:local'] = { files: [], errors: [error.message], mode: 'local' }; }
+  }
+  if (fs.existsSync(path.join(root, `${gpuiDirectory}/Cargo.toml`))) {
+    try { result['cargo:gpui-pilot'] = collectGpuiPilotSelection(root); }
+    catch (error) { result['cargo:gpui-pilot'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
   }
   if (fs.existsSync(path.join(root, `${appleProject}/project.yml`))) {
     try { result['xcode:mobile-ui'] = collectXcodeUiSelection(root); }

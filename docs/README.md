@@ -62,6 +62,15 @@ separa il codec sperimentale dalla futura verticale clinica e dalla scelta
 della shell. [ADR 0137](./adr/0137-rust-boundary-pilot-proposal.md) resta Proposed;
 non sostituisce i prerequisiti 0.9.0/0.9.1 né autorizza una migrazione runtime.
 
+La [verticale paziente Rust/GPUI del 17 ottobre](./analysis/2026-10-17-rust-gpui-patient-pilot.md)
+aggiunge un [pilota nativo avviabile](../experiments/gpui-patient-pilot/README.md)
+con stato del client in Rust, revisione e rilettura su dati inventati.
+La [baseline cifrata delle note](./analysis/2026-10-17-patient-notes-pilot.md)
+caratterizza separatamente i due ingressi Web/API v1 correnti per WUL-574.
+Le prove e i limiti di entrambe le attività sono nei rispettivi verbali;
+il collegamento alla stessa autorità e la decisione IPC/FFI restano nel
+percorso 0.9.1/0.9.2.
+
 ## Percorsi di lettura
 
 - **Prodotto e uso:** [Inizia qui](./start-here.md),

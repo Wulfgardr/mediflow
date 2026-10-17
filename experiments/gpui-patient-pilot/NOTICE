@@ -1,0 +1,17 @@
+MediFlow Rust/GPUI patient pilot
+
+The MediFlow-specific code is covered by the repository MIT license, except
+the portions identified below.
+
+app/src/text_input.rs contains modified portions of the GPUI input example:
+https://github.com/zed-industries/zed/blob/56934ec0560bce8929025497411de7f5322fb6ca/crates/gpui/examples/input.rs
+Copyright Zed Industries and contributors. Licensed under Apache License 2.0.
+See LICENSE-APACHE-GPUI. Changes are identified in the source header.
+
+GPUI and gpui_platform are pinned Git dependencies. Their own licenses and
+transitive dependency licenses remain applicable. No Zed crates/ui widgets
+are copied into this pilot.
+
+The app embeds the existing repository Newsreader and IBM Plex Mono font
+assets. Their SIL Open Font License files remain with those assets; this
+experiment does not relicense them.
