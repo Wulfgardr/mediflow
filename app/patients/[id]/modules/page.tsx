@@ -116,30 +116,12 @@ export default function PatientDetailPage() {
         undefined,
         ['checkups'],
     );
-    /* WUL-262: same data the archive and Smart Import panels already read. */
+    /* The sheet consumes metadata and stored summaries, not original file bytes. */
     const { data: attachments, error: attachmentsError } = useLiveQueryState(
-        async () => db.attachments.query({ patientId: id }).toArray(),
+        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray(),
         [id],
         undefined,
         ['attachments'],
-    );
-    /* WUL-UIUX: conteggi per la striscia di segnali sopra la piega. */
-    // Terapie attive complete (non solo il conteggio) per servire i principi attivi
-    // con posologia direttamente nella cella, senza scendere al TherapyManager.
-    const activeTherapies = useLiveQuery(
-        async () => {
-            const items = await db.therapies.query({ patientId: id }).toArray();
-            return items
-                .filter((therapy) => therapy.status === 'active' && !therapy.deletedAt)
-                .sort((left, right) => {
-                    const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
-                    const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
-                    return rightTime - leftTime;
-                });
-        },
-        [id],
-        undefined,
-        ['therapies'],
     );
     /* WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
        le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
@@ -149,6 +131,18 @@ export default function PatientDetailPage() {
         [id],
         undefined,
         ['therapies'],
+    );
+    // La sintesi usa la stessa lettura, mantenendo solo le terapie attive
+    // e l'ordine per inizio terapia; il workspace riceve l'insieme completo.
+    const activeTherapies = useMemo(
+        () => therapies
+            ?.filter((therapy) => therapy.status === 'active' && !therapy.deletedAt)
+            .sort((left, right) => {
+                const leftTime = left.startDate ? new Date(left.startDate).getTime() : 0;
+                const rightTime = right.startDate ? new Date(right.startDate).getTime() : 0;
+                return rightTime - leftTime;
+            }),
+        [therapies],
     );
     const observations = useLiveQuery(
         async () => db.observations.query({ patientId: id }).toArray(),
@@ -183,30 +177,23 @@ export default function PatientDetailPage() {
         undefined,
         ['service_catalog_entries'],
     );
-    // Ultima osservazione registrata: data e valore per la cella Parametri.
-    const latestObservation = useLiveQuery(
-        async () => {
-            const items = await db.observations.query({ patientId: id }).toArray();
-            return items
-                .filter((observation) => observation.observedAt)
-                .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime())[0] ?? null;
-        },
-        [id],
-        undefined,
-        ['observations'],
+    // Un'unica lettura alimenta l'ultima osservazione e la sua variazione.
+    const datedObservations = useMemo(
+        () => observations
+            ?.filter((observation) => observation.observedAt)
+            .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime()),
+        [observations],
     );
+    const latestObservation = datedObservations === undefined ? undefined : datedObservations[0] ?? null;
     /* WUL-UIUX (Fase 4): ultima misura per il Foglio sinottico, con delta
        calcolato DENTRO il gruppo per codice (mai tra analiti diversi) e solo se
        stessa unita e valori numerici. Classificazione fuori-range da observation-range. */
-    const latestMeasure = useLiveQuery<SynopticMeasure | null>(
-        async () => {
-            const items = await db.observations.query({ patientId: id }).toArray();
-            const sorted = items
-                .filter((observation) => observation.observedAt)
-                .sort((left, right) => new Date(right.observedAt).getTime() - new Date(left.observedAt).getTime());
-            const latest = sorted[0];
+    const latestMeasure = useMemo<SynopticMeasure | null | undefined>(
+        () => {
+            if (datedObservations === undefined) return undefined;
+            const latest = datedObservations[0];
             if (!latest) return null;
-            const previous = sorted.find(
+            const previous = datedObservations.find(
                 (observation, index) => index > 0 && observation.code === latest.code && observation.unitCode === latest.unitCode,
             );
             let delta: SynopticMeasure['delta'];
@@ -228,9 +215,7 @@ export default function PatientDetailPage() {
                 outOfRange: classifyObservationRange(latest.value, latest.refLow, latest.refHigh) ?? undefined,
             };
         },
-        [id],
-        undefined,
-        ['observations'],
+        [datedObservations],
     );
     /* WUL-UIUX: conteggi leggeri per i chip delle sezioni collassabili. */
     const prestazioniCount = servicePrescriptions?.length;

@@ -171,7 +171,8 @@ export default function ObservationManager({
 
     const observations = useLiveQuery(
         async () => {
-            const items = await db.observations.filter((o) => o.patientId === patientId).toArray();
+            if (!patientId) return [];
+            const items = await db.observations.query({ patientId }).toArray();
             return items.sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime());
         },
         [patientId],
