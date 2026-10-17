@@ -250,7 +250,7 @@ export function summarizeObservation(observation: Observation): string {
 }
 
 function buildCodingHints(
-  patient: Kree8Patient,
+  patient: Pick<Kree8Patient, 'raw'>,
   therapies: Therapy[],
   attachments: Attachment[],
 ): string[] {
@@ -273,13 +273,8 @@ function buildCodingHints(
   return hints.slice(0, 3);
 }
 
-/* WUL-UIUX Fase 7 (innesto): adapter per la Scheda (/modules), che ha
-   gia il record Patient di '@/lib/db' e gli array grezzi. Costruiamo il minimo
-   Kree8Patient che buildPatientWorkspace legge davvero (solo `raw`, da cui
-   arrivano diagnoses e documentInsights) e deleghiamo alla stessa pipeline del
-   Quadro: i numeri non possono divergere per costruzione. Gli array vengono
-   copiati perche il builder ordina in-place e gli array della pagina sono
-   condivisi con altre viste. Nessun cambio di comportamento per il cockpit. */
+/* La Scheda usa lo stesso riepilogo del Quadro. Si copiano solo osservazioni
+   e allegati: il builder filtra gli altri array prima di ordinarli. */
 export function buildPatientWorkspaceFromRecords({
   patient,
   entries,
@@ -295,29 +290,11 @@ export function buildPatientWorkspaceFromRecords({
   observations: Observation[];
   attachments: Attachment[];
 }): Kree8PatientWorkspace {
-  const minimalPatient: Kree8Patient = {
-    id: patient.id,
-    name: [patient.lastName, patient.firstName].filter(Boolean).join(' ') || 'Paziente senza nome',
-    code: '',
-    scope: 'ambulatorio',
-    list: patient.isArchived ? 'archivio' : 'attivi',
-    status: 'neutral',
-    statusLabel: '',
-    diagnoses: [],
-    lastTouch: '',
-    pathway: '',
-    href: '',
-    modulesHref: '',
-    ageLabel: '',
-    summary: '',
-    raw: patient,
-  };
-
   return buildPatientWorkspace({
-    patient: minimalPatient,
-    entries: [...entries],
-    therapies: [...therapies],
-    checkups: [...checkups],
+    patient: { raw: patient },
+    entries,
+    therapies,
+    checkups,
     observations: [...observations],
     attachments: [...attachments],
   });
@@ -331,7 +308,7 @@ export function buildPatientWorkspace({
   observations,
   attachments,
 }: {
-  patient: Kree8Patient;
+  patient: Pick<Kree8Patient, 'raw'>;
   entries: ClinicalEntry[];
   therapies: Therapy[];
   checkups: Checkup[];
