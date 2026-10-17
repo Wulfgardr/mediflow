@@ -72,6 +72,26 @@ L'host di queste prove resta `9028b0772d0b5415e749e22f730e31cfcc3bf6fa`.
 Gli esiti del client `b8eb2ed67` non attestano il runtime finale `32437e7c5`,
 una distribuzione installata o dispositivi fisici.
 
+La [PR #560](https://github.com/Wulfgardr/mediflow/pull/560), integrata a
+`d1c087fcb`, corregge la lista iPhone in orizzontale. La prova manuale su
+iPhone Simulator 26.5, client `220e89291` e host `9028b0772`, ha verificato
+accesso v3, cinque pazienti sintetici, prima riga visibile, CSV e filtri
+raggiungibili e selezione conservata tornando in verticale. Dopo la correzione
+numerica del test nella [PR #561](https://github.com/Wulfgardr/mediflow/pull/561),
+la [verifica Apple su `63a3cfe254159310a49143c2212760d2cd76ad0f`](https://github.com/Wulfgardr/mediflow/actions/runs/39055983083)
+è riuscita: build nativa ed export, iPad 4/4, iPhone 38 prove riuscite e 16
+saltate. La rotazione è riuscita al primo tentativo; una prova di accessibilità
+è riuscita al secondo tentativo previsto dopo un timeout `Code -56`.
+Le prove su hardware fisico sono descritte separatamente sotto.
+
+Il pacchetto Mac `32437e7c5` ha superato compilazione nativa GitHub, export e
+controllo automatico di avvio. Il Web del pacchetto ha superato la prova UI
+con PIN, una scheda inventata e due PDF: passaggio dall'originale A a B,
+rimozione dei contenuti al blocco, sblocco con l'originale chiuso e riapertura
+esplicita corretta di A. La copia in Applicazioni ha firma e hash verificati.
+L'app installata si avvia; il nuovo accesso della sessione operatore resta da
+verificare.
+
 In una prova separata, firma automatica e provisioning di sviluppo sono
 riusciti; l'app QA è stata installata e avviata su iPhone fisico, con processo
 osservato stabile per 14,5 secondi. Non erano configurati archivi: accesso e
@@ -92,13 +112,13 @@ per la revisione e la superficie indicate, senza trasferirsi ad altri candidati.
 
 | Funzione | Web macOS | Web Windows 11 ARM | Web Ubuntu | Nativo macOS | iPhone / iPad |
 | --- | --- | --- | --- | --- | --- |
-| Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Tre prove di accesso riuscite sulla base `a5420afa3`; lifecycle completato in 50,6 secondi con limite di 120 | Ambiente assente | Accesso v3 UI riuscito anche sul client `b8eb2ed67`, con host `9028b0772` | Accesso e cartella riusciti su iPhone simulato `65da73735` e iPad simulato `b8eb2ed67` con host `9028b0772`; hardware fisico da provare |
-| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati su `65da73735`; CSV nel client `b8eb2ed67`: due schede e un duplicato escluso, lista aggiornata da tre a cinque e selezione conservata; host `9028b0772` | Cartella e indirizzo letti nei simulatori iPhone e iPad; iPad legge anche le schede importate dal Mac. Importazione CSV dal dispositivo e riavvio da provare |
+| Accesso e account v3 | Accesso disponibile; lifecycle completo da provare sul candidato | Rotte v3 HTTPS su `32437e7c5`: due prove riuscite, Swift saltato; verifica, uscita, rifiuto del riuso, revoca e blocco dei tentativi nel test canonico. UI e client Swift da provare | Ambiente assente | Accesso v3 UI riuscito anche sul client `b8eb2ed67`, con host `9028b0772` | Accesso e cartella riusciti su iPhone simulato `65da73735` e iPad simulato `b8eb2ed67` con host `9028b0772`; hardware fisico da provare |
+| Cartella senza AI e importazione CSV | CRUD presenti; percorsi completi e recupero da provare | Sei prove dell'harness ufficiale riuscite, con errore a freddo ancora da qualificare | Ambiente assente | Creazione e indirizzo decifrato verificati su `65da73735`; CSV nel client `b8eb2ed67`: due schede e un duplicato escluso, lista aggiornata da tre a cinque e selezione conservata; host `9028b0772` | Cartella e indirizzo letti nei simulatori iPhone e iPad; iPad legge anche le schede importate dal Mac. Rotazione e selezione verificate in simulatore; correzioni #560/#561 e verifica Apple descritte sopra. Importazione CSV dal dispositivo e riavvio da provare |
 | Diario ed editor | Composizione, allegati e recupero bozza da provare | Interazione nel guest da provare | Ambiente assente | Client `b8eb2ed67`: rientri annidati, due allegati e titolo aggiornato da iPad visibili; host `9028b0772` | iPad simulato `b8eb2ed67`: Diario senza arresto, rientri visibili e modifica titolo salvata; versione 2 e due allegati riletti via HTTPS dall’host `9028b0772`. Altri flussi editor da provare; niente scritture offline |
 | Documenti e OCR | Percorso HTTP/UI completo da provare; composizione locale AnyDoc → Apple Vision riuscita su `b8eb2ed67` | OCR Tesseract e dipendenze guest da provare | Ambiente assente; Omarchy resta distinto | Upload di due file riuscito su `9028b0772`; nel client `b8eb2ed67` Documenti è disponibile subito senza cambio di sezione. OCR locale provato separatamente, senza UI | Upload multiplo integrato con #541; motore OCR sull'host, non sul dispositivo |
 | Repertori WHO, AIFA, esenzioni, protesica | Importazione, ricerca e aggiornamento da provare | Servizi e cataloghi locali al guest da provare | Ambiente assente | Lookup e flussi manuali presenti; amministrazione sull'host | Lookup paired e inserimento manuale; amministrazione sull'host |
 | Quattro esperienze AI / ChatGPT | Tre funzioni locali Ollama con almeno una preview HTTP riuscita sul candidato `c3ee6f5f1`; limiti Patient Insight descritti sotto. ChatGPT: accesso/catalogo riusciti, generazione bloccata dalla quota | Esecuzione locale ChatGPT non qualificata | Target ed esecuzione locale ChatGPT non qualificati | Quattro viste presenti; generazioni e revisione finale ancora da verificare | Quattro viste integrate con #541; esecuzione sull'host Mac, generazioni da mobile non provate |
-| Conflitti, lock, backup e recupero | Ripristino sintetico locale provato su `b8eb2ed67`; conflitto, riavvio e recupero dal file tramite UI da provare | Lifecycle riuscito; Supervisor completo riuscito sul candidato `b720ccfe7` descritto sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
+| Conflitti, lock, backup e recupero | Ripristino sintetico locale provato su `b8eb2ed67`; conflitto, riavvio e recupero dal file tramite UI da provare | Supervisor canonico riuscito su `32437e7c5`: cinque operazioni, checkup, aggiornamento e audit, revoca e pulizia; dettagli sotto | Ambiente assente | Writer HTTP e lock presenti; recupero completo amministrato sull'host | Writer HTTP e cache cifrata read-only presenti; niente coda write offline; backup e recupero sull'host |
 
 Il contributo editor #544 aggiunge aumento e riduzione del rientro, elenchi
 annidati e citazioni multiblocco. La prova Mac conferma il salvataggio e la
@@ -128,6 +148,7 @@ sono descritti nelle PR sopra; le prove restano riferite ai candidati indicati.
 | Omarchy/Arch ARM, Node 24.21.0, `main` a `35412087c50cf98df7cb7afa4b10a7b4641be6e7` | Nuova build e prova completa del Supervisor riuscite: due backend isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura. Cinque letture HTTP della revisione hanno confermato il candidato pulito. | Include la correzione #550; non prova UI, Ubuntu o Linux x86_64. Dati temporanei rimossi e porte liberate. |
 | Windows 11 ARM con Node 24.21.0 Windows x64, stessa base `a5420afa3` | Build e sei prove ufficiali riuscite dopo una migrazione eseguita dal codice sorgente; tre prove di accesso riuscite, incluso lifecycle in 50,6 secondi con limite di 120 | Primo `DB_QUERY_FAILED` a freddo senza causa stabilita; trasporto di prova intermittente. Il successivo difetto di attivazione e la sua correzione sono descritti sotto. |
 | Windows 11 ARM con Node 24.21.0 Windows x64, candidato `b720ccfe7a30c88badd57e4f99830bed487347b2` | Attivazione HTTP 200 in 3,287 secondi; prova completa del Supervisor in 75,504 secondi: due processi isolati, cinque operazioni, checkup governato, singolo aggiornamento e audit, revoca e chiusura | Nessuna strumentazione nel prodotto; harness originale ripristinato e nessun processo Node residuo osservato. Non prova interazione UI o Windows 11 x64 nativo. |
+| Windows 11 ARM, Node 24.21.0 Windows x64, revisione `32437e7c5646042d6f156113f3f0df0fd4640455` | Compilazione, preparazione del pacchetto e avvio riusciti su archivio sintetico isolato; revisione HTTP coerente e controllo autenticazione con PIN pronto. Rotte v3 HTTPS: due prove riuscite in 13,15 secondi e una Swift saltata. Supervisor canonico riuscito in 84,03 secondi: archivi isolati, cinque operazioni, checkup, aggiornamento e audit, revoca e pulizia | UI guest non verificata: i comandi di controllo non hanno aperto Edge, con causa non stabilita. Le prove v3 esercitano le rotte di produzione nel test HTTPS, con client Swift saltato; la fixture Next ordinaria è separata. Esecuzione x64 emulata su ARM; hardware Windows x64 da provare. |
 
 Le prove guest non attestano un installer nativo, Windows x64 o Ubuntu.
 Su una nuova fixture Windows, il primo avvio canonico ha completato la
