@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "releaseTag": "v0.9.0",
+  "releaseSha": "9c7b3adf2eb18551b7c03b61e0fa6ee2303d31d0",
+  "lockfileSha256": "50aa3dde33fcdc846a8278cd1749b5d317ed9a14a2e5e54ead1cfc4dfcb2a71f",
+  "dependencyStrategy": "exact-lock overlay: unchanged dependencies linked; mismatched dependencies physically verified",
+  "physicalDependencies": [
+    {
+      "name": "@mediflow/web-auth-lifecycle-owner",
+      "version": "0.8.9-local.3f2e6f2a",
+      "resolved": "file:packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.9-local.3f2e6f2a.tgz",
+      "integrity": "sha512-AwOrnXGjw58hVvnqbcFzftxSNqgx4B16h0WtbXdiVnaybRRiGn4gaGz5gZ+QbvvudsS6P8s78hXLdbj+mkI8Xw==",
+      "physicalCopy": true
+    },
+    {
+      "name": "framer-motion",
+      "version": "12.23.26",
+      "resolved": "https://registry.npmjs.org/framer-motion/-/framer-motion-12.23.26.tgz",
+      "integrity": "sha512-cPcIhgR42xBn1Uj+PzOyheMtZ73H927+uWPDVhUMqxy8UHt6Okavb6xIz9J/phFUHUj0OncR6UvMfJTXoc/LKA==",
+      "physicalCopy": true
+    },
+    {
+      "name": "motion-dom",
+      "version": "12.23.23",
+      "resolved": "https://registry.npmjs.org/motion-dom/-/motion-dom-12.23.23.tgz",
+      "integrity": "sha512-n5yolOs0TQQBRUFImrRfs/+6X4p3Q4n1dUEqt/H58Vx7OW6RF+foWEgmTVDhIWJIMXOuNNL0apKH2S16en9eiA==",
+      "physicalCopy": true
+    },
+    {
+      "name": "motion-utils",
+      "version": "12.23.6",
+      "resolved": "https://registry.npmjs.org/motion-utils/-/motion-utils-12.23.6.tgz",
+      "integrity": "sha512-eAWoPgr4eFEOFfg2WjIsMoqJTW6Z8MTUCgn/GZ3VRpClWBdnbjryiA3ZSNLyxCTmCQx4RmYX6jX1iWHbenUPNQ==",
+      "physicalCopy": true
+    },
+    {
+      "name": "openai",
+      "version": "6.16.0",
+      "resolved": "https://registry.npmjs.org/openai/-/openai-6.16.0.tgz",
+      "integrity": "sha512-fZ1uBqjFUjXzbGc35fFtYKEOxd20kd9fDpFeqWtsOZWiubY8CZ1NAlXHW3iathaFvqmNtCWMIsosCuyeI7Joxg==",
+      "physicalCopy": true
+    }
+  ],
+  "javascriptSource": {
+    "editorSha256": "a72a03293b44aea0394a195f617e64b652c0b7946ab0f705b8dc21050297da1d",
+    "securitySha256": "9415904050b52dea9f52a18fbe654ed1299eaec5e7a8a9fee6a2fc796493329c"
+  },
+  "qualification": "Frozen exact release source with its released Web PIN protocol. The observed read is separate from the candidate paired-v3 same-host comparison."
+}

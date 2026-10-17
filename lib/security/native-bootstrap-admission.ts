@@ -83,7 +83,7 @@ function canonicalPairedRequest(value: unknown): Request | null {
 
 function entryFromPairedClient(client: StoredNetworkPairedClient | null): AdmissionEntry | null {
     if (!client || typeof client.clientId !== 'string' || typeof client.tokenHash !== 'string') return null;
-    if (client.clientPlatform !== 'macos' && client.clientPlatform !== 'ios' && client.clientPlatform !== 'ipados') return null;
+    if (client.clientPlatform !== 'macos' && client.clientPlatform !== 'ios' && client.clientPlatform !== 'ipados' && client.clientPlatform !== 'windows' && client.clientPlatform !== 'linux') return null;
     return ObjectFreeze({ clientId: client.clientId, clientPlatform: client.clientPlatform, tokenHash: client.tokenHash });
 }
 

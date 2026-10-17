@@ -60,6 +60,10 @@ const eslintConfig = defineConfig([
     "scripts/__pycache__/**",
     "native/MediFlowMac/.build/**",
     "native/MediFlowMac/Build/**",
+    // Cargo owns these generated dependency/build trees, which can change
+    // while the JavaScript source lint is running.
+    "experiments/gpui-patient-pilot/target/**",
+    "experiments/rust-boundary/target/**",
   ]),
 ]);
 

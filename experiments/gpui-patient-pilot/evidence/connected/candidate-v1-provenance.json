@@ -1,0 +1,11 @@
+{
+  "baseHead": "d0cd18f1b4d1e96ac37712415ae9b42fd059d062",
+  "hostDiffSha256": "dc0b26ae3fcdacbb0e966078f0e4520a6d03ed9f824f820c20713693d6ba6045",
+  "sourceManifestSha256": "99f19668731fdd7c944ef8da04e974488e8ce05b808fe9da2f3c4bee67b7d590",
+  "copiedFileCount": 1926,
+  "ownerVersion": "0.8.11",
+  "ownerPhysicalCopy": true,
+  "nodeVersion": "v24.19.0",
+  "rustProbeSha256": "c69f2407ffda7bf22aa8e3307dd67ea82a736690b7f2ad93881206e10bed4a9d",
+  "runtimeMode": "Next dev --webpack; optimized Rust probe supplied by caller"
+}

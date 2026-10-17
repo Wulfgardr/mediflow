@@ -1,5 +1,10 @@
 # Prima verticale paziente Rust / GPUI
 
+**Verbale storico della demo in memoria.** Il comando normale ora apre il
+[client collegato](./2026-10-17-rust-gpui-connected-client.md); la demo qui
+descritta resta disponibile con `--demo`. I conteggi, le immagini e i limiti
+di questa prima prova non sono stati attribuiti alla nuova implementazione.
+
 Data: 17 ottobre 2026. Refs [WUL-706](https://linear.app/wulfgardr/issue/WUL-706),
 [WUL-714](https://linear.app/wulfgardr/issue/WUL-714),
 [WUL-574](https://linear.app/wulfgardr/issue/WUL-574).

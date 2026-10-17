@@ -1,0 +1,28 @@
+{
+  "protocolId": "paired-v3-patient-profile-1",
+  "synthetic": true,
+  "taxCodes": {
+    "javascript": "SYNPROFILEJS0001",
+    "rust": "SYNPROFILERS0001"
+  },
+  "create": {
+    "firstName": "Livia",
+    "lastName": "Confronto sintetico",
+    "birthDate": "1991-05-09T00:00:00.000Z",
+    "address": "Via sintetica 1, Città",
+    "phone": "0000000171",
+    "caregiver": "Caregiver sintetico iniziale",
+    "isAdi": false
+  },
+  "update": {
+    "address": "Via sintetica 2, Città e 🩺.",
+    "isAdi": true
+  },
+  "staleUpdate": {
+    "address": "Tentativo sintetico obsoleto da rifiutare."
+  },
+  "clear": {
+    "birthDate": null,
+    "phone": null
+  }
+}

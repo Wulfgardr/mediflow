@@ -280,6 +280,26 @@
       "change": "POST /api/v1/network/patients/{id}/checkups request.id changed",
       "trackingIssue": "WUL-720",
       "reason": "ADR0015 checkup create identity (spec 1.33.0): explicit invalid or blank IDs now return 400 instead of being persisted or silently replaced. Omission still generates a UUID; valid opaque IDs are preserved. Duplicate IDs return 409 after parent/scope admission, without another write or audit."
+    },
+    {
+      "change": "GET /api/v1/network/pairing-intents response 200[].requestedBy.clientPlatform changed",
+      "trackingIssue": "WUL-706",
+      "reason": "ADR0145 / WUL-714: explicitly add windows and linux to the paired native client roster for the Rust/GPUI transition requested on 17 October 2026. Existing Apple request values remain accepted; unknown platforms still fail closed. Response enum extension is not universally compatible with older strict consumers: old hosts reject new platforms and older client roster decoding must be assessed before rollout. No capability or role is granted by platform alone. Spec 1.37.0, network protocol 1.12.0."
+    },
+    {
+      "change": "POST /api/v1/network/pairing-intents request.clientPlatform changed",
+      "trackingIssue": "WUL-706",
+      "reason": "ADR0145 / WUL-714: explicitly add windows and linux to the paired native client roster for the Rust/GPUI transition requested on 17 October 2026. Existing Apple request values remain accepted; unknown platforms still fail closed. Response enum extension is not universally compatible with older strict consumers: old hosts reject new platforms and older client roster decoding must be assessed before rollout. No capability or role is granted by platform alone. Spec 1.37.0, network protocol 1.12.0."
+    },
+    {
+      "change": "POST /api/v1/network/pairing-intents response 201.requestedBy.clientPlatform changed",
+      "trackingIssue": "WUL-706",
+      "reason": "ADR0145 / WUL-714: explicitly add windows and linux to the paired native client roster for the Rust/GPUI transition requested on 17 October 2026. Existing Apple request values remain accepted; unknown platforms still fail closed. Response enum extension is not universally compatible with older strict consumers: old hosts reject new platforms and older client roster decoding must be assessed before rollout. No capability or role is granted by platform alone. Spec 1.37.0, network protocol 1.12.0."
+    },
+    {
+      "change": "POST /api/v1/network/pairing-intents/{intentId}/confirm response 201.pairedClient.clientPlatform changed",
+      "trackingIssue": "WUL-706",
+      "reason": "ADR0145 / WUL-714: explicitly add windows and linux to the paired native client roster for the Rust/GPUI transition requested on 17 October 2026. Existing Apple request values remain accepted; unknown platforms still fail closed. Response enum extension is not universally compatible with older strict consumers: old hosts reject new platforms and older client roster decoding must be assessed before rollout. No capability or role is granted by platform alone. Spec 1.37.0, network protocol 1.12.0."
     }
   ]
 }

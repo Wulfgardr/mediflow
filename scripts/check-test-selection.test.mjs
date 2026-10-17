@@ -57,7 +57,8 @@ test('a deleted file still listed by git is not read as a test', () => {
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const pilotFiles = [`${pilot}/client/tests/flow.rs`, `${pilot}/app/src/demo.rs`, `${pilot}/app/src/text_input.rs`];
+const pilotFiles = ['client/tests/flow.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/text_input.rs',
+  'transport/src/catalogs.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/session.rs'].map(file => `${pilot}/${file}`);
 const pilotTestCall = `cargo test --manifest-path ${pilot}/Cargo.toml --workspace --all-targets --locked`;
 function pilotFixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'mediflow-cargo-selection-'));
@@ -66,11 +67,15 @@ function pilotFixture(t) {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     writeFileSync(path.join(root, file), value);
   };
-  for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'client/Cargo.toml', 'app/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
+  for (const file of [pilotWorkflow, ...['Cargo.toml', 'rust-toolchain.toml', 'client/Cargo.toml', 'transport/Cargo.toml', 'app/Cargo.toml'].map(file => `${pilot}/${file}`)]) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
-  for (const file of [...pilotFiles, `${pilot}/client/src/lib.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
-  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod demo;\nmod text_input;\nmod theme;\nfn main() {}');
+  for (const file of [...pilotFiles, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
+  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
+  write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod catalogs;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod session;\nmod tls;');
+  for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
+    write(`${pilot}/comparison/${file}`, readFileSync(path.join(sourceRoot, pilot, 'comparison', file)));
+  }
   return root;
 }
 function changePilot(root, file, before, after) {
@@ -88,13 +93,33 @@ test('GPUI test selection binds the explicit Cargo targets to every native CI pl
   assert.deepEqual(selection.binding.matrix.os, ['ubuntu-24.04', 'macos-latest', 'windows-latest']);
 });
 
+test('GPUI runtime comparison binds all adapters and preparer to the actual CI command', t => {
+  const selection = collectNativeToolSelections(sourceRoot)['http:gpui-comparison'];
+  assert.deepEqual(selection.errors, []);
+  assert.deepEqual(selection.files, ['prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs'].map(file => `${pilot}/comparison/${file}`));
+  for (const [file, before, after] of [
+    [pilotWorkflow, '--output-dir comparison-results --samples 5', '--output-dir comparison-results --samples 5 || true'],
+    [`${pilot}/comparison/run.mjs`, "[path.join(directory, 'prepare-runtime.mjs'), 'candidate', privatePath, workspace]", "['not-the-preparer.mjs']"],
+    [`${pilot}/comparison/run.mjs`, 'compareReports(mutationReports.javascript, mutationReports.rust)', 'compareReports({}, {})'],
+    [ `${pilot}/comparison/run.mjs`, 'compareResourceWritesReports(resourceReports.javascript, resourceReports.rust)', 'compareResourceWritesReports({}, {})'],
+    [ `${pilot}/comparison/run.mjs`, 'comparePatientProfileWritesReports(profileReports.javascript, profileReports.rust)', 'comparePatientProfileWritesReports({}, {})'],
+  ]) {
+    const root = pilotFixture(t);
+    assert.deepEqual(collectNativeToolSelections(root)['http:gpui-comparison'].errors, []);
+    changePilot(root, file, before, after);
+    assert.ok(collectNativeToolSelections(root)['http:gpui-comparison'].errors.length);
+  }
+});
+
 test('GPUI coverage fails closed when Cargo membership, modules or actual CI invocation diverge', t => {
   for (const [file, before, after] of [
-    [`${pilot}/Cargo.toml`, 'members = ["client", "app"]', 'members = ["client"]'],
+    [`${pilot}/Cargo.toml`, 'members = ["client", "transport", "app"]', 'members = ["client", "app"]'],
     [`${pilot}/client/Cargo.toml`, 'path = "tests/flow.rs"', 'path = "tests/flow.rs"\nharness = false'],
     [`${pilot}/app/Cargo.toml`, 'path = "src/main.rs"', 'path = "src/main.rs"\ntest = false'],
     [`${pilot}/app/src/main.rs`, 'mod demo;', '#[cfg(feature = "optional")]\nmod demo;'],
     [`${pilot}/app/src/main.rs`, 'mod demo;', '// mod demo;'],
+    [`${pilot}/transport/src/lib.rs`, 'mod session;', '#[cfg(feature = "optional")]\nmod session;'],
+    [`${pilot}/transport/Cargo.toml`, 'path = "src/lib.rs"', 'path = "src/lib.rs"\ntest = false'],
     [pilotWorkflow, pilotTestCall, pilotTestCall.replace('--workspace ', '')],
     [pilotWorkflow, pilotTestCall, pilotTestCall.replace('--all-targets', '--lib')],
     [pilotWorkflow, pilotTestCall, `${pilotTestCall} || true`],
