@@ -1,0 +1,314 @@
+{
+  "schemaVersion": "mediflow.owner-pins.recovery-validation.v1",
+  "evidenceKind": "new-local-execution-after-filesystem-recovery",
+  "syntheticOnly": true,
+  "conclusive": true,
+  "baselineHead": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+  "baselineTree": "0c77efadbcd16b2ec17d263b0e29ad221a0dedab",
+  "previousExecutionIsNotReused": true,
+  "sourceFiles": [
+    {
+      "path": "app/api/patients/route.test.ts",
+      "bytes": 16737,
+      "sha256": "cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8"
+    },
+    {
+      "path": "lib/patient-create-service.test.ts",
+      "bytes": 12220,
+      "sha256": "be162f903a5d8076a7f8de87a0c7cf618d2db832f7b0a302b237fb7b84a12bcd"
+    },
+    {
+      "path": "lib/security/patient-create-context.test.ts",
+      "bytes": 7251,
+      "sha256": "a1e5da8287c9c863b55d8e422c28c54180499ae3cc05dc5a2a6c6cb845d6f0f5"
+    },
+    {
+      "path": "lib/security/web-auth-lifecycle-owner-boundary.test.ts",
+      "bytes": 22564,
+      "sha256": "a137f2ae0574c807da55270336bebc189f87c9cc466081a61b7489af3daf5bb9"
+    }
+  ],
+  "testDiffSha256": "b04bc61533eb31c843c543df2cde47897259222f3d71d2004888ad0d73b5350f",
+  "execution": {
+    "startedAt": "2026-10-17T20:21:18.912746+00:00",
+    "completedAt": "2026-10-17T20:21:22.670308+00:00",
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "scripts/run-strip-types.mjs",
+      "--test",
+      "--test-concurrency=1",
+      "--test-reporter=tap",
+      "app/api/patients/route.test.ts",
+      "lib/patient-create-service.test.ts",
+      "lib/security/patient-create-context.test.ts",
+      "lib/security/web-auth-lifecycle-owner-boundary.test.ts"
+    ],
+    "cwd": "/workspace/scratch/40b5a2cd37a4/mediflow-ci-fixes",
+    "nodeVersion": "v24.19.0",
+    "npmVersion": "11.9.0",
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "exitCode": 0,
+    "durationSeconds": 3.749913115000254,
+    "counts": {
+      "tests": 46,
+      "suites": 0,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "syntheticRuntimePath": "/tmp/mediflow-owner-pin-recovery-8x4plx71",
+    "syntheticRuntimeRemoved": true,
+    "logPath": "/tmp/mediflow-owner-0811-pins-recovery-tests.log",
+    "logSha256": "c1e7acbe7e5cba88335e1dd6a09eb64dcbe0efd80cbf8c0ce5f4ad0f3f7eb548",
+    "logExcerpt": [
+      "# Subtest: actual patient HTTP route boundaries on synthetic SQL",
+      "ok 1 - actual patient HTTP route boundaries on synthetic SQL",
+      "# Subtest: fenced A with cookie B and body B commits patient AND membership ONLY in A",
+      "ok 2 - fenced A with cookie B and body B commits patient AND membership ONLY in A",
+      "# Subtest: generation retired immediately before the transaction operation leaves zero SQL rows",
+      "ok 3 - generation retired immediately before the transaction operation leaves zero SQL rows",
+      "# Subtest: same user NEW generation with old precondition cannot insert either SQL row",
+      "ok 4 - same user NEW generation with old precondition cannot insert either SQL row",
+      "# Subtest: physical owner FINAL denial after both INSERTs rolls back the REAL SQLite transaction",
+      "ok 5 - physical owner FINAL denial after both INSERTs rolls back the REAL SQLite transaction",
+      "# Subtest: preview TTL expiring after INSERTs also rolls back, not just a failed boolean",
+      "ok 6 - preview TTL expiring after INSERTs also rolls back, not just a failed boolean",
+      "# Subtest: target deleted after preview never routes to B/default",
+      "ok 7 - target deleted after preview never routes to B/default",
+      "# Subtest: membership constraint failure rolls back the inserted patient and retains existing rows",
+      "ok 8 - membership constraint failure rolls back the inserted patient and retains existing rows",
+      "# Subtest: retirement AFTER commit is not represented as rollback",
+      "ok 9 - retirement AFTER commit is not represented as rollback",
+      "# Subtest: duplicate UUID is create-only: no upsert and no loss of the original SQL patient/membership",
+      "ok 10 - duplicate UUID is create-only: no upsert and no loss of the original SQL patient/membership",
+      "# Subtest: physical package root is exact 0.8.11, not a shim",
+      "ok 11 - physical package root is exact 0.8.11, not a shim",
+      "# Subtest: preview emits only inert bounded metadata; reusable only under the original generation",
+      "ok 12 - preview emits only inert bounded metadata; reusable only under the original generation",
+      "# Subtest: same user, different active generation cannot reuse the preview",
+      "ok 13 - same user, different active generation cannot reuse the preview",
+      "# Subtest: physical owner disposal invalidates preview and frees consumer capacity",
+      "ok 14 - physical owner disposal invalidates preview and frees consumer capacity",
+      "# Subtest: TTL is inclusive at expiry, not silently renewed, and pruning releases the real owner registration",
+      "ok 15 - TTL is inclusive at expiry, not silently renewed, and pruning releases the real owner registration",
+      "# Subtest: per-generation and process capacities deny without evicting a live preview; disposal frees capacity",
+      "ok 16 - per-generation and process capacities deny without evicting a live preview; disposal frees capacity",
+      "# Subtest: mismatched/unknown/invalid preconditions never invoke operation or change target",
+      "ok 17 - mismatched/unknown/invalid preconditions never invoke operation or change target",
+      "# Subtest: fenced headers cannot fall back when partial/invalid (undefined)",
+      "ok 18 - fenced headers cannot fall back when partial/invalid (undefined)",
+      "# Subtest: fenced headers cannot fall back when partial/invalid (\"\")",
+      "ok 19 - fenced headers cannot fall back when partial/invalid (\"\")",
+      "# Subtest: fenced headers cannot fall back when partial/invalid (\"legacy\")",
+      "ok 20 - fenced headers cannot fall back when partial/invalid (\"legacy\")",
+      "# Subtest: fenced headers cannot fall back when partial/invalid (\"fixed-preview-v2\")",
+      "ok 21 - fenced headers cannot fall back when partial/invalid (\"fixed-preview-v2\")",
+      "# Subtest: fenced headers cannot fall back when partial/invalid (\"fixed-preview-v1\")",
+      "ok 22 - fenced headers cannot fall back when partial/invalid (\"fixed-preview-v1\")",
+      "# Subtest: only no headers means legacy; valid triple means fenced; duplicate or orphan headers deny",
+      "ok 23 - only no headers means legacy; valid triple means fenced; duplicate or orphan headers deny",
+      "# Subtest: preserves the preceding 0.8.9-local.3f2e6f2a artifact and provenance as immutable predecessor evidence",
+      "ok 24 - preserves the preceding 0.8.9-local.3f2e6f2a artifact and provenance as immutable predecessor evidence",
+      "# Subtest: preserves the preceding 0.8.10 artifact and provenance as immutable predecessor evidence",
+      "ok 25 - preserves the preceding 0.8.10 artifact and provenance as immutable predecessor evidence",
+      "# Subtest: pins the exact final source manifest and immutable input bytes",
+      "ok 26 - pins the exact final source manifest and immutable input bytes",
+      "# Subtest: pins the final tarball and its normalized regular-file roster",
+      "ok 27 - pins the final tarball and its normalized regular-file roster",
+      "# Subtest: reproduces the tracked artifact byte-for-byte from two clean offline source copies",
+      "ok 28 - reproduces the tracked artifact byte-for-byte from two clean offline source copies",
+      "# Subtest: binds provenance to the accepted base, predecessor, inputs, and tar roster",
+      "ok 29 - binds provenance to the accepted base, predecessor, inputs, and tar roster",
+      "# Subtest: installs exactly one physical package copy from the pinned artifact",
+      "ok 30 - installs exactly one physical package copy from the pinned artifact",
+      "# Subtest: installs the tracked artifact offline as one physical scratch package",
+      "ok 31 - installs the tracked artifact offline as one physical scratch package",
+      "# Subtest: exposes only the frozen final root and keeps the adapter package-only",
+      "ok 32 - exposes only the frozen final root and keeps the adapter package-only",
+      "# Subtest: leaves the historical owner cluster without production consumers",
+      "ok 33 - leaves the historical owner cluster without production consumers",
+      "# tests 46",
+      "# suites 0",
+      "# pass 46",
+      "# fail 0",
+      "# cancelled 0",
+      "# skipped 0",
+      "# todo 0",
+      "# duration_ms 3456.52436"
+    ],
+    "localLogPathOnly": true
+  },
+  "limits": [
+    "Targeted local tests only; no new GitHub CI or native GUI qualification."
+  ],
+  "lint": {
+    "command": [
+      "node",
+      "node_modules/eslint/bin/eslint.js",
+      "--format",
+      "json",
+      "app/api/patients/route.test.ts",
+      "lib/patient-create-service.test.ts",
+      "lib/security/patient-create-context.test.ts",
+      "lib/security/web-auth-lifecycle-owner-boundary.test.ts"
+    ],
+    "exitCode": 0,
+    "files": 4,
+    "errors": 0,
+    "warnings": 0,
+    "fatalErrors": 0,
+    "logPath": "/tmp/mediflow-owner-0811-pins-recovery-eslint.json",
+    "logSha256": "e0bb7eb901080fbb1bd017ae9a97c787b38f662af877f2ce74574e969e6aab84"
+  },
+  "recovery": {
+    "method": "Rebuilt from public db98 baseline and retained context; no lost receipt was invented.",
+    "files": [
+      {
+        "path": "app/api/patients/route.test.ts",
+        "matchesPreviouslyReviewedFile": true,
+        "previouslyReviewedSha256": "cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8",
+        "currentSha256": "cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8"
+      },
+      {
+        "path": "lib/patient-create-service.test.ts",
+        "matchesPreviouslyReviewedFile": true,
+        "previouslyReviewedSha256": "be162f903a5d8076a7f8de87a0c7cf618d2db832f7b0a302b237fb7b84a12bcd",
+        "currentSha256": "be162f903a5d8076a7f8de87a0c7cf618d2db832f7b0a302b237fb7b84a12bcd"
+      },
+      {
+        "path": "lib/security/patient-create-context.test.ts",
+        "matchesPreviouslyReviewedFile": true,
+        "previouslyReviewedSha256": "a1e5da8287c9c863b55d8e422c28c54180499ae3cc05dc5a2a6c6cb845d6f0f5",
+        "currentSha256": "a1e5da8287c9c863b55d8e422c28c54180499ae3cc05dc5a2a6c6cb845d6f0f5"
+      },
+      {
+        "path": "lib/security/web-auth-lifecycle-owner-boundary.test.ts",
+        "matchesPreviouslyReviewedFile": false,
+        "previouslyReviewedSha256": "2ba75c38075e70c4580c06da5dc644cddce130b699b3906482da8ec49bda111f",
+        "currentSha256": "a137f2ae0574c807da55270336bebc189f87c9cc466081a61b7489af3daf5bb9"
+      }
+    ]
+  },
+  "inconclusiveAttempts": [
+    {
+      "schemaVersion": "mediflow.owner-pins.recovery-validation.v1",
+      "evidenceKind": "new-local-execution-after-filesystem-recovery",
+      "syntheticOnly": true,
+      "baselineHead": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+      "baselineTree": "0c77efadbcd16b2ec17d263b0e29ad221a0dedab",
+      "previousExecutionIsNotReused": true,
+      "sourceFiles": [
+        {
+          "path": "app/api/patients/route.test.ts",
+          "bytes": 16737,
+          "sha256": "cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8"
+        },
+        {
+          "path": "lib/patient-create-service.test.ts",
+          "bytes": 12220,
+          "sha256": "be162f903a5d8076a7f8de87a0c7cf618d2db832f7b0a302b237fb7b84a12bcd"
+        },
+        {
+          "path": "lib/security/patient-create-context.test.ts",
+          "bytes": 7251,
+          "sha256": "a1e5da8287c9c863b55d8e422c28c54180499ae3cc05dc5a2a6c6cb845d6f0f5"
+        },
+        {
+          "path": "lib/security/web-auth-lifecycle-owner-boundary.test.ts",
+          "bytes": 22564,
+          "sha256": "a137f2ae0574c807da55270336bebc189f87c9cc466081a61b7489af3daf5bb9"
+        }
+      ],
+      "testDiffSha256": "b04bc61533eb31c843c543df2cde47897259222f3d71d2004888ad0d73b5350f",
+      "execution": {
+        "startedAt": "2026-10-17T20:20:00.818254+00:00",
+        "completedAt": "2026-10-17T20:20:04.312598+00:00",
+        "command": [
+          "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+          "scripts/run-strip-types.mjs",
+          "--test",
+          "--test-concurrency=1",
+          "--test-reporter=tap",
+          "app/api/patients/route.test.ts",
+          "lib/patient-create-service.test.ts",
+          "lib/security/patient-create-context.test.ts",
+          "lib/security/web-auth-lifecycle-owner-boundary.test.ts"
+        ],
+        "cwd": "/workspace/scratch/40b5a2cd37a4/mediflow-ci-fixes",
+        "nodeVersion": "v24.19.0",
+        "npmVersion": "11.9.0",
+        "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+        "exitCode": 0,
+        "durationSeconds": 3.4866759050000837,
+        "counts": {
+          "tests": 4,
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "syntheticRuntimePath": "/tmp/mediflow-owner-pin-recovery-1os7o8t_",
+        "syntheticRuntimeRemoved": true,
+        "logPath": "/tmp/mediflow-owner-0811-pins-recovery-sandbox-inconclusive.log",
+        "logSha256": "244fb6a365dc080170dfef0f18ff6c82e7034423f0d9daf624894c0f53b97144"
+      },
+      "limits": [
+        "Targeted local tests only; no new GitHub CI or native GUI qualification."
+      ],
+      "conclusive": false,
+      "reason": "Only 4 file wrapper subtests were observed instead of the 46 required test cases; exit 0 is not accepted as validation."
+    }
+  ],
+  "packageVerification": {
+    "artifact": {
+      "path": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.11.tgz",
+      "bytes": 39022,
+      "sha256": "cf714b64126aa84eca9a6c98f699065ba0bf9721d85ceaa7bc8647d2f6745a19",
+      "integrity": "sha512-CLK6h6hCPmG0REHpwvoifX24d8WE6yaMjf/OREWiQoRK5MRrzIndlCXP9Q4mcVGPFO5Jm78mR43mh/gj5+2MTw=="
+    },
+    "acceptedBase": "3d4e5f0ffff8367c5be0bb73c62665b7e2eab1af",
+    "sourceBase": "d0cd18f1b4d1e96ac37712415ae9b42fd059d062",
+    "provenancePath": "packages/web-auth-lifecycle-owner/artifacts/mediflow-web-auth-lifecycle-owner-0.8.11.provenance.json",
+    "provenanceBytes": 6431,
+    "provenanceSha256": "b0f41da071d3e810e680fd3cb9cff44ab3f0419d2e81fb519112366ac598f85f",
+    "regularTarMembersEqualSourceAndProvenance": 13,
+    "doubleCleanOfflinePackByteIdentical": true,
+    "physicalRepositoryAndOfflineScratchInstall": true,
+    "historicalVersionsPinned": [
+      "0.8.9-local.3f2e6f2a",
+      "0.8.10"
+    ],
+    "productionManifestLockSourceArtifactsUnchangedFromBaseline": true
+  },
+  "triggeringHistoricalCiFailure": {
+    "repository": "Wulfgardr/mediflow",
+    "workflow": "Web Core",
+    "runId": 39060304226,
+    "jobId": 117476721731,
+    "jobUrl": "https://github.com/Wulfgardr/mediflow/actions/runs/39060304226/job/117476721731",
+    "headSha": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+    "checkedMergeSha": "f21c26d87af14f986b201a1d6324ca3e05b5c855",
+    "checkedBaseSha": "2dde0c0503abf828b99d73d7129cb7beed733044",
+    "unitCounts": {
+      "tests": 7059,
+      "passed": 7019,
+      "failed": 6,
+      "skipped": 34
+    },
+    "reason": "Six failures due to stale 0.8.10 version/manifest pins in these four files; other Web Core steps after the unit gate were skipped.",
+    "notEvidenceForRecoveredDelta": true
+  },
+  "verifiedAt": "2026-10-17T20:23:03.859905+00:00",
+  "diffCheck": {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exitCode": 0
+  }
+}
