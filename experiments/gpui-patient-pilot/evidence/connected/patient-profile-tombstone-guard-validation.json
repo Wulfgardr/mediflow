@@ -1,0 +1,732 @@
+{
+  "schemaVersion": 1,
+  "runId": "r08ef12a",
+  "recordedAt": "2026-10-17T23:27:41.218037+00:00",
+  "result": "pass",
+  "scope": "Local candidate validation of route-to-profile-port-to-writer tombstone guards; final published-head CI is reported in PR558, not inferred from these local runs.",
+  "base": {
+    "commit": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+    "tree": "694eb941f9bae4f109054850728dce507bc72fe7"
+  },
+  "mainToPreserve": "2dde0c0503abf828b99d73d7129cb7beed733044",
+  "triggeringCi": {
+    "runId": 39069695204,
+    "jobId": 117504554126,
+    "url": "https://github.com/Wulfgardr/mediflow/actions/runs/39069695204/job/117504554126",
+    "effectiveMerge": "e568866516fe3f03d782d62e085c0f79b4bf0f7f",
+    "mergeParents": [
+      "2dde0c0503abf828b99d73d7129cb7beed733044",
+      "3b5068f621e18825cc99eeb447073e9302cc1aa2"
+    ],
+    "result": "failure",
+    "portableRecipes": {
+      "total": 46,
+      "passed": 45,
+      "failed": 1
+    },
+    "softDeleteReportedBlock": {
+      "pass": 11,
+      "fail": 2
+    },
+    "confirmedCauses": [
+      "The GET/PUT source test required an inline activePatients() in routes which now delegate to patient-profile-service.",
+      "The AST read guard did not follow a local const containing activePatients() when that const was used inside AND in its owning patient WHERE."
+    ]
+  },
+  "sourceChange": {
+    "file": "scripts/patient-soft-delete.test.mjs",
+    "sha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+    "bytes": 40502,
+    "productionCodeChanged": false,
+    "workflowChanged": false,
+    "runtimeLifecycleTestsChanged": false,
+    "allowlistOrMultiplicityChanged": false
+  },
+  "sourceInputs": {
+    "app/api/patients/[id]/route.ts": {
+      "sha256": "679b8fe79f05e4301b21a6c835cfe7f6ffb84dd2d6bf279ecb928e1b15f24aff",
+      "bytes": 5457,
+      "unchangedFromBase": true
+    },
+    "app/api/v1/patients/[id]/route.ts": {
+      "sha256": "dced582f81e67864faf0374980d1629ffa6f896c73684a532394703cbdac956d",
+      "bytes": 5651,
+      "unchangedFromBase": true
+    },
+    "lib/patient-profile-service.ts": {
+      "sha256": "864d5b9904799043796d75eac1902240b46cea56f0c8802ab8648998caf83912",
+      "bytes": 5375,
+      "unchangedFromBase": true
+    },
+    "lib/patient-update-operation.ts": {
+      "sha256": "6d77aadacf42cd7c01145656759166a8bd51389203fdd114244971b226e974b1",
+      "bytes": 4770,
+      "unchangedFromBase": true
+    },
+    "lib/security/audit.ts": {
+      "sha256": "8912b24b02dc66e4b12fe88bcef80355917b1a2087a1caf5266c3ff83216963f",
+      "bytes": 18652,
+      "unchangedFromBase": true
+    },
+    "scripts/audit-quality-gate.mjs": {
+      "sha256": "aae7e9609f2b5d5d5cc2940cabac82983a3163c0c832465f88f94831f48ec054",
+      "bytes": 195102,
+      "unchangedFromBase": true
+    },
+    "lib/patient-lifecycle.test.ts": {
+      "sha256": "9768262c67b092c0abdebf947bec28750e76933ab63b0d882879eb5286dacd11",
+      "bytes": 9481,
+      "unchangedFromBase": true
+    },
+    "lib/patient-cascade.test.ts": {
+      "sha256": "66c3ac6f84e8a8b063feb40059529ccae9d68ad642f2deeb1ffaf57c093415a0",
+      "bytes": 19322,
+      "unchangedFromBase": true
+    },
+    "lib/test-container-clear.test.ts": {
+      "sha256": "39af4dc5340cd26a22d438f05f9a9c761c4af6738e94b5744cafcb202744932a",
+      "bytes": 12216,
+      "unchangedFromBase": true
+    },
+    "scripts/patient-cascade.test.mjs": {
+      "sha256": "b052fd368e3b8ad2c02d14076f84c07f549d8aabdde6ec5a7d18c81c96f63be6",
+      "bytes": 6800,
+      "unchangedFromBase": true
+    },
+    "lib/chatgpt-execution/execution-mac-qualification.ts": {
+      "sha256": "f419590cddef5c5f8005ed664f19b4cd1096ceef0ae7251e564334c767276740",
+      "bytes": 30093,
+      "unchangedFromBase": true
+    },
+    ".github/workflows/web-core.yml": {
+      "sha256": "56d4005d617828e8a8ac764c9873ac2460ad5cf5a6cbb68f02a3ac9ecb8dda2b",
+      "bytes": 3576,
+      "unchangedFromBase": true
+    }
+  },
+  "allowlistBlocks": {
+    "UNFILTERED_PATIENTS_READ_ALLOWLIST": {
+      "unchanged": true,
+      "sha256": "9286f6b9e73652ba10d43d53ac94a7737de8683195a00c0ff23951ebb454117a"
+    },
+    "PATIENTS_HARD_DELETE_ALLOWLIST": {
+      "unchanged": true,
+      "sha256": "a5a96c6e28babfdc2d2eed14f0c7fbdd70c45e037ec01ef112c6eb6259ffc203"
+    }
+  },
+  "guardCoverage": {
+    "directTests": 12,
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0,
+    "routeMutationsPerRoute": 20,
+    "routes": 2,
+    "andEscapeNegativeCases": 19,
+    "unsafeUseInvalidatesBothPatientQueries": true,
+    "negativeCasesAreAssertionsInsideTheTwelveTests": true,
+    "retainedGuarantees": [
+      "Exact imported GET service binding, patient ID/projection and missing-to-404 return.",
+      "PUT delegates the same patient to the profile port and propagates the status; reuse mandatory audit binding/transaction validation.",
+      "Unscoped preflight and scoped/unscoped read predicates; missing profiles remain null.",
+      "Writer rereads and final conditional UPDATE each exclude tombstones; missing writer input returns404 before effects.",
+      "Const must be local, preceding, immutable and AND-only through every use into its own patient WHERE.",
+      "Reject OR, negation, aliases, mutation, callbacks, closure capture, shadowing, optional calls and unrelated queries.",
+      "Existing exact read fingerprints, expected multiplicity and hard-delete allowlist are byte-identical."
+    ]
+  },
+  "checks": {
+    "static-verified": {
+      "runId": "r08ef12a",
+      "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+      "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+      "guardUnchangedDuringRun": true,
+      "command": [
+        "node",
+        "scripts/patient-soft-delete.test.mjs"
+      ],
+      "startedAt": "2026-10-17T23:12:05.326856+00:00",
+      "finishedAt": "2026-10-17T23:12:07.253384+00:00",
+      "wallSeconds": 1.9265394650010421,
+      "exitCode": 0,
+      "logBytes": 1472,
+      "logSha256": "4001da3f146c567882e8fe863f8129084d55a615acdf4307ab576ec6b09a53ea"
+    },
+    "soft-delete-verified": {
+      "runId": "r08ef12a",
+      "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+      "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+      "guardUnchangedDuringRun": true,
+      "command": [
+        "node",
+        "scripts/run-portable-local-tests.mjs",
+        "local:test:patient-soft-delete"
+      ],
+      "startedAt": "2026-10-17T23:13:14.508722+00:00",
+      "finishedAt": "2026-10-17T23:13:21.945640+00:00",
+      "wallSeconds": 7.4369113390002894,
+      "exitCode": 0,
+      "logBytes": 639,
+      "logSha256": "9d762ebce7790699b9eeba1461bc0add056d8f7f3a5706b5d5e5fd804a8917a0"
+    },
+    "lint-verified": {
+      "runId": "r08ef12a",
+      "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+      "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+      "guardUnchangedDuringRun": true,
+      "command": [
+        "node",
+        "node_modules/eslint/bin/eslint.js",
+        "scripts/patient-soft-delete.test.mjs"
+      ],
+      "startedAt": "2026-10-17T23:13:14.521346+00:00",
+      "finishedAt": "2026-10-17T23:13:18.266543+00:00",
+      "wallSeconds": 3.7451989560013317,
+      "exitCode": 0,
+      "logBytes": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fixture-generators-verified": {
+      "runId": "r08ef12a",
+      "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+      "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+      "guardUnchangedDuringRun": true,
+      "command": [
+        "npm",
+        "run",
+        "test:fixture-generators"
+      ],
+      "startedAt": "2026-10-17T23:13:02.275958+00:00",
+      "finishedAt": "2026-10-17T23:13:04.657299+00:00",
+      "wallSeconds": 2.3813404960001208,
+      "exitCode": 0,
+      "logBytes": 1421,
+      "logSha256": "0a99f86691d6d3bbe8c189103b59ae1aa2d047a4fdb1a1b3177cc0357983d6fd"
+    },
+    "research-boundary-toolchain-restored": {
+      "runId": "r08ef12a",
+      "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+      "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+      "guardUnchangedDuringRun": true,
+      "command": [
+        "npm",
+        "run",
+        "test:research-boundary"
+      ],
+      "startedAt": "2026-10-17T23:13:32.680082+00:00",
+      "finishedAt": "2026-10-17T23:13:43.051407+00:00",
+      "wallSeconds": 10.371322404000239,
+      "exitCode": 0,
+      "logBytes": 4792,
+      "logSha256": "4a50b5d9244181a39f7c39b131c4e9924524fcb2ef1f7504e9c100a00e65889f"
+    },
+    "portable-local-complete": {
+      "runId": "r08ef12a",
+      "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+      "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+      "guardUnchangedDuringRun": true,
+      "command": [
+        "python3",
+        "experiments/gpui-patient-pilot/comparison/local-subreaper.py",
+        "/tmp/mediflow-r08ef12a/portable-local-complete-reaping.json",
+        "npm",
+        "run",
+        "test:portable-local"
+      ],
+      "startedAt": "2026-10-17T23:23:45.842506+00:00",
+      "finishedAt": "2026-10-17T23:26:16.252677+00:00",
+      "wallSeconds": 150.41016537200085,
+      "exitCode": 0,
+      "logBytes": 198565,
+      "logSha256": "bade3c57cf9b59cc79c89c5dffb4de62403d3d13a16c02577464628558487bb3"
+    }
+  },
+  "portable": {
+    "canonicalCommand": [
+      "npm",
+      "run",
+      "test:portable-local"
+    ],
+    "recipes": 46,
+    "passed": 46,
+    "failed": 0,
+    "outcomes": [
+      {
+        "id": "local:scripts/who-local-probe.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/install-redaction-runtime.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:app/api/ai/local-provider/onboarding/route.test.ts",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:lib/chatgpt-execution/execution-mac-initialize.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:mac-login",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:lib/chatgpt-execution/execution-mac-readback.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "chatgpt:local",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "prototype:local",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:native/MediFlowMac/ExecutionCustodian/descriptor-close.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:api-v1-contract-negative",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:audit",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:backup-restore:date-fields",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:backup-scheduler:collections",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:backup-scheduler",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:document-router-benchmark",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/benchmark-document-router.ts",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:ai-model-parliament",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:ai-rollout-readiness",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/chatgpt-account/account-host.test.ts",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:anydoc-local-only",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:attachment-currentness-writers",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/check-macos-web-runtime-native-payload.sh",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/check-standalone-runtime-bundle.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:document-intelligence-columns-migration",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:fabric-settings-view",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/function-models/browser.test.ts",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/launch-macos-synthetic.test.py",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:local-provider-setup",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/mobile-home-base-interop-xctestrun-test.py",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:openmed-redaction",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:patient-ambulatory-membership",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:patient-soft-delete",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:pin-change",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:server-auth-policy",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:service-prescription-items-catalog-migration",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:settings-navigation",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:siss-adapter",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:siss-prescription",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:sqlite-repair",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/stage-chatgpt-execution-mac-assets.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:terminology-registry",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:scripts/treatment-reasoning-portable-setup.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:test:treatment-reasoning",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "ui06:domain:local",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:tools/code-explorer/extract-files.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      },
+      {
+        "id": "local:tools/code-explorer/generate.test.mjs",
+        "status": 0,
+        "signal": null,
+        "error": null
+      }
+    ],
+    "reaping": {
+      "schemaVersion": 1,
+      "runId": "r08ef12a",
+      "command": [
+        "npm",
+        "run",
+        "test:portable-local"
+      ],
+      "startedAt": "2026-10-17T23:23:45.875034+00:00",
+      "finishedAt": "2026-10-17T23:26:16.239607+00:00",
+      "commandExitCode": 0,
+      "signalsSentByWrapper": 0,
+      "reapedAdoptedChildren": [
+        {
+          "pid": 42476,
+          "waitStatus": 9,
+          "exitCode": -9
+        }
+      ],
+      "hasRemainingOwnedChildren": false
+    }
+  },
+  "fixtureGenerators": {
+    "clinicalRichTextFixtures": 40,
+    "verifiedJsonOutputs": 3,
+    "knownIdempotenceFinding": "non-idempotent-nested-empty-block",
+    "unexpectedIdempotenceFindings": 0
+  },
+  "researchBoundary": {
+    "rustUnitTests": 4,
+    "passed": 4,
+    "failed": 0,
+    "docTestCases": 0,
+    "lockedReleaseBuild": "pass",
+    "javascriptRustCodecComparison": "pass",
+    "scope": "experiments/rust-boundary, distinct from GPUI and clinical HTTP differential suites",
+    "platform": "linux",
+    "nativeMacQualificationRun": false
+  },
+  "environment": {
+    "os": "Ubuntu24.04.3/Linux x64",
+    "node": "v24.19.0",
+    "rust": "1.98.1",
+    "typescript": "5.9.3",
+    "sqliteCli": "3.45.1",
+    "syntheticOnly": true,
+    "canonicalRunnerOwnsAndRemovesTemporaryData": true,
+    "legacyArchiveCopyDisabled": true,
+    "liveProviderUsed": false,
+    "restoration": {
+      "sqliteDeb": {
+        "name": "sqlite3_3.45.1-1ubuntu2.7_amd64.deb",
+        "bytes": 144006,
+        "sha256": "36c50acc88839554db79ae9c7d14a56c9c7c16e30f86992be7a0a8fce30fe86e"
+      },
+      "sqliteBinary": {
+        "sha256": "a17a749643e8f5abe5f8a694fe52625c6c53c68ea8546378c4a78467c14dad1c",
+        "version": "3.45.1 2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257ccalt1 (64-bit)"
+      },
+      "restoredGitFixture": "90fa7771fc0822475611c9affb9c22e212939399",
+      "branchHeadUnchanged": true
+    },
+    "cargoHome": "/tmp/mediflow-recovery-cargo",
+    "rustupHome": "/tmp/mediflow-recovery-rustup"
+  },
+  "reproducibilityHelper": {
+    "file": "experiments/gpui-patient-pilot/comparison/local-subreaper.py",
+    "sha256": "c55bfe43f312dc52ebc3ea3fc4af88b78cc8910fb2231d9ed2775238fb88d81d",
+    "behavior": "Linux subreaper with waitpid(-1,WNOHANG); adopts only own orphan descendants and collects actual terminated-child status. No signals, argv changes or assertion changes.",
+    "negativeExitProbe": {
+      "schemaVersion": 1,
+      "runId": "r08ef12a",
+      "command": [
+        "python3",
+        "-c",
+        "raise SystemExit(7)"
+      ],
+      "startedAt": "2026-10-17T23:23:29.290853+00:00",
+      "finishedAt": "2026-10-17T23:23:29.316897+00:00",
+      "commandExitCode": 7,
+      "signalsSentByWrapper": 0,
+      "reapedAdoptedChildren": [],
+      "hasRemainingOwnedChildren": false
+    },
+    "priorContainerAccountFailure": "Consistent with PID1 collection latency beyond the existing200ms test budget. The first failing PID was not recorded, so its zombie state is not asserted retroactively."
+  },
+  "nonQualifyingAttempts": [
+    {
+      "name": "baseline-reproduction",
+      "result": {
+        "runId": "r08ef12a",
+        "head": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+        "guardSha256": "985515813c8e515d5d96db00e25928a6fd0f2dc588d358e576a8a97c00358ad4",
+        "command": [
+          "node",
+          "scripts/run-portable-local-tests.mjs",
+          "local:test:patient-soft-delete"
+        ],
+        "startedAt": "2026-10-17T22:50:09.742675+00:00",
+        "wallSeconds": 4.538364721000107,
+        "exitCode": 1,
+        "logSha256": "2583e0e637a96bd865fc2f6de74db0f81b6114b48a3fb206b55e63ee81630770"
+      },
+      "meaning": "Expected failure on the original guard; not evidence about the final candidate."
+    },
+    {
+      "name": "initial-sandbox-full-gate",
+      "exitCode": 1,
+      "recipes": 46,
+      "passed": 33,
+      "failed": 13,
+      "logSha256": "c1b4418dd14d44c11dd277696ebbaa1c5a83e8c331a4b0812a534294172653a8",
+      "meaning": "Contained EPERM child-process/Git failures; not a product pass or a final-source run."
+    },
+    {
+      "name": "restored-permission-full-gate",
+      "result": {
+        "runId": "r08ef12a",
+        "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+        "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+        "guardUnchangedDuringRun": true,
+        "command": [
+          "npm",
+          "run",
+          "test:portable-local"
+        ],
+        "startedAt": "2026-10-17T23:12:30.296629+00:00",
+        "finishedAt": "2026-10-17T23:15:02.545684+00:00",
+        "wallSeconds": 152.24905224400027,
+        "exitCode": 1,
+        "logBytes": 208742,
+        "logSha256": "9e35b3981bdc36b2089c08df07fd4b72db7bbdfb367006a562cf56b035f418bf"
+      },
+      "recipes": 46,
+      "passed": 41,
+      "failed": 5,
+      "causes": {
+        "missingSqliteCli": [
+          "local:test:document-intelligence-columns-migration",
+          "local:test:service-prescription-items-catalog-migration"
+        ],
+        "missingFrozenGitObject": [
+          "local:tools/code-explorer/extract-files.test.mjs",
+          "local:tools/code-explorer/generate.test.mjs"
+        ],
+        "accountProcessExit": [
+          "local:scripts/chatgpt-account/account-host.test.ts"
+        ]
+      }
+    },
+    {
+      "name": "research-toolchain-path",
+      "result": {
+        "runId": "r08ef12a",
+        "headBeforePublication": "3b5068f621e18825cc99eeb447073e9302cc1aa2",
+        "guardSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+        "guardUnchangedDuringRun": true,
+        "command": [
+          "npm",
+          "run",
+          "test:research-boundary"
+        ],
+        "startedAt": "2026-10-17T23:12:39.692533+00:00",
+        "finishedAt": "2026-10-17T23:12:40.611724+00:00",
+        "wallSeconds": 0.9191931909990672,
+        "exitCode": 1,
+        "logBytes": 278,
+        "logSha256": "af055824244051f3fff7271dc896ac34eb279ac015b1002bd5df3e79e650e98b"
+      },
+      "meaning": "cargo ENOENT resolved by selecting the already installed Rust toolchain."
+    },
+    {
+      "name": "symbol-diagnostic-candidate",
+      "guardSha256": "cad4c34ea10d3c1996f81f324fb971704803845f1a4436d6081c1677b9a0c2cd",
+      "exitCode": -9,
+      "logBytes": 0,
+      "meaning": "Observed SIGKILL. Replacing assert.equal(Symbol,Symbol) with assert.ok(Symbol===Symbol) preserves identity and avoids formatting the Symbol/AST object graphs; final direct tests passed."
+    },
+    {
+      "name": "first-subreaper-attempt",
+      "exitCode": 1,
+      "meaning": "Wrapper failed on unavailable /proc/<getpid>/task/<pid>/children after spawning npm. Partial output is not a complete test result; a read-only process check found no matching running command before the successful retry. No process was signaled."
+    }
+  ],
+  "review": {
+    "guardReviewer": "rust_core_transition",
+    "guardSourceSha256": "5c4981cad467d5c7c60ab4c104ae284b009ffefd0919d25a1b2b6735da714117",
+    "result": "no blocking finding",
+    "findingClosed": "A local reader binding could shadow the approved GET import. TypeScript symbol identity and const/function/destructuring mutants close it.",
+    "helperReviewer": "rust_ci_publication",
+    "helperSourceSha256": "c55bfe43f312dc52ebc3ea3fc4af88b78cc8910fb2231d9ed2775238fb88d81d",
+    "helperResult": "no blocking finding",
+    "scopeLimit": "These local reviews do not replace Codex independent review of auth, keys, writes and audit on the final published head; merge remains reserved to Codex."
+  },
+  "publishedHeadCiRule": "Read PR558 current head and the actual GitDB merge parents, then workflow runs/jobs/logs for that revision. Previous green workflows do not qualify a new head.",
+  "limits": [
+    "Static topology checks are bounded and conservative, not a general TypeScript data-flow proof. Existing runtime/HTTP gates remain required.",
+    "No new Mac installed qualification: execution-mac-qualification.ts is byte-unchanged in this delta. Portable helper tests are not installed Mac qualification.",
+    "No core writer migration, Swift authority retirement, IPC/FFI decision or installed-product qualification is claimed.",
+    "ADR0145 remains Proposed; WUL573/582/706/714 and reserved GO decisions retain their actual acceptance criteria.",
+    "Rejected PNG09 is not included or published. No real archives, external providers or secrets were used."
+  ]
+}
