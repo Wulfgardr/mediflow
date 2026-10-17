@@ -217,9 +217,8 @@ struct PairedPatientDiarySection: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("entry-content-locked-\(entry.id)")
                         } else {
-                            Text(ClinicalContentRendering.attributedString(from: entry.content))
+                            ClinicalContentText(entry.content, foregroundStyle: entry.deletedAt == nil ? .primary : .secondary)
                                 .chartProse()
-                                .foregroundStyle(entry.deletedAt == nil ? .primary : .secondary)
                         }
                         // S7 (D4): resolves the entry's referenced attachment ids
                         // against the loaded patient attachment list (S6), same

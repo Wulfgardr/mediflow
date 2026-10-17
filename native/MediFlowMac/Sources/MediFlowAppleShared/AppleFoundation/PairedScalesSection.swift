@@ -114,7 +114,7 @@ struct PairedScalesSection: View {
                 ForEach(historyItems) { item in
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: ClinicalChartMetrics.itemSpacing) {
-                            Text(ClinicalContentRendering.attributedString(from: item.content))
+                            ClinicalContentText(item.content)
                                 .chartProse()
                                 .foregroundStyle(.primary)
                             if let interpretation = item.interpretation {
