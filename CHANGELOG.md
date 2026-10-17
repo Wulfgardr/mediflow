@@ -113,6 +113,9 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Manutenzione
 
+- Il riepilogo paziente usa solo i campi necessari ed evita tre copie superflue
+  delle liste. Rimossi parser, test ed esempio del comparator cloud storico,
+  senza utilizzatori ([WUL-781](https://linear.app/wulfgardr/issue/WUL-781)).
 - Le sintesi della scheda paziente riusano le letture di terapie e osservazioni;
   gli elenchi documenti trasferiscono i metadati e l’originale viene letto quando lo apri.
   Il pannello delle misure richiede soltanto le osservazioni del paziente aperto.
