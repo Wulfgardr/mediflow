@@ -143,8 +143,8 @@ La Fabric è la struttura che tiene organizzate queste scelte. Non usarla
 resta possibile; attivarla non rende intercambiabile qualunque modello.
 Le opzioni per funzione dipendono dal catalogo e dall’autorità dell’host,
 secondo ADR0129. Il sistema distingue runtime operativo locale con revisione,
-confronti `benchmark-only` — compresi il comparator cloud `gpt-5.4` e MLX
-nei relativi benchmark — e sidecar specialistici come OpenMed `redaction.v1`
+confronti `benchmark-only`, come MLX nei relativi benchmark, e sidecar
+specialistici come OpenMed `redaction.v1`
 in shadow/opt-in. Una prova parallela non autorizza l’uso clinico.
 
 Il kill-switch per `patient-insight`, `smart-import` e `document-synthesis`
