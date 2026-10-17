@@ -422,6 +422,11 @@ final class MediFlowMobileAppUITests: XCTestCase {
         landscapeGeometryEvidence.lifetime = .keepAlways
         add(landscapeGeometryEvidence)
         XCTAssertTrue(firstRow.isHittable, "the first patient must remain reachable in landscape")
+        let csvImport = app.buttons["patient-csv-open"]
+        XCTAssertTrue(csvImport.isHittable, "CSV import must stay reachable beside the landscape filters")
+        XCTAssertGreaterThanOrEqual(csvImport.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(csvImport.frame.width, 44)
+        XCTAssertTrue(sectionView("patient-view-mode").isHittable, "patient scope filters must stay reachable in landscape")
         XCTAssertLessThanOrEqual(
             firstRow.frame.maxY,
             window.frame.maxY,
