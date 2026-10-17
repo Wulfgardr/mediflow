@@ -87,6 +87,9 @@ con una nuova build Linux e immagini originali attribuite alla loro esecuzione.
 Il [confronto dei compilatori TypeScript](./analysis/2026-10-17-tsc-ts-migration-review.md)
 misura il typecheck di uno snapshot preciso con TypeScript 5.9, TypeScript 7
 e tsc-ts, includendo driver, ricevuta e limiti dell'eventuale adozione.
+La [consegna verificabile di PR #558, r08ef12a](./analysis/2026-10-18-pr558-soft-delete-delivery.md)
+documenta il guard dei tombstone attraverso route, porta e writer, le prove
+locali sul candidato e il passaggio di consegne per la successiva verticale.
 
 ## Percorsi di lettura
 

@@ -1,0 +1,22 @@
+✔ patient DELETE routes delegate one version-guarded tombstone and required audit transaction (165.366407ms)
+✔ patient GET and PUT handlers preserve tombstones through the profile port and writer (404 contract) (96.107183ms)
+✔ profile tombstone guard rejects broken imports, delegation, filters, 404s and final updates (294.627523ms)
+ℹ 20 in-memory rejection cases per route; production files unchanged
+✔ the schema owner keeps the additive ensureColumn guards for the tombstone columns (0.303599ms)
+✔ primary patient list reads exclude soft-deleted patients (0.414416ms)
+✔ ambulatories/clear is membership-based, soft-deletes and stays test-only (0.746178ms)
+✔ the membership-clear helper tombstones with the dedicated reason (0.279762ms)
+✔ AST guard isolates direct patient-read chains and normalizes their fingerprints (2.991549ms)
+✔ AST allowlist consumes fingerprints and rejects stale, substituted, or duplicate reads (0.795452ms)
+✔ AST guard follows a local immutable predicate without accepting aliases, mutation, or shadowing (2.719959ms)
+✔ AST guard follows AND-only predicate paths and invalidates every query after an unsafe use (4.662303ms)
+ℹ 19 rejected AND/escape cases, plus all-use invalidation of two patient queries
+✔ patients table access stays behind activePatients() outside the allowlist (1055.40408ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1634.002819
