@@ -15,7 +15,7 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-10-16. I verbali di luglio e le proposte superate rimossi dall’albero
+2026-10-17. I verbali di luglio e le proposte superate rimossi dall’albero
 restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
 Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
@@ -36,6 +36,9 @@ versione o risalire alla provenienza di un’interfaccia.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [analysis/2026-09-26-rust-boundary-evaluation.md](./analysis/2026-09-26-rust-boundary-evaluation.md) | Preparazione WUL-706, prerequisiti, esperimento codec e confronto GPUI/Tauri/SwiftUI. | Prima della decisione Rust 0.9.2 o della valutazione shell 0.9.6. |
+| [analysis/2026-10-17-rust-gpui-patient-pilot.md](./analysis/2026-10-17-rust-gpui-patient-pilot.md) | Client Rust e UI GPUI della verticale paziente, prove locali e criteri ancora da qualificare. | Per riesaminare WUL-706/WUL-714 senza attribuire al pilota un'autorità clinica. |
+| [experiments/gpui-patient-pilot/README.md](../experiments/gpui-patient-pilot/README.md) | Avvio del pilota sintetico, percorso utente, comandi, confini e provenienza delle dipendenze. | Per compilare, provare o modificare il client Rust e la finestra GPUI. |
+| [analysis/2026-10-17-patient-notes-pilot.md](./analysis/2026-10-17-patient-notes-pilot.md) | Baseline cifrata continua di lettura/modifica note sui due ingressi HTTP correnti. | Per riprodurre le prove WUL-574 prima del collegamento al servizio condiviso. |
 | [adr/0137-rust-boundary-pilot-proposal.md](./adr/0137-rust-boundary-pilot-proposal.md) | ADR Proposed: confine Rust condizionato, IPC/FFI, protocollo e rollback. | Per riesaminare la proposta, senza inferire accettazione o runtime. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
