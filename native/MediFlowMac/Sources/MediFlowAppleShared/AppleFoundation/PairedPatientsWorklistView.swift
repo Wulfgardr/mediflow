@@ -196,22 +196,6 @@ struct PairedHomeBaseCredentialsSheet: View {
     }
 }
 
-/// Worklist actions are real controls, not caption-sized text. 44pt is the HIG
-/// touch-target minimum, not a device metric, and the label still grows past it
-/// with Dynamic Type. macOS keeps its existing compact presentation.
-private struct WorklistPrimaryActionStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        #if os(macOS)
-        content.font(.caption)
-        #else
-        content
-            .buttonStyle(.bordered)
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        #endif
-    }
-}
-
 struct PairedPatientsWorklistView: View {
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
