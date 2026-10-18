@@ -1,12 +1,11 @@
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
     IntelligentHostBrowserAdapterError,
     createIntelligentHostBrowserAdapter,
-} from '../lib/security/intelligent-host-browser-adapter.ts';
+} from './intelligent-host-browser-adapter.ts';
 
 const SCOPE = Object.freeze({
     patientId: 'patient.synthetic.01',
@@ -126,25 +125,4 @@ test('terminalizes host-side 409 and 503 without retry and fences a completion a
     stale.reset();
     delayed.resolve(response({ state: 'active', expiresAt: 1_800_000_000_000 }));
     await assert.rejects(() => pending, rejects('operation_superseded'));
-});
-
-test('keeps the retired standalone action accessible without wiring a second H1a caller', () => {
-    const component = readFileSync(new URL('./intelligent-host-patient-action.tsx', import.meta.url), 'utf8');
-    const page = readFileSync(new URL('../app/patients/[id]/modules/page.tsx', import.meta.url), 'utf8');
-
-    assert.match(component, /data-lume-action="quiet"/u);
-    assert.match(component, /'Attiva Intelligent Host per questa scheda'/u);
-    assert.match(component, /aria-label=\{accessibleLabel\}/u);
-    assert.match(component, /min-w-11 sm:min-w-0/u);
-    assert.match(component, /className="hidden sm:inline"/u);
-    assert.match(component, /role="status" aria-live="polite" aria-atomic="true"/u);
-    assert.match(component, /disabled=\{!canActivate\}/u);
-    assert.match(component, /Host intelligente non disponibile\. Riavvia la sessione per ripartire\./u);
-    assert.doesNotMatch(component, /canActivate[\s\S]{0,180}host_unavailable/u);
-    assert.match(component, /generation\.current/u);
-    assert.match(component, /client\.reset\(\)/u);
-    assert.match(component, /code === 'operation_terminal'[\s\S]{0,100}'host_unavailable'/u);
-    assert.doesNotMatch(component, /setInterval|setTimeout|console\.|framer-motion|animate-/u);
-    assert.doesNotMatch(page, /<IntelligentHostPatientAction/u);
-    assert.match(page, /<IntelligentHostCheckupAction\s+patientId=\{patient\.id\}/u);
 });

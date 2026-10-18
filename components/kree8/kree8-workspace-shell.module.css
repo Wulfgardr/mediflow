@@ -281,7 +281,6 @@
 .clinicalShell .clinicalSurface :global(.lume-panel),
 .clinicalShell .clinicalSurface :global(.mf-section),
 .clinicalShell .clinicalSurface :global(.apple-subsection),
-.clinicalShell .clinicalSurface :global(.evidence-stack-tile) { background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; backdrop-filter: none !important; }
 .clinicalShell .clinicalSurface :global(.patient-identity-lens) { min-height: 0 !important; padding: 0 !important; }
 .clinicalShell .clinicalSurface :global(.patient-identity-lens::after) { display: none !important; }
 /* LUME-104/68: gli stati vuoto/disabilitato dell'insight contengono un
