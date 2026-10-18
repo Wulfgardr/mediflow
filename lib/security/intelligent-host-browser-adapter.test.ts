@@ -126,3 +126,16 @@ test('terminalizes host-side 409 and 503 without retry and fences a completion a
     delayed.resolve(response({ state: 'active', expiresAt: 1_800_000_000_000 }));
     await assert.rejects(() => pending, rejects('operation_superseded'));
 });
+
+test('adds an explicit exact profile grant only when the caller confirms that projection', async () => {
+    for (const projection of ['profile', 'notes'] as const) {
+        let body: unknown;
+        const client = createIntelligentHostBrowserAdapter({ fetch: async (url, init = {}) => {
+            if (init.method === 'GET') return response({ selectionEpoch: 0 });
+            if (String(url).endsWith('/selection')) return response({ selection: LEASE });
+            body = JSON.parse(init.body as string); return response({ state: 'active', expiresAt: 1800000000000 });
+        } });
+        await client.initialize(); await client.activate(SCOPE, true, { projection });
+        assert.deepEqual(body, { selectionEpoch: 1, patientProfileQuery: { projection } });
+    }
+});

@@ -247,3 +247,16 @@ test('rejects Promise-valued host sources and records no audit', async () => {
     (error) => (error as { code?: unknown }).code === 'audit_unavailable');
   assert.equal(auditCount(), before);
 });
+
+test('persists the profile wrapper authorization without recording the patient projection', async () => {
+  const writeAudit = writer();
+  await writeAudit(Object.freeze({ ...authorizationAllowed(), operation: 'patient-profile.read.v1', capabilityId: 'patient-profile.read.v1' }));
+  const sqlite = database();
+  try {
+    const rows = sqlite.prepare("SELECT redacted_metadata AS metadata FROM audit_events WHERE event_type='agent.operation.attempted'").all() as Array<{metadata: string}>;
+    const recorded = rows.map(r => JSON.parse(r.metadata)).filter(r => r.flags.includes('operation:patient-profile.read.v1'));
+    assert.equal(recorded.length, 1);
+    assert.ok(recorded[0].flags.includes('max_stage:read_only'));
+    assert.doesNotMatch(JSON.stringify(recorded), /notes|firstName|taxCode|patientId|ambulatoryId/u);
+  } finally { sqlite.close(); }
+});

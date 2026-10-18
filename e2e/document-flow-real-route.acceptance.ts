@@ -1,3 +1,4 @@
+import { scopedNotesOpenInput } from './fixtures/scoped-profile-notes-query';
 /* * Test-only scenario for the coordinator's real authenticated synthetic Page.
  * Does not log in, read credentials/storageState, seed a patient, intercept routes,
  * instantiate a substitute component, change settings or manufacture readiness.
@@ -44,6 +45,7 @@ export async function assertDocumentFlowRealRoutes(page: Page, info: TestInfo, o
             ? { patientId: requestUrl.searchParams.get('patientId') } : {}), ...(method === 'GET' && path === '/api/attachments'
             ? { metadataOnly: requestUrl.searchParams.get('metadata') === 'true' } : {}), ...(keys ? { bodyKeys: keys } : {}) });
         if (['GET', 'HEAD', 'OPTIONS'].includes(method)) return;
+        if (scopedNotesOpenInput(request, url.pathname.split('/')[2], url.origin)) return;
         const attachmentWrite = (method === 'POST' && path === '/api/attachments')
             || (method === 'DELETE' && /^\/api\/attachments\/[^/]+$/u.test(path));
         // Existing shell migration resets this retired visual preference on mount.

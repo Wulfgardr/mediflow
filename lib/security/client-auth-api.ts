@@ -433,8 +433,9 @@ export function installArchiveGenerationTransport(): () => void {
     const guarded: typeof fetch = (input, init) => {
         const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
         const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+        const scopedEpochRead = method === 'GET' && url.pathname === '/api/patient-profile/selection-epoch';
         if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')
-            || !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return original(input, init);
+            || (!scopedEpochRead && !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method))) return original(input, init);
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         // A caller cannot silently change which archive this document has displayed.
         if (documentGeneration) headers.set('x-mediflow-archive-generation', documentGeneration);

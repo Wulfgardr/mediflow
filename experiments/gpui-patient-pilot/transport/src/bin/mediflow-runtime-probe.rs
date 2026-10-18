@@ -75,6 +75,16 @@ fn fail(phase: &'static str, reason: &'static str) -> ProbeError {
     }
 }
 
+fn open_profile(
+    session: &RuntimeSession,
+    scope: &str,
+    patient_id: &str,
+) -> mediflow_runtime_client::Result<PatientDetail> {
+    session.select_profile_patient(scope, patient_id)?;
+    let intent = session.profile_query_intent();
+    session.open_patient_profile(scope, patient_id, &intent)
+}
+
 fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
     let reason = match error {
         RuntimeError::UnsupportedUnlock => "unsupported-unlock",
@@ -88,6 +98,7 @@ fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
         RuntimeError::ReadRequired => "read-required",
         RuntimeError::Busy => "busy",
         RuntimeError::TooLarge => "too-large",
+        RuntimeError::ProfileTooLarge => "profile-too-large",
         RuntimeError::Crypto => "crypto",
         RuntimeError::InvalidResponse => "invalid-response",
         RuntimeError::Transport => "transport",
@@ -137,9 +148,8 @@ fn snapshot(session: &RuntimeSession, config: &ProbeConfig) -> Result<Value, Pro
     let archived = session
         .list_patients(scope, true)
         .map_err(|e| runtime_error("archived-patients", e))?;
-    let patient = session
-        .read_patient(scope, patient_id)
-        .map_err(|e| runtime_error("patient", e))?;
+    let patient =
+        open_profile(session, scope, patient_id).map_err(|e| runtime_error("patient", e))?;
     unlocked(&patient.locked_fields, "patient")?;
 
     let mut entries = session
@@ -270,9 +280,8 @@ fn writes(
         return Err(fail("writes", "wrong-synthetic-write-patient"));
     }
     let scope = &config.scope;
-    let before = session
-        .read_patient(scope, patient_id)
-        .map_err(|e| runtime_error("write-preread", e))?;
+    let before =
+        open_profile(session, scope, patient_id).map_err(|e| runtime_error("write-preread", e))?;
     if before.tax_code != "SYNTHETIC0000003" {
         return Err(fail("writes", "wrong-synthetic-identity"));
     }
@@ -288,8 +297,7 @@ fn writes(
         stale_session
             .list_ambulatories()
             .map_err(|e| runtime_error("stale-scopes", e))?;
-        let stale = stale_session
-            .read_patient(scope, patient_id)
+        let stale = open_profile(&stale_session, scope, patient_id)
             .map_err(|e| runtime_error("stale-preread", e))?;
         if stale.version != before.version {
             return Err(fail("stale-preread", "concurrent-change"));
@@ -311,8 +319,7 @@ fn writes(
         if stale_error != RuntimeError::Conflict {
             return Err(runtime_error("stale-write", stale_error));
         }
-        let after = session
-            .read_patient(scope, patient_id)
+        let after = open_profile(session, scope, patient_id)
             .map_err(|e| runtime_error("notes-readback", e))?;
         unlocked(&after.locked_fields, "notes-readback")?;
         if Some(after.version) != before.version.checked_add(1)
@@ -402,7 +409,6 @@ fn canonical_hash(value: &Value) -> Result<String, ProbeError> {
 
 fn profile_projection(
     row: &PatientDetail,
-    config: &ProbeConfig,
     id: &str,
     tax_code: &str,
     version: u64,
@@ -412,7 +418,7 @@ fn profile_projection(
     unlocked(&row.locked_fields, phase)?;
     if row.id != id
         || row.tax_code != tax_code
-        || row.ambulatory_id.as_deref() != Some(&config.scope)
+        || row.ambulatory_id.is_some()
         || row.version != version
         || row.is_archived
         || row.deleted_at.is_some()
@@ -495,10 +501,23 @@ fn patient_profile_writes(
         return Err(fail("profile-create", "profile-acknowledgment-mismatch"));
     }
     let read = |active: &RuntimeSession, version, expected: &Value| {
-        let row = active
-            .read_patient(scope, &created.id)
+        let row = open_profile(active, scope, &created.id)
             .map_err(|e| runtime_error("profile-readback", e))?;
-        profile_projection(&row, config, &created.id, tax_code, version, expected)
+        // The scoped view deliberately omits ambulatoryId. Admission is instead
+        // established by open_profile's selected target and bound HTTP scope.
+        let intent = active.profile_query_intent();
+        for (foreign_scope, foreign_patient) in [
+            (scope.as_str(), "synthetic-unselected-patient"),
+            ("synthetic-unselected-scope", created.id.as_str()),
+        ] {
+            if !matches!(
+                active.read_patient_profile(foreign_scope, foreign_patient, &intent),
+                Err(RuntimeError::ReadRequired)
+            ) {
+                return Err(fail("profile-readback", "foreign-selection-admitted"));
+            }
+        }
+        profile_projection(&row, &created.id, tax_code, version, expected)
     };
     let before = read(session, 1, initial_expected)?;
     let stale = login(client, config)?;
@@ -618,8 +637,7 @@ fn resource_writes(
         return Err(fail("resources-config", "wrong-synthetic-write-patient"));
     }
     let scope = &config.scope;
-    let parent = session
-        .read_patient(scope, patient_id)
+    let parent = open_profile(session, scope, patient_id)
         .map_err(|e| runtime_error("resources-parent", e))?;
     unlocked(&parent.locked_fields, "resources-parent")?;
     if parent.tax_code != "SYNTHETIC0000003"
@@ -927,6 +945,59 @@ fn main() -> ExitCode {
                 json!({"schemaVersion":1, "protocolId":null, "client":"rust", "result":"fail", "phase":error.phase, "reason":error.reason, "status":error.status})
             );
             ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scoped_profile_projection_uses_domain_fields_without_internal_ambulatory_id() {
+        let fixture: Value = serde_json::from_slice(PROFILE_FIXTURE).unwrap();
+        let mut value = fixture["create"].clone();
+        value["id"] = json!("synthetic-selected-patient");
+        value["taxCode"] = json!("SYNPROFILERS0001");
+        value["version"] = json!(1);
+        let row: PatientDetail = serde_json::from_value(value.clone()).unwrap();
+        assert!(row.ambulatory_id.is_none());
+        assert!(
+            profile_projection(
+                &row,
+                "synthetic-selected-patient",
+                "SYNPROFILERS0001",
+                1,
+                &fixture["create"]
+            )
+            .is_ok()
+        );
+        for changed in [
+            "id",
+            "taxCode",
+            "version",
+            "isArchived",
+            "address",
+            "ambulatoryId",
+        ] {
+            let mut invalid_value = value.clone();
+            invalid_value[changed] = match changed {
+                "version" => json!(2),
+                "isArchived" => json!(true),
+                _ => json!("synthetic-unexpected-value"),
+            };
+            let invalid: PatientDetail = serde_json::from_value(invalid_value).unwrap();
+            assert!(
+                profile_projection(
+                    &invalid,
+                    "synthetic-selected-patient",
+                    "SYNPROFILERS0001",
+                    1,
+                    &fixture["create"]
+                )
+                .is_err(),
+                "changed {changed} must remain rejected"
+            );
         }
     }
 }

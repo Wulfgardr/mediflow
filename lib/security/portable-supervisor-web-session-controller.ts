@@ -16,6 +16,9 @@ import {
 } from './portable-supervisor-web-ipc-bridge.ts';
 import { createPortableSupervisorCheckupWebSessionPortV1 } from
     './portable-supervisor-checkup-web-session-port.ts';
+import { acquirePatientProfileQueryHostPort, type PatientProfileQueryHostPort } from './patient-profile-query-host-port';
+import type { ProfileProjection } from '../patient-profile-scoped-contract';
+import { createPatientProfileQueryWebDispatcher } from './patient-profile-query-web-dispatcher';
 
 const INPUT_KEYS = ['expectedPatientId', 'selectionEpoch'] as const;
 const HOST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -29,6 +32,7 @@ export type PortableSupervisorWebSessionRetirementReasonV1 =
 export type PortableSupervisorWebSessionActivationInputV1 = Readonly<{
     expectedPatientId: string;
     selectionEpoch: number;
+    patientProfileQuery?: Readonly<{ projection: ProfileProjection }>;
 }>;
 export type PortableSupervisorWebSessionActivationV1 = Readonly<{
     state: 'active';
@@ -41,12 +45,16 @@ export type PortableSupervisorWebSessionV1ErrorCode =
 type TerminalObserver = (reason: PortableSupervisorWebCaptureTerminalReasonV1) => unknown;
 type Sources = Readonly<{
     acquireCaptureOwner(observer: TerminalObserver): Promise<PortableSupervisorWebCaptureOwnerV1 | null>;
-    activateBridge(readCapture: () => unknown): Promise<Readonly<{ expiresAt: number }>>;
+    activateBridge(readCapture: () => unknown, patientProfileQuery?: Readonly<{ projection: ProfileProjection }>): Promise<Readonly<{ expiresAt: number }>>;
     revokeBridge(reason: PortableSupervisorWebCaptureTerminalReasonV1): Promise<boolean>;
     disconnectBridge(): unknown;
     checkupLifecycle: Readonly<{
         activate(owner: PortableSupervisorWebCaptureOwnerV1): boolean;
         terminate(): boolean;
+    }>;
+    profileQueries?: Readonly<{
+        acquire(projection: ProfileProjection, expiresAt: number): Promise<PatientProfileQueryHostPort | null>;
+        publish(port: PatientProfileQueryHostPort | null): void;
     }>;
 }>;
 type Deferred = Readonly<{
@@ -80,15 +88,25 @@ function input(value: unknown): PortableSupervisorWebSessionActivationInputV1 | 
         const prototype = Object.getPrototypeOf(value);
         if (prototype !== null && prototype !== Object.prototype) return null;
         const own = Reflect.ownKeys(value);
-        if (own.length !== INPUT_KEYS.length
+        const profile = Object.getOwnPropertyDescriptor(value, 'patientProfileQuery');
+        if (own.length !== INPUT_KEYS.length + (profile ? 1 : 0)
             || own.some((key) => typeof key !== 'string'
-                || !INPUT_KEYS.some((candidate) => candidate === key))) return null;
+                || (!INPUT_KEYS.some((candidate) => candidate === key) && key !== 'patientProfileQuery'))) return null;
         const patient = Object.getOwnPropertyDescriptor(value, 'expectedPatientId');
         const epoch = Object.getOwnPropertyDescriptor(value, 'selectionEpoch');
         if (!patient?.enumerable || !('value' in patient) || typeof patient.value !== 'string'
             || !HOST_ID.test(patient.value) || !epoch?.enumerable || !('value' in epoch)
             || !Number.isSafeInteger(epoch.value) || epoch.value < 1) return null;
-        return record({ expectedPatientId: patient.value, selectionEpoch: epoch.value });
+        let projection: ProfileProjection | undefined;
+        if (profile) {
+            if (!profile.enumerable || !('value' in profile) || !profile.value || typeof profile.value !== 'object'
+                || types.isProxy(profile.value) || Reflect.ownKeys(profile.value).length !== 1) return null;
+            const field = Object.getOwnPropertyDescriptor(profile.value, 'projection');
+            if (!field?.enumerable || !('value' in field) || (field.value !== 'profile' && field.value !== 'notes')) return null;
+            projection = field.value;
+        }
+        return record({ expectedPatientId: patient.value, selectionEpoch: epoch.value,
+            ...(projection ? { patientProfileQuery: record({ projection }) } : {}) });
     } catch { return null; }
 }
 function bridgeExpiry(value: unknown, maximum: number): number | null {
@@ -130,6 +148,11 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
 }> {
     let phase: Phase = 'idle';
     let owner: PortableSupervisorWebCaptureOwnerV1 | null = null;
+    let profilePort: PatientProfileQueryHostPort | null = null;
+    const disposeProfile = (): void => {
+        const previous = profilePort; profilePort = null;
+        try { previous?.dispose(); } finally { sources.profileQueries?.publish(null); }
+    };
     let activationPromise: Promise<PortableSupervisorWebSessionActivationV1> | null = null;
     let revocationPromise: Promise<boolean> | null = null;
     let acquisitionCut = false;
@@ -149,6 +172,7 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
     const revokeRemote = (reason: PortableSupervisorWebCaptureTerminalReasonV1): Promise<boolean> => {
         if (revocationPromise) return revocationPromise;
         sources.checkupLifecycle.terminate();
+        disposeProfile();
         phase = 'revoking';
         const pending = deferred();
         revocationPromise = pending.promise;
@@ -242,14 +266,25 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
             }
             if (!acquired) throw fail('selection_unavailable');
             owner = acquired;
-            const activated = await sources.activateBridge(() => constrainCapture(acquired, constraint));
+            const activated = await sources.activateBridge(() => constrainCapture(acquired, constraint), constraint.patientProfileQuery);
             if (phase !== 'activating' || owner !== acquired) throw fail('session_terminal');
             const currentCapture = constrainCapture(acquired, constraint);
             const expiresAt = bridgeExpiry(activated, currentCapture.expiresAt);
             if (expiresAt === null) throw fail('host_unavailable');
+            if (constraint.patientProfileQuery) {
+                const acquiredPort = await sources.profileQueries?.acquire(constraint.patientProfileQuery.projection, expiresAt);
+                if (!acquiredPort) throw fail('host_unavailable');
+                if (phase !== 'activating' || owner !== acquired) { acquiredPort.dispose(); throw fail('session_terminal'); }
+                try {
+                    const capture = constrainCapture(acquired, constraint);
+                    if (bridgeExpiry(activated, capture.expiresAt) !== expiresAt) throw fail('host_unavailable');
+                } catch (error) { acquiredPort.dispose(); throw error; }
+                profilePort = acquiredPort;
+            }
             const result = record({ state: 'active' as const, expiresAt });
             if (!sources.checkupLifecycle.activate(acquired)) throw fail('host_unavailable');
             phase = 'active';
+            if (profilePort) sources.profileQueries?.publish(profilePort);
             return result;
         } catch (error) {
             if (acquisitionCut) throw fail('session_terminal');
@@ -288,15 +323,34 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
 }
 
 const productionCheckupPort = createPortableSupervisorCheckupWebSessionPortV1({ now: Date.now });
+let productionProfilePort: PatientProfileQueryHostPort | null = null;
 const productionController = createPortableSupervisorWebSessionControllerV1({
     acquireCaptureOwner: acquirePortableSupervisorWebCaptureOwnerV1,
     activateBridge: activatePortableSupervisorWebIpcV1,
     revokeBridge: revokePortableSupervisorWebIpcV1,
     disconnectBridge: disconnectPortableSupervisorWebIpcV1,
     checkupLifecycle: productionCheckupPort.controller,
+    profileQueries: {
+        acquire: acquirePatientProfileQueryHostPort,
+        publish: port => { productionProfilePort = port; },
+    },
 });
 
 export const activatePortableSupervisorWebSessionV1 = productionController.activateCurrentSelection;
 export const retirePortableSupervisorWebSessionV1 = productionController.retire;
 /** Private operation-specific dependent surface; it cannot activate or revoke H1a. */
 export const portableSupervisorCheckupWebSessionPortV1 = productionCheckupPort.port;
+export function portableSupervisorPatientProfileQueryHostPortV1(): PatientProfileQueryHostPort | null {
+    return productionProfilePort;
+}
+if (typeof process.send === 'function' && process.connected) {
+    const dispatcher = createPatientProfileQueryWebDispatcher({
+        readPort: portableSupervisorPatientProfileQueryHostPortV1,
+        send: frame => {
+            if (!process.connected || !process.send) throw new Error('patient_profile_channel_unavailable');
+            process.send(frame, undefined, undefined, (error: Error | null) => { if (error) void productionController.retire('explicit').catch(() => undefined); });
+        },
+        onProtocolFailure: () => { void productionController.retire('explicit').catch(() => undefined); },
+    });
+    process.on('message', frame => { void dispatcher.accept(frame); });
+}

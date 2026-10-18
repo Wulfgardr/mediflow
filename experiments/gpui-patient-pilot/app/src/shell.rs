@@ -10,7 +10,7 @@ use mediflow_patient_client::{PatientProfile, ReadFailure, UpdateOutcome, Worksp
 use mediflow_runtime_client::{
     AgendaFilter, Ambulatory, Attachment, Checkup, CheckupDraft, Entry, EntryDraft,
     GlobalEntryFilter, Observation, ObservationDraft, PairingCredentials, PatientDetail,
-    PatientSummary, RuntimeClient, RuntimeConfig, RuntimeError, RuntimeSession,
+    PatientSummary, ProfileQueryIntent, RuntimeClient, RuntimeConfig, RuntimeError, RuntimeSession,
     TerminologyRegistryEntry, TerminologyRegistryStatus, Therapy, TherapyDraft,
 };
 use std::collections::{HashMap, HashSet};
@@ -375,6 +375,7 @@ pub struct ClinicalApp {
     focus_search_after_render: bool,
     profile_scroll: gpui::ScrollHandle,
     epoch: u64,
+    profile_query_intent: Option<ProfileQueryIntent>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -579,6 +580,7 @@ impl ClinicalApp {
             focus_search_after_render: false,
             profile_scroll,
             epoch: 0,
+            profile_query_intent: None,
             _subscriptions: vec![subscription, global_subscription],
         };
         let quit = cx.on_app_quit(|this, cx| {
@@ -632,7 +634,25 @@ impl ClinicalApp {
         }
     }
 
+    fn retire_profile_selection(&self) {
+        if let Some(session) = &self.session {
+            session.clear_profile_selection();
+        }
+    }
+
+    fn profile_intent(&mut self, session: &RuntimeSession) -> ProfileQueryIntent {
+        if let Some(previous) = self.profile_query_intent.take() {
+            previous.cancel();
+        }
+        let intent = session.profile_query_intent();
+        self.profile_query_intent = Some(intent.clone());
+        intent
+    }
+
     fn next_epoch(&mut self) {
+        if let Some(intent) = self.profile_query_intent.take() {
+            intent.cancel();
+        }
         self.document_busy = false;
         self.edit_pending = false;
         self.epoch = self
@@ -830,6 +850,7 @@ impl ClinicalApp {
         }
         self.global_search
             .update(cx, |input, cx| input.set_content("", cx));
+        self.retire_profile_selection();
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core.lock();
@@ -892,6 +913,7 @@ impl ClinicalApp {
         self.drug_count = Load::Idle;
         self.exemption_count = Load::Idle;
         self.reference_registry = Load::Idle;
+        self.retire_profile_selection();
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core = Workspace::default();
@@ -936,6 +958,13 @@ impl ClinicalApp {
             Ok(request) => request,
             Err(_) => return,
         };
+        if let Err(error) = session.select_profile_patient(&scope, id) {
+            self.core
+                .receive_read(&request, Err(ReadFailure::Unavailable));
+            self.message = Some((ui_error(error), true));
+            cx.notify();
+            return;
+        }
         self.next_epoch();
         self.focus_after_render = open;
         self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
@@ -949,8 +978,9 @@ impl ClinicalApp {
         self.message = None;
         self.verified = None;
         let patient_id = id.to_owned();
+        let intent = self.profile_intent(&session);
         self.run(
-            move || session.read_patient(&scope, &patient_id),
+            move || session.open_patient_profile(&scope, &patient_id, &intent),
             move |this, result, _| match result {
                 Ok(patient) => {
                     this.core
@@ -1032,6 +1062,7 @@ impl ClinicalApp {
             self.show_other = false;
             self.directory = true;
             if self.area != area {
+                self.retire_profile_selection();
                 self.selected_id = None;
                 self.patient = PatientData::default();
                 self.core = Workspace::default();
@@ -1413,9 +1444,10 @@ impl ClinicalApp {
                 return;
             };
             let id = request.patient_id.clone();
+            let intent = self.profile_intent(&session);
             self.patient.detail = Load::Loading;
             self.run(
-                move || session.read_patient(&scope, &id),
+                move || session.open_patient_profile(&scope, &id, &intent),
                 move |this, result, _| match result {
                     Ok(patient) => {
                         this.core
@@ -1724,8 +1756,9 @@ impl ClinicalApp {
         // Supersede pending reads before writing: an older list cannot replace
         // the authoritative reread after an acknowledged mutation.
         self.next_epoch();
+        let intent = self.profile_intent(&session);
         if kind == FormKind::PatientNew {
-            self.run(move || patient_forms::create(&session, &scope, &values), |this, result, cx| {
+            self.run(move || patient_forms::create(&session, &scope, &values, &intent), |this, result, cx| {
                 match result {
                     Ok(patient_forms::Creation::Verified(row)) => {
                         this.archived = false;
@@ -1733,9 +1766,12 @@ impl ClinicalApp {
                         this.saved("Scheda creata e dati anagrafici riletti dall'archivio.", cx);
                         this.load_sections(cx);
                     }
-                    Ok(patient_forms::Creation::Unconfirmed { id }) => {
+                    Ok(patient_forms::Creation::Unconfirmed { id, read_error }) => {
                         if let Some(form) = &mut this.form { form.created_id = Some(id); }
-                        this.save_unconfirmed(false, "La creazione ha ricevuto una risposta, ma la rilettura non conferma tutti i dati. Rileggi prima di creare altre schede.".into(), cx);
+                        let message = read_error.map_or_else(
+                            || "La creazione ha ricevuto una risposta, ma la rilettura non conferma tutti i dati. Rileggi prima di creare altre schede.".into(),
+                            |error| format!("{error} La creazione ha ricevuto risposta, ma richiede verifica; non creare di nuovo la stessa scheda."));
+                        this.save_unconfirmed(false, message, cx);
                     }
                     Err(error) => this.save_error(error, cx),
                 }
@@ -1746,7 +1782,7 @@ impl ClinicalApp {
                 return;
             };
             self.run(
-                move || patient_forms::update(&session, &scope, &original, &values),
+                move || patient_forms::update(&session, &scope, &original, &values, &intent),
                 |this, result, cx| match result {
                     Ok(Some(row)) => {
                         this.install_patient(row);
@@ -1759,6 +1795,8 @@ impl ClinicalApp {
                             .into(),
                         cx,
                     ),
+                    Err(RuntimeError::ProfileTooLarge) => this.save_unconfirmed(false,
+                        format!("{} La bozza resta disponibile; verifica l'esito prima di un nuovo invio.", RuntimeError::ProfileTooLarge), cx),
                     Err(error) => this.save_error(error, cx),
                 },
                 cx,
@@ -1785,10 +1823,11 @@ impl ClinicalApp {
             let submitted = command.clone();
             self.run(move || {
                 session.update_patient_notes(&scope, &id, submitted.expected_version, &submitted.notes)?;
-                Ok(session.read_patient(&scope, &id))
+                Ok(session.open_patient_profile(&scope, &id, &intent))
             }, move |this, result, cx| {
                 match result {
                     Ok(readback) => {
+                        let mut readback_message = "La rilettura non conferma la modifica. La bozza resta disponibile.".to_owned();
                         if let Some(request) = this.core.receive_update(&command, UpdateOutcome::Acknowledged) {
                             match readback {
                                 Ok(patient) => {
@@ -1805,13 +1844,16 @@ impl ClinicalApp {
                                         this.message = Some((ui_error(error), true));
                                         return;
                                     }
+                                    if error == RuntimeError::ProfileTooLarge {
+                                        readback_message = format!("{error} La bozza resta disponibile; verifica l'esito prima di un nuovo invio.");
+                                    }
                                     this.core.receive_read(&request, Err(ReadFailure::Unavailable));
                                 }
                             }
                         }
                         if this.core.phase() == mediflow_patient_client::Phase::Saved {
                             this.saved("Note registrate e rilette dalla scheda.", cx);
-                        } else { this.save_unconfirmed(false, "La rilettura non conferma la modifica. La bozza resta disponibile.".into(), cx); }
+                        } else { this.save_unconfirmed(false, readback_message, cx); }
                     }
                     Err(error) => {
                         let outcome = if error.is_conflict() { UpdateOutcome::Conflict } else if error.is_indeterminate() { UpdateOutcome::Indeterminate } else { UpdateOutcome::Rejected };
@@ -2507,6 +2549,7 @@ impl ClinicalApp {
                                             return;
                                         }
                                         this.archived = archived;
+                                        this.retire_profile_selection();
                                         this.selected_id = None;
                                         this.patient = PatientData::default();
                                         this.core = Workspace::default();
@@ -4699,9 +4742,17 @@ impl ClinicalApp {
             return;
         }
         self.next_epoch();
+        self.retire_profile_selection();
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core = Workspace::default();
+        if let (Some(session), Some(scope)) = (&self.session, &self.scope)
+            && let Err(error) = session.begin_profile_creation(scope)
+        {
+            self.message = Some((ui_error(error), true));
+            cx.notify();
+            return;
+        }
         self.area = Area::Patients;
         self.stage_fields(FormKind::PatientNew, patient_forms::fields(None), None, cx);
     }
@@ -4731,7 +4782,8 @@ impl ClinicalApp {
             "Rilettura della scheda prima di modificare l'anagrafica…".into(),
             false,
         ));
-        self.run(move || session.read_patient(&scope, &id), |this, result, cx| {
+        let intent = self.profile_intent(&session);
+        self.run(move || session.read_patient_profile(&scope, &id, &intent), |this, result, cx| {
             this.edit_pending = false;
             match result {
                 Ok(row) if this.form.is_none() && this.selected_id.as_deref() == Some(&row.id) && !row.is_archived && row.deleted_at.is_none() => {
@@ -6134,6 +6186,7 @@ mod tests {
             RuntimeError::Conflict,
             RuntimeError::Indeterminate,
             RuntimeError::ReadRequired,
+            RuntimeError::ProfileTooLarge,
         ] {
             let editor = view.update(cx, |app, cx| {
                 let editor = synthetic_notes_form(app, FormState::Saving, cx);

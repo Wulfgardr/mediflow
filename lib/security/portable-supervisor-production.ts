@@ -11,6 +11,8 @@ import {
 } from '../../packages/aip/src/portable-supervisor-web-control.ts';
 import { decodePortableSupervisorWebIpcFrameV1 } from
   '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
+import { createPatientProfileQuerySupervisorPortV1 } from './patient-profile-query-supervisor-port.ts';
+import type { PortableSupervisorPatientProfileQueryGrantV1 } from '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
 import { getDataDir } from '../data-dir';
 import { resolveAthenaMlxGenerateBin } from '../athena-mlx-launcher-config.ts';
 import { createCheckupStatusTransitionSupervisorPortV1 } from
@@ -46,7 +48,8 @@ type RuntimeSources = Readonly<{
   nextChallenge(): string;
   schedule(delayMs: number, callback: () => void): () => void;
   mirror: MirrorPort;
-  launchMcp(): Promise<AuthenticatedSession>;
+  launchMcp(patientProfileQuery?: PortableSupervisorPatientProfileQueryGrantV1): Promise<AuthenticatedSession>;
+  profile?: Readonly<{ acceptWebFrame(frame: unknown): boolean; close(): boolean }>;
   checkup: Readonly<{ acceptWebFrame(frame: unknown): boolean; close(): boolean }>;
   children: PortableSupervisorProductionChildProcessesV1;
 }>;
@@ -87,6 +90,7 @@ export function createPortableSupervisorProductionRuntimeV1(
     const current = session; session = null;
     try { current?.close(); } catch { failed = true; }
     try { mirror.revoke(); } catch { failed = true; }
+    try { sources.profile?.close(); } catch { failed = true; }
     try { sources.checkup.close(); } catch { failed = true; }
     try { children.terminateMcp(); } catch { failed = true; }
     if (failed) throw new Error('revoke_failed');
@@ -105,12 +109,12 @@ export function createPortableSupervisorProductionRuntimeV1(
   const control = createPortableSupervisorWebControlV1({
     now: sources.now,
     nextChallenge: sources.nextChallenge,
-    activate: async (capture: unknown) => {
+    activate: async (capture: unknown, patientProfileQuery?: PortableSupervisorPatientProfileQueryGrantV1) => {
       if (terminal || authorityRevoked || mirror.activate(capture) !== true) {
         throw new Error('activation_failed');
       }
       let launched: AuthenticatedSession;
-      try { launched = await sources.launchMcp(); }
+      try { launched = await sources.launchMcp(patientProfileQuery); }
       catch (error) { try { revokeAuthority(); } catch { /* original failure */ } throw error; }
       if (terminal || authorityRevoked || launched.status !== 'authenticated'
         || launched.schemaVersion !== 'mediflow.headless.authenticated-launch.v1') {
@@ -165,7 +169,7 @@ export function createPortableSupervisorProductionRuntimeV1(
   };
   const handleWeb = async (frame: unknown): Promise<void> => {
     if (terminal || ackPending) return;
-    if (sources.checkup.acceptWebFrame(frame)) return;
+    if (sources.profile?.acceptWebFrame(frame) || sources.checkup.acceptWebFrame(frame)) return;
     let revoke = false;
     try { revoke = decodePortableSupervisorWebIpcFrameV1(frame).method === 'revoke_all'; }
     catch { terminate('explicit'); return; }
@@ -238,6 +242,11 @@ export function createPortableSupervisorProductionV1(
       },
       onTerminal: (reason) => runtime?.terminate(reason === 'web_disconnect' ? 'web_disconnect' : 'explicit'),
     });
+    const profile = createPatientProfileQuerySupervisorPortV1({ randomBytes, sendWeb: children.sendWeb,
+      schedule: (delayMs: number, callback: () => void) => {
+        const timer = setTimeout(callback, delayMs); timer.unref(); return () => { clearTimeout(timer); };
+      }, onTerminal: (reason) => runtime?.terminate(reason === 'web_disconnect' ? 'web_disconnect' : 'explicit'),
+    });
     runtime = createPortableSupervisorProductionRuntimeV1({
       now,
       nextChallenge: () => `pswc_${randomBytes(32).toString('hex')}`,
@@ -246,12 +255,15 @@ export function createPortableSupervisorProductionV1(
       },
       mirror: context,
       checkup,
+      profile,
       children,
-      launchMcp: () => (agentKind === 'mini'
+      launchMcp: (patientProfileQuery) => (agentKind === 'mini'
         ? createProductionMiniAgentLauncherWithPreSpawnedChildV1
         : createProductionMcpAgentLauncherWithPreSpawnedChildV1)({
         readHostContext: context.readHostContext, writeAudit, commitTerminalAudit,
         previewCheckupStatus: checkup.preview,
+        ...(patientProfileQuery ? { patientProfileQueries: { projection: patientProfileQuery.projection,
+          executeProfileQuery: profile.executeProfileQuery } } : {}),
       }, children.mcpPort).launch(),
     });
     return runtime;

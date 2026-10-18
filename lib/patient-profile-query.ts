@@ -13,7 +13,7 @@ export type PatientProfileActor =
 export type PatientProfileQuery = Readonly<{
     operation: typeof PATIENT_PROFILE_READ_OPERATION.id;
     actor: PatientProfileActor;
-    purpose: typeof PATIENT_PROFILE_READ_OPERATION.purpose | typeof PATIENT_PROFILE_READ_OPERATION.fsePurpose;
+    purpose: typeof PATIENT_PROFILE_READ_OPERATION.purpose | typeof PATIENT_PROFILE_READ_OPERATION.fsePurpose | 'care_coordination';
     patientId: string;
     scope: Readonly<{ kind: 'local' }> | Readonly<{ kind: 'ambulatory'; ambulatoryId: string }>;
 }>;

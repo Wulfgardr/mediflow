@@ -38,6 +38,9 @@ import {
   AuthenticatedAgentLauncherV1Error, exact, hostId, integer, record,
   type AuthenticatedAgentLauncherV1ErrorCode, type Child, type Context, type OperationState,
 } from './authenticated-agent-launcher-contract.ts';
+import { PROFILE_QUERY_OPERATION_ID, parseProfileQuery, isProfileResult, assertProfileResultBudget,
+  type ProfileQuery, type ProfileResult } from '../patient-profile-scoped-contract.ts';
+
 import { createAuthenticatedSessionScopeRegistryV1 } from './authenticated-session-scope-registry.ts';
 
 const BOOTSTRAP_TIMEOUT_MS = 1_500;
@@ -50,7 +53,9 @@ export { AuthenticatedAgentLauncherV1Error } from './authenticated-agent-launche
 export type { AuthenticatedAgentLauncherV1ErrorCode } from './authenticated-agent-launcher-contract.ts';
 
 export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
-  const sources = exact(sourcesValue, SOURCE_KEYS);
+  const profileDescriptor = sourcesValue && typeof sourcesValue === 'object' && !types.isProxy(sourcesValue)
+    ? Object.getOwnPropertyDescriptor(sourcesValue, 'patientProfileQueries') : undefined;
+  const sources = exact(sourcesValue, [...SOURCE_KEYS, ...(profileDescriptor ? ['patientProfileQueries'] : [])]);
   if (!sources || SOURCE_KEYS.some((key) => typeof sources[key] !== 'function' || types.isProxy(sources[key]))) {
     throw new AuthenticatedAgentLauncherV1Error('input_invalid');
   }
@@ -64,6 +69,11 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
   const createOpenLoopsRead = sources.createOpenLoopsRead as (value: unknown) => unknown;
   const previewCheckupStatus = sources.previewCheckupStatus as
     (value: unknown, signal: AbortSignal) => Promise<unknown>;
+  const profilePort = profileDescriptor ? exact(sources.patientProfileQueries, ['projection', 'executeProfileQuery']) : null;
+  if (profileDescriptor && (!profilePort || !['profile', 'notes'].includes(profilePort.projection as string)
+    || typeof profilePort.executeProfileQuery !== 'function' || types.isProxy(profilePort.executeProfileQuery))) {
+    throw new AuthenticatedAgentLauncherV1Error('input_invalid');
+  }
   if (types.isAsyncFunction(commitTerminalAudit)) throw new AuthenticatedAgentLauncherV1Error('input_invalid');
   const issued = new Set<string>();
   let lastNow = -1;
@@ -329,12 +339,44 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
         }
       });
     };
+    const executeProfileQuery = async (state: OperationState, value: unknown, signal: AbortSignal) => {
+      const input = parseProfileQuery(value);
+      if (!input || !profilePort || (profilePort.projection === 'notes' && input.projection !== 'notes')) {
+        throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+      }
+      const permit = await authorize(state), claim = record({ operation: state.operationId, capabilityId: state.capabilityId });
+      let execution: object | null = null;
+      const cancel = () => { if (execution) { try { broker.denyPermit(execution); } catch { /* terminal */ } } };
+      return withAbort(signal, cancel, async () => {
+        try {
+          execution = beginScopedPermit(state, permit, current(state), claim, 'read_only');
+          const result = await (profilePort.executeProfileQuery as
+            (input: ProfileQuery, signal: AbortSignal) => Promise<ProfileResult>)(input, signal);
+          const snapshot = resolveScopedCurrent(state, execution);
+          if (signal.aborted || !isProfileResult(result) || result.projection !== input.projection
+            || result.currentness.selectionEpoch !== snapshot.selectionEpoch
+            || result.currentness.expiresAt <= now() || result.currentness.expiresAt > state.context.expiresAt
+            || (input.kind === 'open' && input.expectedSelectionEpoch !== snapshot.selectionEpoch)
+            || (input.kind === 'read' && (result.handle !== input.handle || result.currentness.revision !== input.expectedRevision))) {
+            throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+          }
+          assertProfileResultBudget(result);
+          broker.finalizePermit(execution, snapshot, claim); execution = null;
+          return result;
+        } catch (error) {
+          cancel(); execution = null;
+          if (error instanceof AuthenticatedAgentLauncherV1Error) throw error;
+          throw new AuthenticatedAgentLauncherV1Error('operation_unavailable');
+        }
+      });
+    };
     const prepareRpc = (): void => {
       const terminologyState = createOperation(AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.operationId, 'read_only');
       const openLoopsState = createOperation(PATIENT_OPEN_LOOPS_READ_OPERATION_V1, 'read_only');
       const proposalState = createOperation(PATIENT_OPEN_LOOPS_FOLLOW_UP_PROPOSAL_OPERATION_V1, 'proposal_only');
       const semanticState = createOperation(SEMANTIC_QUERY_OPERATION_CONTRACT_V1.operationId, 'read_only');
       const checkupState = createOperation(HEADLESS_CHECKUP_STATUS_OPERATION_V1, 'proposal_only');
+      const profileState = profilePort ? createOperation(PROFILE_QUERY_OPERATION_ID, 'read_only') : null;
       rpcHost = createAipOperationRpcHostV1({ operations: [{
         operationId: terminologyState.operationId, capabilityId: terminologyState.capabilityId,
         serviceRef: AIP_TERMINOLOGY_SEARCH_CONTRACT_V1.applicationServiceRef, maximumStage: 'read_only', timeoutMs: 500,
@@ -422,7 +464,10 @@ export function createAuthenticatedAgentLauncherV1(sourcesValue: unknown) {
             } finally { service.dispose(); }
           });
         },
-      }] });
+      }, ...(profileState ? [{ operationId: PROFILE_QUERY_OPERATION_ID, capabilityId: PROFILE_QUERY_OPERATION_ID,
+        serviceRef: 'PatientProfileQueryHostPortV1', maximumStage: 'read_only', timeoutMs: 5_000,
+        execute: (input: unknown, signal: AbortSignal) => executeProfileQuery(profileState, input, signal),
+      }] : [])] });
       rpcHandle = rpcHost.attach({ subscribe: child.subscribe, publish: child.publish });
     };
     const onBootstrap = (frame: unknown): void => {

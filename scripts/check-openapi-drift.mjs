@@ -104,6 +104,51 @@ function hasProfileFseAdmission(sourcePath, source) {
     return false;
 }
 
+function hasScopedProfileAdmission(sourcePath, source) {
+    const query = sourcePath === 'app/api/v1/network/patients/[id]/profile-query/route.ts';
+    const epoch = sourcePath === 'app/api/v1/network/patient-profile/selection-epoch/route.ts';
+    if (!query && !epoch) return false;
+    const method = query ? 'POST' : 'GET';
+    const service = query ? 'readScopedPatientProfileHttp' : 'readPatientProfileSelectionEpochHttp';
+    if (extractMethods(source).join(',') !== method) return false;
+    const file = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true);
+    const imported = (name, module) => file.statements.some(node => ts.isImportDeclaration(node)
+        && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === module
+        && node.importClause && !node.importClause.isTypeOnly && node.importClause.namedBindings
+        && ts.isNamedImports(node.importClause.namedBindings)
+        && node.importClause.namedBindings.elements.some(e => !e.isTypeOnly && !e.propertyName && e.name.text === name));
+    if (!imported(service, '@/lib/patient-profile-service')
+        || !imported('withArchiveRequestContext', '@/lib/security/archive-request-context')) return false;
+    let shadowed = false;
+    const inspect = node => {
+        if ((ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node))
+            && [service, 'withArchiveRequestContext'].includes(node.name?.getText(file))) shadowed = true;
+        if ((ts.isParameter(node) || ts.isFunctionDeclaration(node)) && node.name?.getText(file) === 'scopedProfileHandler') shadowed = true;
+        ts.forEachChild(node, inspect);
+    };
+    inspect(file); if (shadowed) return false;
+    const handler = file.statements.filter(ts.isVariableStatement).flatMap(n => [...n.declarationList.declarations])
+        .filter(n => ts.isIdentifier(n.name) && n.name.text === 'scopedProfileHandler');
+    if (handler.length !== 1) return false;
+    const wrapped = handler[0].initializer;
+    if (!wrapped || !ts.isCallExpression(wrapped) || wrapped.expression.getText(file) !== 'withArchiveRequestContext'
+        || wrapped.arguments.length !== 1 || !ts.isArrowFunction(wrapped.arguments[0])) return false;
+    const callback = wrapped.arguments[0], call = callback.body;
+    if (!ts.isCallExpression(call) || call.expression.getText(file) !== service
+        || call.arguments.length !== (query ? 3 : 2) || call.arguments[0].getText(file) !== 'request'
+        || !ts.isStringLiteral(call.arguments[1]) || call.arguments[1].text !== 'network'
+        || callback.parameters[0]?.name.getText(file) !== 'request') return false;
+    if (query && (callback.parameters[1]?.name.getText(file) !== 'context'
+        || call.arguments[2].getText(file).replace(/\s/gu, '') !== 'async()=>(awaitcontext.params).id')) return false;
+    const entry = file.statements.find(n => ts.isFunctionDeclaration(n) && n.name?.text === method
+        && n.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword));
+    if (!entry?.body || entry.body.statements.length !== 1 || entry.parameters[0]?.name.getText(file) !== 'request'
+        || entry.parameters.length !== (query ? 2 : 1) || (query && entry.parameters[1]?.name.getText(file) !== 'context')) return false;
+    const returned = entry.body.statements[0];
+    return ts.isReturnStatement(returned) && returned.expression?.getText(file).replace(/\s/gu, '')
+        === `scopedProfileHandler(request${query ? ',context' : ''})`;
+}
+
 function hasRecognizedApiV1AuthGuard(sourcePath, source) {
     const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
     const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
@@ -129,7 +174,7 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         && source.includes(`return handleNativeOrdinaryHttp(request, '${nativeOperation[0]}')`)
         && extractMethods(source).join(',') === nativeOperation[1];
     return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard
-        || hasProfileFseAdmission(sourcePath, source);
+        || hasProfileFseAdmission(sourcePath, source) || hasScopedProfileAdmission(sourcePath, source);
 }
 
 function buildCurrentRoutes() {
@@ -770,6 +815,29 @@ function runSelfTest() {
             },
             expect: rejected => rejected === true,
         })),
+        ...['query', 'epoch'].flatMap(kind => {
+            const query = kind === 'query', method = query ? 'POST' : 'GET';
+            const service = query ? 'readScopedPatientProfileHttp' : 'readPatientProfileSelectionEpochHttp';
+            const sourcePath = query ? 'app/api/v1/network/patients/[id]/profile-query/route.ts'
+                : 'app/api/v1/network/patient-profile/selection-epoch/route.ts';
+            const source = `import { ${service} } from '@/lib/patient-profile-service';
+import { withArchiveRequestContext } from '@/lib/security/archive-request-context';
+const scopedProfileHandler = withArchiveRequestContext((request${query ? ', context' : ''}) =>
+${service}(request, 'network'${query ? ', async () => (await context.params).id' : ''}));
+export async function ${method}(request${query ? ', context' : ''}) { return scopedProfileHandler(request${query ? ', context' : ''}); }`;
+            return [
+                ['fixed current scoped profile wrapper', source, true],
+                ['wrong module', source.replace('@/lib/patient-profile-service', './forged'), false],
+                ['caller-selected surface', source.replace("'network'", 'request.surface'), false],
+                ['wrong Web surface', source.replace("'network'", "'web'"), false],
+                ['unreachable handler', source.replace(`return scopedProfileHandler`, `return Response.json({}); return scopedProfileHandler`), false],
+                ['conditional handler', source.replace(`return scopedProfileHandler`, `if (false) return scopedProfileHandler`), false],
+                ['unused conditional admission', source.replace(`${service}(request,`, `false && ${service}(request,`), false],
+                ['shadowed archive wrapper', source + '\nconst withArchiveRequestContext = x => x;', false],
+                ['shadowed dispatcher parameter', source.replace(`function ${method}(request`, `function ${method}(scopedProfileHandler, request`), false],
+            ].map(([name, candidate, expected]) => ({ name: `${kind}: ${name}`,
+                run: () => hasRecognizedApiV1AuthGuard(sourcePath, candidate), expect: actual => actual === expected }));
+        }),
         ...[
             { name: 'fixed delegated FSE admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); }", expected: true },
             { name: 'canonical try delegates FSE admission before operations', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { try { let patientId = null; const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); } catch { return Response.json({}, {status:500}); } }", expected: true },

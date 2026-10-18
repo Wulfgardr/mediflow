@@ -245,9 +245,10 @@ test('registers the static surface before a one-shot inherited-IPC late binding'
         'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
         'mediflow.terminology.search.v1', 'mediflow.patient.open_loops.read.v1',
         'mediflow.patient.open_loops.follow_up.propose.v1', 'mediflow.semantic_query_plan.execute.v1',
-        'mediflow.patient.checkup.status.transition.v1',
+        'mediflow.patient.checkup.status.transition.v1', 'patient-profile.read.v1',
     ]);
     const unboundCalls = [
+        ['patient-profile.read.v1', { kind: 'open', contractVersion: 1, projection: 'notes', expectedSelectionEpoch: 2 }],
         ['mediflow.system.headless_status.v1', {}],
         ['mediflow.system.capabilities.v1', {}],
         ['mediflow.terminology.search.v1', { system: 'LOINC', query: 'synthetic', limit: 1 }],
@@ -352,12 +353,12 @@ test('discovers status, capabilities, two reads, one proposal and semantic orche
         'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
         'mediflow.terminology.search.v1', 'mediflow.patient.open_loops.read.v1',
         'mediflow.patient.open_loops.follow_up.propose.v1', 'mediflow.semantic_query_plan.execute.v1',
-        'mediflow.patient.checkup.status.transition.v1',
+        'mediflow.patient.checkup.status.transition.v1', 'patient-profile.read.v1',
     ]);
     assert.equal(listed.result.tools.every((tool) => tool.annotations.readOnlyHint === true
         && tool.annotations.destructiveHint === false && tool.annotations.openWorldHint === false), true);
     assert.deepEqual(listed.result.tools.map((tool) => tool._meta['mediflow/maximumStage']),
-        ['read_only', 'read_only', 'read_only', 'read_only', 'proposal_only', 'read_only', 'proposal_only']);
+        ['read_only', 'read_only', 'read_only', 'read_only', 'proposal_only', 'read_only', 'proposal_only', 'read_only']);
     const status = await server.send('tools/call', { name: 'mediflow.system.headless_status.v1', arguments: {} });
     assert.equal(status.result.structuredContent.dataScope, 'non_phi_system_status');
     const capabilities = await server.send('tools/call', { name: 'mediflow.system.capabilities.v1', arguments: {} });
@@ -383,7 +384,7 @@ test('lists the static tool but denies execution when its host service binding i
         'mediflow.terminology.search.v1',
         'mediflow.patient.open_loops.read.v1',
         'mediflow.patient.open_loops.follow_up.propose.v1', 'mediflow.semantic_query_plan.execute.v1',
-        'mediflow.patient.checkup.status.transition.v1',
+        'mediflow.patient.checkup.status.transition.v1', 'patient-profile.read.v1',
     ]);
     const denied = await server.send('tools/call', { name: 'mediflow.terminology.search.v1',
         arguments: { system: 'LOINC', query: 'synthetic', limit: 1 } });
@@ -654,7 +655,7 @@ test('fails unknown tools in-band and survives malformed JSON without stdout noi
     const response = await server.send('tools/call', { name: 'unknown.tool', arguments: {} });
     assert.ok(response.error || response.result?.isError === true);
     const valid = await server.send('tools/list');
-    assert.equal(valid.result.tools.length, 7);
+    assert.equal(valid.result.tools.length, 8);
     await server.stop();
     assert.equal(server.protocolMessages.every((message) => message.jsonrpc === '2.0'), true);
 });

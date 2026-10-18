@@ -10,7 +10,9 @@ const DIRECTORY_SURFACES = [
     { relative: 'packages/mini/src', required: true },
     { relative: 'packages/mcp/src', required: false },
 ];
-const FILE_SURFACES = [{ relative: 'scripts/intelligent-host-mcp-stdio.mjs', required: true }];
+const PROFILE_CONTRACT = 'lib/patient-profile-scoped-contract.ts';
+const FILE_SURFACES = [{ relative: 'scripts/intelligent-host-mcp-stdio.mjs', required: true },
+    { relative: PROFILE_CONTRACT, required: false }];
 const FORBIDDEN_EXTERNAL = new Set([
     'better-sqlite3', 'drizzle-orm', 'server-only', 'next/headers', 'next/server',
     'node:http', 'node:https', 'node:http2', 'node:net', 'node:tls', 'node:dgram',
@@ -19,6 +21,7 @@ const FORBIDDEN_EXTERNAL = new Set([
 ]);
 const NATIVE_SEGMENT = /(?:^|[-_/@.])(xpc|swift|vision|metal|mlx|cuda|cudnn)(?:$|[-_/@.])/iu;
 const ALLOWED_PURE_LIB_MODULES = new Set([
+    PROFILE_CONTRACT,
     'lib/terminology', 'lib/terminology.ts',
     'lib/headless/application-operation-registry', 'lib/headless/application-operation-registry.ts',
 ]);
@@ -73,6 +76,9 @@ export function validateHeadlessPortableSource(sourceText, file = 'packages/aip/
     const parsed = sourceFile(sourceText, file);
     const issues = parsed.parseDiagnostics.map((diagnostic) => `${file}:${line(parsed, diagnostic.start ?? 0)}: syntax error`);
     const inspectSpecifier = (node, specifier) => {
+        if (file === PROFILE_CONTRACT) {
+            issues.push(`${file}:${line(parsed, node.getStart(parsed))}: pure profile contract must remain a dependency-free leaf`);
+        }
         const reason = forbiddenSpecifier(specifier, file);
         if (reason) issues.push(`${file}:${line(parsed, node.getStart(parsed))}: ${reason}: ${specifier}`);
     };

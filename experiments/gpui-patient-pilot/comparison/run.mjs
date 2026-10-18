@@ -125,7 +125,20 @@ async function execute(command, commandArgs, environment, cwd = repository) {
     const timer = setTimeout(() => child.kill('SIGTERM'), 180_000);
     try {
         const status = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
-        if (status !== 0) throw new Error(`${phase}: child exited ${status}; no successful receipt was issued`);
+        if (status !== 0) {
+            // Probe failures contain only closed diagnostic codes. Keep those
+            // codes in the public synthetic artifact instead of losing the
+            // reason when the disposable runtime is cleaned up.
+            try {
+                const failed = JSON.parse(stdout);
+                const code = value => typeof value === 'string' && /^[a-z][a-z0-9-]{0,95}$/u.test(value);
+                if (failed.result === 'fail' && code(failed.phase) && code(failed.reason)) {
+                    save(`${phase}-failure.json`, { result: 'fail', phase: failed.phase, reason: failed.reason,
+                        status: Number.isInteger(failed.status) && failed.status >= 400 && failed.status <= 599 ? failed.status : null });
+                }
+            } catch { /* Never retain arbitrary child output or credentials. */ }
+            throw new Error(`${phase}: child exited ${status}; no successful receipt was issued`);
+        }
         return stdout.trim();
     } finally {
         clearTimeout(timer);
