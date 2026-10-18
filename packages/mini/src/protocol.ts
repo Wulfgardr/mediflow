@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import {
   followUpProposalArgumentsSchema, openLoopsArgumentsSchema, semanticQueryArgumentsSchema,
-  terminologyArgumentsSchema, checkupStatusTransitionArgumentsSchema,
+  terminologyArgumentsSchema, checkupStatusTransitionArgumentsSchema, patientProfileQueryArgumentsSchema,
 } from '../../mcp/src/contracts.ts';
 import type { createOperationClient } from '../../mcp/src/operation-client.ts';
 
@@ -15,6 +15,7 @@ const KEYS = Object.keys;
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 export const miniRequestSchema = z.discriminatedUnion('command', [
+  z.object({ command: z.literal('profile-read'), args: patientProfileQueryArgumentsSchema }).strict(),
   z.object({ command: z.literal('status'), args: z.object({}).strict() }).strict(),
   z.object({ command: z.literal('capabilities'), args: z.object({}).strict() }).strict(),
   z.object({ command: z.literal('terminology search'), args: terminologyArgumentsSchema }).strict(),
@@ -37,6 +38,7 @@ export function parseMiniRequest(bytes: Uint8Array): MiniRequest {
 /** Both transports invoke precisely the existing OperationClient methods and DTOs. */
 export function executeMiniRequest(client: ReturnType<typeof createOperationClient>, request: MiniRequest) {
   switch (request.command) {
+    case 'profile-read': return client.readPatientProfile(request.args);
     case 'status': return client.status();
     case 'capabilities': return client.publicCatalog();
     case 'terminology search': return client.searchTerminology(request.args);

@@ -1,3 +1,4 @@
+import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
 // Run only with the existing isolated E2E environment, never a clinical runtime.
 // The real route/form/facade run; patient/checkup API responses below are synthetic.
 import { expect, test, type Page } from '@playwright/test';
@@ -37,6 +38,8 @@ async function editorFixture(page: Page, failure: 'none' | 'once' | 'conflict' =
         const request = route.request();
         const path = new URL(request.url()).pathname;
         const method = request.method();
+        const notesInput = scopedNotesOpenInput(request, PATIENT_ID, new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3000').origin);
+        if (notesInput) return route.fulfill({ json: syntheticScopedNotesView(notesInput, patient) });
         if (method === 'GET') {
             if (path === `/api/patients/${PATIENT_ID}`) {
                 patientVersionsRead.push(patient.version);
@@ -126,6 +129,8 @@ test('confirmed reread updates page actions, but a later external change still r
         const request = route.request();
         const path = new URL(request.url()).pathname;
         const method = request.method();
+        const notesInput = scopedNotesOpenInput(request, PATIENT_ID, new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3000').origin);
+        if (notesInput) return route.fulfill({ json: syntheticScopedNotesView(notesInput, patient) });
         if (method === 'GET') {
             if (path === `/api/patients/${PATIENT_ID}`) {
                 reads.push(patient.version);

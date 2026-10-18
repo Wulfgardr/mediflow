@@ -83,6 +83,16 @@ test('authenticates before observing route params or request content', async () 
     assert.equal(observations, 0);
 });
 
+test('activation accepts only an explicit bounded profile projection while preserving the default without a grant', async () => {
+    const current = subject();
+    assert.equal((await current.handler(request({ selectionEpoch: EPOCH, patientProfileQuery: { projection: 'notes' } }), CONTEXT)).status, 200);
+    assert.deepEqual(current.received(), { expectedPatientId: PATIENT, selectionEpoch: EPOCH, patientProfileQuery: { projection: 'notes' } });
+    for (const patientProfileQuery of [true, {}, { projection: 'all' }, { projection: 'profile', patientId: PATIENT },
+        { projection: 'notes', role: 'admin' }]) {
+        assert.equal((await current.handler(request({ selectionEpoch: EPOCH, patientProfileQuery }), CONTEXT)).status, 400);
+    }
+});
+
 test('accepts only the exact selectionEpoch body and a canonical path id', async () => {
     const current = subject();
     const accessor = {};

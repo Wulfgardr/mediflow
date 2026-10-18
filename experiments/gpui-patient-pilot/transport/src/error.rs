@@ -17,6 +17,7 @@ pub enum RuntimeError {
     ReadRequired,
     Busy,
     TooLarge,
+    ProfileTooLarge,
     Crypto,
     InvalidResponse,
     Transport,
@@ -41,6 +42,7 @@ impl RuntimeError {
             Self::Missing => Some(404),
             Self::Conflict => Some(409),
             Self::Rejected(status) => Some(*status),
+            Self::ProfileTooLarge => Some(413),
             _ => None,
         }
     }
@@ -61,6 +63,7 @@ impl fmt::Display for RuntimeError {
             Self::ReadRequired => "Ricarica la scheda prima di modificarla.",
             Self::Busy => "Un salvataggio è già in corso. Attendi il suo esito.",
             Self::TooLarge => "Il contenuto supera la dimensione consentita.",
+            Self::ProfileTooLarge => "Il profilo supera il limite di lettura di questo pilota.",
             Self::Crypto => "Impossibile verificare o proteggere i dati cifrati.",
             Self::InvalidResponse => "Non è stato possibile verificare la risposta dell’archivio.",
             Self::Transport => "Impossibile contattare il computer che ospita l’archivio o verificare la connessione.",

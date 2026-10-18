@@ -13,6 +13,7 @@ import {
   SEMANTIC_QUERY_OPERATION_ID, selectBoundOperations, semanticQueryArgumentsSchema, semanticQueryOutputSchema,
   terminologyArgumentsSchema, terminologyOutputSchema,
   checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
+  PATIENT_PROFILE_QUERY_OPERATION_ID, patientProfileQueryArgumentsSchema, patientProfileQueryOutputSchema,
   type OperationDescriptor,
 } from './contracts.ts';
 
@@ -246,6 +247,15 @@ export function createOperationClient() {
         checkupRef: args.checkupRef, targetStatus: args.targetStatus, expectedRevision: args.expectedRevision,
       }, signal));
       return output.success ? output.data : invalid();
+    },
+    readPatientProfile: async (argumentsValue: unknown, signal?: AbortSignal) => {
+      const input = patientProfileQueryArgumentsSchema.parse(argumentsValue);
+      const descriptor = OPERATION_DESCRIPTORS.find(item => item.operationId === PATIENT_PROFILE_QUERY_OPERATION_ID)!;
+      const output = patientProfileQueryOutputSchema.safeParse(await run(descriptor, input, signal));
+      if (!output.success || output.data.projection !== input.projection
+        || (input.kind === 'open' && output.data.currentness.selectionEpoch !== input.expectedSelectionEpoch)
+        || (input.kind === 'read' && (output.data.handle !== input.handle || output.data.currentness.revision !== input.expectedRevision))) return invalid();
+      return output.data;
     },
     executeSemanticQuery: async (argumentsValue: unknown, signal?: AbortSignal) => {
       const args = semanticQueryArgumentsSchema.parse(argumentsValue);

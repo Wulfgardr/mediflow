@@ -301,6 +301,21 @@ contesto, finalità, ambito, durata dell’autorizzazione, revoca e audit. MCP
 lettura delle Open Loops del paziente selezionato, proposta di follow-up
 `proposal_only` e interrogazione semantica limitata alla sola lettura.
 
+Il pilota profilo aggiunge soltanto `patient-profile.read.v1`, con consenso
+esplicito nella UI Web sul paziente selezionato e proiezione massima `profile`
+o `notes`. Senza tale concessione la connessione non riceve l'operazione né
+il relativo owner AIP. La porta specifica ritorna al proprietario Web corrente;
+non basta il mirror del Supervisor. La vista contiene soltanto i quindici
+campi di dominio enumerati in ADR 0146, oppure le sole note, senza identificativi
+di riga, ambulatori, blob AI/documentali, SQL o percorsi. I riferimenti opachi
+non concedono autorità: richiedono ancora sessione, selezione, ruolo, scope,
+revisione e durata correnti. Il riuso è ammesso nella lease; replay dopo revoca
+o in altri contesti e RequestId RPC duplicati sono negati. Il budget comune
+del JSON UTF-8 è 32 KiB: il superamento restituisce `output_too_large`, senza
+dati parziali o troncamenti. La query non muta dati clinici o audit; il wrapper
+AIP conserva il proprio audit obbligatorio. Mini può usarla senza MCP o provider.
+Il planner semantico e le capability intelligenti non si ampliano.
+
 Gli agenti usano dunque comandi MediFlow mediati: nessun adapter importa il
 database, accetta autorità dal chiamante o apre un proprio listener. Il
 candidato non autorizza sessioni agentiche generali e non dichiara installer,

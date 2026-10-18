@@ -18,6 +18,8 @@ const DENIAL_CODES = new Set(['protocol_invalid', 'frame_too_large', 'replayed',
   'challenge_expired', 'context_invalid', 'context_stale', 'already_bound', 'host_unavailable',
   'activation_failed', 'revoke_failed', 'timeout']);
 
+export type PortableSupervisorPatientProfileQueryGrantV1 = Readonly<{ projection: 'profile' | 'notes' }>;
+
 type CanonicalRecord = Record<string, unknown>;
 export type PortableSupervisorWebCaptureV1 = Readonly<{
   schemaVersion: typeof PORTABLE_SUPERVISOR_WEB_CAPTURE_SCHEMA_V1;
@@ -113,10 +115,19 @@ function canonical(value: unknown): PortableSupervisorWebIpcFrameV1 {
       method: 'prepare', requestRef: request(parsed.requestRef) });
   }
   if (method === 'activate') {
-    const parsed = exact(value, ['schemaVersion', 'method', 'requestRef', 'challenge', 'capture']);
+    const descriptor = Object.getOwnPropertyDescriptor(value as object, 'patientProfileQuery');
+    const parsed = exact(value, ['schemaVersion', 'method', 'requestRef', 'challenge', 'capture',
+      ...(descriptor ? ['patientProfileQuery'] : [])]);
+    let grant: PortableSupervisorPatientProfileQueryGrantV1 | undefined;
+    if (descriptor) {
+      const v = exact(parsed.patientProfileQuery, ['projection']);
+      if (v.projection !== 'profile' && v.projection !== 'notes') return fail();
+      grant = record({ projection: v.projection });
+    }
     if (parsed.schemaVersion !== PORTABLE_SUPERVISOR_WEB_IPC_SCHEMA_V1) return fail();
     return record({ schemaVersion: PORTABLE_SUPERVISOR_WEB_IPC_SCHEMA_V1, method: 'activate',
-      requestRef: request(parsed.requestRef), challenge: challenge(parsed.challenge), capture: capture(parsed.capture) });
+      requestRef: request(parsed.requestRef), challenge: challenge(parsed.challenge), capture: capture(parsed.capture),
+      ...(grant ? { patientProfileQuery: grant } : {}) });
   }
   if (method === 'revoke_all') {
     const parsed = exact(value, ['schemaVersion', 'method', 'requestRef', 'reason']);

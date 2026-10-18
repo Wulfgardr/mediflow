@@ -8,6 +8,7 @@ import {
   semanticQueryArgumentsSchema, semanticQueryOutputSchema, systemArgumentsSchema, terminologyArgumentsSchema,
   terminologyOutputSchema,
   checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
+  PATIENT_PROFILE_QUERY_OPERATION_ID, patientProfileQueryArgumentsSchema, patientProfileQueryOutputSchema,
 } from './contracts.ts';
 import { OperationClientError, createOperationClient } from './operation-client.ts';
 
@@ -121,6 +122,17 @@ export async function createUsefulMcpServer() {
         ? 'Checkup transition preview created; trusted MediFlow UI confirmation is required.'
         : `Checkup transition preview denied: ${output.denialCode}.`;
       return { content: [{ type: 'text', text }], structuredContent: output };
+    } catch (error) { return toolError(error); }
+  });
+  server.registerTool(PATIENT_PROFILE_QUERY_OPERATION_ID, {
+    title: 'Read the admitted patient profile projection',
+    description: 'Uses the host-admitted projection and current selection or opaque handle. No clinical writes.',
+    inputSchema: patientProfileQueryArgumentsSchema, outputSchema: patientProfileQueryOutputSchema, annotations,
+    _meta: { 'mediflow/capabilityId': PATIENT_PROFILE_QUERY_OPERATION_ID, 'mediflow/maximumStage': 'read_only' },
+  }, async (args, context) => {
+    try {
+      const output = await bound().readPatientProfile(args, context.mcpReq.signal);
+      return { content: [{ type: 'text', text: 'Admitted patient projection read.' }], structuredContent: output };
     } catch (error) { return toolError(error); }
   });
   return Object.freeze({ server, close: () => client?.close() });

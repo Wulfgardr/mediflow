@@ -133,3 +133,18 @@ test('the portable contract contains no Web, database, listener, secret or clini
   assert.doesNotMatch(source, /(?:next\/headers|server-auth|db-server|\.\.\/schema|listen\s*\(|createServer|cookie|password|pin|proof|permit|clinicalText|noteText)/iu);
   assert.match(source, /MAX_FRAME_BYTES_V1\s*=\s*4\s*\*\s*1024/u);
 });
+
+test('profile admission is an exact optional top-level grant, never part of the eight-field capture', () => {
+  const original = frames()[1]!;
+  const wire = encodePortableSupervisorWebIpcFrameV1({ ...original, patientProfileQuery: { projection: 'notes' } });
+  const decoded = decodePortableSupervisorWebIpcFrameV1(wire);
+  assert.deepEqual({ ...(decoded.patientProfileQuery as object) }, { projection: 'notes' });
+  assert.equal(Object.keys(decoded.capture as object).length, 8);
+  assert.equal('patientProfileQuery' in decodePortableSupervisorWebIpcFrameV1(encodePortableSupervisorWebIpcFrameV1(original)), false);
+  for (const grant of [{ projection: 'all' }, { projection: 'notes', patientId: 'forbidden' },
+    { projection: 'notes', selectionEpoch: 7 }, null, undefined]) {
+    assert.throws(() => encodePortableSupervisorWebIpcFrameV1({ ...original, patientProfileQuery: grant }));
+  }
+  assert.throws(() => encodePortableSupervisorWebIpcFrameV1({ ...original,
+    capture: { ...capture(), patientProfileQuery: { projection: 'notes' } } }));
+});

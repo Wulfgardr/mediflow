@@ -50,7 +50,7 @@ export interface SynopticSignal {
 export interface PatientSynopticSheetProps {
     /* WUL-678: clinical proposals live inside the actual summary destination. */
     clinicalSupport?: ReactNode;
-    notes?: string;
+    notesContent?: ReactNode;
     leadDiagnosis?: Diagnosis;
     otherProblemsCount: number;
     signals: SynopticSignal[];
@@ -91,7 +91,7 @@ function MicroLabel({ children }: { children: ReactNode }) {
 
 export function PatientSynopticSheet({
     clinicalSupport,
-    notes,
+    notesContent,
     leadDiagnosis,
     otherProblemsCount,
     signals,
@@ -114,7 +114,7 @@ export function PatientSynopticSheet({
             <div className={reading.sectionHead}><h2>Quadro clinico</h2><a href="#clinica">Diagnosi</a></div>
             {leadDiagnosis ? <><p className={reading.diagnosis}>{leadDiagnosis.description || leadDiagnosis.code}</p><p className={reading.meta}>{[leadDiagnosis.code, leadDiagnosis.system, otherProblemsCount === 1 ? 'un’altra diagnosi' : otherProblemsCount > 1 ? `altre ${otherProblemsCount} diagnosi` : null].filter(Boolean).join(' · ')}</p></>
               : <p className={reading.muted}>Diagnosi non registrata. <a href="#clinica">Consulta le diagnosi</a></p>}
-            {notes?.trim() ? <div className={reading.notes}><h3>Note in cartella</h3><p>{notes.length > 320 ? `${notes.slice(0, 320).trimEnd()}…` : notes}</p>{notes.length > 320 ? <details><summary>Leggi la nota completa</summary><p>{notes}</p></details> : null}</div> : null}
+            {notesContent ? <div className={reading.notes}>{notesContent}</div> : null}
           </div>
           {therapies === undefined || visibleTherapies.length > 0 ? <div className={reading.therapies}>
             <div className={reading.sectionHead}><h2>Terapie attive <span className={reading.count}>{therapiesTotal ?? ''}</span></h2><a href="#terapie">Gestisci</a></div>
@@ -141,7 +141,7 @@ export function PatientSynopticSheet({
             <div className="mb-4">
                 <p className={styles.sectionLabel}>Quadro clinico</p>
                 <h2 id="synoptic-title" className={styles.sectionTitle}>{proposal ? 'Quadro clinico' : 'Baseline e dati verificabili'}</h2>
-                {proposal ? <div className={styles.synopticNotes}><strong>Note in cartella</strong><p>{notes?.trim() || 'Nessuna nota generale registrata.'}</p></div> : null}
+                {notesContent ? <div className={styles.synopticNotes}>{notesContent}</div> : null}
             </div>
 
             {/* Problema guida (prima diagnosi di qualunque sistema) */}

@@ -44,10 +44,16 @@ function exact(value: unknown, keys: readonly string[]): Record<string, unknown>
     } catch { return null; }
 }
 
-function epoch(value: unknown): number | null {
-    const parsed = exact(value, ['selectionEpoch']);
-    return parsed && Number.isSafeInteger(parsed.selectionEpoch) && (parsed.selectionEpoch as number) >= 1
-        ? parsed.selectionEpoch as number : null;
+function activation(value: unknown): Pick<PortableSupervisorWebSessionActivationInputV1, 'selectionEpoch' | 'patientProfileQuery'> | null {
+    const parsed = exact(value, ['selectionEpoch']) ?? exact(value, ['selectionEpoch', 'patientProfileQuery']);
+    if (!parsed || !Number.isSafeInteger(parsed.selectionEpoch) || (parsed.selectionEpoch as number) < 1) return null;
+    if ('patientProfileQuery' in parsed) {
+        const grant = exact(parsed.patientProfileQuery, ['projection']);
+        if (!grant || (grant.projection !== 'profile' && grant.projection !== 'notes')) return null;
+        return Object.freeze({ selectionEpoch: parsed.selectionEpoch as number,
+            patientProfileQuery: Object.freeze({ projection: grant.projection }) });
+    }
+    return Object.freeze({ selectionEpoch: parsed.selectionEpoch as number });
 }
 
 function patient(value: unknown): string | null {
@@ -92,12 +98,12 @@ export function createPortableSupervisorWebSessionActivationHttpHandlerV1(source
 
         let value: unknown;
         try { value = await request.json(); } catch { return failure('input_invalid', 400); }
-        const selectionEpoch = epoch(value);
-        if (selectionEpoch === null) return failure('input_invalid', 400);
+        const selected = activation(value);
+        if (!selected) return failure('input_invalid', 400);
 
         try {
             const result = output(await sources.activate(Object.freeze({
-                expectedPatientId: patientId, selectionEpoch,
+                expectedPatientId: patientId, ...selected,
             })));
             if (!result) return failure('host_unavailable', 503);
             const response = NextResponse.json({ state: result.state, expiresAt: result.expiresAt });

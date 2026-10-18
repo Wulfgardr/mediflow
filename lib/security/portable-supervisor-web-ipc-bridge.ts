@@ -2,6 +2,8 @@ import 'server-only';
 
 import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
+import type { ProfileProjection } from '../patient-profile-scoped-contract';
+import { decodePatientProfileQueryIpcFrameV1 } from '../../packages/aip/src/patient-profile-query-ipc.ts';
 
 import {
     decodePortableSupervisorWebIpcFrameV1,
@@ -54,7 +56,7 @@ function discardPromise(value: unknown): boolean {
 }
 
 export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readonly<{
-    activate(readCurrentCapture: () => unknown): Promise<Readonly<{ expiresAt: number }>>;
+    activate(readCurrentCapture: () => unknown, patientProfileQuery?: Readonly<{ projection: ProfileProjection }>): Promise<Readonly<{ expiresAt: number }>>;
     revokeAll(reason: RevokeReason): Promise<boolean>;
     disconnect(): void;
 }> {
@@ -127,7 +129,11 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
                 }
                 let response: PortableSupervisorWebIpcFrameV1;
                 try { response = decodePortableSupervisorWebIpcFrameV1(message); }
-                catch { finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return; }
+                catch {
+                    try { if (decodePatientProfileQueryIpcFrameV1(message).type === 'query') return; }
+                    catch { /* Unknown or malformed frames remain terminal below. */ }
+                    finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return;
+                }
                 if (response.requestRef !== expectedRequest) return;
                 if (response.method !== 'ack') {
                     finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return;
@@ -185,7 +191,7 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
             } catch { finish(new PortableSupervisorWebIpcBridgeV1Error('host_unavailable'), null, true); }
         });
     };
-    const activate = async (readCurrentCapture: () => unknown): Promise<Readonly<{ expiresAt: number }>> => {
+    const activate = async (readCurrentCapture: () => unknown, patientProfileQuery?: Readonly<{ projection: ProfileProjection }>): Promise<Readonly<{ expiresAt: number }>> => {
         if (typeof readCurrentCapture !== 'function' || types.isProxy(readCurrentCapture)
             || types.isAsyncFunction(readCurrentCapture)) return fail('context_invalid');
         const startedAt = hostNow(), currentRequest = requestRef();
@@ -206,7 +212,8 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
         let activationFrame: string, canonicalActivation: PortableSupervisorWebIpcFrameV1;
         try {
             activationFrame = encodePortableSupervisorWebIpcFrameV1({ schemaVersion: SCHEMA, method: 'activate',
-                requestRef: currentRequest, challenge: prepared.challenge, capture: captureValue });
+                requestRef: currentRequest, challenge: prepared.challenge, capture: captureValue,
+                ...(patientProfileQuery ? { patientProfileQuery } : {}) });
             canonicalActivation = decodePortableSupervisorWebIpcFrameV1(activationFrame);
         } catch { return fail('context_invalid'); }
         const activated = await exchange(activationFrame, currentRequest, 'activated', ACTIVATE_TIMEOUT_MS);

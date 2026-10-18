@@ -77,7 +77,7 @@ function selectionError(error: unknown): never {
 /* One-shot boundary: the authoritative selection yields the sole epoch
    sent to the host route, and no unknown outcome is retried automatically. */
 export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
-    const request = sources.fetch ?? globalThis.fetch;
+    const request: typeof fetch = sources.fetch ?? ((input, init) => globalThis.fetch(input, init));
     const selection = createSmartImportSelectionBrowserAdapter({ fetch: request });
     let generation = 0;
     let operation = 0;
@@ -106,9 +106,11 @@ export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
             operation += 1;
             selection.reset();
         },
-        async activate(value: unknown, confirmed: true): Promise<ActiveHost> {
+        async activate(value: unknown, confirmed: true, patientProfileQuery?: Readonly<{ projection: 'profile' | 'notes' }>): Promise<ActiveHost> {
             if (confirmed !== true) return fail('confirmation_required');
             if (terminal) return fail('operation_terminal');
+            const grant = patientProfileQuery === undefined ? null : exact(patientProfileQuery, ['projection']);
+            if (patientProfileQuery !== undefined && (!grant || !['profile', 'notes'].includes(grant.projection as string))) return fail('input_invalid');
             const scope = patientScope(value);
             if (!scope) return fail('input_invalid');
             const token = generation;
@@ -132,7 +134,8 @@ export function createIntelligentHostBrowserAdapter(sources: Sources = {}) {
                     {
                         method: 'POST', cache: 'no-store',
                         headers: { 'content-type': 'application/json' },
-                        body: JSON.stringify({ selectionEpoch: selected.selectionEpoch }),
+                        body: JSON.stringify({ selectionEpoch: selected.selectionEpoch,
+                            ...(grant ? { patientProfileQuery: { projection: grant.projection } } : {}) }),
                     },
                 );
             } catch {
