@@ -1,3 +1,4 @@
+import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
 /* WUL-457: exact-string legacy systems only, not malformed-record normalization. */
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
@@ -36,6 +37,8 @@ async function fixture(page: Page, entry: EntryPoint) {
   };
   await page.route(/\/api\/patients(\/|\?|$)/, route => {
     const request = route.request();
+    const notesInput = scopedNotesOpenInput(request, PATIENT_ID, new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3000').origin);
+    if (notesInput) return route.fulfill({ json: syntheticScopedNotesView(notesInput, patient) });
     if (request.method() !== 'GET') throw new Error('This export fixture permits no patient writes');
     const path = new URL(request.url()).pathname;
     return route.fulfill({ json: path === `/api/patients/${PATIENT_ID}` ? patient : [patient] });
