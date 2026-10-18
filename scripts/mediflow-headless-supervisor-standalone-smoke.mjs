@@ -461,7 +461,8 @@ async function main() {
     assert.equal(cloudProbe.status, 409);
     assert.equal((await cloudProbe.json()).code, 'provider_probe_disabled');
     const capabilities = await rpc.send('tools/call', tool('mediflow.system.capabilities.v1'));
-    assert.deepEqual(capabilities.result.structuredContent, publicCatalog(OPERATION_DESCRIPTORS));
+    assert.deepEqual(capabilities.result.structuredContent, publicCatalog(OPERATION_DESCRIPTORS.filter(
+      descriptor => descriptor.operationId !== 'patient-profile.read.v1')));
     const listed = await rpc.send('tools/list');
     assert.deepEqual(new Set(listed.result.tools.map(item => item.name)), new Set([
       'mediflow.system.headless_status.v1', 'mediflow.system.capabilities.v1',
