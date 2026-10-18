@@ -3,6 +3,76 @@
 Data: 2026-10-18. Stato: Proposed; accettazione con il merge della PR.
 Riferimenti: WUL-582, WUL-575, ADR 0071, ADR 0145.
 
+## Incremento S1: vista scoped e riferimenti host (WUL-583)
+
+Il pilota espone `patient-profile.read.v1` con `contractVersion: 1`, distinto
+dalla revisione del paziente. `lib/patient-profile-scoped-contract.ts` definisce
+una vista consegnabile separata dallo snapshot interno: non contiene `id`,
+`ambulatoryId`, percorsi, SQL o righe ORM. La proiezione `profile` ammette soltanto
+nome, cognome, codice fiscale, nascita, indirizzo, telefono, caregiver, diagnosi,
+esenzioni, note, ADI, stato archiviato e motivi/note di stato e archivio. `notes`
+ammette soltanto le note. ENC e custodia delle chiavi non cambiano; nessun blob
+AI/documentale o sottorisorsa entra nella vista.
+
+La richiesta distingue `open` da `read`. Web e paired aprono sul paziente scelto
+dal rispettivo ingresso autenticato, con `expectedSelectionEpoch` obbligatorio.
+La selezione usa il proprietario corrente e il suo confronto atomico dell'epoch;
+il paziente della route e lo scope risolto dall'host non sono autorizzazioni
+fornite dal body. Il GET autenticato dell'epoch permette l'acquisizione iniziale
+e la risincronizzazione. I consumer conservano l'epoch osservato e scartano le
+risposte di intenzioni superate: soltanto l'intenzione ancora corrente può
+essere ritentata dopo un conflitto. Un'apertura A tardiva non rinnova il proprio
+epoch per riscegliere A dopo B.
+
+`read` richiede handle e `expectedRevision`; non può trasformarsi implicitamente
+in apertura quando l'handle manca, scade o viene revocato. Un riferimento casuale
+è posseduto dall'host e legato a sessione, selezione, paziente, scope, scopo,
+proiezione massima, revisione e durata. Il riuso nella stessa lease è ammesso;
+falsificazione, contesto diverso, ampliamento della proiezione, cambio ruolo,
+lock/logout, revoca, restart, scadenza o revisione non più corrente lo negano.
+Il risultato restituisce riferimento e attualità (`revision`, `selectionEpoch`,
+`observedAt`, `expiresAt`), senza promettere validità dopo la risposta. Le risposte
+sono `no-store`; i consumer separano cache e continuazioni per selezione e handle.
+
+Web e native riusano i propri issuer fisici di sessione e il proprietario della
+selezione. La lettura paired richiede le protezioni correnti di modalità,
+dispositivo, operatore, ruolo, capability readonly e ambulatorio atteso; non
+richiede una capability di inferenza né un provider. Local-v1 token-only rimane
+un principal servizio nel percorso legacy, senza inventare identità mediche.
+I GET legacy conservano il wire compatibile, ma i consumer del pilota usano
+la vista scoped per aperture, riletture e readback che abilitano il writer.
+Il proprietario native profilo usa i resource port emessi da `serverSessions`
+con un gate fisso readonly e un registro fisicamente distinto dal proprietario
+di inferenza. Non amplia il gate AI Apple né accetta un gate sostituibile dal
+chiamante. Le piattaforme paired ammesse, comprese Windows e Linux, possono
+leggere il profilo senza `network.ai.central-runtime`; i dinieghi dell'inferenza
+restano invariati.
+
+La sola operazione profilo può attraversare Mini/OperationClient/RPC tramite
+composizione esplicita dell'host e issuer AIP già esistente. Una connessione
+open-loops non riceve per questo la nuova operazione. La proiezione massima è
+fissata dall'host; il chiamante può restringerla, mai ampliarla. La porta IPC
+specifica torna al proprietario Web attivo: il solo mirror del Supervisor non
+ammette la query. `open` headless verifica epoch e binding già attivati e crea
+soltanto un riferimento di lettura; non seleziona nuovamente il paziente e non
+revoca implicitamente l'autorizzazione. Ruolo corrente, binding, query e verifica
+finale condividono l'ultimo segmento sincrono, dopo tutte le attese. La porta è
+revocabile con il ciclo di vita esistente. RequestId RPC duplicati sono negati;
+un retry con nuovo RequestId può usare lo stesso handle ancora valido.
+
+La query non modifica dati clinici o audit. Il wrapper AIP conserva invece il
+proprio audit obbligatorio, verificato separatamente. Mini funziona con parent
+autenticato anche senza MCP o provider. Non si ampliano planner semantico,
+capability intelligenti, writer, ENC, CAS, idempotenza o semantica di WUL-576.
+Il confine non dichiara isolamento da codice ostile nello stesso processo.
+
+Le prove attraversano gli adapter reali e comprendono successo, DTO privo di
+identificativi interni, retry, replay dopo invalidazione, scope/proiezione,
+revisione, aperture tardive e revoca/cambio ruolo durante le attese. Snapshot
+clinico e audit della query restano invariati; l'audit del wrapper AIP è atteso.
+La reversione non richiede migrazioni o ripristini di dati: elimina soltanto
+contratto, ingressi e riferimenti volatili introdotti dal pilota.
+
 ## Problema
 
 La porta `patient-profile-service` esiste, ma la sua lettura accetta identificativo,
