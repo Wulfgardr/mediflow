@@ -107,7 +107,12 @@ export function cargoGpuiPilotTestCommand(root) {
   exactFields(rust['[toolchain]'], { channel: `"${toolchain}"`, profile: '"minimal"', components: '["rustfmt", "clippy"]' }, 'toolchain');
   const client = gpuiTables(root, `${gpuiDirectory}/client/Cargo.toml`, ['[package]', '[lib]', '[dependencies]', '[dev-dependencies]', '[[test]]']);
   const transport = gpuiTables(root, `${gpuiDirectory}/transport/Cargo.toml`, ['[package]', '[lib]', '[[bin]]', '[dependencies]']);
-  const app = gpuiTables(root, `${gpuiDirectory}/app/Cargo.toml`, ['[package]', '[[bin]]', '[dependencies]']);
+  const app = gpuiTables(root, `${gpuiDirectory}/app/Cargo.toml`, ['[package]', '[[bin]]', '[dependencies]', '[dev-dependencies]']);
+  // Model the actual test-support feature and timezone fixture dependency;
+  // accepting this table must not silently accept an optional/disabled harness.
+  exactFields(app['[dev-dependencies]'], {
+    gpui: '{ workspace = true, features = ["test-support"] }', 'chrono-tz': '"0.10"',
+  }, 'app test-support dependencies');
   for (const [tables, name] of [[client, 'mediflow-patient-client'], [transport, 'mediflow-runtime-client'], [app, 'mediflow-gpui-patient-pilot']]) {
     exactFields(tables['[package]'], { name: `"${name}"`, 'version.workspace': 'true', 'edition.workspace': 'true',
       'rust-version.workspace': 'true', 'license.workspace': 'true', 'publish.workspace': 'true' }, 'package');
@@ -119,7 +124,7 @@ export function cargoGpuiPilotTestCommand(root) {
   exactFields(app['[[bin]]'], { name: '"mediflow-gpui-patient-pilot"', path: '"src/main.rs"' }, 'binary test target');
   const main = read(root, `${gpuiDirectory}/app/src/main.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
   // These first items cannot be hidden inside a comment, string, cfg or function.
-  if (!/^mod clinical_text;\s*mod components;\s*mod demo;\s*mod demo_app;\s*mod documents;\s*mod editing;\s*mod icons;\s*mod navigation;\s*mod patient_forms;\s*mod references;\s*mod shell;\s*mod text_input;\s*mod theme;/u.test(main)) throw new Error('Pilot binary module binding changed');
+  if (!/^mod appointments;\s*mod clinical_text;\s*mod components;\s*mod demo;\s*mod demo_app;\s*mod documents;\s*mod editing;\s*mod icons;\s*mod navigation;\s*mod patient_forms;\s*mod references;\s*mod shell;\s*mod text_input;\s*mod theme;/u.test(main)) throw new Error('Pilot binary module binding changed');
   const library = read(root, `${gpuiDirectory}/transport/src/lib.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
   if (!/^#!\[forbid\(unsafe_code\)\]\s*mod catalogs;\s*mod crypto;\s*mod dto;\s*mod error;\s*mod http;\s*mod session;\s*mod tls;/u.test(library)) throw new Error('Pilot transport module binding changed');
   const files = ['client/tests/flow.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/text_input.rs',

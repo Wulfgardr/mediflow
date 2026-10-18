@@ -137,7 +137,39 @@ autorizzati, directory sintetiche temporanee e copia legacy disabilitata.
 L'helper subreaper esistente raccoglie soltanto propri figli già terminati;
 in questo batch non ha inviato segnali e non restano figli residui.
 
-### Riproduzione
+### Follow-up della CI: binding Cargo della selezione
+
+Il candidato precedente è stato pubblicato come
+`8cfb7d7065c7c7f114e49e04bb5412dfcebb3b6e`. Nel
+[Repository Guards effettivo](https://github.com/Wulfgardr/mediflow/actions/runs/39110303479/job/117624811357),
+checkout `cb45b9f9a4e395d445447ce4ce412b3c046bc1b3`, il controllo della
+selezione aveva **113 PASS e 2 FAIL su 115**: il contratto chiuso del
+selettore non modellava ancora `[dev-dependencies]` dell'app. La lettura
+del codice ha trovato anche il prefisso dei moduli fermo a `clinical_text`,
+prima dell'aggiunta del nuovo `appointments`.
+
+Il follow-up aggiorna soltanto
+[`native-tool-test-selection.mjs`](../../scripts/native-tool-test-selection.mjs),
+le sue fixture e questo verbale con la ricevuta. La tabella deve contenere
+esattamente GPUI workspace con `test-support` e `chrono-tz` come nel manifest
+pubblicato; il prefisso ordinato richiede `mod appointments;` senza condizioni.
+`appointments.rs` è un helper senza test propri e non viene dichiarato
+artificialmente come test selezionato. Target, comando `--workspace
+--all-targets --locked`, matrici OS, errori ed esclusioni preesistenti
+mantengono il loro contratto.
+
+La suite canonica passa a **131 PASS, zero FAIL/SKIP**, compresi 15 nuovi
+subtest negativi su dipendenze mancanti/opzionali/duplicate/condizionali,
+harness disabilitato, target con `required-features` e moduli mancanti o
+condizionali. Il censimento risulta **COMPLETE: 1.062 file, 1.033 presi da
+una suite, 29 esclusioni motivate preesistenti**. Lint e diff-check PASS.
+La ricevuta precedente resta disponibile allo SHA 8cfb7d7, con i suoi hash;
+quella aggiornata distingue i risultati conservati dai nuovi test del
+selettore. Nessun nuovo sorgente di prodotto, run nativo facoltativo o
+ampliamento generico per ottenere verde. La nuova revisione richiede
+nuovo binding della review completa e CI propria prima del merge.
+
+### Comandi riproducibili
 
 Da un checkout della revisione pubblicata, con dipendenze installate tramite
 `npm ci`, Node 24, Rust 1.98.1 e le dipendenze native documentate nel README:
@@ -146,6 +178,8 @@ Da un checkout della revisione pubblicata, con dipendenze installate tramite
 node --test scripts/patient-soft-delete.test.mjs
 node scripts/check-openapi-drift.mjs --self-test
 node scripts/check-openapi-drift.mjs --base-ref 2dde0c0503abf828b99d73d7129cb7beed733044
+npm run test:test-selection
+npm run check:test-selection
 npm run typecheck
 cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --locked -p mediflow-runtime-client --all-targets
 cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --locked -p mediflow-gpui-patient-pilot
