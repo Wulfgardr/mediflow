@@ -154,7 +154,7 @@ passi (Fasi 0-1) sono quindi deliberatamente comuni a tutte le proposte.
 
 [WUL-582](https://linear.app/wulfgardr/issue/WUL-582) verifica la lettura del
 profilo e l'aggiornamento delle note del paziente prima della migrazione del
-writer. Il percorso opzionale `LocalPatientsDataSource` possiede oggi anche
+writer. Prima di questo emendamento, il percorso opzionale `LocalPatientsDataSource` possedeva anche
 scritture SQLite che non attraversano l'audit obbligatorio del servizio Node.
 La sola presenza del flag `MEDIFLOW_LOCAL_AUTHORITY` non qualifica queste
 scritture come equivalenti al servizio.
