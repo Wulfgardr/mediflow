@@ -80,6 +80,11 @@ async function trace(nodeFileTrace, seeds, root, options = {}) {
     physicalPath(file); return relative.split(path.sep).join('/');
   });
 }
+export function headlessTraceReadPath(file, root, paths = path) {
+  if (paths.sep === '\\') file = file.replaceAll('/', paths.sep);
+  if (!file.startsWith(`${root}${paths.sep}`) || paths.normalize(file) !== file) deny('Headless trace escaped its root.');
+  return file;
+}
 export function privateDatabaseDependency(file) {
   return /\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal|mj[0-9a-f]+))?$/iu.test(file.replaceAll('\\', '/'));
 }
@@ -99,7 +104,7 @@ async function sourceClosure() {
     ignore: file => privateDatabaseDependency(file) || sharedRuntimeDependency(file)
       || file.replaceAll('\\', '/') === 'scripts/headless-web-server.mjs',
     readFile: async file => {
-      if (!file.startsWith(`${ROOT}${path.sep}`) || path.normalize(file) !== file) deny('Headless trace escaped its root.');
+      file = headlessTraceReadPath(file, ROOT);
       if (privateDatabaseDependency(file)) return null;
       let bytes;
       try {
