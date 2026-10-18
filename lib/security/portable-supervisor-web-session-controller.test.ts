@@ -108,7 +108,8 @@ function fixture(options: FixtureOptions = {}) {
         disconnectBridge: () => { disconnects += 1; events.push('transport:disconnect'); },
         checkupLifecycle: checkup.controller,
         profileQueries: {
-            async acquire() {
+            async acquire(_projection, expiresAt) {
+                assert.equal(expiresAt, EXPIRES_AT - 1);
                 profileAcquisitions++;
                 if (options.profile === 'deferred') await profileAcquisition.promise;
                 return Object.freeze({ async executeProfileQuery(): Promise<never> { throw new Error('not used by lifecycle test'); },
@@ -177,24 +178,24 @@ test('lock during profile-port acquisition cannot publish a late grant', async (
     await current.controller.retire('application_lock'); current.profileAcquisition.resolve();
     await assert.rejects(activation, { code: 'session_terminal' });
     assert.equal(current.profileDisposals(), 1); assert.equal(current.profilePublished(), false);
-    assert.equal(current.activations(), 0);
+    assert.equal(current.activations(), 1);
 });
 
-test('selection drift during profile acquisition disposes the new port before IPC activation', async () => {
+test('selection drift during profile acquisition disposes the new port after ACK without publication', async () => {
     const current = fixture({ profile: 'deferred' });
     const activation = current.controller.activateCurrentSelection({ ...INPUT, patientProfileQuery: { projection: 'profile' } });
     await new Promise<void>(resolve => setImmediate(resolve));
     current.setCapture({ selectionEpoch: INPUT.selectionEpoch + 1 }); current.profileAcquisition.resolve();
     await assert.rejects(activation, { code: 'selection_conflict' });
     assert.equal(current.profileDisposals(), 1); assert.equal(current.profilePublished(), false);
-    assert.equal(current.activations(), 0);
+    assert.equal(current.activations(), 1);
 });
 
 test('profile authority remains unpublished until the exact activation acknowledgement', async () => {
     const current = fixture({ activation: 'deferred' });
     const activation = current.controller.activateCurrentSelection({ ...INPUT, patientProfileQuery: { projection: 'notes' } });
     await new Promise<void>(resolve => setImmediate(resolve));
-    assert.equal(current.profileAcquisitions(), 1); assert.equal(current.profilePublished(), false);
+    assert.equal(current.profileAcquisitions(), 0); assert.equal(current.profilePublished(), false);
     current.activation.resolve({ expiresAt: EXPIRES_AT - 1 }); await activation;
     assert.equal(current.profilePublished(), true);
     await current.controller.retire('explicit'); assert.equal(current.profilePublished(), false);

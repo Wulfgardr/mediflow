@@ -167,7 +167,7 @@ for (const platform of ['windows', 'linux'] as const) test(`${platform}: native 
 
 test('headless host port opens only the activated selection and revokes without reselection or clinical effects', async () => {
     reset(); const selected = await (await query('web', open(0))).json() as ProfileResult;
-    const port = await acquirePatientProfileQueryHostPort('notes'); assert.ok(port);
+    const port = await acquirePatientProfileQueryHostPort('notes', Date.now() + 60_000); assert.ok(port);
     const before = snapshot(); const input = open(selected.currentness.selectionEpoch, 'notes');
     const first = await port.executeProfileQuery(input); assert.equal(first.currentness.selectionEpoch, selected.currentness.selectionEpoch);
     assert.deepEqual(first.profile, { notes });
@@ -232,7 +232,7 @@ test('expired, version-stale and new-session references never return profile dat
 
 test('observed role drift permanently retires the host owner and old handle after role restoration', async () => {
     reset(); const selected = await (await query('web', open(0))).json() as ProfileResult;
-    const port = await acquirePatientProfileQueryHostPort('profile'); assert.ok(port);
+    const port = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000); assert.ok(port);
     const first = await port.executeProfileQuery(open(selected.currentness.selectionEpoch));
     dbServer.update(users).set({ role: 'user' }).where(eq(users.id, authority.session.userId)).run();
     await assert.rejects(port.executeProfileQuery(reread(first)), { code: 'session_unavailable' });
@@ -243,7 +243,7 @@ test('observed role drift permanently retires the host owner and old handle afte
 
 test('real Web dispatcher requires its admitted port and publishes only the current scoped result', async () => {
     reset(); const selected = await (await query('web', open(0))).json() as ProfileResult;
-    const acquired = await acquirePatientProfileQueryHostPort('notes'); assert.ok(acquired);
+    const acquired = await acquirePatientProfileQueryHostPort('notes', Date.now() + 60_000); assert.ok(acquired);
     const { createPatientProfileQueryWebDispatcher } = load('./security/patient-profile-query-web-dispatcher.ts') as typeof import('./security/patient-profile-query-web-dispatcher');
     const { encodePatientProfileQueryIpcFrameV1, decodePatientProfileQueryIpcFrameV1 } = load('../packages/aip/src/patient-profile-query-ipc.ts') as typeof import('../packages/aip/src/patient-profile-query-ipc');
     let port: typeof acquired | null = null, failures = 0;
@@ -264,7 +264,7 @@ test('real Web dispatcher requires its admitted port and publishes only the curr
 
 for (const transition of ['lock', 'role'] as const) test(`dispatcher withholds a result invalidated during its publication await: ${transition}`, async () => {
     reset(); const selected = await (await query('web', open(0))).json() as ProfileResult;
-    const port = await acquirePatientProfileQueryHostPort('profile'); assert.ok(port);
+    const port = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000); assert.ok(port);
     const { createPatientProfileQueryWebDispatcher } = load('./security/patient-profile-query-web-dispatcher.ts') as typeof import('./security/patient-profile-query-web-dispatcher');
     const { encodePatientProfileQueryIpcFrameV1, decodePatientProfileQueryIpcFrameV1 } = load('../packages/aip/src/patient-profile-query-ipc.ts') as typeof import('../packages/aip/src/patient-profile-query-ipc');
     const frames: string[] = [];
@@ -283,4 +283,47 @@ test('MCP contracts import directly in Node strip-only mode without a transform 
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(moduleUrl)})`],
         { encoding: 'utf8', timeout: 10_000, env: { ...process.env, NODE_OPTIONS: '' } });
     assert.equal(result.status, 0, result.stderr || result.error?.message);
+});
+
+for (const lane of ['web', 'network'] as const) test(`${lane}: scoped open, real PUT, epoch observation and explicit fresh readback`, async () => {
+    reset(); if (lane === 'network') grant('ipados', ['network.replica.readonly-patients', 'network.replica.write-patient-profile']); select(lane);
+    const initial = await (await query(lane, open(await epoch(lane)))).json() as ProfileResult;
+    const writer = load(lane === 'web' ? '../app/api/patients/[id]/route.ts' : '../app/api/v1/network/patients/[id]/route.ts');
+    const base = request(lane); const req = new Request(base.url, { method: 'PUT', headers: base.headers,
+        body: JSON.stringify({ version: initial.currentness.revision, notes: 'ENC:aXY=:dXBkYXRlZA==' }) });
+    const update = await writer.PUT(req, { params: Promise.resolve({ id: patientA }) });
+    assert.equal(update.status, 200, await update.clone().text());
+    const epochResponse = await (lane === 'web' ? epochWeb : epochNetwork).GET(request(lane));
+    assert.equal(epochResponse.status, 200, await epochResponse.clone().text());
+    const currentEpoch = (await epochResponse.json()).selectionEpoch; assert.ok(currentEpoch >= initial.currentness.selectionEpoch);
+    const before = snapshot();
+    const freshResponse = await query(lane, open(currentEpoch)); assert.equal(freshResponse.status, 200, await freshResponse.clone().text());
+    const fresh = await freshResponse.json() as ProfileResult; assert.equal(fresh.currentness.revision, initial.currentness.revision + 1);
+    assert.equal(fresh.profile.notes, 'ENC:aXY=:dXBkYXRlZA=='); assert.notEqual(fresh.handle, initial.handle); assert.ok(fresh.currentness.selectionEpoch > initial.currentness.selectionEpoch);
+    assert.equal((await query(lane, reread(fresh))).status, 200); assert.ok((await query(lane, reread(initial))).status >= 400);
+    assert.deepEqual(snapshot(), before);
+    if (lane === 'web') retireSyntheticWebSession(webSession.session); else grant('ipados', []);
+    const revoked = await (lane === 'web' ? epochWeb : epochNetwork).GET(request(lane));
+    assert.ok(revoked.status === 401 || revoked.status === 403);
+    assert.equal((await revoked.json()).selectionEpoch, undefined);
+});
+
+test('headless handle deadline intersects the acknowledged host grant despite query skew and never renews on read', async () => {
+    reset(); const selected = await (await query('web', open(0))).json() as ProfileResult;
+    const originalNow = Date.now; const capturedAt = originalNow(); const deadline = capturedAt + 60_000;
+    try {
+        Date.now = () => capturedAt;
+        const port = await acquirePatientProfileQueryHostPort('notes', deadline); assert.ok(port);
+        Date.now = () => capturedAt + 124;
+        const result = await port.executeProfileQuery(open(selected.currentness.selectionEpoch, 'notes'));
+        assert.equal(result.currentness.observedAt, capturedAt + 124); assert.equal(result.currentness.expiresAt, deadline);
+        Date.now = () => capturedAt + 248;
+        const retry = await port.executeProfileQuery(reread(result)); assert.equal(retry.handle, result.handle);
+        assert.equal(retry.currentness.expiresAt, deadline); assert.ok(retry.currentness.expiresAt <= deadline);
+        Date.now = () => deadline;
+        await assert.rejects(port.executeProfileQuery(reread(retry)), { code: 'handle_expired' });
+        port.dispose();
+        assert.equal(await acquirePatientProfileQueryHostPort('notes', Date.now() - 1), null);
+        assert.equal(await acquirePatientProfileQueryHostPort('notes', NaN), null);
+    } finally { Date.now = originalNow; }
 });

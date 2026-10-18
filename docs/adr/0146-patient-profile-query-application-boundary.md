@@ -31,7 +31,12 @@ proiezione massima, revisione e durata. Il riuso nella stessa lease è ammesso;
 falsificazione, contesto diverso, ampliamento della proiezione, cambio ruolo,
 lock/logout, revoca, restart, scadenza o revisione non più corrente lo negano.
 Il risultato restituisce riferimento e attualità (`revision`, `selectionEpoch`,
-`observedAt`, `expiresAt`), senza promettere validità dopo la risposta. Le risposte
+`observedAt`, `expiresAt`), senza promettere validità dopo la risposta. La vista
+Web ritira subito le note se cambia la revisione osservata nel contesto del
+paziente; serve una riapertura esplicita, senza ripubblicare risposte o
+esiti di decrittazione della revisione precedente. Dopo una scrittura, il GET
+dell'epoch può osservare l'invalidazione della selezione precedente e restituire
+l'epoch corrente; non apre una selezione né rinnova un riferimento. Le risposte
 sono `no-store`; i consumer separano cache e continuazioni per selezione e handle.
 Il JSON UTF-8 della vista ha un budget condiviso di 32 KiB, applicato dall'host
 su tutti gli ingressi prima della risposta. Il superamento restituisce soltanto
@@ -62,7 +67,10 @@ ammette la query. `open` headless verifica epoch e binding già attivati e crea
 soltanto un riferimento di lettura; non seleziona nuovamente il paziente e non
 revoca implicitamente l'autorizzazione. Ruolo corrente, binding, query e verifica
 finale condividono l'ultimo segmento sincrono, dopo tutte le attese. La porta è
-revocabile con il ciclo di vita esistente. RequestId RPC duplicati sono negati;
+revocabile con il ciclo di vita esistente. L'acquisizione della porta segue
+l'ACK di attivazione e usa la sua scadenza effettiva, verificata contro la capture
+autenticata: risultato e handle non possono superarla, neppure sulle riletture.
+Questa deadline non proviene dal body del chiamante. RequestId RPC duplicati sono negati;
 un retry con nuovo RequestId può usare lo stesso handle ancora valido.
 
 La query non modifica dati clinici o audit. Il wrapper AIP conserva invece il

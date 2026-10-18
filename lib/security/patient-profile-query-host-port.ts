@@ -8,8 +8,8 @@ export type PatientProfileQueryHostPort = Readonly<{
     dispose(): boolean;
 }>;
 
-export function acquirePatientProfileQueryHostPort(projection: ProfileProjection): Promise<PatientProfileQueryHostPort | null> {
-    return acquireScopedPatientProfileHostPort(projection);
+export function acquirePatientProfileQueryHostPort(projection: ProfileProjection, expiresAt: number): Promise<PatientProfileQueryHostPort | null> {
+    return acquireScopedPatientProfileHostPort(projection, expiresAt);
 }
 
 export const isCurrentPatientProfileQueryResult = isCurrentScopedPatientProfileResult;

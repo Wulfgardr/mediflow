@@ -163,7 +163,7 @@ type ScopedOwnerProcess = Pick<typeof serverSessionProjectionOwnerProductionOwne
 type ScopedContext = Readonly<{
     session: ServerSession; owner: ServerSessionProfileSelectionOwner; process: ScopedOwnerProcess;
     purpose: PatientProfileQuery['purpose']; lane: 'web' | 'network' | symbol; maximumProjection: ProfileProjection;
-    currentScope(): string; pairedClient?: StoredNetworkPairedClient;
+    currentScope(): string; pairedClient?: StoredNetworkPairedClient; resultDeadline?: number;
 }>;
 type ScopedReferences = {
     active: boolean; epoch: number; scope: ServerSessionSelectionScopeV1;
@@ -290,7 +290,7 @@ function executeScopedProfile(context: ScopedContext, query: ProfileQuery, expec
                 if (!snapshot) return scopedFail('query_unavailable');
                 if (snapshot.version !== binding.patientVersion || (reference && snapshot.version !== reference.revision)) return scopedFail('revision_conflict');
                 const observedAt = Date.now();
-                const expiresAt = Math.min(binding.selection.expiresAt, reference?.expiresAt ?? observedAt + 15 * 60_000);
+                const expiresAt = Math.min(binding.selection.expiresAt, context.resultDeadline ?? Infinity, reference?.expiresAt ?? observedAt + 15 * 60_000);
                 if (observedAt >= expiresAt) return scopedFail('handle_expired');
                 const output = Object.freeze({ schemaVersion: PROFILE_QUERY_RESULT_SCHEMA, operationId: PROFILE_QUERY_OPERATION_ID,
                     contractVersion: 1 as const, handle, projection: query.projection,
@@ -363,28 +363,35 @@ export async function readPatientProfileSelectionEpochHttp(request: Request, sur
     try {
         const context = await admitScopedProfileRequest(request, surface); if (context instanceof NextResponse) return context;
         const selectionEpoch = withCurrentProfileSession(context, () => {
-            context.currentScope(); return context.owner.snapshotSelectionEpoch(context.session);
+            context.currentScope();
+            try { return context.owner.snapshotSelectionEpoch(context.session); }
+            catch (error) {
+                if (!(error instanceof ServerSessionProjectionOwnerError) || error.code !== 'stale_selection') throw error;
+                context.currentScope();
+                return context.owner.snapshotSelectionEpoch(context.session);
+            }
         });
         const response = NextResponse.json({ contractVersion: 1, selectionEpoch });
         response.headers.set('Cache-Control', 'no-store'); return response;
     } catch (error) { return profileQueryFailureResponse(error); }
 }
 
-export async function acquireScopedPatientProfileHostPort(projection: ProfileProjection): Promise<PatientProfileQueryHostPort | null> {
-    if (projection !== 'profile' && projection !== 'notes') return null;
+export async function acquireScopedPatientProfileHostPort(projection: ProfileProjection, expiresAt: number): Promise<PatientProfileQueryHostPort | null> {
+    if ((projection !== 'profile' && projection !== 'notes') || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) return null;
     const authenticated = await acquireAuthenticatedWebSessionProjectionOwnerContext();
-    if (!authenticated) return null;
+    if (!authenticated || expiresAt <= Date.now()) return null;
     let active = true;
     try {
         const { session, owner } = authenticated;
         const selected = owner.withLeaseCriticalSection(session, value => value);
         const context: ScopedContext = { session, owner, process: serverSessionProjectionOwnerProductionOwner,
-            purpose: 'care_coordination', lane: Symbol('patient-profile-host-query'), maximumProjection: projection,
+            purpose: 'care_coordination', lane: Symbol('patient-profile-host-query'), maximumProjection: projection, resultDeadline: expiresAt,
             currentScope: () => selected.ambulatoryId };
         const state = withCurrentProfileSession(context, () => references(context));
         const port: PatientProfileQueryHostPort = Object.freeze({
             async executeProfileQuery(value: ProfileQuery, signal?: AbortSignal): Promise<ProfileResult> {
                 if (!active || !state.active) return scopedFail('handle_unavailable');
+                if (Date.now() >= expiresAt) return scopedFail('handle_expired');
                 const input = parseProfileQuery(value); if (!input) return scopedFail('input_invalid');
                 return executeScopedProfile(context, input, selected.patientId, false, signal);
             },
