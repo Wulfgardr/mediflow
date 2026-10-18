@@ -36,7 +36,7 @@ const EXPECTED_SCRIPTS = {
     [`post${GUARD_SCRIPT}`]: null,
     predev: 'node scripts/node-runtime-contract.mjs verify',
     dev: 'next dev --turbopack --hostname 127.0.0.1 --port 3000', postdev: null,
-    prebuild: 'node scripts/node-runtime-contract.mjs verify', build: 'node scripts/source-runtime.mjs build',
+    prebuild: 'node scripts/build-input-metadata.mjs --source . && node scripts/node-runtime-contract.mjs verify', build: 'node scripts/source-runtime.mjs build',
     postbuild: 'node scripts/node-runtime-contract.mjs write-standalone-manifest && node scripts/check-standalone-runtime-bundle.mjs && node scripts/source-runtime.mjs prepare',
     prestart: 'node scripts/node-runtime-contract.mjs verify-node',
     start: 'node scripts/source-runtime.mjs web',
