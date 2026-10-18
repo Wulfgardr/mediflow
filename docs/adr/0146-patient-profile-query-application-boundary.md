@@ -32,8 +32,15 @@ Identità dell'autore, scopo e ambito compongono una query interna al servizio.
 Il contratto della query e la vista del profilo sono tipi espliciti, indipendenti
 sia da Request/Next sia dalle righe ORM. I campi cifrati restano stringhe opache;
 le date sono proiettate senza introdurre decifratura o canonicalizzazione clinica.
-Il descrittore versionato di questa singola operazione è usato dal dispatch host:
-non è un nuovo registro generico né una capacità intelligente o agentica.
+Il descrittore versionato di lettura è usato dal dispatch host. L'UPDATE usa
+l'identità `patient-profile.update.v1`, versione 1, assegnata dal servizio host
+nel discriminatore interno diretto a `updatePatientOperation`. Il writer esistente
+rifiuta identità/versione mancanti o diverse prima di aprire una transazione.
+`operationId` e `contractVersion` sono distinti dalla versione CAS del paziente.
+Il descrittore identifica il contratto operativo, non emette autorizzazioni:
+ammissione, audit e guard del commit restano quelli esistenti. Il body HTTP
+non può selezionare l'operazione. Non viene creato un registro generico né una
+capacità intelligente o agentica.
 Il catalogo Headless statico denied/unavailable mantiene la propria semantica.
 
 L'adattatore traduce decisioni e vista nel wire esistente. Sessioni mancanti,
@@ -64,5 +71,9 @@ prima di ENC e gli altri criteri S0 non sono chiusi dalla sola query.
 Test sintetici attraverso gli adattatori reali verificano le tre proiezioni,
 lettura locale token-only, scope/capability paired e FSE, rifiuti e tentativi di
 sostituire autorità, tombstone e assenza di effetti su SQLite/audit. I test del
-writer restano applicabili. Una reversione del contributo ripristina i precedenti
+writer restano applicabili; test del contratto UPDATE verificano rifiuto di
+identità/versioni sconosciute prima degli effetti, impossibilità di selezionare
+il dispatch dal body e conservazione di commit, singolo audit e conflitto 409.
+Questo completa i descrittori operativi della verticale lettura/UPDATE, senza
+introdurre ricevute, idempotenza nuova o un writer portabile. Una reversione del contributo ripristina i precedenti
 ingressi senza migrazioni, formato persistente nuovo o effetti da annullare.
