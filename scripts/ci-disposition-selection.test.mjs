@@ -47,15 +47,27 @@ test('canonical prebuild reaches the real metadata CLI and denies a synthetic pr
 });
 
 test('production sparse checkouts omit one exact file while retaining committed identity and other test sources', t => {
-  const checkouts = ['web-core.yml', 'e2e.yml'].map(file => {
+  const checkouts = [['web-core.yml', 'web-core'], ['e2e.yml', 'e2e'], ['cross-platform.yml', 'build-start']].map(([file, job]) => {
     const workflow = loadYaml(fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8'));
-    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+    const steps = workflow.jobs[job].steps;
     const checkout = steps.filter(step => step.uses?.startsWith('actions/checkout@'));
     assert.equal(checkout.length, 1);
+    assert.ok(checkout[0].with, `${file}/${job} requires the production sparse checkout`);
     assert.equal(checkout[0].with['sparse-checkout-cone-mode'], false);
-    return checkout[0].with['sparse-checkout'].trim().split('\n');
+    const patterns = checkout[0].with['sparse-checkout'].trim().split('\n');
+    const verify = steps.find(step => step.name === 'Verify sparse production source identity');
+    assert.ok(verify, `${file}/${job} checks committed identity and materialization before building`);
+    assert.deepEqual(verify.run.trim().split('\n'), [
+      'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
+      'test -z "$(git status --porcelain --untracked-files=normal)"',
+      `test ! -e ${patterns[1].slice(2)}`,
+    ]);
+    if (job === 'build-start') assert.equal(verify.shell, 'bash', 'the identity guard must also run on Windows');
+    assert.ok(steps.indexOf(verify) < steps.findIndex(step => step.uses?.startsWith('actions/setup-node@')));
+    return patterns;
   });
   assert.deepEqual(checkouts[0], checkouts[1]);
+  assert.deepEqual(checkouts[0], checkouts[2]);
   const patterns = checkouts[0];
   assert.equal(patterns.length, 2); assert.equal(patterns[0], '/*');
   assert.ok(patterns[1].startsWith('!/')); assert.doesNotMatch(patterns[1].slice(2), /[*!?\[\]{}\\]/u);
