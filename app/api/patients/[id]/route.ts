@@ -15,12 +15,10 @@ function parsePatientDeletionReason(body: Record<string, unknown>, fallback: str
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const session = await requireSession();
-    if (!session) return unauthorizedResponse();
-
     try {
-        const { id } = await params;
-        const patient = await readPatientProfile({ patientId: id, projection: 'web' });
+        const resolved = await readPatientProfile({ request, projection: 'web', patientId: async () => (await params).id });
+        if (!resolved.ok) return resolved.response;
+        const patient = resolved.profile;
         if (!patient) return NextResponse.json({ error: "Not found" }, { status: 404 });
         return NextResponse.json(patient);
     } catch (archiveError) {

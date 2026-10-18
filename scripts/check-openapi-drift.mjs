@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import yaml from 'js-yaml';
+import ts from 'typescript';
 
 const ROOT = process.cwd();
 const SPEC_PATH = 'docs/openapi/mediflow-v1.yaml';
@@ -54,6 +55,58 @@ function extractMethods(source) {
     ));
 }
 
+function hasProfileFseAdmission(sourcePath, source) {
+    if (sourcePath !== 'app/api/v1/network/fse/validate-patient/route.ts') return false;
+    const file = ts.createSourceFile(sourcePath, source, ts.ScriptTarget.Latest, true);
+    const imported = file.statements.some(node => ts.isImportDeclaration(node)
+        && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === '@/lib/network-patient-read'
+        && node.importClause && !node.importClause.isTypeOnly && node.importClause.namedBindings
+        && ts.isNamedImports(node.importClause.namedBindings)
+        && node.importClause.namedBindings.elements.some(element => !element.isTypeOnly
+            && !element.propertyName && element.name.text === 'getNetworkScopedPatientDetail'));
+    if (!imported) return false;
+    let shadowed = false;
+    function inspectBinding(node) {
+        if ((ts.isVariableDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isParameter(node))
+            && node.name?.getText(file) === 'getNetworkScopedPatientDetail') shadowed = true;
+        ts.forEachChild(node, inspectBinding);
+    }
+    inspectBinding(file);
+    if (shadowed) return false;
+    const get = file.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'GET'
+        && node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword));
+    if (!get?.body || get.parameters[0]?.name.getText(file) !== 'request'
+        || extractMethods(source).join(',') !== 'GET') return false;
+    let found = false;
+    function visit(node) {
+        if (ts.isFunctionLike(node)) return;
+        if (ts.isBlock(node)) {
+            for (let index = 0; index < node.statements.length - 1; index++) {
+                const statement = node.statements[index];
+                if (!ts.isVariableStatement(statement) || statement.declarationList.declarations.length !== 1) continue;
+                const declaration = statement.declarationList.declarations[0], initializer = declaration.initializer;
+                if (!ts.isIdentifier(declaration.name) || !initializer || !ts.isAwaitExpression(initializer)
+                    || !ts.isCallExpression(initializer.expression)) continue;
+                const call = initializer.expression;
+                if (!ts.isIdentifier(call.expression) || call.expression.text !== 'getNetworkScopedPatientDetail'
+                    || call.arguments.length !== 3 || !ts.isIdentifier(call.arguments[0]) || call.arguments[0].text !== 'request'
+                    || !ts.isArrowFunction(call.arguments[1]) || call.arguments[1].modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+                    || !ts.isStringLiteral(call.arguments[2]) || call.arguments[2].text !== 'network-fse') continue;
+                const gate = node.statements[index + 1], name = declaration.name.text;
+                if (ts.isIfStatement(gate) && ts.isPrefixUnaryExpression(gate.expression)
+                    && gate.expression.operator === ts.SyntaxKind.ExclamationToken
+                    && ts.isPropertyAccessExpression(gate.expression.operand)
+                    && gate.expression.operand.expression.getText(file) === name && gate.expression.operand.name.text === 'ok'
+                    && ts.isReturnStatement(gate.thenStatement)
+                    && gate.thenStatement.expression?.getText(file) === `${name}.response`) found = true;
+            }
+        }
+        ts.forEachChild(node, visit);
+    }
+    visit(get.body);
+    return found;
+}
+
 function hasRecognizedApiV1AuthGuard(sourcePath, source) {
     const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
     const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
@@ -78,7 +131,8 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         && source.includes("import { handleNativeOrdinaryHttp } from '@/lib/chatgpt-product/native-ordinary-http'")
         && source.includes(`return handleNativeOrdinaryHttp(request, '${nativeOperation[0]}')`)
         && extractMethods(source).join(',') === nativeOperation[1];
-    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard;
+    return hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard
+        || hasProfileFseAdmission(sourcePath, source);
 }
 
 function buildCurrentRoutes() {
@@ -719,6 +773,15 @@ function runSelfTest() {
             },
             expect: rejected => rejected === true,
         })),
+        ...[
+            { name: 'fixed delegated FSE admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); }", expected: true },
+            { name: 'comment is not an imported admission', source: "// import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read';\nexport async function GET(request) { return getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); }", expected: false },
+            { name: 'untrusted module is not admission', source: "import { getNetworkScopedPatientDetail } from './forged'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; }", expected: false },
+            { name: 'caller purpose cannot select admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', request.purpose); if (!resolved.ok) return resolved.response; }", expected: false },
+            { name: 'unused nested admission does not authenticate GET', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { async function unused() { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; } return Response.json({}); }", expected: false },
+            { name: 'shadowed import is not admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const getNetworkScopedPatientDetail = () => ({ok:true}); const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; }", expected: false },
+            { name: 'ignored denial is not admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); return Response.json({}); }", expected: false },
+        ].map(item => ({ name: item.name, run: () => hasRecognizedApiV1AuthGuard('app/api/v1/network/fse/validate-patient/route.ts', item.source), expect: result => result === item.expected })),
         {
             name: 'project native riconosce solo il wrapper autenticato con POST e DELETE',
             run: () => hasRecognizedApiV1AuthGuard(

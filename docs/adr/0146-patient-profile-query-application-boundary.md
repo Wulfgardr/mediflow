@@ -40,6 +40,9 @@ L'adattatore traduce decisioni e vista nel wire esistente. Sessioni mancanti,
 capability, modalità, scope, tombstone e pazienti archiviati conservano i rispettivi
 esiti e precedenze. La risoluzione dell'identificativo avviene dopo l'ammissione
 iniziale, conservando il rifiuto di richieste non autenticate prima dei parametri.
+Nel paired i parametri sono risolti prima dello scope finale; dopo tale controllo
+la query viene consumata senza ulteriori attese. FSE usa un identificativo
+sincrono ricavato dalla URL, senza callback asincrona dopo lo scope.
 La query non scrive SQLite né audit. Le normali primitive di sessione mantengono
 la propria gestione volatile del ciclo di vita.
 
