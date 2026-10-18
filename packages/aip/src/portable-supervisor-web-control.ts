@@ -4,7 +4,7 @@ import {
   PORTABLE_SUPERVISOR_WEB_IPC_SCHEMA_V1,
   decodePortableSupervisorWebIpcFrameV1,
   encodePortableSupervisorWebIpcFrameV1,
-  type PortableSupervisorWebCaptureV1,
+  type PortableSupervisorWebCaptureV1, type PortableSupervisorPatientProfileQueryGrantV1,
   type PortableSupervisorWebIpcFrameV1,
 } from './portable-supervisor-web-ipc-contract.ts';
 
@@ -22,7 +22,7 @@ type TerminalReason = 'logout' | 'application_lock' | 'reselection' | 'expiry'
 type Sources = Readonly<{
   now(): unknown;
   nextChallenge(): unknown;
-  activate(capture: PortableSupervisorWebCaptureV1): unknown;
+  activate(capture: PortableSupervisorWebCaptureV1, patientProfileQuery?: PortableSupervisorPatientProfileQueryGrantV1): unknown;
   revoke(reason: TerminalReason): unknown;
 }>;
 type Pending = Readonly<{ requestRef: string; challenge: string; expiresAt: number }>;
@@ -145,7 +145,8 @@ export function createPortableSupervisorWebControlV1(sourcesValue: unknown) {
       return denied(requestRef, 'challenge_expired');
     }
     try {
-      const activation = sources.activate(frame.capture as PortableSupervisorWebCaptureV1);
+      const activation = sources.activate(frame.capture as PortableSupervisorWebCaptureV1,
+        frame.patientProfileQuery as PortableSupervisorPatientProfileQueryGrantV1 | undefined);
       if (!types.isPromise(activation)) throw new Error('activation_failed');
       const result = exact(await activation, RESULT_KEYS, true);
       const completedAt = now();

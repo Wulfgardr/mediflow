@@ -8,6 +8,7 @@ import {
   headlessStatusOutputSchema, openLoopsOutputSchema, publicCatalog, selectBoundOperations,
   semanticQueryArgumentsSchema, semanticQueryOutputSchema, terminologyArgumentsSchema, terminologyOutputSchema,
   checkupStatusTransitionArgumentsSchema, checkupStatusTransitionOutputSchema,
+  patientProfileQueryArgumentsSchema, patientProfileQueryOutputSchema, PATIENT_PROFILE_QUERY_OPERATION_ID,
 } from './contracts.ts';
 
 const terminology = (items: unknown[]) => ({
@@ -201,4 +202,18 @@ test('binds open-loop receipts to the semantic query currentness receipt', () =>
     receipt: { ...openLoops.receipt, timestamp: output.receipt.createdAt + 1 } };
   assert.equal(semanticQueryOutputSchema.safeParse({ ...output,
     steps: [{ ...output.steps[0], output: afterCommit }] }).success, false, 'timestamp');
+});
+
+test('keeps the profile operation separate from semantic reads and enforces exact projections and UTF-8 budget', () => {
+  const input = { kind: 'open', contractVersion: 1, projection: 'notes', expectedSelectionEpoch: 2 };
+  assert.equal(patientProfileQueryArgumentsSchema.safeParse(input).success, true);
+  assert.equal(patientProfileQueryArgumentsSchema.safeParse({ ...input, patientId: 'forbidden' }).success, false);
+  const result = { schemaVersion: 'mediflow.patient.profile-view.v1', operationId: PATIENT_PROFILE_QUERY_OPERATION_ID,
+    contractVersion: 1, handle: `pph_${'a'.repeat(64)}`, projection: 'notes',
+    currentness: { revision: 1, selectionEpoch: 2, observedAt: 1000, expiresAt: 2000 }, profile: { notes: 'Synthetic' } };
+  assert.equal(patientProfileQueryOutputSchema.safeParse(result).success, true);
+  assert.equal(patientProfileQueryOutputSchema.safeParse({ ...result, profile: { notes: 'Synthetic', id: 'forbidden' } }).success, false);
+  assert.equal(patientProfileQueryOutputSchema.safeParse({ ...result, profile: { notes: '😀'.repeat(9000) } }).success, false);
+  assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments,
+    steps: [{ stepRef: 'step_profile', operationId: PATIENT_PROFILE_QUERY_OPERATION_ID, input }] }).success, false);
 });

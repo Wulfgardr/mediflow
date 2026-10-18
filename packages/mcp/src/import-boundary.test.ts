@@ -11,6 +11,7 @@ const roots = [
 ];
 const allowedExternal = new Set(['zod', '@modelcontextprotocol/server', '@modelcontextprotocol/server/stdio',
   'node:process', 'node:util']);
+const pureProfileContract = resolve(root, 'lib/patient-profile-scoped-contract.ts');
 const allowedAip = new Set([resolve(root, 'packages/aip/src/child-ipc-contract.ts')]);
 const allowedMini = new Set([
   resolve(root, 'packages/mini/src/protocol.ts'), resolve(root, 'packages/mini/src/session.ts'),
@@ -33,7 +34,7 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
       const candidate = resolve(dirname(path), specifier);
       const target = extname(candidate) ? candidate : `${candidate}.ts`;
       const insideMcp = target.startsWith(resolve(root, 'packages/mcp/src/'));
-      assert.equal(insideMcp || allowedAip.has(target) || allowedMini.has(target), true, `runtime boundary escape ${target}`);
+      assert.equal(target === pureProfileContract || insideMcp || allowedAip.has(target) || allowedMini.has(target), true, `runtime boundary escape ${target}`);
       pending.push(target);
     }
   }
@@ -41,6 +42,7 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
     /(?:better-sqlite3|lib\/db|lib\/schema|web-auth|next\/|node:(?:net|http|https|tls)|\.swift|AppKit|Foundation)/iu);
   assert.doesNotMatch(combined, /(?:\bfetch\s*\(|WebSocket|XMLHttpRequest|generic[._ -]?invoke)/iu);
   assert.deepEqual([...visited].sort(), [
+    pureProfileContract,
     resolve(root, 'packages/aip/src/child-ipc-contract.ts'),
     resolve(root, 'packages/mcp/src/contracts.ts'), resolve(root, 'packages/mcp/src/operation-client.ts'),
     resolve(root, 'packages/mcp/src/server.ts'), resolve(root, 'packages/mini/src/cli.ts'),

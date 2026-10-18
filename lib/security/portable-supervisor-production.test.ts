@@ -57,11 +57,12 @@ async function waitFor(predicate: () => boolean): Promise<void> {
   throw new Error('synthetic wait timed out');
 }
 
-function fixture() {
+function fixture(profile?: Readonly<{ acceptWebFrame(frame: unknown): boolean; close(): boolean }>) {
   let now = 1_000;
   let webListener: ((frame: unknown) => void) | null = null;
   let terminalListener: ((reason: 'web_disconnect' | 'mcp_disconnect') => void) | null = null;
   const events: string[] = [], sent: string[] = [];
+  const admittedProfileGrants: unknown[] = [];
   const sendCallbacks: Array<(error: Error | null) => void> = [];
   const scheduled: Array<{ active: boolean; callback: () => void }> = [];
   const launch = deferred<Readonly<{
@@ -102,12 +103,12 @@ function fixture() {
       assert.equal(delay, 250); const timer = { active: true, callback }; scheduled.push(timer);
       events.push('web.drain.scheduled'); return () => { timer.active = false; };
     },
-    mirror, children,
+    mirror, children, ...(profile ? { profile } : {}),
     checkup: Object.freeze({ acceptWebFrame: () => false, close: () => true }),
-    launchMcp: () => { events.push('mcp.launch'); return launch.promise; },
+    launchMcp: grant => { admittedProfileGrants.push(grant); events.push('mcp.launch'); return launch.promise; },
   });
   return {
-    runtime, events, sent, sendCallbacks, launch,
+    runtime, events, sent, sendCallbacks, launch, admittedProfileGrants,
     send(frame: unknown) { assert.ok(webListener); webListener(frame); },
     childExit(reason: 'web_disconnect' | 'mcp_disconnect') { assert.ok(terminalListener); terminalListener(reason); },
     drainAck() {
@@ -217,4 +218,30 @@ test('child loss or malformed Web IPC terminalizes the complete topology once', 
     assert.equal(current.events.filter((event) => event === 'web.terminate').length, 1);
     assert.equal(current.runtime.terminate(), false);
   }
+});
+
+test('forwards only an explicit top-level profile grant when starting the authenticated child', async () => {
+  for (const admitted of [false, true]) {
+    const current = fixture(), challenge = await prepare(current);
+    current.send(request({ method: 'activate', challenge, capture,
+      ...(admitted ? { patientProfileQuery: { projection: 'notes' } } : {}) }));
+    await waitFor(() => current.events.includes('mcp.launch'));
+    assert.equal(current.admittedProfileGrants.length, 1);
+    assert.deepEqual(current.admittedProfileGrants[0] ? { ...(current.admittedProfileGrants[0] as object) } : undefined,
+      admitted ? { projection: 'notes' } : undefined);
+    current.launch.resolve(Object.freeze({ schemaVersion: 'mediflow.headless.authenticated-launch.v1',
+      status: 'authenticated', close: () => true }));
+    await waitFor(() => current.sent.length === 2);
+    current.runtime.terminate(); await current.runtime.closed;
+  }
+});
+
+test('the existing Supervisor listener dispatches profile frames and revokes the port on termination', async () => {
+  let closed = 0, observed = 0;
+  const current = fixture({ acceptWebFrame: value => { observed++; return value === 'synthetic-profile-result'; },
+    close: () => { closed++; return true; } });
+  current.send('synthetic-profile-result');
+  assert.equal(observed, 1); assert.equal(current.sent.length, 0);
+  current.runtime.terminate(); await current.runtime.closed;
+  assert.equal(closed, 1);
 });
