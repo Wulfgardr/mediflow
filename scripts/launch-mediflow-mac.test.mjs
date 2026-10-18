@@ -17,12 +17,12 @@ function writeExecutable(filePath, source) {
 }
 
 function createFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-mac-launcher-test-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-mac-launcher-test-')));
   const home = path.join(root, 'home');
   const scripts = path.join(root, 'scripts');
   const invalidBin = path.join(root, 'invalid-bin');
   const toolsBin = path.join(root, 'tools-bin');
-  const derived = path.join(root, 'derived');
+  const derived = `${root}-derived`;
   const attemptsLog = path.join(root, 'node-attempts.log');
   const selectedNodeLog = path.join(root, 'selected-node.log');
   const selectedOverrideLog = path.join(root, 'selected-override.log');
@@ -33,6 +33,7 @@ function createFixture() {
 
   fs.mkdirSync(scripts, { recursive: true });
   fs.copyFileSync(launcherSource, path.join(scripts, 'Launch_MediFlowMac.command'));
+  fs.copyFileSync(path.join(repoRoot, 'scripts/build-input-metadata.mjs'), path.join(scripts, 'build-input-metadata.mjs'));
   fs.writeFileSync(path.join(root, '.nvmrc'), '24\n');
   fs.writeFileSync(path.join(scripts, 'launcher-helpers.mjs'), 'process.exit(1);\n');
 
@@ -42,6 +43,9 @@ exit 1
 `);
 writeExecutable(validNode, `#!/bin/bash
 case "\${2:-}" in
+  --derived)
+    exec "${process.execPath}" "$@"
+    ;;
   check-runtime)
     printf 'valid\\n' >> "$MEDIFLOW_TEST_NODE_ATTEMPTS"
     exit 0
@@ -74,7 +78,7 @@ printf '%s\\n' "$*" > "$MEDIFLOW_TEST_OPEN_LOG"
   };
 }
 
-function runLauncher(scenario) {
+function runLauncher(scenario, overrides = {}) {
   return spawnSync('/bin/bash', [path.join(scenario.root, 'scripts', 'Launch_MediFlowMac.command')], {
     encoding: 'utf8',
     env: {
@@ -90,13 +94,14 @@ function runLauncher(scenario) {
       MEDIFLOW_TEST_SETUP_LOG: scenario.setupLog,
       MEDIFLOW_TEST_BUILD_LOG: scenario.buildLog,
       MEDIFLOW_TEST_OPEN_LOG: scenario.openLog,
+      ...overrides,
     },
   });
 }
 
 test('selects a contract-compatible Node 24 before native setup and build', (t) => {
   const scenario = createFixture();
-  t.after(() => fs.rmSync(scenario.root, { recursive: true, force: true }));
+  t.after(() => { fs.rmSync(scenario.root, { recursive: true, force: true }); fs.rmSync(scenario.derived, { recursive: true, force: true }); });
 
   const result = runLauncher(scenario);
 
@@ -114,7 +119,7 @@ test('selects a contract-compatible Node 24 before native setup and build', (t) 
 
 test('fails closed before native setup when no Node satisfies the runtime contract', (t) => {
   const scenario = createFixture();
-  t.after(() => fs.rmSync(scenario.root, { recursive: true, force: true }));
+  t.after(() => { fs.rmSync(scenario.root, { recursive: true, force: true }); fs.rmSync(scenario.derived, { recursive: true, force: true }); });
   fs.rmSync(scenario.validNode);
 
   const result = runLauncher(scenario);
@@ -125,4 +130,16 @@ test('fails closed before native setup when no Node satisfies the runtime contra
   assert.equal(fs.existsSync(scenario.setupLog), false);
   assert.equal(fs.existsSync(scenario.buildLog), false);
   assert.equal(fs.existsSync(scenario.openLog), false);
+});
+
+test('launcher and builder share the external default resolved after Node selection', t => {
+  const scenario = createFixture(), home = `${scenario.root}-external-home`;
+  t.after(() => { fs.rmSync(scenario.root, { recursive: true, force: true }); fs.rmSync(home, { recursive: true, force: true }); });
+  const env = { ...process.env, HOME: home, MEDIFLOW_MAC_DERIVED_DATA: undefined };
+  const resolved = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/build-input-metadata.mjs'), '--derived', scenario.root], { env, encoding: 'utf8' });
+  assert.equal(resolved.status, 0, resolved.stderr);
+  const result = runLauncher(scenario, { HOME: home, MEDIFLOW_MAC_DERIVED_DATA: undefined, MEDIFLOW_NODE_BINARY: scenario.validNode });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(fs.readFileSync(scenario.openLog, 'utf8'), new RegExp(resolved.stdout.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.ok(fs.existsSync(path.join(resolved.stdout, 'Build/Products/Debug/MediFlow.app')));
 });

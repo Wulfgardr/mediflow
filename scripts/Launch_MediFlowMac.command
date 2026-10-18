@@ -3,8 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
-DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
-APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 
 # build and setup must use a Node that satisfies the project contract,
 # including the installed better-sqlite3 native binding.
@@ -33,6 +31,10 @@ if ! select_mediflow_node; then
   echo "Attiva Node ${REQUIRED_NODE_MAJOR}, esegui npm ci nella cartella MediFlow e rilancia." >&2
   exit 1
 fi
+
+DERIVED="$("$MEDIFLOW_NODE_BINARY" "$ROOT_DIR/scripts/build-input-metadata.mjs" --derived "$ROOT_DIR")"
+export MEDIFLOW_MAC_DERIVED_DATA="$DERIVED"
+APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 
 # expose the exact product and source before any native build work.
 "$MEDIFLOW_NODE_BINARY" "$ROOT_DIR/scripts/launcher-helpers.mjs" identity-summary

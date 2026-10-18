@@ -6,6 +6,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { physicalPath, physicalFiles, physicalRecord, sha256 } from './launch-bundled-headless-supervisor.mjs';
 import { assertNodeRuntime, readNodeContract } from './node-runtime-contract.mjs';
+import { privateDatabaseDependency } from './build-input-metadata.mjs';
+export { privateDatabaseDependency } from './build-input-metadata.mjs';
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SEEDS = ['scripts/mediflow-headless-supervisor.mjs', 'scripts/intelligent-host-mcp-stdio.mjs',
@@ -84,9 +86,6 @@ export function headlessTraceReadPath(file, root, paths = path) {
   if (paths.sep === '\\') file = file.replaceAll('/', paths.sep);
   if (!file.startsWith(`${root}${paths.sep}`) || paths.normalize(file) !== file) deny('Headless trace escaped its root.');
   return file;
-}
-export function privateDatabaseDependency(file) {
-  return /\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal|mj[0-9a-f]+))?$/iu.test(file.replaceAll('\\', '/'));
 }
 // NFT supplies native relative paths, including backslashes on Windows.
 export function sharedRuntimeDependency(file) {

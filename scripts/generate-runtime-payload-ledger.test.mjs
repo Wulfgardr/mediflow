@@ -8,6 +8,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
 import { materializeSourceRuntime } from './source-runtime.mjs';
+import { assertBuildInputMetadata } from './build-input-metadata.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const owner = '@mediflow/web-auth-lifecycle-owner';
@@ -118,7 +119,9 @@ test('source preparation materializes only the proven installed local package, w
   const f = sourceAliasFixture(t);
   const ledger = generatePayloadLedger({ ...f, payloadRoot: f.installed });
   assert.throws(() => verifyPayloadLedger({ payloadRoot: f.alias, ledger }), /nonphysical/u);
+  assertBuildInputMetadata({ sourceRoot: f.sourceRoot, payloadRoot: f.web });
   materializeSourceRuntime(f.web, f.sourceRoot);
+  assertBuildInputMetadata({ sourceRoot: f.sourceRoot, payloadRoot: f.web, allowPayloadAliases: false });
   assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), false);
   assert.equal(verifyPayloadLedger({ payloadRoot: f.alias, ledger }).files, 2);
   assert.equal(verifyPayloadLedger({ payloadRoot: f.installed, ledger }).files, 2);
@@ -126,7 +129,9 @@ test('source preparation materializes only the proven installed local package, w
 
 test('source registry alias reuses only its matching physical traced subset', t => {
   const f = sourceAliasFixture(t, true);
+  assertBuildInputMetadata({ sourceRoot: f.sourceRoot, payloadRoot: f.web });
   materializeSourceRuntime(f.web, f.sourceRoot);
+  assertBuildInputMetadata({ sourceRoot: f.sourceRoot, payloadRoot: f.web, allowPayloadAliases: false });
   assert.equal(fs.lstatSync(f.alias).isSymbolicLink(), false);
   assert.deepEqual(fs.readdirSync(f.alias), ['index.js', 'package.json']);
   assert.deepEqual(fs.readFileSync(path.join(f.alias, 'index.js')), fs.readFileSync(path.join(f.installed, 'index.js')));
