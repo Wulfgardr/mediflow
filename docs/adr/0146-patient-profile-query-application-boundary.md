@@ -33,6 +33,11 @@ lock/logout, revoca, restart, scadenza o revisione non più corrente lo negano.
 Il risultato restituisce riferimento e attualità (`revision`, `selectionEpoch`,
 `observedAt`, `expiresAt`), senza promettere validità dopo la risposta. Le risposte
 sono `no-store`; i consumer separano cache e continuazioni per selezione e handle.
+Il JSON UTF-8 della vista ha un budget condiviso di 32 KiB, applicato dall'host
+su tutti gli ingressi prima della risposta. Il superamento restituisce soltanto
+`output_too_large` (HTTP 413) e un messaggio utile: nessun dato parziale,
+troncamento o ripiego legacy. È un limite della vista pilota; non modifica
+lunghezza delle note, dati clinici, writer o limiti IPC/RPC esistenti.
 
 Web e native riusano i propri issuer fisici di sessione e il proprietario della
 selezione. La lettura paired richiede le protezioni correnti di modalità,

@@ -1,6 +1,7 @@
 export const PROFILE_QUERY_CONTRACT_VERSION = 1 as const;
 export const PROFILE_QUERY_OPERATION_ID = 'patient-profile.read.v1' as const;
 export const PROFILE_QUERY_RESULT_SCHEMA = 'mediflow.patient.profile-view.v1' as const;
+export const PROFILE_QUERY_MAX_RESULT_BYTES = 32 * 1024;
 export const PROFILE_QUERY_HANDLE_PATTERN = /^pph_[0-9a-f]{64}$/u;
 
 export type ProfileProjection = 'profile' | 'notes';
@@ -37,7 +38,7 @@ export type ProfileResult = ProfileResultBase & (
 
 export type ProfileQueryErrorCode =
     | 'input_invalid' | 'session_unavailable' | 'scope_denied' | 'selection_conflict'
-    | 'handle_unavailable' | 'handle_expired' | 'revision_conflict' | 'query_unavailable' | 'cancelled';
+    | 'handle_unavailable' | 'handle_expired' | 'revision_conflict' | 'query_unavailable' | 'output_too_large' | 'cancelled';
 
 export class ProfileQueryError extends Error {
     constructor(readonly code: ProfileQueryErrorCode) {
@@ -102,4 +103,10 @@ export function isProfileResult(value: unknown): value is ProfileResult {
         if (key === 'firstName' || key === 'lastName' || key === 'taxCode') return typeof field === 'string';
         return field === null || typeof field === 'string';
     });
+}
+
+export function assertProfileResultBudget(result: ProfileResult): void {
+    if (new TextEncoder().encode(JSON.stringify(result)).byteLength > PROFILE_QUERY_MAX_RESULT_BYTES) {
+        throw new ProfileQueryError('output_too_large');
+    }
 }
