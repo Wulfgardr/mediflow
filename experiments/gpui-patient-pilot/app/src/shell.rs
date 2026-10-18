@@ -582,6 +582,7 @@ impl ClinicalApp {
             _subscriptions: vec![subscription, global_subscription],
         };
         let quit = cx.on_app_quit(|this, cx| {
+            this.retire_form(cx);
             this.pairing.take();
             let session = this.session.take();
             if let Some(session) = &session {
@@ -598,6 +599,7 @@ impl ClinicalApp {
         });
         app._subscriptions.push(quit);
         let release = cx.on_release(|this, cx| {
+            this.retire_form(cx);
             this.pairing.take();
             if let Some(session) = this.session.take() {
                 session.lock();
@@ -620,6 +622,14 @@ impl ClinicalApp {
         app._subscriptions.push(focus_lost);
         window.focus(&app.focus, cx);
         app
+    }
+
+    fn retire_form(&mut self, cx: &mut App) {
+        if let Some(form) = self.form.take() {
+            for field in &form.fields {
+                field.editor.update(cx, |input, cx| input.retire(cx));
+            }
+        }
     }
 
     fn next_epoch(&mut self) {
@@ -823,7 +833,7 @@ impl ClinicalApp {
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core.lock();
-        self.form = None;
+        self.retire_form(cx);
         self.discard = None;
         self.verified = None;
         self.query.clear();
@@ -1362,7 +1372,7 @@ impl ClinicalApp {
             .as_ref()
             .is_some_and(|form| form.kind == FormKind::PatientNew);
         let created_id = self.form.as_ref().and_then(|form| form.created_id.clone());
-        self.form = None;
+        self.retire_form(cx);
         self.discard = None;
         self.message = None;
         if was_creation {
@@ -1842,7 +1852,7 @@ impl ClinicalApp {
 
     fn saved(&mut self, message: &str, cx: &mut Context<Self>) {
         self.focus_after_render = true;
-        self.form = None;
+        self.retire_form(cx);
         self.discard = None;
         self.verified = Some(message.into());
         self.message = None;
@@ -6025,6 +6035,152 @@ mod tests {
             }
         }
         panic!("workspace rendering did not return to an idle frame");
+    }
+
+    fn synthetic_notes_form(
+        app: &mut ClinicalApp,
+        state: FormState,
+        cx: &mut Context<ClinicalApp>,
+    ) -> Entity<TextInput> {
+        let field = Field::new(
+            "retired-form-notes",
+            "Note sintetiche",
+            "Bozza sintetica da ritirare",
+            true,
+            false,
+            app.theme,
+            cx,
+        );
+        let editor = field.editor.clone();
+        app.form = Some(Form {
+            kind: FormKind::Notes,
+            fields: vec![field],
+            upload: None,
+            edit: None,
+            patient_original: None,
+            created_id: None,
+            state,
+            _subscriptions: vec![],
+        });
+        editor
+    }
+
+    #[gpui::test]
+    fn lock_discard_and_verified_save_retire_form_editors_even_when_entities_survive(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for state in [
+            FormState::Draft,
+            FormState::Review,
+            FormState::Saving,
+            FormState::Conflict,
+            FormState::Uncertain,
+            FormState::Rejected,
+        ] {
+            let editor = view.update(cx, |app, cx| {
+                let editor = synthetic_notes_form(app, state, cx);
+                app.request_discard(Discard::Lock, cx);
+                assert!(app.form.is_none());
+                assert_eq!(app.core.phase(), mediflow_patient_client::Phase::Locked);
+                editor
+            });
+            editor.read_with(cx, |input, _| {
+                assert!(
+                    input.value().is_empty(),
+                    "lock must retire a form editor that is still referenced"
+                );
+                assert!(input.read_only);
+            });
+            cx.update(|window, cx| {
+                editor.update(cx, |input, cx| {
+                    gpui::EntityInputHandler::replace_text_in_range(
+                        input,
+                        None,
+                        "Input sintetico tardivo",
+                        window,
+                        cx,
+                    );
+                    assert!(input.value().is_empty());
+                });
+            });
+        }
+        for saved in [false, true] {
+            let editor = view.update(cx, |app, cx| {
+                let editor = synthetic_notes_form(app, FormState::Draft, cx);
+                if saved {
+                    app.saved("Rilettura sintetica verificata", cx);
+                } else {
+                    app.finish_discard(Discard::Form, cx);
+                }
+                assert!(app.form.is_none());
+                editor
+            });
+            editor.read_with(cx, |input, _| {
+                assert!(input.value().is_empty());
+                assert!(input.read_only);
+            });
+        }
+    }
+
+    #[gpui::test]
+    fn conflict_uncertain_and_rejected_results_keep_the_active_draft_editor(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for error in [
+            RuntimeError::Conflict,
+            RuntimeError::Indeterminate,
+            RuntimeError::ReadRequired,
+        ] {
+            let editor = view.update(cx, |app, cx| {
+                let editor = synthetic_notes_form(app, FormState::Saving, cx);
+                app.save_error(error, cx);
+                assert!(app.form.is_some());
+                editor
+            });
+            editor.read_with(cx, |input, _| {
+                assert_eq!(input.value(), "Bozza sintetica da ritirare");
+            });
+        }
+    }
+
+    #[gpui::test]
+    fn releasing_the_clinical_workspace_retires_surviving_form_editors(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let editor = view.update(cx, |app, cx| {
+            synthetic_notes_form(app, FormState::Draft, cx)
+        });
+        cx.update(|window, _| window.remove_window());
+        drop(view);
+        cx.cx.update(|_| {});
+        cx.run_until_parked();
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+    }
+
+    #[gpui::test]
+    fn application_shutdown_retires_form_editors_before_the_workspace_is_released(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        let editor = view.update(cx, |app, cx| {
+            synthetic_notes_form(app, FormState::Draft, cx)
+        });
+        cx.cx.update(|app| app.shutdown());
+        editor.read_with(cx, |input, _| {
+            assert!(input.value().is_empty());
+            assert!(input.read_only);
+        });
+        view.read_with(cx, |app, _| assert!(app.form.is_none()));
     }
 
     #[gpui::test]

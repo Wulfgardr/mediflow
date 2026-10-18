@@ -156,11 +156,17 @@ impl TextInput {
         self.reversed = false;
         self.marked = None;
         self.layout = None;
+        self.painted_content = "".into();
         self.autoscroll = true;
         self.scroll.set_offset(point(px(0.), px(0.)));
         self.undo.clear();
         self.redo.clear();
         cx.notify();
+    }
+
+    pub fn retire(&mut self, cx: &mut Context<Self>) {
+        self.set_content("", cx);
+        self.read_only = true;
     }
 
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
@@ -1029,6 +1035,70 @@ fn platform_text_for_range(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct EditorView {
+        editor: Entity<TextInput>,
+        visible: bool,
+    }
+
+    impl Render for EditorView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            gpui::div()
+                .size_full()
+                .when(self.visible, |view| view.child(self.editor.clone()))
+        }
+    }
+
+    #[gpui::test]
+    fn authoritative_reset_retires_painted_text_before_a_hidden_editor_repaints(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) = cx.add_window_view(|_, cx| EditorView {
+            editor: cx.new(|cx| {
+                TextInput::new(
+                    "retirement-notes",
+                    "Note sintetiche",
+                    "",
+                    true,
+                    Theme::for_dark(false),
+                    cx,
+                )
+            }),
+            visible: true,
+        });
+        let editor = view.read_with(cx, |view, _| view.editor.clone());
+        cx.update_window_entity(&editor, |input, window, cx| {
+            input.set_content("Nota sintetica iniziale", cx);
+            input.select_all(&SelectAll, window, cx);
+            input.replace_text_in_range(None, "Bozza sintetica modificata", window, cx);
+            input.undo(&Undo, window, cx);
+            assert_eq!(input.value(), "Nota sintetica iniziale");
+            input.redo(&Redo, window, cx);
+            assert_eq!(input.value(), "Bozza sintetica modificata");
+            assert!(!input.undo.is_empty());
+        });
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        editor.read_with(cx, |input, _| {
+            assert_eq!(input.painted_content.as_ref(), "Bozza sintetica modificata");
+            assert!(input.layout.is_some());
+        });
+
+        view.update(cx, |view, cx| {
+            view.visible = false;
+            view.editor.update(cx, |input, cx| {
+                input.set_content("", cx);
+                assert!(input.value().is_empty());
+                assert!(input.painted_content.is_empty(), "a hidden editor must release its retired paint snapshot without waiting for another paint");
+                assert!(input.layout.is_none());
+                assert!(input.undo.is_empty());
+                assert!(input.redo.is_empty());
+            });
+            cx.notify();
+        });
+    }
 
     #[test]
     fn caret_reveal_keeps_visible_lines_still_and_scrolls_large_lines_within_content() {
