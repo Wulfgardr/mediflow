@@ -120,13 +120,14 @@ function assertPatientProfileTombstones({ route, routeSource, profileSource, cor
     const routeFile = checkedSource(routeSource);
     assertNamedImports(routeFile, '@/lib/patient-profile-service', ['readPatientProfile', 'updatePatientProfile']);
     const get = tryStatements(exportedFunction(routeFile, 'GET'));
-    assert.equal(get.length, 4, 'GET must read once and return 404 before projecting the patient');
-    assertSyntax(get[0], 'const { id } = await params;', 'GET must retain the route patient');
-    assertSyntax(get[1], 'const patient = await readPatientProfile({ patientId: id, projection: "' + route.projection + '" });',
-        'GET must await the approved profile projection');
-    assertImportedProfileRead(routeFile, constantDeclaration(get[1], 'patient'));
-    assertIfReturn(get[2], '!patient', 'NextResponse.json({ error: "Not found" }, { status: 404 })', 'GET must preserve 404');
-    assertSyntax(get[3], 'return NextResponse.json(patient);', 'GET must return the filtered profile');
+    assert.equal(get.length, 5, 'GET must admit and read once, then return 404 before projecting the patient');
+    assertSyntax(get[0], 'const resolved = await readPatientProfile({ request, projection: "' + route.projection + '", patientId: async () => (await params).id });',
+        'GET must delegate the same request and route patient to the approved profile projection');
+    assertImportedProfileRead(routeFile, constantDeclaration(get[0], 'resolved'));
+    assertIfReturn(get[1], '!resolved.ok', 'resolved.response', 'GET must propagate admission denial before the profile');
+    assertSyntax(get[2], 'const patient = resolved.profile;', 'GET must consume the admitted profile');
+    assertIfReturn(get[3], '!patient', 'NextResponse.json({ error: "Not found" }, { status: 404 })', 'GET must preserve 404');
+    assertSyntax(get[4], 'return NextResponse.json(patient);', 'GET must return the filtered profile');
 
     const put = tryStatements(exportedFunction(routeFile, 'PUT'));
     const commitIndex = put.findIndex((statement) => ts.isVariableStatement(statement)
@@ -141,14 +142,40 @@ function assertPatientProfileTombstones({ route, routeSource, profileSource, cor
     assertNamedImports(profile, './patient-lifecycle', ['activePatients']);
     assertNamedImports(profile, './patient-update-operation', ['updatePatientOperation']);
     const readBody = exportedFunction(profile, 'readPatientProfile').body.statements;
-    assert.equal(readBody.length, 4, 'profile read must retain its filtered lookup and absent result');
-    assertSyntax(readBody[0], 'const condition = and(eq(patients.id, input.patientId), activePatients());',
-        'profile predicate must bind the patient and exclude tombstones');
-    const patient = constantDeclaration(readBody[1], 'patient');
+    assert.equal(readBody.length, 1, 'profile read must dispatch through its host admission');
+    const admitted = readBody[0].expression;
+    assert.ok(ts.isReturnStatement(readBody[0]) && ts.isCallExpression(admitted));
+    assertSyntax(admitted.expression, 'admitProfileRead', 'profile read must use host admission');
+    assert.equal(admitted.arguments.length, 2);
+    assertSyntax(admitted.arguments[0], 'input', 'profile admission must consume the original host input');
+    const consume = admitted.arguments[1];
+    assert.ok(ts.isArrowFunction(consume) && ts.isBlock(consume.body));
+    assertSyntax(consume.body.statements[0], `const query: PatientProfileQuery | null = patientId ? {
+        operation: PATIENT_PROFILE_READ_OPERATION.id, actor: admitted.actor, purpose: admitted.purpose,
+        patientId, scope: admitted.scope,
+    } : null;`, 'query must retain admitted patient, purpose and scope');
+    assertSyntax(consume.body.statements[1], 'const snapshot = query ? queryPatientProfile(query) : null;',
+        'the admitted query must reach the filtered lookup');
+    assertSyntax(consume.body.statements.at(-1), 'return { ok: true, profile: snapshot, scopeAmbulatoryId };',
+        'profile read must return the filtered snapshot');
+    const queries = profile.statements.filter((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'queryPatientProfile');
+    assert.equal(queries.length, 1, 'expected one private profile query implementation');
+    assert.ok(!ts.getModifiers(queries[0])?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword),
+        'the raw query must stay private');
+    const queryBody = queries[0].body.statements;
+    assert.equal(queryBody.length, 4, 'query must retain operation check, filtered lookup and absent result');
+    assertSyntax(queryBody[1], 'const condition = and(eq(patients.id, query.patientId), activePatients());',
+        'profile predicate must bind the admitted patient and exclude tombstones');
+    const patient = constantDeclaration(queryBody[2], 'patient');
     assert.equal(matchingNodes(patient.initializer, isFromPatients).length, 2, 'both profile read branches must query patients');
-    assertIfReturn(readBody[2], '!patient', 'null', 'absent profile must stay absent');
-    assertSyntax(readBody[3], "return input.projection === 'web' ? patient : projectDetail(patient, input.projection === 'network');",
-        'profile projection must follow the absent-patient guard');
+    assertSyntax(patient.initializer, `query.scope.kind === 'ambulatory'
+        ? dbServer.select({ patient: patients }).from(patients)
+            .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
+            .where(and(condition, eq(patientsToAmbulatories.ambulatoryId, query.scope.ambulatoryId))).get()?.patient
+        : dbServer.select().from(patients).where(condition).get()`,
+    'scoped query must retain membership and both branches must retain the active predicate');
+    assertSyntax(queryBody[3], 'return patient ? projectDetail(patient) : null;',
+        'absent profile must stay absent before projection');
     assert.deepEqual(unfilteredPatientReads('lib/patient-profile-service.ts', profileSource), [],
         'every profile lookup must exclude tombstones');
 
@@ -226,27 +253,32 @@ test('profile tombstone guard rejects broken imports, delegation, filters, 404s 
         ['unapproved profile import', 'routeSource', "'@/lib/patient-profile-service'", "'@/lib/unapproved-profile-service'"],
         ['different GET delegate', 'routeSource', 'await readPatientProfile(', 'await readUncheckedPatientProfile('],
         ['GET shadows the imported reader with a const', 'routeSource',
-            '    try {\n        const { id } = await params;',
-            '    const readPatientProfile = async () => ({ deletedAt: "synthetic-tombstone" });\n    try {\n        const { id } = await params;'],
+            '    try {\n        const resolved = await readPatientProfile',
+            '    const readPatientProfile = async () => ({ deletedAt: "synthetic-tombstone" });\n    try {\n        const resolved = await readPatientProfile'],
         ['GET shadows the imported reader with a function', 'routeSource',
-            '    try {\n        const { id } = await params;',
-            '    function readPatientProfile() { return { deletedAt: "synthetic-tombstone" }; }\n    try {\n        const { id } = await params;'],
+            '    try {\n        const resolved = await readPatientProfile',
+            '    function readPatientProfile() { return { deletedAt: "synthetic-tombstone" }; }\n    try {\n        const resolved = await readPatientProfile'],
         ['GET shadows the imported reader with destructuring', 'routeSource',
-            '    try {\n        const { id } = await params;',
-            '    const { readPatientProfile } = unapproved;\n    try {\n        const { id } = await params;'],
-        ['different GET patient', 'routeSource', 'patientId: id, projection:', 'patientId: otherId, projection:'],
+            '    try {\n        const resolved = await readPatientProfile',
+            '    const { readPatientProfile } = unapproved;\n    try {\n        const resolved = await readPatientProfile'],
+        ['different GET patient', 'routeSource', 'patientId: async () => (await params).id', 'patientId: async () => otherId'],
         ['GET turns absence into success', 'routeSource', '{ status: 404 }', '{ status: 200 }'],
         ['GET removes its absent guard', 'routeSource', 'if (!patient)', 'if (false)'],
         ['different PUT delegate', 'routeSource', 'await updatePatientProfile(', 'await updateUncheckedPatientProfile('],
         ['PUT discards the status', 'routeSource', '{ status: commit.status }', '{ status: 200 }'],
         ['profile loses the active predicate', 'profileSource',
-            'const condition = and(eq(patients.id, input.patientId), activePatients());',
-            'const condition = eq(patients.id, input.patientId);'],
+            'const condition = and(eq(patients.id, query.patientId), activePatients());',
+            'const condition = eq(patients.id, query.patientId);'],
         ['scoped profile uses OR', 'profileSource',
-            '.where(and(condition, eq(patientsToAmbulatories.ambulatoryId, input.scopeAmbulatoryId)))',
-            '.where(or(condition, eq(patientsToAmbulatories.ambulatoryId, input.scopeAmbulatoryId)))'],
-        ['unscoped profile loses the predicate', 'profileSource', '.where(condition).get()', '.where(eq(patients.id, input.patientId)).get()'],
-        ['absent profile becomes an object', 'profileSource', 'if (!patient) return null;', 'if (!patient) return {};'],
+            '.where(and(condition, eq(patientsToAmbulatories.ambulatoryId, query.scope.ambulatoryId)))',
+            '.where(or(condition, eq(patientsToAmbulatories.ambulatoryId, query.scope.ambulatoryId)))'],
+        ['unscoped profile loses the predicate', 'profileSource', '.where(condition).get()', '.where(eq(patients.id, query.patientId)).get()'],
+        ['scoped profile loses membership scope', 'profileSource', '.where(and(condition, eq(patientsToAmbulatories.ambulatoryId, query.scope.ambulatoryId)))', '.where(condition)'],
+        ['raw query becomes public', 'profileSource', 'function queryPatientProfile(', 'export function queryPatientProfile('],
+        ['absent profile becomes an object', 'profileSource', 'return patient ? projectDetail(patient) : null;', 'return patient ? projectDetail(patient) : {};'],
+        ['query scope is replaced with local access', 'profileSource', 'patientId, scope: admitted.scope,', "patientId, scope: { kind: 'local' },"],
+        ['query skips the filtered implementation', 'profileSource', 'const snapshot = query ? queryPatientProfile(query) : null;', 'const snapshot = query ? uncheckedPatientProfile(query) : null;'],
+        ['GET ignores admission denial', 'routeSource', 'if (!resolved.ok)', 'if (false)'],
         ['profile preflight loses 404', 'profileSource',
             "if (!existing) return { status: 404, value: { error: 'Not found' } };",
             "if (!existing) return { status: 200, value: { error: 'Not found' } };"],

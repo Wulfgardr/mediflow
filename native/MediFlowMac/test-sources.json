@@ -62,7 +62,6 @@
     "HomeBaseWHOClientTests.swift",
     "HomeBaseWHOContractTests.swift",
     "ICDCatalogTests.swift",
-    "LocalPatientsDataSourceTests.swift",
     "LumeKitTests.swift",
     "LumePaletteParityTests.swift",
     "LumeToneMappingTests.swift",

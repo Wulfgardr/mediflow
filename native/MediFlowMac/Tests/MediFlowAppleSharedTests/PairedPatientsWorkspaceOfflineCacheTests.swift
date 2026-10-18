@@ -4,6 +4,23 @@ import XCTest
 @testable import MediFlowAppleShared
 
 final class PairedPatientsWorkspaceOfflineCacheTests: XCTestCase {
+    @MainActor func testRetiredLocalAuthorityFlagDoesNotDisableBoundOfflineCache() async throws {
+        let previous = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]
+        defer {
+            if let previous { setenv("MEDIFLOW_LOCAL_AUTHORITY", previous, 1) }
+            else { unsetenv("MEDIFLOW_LOCAL_AUTHORITY") }
+        }
+        for value in ["1", "true", "yes"] {
+            setenv("MEDIFLOW_LOCAL_AUTHORITY", value, 1)
+            let (model, store, transport, context, _) = try harness()
+            try seed(store, context: context)
+            transport.setMode(.unreachable)
+            await model.loadPatients()
+            XCTAssertNotNil(model.cacheMetadata, "retired value: \(value)")
+            XCTAssertEqual(model.patients.map(\.id), ["p1"])
+        }
+    }
+
     @MainActor func testOnlineReadPersistsOnlyProfileAndNetworkLossRestoresReadOnlyWithoutRequests() async throws {
         let (model, store, transport, context, _) = try harness()
         await model.loadPatients()

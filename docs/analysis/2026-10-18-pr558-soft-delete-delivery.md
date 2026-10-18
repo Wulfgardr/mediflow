@@ -188,7 +188,7 @@ cifratura**: il normalizzatore attuale riceve già valori ENC.
 La destinazione di Swift opzionale è una decisione ancora aperta.
 [`makeClient`](../../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift)
 può scegliere
-[`LocalPatientsDataSource`](../../native/MediFlowMac/Sources/MediFlowAppleShared/LocalPatientsDataSource.swift).
+[`LocalPatientsDataSource`](https://github.com/Wulfgardr/mediflow/blob/e493220a485cb1f1777b6d2e633c17f0b05b25c1/native/MediFlowMac/Sources/MediFlowAppleShared/LocalPatientsDataSource.swift).
 Le letture paziente possono arrivare a SQLite anche senza scope; gli
 aggiornamenti usano SQLite con scope non vuoto e HTTP altrimenti. Il commento
 della factory che limita il percorso locale alle letture è arretrato.

@@ -326,29 +326,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         }
     }
 
-    func testLocalDataSourceForwardsPairedLoginCredentialsUnchanged() async throws {
-        let client = makeClient { request in
-            if request.url?.path == "/api/auth/check" { return try self.legacyUnlockCheck(request) }
-            XCTAssertEqual(request.url?.path, "/api/auth/native/login")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
-            let response = HTTPURLResponse(
-                url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil,
-                headerFields: ["Set-Cookie": "mediflow_session=session-123; Path=/; HttpOnly"]
-            )!
-            return (response, Data(#"{"success":true}"#.utf8))
-        }
-        let source = LocalPatientsDataSource(
-            databasePath: "/tmp/mediflow-unused-login-forwarding.db",
-            masterKey: SymmetricKey(data: Data(repeating: 1, count: 32)),
-            fallback: client
-        )
-
-        let result = try await source.login(username: "doctor", password: "1992", credentials: creds)
-
-        XCTAssertEqual(result.sessionCookie, "mediflow_session=session-123")
-    }
-
     private func legacyUnlockCheck(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
@@ -491,6 +468,88 @@ final class HomeBasePatientsClientTests: XCTestCase {
 
         XCTAssertEqual(withDiagnoses.first?.diagnoses, "ENC:iv:ciphertext")
         XCTAssertNil(withoutDiagnoses.first?.diagnoses)
+    }
+
+    func testProfileReadPreservesCiphertextAndPairedScope() async throws {
+        let key = SymmetricKey(data: Data(repeating: 7, count: 32))
+        let address = try XCTUnwrap(CryptoService.encryptField("Via sintetica 1", masterKey: key))
+        var calls = 0
+        let client = makeClient { request in
+            calls += 1
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "/api/v1/network/patients/fixture-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), self.creds.clientId)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), self.creds.clientToken)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"),
+                calls == 1 ? self.cookie + "; ambulatory_id=AMB-1" : self.cookie)
+            let data = try JSONSerialization.data(withJSONObject: [
+                "id": "fixture-1", "firstName": "Host", "lastName": "Synthetic",
+                "taxCode": "SYNTHETIC", "version": 7, "address": address, "notes": "ENC:opaque"])
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200,
+                httpVersion: nil, headerFields: nil)!, data)
+        }
+        for scope in ["AMB-1", nil] as [String?] {
+            let detail = try await client.fetchPatient(id: "fixture-1", credentials: creds,
+                sessionCookie: cookie, ambulatoryId: scope)
+            XCTAssertEqual(detail.firstName, "Host")
+            XCTAssertEqual(detail.version, 7)
+            XCTAssertEqual(detail.address, address)
+            XCTAssertEqual(detail.notes, "ENC:opaque")
+            XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: key), "Via sintetica 1")
+        }
+        XCTAssertEqual(calls, 2)
+    }
+
+    func testProfileRequestsPreserveHostRejectionsWithoutRetry() async throws {
+        for status in [401, 403, 404, 500] {
+            var calls = 0
+            let client = makeClient { request in
+                calls += 1
+                XCTAssertEqual(request.url?.path, "/api/v1/network/patients/fixture-1")
+                return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: status,
+                    httpVersion: nil, headerFields: nil)!, Data(#"{"error":"Synthetic rejection"}"#.utf8))
+            }
+            for write in [false, true] {
+                do {
+                    if write {
+                        _ = try await client.updatePatient(patientId: "fixture-1",
+                            payload: .init(version: 1, firstName: "Synthetic"), credentials: creds,
+                            sessionCookie: cookie, ambulatoryId: "AMB-1")
+                    } else {
+                        _ = try await client.fetchPatient(id: "fixture-1", credentials: creds,
+                            sessionCookie: cookie, ambulatoryId: "AMB-1")
+                    }
+                    XCTFail("Expected host rejection")
+                } catch let HomeBaseClientError.httpStatus(code, _) {
+                    XCTAssertEqual(code, status)
+                }
+            }
+            XCTAssertEqual(calls, 2)
+        }
+    }
+
+    func testProfileRequestsPreserveTransportFailureWithoutRetry() async throws {
+        var calls = 0
+        let client = makeClient { _ in
+            calls += 1
+            throw URLError(.cannotConnectToHost)
+        }
+        for write in [false, true] {
+            do {
+                if write {
+                    _ = try await client.updatePatient(patientId: "fixture-1",
+                        payload: .init(version: 1, firstName: "Synthetic"), credentials: creds,
+                        sessionCookie: cookie, ambulatoryId: "AMB-1")
+                } else {
+                    _ = try await client.fetchPatient(id: "fixture-1", credentials: creds,
+                        sessionCookie: cookie, ambulatoryId: "AMB-1")
+                }
+                XCTFail("Expected transport failure")
+            } catch let HomeBaseClientError.transport(issue) {
+                XCTAssertEqual(issue, .unreachable)
+            }
+        }
+        XCTAssertEqual(calls, 2)
     }
 
     func testFetchPatientSurfacesHomeBaseStatusMessage() async {
@@ -1882,6 +1941,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
             XCTAssertEqual(payload["version"] as? Int, 5)
             XCTAssertEqual(payload["firstName"] as? String, "Mario")
             XCTAssertNil(payload["lastName"], "an omit-only optional left nil must be absent")
+            XCTAssertEqual(payload["notes"] as? String, "ENC:synthetic-sealed-notes")
             XCTAssertEqual(payload["phone"] as? String, "06 1234")
             XCTAssertTrue(payload.keys.contains("address"), "PatchValue .null must emit an explicit null")
             XCTAssertTrue(payload["address"] is NSNull)
@@ -1904,6 +1964,7 @@ final class HomeBasePatientsClientTests: XCTestCase {
             patientId: "patient-1",
             payload: HomeBasePatientUpdatePayload(
                 version: 5, firstName: "Mario", isArchived: true, address: .null, phone: .value("06 1234"),
+                notes: .value("ENC:synthetic-sealed-notes"),
                 diagnoses: .value("[{\"code\":\"E11.9\",\"description\":\"Diabete\",\"system\":\"ICD-10\",\"date\":\"2026-01-01T00:00:00.000Z\"}]")
             ),
             credentials: HomeBasePairedCredentials(clientId: "paired-client-1", clientToken: "paired-token-1"),

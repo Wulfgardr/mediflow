@@ -10,11 +10,12 @@ import {
     type RequiredAuditContext,
 } from './security/audit';
 import { patients, patientsToAmbulatories } from './schema';
+import { PATIENT_PROFILE_UPDATE_OPERATION, type PatientProfileUpdateContract } from './patient-profile-update-contract';
 import type { NetworkPatientCommitGuard, NetworkPatientCommitDenial } from './network-patient-commit-authority';
 
 type PatientUpdateValues = Partial<typeof patients.$inferInsert>;
 
-type PatientUpdateOperationInput = {
+type PatientUpdateOperationInput = PatientProfileUpdateContract & {
     patientId: string;
     expectedVersion: number;
     values: PatientUpdateValues;
@@ -31,6 +32,10 @@ export type PatientUpdateOperationResult =
     | NetworkPatientCommitDenial;
 
 export function updatePatientOperation(input: PatientUpdateOperationInput): PatientUpdateOperationResult {
+    if (input.operationId !== PATIENT_PROFILE_UPDATE_OPERATION.id
+        || input.contractVersion !== PATIENT_PROFILE_UPDATE_OPERATION.version) {
+        throw new Error('Unsupported patient profile update operation');
+    }
     // better-sqlite3/Drizzle callback stays synchronous. Patient, membership and
     // required audit either commit together or all roll back; no second writer.
     return dbServer.transaction((tx): PatientUpdateOperationResult => {
