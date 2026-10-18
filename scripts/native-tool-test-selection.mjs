@@ -126,9 +126,9 @@ export function cargoGpuiPilotTestCommand(root) {
   // These first items cannot be hidden inside a comment, string, cfg or function.
   if (!/^mod appointments;\s*mod clinical_text;\s*mod components;\s*mod demo;\s*mod demo_app;\s*mod documents;\s*mod editing;\s*mod icons;\s*mod navigation;\s*mod patient_forms;\s*mod references;\s*mod shell;\s*mod text_input;\s*mod theme;/u.test(main)) throw new Error('Pilot binary module binding changed');
   const library = read(root, `${gpuiDirectory}/transport/src/lib.rs`).replace(/^(?:\s|\/\/[^\n]*(?:\n|$))*/u, '');
-  if (!/^#!\[forbid\(unsafe_code\)\]\s*mod catalogs;\s*mod crypto;\s*mod dto;\s*mod error;\s*mod http;\s*mod session;\s*mod tls;/u.test(library)) throw new Error('Pilot transport module binding changed');
+  if (!/^#!\[forbid\(unsafe_code\)\]\s*mod catalogs;\s*mod crypto;\s*mod dto;\s*mod error;\s*mod http;\s*mod profile_query;\s*mod session;\s*mod tls;/u.test(library)) throw new Error('Pilot transport module binding changed');
   const files = ['client/tests/flow.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/text_input.rs',
-    'transport/src/catalogs.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/session.rs'].map(file => `${gpuiDirectory}/${file}`);
+    'transport/src/catalogs.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/profile_query.rs', 'transport/src/session.rs'].map(file => `${gpuiDirectory}/${file}`);
   for (const file of [...files, `${gpuiDirectory}/client/src/lib.rs`, `${gpuiDirectory}/transport/src/bin/mediflow-runtime-probe.rs`, `${gpuiDirectory}/Cargo.lock`]) read(root, file);
   return { files, executable: 'cargo', args: ['test', '--manifest-path', manifest, '--workspace', '--all-targets', '--locked'], toolchain };
 }

@@ -192,6 +192,15 @@ pub fn create(
 ) -> Result<Creation, RuntimeError> {
     let draft = create_draft(values).map_err(|_| RuntimeError::InvalidInput)?;
     let created = session.create_patient(scope, &draft)?;
+    if let Err(error) = session.bind_created_profile(scope, &created.id, intent) {
+        if error.is_auth_failure() {
+            return Err(error);
+        }
+        return Ok(Creation::Unconfirmed {
+            id: created.id,
+            read_error: Some(error),
+        });
+    }
     match session.open_patient_profile(scope, &created.id, intent) {
         Ok(row)
             if row.id == created.id

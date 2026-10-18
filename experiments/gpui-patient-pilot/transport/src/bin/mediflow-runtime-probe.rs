@@ -75,6 +75,16 @@ fn fail(phase: &'static str, reason: &'static str) -> ProbeError {
     }
 }
 
+fn open_profile(
+    session: &RuntimeSession,
+    scope: &str,
+    patient_id: &str,
+) -> mediflow_runtime_client::Result<PatientDetail> {
+    session.select_profile_patient(scope, patient_id)?;
+    let intent = session.profile_query_intent();
+    session.open_patient_profile(scope, patient_id, &intent)
+}
+
 fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
     let reason = match error {
         RuntimeError::UnsupportedUnlock => "unsupported-unlock",
@@ -138,9 +148,8 @@ fn snapshot(session: &RuntimeSession, config: &ProbeConfig) -> Result<Value, Pro
     let archived = session
         .list_patients(scope, true)
         .map_err(|e| runtime_error("archived-patients", e))?;
-    let patient = session
-        .read_patient(scope, patient_id)
-        .map_err(|e| runtime_error("patient", e))?;
+    let patient =
+        open_profile(session, scope, patient_id).map_err(|e| runtime_error("patient", e))?;
     unlocked(&patient.locked_fields, "patient")?;
 
     let mut entries = session
@@ -271,9 +280,8 @@ fn writes(
         return Err(fail("writes", "wrong-synthetic-write-patient"));
     }
     let scope = &config.scope;
-    let before = session
-        .read_patient(scope, patient_id)
-        .map_err(|e| runtime_error("write-preread", e))?;
+    let before =
+        open_profile(session, scope, patient_id).map_err(|e| runtime_error("write-preread", e))?;
     if before.tax_code != "SYNTHETIC0000003" {
         return Err(fail("writes", "wrong-synthetic-identity"));
     }
@@ -289,8 +297,7 @@ fn writes(
         stale_session
             .list_ambulatories()
             .map_err(|e| runtime_error("stale-scopes", e))?;
-        let stale = stale_session
-            .read_patient(scope, patient_id)
+        let stale = open_profile(&stale_session, scope, patient_id)
             .map_err(|e| runtime_error("stale-preread", e))?;
         if stale.version != before.version {
             return Err(fail("stale-preread", "concurrent-change"));
@@ -312,8 +319,7 @@ fn writes(
         if stale_error != RuntimeError::Conflict {
             return Err(runtime_error("stale-write", stale_error));
         }
-        let after = session
-            .read_patient(scope, patient_id)
+        let after = open_profile(session, scope, patient_id)
             .map_err(|e| runtime_error("notes-readback", e))?;
         unlocked(&after.locked_fields, "notes-readback")?;
         if Some(after.version) != before.version.checked_add(1)
@@ -496,8 +502,7 @@ fn patient_profile_writes(
         return Err(fail("profile-create", "profile-acknowledgment-mismatch"));
     }
     let read = |active: &RuntimeSession, version, expected: &Value| {
-        let row = active
-            .read_patient(scope, &created.id)
+        let row = open_profile(active, scope, &created.id)
             .map_err(|e| runtime_error("profile-readback", e))?;
         profile_projection(&row, config, &created.id, tax_code, version, expected)
     };
@@ -619,8 +624,7 @@ fn resource_writes(
         return Err(fail("resources-config", "wrong-synthetic-write-patient"));
     }
     let scope = &config.scope;
-    let parent = session
-        .read_patient(scope, patient_id)
+    let parent = open_profile(session, scope, patient_id)
         .map_err(|e| runtime_error("resources-parent", e))?;
     unlocked(&parent.locked_fields, "resources-parent")?;
     if parent.tax_code != "SYNTHETIC0000003"
