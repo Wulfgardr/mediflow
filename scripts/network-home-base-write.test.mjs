@@ -228,6 +228,48 @@ test('disabling home-base mode makes paired-client tokens inert until re-enabled
     }
 });
 
+test('canonical profile update keeps Web, token-only and paired wire with caller-key replay protected by CAS', async () => {
+    await assertServerReady();
+    const ambulatoryId = await resolveDefaultAmbulatoryId();
+    await enableHomeBaseMode();
+    const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
+    assert.equal(login.response.status, 200);
+    const client = await pairClient([READ_CAPABILITY, WRITE_CAPABILITY], 'Synthetic canonical dispatcher');
+    for (const surface of ['web', 'local-v1', 'paired']) {
+        const patientId = await createSeedPatient(ambulatoryId);
+        const pathname = `${surface === 'web' ? '/api' : surface === 'local-v1' ? '/api/v1' : '/api/v1/network'}/patients/${patientId}`;
+        const headers = surface === 'local-v1' ? localApiHeaders() : surface === 'web' ? login.webHeaders
+            : { ...login.webHeaders, ...pairedHeaders(client) };
+        try {
+            const before = await request('GET', `/api/v1/patients/${patientId}`, { headers: localApiHeaders() });
+            assert.equal(before.response.status, 200);
+            const body = { version: 1, notes: PHONE_ONE, idempotencyKey: 'synthetic-caller-key',
+                executionId: 'caller-execution', operationId: 'untrusted.operation', contractVersion: 99,
+                executor: 'rust', purpose: 'claimed-purpose', confirmation: 'human-confirmed', authorization: { allowed: true },
+                author: { ref: 'forged-actor' }, scopeAmbulatoryId: 'wrong-scope', patientId: 'wrong-patient' };
+            const first = await request('PUT', pathname, { headers: { ...headers, 'Idempotency-Key': body.idempotencyKey }, body });
+            assert.equal(first.response.status, 200, surface); assert.deepEqual(first.json, { success: true });
+            const retry = await request('PUT', pathname, { headers: { ...headers, 'Idempotency-Key': body.idempotencyKey }, body });
+            assert.equal(retry.response.status, 409, surface); assert.equal(retry.json?.code, 'VERSION_CONFLICT');
+            const detail = await request('GET', `/api/v1/patients/${patientId}`, { headers: localApiHeaders() });
+            assert.equal(detail.json.version, 2); assert.equal(detail.json.notes, PHONE_ONE);
+            for (const field of Object.keys(before.json)) {
+                if (!['notes', 'version', 'updatedAt'].includes(field)) assert.deepEqual(detail.json[field], before.json[field], `${surface}:${field}`);
+            }
+            const audit = await request('GET', '/api/system/audit?eventType=patient.updated&subjectType=patient&limit=100', { headers: login.webHeaders });
+            assert.equal(audit.response.status, 200);
+            const events = audit.json.filter(row => row.subjectRef === patientId);
+            assert.equal(events.length, 1, surface); assert.deepEqual(events[0].redactedMetadata.changedFields, ['notes']);
+            assert.equal(events[0].actorType, surface === 'local-v1' ? 'system' : 'user');
+            if (surface === 'local-v1') assert.equal(events[0].actorRef, 'local-api');
+            assert.equal(events[0].sourceSurface, surface === 'local-v1' ? 'api' : surface === 'web' ? 'web' : 'native');
+            assert.ok(!JSON.stringify(events[0]).includes('forged-actor'));
+            scenarioResults.push({ name: 'canonical profile dispatch', surface, updateStatus: first.response.status,
+                repeatStatus: retry.response.status, patientVersion: detail.json.version, updateAuditCount: events.length });
+        } finally { await cleanupPatient(patientId); }
+    }
+});
+
 async function assertServerReady() {
     const response = await request('GET', '/api/v1/ambulatories', {
         headers: localApiHeaders(),

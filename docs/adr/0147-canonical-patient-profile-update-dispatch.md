@@ -17,7 +17,7 @@ Questo incremento non migra scritture a Rust e non concede capacità agli agenti
 Il servizio conserva ammissione, normalizzazione e precedenze HTTP correnti.
 Dopo le attese già richieste dagli owner, acquisisce il contesto audit host e
 crea un'esecuzione volatile per la singola richiesta ammessa. Il comando interno
-immutabile contiene operazione/versione, paziente/versione attesa, autore e
+immutabile contiene operazione/versione, scopo fisso `patient-profile-update`, paziente/versione attesa, autore e
 scope derivati dall'host, payload profilo esplicito normalizzato, data della
 normalizzazione e conferma `legacy-not-attested`. Il payload non contiene SQL,
 patch arbitrarie o un'autorizzazione scelta dal body. I campi cifrati restano
@@ -30,9 +30,12 @@ commit, audit, CAS e membership rimangono quelli esistenti. Dalla risoluzione
 finale dell'audit all'invocazione sincrona del writer non si aggiungono attese;
 il guard paired resta verificato nella transazione del writer.
 
-L'host genera execution ID, correlation ID e chiave di idempotenza distinti.
-La correlation deriva dal contesto audit corrente; non costituisce una chiave
-di deduplicazione. Il contesto lega il comando e l'autorità già ammessa e non
+L'host genera execution ID e chiave di idempotenza distinti. La correlation
+deriva dal contesto audit corrente e può conservare un `x-request-id` dichiarato
+dal chiamante: serve al tracciamento, mai ad autorità o deduplicazione.
+Il campo di autorizzazione descrive l'ammissione host e il guard esistenti,
+distintamente dalla conferma non attestata; non concede una proof nuova.
+Il contesto lega il comando e l'autorità già ammessa e non
 è un nuovo emittente di capacità. Un oggetto ricostruito dal chiamante non è un
 contesto valido. I campi omonimi nel body non sono adottati dal comando.
 L'autore di una richiesta con solo token locale resta un servizio, senza
@@ -44,6 +47,14 @@ stessa Promise/esito, anche per invocazioni concorrenti o rientranti, senza un
 secondo writer. Chiavi o comandi diversi sono negati. Un'eccezione successiva
 all'avvio resta terminale; il contesto non si riarma e non ritenta gli effetti.
 Non esistono registro globale, persistenza o riuso dell'esecuzione da HTTP.
+
+L'esito interno è legato a operazione/versione, scopo, execution ID, chiave e
+correlation del comando: `applied` contiene il successo del writer, `refused`
+il suo diniego e `uncertain` l'eccezione dopo l'avvio, senza dichiarare se abbia
+committato. Il servizio consuma questo esito: restituisce il risultato legacy
+oppure rilancia la stessa eccezione alle mappature HTTP esistenti. L'attesa
+dell'esito avviene soltanto dopo l'invocazione sincrona del writer. Non è una
+nuova ricevuta HTTP, né una prova di conferma umana.
 
 La garanzia è una **chiave host con ambito singola esecuzione; deduplicazione
 interna e riuso esito; nessuna idempotenza durevole tra richieste**. Una nuova

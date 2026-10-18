@@ -81,6 +81,10 @@ La [porta comune del profilo paziente](./analysis/2026-10-17-patient-profile-por
 estrae lettura e preparazione dell'aggiornamento dai quattro adattatori,
 conservando il commit SQLite e l'audit nell'operazione autorevole esistente.
 Il verbale documenta le nuove prove di conformità e HTTP old/new sul delta.
+L'[ADR 0147](./adr/0147-canonical-patient-profile-update-dispatch.md) definisce
+il comando canonico di aggiornamento e il dispatch unico verso il writer Node
+esistente: deduplicazione interna per esecuzione, senza idempotenza durevole
+tra richieste, prova umana o migrazione di scritture a Rust.
 La [verifica della tastiera GPUI](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md)
 registra ricerca contestuale, lista filtrata, revisione, blocco e ridimensionamento
 con una nuova build Linux e immagini originali attribuite alla loro esecuzione.
