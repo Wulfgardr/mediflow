@@ -1,0 +1,1893 @@
+{
+  "schemaVersion": 1,
+  "baselineRevision": "0feb5658c0b8801b4326f205b6ed74ba69c4d96b",
+  "scope": {
+    "roots": [
+      "app",
+      "lib",
+      "components",
+      "hooks",
+      "packages"
+    ],
+    "entries": [
+      "scripts/source-runtime.mjs",
+      "scripts/mediflow-headless-supervisor.mjs",
+      "scripts/intelligent-host-mcp-stdio.mjs",
+      "scripts/run-scheduled-backup.mjs",
+      "scripts/local-api-tls-proxy.mjs",
+      "scripts/restore-recovery-backup.ts"
+    ]
+  },
+  "classifications": {
+    "legacy-node-http": "Existing Web/local/paired HTTP adapters importing the current Node SQL authority; not migrated by WUL-576.",
+    "legacy-node-service": "Existing Node services/owners with direct authority or handle dependencies; see authority-census and mutation CSV for ownership and guarantees.",
+    "sqlite-infrastructure": "Existing schema/open/repair/maintenance primitives. Not an alternative clinical writer or permission to run maintenance.",
+    "reference-data": "Reference catalog SQL, distinct from clinical patient command dispatch.",
+    "runtime-entry": "Declared runtime/maintenance entry or its local dependencies, outside the Web/lib source roots.",
+    "synthetic-support": "Existing synthetic-support source; inclusion is conservative and does not authorize real data access."
+  },
+  "semantics": {
+    "edge": "Exact source path, resolved target, capability, import form, imported symbols and occurrence count. Value imports are conservatively treated as runtime dependencies; explicit type-only imports are not authority.",
+    "barrels": "Re-exports, aliases, namespace/default/CommonJS bindings and direct-return handle factories propagate authority. DTO-returning application services and ordinary Drizzle operators do not.",
+    "opaque": "Each unsupported dynamic/code/native loader is admitted only by expression, whole-source SHA-256, count and reason. Not isolation against hostile JavaScript.",
+    "scope": "Runtime source roots plus declared script entries and their statically resolved local dependencies, including test-named helpers when reached by runtime. Generated/vendor/dependency directories and standalone test sources are not source roots."
+  },
+  "nativeBoundary": {
+    "rust": {
+      "classification": "No direct SQL dependency in either current first-party Rust experiment; HTTP/ENC client code is not DB authority.",
+      "manifests": [
+        "experiments/gpui-patient-pilot/Cargo.toml",
+        "experiments/gpui-patient-pilot/client/Cargo.toml",
+        "experiments/gpui-patient-pilot/transport/Cargo.toml",
+        "experiments/gpui-patient-pilot/app/Cargo.toml",
+        "experiments/rust-boundary/Cargo.toml"
+      ],
+      "limit": "This guard does not parse Rust, Cargo feature graphs, macros or upstream GPUI. Existing Rust test/manifest selection guards remain separate."
+    },
+    "swift": {
+      "classification": "Preserved experimental local SQLite core, not selected by the production Apple workspace factory, which uses the paired host.",
+      "sources": [
+        "native/MediFlowMac/Sources/MediFlowCore/SQLite.swift",
+        "native/MediFlowMac/Sources/MediFlowCore/SQLiteConnection.swift",
+        "native/MediFlowMac/Sources/MediFlowCore/SQLitePatientStore.swift",
+        "native/MediFlowMac/Sources/MediFlowCore/SQLiteClinicalStore.swift"
+      ],
+      "manifest": "native/MediFlowMac/Package.swift",
+      "vendorTarget": "MediFlowSQLiteC",
+      "limit": "Classification only: no new Swift parser, FFI audit or vendor scan. Existing Swift store/lifecycle tests and target/test inventory retain their own guarantees."
+    }
+  },
+  "edges": [
+    {
+      "file": "app/api/ai/fabric/observability/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/ambulatories/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/attachments/[id]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/attachments/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/auth/check/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/auth/login/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/auth/reset/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/auth/rewrap-master-key/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/auth/setup/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/checkups/[id]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/checkups/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/conversations/[id]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/conversations/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/drugs/source/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/entries/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/exemptions/import/commit/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/exemptions/import/preview/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/exemptions/import/status/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/exemptions/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/messages/[id]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/messages/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/observations/[id]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/observations/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/patients/assign/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/patients/create-context/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/patients/duplicate/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/patients/move/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/patients/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/patients/unassign/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/service-catalog/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/settings/[key]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/settings/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/siss-handoffs/[id]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/siss-handoffs/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/siss/context/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/siss/prescription/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/ai-rollout-readiness/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/backup-restore/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/backup-scheduler/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/fix-orphans/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/function-status/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/migrate-m2m/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/migrate/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/purge-patient/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/recovery-backup/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/redaction/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/system/restore-patient/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/therapies/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/exemptions/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/checkups/[checkupId]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/checkups/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/entries/[entryId]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/entries/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/observations/[observationId]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/observations/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/therapies/[therapyId]/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/[id]/therapies/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "app/api/v1/patients/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-http"
+    },
+    {
+      "file": "lib/ai-providers/fabric/document-synthesis-authenticated-attachment-capture.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/document-synthesis-production-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/document-synthesis-provider-binding.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/durable-current-review-locator.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "hasCanonicalDurableReviewPatientLinkSchema"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/durable-review-record-store.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/function-model-preferences-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/local-provider-onboarding-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/patient-insight-authenticated-preview-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/physician-review-command.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/fabric/treatment-reasoning-production-root.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ai-providers/host-local-provider-binding.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/aifa-catalog-server.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/aifa-catalog-source-server.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ambulatory-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/ambulatory-write.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/attachment-content-cas-route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/attachment-currentness-host.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/attachment-web-create.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/backup-restore-executor.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "openDbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/chatgpt-product/ordinary-flow.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/chatgpt-product/ordinary-settings.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/checkup-write-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/db-server.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/db-server.ts",
+      "target": "drizzle-orm/better-sqlite3",
+      "capability": "driver:drizzle-orm/better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "drizzle"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/db-server.ts",
+      "target": "lib/sqlite-maintenance-admission.mjs",
+      "capability": "server:lib/sqlite-maintenance-admission.mjs",
+      "form": "import",
+      "symbols": [
+        "openAdmittedSqlite"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/db-server.ts",
+      "target": "lib/sqlite-schema-open.ts",
+      "capability": "server:lib/sqlite-schema-open.ts",
+      "form": "import",
+      "symbols": [
+        "openVersionedSqliteDatabase"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/domain/documents/attachment-extraction-selection-binding.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/domain/documents/attachment-extraction-source-authority.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/entry-write-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/fse-validate-patient.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/fse-validation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/native-ai-configuration-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-ai-runtime.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-attachment-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-attachment-write.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-catalog-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-checkup-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-entry-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-home-base-server.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-identity.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-observation-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-patient-lifecycle.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-patient-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/network-therapy-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/observation-write-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/patient-delete-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/patient-profile-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/patient-update-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/prosthetic-prescription-write.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/recovery-backup-server.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/recovery-backup-server.ts",
+      "target": "lib/sqlite-schema-open.ts",
+      "capability": "server:lib/sqlite-schema-open.ts",
+      "form": "import",
+      "symbols": [
+        "openVersionedSqliteDatabase"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/reference-data/icd11-embedded-store.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "reference-data"
+    },
+    {
+      "file": "lib/reference-data/prosthetics-catalog-http.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "reference-data"
+    },
+    {
+      "file": "lib/security/archive-generation-test-support.cjs",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "require",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "synthetic-support"
+    },
+    {
+      "file": "lib/security/archive-maintenance-owner.ts",
+      "target": "lib/sqlite-maintenance-admission.mjs",
+      "capability": "server:lib/sqlite-maintenance-admission.mjs",
+      "form": "import",
+      "symbols": [
+        "openAdmittedSqlite"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/archive-maintenance-owner.ts",
+      "target": "lib/sqlite-schema-open.ts",
+      "capability": "server:lib/sqlite-schema-open.ts",
+      "form": "import",
+      "symbols": [
+        "openVersionedSqliteDatabase"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/archive-session-generation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/audit.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 2,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/authenticated-review-principal-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/durable-review-patient-link-store.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "hasCanonicalDurableReviewPatientLinkSchema",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/fresh-review-pin-uniqueness.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/headless-checkup-active-role-attestation-store.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "hasCanonicalHeadlessCheckupActiveRoleAttestationSchema",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/headless-checkup-status-transition-storage.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/headless-soap-active-role-attestation-store.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/headless-soap-active-role-attestation-store.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "getInitialDbServerHandle",
+        "hasCanonicalHeadlessSoapActiveRoleAttestationSchema",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/headless-soap-entry-commit-owner.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/headless-soap-entry-commit-owner.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "getInitialDbServerHandle",
+        "hasCanonicalHeadlessSoapEntryCommitSchema",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/host-credential-verification.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/native-inference-environment.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/native-profile-lifecycle.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/native-profile-selection-owner.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/native-session-projection-owner-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/paired-native-session.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/patient-open-loops-read-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/physician-review-attestation-store.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "hasCanonicalPhysicianReviewAttestationSchema",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/pin-change-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/pin-era-residues.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/portable-supervisor-aip-audit-port.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/portable-supervisor-patient-version-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/portable-supervisor-semantic-audit-port.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/profile-update-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/server-auth.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/server-session-authenticated-smart-import-preview-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/server-session-clinical-context-native-source-rows.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/server-session-clinical-context-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/security/session-physician-review-authority-production.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/service-prescription-write.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/siss-session-observer.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/sqlite-maintenance-admission.mjs",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/sqlite-observation-schema-upgrade.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/sqlite-repair.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/sqlite-schema-open.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/sqlite-schema.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
+      "file": "lib/terminology-registry.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "dynamic",
+      "symbols": [
+        "*"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/therapy-write-operation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/visit-draft-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/work-profile-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer",
+        "runDbServerImmediateTransaction"
+      ],
+      "count": 1,
+      "classification": "legacy-node-service"
+    },
+    {
+      "file": "scripts/run-scheduled-backup.mjs",
+      "target": "lib/sqlite-maintenance-admission.mjs",
+      "capability": "server:lib/sqlite-maintenance-admission.mjs",
+      "form": "import",
+      "symbols": [
+        "openAdmittedSqlite"
+      ],
+      "count": 1,
+      "classification": "runtime-entry"
+    }
+  ],
+  "opaqueLoaders": [
+    {
+      "file": "scripts/stage-headless-runtime.mjs",
+      "kind": "require-base",
+      "expression": "createRequire(path.join(layout.web, 'package.json'))",
+      "sourceSha256": "792fae7f60e58f7006c9d55dcbcdd3ae6c30cee07659452e1a3add116c5b7e03",
+      "count": 1,
+      "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
+    },
+    {
+      "file": "scripts/stage-headless-runtime.mjs",
+      "kind": "require-base",
+      "expression": "createRequire(path.join(ROOT, 'package.json'))",
+      "sourceSha256": "792fae7f60e58f7006c9d55dcbcdd3ae6c30cee07659452e1a3add116c5b7e03",
+      "count": 1,
+      "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
+    },
+    {
+      "file": "scripts/node-runtime-contract.mjs",
+      "kind": "require-base",
+      "expression": "createRequire(path.join(runtimeRoot, 'package.json'))",
+      "sourceSha256": "f3f72a3c8c6fd766513b799704ada1269a87bf74c15fa743a5d3838be75ead65",
+      "count": 1,
+      "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
+    },
+    {
+      "file": "scripts/source-runtime.mjs",
+      "kind": "require-base",
+      "expression": "createRequire(path.join(web, 'package.json'))",
+      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "count": 1,
+      "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
+    },
+    {
+      "file": "scripts/source-runtime.mjs",
+      "kind": "require",
+      "expression": "createRequire(path.join(web, 'package.json'))(path.join(web, 'server.js'))",
+      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "count": 1,
+      "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
+    },
+    {
+      "file": "scripts/stage-headless-runtime.mjs",
+      "kind": "dynamic",
+      "expression": "import(pathToFileURL(launcher).href)",
+      "sourceSha256": "792fae7f60e58f7006c9d55dcbcdd3ae6c30cee07659452e1a3add116c5b7e03",
+      "count": 1,
+      "reason": "Existing staging verifier imports the generated launcher from its selected runtime payload. This exact source digest is required."
+    },
+    {
+      "file": "scripts/launch-bundled-headless-supervisor.mjs",
+      "kind": "dynamic",
+      "expression": "import(pathToFileURL(path.join(RUNTIME, 'scripts/headless-source-loader.mjs')).href)",
+      "sourceSha256": "f333744ef21007538dcf50796b90fb2e519af3f612373dfa0454e77f9de5f0b7",
+      "count": 1,
+      "reason": "Canonical installed-payload launcher resolves the preserved runtime root and validated launcher target. This exact source digest/occurrence is admitted, not arbitrary dynamic loading."
+    },
+    {
+      "file": "scripts/source-runtime.mjs",
+      "kind": "dynamic",
+      "expression": "import(pathToFileURL(path.join(web, 'scripts/mediflow-headless-supervisor.mjs')).href)",
+      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "count": 1,
+      "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
+    },
+    {
+      "file": "scripts/source-runtime.mjs",
+      "kind": "dynamic",
+      "expression": "import(pathToFileURL(path.join(web, 'scripts/register-strip-types-loader.mjs')).href)",
+      "sourceSha256": "2b023a5a86135437df941b91246ca53aaa4a35aa49d7d8aa1dae2bb78a06d394",
+      "count": 1,
+      "reason": "Canonical source-runtime launcher selects the validated standalone payload/loader/server. The exact file digest freezes all selection logic."
+    },
+    {
+      "file": "scripts/launch-bundled-headless-supervisor.mjs",
+      "kind": "dynamic",
+      "expression": "import(pathToFileURL(target).href)",
+      "sourceSha256": "f333744ef21007538dcf50796b90fb2e519af3f612373dfa0454e77f9de5f0b7",
+      "count": 1,
+      "reason": "Canonical installed-payload launcher resolves the preserved runtime root and validated launcher target. This exact source digest/occurrence is admitted, not arbitrary dynamic loading."
+    },
+    {
+      "file": "scripts/node-runtime-contract.mjs",
+      "kind": "require",
+      "expression": "requireFromRoot(entry)",
+      "sourceSha256": "f3f72a3c8c6fd766513b799704ada1269a87bf74c15fa743a5d3838be75ead65",
+      "count": 1,
+      "reason": "Native ABI verification resolves the installed better-sqlite3 entry before requiring it. This exact file digest freezes the resolution logic."
+    }
+  ]
+}
