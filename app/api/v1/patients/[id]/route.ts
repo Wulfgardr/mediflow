@@ -16,12 +16,10 @@ function parsePatientDeletionReason(body: Record<string, unknown>, fallback: str
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const authError = requireLocalApiToken(request);
-    if (authError) return authError;
-
     try {
-        const { id } = await params;
-        const patient = await readPatientProfile({ patientId: id, projection: 'api-v1' });
+        const resolved = await readPatientProfile({ request, projection: 'api-v1', patientId: async () => (await params).id });
+        if (!resolved.ok) return resolved.response;
+        const patient = resolved.profile;
 
         if (!patient) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });

@@ -6,6 +6,41 @@ import XCTest
 final class PairedPatientsWorkspaceModelLifecycleTests: XCTestCase {
     private let masterKey = SymmetricKey(data: Data(repeating: 7, count: 32))
 
+    @MainActor
+    func testProductionFactoryIgnoresRetiredLocalAuthorityValuesWithUnlockedKey() throws {
+        let previous = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]
+        defer {
+            if let previous { setenv("MEDIFLOW_LOCAL_AUTHORITY", previous, 1) }
+            else { unsetenv("MEDIFLOW_LOCAL_AUTHORITY") }
+        }
+        let model = makeProductionFactoryModel()
+        model.configurePairedOnlineForTests(operatorId: "factory-operator", masterKey: masterKey)
+        for value in ["1", "true", "yes"] {
+            setenv("MEDIFLOW_LOCAL_AUTHORITY", value, 1)
+            XCTAssertTrue(model.makeClient() is HomeBasePatientsClient, "retired value: \(value)")
+        }
+    }
+
+    @MainActor
+    private func makeProductionFactoryModel() -> PairedPatientsWorkspaceModel {
+        let suite = "ProductionFactoryTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let pairedStore = HomeBasePairedStore(userDefaults: defaults,
+            keychainReader: { _, _ in .success(nil) },
+            keychainWriter: { _, _, _ in .success(()) },
+            keychainDeleter: { _, _ in .success(()) })
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(suite, isDirectory: true)
+        let cache = HomeBasePatientCacheStore(cacheDirectory: directory,
+            keyProvider: { SymmetricKey(data: Data(repeating: 8, count: 32)) })
+        addTeardownBlock {
+            defaults.removePersistentDomain(forName: suite)
+            if FileManager.default.fileExists(atPath: directory.path) {
+                try FileManager.default.removeItem(at: directory)
+            }
+        }
+        return PairedPatientsWorkspaceModel(pairedStore: pairedStore, cacheStore: cache)
+    }
+
     private struct CryptoFixture: Decodable {
         struct Inputs: Decodable {
             let pin: String

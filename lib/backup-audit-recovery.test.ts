@@ -264,7 +264,7 @@ test('scheduled snapshot restores original audits, preserves target history and 
             "dbServer.insert(ambulatories).values({id:'audit-amb',name:'Synthetic audit',type:'synthetic',createdAt:new Date(1783000000000)}).run();",
             "dbServer.insert(patients).values({id:'audit-patient',firstName:'Synthetic',lastName:'Before',taxCode:'SYNTHETIC-AUDIT',ambulatoryId:'audit-amb',version:1,createdAt:new Date(1783000000000)}).run();",
             "dbServer.insert(patientsToAmbulatories).values({patientId:'audit-patient',ambulatoryId:'audit-amb',assignedAt:new Date(1783000000000)}).run();",
-            "const result = updatePatientOperation({patientId:'audit-patient',expectedVersion:1,values:{lastName:'After',updatedAt:new Date(1783000001000)},setPrimaryAmbulatory:false,audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation,actorType:'user',actorRef:'synthetic-operator',sourceSurface:'web',requestId:'synthetic-required-update'}});",
+            "const result = updatePatientOperation({ operationId:'patient-profile.update.v1',contractVersion:1,patientId:'audit-patient',expectedVersion:1,values:{lastName:'After',updatedAt:new Date(1783000001000)},setPrimaryAmbulatory:false,audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation,actorType:'user',actorRef:'synthetic-operator',sourceSurface:'web',requestId:'synthetic-required-update'}});",
             "if (result.status !== 200) throw new Error('Synthetic patient update failed');",
         ].join('\n'));
         const source = new Database(path.join(sourceDir, 'medical.db'));

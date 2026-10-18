@@ -3,7 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { activePatients } from './patient-lifecycle';
 import { dbServer } from './db-server';
 import { patients, patientsToAmbulatories } from './schema';
-import type { PatientDetail, PatientSummary } from './api/v1/types';
+import type { PatientSummary } from './api/v1/types';
 import { readPatientProfile } from './patient-profile-service';
 
 function toIsoString(value: unknown): string | null {
@@ -49,9 +49,17 @@ export async function listNetworkScopedPatients(
     return rows.map((row) => toPatientSummary(row.patient, options.includeDiagnoses));
 }
 
-export async function getNetworkScopedPatientDetail(
-    patientId: string,
-    scopeAmbulatoryId: string
-): Promise<PatientDetail | null> {
-    return readPatientProfile({ patientId, projection: 'network', scopeAmbulatoryId });
+export function getNetworkScopedPatientDetail(request: Request, patientId: () => Promise<string | null>, projection?: 'network'): ReturnType<typeof readPatientProfile>;
+export function getNetworkScopedPatientDetail(request: Request, patientId: () => string | null, projection: 'network-fse'): ReturnType<typeof readPatientProfile>;
+export function getNetworkScopedPatientDetail(
+    request: Request,
+    patientId: () => Promise<string | null> | string | null,
+    projection: 'network' | 'network-fse' = 'network',
+) {
+    if (projection === 'network-fse') return readPatientProfile({ request, projection, patientId: () => {
+        const id = patientId();
+        if (typeof id !== 'string' && id !== null) throw new Error('FSE patient locator must be synchronous');
+        return id;
+    } });
+    return readPatientProfile({ request, patientId: async () => patientId(), projection });
 }

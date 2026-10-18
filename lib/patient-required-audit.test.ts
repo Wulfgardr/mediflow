@@ -141,7 +141,7 @@ if (mode === 'before-audit') {
   dbServer.$client.function('c04_isolated_kill', () => process.kill(process.pid, 'SIGKILL'));
   dbServer.$client.exec("CREATE TRIGGER c04_isolated_kill_audit BEFORE INSERT ON audit_events BEGIN SELECT c04_isolated_kill(); END");
 }
-const result = updatePatientOperation({ patientId:'c04-isolated', expectedVersion:3,
+const result = updatePatientOperation({ operationId:'patient-profile.update.v1',contractVersion:1, patientId:'c04-isolated', expectedVersion:3,
   values:{firstName:'Child',ambulatoryId:'c04-b',version:999,updatedAt:new Date()},
   setPrimaryAmbulatory:true,
   audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation, actorType:'user',actorRef:'c04-child',sourceSurface:'web',requestId:'c04-child',flags:['auth:session']}
@@ -295,7 +295,7 @@ test('network: required event uses paired session and scope, failure rolls back'
 test('core derives committed version and audit version from expectedVersion, not supplied values', () => {
     reset();
     const before = events().length;
-    const result = updatePatientOperation({
+    const result = updatePatientOperation({ operationId:'patient-profile.update.v1',contractVersion:1,
         patientId: 'c04-patient', expectedVersion: 3,
         values: { firstName: 'Core', version: 999, updatedAt: new Date() },
         setPrimaryAmbulatory: false,
@@ -320,7 +320,7 @@ test('SQLITE_FULL in required audit insert rolls back patient and membership', a
     const oldLimit = dbServer.$client.pragma('max_page_count', { simple: true }) as number;
     dbServer.$client.pragma(`max_page_count = ${pageCount + 1}`);
     try {
-        assert.throws(() => updatePatientOperation({
+        assert.throws(() => updatePatientOperation({ operationId:'patient-profile.update.v1',contractVersion:1,
             patientId: 'c04-patient', expectedVersion: 3,
             values: { firstName: 'Full', ambulatoryId: 'c04-b', version: 999, updatedAt: new Date() },
             setPrimaryAmbulatory: true,
@@ -374,7 +374,7 @@ test('two independent writers for one version yield one success and one required
 const load = createRequire(import.meta.url);
 const { updatePatientOperation } = load(${JSON.stringify(join(repo, 'lib/patient-update-operation.ts'))});
 const { dbServer } = load(${JSON.stringify(join(repo, 'lib/db-server.ts'))});
-const result = updatePatientOperation({patientId:'c04-patient',expectedVersion:3,
+const result = updatePatientOperation({ operationId:'patient-profile.update.v1',contractVersion:1,patientId:'c04-patient',expectedVersion:3,
   values:{firstName:process.argv[2],version:4,updatedAt:new Date()},setPrimaryAmbulatory:false,
   audit:{archiveGeneration: dbServer.$client.prepare('SELECT generation FROM archive_generation WHERE id=1').get().generation, actorType:'user',actorRef:'c04-writer',sourceSurface:'web',requestId:'c04-compete',flags:['auth:session']}});
 console.log(JSON.stringify({status:result.status}));

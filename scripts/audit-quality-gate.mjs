@@ -1262,6 +1262,7 @@ function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
     const profile = checkedSource(spec.profileFile, profileSource);
     const entry = namedFunction(profile.sourceFile, spec.serviceExport, true);
     const operation = importedBinding(profile.sourceFile, profile.checker, './patient-update-operation', spec.ownerName);
+    const contract = importedBinding(profile.sourceFile, profile.checker, './patient-profile-update-contract', 'PATIENT_PROFILE_UPDATE_OPERATION');
     const calls = entry && operation ? bindingCalls(entry, profile.checker, operation.symbol) : [];
     const call = calls.length === 1 ? calls[0] : null;
     const contextName = entry?.parameters[0]?.name;
@@ -1276,7 +1277,7 @@ function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
         problems.push('profile port must directly return exactly one synchronous approved patient-update operation');
     } else {
         const input = unwrap(call.arguments[0]);
-        const names = ['patientId', 'expectedVersion', 'values', 'setPrimaryAmbulatory', 'scopeAmbulatoryId', 'authorizeCommit', 'audit'];
+        const names = ['operationId', 'contractVersion', 'patientId', 'expectedVersion', 'values', 'setPrimaryAmbulatory', 'scopeAmbulatoryId', 'authorizeCommit', 'audit'];
         const properties = ts.isObjectLiteralExpression(input) && input.properties.every((property) =>
             (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
             && !ts.isComputedPropertyName(property.name)
@@ -1285,8 +1286,14 @@ function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
         const contextProperty = (node, name) => Boolean(node && ts.isPropertyAccessExpression(node)
             && !node.questionDotToken && node.name.text === name
             && exactIdentifierBinding(profile.checker, node.expression, context));
+        const contractProperty = (node, name) => Boolean(contract && node && ts.isPropertyAccessExpression(node)
+            && !node.questionDotToken && node.name.text === name
+            && exactIdentifierBinding(profile.checker, node.expression, contract.symbol));
         const audit = properties?.get('audit')?.initializer;
-        if (!properties || input.properties.length !== names.length || properties.size !== names.length
+        if (!contract || bindingIsWritten(profile.sourceFile, profile.checker, contract.symbol)
+            || !contractProperty(properties?.get('operationId')?.initializer, 'id')
+            || !contractProperty(properties?.get('contractVersion')?.initializer, 'version')
+            || !properties || input.properties.length !== names.length || properties.size !== names.length
             || names.some((name) => !properties.has(name))
             || !['patientId', 'expectedVersion', 'scopeAmbulatoryId'].every((name) =>
                 contextProperty(properties.get(name)?.initializer, name))
