@@ -814,6 +814,13 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return copy;
     }
 
+    async decryptProfileNotes(notes: string | null): Promise<string | null> {
+        if (this.tableName !== 'patients') throw new Error('Patient projection required');
+        const result = await this.decryptItem({ notes });
+        if (result.notes !== null && typeof result.notes !== 'string') throw new Error('Invalid notes projection');
+        return result.notes;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async decryptItem(item: any): Promise<any> {
         const key = this.getMasterKey();
@@ -946,6 +953,12 @@ class MedicalApiClient {
         await assertBackupReadableWithKey(artifactJson, key, ENCRYPTED_FIELDS);
         // A lock or key change while the check ran voids its answer.
         if (this.masterKey !== key) throw new BackupRestoreKeyError('Ripristino non avviato: la sessione è stata bloccata durante il controllo. Sblocca e riprova.');
+    }
+
+    async decryptPatientProfileNotes(notes: string | null): Promise<string | null> {
+        const signal = this.getSessionReadSignal(); signal.throwIfAborted();
+        const result = await this.patients.decryptProfileNotes(notes);
+        signal.throwIfAborted(); return result;
     }
 
     setKey(key: CryptoKey | null) {
