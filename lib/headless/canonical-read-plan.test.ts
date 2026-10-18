@@ -261,10 +261,16 @@ test('publishes an exact deeply immutable non-authorizing graph', () => {
   assert.equal(visited.size > 250, true);
 });
 
-test('classifies all 36 OpenAPI GETs without admitting separate native authority to the 32 read candidates', () => {
+test('classifies all 37 OpenAPI GETs without admitting separate native authority to the 32 read candidates', () => {
   // ADR 0135 keeps host-wide configuration under native authority. ADR 0115
   // authorizes WHO only as paired consultation and leaves its Headless packet separate.
+  // ADR 0146 keeps scoped profile admission outside this non-authorizing planner inventory.
   const excludedPrimaryOpenApiAuthority = [
+    {
+      route: '/api/v1/network/patient-profile/selection-epoch',
+      openApiOperationId: 'getScopedPatientProfileSelectionEpoch',
+      runtimeRef: 'app/api/v1/network/patient-profile/selection-epoch/route.ts',
+    },
     {
       route: '/api/v1/network/ai/functions',
       openApiOperationId: 'ReadNativeFunctionPreferences',
@@ -295,7 +301,7 @@ test('classifies all 36 OpenAPI GETs without admitting separate native authority
     },
   ] as const;
   const observed = openApiNetworkGets();
-  assert.equal(observed.length, 36);
+  assert.equal(observed.length, 37);
   for (const excluded of excludedPrimaryOpenApiAuthority) {
     assert.deepEqual(observed.filter(([route]) => route === excluded.route), [
       [excluded.route, excluded.openApiOperationId],

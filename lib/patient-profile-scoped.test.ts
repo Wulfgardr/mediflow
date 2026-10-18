@@ -24,6 +24,8 @@ const cookieState: { cookies: Map<string, string>; onCookies?: () => Promise<voi
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const web = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const network = load('../app/api/v1/network/patients/[id]/profile-query/route.ts') as typeof import('../app/api/v1/network/patients/[id]/profile-query/route');
+const writerWeb = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
+const writerNetwork = load('../app/api/v1/network/patients/[id]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/route');
 const epochWeb = load('../app/api/patient-profile/selection-epoch/route.ts') as typeof import('../app/api/patient-profile/selection-epoch/route');
 const epochNetwork = load('../app/api/v1/network/patient-profile/selection-epoch/route.ts') as typeof import('../app/api/v1/network/patient-profile/selection-epoch/route');
 const { acquirePatientProfileQueryHostPort } = load('./security/patient-profile-query-host-port.ts') as typeof import('./security/patient-profile-query-host-port');
@@ -288,7 +290,7 @@ test('MCP contracts import directly in Node strip-only mode without a transform 
 for (const lane of ['web', 'network'] as const) test(`${lane}: scoped open, real PUT, epoch observation and explicit fresh readback`, async () => {
     reset(); if (lane === 'network') grant('ipados', ['network.replica.readonly-patients', 'network.replica.write-patient-profile']); select(lane);
     const initial = await (await query(lane, open(await epoch(lane)))).json() as ProfileResult;
-    const writer = load(lane === 'web' ? '../app/api/patients/[id]/route.ts' : '../app/api/v1/network/patients/[id]/route.ts');
+    const writer = lane === 'web' ? writerWeb : writerNetwork;
     const base = request(lane); const req = new Request(base.url, { method: 'PUT', headers: base.headers,
         body: JSON.stringify({ version: initial.currentness.revision, notes: 'ENC:aXY=:dXBkYXRlZA==' }) });
     const update = await writer.PUT(req, { params: Promise.resolve({ id: patientA }) });
