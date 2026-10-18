@@ -70,7 +70,6 @@ const CLINICAL_COMPONENT_NAMES = new Set([
   'ai-patient-insight',
   'treatment-reasoning-panel',
   'pdf-importer',
-  'evidence-stack-tile',
 ]);
 const CLINICAL_COMPONENT_PREFIXES = [
   'patient-',
