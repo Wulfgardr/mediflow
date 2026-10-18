@@ -9,6 +9,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import { checkNode, knownMainUpdates, openUrl, probeRunningInstance, readProductIdentity, waitForRunningInstance } from './launcher-helpers.mjs';
 import { verifySourceRuntime } from './source-runtime.mjs';
+import { macDerivedDataDirectory } from './build-input-metadata.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
 import { prepareLauncherState } from './launcher-state.mjs';
 
@@ -79,7 +80,7 @@ function readJson(file) {
 
 function nativeApplication(root) {
   if (process.platform !== 'darwin') return null;
-  const app = path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA || path.join(root, 'tmp-mac-derived-data'),
+  const app = path.join(macDerivedDataDirectory(root),
     'Build/Products', process.env.MEDIFLOW_MAC_CONFIG || 'Debug', 'MediFlow.app');
   const binary = path.join(app, 'Contents/MacOS/MediFlow');
   return fs.existsSync(binary) ? binary : null;

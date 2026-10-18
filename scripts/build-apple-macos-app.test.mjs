@@ -28,7 +28,7 @@ function dependencies(web) {
   ]) write(path.join(web, file), code + '\n');
   write(path.join(web, 'node_modules/sharp/node_modules/semver/bin/semver.js'), '// safe non-native link target\n');
   fs.mkdirSync(path.join(web, 'node_modules/sharp/node_modules/.bin'));
-  fs.symlinkSync('../semver/bin/semver.js', path.join(web, 'node_modules/sharp/node_modules/.bin/semver'));
+  fs.copyFileSync(path.join(web, 'node_modules/sharp/node_modules/semver/bin/semver.js'), path.join(web, 'node_modules/sharp/node_modules/.bin/semver'));
 }
 
 const driver = String.raw`
@@ -59,7 +59,7 @@ switch (command) {
   case 'generate': case 'structure-guard': case 'entitlement-guard': case 'record-stager': break;
   case 'scheduled-backup-order-only':
     if (args.length !== 2 || args[0] !== '--runtime-root'
-      || target !== path.join(root, 'derived/Build/Products', process.env.MEDIFLOW_MAC_CONFIG, 'MediFlow.app/Contents/Resources/WebRuntime')
+      || target !== path.join(process.env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products', process.env.MEDIFLOW_MAC_CONFIG, 'MediFlow.app/Contents/Resources/WebRuntime')
       || !fs.existsSync(path.join(target, 'server.js'))) throw new Error('Scheduled backup check did not target the copied WebRuntime');
     if (process.env.MEDIFLOW_PACKAGING_TEST_BACKUP_REJECT === '1') throw new Error('Synthetic scheduled backup closure rejection');
     break; // Call order and failure propagation only; the real import closure has dedicated tests.
@@ -72,6 +72,11 @@ switch (command) {
     const plist = path.join(fixture.contents, 'Info.plist');
     fs.writeFileSync(plist, fs.readFileSync(plist, 'utf8').replace('</dict></plist>', '<key>CFBundleIdentifier</key><string>com.mediflow.mobile</string><key>CFBundleURLTypes</key><array><dict><key>CFBundleURLSchemes</key><array><string>mediflow</string></array></dict></array><key>LSEnvironment</key><dict><key>EXISTING_NATIVE_ENV</key><string>preserve-me</string></dict></dict></plist>'));
     if (process.env.MEDIFLOW_PACKAGING_TEST_MUTATE_CHECKOUT === '1') fs.appendFileSync(path.join(root, 'package.json'), '\n');
+    if (process.env.MEDIFLOW_PACKAGING_TEST_NATIVE_OVERLAY) {
+      const target = path.join(fixture.web, process.env.MEDIFLOW_PACKAGING_TEST_NATIVE_OVERLAY);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.symlinkSync(process.env.MEDIFLOW_PACKAGING_TEST_NATIVE_OVERLAY_TARGET, target);
+    }
     console.log('SYNTHETIC Xcode stub, no compilation'); break;
   }
   case 'lipo':
@@ -117,7 +122,7 @@ switch (command) {
 
 function buildFixture(t) {
   const input = fixture(t), root = path.join(input.directory, 'repo with spaces');
-  for (const file of ['package.json', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
+  for (const file of ['package.json', 'scripts/build-input-metadata.mjs', 'scripts/build-apple-macos-app.sh', 'scripts/macos-native-artifact.py', 'scripts/check-macos-web-runtime-native-payload.sh',
     'scripts/stage-chatgpt-execution-mac-assets.ts', 'scripts/run-strip-types.mjs',
     'scripts/native-first-install.mjs', 'scripts/native-first-install-contract.json', 'scripts/launcher-helpers.mjs', 'scripts/node-runtime-contract.mjs',
     'scripts/fixtures/mac-packaging-test-loader.mjs', 'scripts/fixtures/mac-packaging-test-support.mjs',
@@ -170,7 +175,7 @@ fi
 exec "${process.execPath}" "$@"
 `, 0o755);
   const env = { ...process.env, NODE_OPTIONS: '', PATH: `${bin}:${process.env.PATH}`, DEVELOPER_DIR: path.join(root, 'synthetic-Xcode'),
-    MEDIFLOW_SKIP_WEB_BUILD: '1', MEDIFLOW_NEXT_DIST_DIR: '.next', MEDIFLOW_MAC_CONFIG: 'Debug', MEDIFLOW_MAC_DERIVED_DATA: path.join(root, 'derived'),
+    MEDIFLOW_SKIP_WEB_BUILD: '1', MEDIFLOW_NEXT_DIST_DIR: '.next', MEDIFLOW_MAC_CONFIG: 'Debug', MEDIFLOW_MAC_DERIVED_DATA: path.join(input.directory, 'derived'),
     MEDIFLOW_PACKAGING_TEST_ROOT: root, MEDIFLOW_PACKAGING_TEST_PINS: 'synthetic-only', MEDIFLOW_CODESIGN_IDENTITY: '',
     MEDIFLOW_CHATGPT_EXECUTION_BINARY: input.binary, MEDIFLOW_CHATGPT_EXECUTION_NATIVE_SOURCE: input.nativeSource,
     MEDIFLOW_CHATGPT_EXECUTION_SCHEMA_DIRECTORY: input.schemaDirectory, MEDIFLOW_CHATGPT_EXECUTION_C1_RECEIPT: input.c1Receipt };
@@ -198,7 +203,7 @@ exec "${process.execPath}" "$@"
   write(path.join(root, '.next/BUILD_ID'), `${buildId}\n`);
   write(path.join(web, '.next/BUILD_ID'), `${buildId}\n`);
   write(path.join(web, 'mediflow-build-identity.json'), `${JSON.stringify({ schemaVersion: 1, ...identity, buildId })}\n`);
-  return { ...input, root, bin, env, web, identity, buildId, expectedRevision: gitProbe.stdout.trim(), app: path.join(root, 'derived/Build/Products/Debug/MediFlow.app'),
+  return { ...input, root, bin, env, web, identity, buildId, expectedRevision: gitProbe.stdout.trim(), app: path.join(env.MEDIFLOW_MAC_DERIVED_DATA, 'Build/Products/Debug/MediFlow.app'),
     run(overrides = {}) { return spawnSync('bash', [path.join(root, 'scripts/build-apple-macos-app.sh')], { cwd: root, encoding: 'utf8', env: { ...env, ...overrides }, timeout: 180_000, maxBuffer: 1024 * 1024 }); },
     events() { const file = path.join(root, 'events.jsonl'); return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : []; } };
 }
@@ -443,7 +448,7 @@ test('helper architecture rejection stops packaging before dependency rewriting 
   assert.equal(input.events().some(e => e.command === 'install_name_tool' || e.command === 'codesign' && e.args[0] === '--force'), false);
 });
 for (const overlay of ['.next', '.next/static', 'public']) {
-  test(`copied ${overlay} overlay symlink is rejected before writing through it`, t => {
+  test(`source ${overlay} overlay symlink is rejected at metadata admission before writing through it`, t => {
     const input = buildFixture(t), outside = path.join(input.directory, 'unrelated-overlay');
     write(path.join(outside, 'sentinel.txt'), 'must stay unchanged\n');
     // keep identity valid so the overlay guard, not a missing BUILD_ID, denies this fixture.
@@ -451,8 +456,18 @@ for (const overlay of ['.next', '.next/static', 'public']) {
     const link = path.join(input.web, overlay); fs.rmSync(link, { recursive: true, force: true }); fs.mkdirSync(path.dirname(link), { recursive: true });
     fs.symlinkSync(outside, link);
     const before = snapshot(outside), result = input.run();
-    deny(result); assert.match(result.stderr, /Nonphysical app directory/);
+    deny(result); assert.match(result.stderr, /Build input metadata: materialized payload contains an alias/u);
     assert.deepEqual(snapshot(outside), before);
+    assert.equal(input.events().some(e => e.command === 'record-stager' && e.args.includes('--relocate-bundle')), false);
+  });
+  test(`native destination ${overlay} overlay symlink still exercises the specific destination guard`, t => {
+    const input = buildFixture(t), outside = path.join(input.directory, 'unrelated-overlay');
+    write(path.join(outside, 'sentinel.txt'), 'must stay unchanged\n');
+    const before = snapshot(outside);
+    const result = input.run({ MEDIFLOW_PACKAGING_TEST_NATIVE_OVERLAY: overlay, MEDIFLOW_PACKAGING_TEST_NATIVE_OVERLAY_TARGET: outside });
+    deny(result); assert.match(result.stderr, /Nonphysical app directory/u);
+    assert.deepEqual(snapshot(outside), before);
+    assert.equal(input.events().some(e => e.command === 'xcodebuild'), true);
     assert.equal(input.events().some(e => e.command === 'record-stager' && e.args.includes('--relocate-bundle')), false);
   });
 }
@@ -475,4 +490,40 @@ test('a pre-existing native first-install symlink is rejected before Xcode or an
   deny(result); assert.match(result.stderr, /Nonphysical native first-install destination/);
   assert.deepEqual(fs.readFileSync(outside), before);
   assert.equal(input.events().length, 0);
+});
+
+for (const [profile, relative] of [['source', 'nested/archive.DB-WAL'], ['dependencies', 'node_modules/synthetic/archive.sqlite3-shm'], ['reused payload', '.next/standalone/nested/archive.db-journal']]) {
+  test(`${profile} metadata rejects before compiler, native importer or runtime copier`, t => {
+    const input = buildFixture(t);
+    write(path.join(input.root, relative), 'SYNTHETIC PROTECTED INPUT\n');
+    const result = input.run();
+    deny(result);
+    assert.match(result.stderr, /Build input metadata:/u);
+    assert.deepEqual(input.events(), []);
+    assert.equal(fs.existsSync(input.app), false);
+  });
+}
+
+test('internal DerivedData override is rejected before compiler or copier', t => {
+  const input = buildFixture(t);
+  const result = input.run({ MEDIFLOW_MAC_DERIVED_DATA: path.join(input.root, 'derived') });
+  deny(result); assert.match(result.stderr, /DerivedData must be outside/u);
+  assert.deepEqual(input.events(), []);
+});
+
+test('default external DerivedData supports two unsigned synthetic packaging builds', t => {
+  const input = buildFixture(t), home = path.join(input.directory, 'home');
+  pass(input.run({ MEDIFLOW_MAC_DERIVED_DATA: undefined, HOME: home }));
+  pass(input.run({ MEDIFLOW_MAC_DERIVED_DATA: undefined, HOME: home }));
+  assert.equal(input.events().filter(e => e.command === 'xcodebuild').length, 2);
+  assert.equal(fs.existsSync(path.join(input.root, 'tmp-mac-derived-data')), false);
+});
+
+test('reuse requires an already materialized payload before compiler or copier', t => {
+  const input = buildFixture(t);
+  fs.symlinkSync(path.join(input.web, 'server.js'), path.join(input.web, 'contained-alias.js'));
+  const result = input.run();
+  deny(result); assert.match(result.stderr, /materialized payload contains an alias/u);
+  assert.deepEqual(input.events(), []);
+  assert.equal(fs.existsSync(input.app), false);
 });
