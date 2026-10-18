@@ -4405,15 +4405,9 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         isTerminologySearchAvailable = true
     }
 
-    // ADR 0071 Fase 3: returns the data-source SEAM (any HomeBasePatientsDataSource),
-    // not the concrete HTTP actor, so the implementation can be swapped for the
-    // in-process SQLite-backed adapter without touching the call sites.
-    //
-    // Opt-in local authority (MEDIFLOW_LOCAL_AUTHORITY): when enabled AND the field
-    // key is unlocked, patient list/detail are served from the on-device medical.db
-    // via LocalPatientsDataSource (the reversed-flow read path drives the app);
-    // everything else still delegates to the HTTP client. OFF by default -> the app's
-    // behavior is unchanged unless the flag is set.
+    // ADR 0071: the opt-in adapter retains local list/create and clinical
+    // sub-resource operations. Profile detail and UPDATE always use the HTTP
+    // service. Local authority remains off by default and requires an unlocked key.
     private func makeClient() -> any HomeBasePatientsDataSource {
         if let dataSourceFactory {
             return dataSourceFactory(self)

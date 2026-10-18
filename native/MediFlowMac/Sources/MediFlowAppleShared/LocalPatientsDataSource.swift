@@ -1,19 +1,10 @@
 import Crypto
 import Foundation
 
-// ADR 0071 Fase 3 (Codex-directed): the in-process local-authority adapter. A serial
-// `actor` so the synchronous SQLite reads/writes run off the MainActor. Serves
-// in-process, straight from the on-device medical.db: patient list/detail (slice 2),
-// patient UPDATE (slice 3), clinical list reads for all 4 sub-resources (slice 4), and
-// clinical create/update for all 4 sub-resources (slice 5) - every write path uses
-// sealOrPassthrough (SQLitePatientStore + SQLiteClinicalStore.AssignmentBuilder) so
-// the model's pre-sealed HTTP payloads are never double-encrypted. Only login,
-// ambulatories, and unscoped operations still delegate to the HTTP `fallback`. The
-// masterKey crosses only Swift call frames inside the app process (no FFI / loopback /
-// IPC), per the KeyStore rule. Every local write/read needs a non-empty ambulatoryId
-// scope (joined against the patients_to_ambulatories membership); without one, the
-// call falls back to HTTP (matching the web, which resolves the default scope
-// server-side - a capability the local store does not have).
+// ADR 0071: the optional local adapter keeps the existing list, create and
+// clinical sub-resource paths. Profile detail and UPDATE use the admitted host
+// service even when a local archive and unlocked key are available. HTTP errors
+// never trigger a second local attempt. Keys remain inside the app process.
 public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     private let patientStore: SQLitePatientStore
     private let clinicalStore: SQLiteClinicalStore
@@ -42,13 +33,8 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
     public func fetchPatient(
         id: String, credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBasePatientDetail {
-        // Preserve raw ENC parity with the HTTP data source. The workspace model owns
-        // decrypt-or-lock resolution so failed decrypts cannot be collapsed to nil.
-        let scope = ambulatoryId?.isEmpty == false ? ambulatoryId : nil
-        guard let detail = try patientStore.loadRawPatientDetail(id: id, scopeAmbulatoryId: scope) else {
-            throw HomeBaseClientError.httpStatus(404, "Not found")  // 1:1 with the HTTP 404
-        }
-        return detail
+        try await fallback.fetchPatient(
+            id: id, credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
     // MARK: Delegated to HTTP when local authority cannot serve the operation
@@ -196,22 +182,14 @@ public actor LocalPatientsDataSource: HomeBasePatientsDataSource {
             credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
-    // Local patient WRITE (Fase 3 slice 3). The model pre-seals the payload for HTTP;
-    // SQLitePatientStore now uses sealOrPassthrough, so authenticated ciphertext passes
-    // through verbatim (no double-encryption). Needs a scope; falls back to HTTP when
-    // none is given (the web resolves the default scope server-side). Outcomes map to
-    // the same errors the model already handles (versionConflict / httpStatus).
+    // The profile pilot has one host commit path, including its required audit.
     public func updatePatient(
         patientId: String, payload: HomeBasePatientUpdatePayload,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
     ) async throws -> HomeBaseMutationAcknowledgement {
-        guard let scope = ambulatoryId, !scope.isEmpty else {
-            return try await fallback.updatePatient(
-                patientId: patientId, payload: payload, credentials: credentials,
-                sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
-        }
-        return try mapped(try patientStore.updatePatient(
-            id: patientId, scopeAmbulatoryId: scope, payload: payload, masterKey: masterKey))
+        try await fallback.updatePatient(
+            patientId: patientId, payload: payload, credentials: credentials,
+            sessionCookie: sessionCookie, ambulatoryId: ambulatoryId)
     }
 
     // Local patient CREATE (ADR 0071). No paired wire peer exists, so this is the ONLY
