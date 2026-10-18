@@ -8,6 +8,7 @@ mod crypto;
 mod dto;
 mod error;
 mod http;
+mod profile_query;
 mod session;
 mod tls;
 
@@ -15,7 +16,8 @@ pub use catalogs::*;
 pub use dto::*;
 pub use error::{Result, RuntimeError};
 pub use http::{PairingCredentials, RuntimeClient, RuntimeConfig};
-pub use session::RuntimeSession;
+pub use profile_query::{ProfileCurrentness, ProfileProjection};
+pub use session::{ProfileQueryIntent, RuntimeSession};
 
 pub(crate) const MAX_SAFE_VERSION: u64 = 9_007_199_254_740_991;
 

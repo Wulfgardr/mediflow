@@ -88,6 +88,7 @@ fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
         RuntimeError::ReadRequired => "read-required",
         RuntimeError::Busy => "busy",
         RuntimeError::TooLarge => "too-large",
+        RuntimeError::ProfileTooLarge => "profile-too-large",
         RuntimeError::Crypto => "crypto",
         RuntimeError::InvalidResponse => "invalid-response",
         RuntimeError::Transport => "transport",

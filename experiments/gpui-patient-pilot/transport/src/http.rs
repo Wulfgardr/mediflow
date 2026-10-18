@@ -106,6 +106,7 @@ impl RuntimeClient {
             None,
             false,
             AUTH_LIMIT,
+            None,
         )?;
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -159,6 +160,7 @@ impl RuntimeClient {
             Some(&body),
             false,
             AUTH_LIMIT,
+            None,
         )?;
         let cookie = session_cookie(&response.headers)?;
         #[derive(Deserialize)]
@@ -205,6 +207,7 @@ impl RuntimeClient {
                     None,
                     false,
                     AUTH_LIMIT,
+                    None,
                 );
                 Err(error)
             }
@@ -223,6 +226,7 @@ impl RuntimeClient {
         body: Option<&Value>,
         mutation: bool,
         limit: usize,
+        archive_generation: Option<&str>,
     ) -> Result<Value> {
         let encoded = body
             .map(serde_json::to_vec)
@@ -242,6 +246,7 @@ impl RuntimeClient {
             encoded.as_deref().map(Vec::as_slice),
             mutation,
             limit,
+            archive_generation,
         )?;
         if response.body.is_empty() {
             return Ok(Value::Null);
@@ -267,6 +272,7 @@ impl RuntimeClient {
         body: Option<&[u8]>,
         mutation: bool,
         limit: usize,
+        archive_generation: Option<&str>,
     ) -> Result<RawResponse> {
         let url = self.endpoint(path, query)?;
         let mut headers = HeaderMap::new();
@@ -282,6 +288,13 @@ impl RuntimeClient {
             "x-mediflow-source-surface",
             HeaderValue::from_static("native"),
         );
+        if let Some(generation) = archive_generation {
+            validate_id(generation)?;
+            headers.insert(
+                "x-mediflow-archive-generation",
+                sensitive_header(generation)?,
+            );
+        }
         headers.insert("cache-control", HeaderValue::from_static("no-store"));
         headers.insert("accept", HeaderValue::from_static("application/json"));
         if let Some(scope) = scope {
