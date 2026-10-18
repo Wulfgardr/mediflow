@@ -32,6 +32,7 @@ struct SessionInner {
     secrets: Mutex<SessionSecrets>,
     reads: Mutex<HashMap<ReadKey, ReadReceipt>>,
     profile_reads: Mutex<HashMap<ReadKey, ProfileLease>>,
+    profile_selection: Mutex<Option<Arc<ProfileSelection>>>,
     scopes: Mutex<HashSet<String>>,
     capabilities: Mutex<HashSet<String>>,
 }
@@ -47,8 +48,21 @@ struct ReadKey {
     domain: String,
     id: String,
 }
+struct ProfileSelection {
+    target: Mutex<ProfileSelectionTarget>,
+    host_epoch: AtomicU64,
+}
+enum ProfileSelectionTarget {
+    Patient { scope: String, patient: String },
+    Creating { scope: String },
+}
+struct ProfileReadBinding {
+    selection: Weak<ProfileSelection>,
+    selection_epoch: u64,
+    deadline: Instant,
+}
 struct ReadReceipt {
-    deadline: Option<Instant>,
+    profile: Option<ProfileReadBinding>,
     version: u64,
     locked: Vec<String>,
 }
@@ -60,6 +74,7 @@ struct ReadResponse {
 pub struct ProfileQueryIntent {
     owner: Weak<SessionInner>,
     active: Arc<Mutex<bool>>,
+    selection: Option<Arc<ProfileSelection>>,
 }
 impl ProfileQueryIntent {
     pub fn cancel(&self) {
@@ -128,6 +143,7 @@ impl RuntimeSession {
                 }),
                 reads: Mutex::new(HashMap::new()),
                 profile_reads: Mutex::new(HashMap::new()),
+                profile_selection: Mutex::new(None),
                 scopes: Mutex::new(HashSet::new()),
                 capabilities: Mutex::new(HashSet::new()),
             }),
@@ -203,6 +219,7 @@ impl RuntimeSession {
         if let Ok(mut secrets) = self.inner.secrets.lock() {
             secrets.master.take();
         }
+        self.clear_profile_selection();
         if let Ok(mut reads) = self.inner.reads.lock() {
             reads.clear();
         }
@@ -372,6 +389,15 @@ impl RuntimeSession {
         if result.as_ref().is_err_and(|error| error.is_auth_failure()) {
             self.lock();
         }
+        if let Some(intent) = intent
+            && self.profile_intent_guard(intent).is_err()
+        {
+            return Err(if mutation {
+                RuntimeError::Indeterminate
+            } else {
+                RuntimeError::ReadRequired
+            });
+        }
         result
     }
 
@@ -446,10 +472,131 @@ impl RuntimeSession {
         Ok(rows)
     }
 
+    fn select_profile_target(&self, target: ProfileSelectionTarget) -> Result<()> {
+        self.ensure_open()?;
+        let mut current = self
+            .inner
+            .profile_selection
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        self.ensure_open()?;
+        self.inner
+            .reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?
+            .retain(|key, _| key.domain != "patients");
+        self.inner
+            .profile_reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?
+            .clear();
+        *current = Some(Arc::new(ProfileSelection {
+            target: Mutex::new(target),
+            host_epoch: AtomicU64::new(0),
+        }));
+        Ok(())
+    }
+
+    pub fn select_profile_patient(&self, scope: &str, patient: &str) -> Result<()> {
+        validate_scope_id(scope)?;
+        validate_id(patient)?;
+        self.select_profile_target(ProfileSelectionTarget::Patient {
+            scope: scope.to_owned(),
+            patient: patient.to_owned(),
+        })
+    }
+
+    pub fn begin_profile_creation(&self, scope: &str) -> Result<()> {
+        validate_scope_id(scope)?;
+        self.select_profile_target(ProfileSelectionTarget::Creating {
+            scope: scope.to_owned(),
+        })
+    }
+
+    pub fn clear_profile_selection(&self) {
+        if let Ok(mut current) = self.inner.profile_selection.lock() {
+            current.take();
+            if let Ok(mut reads) = self.inner.reads.lock() {
+                reads.retain(|key, _| key.domain != "patients");
+            }
+            if let Ok(mut profiles) = self.inner.profile_reads.lock() {
+                profiles.clear();
+            }
+        }
+    }
+
+    pub fn bind_created_profile(
+        &self,
+        scope: &str,
+        patient: &str,
+        intent: &ProfileQueryIntent,
+    ) -> Result<()> {
+        validate_scope_id(scope)?;
+        validate_id(patient)?;
+        let _intent = self.profile_intent_guard(intent)?;
+        let current = self
+            .inner
+            .profile_selection
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let selected = current.as_ref().ok_or(RuntimeError::ReadRequired)?;
+        if intent
+            .selection
+            .as_ref()
+            .is_none_or(|selection| !Arc::ptr_eq(selection, selected))
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let mut target = selected.target.lock().map_err(|_| RuntimeError::Locked)?;
+        if !matches!(&*target, ProfileSelectionTarget::Creating { scope: expected } if expected == scope)
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        *target = ProfileSelectionTarget::Patient {
+            scope: scope.to_owned(),
+            patient: patient.to_owned(),
+        };
+        Ok(())
+    }
+
+    fn profile_target_matches(
+        &self,
+        intent: &ProfileQueryIntent,
+        scope: &str,
+        patient: &str,
+    ) -> Result<()> {
+        let current = self
+            .inner
+            .profile_selection
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let selected = current.as_ref().ok_or(RuntimeError::ReadRequired)?;
+        if intent
+            .selection
+            .as_ref()
+            .is_none_or(|selection| !Arc::ptr_eq(selection, selected))
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let target = selected.target.lock().map_err(|_| RuntimeError::Locked)?;
+        if !matches!(&*target, ProfileSelectionTarget::Patient { scope: expected_scope, patient: expected_patient }
+            if expected_scope == scope && expected_patient == patient)
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(())
+    }
+
     pub fn profile_query_intent(&self) -> ProfileQueryIntent {
         ProfileQueryIntent {
             owner: Arc::downgrade(&self.inner),
             active: Arc::new(Mutex::new(true)),
+            selection: self
+                .inner
+                .profile_selection
+                .lock()
+                .ok()
+                .and_then(|current| current.clone()),
         }
     }
 
@@ -472,6 +619,19 @@ impl RuntimeSession {
         if !*guard {
             return Err(RuntimeError::ReadRequired);
         }
+        let current = self
+            .inner
+            .profile_selection
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        if current.as_ref().is_none_or(|current| {
+            intent
+                .selection
+                .as_ref()
+                .is_none_or(|selected| !Arc::ptr_eq(current, selected))
+        }) {
+            return Err(RuntimeError::ReadRequired);
+        }
         Ok(guard)
     }
 
@@ -489,6 +649,7 @@ impl RuntimeSession {
         validate_id(patient_id)?;
         let epoch = self.inner.read_epoch.load(Ordering::Acquire);
         self.check_profile_intent(intent, epoch)?;
+        self.profile_target_matches(intent, scope, patient_id)?;
         let value = self.request_with_profile_intent(
             Method::GET,
             &["api", "v1", "network", "patient-profile", "selection-epoch"],
@@ -529,6 +690,7 @@ impl RuntimeSession {
         validate_id(patient_id)?;
         let epoch = self.inner.read_epoch.load(Ordering::Acquire);
         self.check_profile_intent(intent, epoch)?;
+        self.profile_target_matches(intent, scope, patient_id)?;
         let key = read_key(scope, patient_id, "patients", patient_id);
         let lease = self
             .inner
@@ -628,27 +790,52 @@ impl RuntimeSession {
             response.lease.currentness,
             locked.clone(),
         )?;
+        self.remember_profile(epoch, scope, patient_id, intent, response.lease, locked)?;
+        Ok(row)
+    }
+
+    fn remember_profile(
+        &self,
+        epoch: u64,
+        scope: &str,
+        patient: &str,
+        intent: &ProfileQueryIntent,
+        lease: ProfileLease,
+        locked: Vec<String>,
+    ) -> Result<()> {
         let _intent = self.profile_intent_guard(intent)?;
-        if Instant::now() >= response.lease.deadline {
+        let current = self
+            .inner
+            .profile_selection
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let selected = current.as_ref().ok_or(RuntimeError::ReadRequired)?;
+        if intent
+            .selection
+            .as_ref()
+            .is_none_or(|selection| !Arc::ptr_eq(selection, selected))
+        {
             return Err(RuntimeError::ReadRequired);
         }
+        let target = selected.target.lock().map_err(|_| RuntimeError::Locked)?;
+        if !matches!(&*target, ProfileSelectionTarget::Patient { scope: expected_scope, patient: expected_patient }
+            if expected_scope == scope && expected_patient == patient)
         {
-            let mut reads = self.inner.reads.lock().map_err(|_| RuntimeError::Locked)?;
-            self.check_read_epoch(epoch)?;
-            if reads.get(&key).is_some_and(|old| old.version > row.version) {
-                return Err(RuntimeError::ReadRequired);
-            }
-            if reads.len() >= 2048 {
-                reads.clear();
-            }
-            reads.insert(
-                read_key(scope, patient_id, "patients", patient_id),
-                ReadReceipt {
-                    version: row.version,
-                    locked,
-                    deadline: Some(response.lease.deadline),
-                },
-            );
+            return Err(RuntimeError::ReadRequired);
+        }
+        if Instant::now() >= lease.deadline
+            || lease.currentness.selection_epoch < selected.host_epoch.load(Ordering::Acquire)
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let key = read_key(scope, patient, "patients", patient);
+        let mut reads = self.inner.reads.lock().map_err(|_| RuntimeError::Locked)?;
+        self.check_read_epoch(epoch)?;
+        if reads
+            .get(&key)
+            .is_some_and(|old| old.version > lease.currentness.revision)
+        {
+            return Err(RuntimeError::ReadRequired);
         }
         let mut profiles = self
             .inner
@@ -656,15 +843,33 @@ impl RuntimeSession {
             .lock()
             .map_err(|_| RuntimeError::Locked)?;
         self.check_read_epoch(epoch)?;
+        if reads.len() >= 2048 {
+            reads.clear();
+        }
         if profiles.len() >= 2048 {
             profiles.clear();
         }
-        profiles.insert(key, response.lease);
-        self.ensure_open()?;
-        Ok(row)
+        selected
+            .host_epoch
+            .store(lease.currentness.selection_epoch, Ordering::Release);
+        reads.insert(
+            read_key(scope, patient, "patients", patient),
+            ReadReceipt {
+                version: lease.currentness.revision,
+                locked,
+                profile: Some(ProfileReadBinding {
+                    selection: Arc::downgrade(selected),
+                    selection_epoch: lease.currentness.selection_epoch,
+                    deadline: lease.deadline,
+                }),
+            },
+        );
+        profiles.insert(key, lease);
+        Ok(())
     }
 
-    pub fn read_patient(&self, scope: &str, patient_id: &str) -> Result<PatientDetail> {
+    /// Compatibility display only; this GET never installs a profile write receipt.
+    pub fn read_patient_legacy(&self, scope: &str, patient_id: &str) -> Result<PatientDetail> {
         validate_id(patient_id)?;
         let response = self.read_json(
             Some(scope),
@@ -682,15 +887,7 @@ impl RuntimeSession {
             return Err(RuntimeError::Missing);
         }
         row.locked_fields = locked.clone();
-        self.remember(
-            response.epoch,
-            scope,
-            patient_id,
-            "patients",
-            &row.id,
-            row.version,
-            locked,
-        )?;
+        self.check_read_epoch(response.epoch)?;
         self.ensure_open()?;
         Ok(row)
     }
@@ -753,6 +950,7 @@ impl RuntimeSession {
             .copied()
             .filter(|field| body.get(*field).is_some())
             .collect();
+        let intent = self.profile_query_intent();
         let _guard = self.begin_write()?;
         self.require_read(
             scope,
@@ -765,10 +963,11 @@ impl RuntimeSession {
         let mut body = self.seal_fields(body, &changed_sensitive)?;
         body["version"] = json!(version);
         self.forget(scope, patient_id, "patients", patient_id)?;
-        self.update(
+        self.update_with_profile_intent(
             scope,
             &["api", "v1", "network", "patients", patient_id],
             body,
+            Some(&intent),
         )
     }
 
@@ -779,6 +978,7 @@ impl RuntimeSession {
         version: u64,
         notes: &str,
     ) -> Result<()> {
+        let intent = self.profile_query_intent();
         let _guard = self.begin_write()?;
         self.require_read(
             scope,
@@ -790,10 +990,11 @@ impl RuntimeSession {
         )?;
         let body = self.seal_fields(json!({ "version": version, "notes": notes }), &["notes"])?;
         self.forget(scope, patient_id, "patients", patient_id)?;
-        self.update(
+        self.update_with_profile_intent(
             scope,
             &["api", "v1", "network", "patients", patient_id],
             body,
+            Some(&intent),
         )
     }
 
@@ -1332,6 +1533,9 @@ impl RuntimeSession {
         version: u64,
         locked: Vec<String>,
     ) -> Result<()> {
+        if domain == "patients" {
+            return Err(RuntimeError::ReadRequired);
+        }
         let mut reads = self.inner.reads.lock().map_err(|_| RuntimeError::Locked)?;
         self.check_read_epoch(epoch)?;
         if reads.len() >= 2048 {
@@ -1346,7 +1550,7 @@ impl RuntimeSession {
             reads.insert(
                 key,
                 ReadReceipt {
-                    deadline: None,
+                    profile: None,
                     version,
                     locked,
                 },
@@ -1367,16 +1571,55 @@ impl RuntimeSession {
         validate_id(patient)?;
         validate_id(id)?;
         validate_version(version)?;
+        let selection = if domain == "patients" {
+            Some(
+                self.inner
+                    .profile_selection
+                    .lock()
+                    .map_err(|_| RuntimeError::Locked)?,
+            )
+        } else {
+            None
+        };
         let reads = self.inner.reads.lock().map_err(|_| RuntimeError::Locked)?;
         let receipt = reads
             .get(&read_key(scope, patient, domain, id))
             .ok_or(RuntimeError::ReadRequired)?;
-        if receipt.version != version
-            || receipt
-                .deadline
-                .is_some_and(|deadline| Instant::now() >= deadline)
-        {
+        if receipt.version != version {
             return Err(RuntimeError::ReadRequired);
+        }
+        if let Some(selection) = selection.as_ref() {
+            let selected = selection.as_ref().ok_or(RuntimeError::ReadRequired)?;
+            let binding = receipt.profile.as_ref().ok_or(RuntimeError::ReadRequired)?;
+            if binding
+                .selection
+                .upgrade()
+                .is_none_or(|owner| !Arc::ptr_eq(&owner, selected))
+                || binding.selection_epoch != selected.host_epoch.load(Ordering::Acquire)
+                || Instant::now() >= binding.deadline
+            {
+                return Err(RuntimeError::ReadRequired);
+            }
+            let target = selected.target.lock().map_err(|_| RuntimeError::Locked)?;
+            if !matches!(&*target, ProfileSelectionTarget::Patient { scope: expected_scope, patient: expected_patient }
+                if expected_scope == scope && expected_patient == patient && id == patient)
+            {
+                return Err(RuntimeError::ReadRequired);
+            }
+            let profiles = self
+                .inner
+                .profile_reads
+                .lock()
+                .map_err(|_| RuntimeError::Locked)?;
+            let lease = profiles
+                .get(&read_key(scope, patient, domain, id))
+                .ok_or(RuntimeError::ReadRequired)?;
+            if lease.currentness.selection_epoch != binding.selection_epoch
+                || lease.currentness.revision != version
+                || Instant::now() >= lease.deadline
+            {
+                return Err(RuntimeError::ReadRequired);
+            }
         }
         if receipt
             .locked
@@ -1556,7 +1799,16 @@ impl RuntimeSession {
         Ok(created)
     }
     fn update(&self, scope: &str, path: &[&str], body: Value) -> Result<()> {
-        let response = self.request(
+        self.update_with_profile_intent(scope, path, body, None)
+    }
+    fn update_with_profile_intent(
+        &self,
+        scope: &str,
+        path: &[&str],
+        body: Value,
+        intent: Option<&ProfileQueryIntent>,
+    ) -> Result<()> {
+        let response = self.request_with_profile_intent(
             Method::PUT,
             path,
             &[],
@@ -1564,6 +1816,7 @@ impl RuntimeSession {
             Some(&body),
             true,
             JSON_LIMIT,
+            intent,
         )?;
         if response.get("success").and_then(Value::as_bool) != Some(true) {
             return Err(RuntimeError::Indeterminate);
@@ -1692,6 +1945,50 @@ mod tests {
         thread,
         time::Duration,
     };
+    impl RuntimeSession {
+        #[allow(clippy::too_many_arguments)]
+        fn fixture_read(
+            &self,
+            epoch: u64,
+            scope: &str,
+            patient: &str,
+            domain: &str,
+            id: &str,
+            version: u64,
+            locked: Vec<String>,
+        ) -> Result<()> {
+            if domain != "patients" {
+                return self.remember(epoch, scope, patient, domain, id, version, locked);
+            }
+            self.check_read_epoch(epoch)?;
+            let pending = self.profile_query_intent();
+            if self
+                .profile_target_matches(&pending, scope, patient)
+                .is_err()
+            {
+                self.select_profile_patient(scope, patient)?;
+            }
+            let intent = self.profile_query_intent();
+            self.remember_profile(
+                epoch,
+                scope,
+                patient,
+                &intent,
+                ProfileLease {
+                    handle: Zeroizing::new(format!("pph_{}", "a".repeat(64))),
+                    currentness: ProfileCurrentness {
+                        revision: version,
+                        selection_epoch: 3,
+                        observed_at: 1000,
+                        expires_at: 61000,
+                    },
+                    deadline: Instant::now() + Duration::from_secs(60),
+                },
+                locked,
+            )
+        }
+    }
+
     fn session() -> RuntimeSession {
         session_at("http://127.0.0.1:43181")
     }
@@ -1760,7 +2057,7 @@ mod tests {
         let first = session();
         let second = session();
         first
-            .remember(
+            .fixture_read(
                 0,
                 "scope-a",
                 "patient-a",
@@ -1814,17 +2111,18 @@ mod tests {
             ),
             Err(RuntimeError::ReadRequired)
         );
-        first
-            .remember(
+        assert_eq!(
+            first.fixture_read(
                 0,
                 "scope-a",
                 "patient-a",
                 "patients",
                 "patient-a",
                 1,
-                vec![],
-            )
-            .unwrap();
+                vec![]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
         assert!(
             first
                 .require_read(
@@ -1967,7 +2265,7 @@ mod tests {
     fn late_read_cannot_reinstall_the_consumed_write_prerequisite() {
         let session = session();
         session
-            .remember(
+            .fixture_read(
                 0,
                 "scope-a",
                 "patient-a",
@@ -1984,7 +2282,7 @@ mod tests {
         assert_eq!(session.check_read_epoch(0), Err(RuntimeError::ReadRequired));
         drop(guard);
         assert_eq!(
-            session.remember(
+            session.fixture_read(
                 0,
                 "scope-a",
                 "patient-a",
@@ -2007,7 +2305,7 @@ mod tests {
             Err(RuntimeError::ReadRequired)
         );
         session
-            .remember(
+            .fixture_read(
                 1,
                 "scope-a",
                 "patient-a",
@@ -2105,7 +2403,7 @@ mod tests {
             .unwrap()
             .insert("scope-a".into());
         session
-            .remember(
+            .fixture_read(
                 0,
                 "scope-a",
                 "patient-a",
@@ -2147,7 +2445,7 @@ mod tests {
         let session = session_at(&url);
         admit_fixture_read(&session);
         let clone = session.clone();
-        let worker = thread::spawn(move || clone.read_patient("scope-a", "patient-a"));
+        let worker = thread::spawn(move || clone.read_patient_legacy("scope-a", "patient-a"));
         assert!(
             seen.recv_timeout(Duration::from_secs(5))
                 .unwrap()
@@ -2235,7 +2533,7 @@ mod tests {
         }
         let session = session();
         session
-            .remember(
+            .fixture_read(
                 0,
                 "scope-a",
                 "patient-a",
@@ -2294,7 +2592,7 @@ mod tests {
             let session = session_at(&url);
             admit_fixture_read(&session);
             session
-                .remember(
+                .fixture_read(
                     0,
                     "scope-a",
                     "patient-a",
@@ -2589,6 +2887,9 @@ mod tests {
         let url = format!("http://{}", listener.local_addr().unwrap());
         let session = session_at(&url);
         session
+            .select_profile_patient("scope-a", "patient-a")
+            .unwrap();
+        session
             .inner
             .scopes
             .lock()
@@ -2722,6 +3023,11 @@ mod tests {
             .lock()
             .unwrap()
             .insert("scope-a".into());
+        if session.inner.profile_selection.lock().unwrap().is_none() {
+            session
+                .select_profile_patient("scope-a", "patient-a")
+                .unwrap();
+        }
         let intent = session.profile_query_intent();
         let pending = intent.clone();
         let clone = session.clone();
@@ -2846,7 +3152,10 @@ mod tests {
             .unwrap()
             .get_mut(&key)
             .unwrap()
-            .deadline = Some(Instant::now() - Duration::from_secs(1));
+            .profile
+            .as_mut()
+            .unwrap()
+            .deadline = Instant::now() - Duration::from_secs(1);
         assert!(matches!(
             session.read_patient_profile("scope-a", "patient-a", &intent),
             Err(RuntimeError::ReadRequired)
@@ -2948,6 +3257,11 @@ mod tests {
                 send_reply(&mut stream, &body);
             }
         });
+        if session.inner.profile_selection.lock().unwrap().is_none() {
+            session
+                .select_profile_patient("scope-a", "patient-a")
+                .unwrap();
+        }
         let intent = session.profile_query_intent();
         let pending = intent.clone();
         let clone = session.clone();
@@ -2963,5 +3277,254 @@ mod tests {
         server.join().unwrap();
         assert!(session.inner.reads.lock().unwrap().is_empty());
         assert!(session.inner.profile_reads.lock().unwrap().is_empty());
+    }
+    #[test]
+    fn completed_profile_legacy_read_keeps_enc_display_but_cannot_arm_a_scoped_write() {
+        let mut row = profile_wire(&session())["profile"].clone();
+        row["id"] = json!("patient-a");
+        row["version"] = json!(7);
+        let (session, _, _, _, server) = profile_script(
+            vec![(
+                "GET /api/v1/network/patients/patient-a ",
+                200,
+                row.to_string(),
+            )],
+            false,
+        );
+        let result = session.read_patient_legacy("scope-a", "patient-a").unwrap();
+        assert_eq!(result.notes.as_deref(), Some("synthetic notes"));
+        assert_eq!(result.id, "patient-a");
+        server.join().unwrap();
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+    }
+
+    #[test]
+    fn completed_profile_receipt_is_retired_after_opening_another_patient() {
+        let a = profile_wire(&session()).to_string();
+        let mut b = profile_wire(&session());
+        b["handle"] = json!(format!("pph_{}", "b".repeat(64)));
+        b["currentness"]["selectionEpoch"] = json!(4);
+        let (session, _, _, _, server) = profile_script(
+            vec![
+                (EPOCH_GET, 200, epoch_wire()),
+                (PROFILE_POST, 200, a),
+                (EPOCH_GET, 200, epoch_wire()),
+                (
+                    "POST /api/v1/network/patients/patient-b/profile-query ",
+                    200,
+                    b.to_string(),
+                ),
+            ],
+            false,
+        );
+        let first = session.profile_query_intent();
+        session
+            .open_patient_profile("scope-a", "patient-a", &first)
+            .unwrap();
+        first.cancel();
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Ok(())
+        );
+        session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        let second = session.profile_query_intent();
+        session
+            .open_patient_profile("scope-a", "patient-b", &second)
+            .unwrap();
+        server.join().unwrap();
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert_eq!(
+            session.update_patient_notes("scope-a", "patient-a", 7, "must never be sent"),
+            Err(RuntimeError::ReadRequired)
+        );
+    }
+
+    #[test]
+    fn clearing_or_changing_scope_retires_the_completed_profile_selection_not_just_its_request() {
+        let wire = profile_wire(&session()).to_string();
+        let (session, _, _, _, server) = profile_script(
+            vec![(EPOCH_GET, 200, epoch_wire()), (PROFILE_POST, 200, wire)],
+            false,
+        );
+        let request = session.profile_query_intent();
+        session
+            .open_patient_profile("scope-a", "patient-a", &request)
+            .unwrap();
+        server.join().unwrap();
+        request.cancel();
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Ok(())
+        );
+        let refresh = session.profile_query_intent();
+        assert!(session.profile_intent_guard(&refresh).is_ok());
+        session.clear_profile_selection();
+        assert_eq!(
+            session.update_patient_notes("scope-a", "patient-a", 7, "no HTTP"),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert!(session.profile_intent_guard(&refresh).is_err());
+        session
+            .select_profile_patient("scope-a", "patient-a")
+            .unwrap();
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+        session
+            .select_profile_patient("scope-b", "patient-a")
+            .unwrap();
+        assert_eq!(
+            session.update_patient_notes("scope-a", "patient-a", 7, "no HTTP"),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert!(session.inner.reads.lock().unwrap().is_empty());
+        assert!(session.inner.profile_reads.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn creation_can_bind_its_new_patient_only_while_that_creation_selection_is_current() {
+        let session = session();
+        session.begin_profile_creation("scope-a").unwrap();
+        let stale = session.profile_query_intent();
+        session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        assert_eq!(
+            session.bind_created_profile("scope-a", "created-a", &stale),
+            Err(RuntimeError::ReadRequired)
+        );
+        session.begin_profile_creation("scope-a").unwrap();
+        let active = session.profile_query_intent();
+        assert_eq!(
+            session.bind_created_profile("scope-b", "created-a", &active),
+            Err(RuntimeError::ReadRequired)
+        );
+        session
+            .bind_created_profile("scope-a", "created-a", &active)
+            .unwrap();
+        assert!(
+            session
+                .profile_target_matches(&active, "scope-a", "created-a")
+                .is_ok()
+        );
+        assert_eq!(
+            session.bind_created_profile("scope-a", "created-b", &active),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "created-a",
+                "patients",
+                "created-a",
+                1,
+                &["notes"]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+        session.begin_profile_creation("scope-a").unwrap();
+        let cancelled = session.profile_query_intent();
+        cancelled.cancel();
+        assert_eq!(
+            session.bind_created_profile("scope-a", "created-c", &cancelled),
+            Err(RuntimeError::ReadRequired)
+        );
+    }
+
+    #[test]
+    fn generic_read_receipts_cannot_be_used_as_unbounded_profile_receipts() {
+        let session = session();
+        session
+            .select_profile_patient("scope-a", "patient-a")
+            .unwrap();
+        assert_eq!(
+            session.remember(
+                0,
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                vec![]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert_eq!(
+            session.update_patient_notes("scope-a", "patient-a", 7, "no HTTP"),
+            Err(RuntimeError::ReadRequired)
+        );
+    }
+    #[test]
+    fn selection_change_during_write_scope_check_prevents_the_profile_put() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        admit_fixture_read(&session);
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            assert!(read_request(&mut stream).starts_with("GET /api/v1/network/identity "));
+            seen_tx.send(()).unwrap();
+            release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            send_reply(
+                &mut stream,
+                r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+            );
+        });
+        let clone = session.clone();
+        let worker = thread::spawn(move || {
+            clone.update_patient_notes("scope-a", "patient-a", 1, "must not be sent")
+        });
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        session
+            .select_profile_patient("scope-a", "patient-b")
+            .unwrap();
+        release_tx.send(()).unwrap();
+        assert_eq!(worker.join().unwrap(), Err(RuntimeError::ReadRequired));
+        server.join().unwrap();
     }
 }

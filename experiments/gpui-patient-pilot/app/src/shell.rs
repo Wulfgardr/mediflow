@@ -634,6 +634,12 @@ impl ClinicalApp {
         }
     }
 
+    fn retire_profile_selection(&self) {
+        if let Some(session) = &self.session {
+            session.clear_profile_selection();
+        }
+    }
+
     fn profile_intent(&mut self, session: &RuntimeSession) -> ProfileQueryIntent {
         if let Some(previous) = self.profile_query_intent.take() {
             previous.cancel();
@@ -844,6 +850,7 @@ impl ClinicalApp {
         }
         self.global_search
             .update(cx, |input, cx| input.set_content("", cx));
+        self.retire_profile_selection();
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core.lock();
@@ -906,6 +913,7 @@ impl ClinicalApp {
         self.drug_count = Load::Idle;
         self.exemption_count = Load::Idle;
         self.reference_registry = Load::Idle;
+        self.retire_profile_selection();
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core = Workspace::default();
@@ -950,6 +958,13 @@ impl ClinicalApp {
             Ok(request) => request,
             Err(_) => return,
         };
+        if let Err(error) = session.select_profile_patient(&scope, id) {
+            self.core
+                .receive_read(&request, Err(ReadFailure::Unavailable));
+            self.message = Some((ui_error(error), true));
+            cx.notify();
+            return;
+        }
         self.next_epoch();
         self.focus_after_render = open;
         self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
@@ -1047,6 +1062,7 @@ impl ClinicalApp {
             self.show_other = false;
             self.directory = true;
             if self.area != area {
+                self.retire_profile_selection();
                 self.selected_id = None;
                 self.patient = PatientData::default();
                 self.core = Workspace::default();
@@ -2533,6 +2549,7 @@ impl ClinicalApp {
                                             return;
                                         }
                                         this.archived = archived;
+                                        this.retire_profile_selection();
                                         this.selected_id = None;
                                         this.patient = PatientData::default();
                                         this.core = Workspace::default();
@@ -4725,9 +4742,17 @@ impl ClinicalApp {
             return;
         }
         self.next_epoch();
+        self.retire_profile_selection();
         self.selected_id = None;
         self.patient = PatientData::default();
         self.core = Workspace::default();
+        if let (Some(session), Some(scope)) = (&self.session, &self.scope)
+            && let Err(error) = session.begin_profile_creation(scope)
+        {
+            self.message = Some((ui_error(error), true));
+            cx.notify();
+            return;
+        }
         self.area = Area::Patients;
         self.stage_fields(FormKind::PatientNew, patient_forms::fields(None), None, cx);
     }
