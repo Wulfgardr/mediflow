@@ -16,7 +16,7 @@ function run(args, env) {
 }
 
 const { dataDir, owned } = acquireTestDataDir(process.env, 'mediflow-unit-suite-');
-const env = { ...process.env, MEDIFLOW_DATA_DIR: dataDir };
+const env = { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' };
 let exitCode = 1;
 let signal = null;
 try {
