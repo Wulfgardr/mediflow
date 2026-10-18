@@ -3,9 +3,47 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { load as loadYaml } from 'js-yaml';
 import { collectCiDispositionSelections, collectAppleInstallabilityBinding, verifyDispositionConsumer } from './ci-disposition-selection.mjs';
 import { collectNpmScriptBinding } from './explicit-npm-test-selection.mjs';
 const root = path.resolve(import.meta.dirname, '..');
+
+test('production sparse checkouts omit one exact file while retaining committed identity and other test sources', t => {
+  const checkouts = ['web-core.yml', 'e2e.yml'].map(file => {
+    const workflow = loadYaml(fs.readFileSync(path.join(root, '.github/workflows', file), 'utf8'));
+    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+    const checkout = steps.filter(step => step.uses?.startsWith('actions/checkout@'));
+    assert.equal(checkout.length, 1);
+    assert.equal(checkout[0].with['sparse-checkout-cone-mode'], false);
+    return checkout[0].with['sparse-checkout'].trim().split('\n');
+  });
+  assert.deepEqual(checkouts[0], checkouts[1]);
+  const patterns = checkouts[0];
+  assert.equal(patterns.length, 2); assert.equal(patterns[0], '/*');
+  assert.ok(patterns[1].startsWith('!/')); assert.doesNotMatch(patterns[1].slice(2), /[*!?\[\]{}\\]/u);
+  const omitted = patterns[1].slice(2);
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'production-sparse-source-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const neighboringTest = path.posix.join(path.posix.dirname(omitted), 'synthetic-contract.swift');
+  for (const file of [omitted, neighboringTest, 'app/synthetic-source.ts']) {
+    fs.mkdirSync(path.dirname(path.join(temp, file)), { recursive: true });
+    fs.writeFileSync(path.join(temp, file), 'Synthetic sparse checkout fixture only.');
+  }
+  const git = (...args) => execFileSync('git', args, { cwd: temp, encoding: 'utf8' }).trim();
+  git('init', '--quiet', '--initial-branch=main'); git('add', '.');
+  git('-c', 'user.name=Synthetic fixture', '-c', 'user.email=synthetic@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '--quiet', '-m', 'synthetic source');
+  const identity = git('rev-parse', 'HEAD', 'HEAD^{tree}');
+  const tracked = git('ls-files', '--stage');
+  execFileSync('git', ['sparse-checkout', 'set', '--no-cone', '--stdin'], { cwd: temp, input: patterns.join('\n') + '\n' });
+  assert.equal(fs.existsSync(path.join(temp, omitted)), false);
+  assert.equal(fs.existsSync(path.join(temp, neighboringTest)), true);
+  assert.equal(fs.existsSync(path.join(temp, 'app/synthetic-source.ts')), true);
+  assert.equal(git('status', '--porcelain', '--untracked-files=normal'), '');
+  assert.equal(git('rev-parse', 'HEAD', 'HEAD^{tree}'), identity);
+  assert.equal(git('ls-files', '--stage'), tracked);
+  assert.ok(git('ls-files', '-t', '--', omitted).startsWith('S '));
+});
 
 test('shared group selections have actual ordinary or Apple conditional CI consumers', () => {
   const selections = collectCiDispositionSelections(root);

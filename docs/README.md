@@ -85,6 +85,11 @@ L'[ADR 0147](./adr/0147-canonical-patient-profile-update-dispatch.md) definisce
 il comando canonico di aggiornamento e il dispatch unico verso il writer Node
 esistente: deduplicazione interna per esecuzione, senza idempotenza durevole
 tra richieste, prova umana o migrazione di scritture a Rust.
+I job di build Web Core ed E2E usano un checkout sparse non-cone della stessa
+revisione: non materializzano soltanto la fixture SQLite dei test Swift.
+Commit, albero Git e tutti gli altri sorgenti restano invariati; i checkout
+completi conservano la fixture e la selezione Swift. Questa provenienza
+di build non concede eccezioni al controllo dei file privati del runtime.
 La [verifica della tastiera GPUI](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md)
 registra ricerca contestuale, lista filtrata, revisione, blocco e ridimensionamento
 con una nuova build Linux e immagini originali attribuite alla loro esecuzione.
