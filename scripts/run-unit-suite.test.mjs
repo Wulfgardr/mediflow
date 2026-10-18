@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
+import Database from 'better-sqlite3';
 import { UNIT_TEST_GROUPS, UNIT_SCRIPT_TESTS, UNIT_SERIAL_SCRIPT_TESTS } from './unit-test-selection.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -56,6 +58,42 @@ test('preserves a non-empty explicit relative data-dir value for every child', (
     fs.rmSync(value.sandbox, { recursive: true, force: true });
   }
 });
+
+for (const inheritedVeto of [undefined, '0']) {
+  test(`bootstrap never copies a cwd database when the inherited legacy veto is ${inheritedVeto ?? 'absent'}`, () => {
+    const value = fixture("require('node:fs').writeFileSync('unit-ran', 'yes');");
+    const seedDir = path.join(value.sandbox, 'seed');
+    const dataDir = path.join(value.sandbox, 'isolated');
+    const legacyPath = path.join(value.sandbox, 'medical.db');
+    try {
+      fs.cpSync(path.join(root, 'drizzle'), path.join(value.sandbox, 'drizzle'), { recursive: true });
+      fs.symlinkSync(path.join(root, 'node_modules'), path.join(value.sandbox, 'node_modules'), 'junction');
+      fs.copyFileSync(path.join(root, 'scripts', 'prepare-e2e-db.mjs'), path.join(value.sandbox, 'scripts', 'prepare-e2e-db.mjs'));
+      const seed = spawnSync(process.execPath, [path.join(value.sandbox, 'scripts', 'prepare-e2e-db.mjs')], {
+        cwd: value.sandbox, encoding: 'utf8',
+        env: { ...process.env, MEDIFLOW_DATA_DIR: seedDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
+      });
+      assert.equal(seed.status, 0, seed.stderr + seed.stdout);
+      fs.copyFileSync(path.join(seedDir, 'medical.db'), legacyPath);
+      const legacy = new Database(legacyPath);
+      try { legacy.exec('CREATE TABLE synthetic_legacy_sentinel (id INTEGER PRIMARY KEY)'); }
+      finally { legacy.close(); }
+      const originalHash = createHash('sha256').update(fs.readFileSync(legacyPath)).digest('hex');
+      const env = { ...process.env, MEDIFLOW_DATA_DIR: dataDir };
+      if (inheritedVeto === undefined) delete env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY;
+      else env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = inheritedVeto;
+      const result = spawnSync(process.execPath, [value.runner], { cwd: value.sandbox, env, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr + result.stdout);
+      assert.equal(fs.readFileSync(path.join(value.sandbox, 'unit-ran'), 'utf8'), 'yes');
+      const db = new Database(path.join(dataDir, 'medical.db'), { readonly: true, fileMustExist: true });
+      try {
+        assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'users' AND type = 'table'").get());
+        assert.equal(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'synthetic_legacy_sentinel'").get(), undefined);
+      } finally { db.close(); }
+      assert.equal(createHash('sha256').update(fs.readFileSync(legacyPath)).digest('hex'), originalHash);
+    } finally { fs.rmSync(value.sandbox, { recursive: true, force: true }); }
+  });
+}
 
 function defaultSelectionFixture(testFile) {
   const value = fixture('', { preserveUnitArgs: true });
