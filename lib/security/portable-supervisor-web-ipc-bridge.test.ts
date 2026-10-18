@@ -93,6 +93,16 @@ test('does not read capture after a typed preparation denial', async () => {
     assert.equal(current.listeners.size, 0);
 });
 
+test('explicit read projection travels only in the private activation, leaving the capture unchanged', async () => {
+    const current = fixture((frame, emit) => emit(ack(frame.requestRef,
+        frame.method === 'prepare' ? 'prepared' : 'activated', frame.method === 'prepare' ? 5_000 : 20_000)));
+    await current.bridge.activate(capture, { projection: 'notes' });
+    const [prepare, activate] = current.frames.map(decodePortableSupervisorWebIpcFrameV1);
+    assert.equal(prepare.patientProfileQuery, undefined);
+    assert.deepEqual({ ...activate.patientProfileQuery as object }, { projection: 'notes' });
+    assert.deepEqual(Object.keys(activate.capture as object), Object.keys(capture()));
+});
+
 test('ignores canonical ACKs for another request but disconnects on malformed parent frames', async () => {
     const unrelated = `pswr_${'9'.repeat(32)}`;
     const valid = fixture((frame, emit) => {

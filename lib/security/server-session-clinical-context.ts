@@ -11,6 +11,7 @@ import {
 } from './ordinary-session-authority';
 import * as webLifetime from './web-auth-lifecycle-owner-adapter';
 import * as nativeLifetime from './native-inference-lifecycle';
+import * as nativeProfileLifetime from './native-profile-lifecycle';
 
 type ClinicalContextDatabase = Pick<typeof dbServer, 'select'>;
 
@@ -45,13 +46,13 @@ function parseRequest(input: unknown): Readonly<{ patientId: string; ambulatoryI
     return Object.freeze({ patientId: patient.value, ambulatoryId: ambulatory.value });
 }
 
-function createClinicalContextResolver(database: ClinicalContextDatabase, native: boolean) {
+function createClinicalContextResolver(database: ClinicalContextDatabase, native: boolean, profile = false) {
     const { abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort }
-        = native ? nativeLifetime : webLifetime;
+        = profile ? nativeProfileLifetime : native ? nativeLifetime : webLifetime;
     return (session: ServerSession, input: unknown) => {
         const request = parseRequest(input);
-        let port: WebResourcePort | null = null;
-        let use: WebResourceUse | null = null;
+        let port: WebResourcePort | import("./web-auth-lifecycle-owner-adapter").NativeSessionResourcePort | null = null;
+        let use: WebResourceUse | import("./web-auth-lifecycle-owner-adapter").NativeSessionResourceUse | null = null;
         let committed = false;
         try {
             port = mintResourcePort(session);
@@ -87,4 +88,8 @@ export function createCanonicalClinicalContextResolver(database: ClinicalContext
 }
 export function createCanonicalNativeClinicalContextResolver(database: ClinicalContextDatabase) {
     return createClinicalContextResolver(database, true);
+}
+
+export function createCanonicalNativeProfileClinicalContextResolver(database: ClinicalContextDatabase) {
+    return createClinicalContextResolver(database, true, true);
 }

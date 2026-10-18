@@ -33,6 +33,7 @@ type FixtureOptions = Readonly<{
     acquire?: 'current' | 'null' | 'deferred';
     activation?: 'current' | 'deferred' | 'sensitive-error' | 'overscoped-output' | 'already-bound';
     revocation?: 'current' | 'deferred';
+    profile?: 'current' | 'deferred';
 }>;
 type Capture = Readonly<{
     schemaVersion: 'mediflow.portable-supervisor.web-capture.v1';
@@ -56,10 +57,13 @@ function fixture(options: FixtureOptions = {}) {
     const acquisition = deferred<void>();
     const activation = deferred<Readonly<{ expiresAt: number }>>();
     const revocation = deferred<boolean>();
+    const profileAcquisition = deferred<void>();
     const events: string[] = [];
     let observer: ((reason: 'logout' | 'application_lock' | 'reselection' | 'expiry'
         | 'web_disconnect' | 'explicit') => unknown) | null = null;
     let active = true, acquisitions = 0, activations = 0, reads = 0, revocations = 0, disconnects = 0;
+    let profileAcquisitions = 0, profileDisposals = 0, profilePublished = false;
+    let forwardedProfile: unknown;
     const owner = Object.freeze({
         readCapture() { reads += 1; events.push('capture:read'); return capture; },
         matchesCurrentContext() { return true; },
@@ -81,7 +85,8 @@ function fixture(options: FixtureOptions = {}) {
             if (options.acquire === 'deferred') await acquisition.promise;
             return options.acquire === 'null' ? null : owner;
         },
-        async activateBridge(readCapture) {
+        async activateBridge(readCapture, profileQuery) {
+            forwardedProfile = profileQuery;
             activations += 1; events.push('bridge:prepare');
             readCapture(); events.push('bridge:activate');
             if (options.activation === 'sensitive-error') {
@@ -102,11 +107,22 @@ function fixture(options: FixtureOptions = {}) {
         },
         disconnectBridge: () => { disconnects += 1; events.push('transport:disconnect'); },
         checkupLifecycle: checkup.controller,
+        profileQueries: {
+            async acquire() {
+                profileAcquisitions++;
+                if (options.profile === 'deferred') await profileAcquisition.promise;
+                return Object.freeze({ async executeProfileQuery(): Promise<never> { throw new Error('not used by lifecycle test'); },
+                    dispose() { profileDisposals++; return true; } });
+            },
+            publish(port) { profilePublished = port !== null; },
+        },
     });
     return Object.freeze({
         controller, checkupPort: checkup.port, events, acquisition, activation, revocation,
         acquisitions: () => acquisitions, activations: () => activations,
         reads: () => reads, revocations: () => revocations, disconnects: () => disconnects,
+        profileAcquisitions: () => profileAcquisitions, profileDisposals: () => profileDisposals,
+        profilePublished: () => profilePublished, forwardedProfile: () => forwardedProfile, profileAcquisition,
         setCapture(next: Partial<Capture>) { capture = Object.freeze({ ...capture, ...next }); },
         terminal(reason: 'logout' | 'application_lock' | 'reselection' | 'expiry'
             | 'web_disconnect' | 'explicit') { assert.ok(observer); observer(reason); },
@@ -137,6 +153,51 @@ test('activates once from the owner capture and exposes only active expiry', asy
     assert.equal(current.activations(), 1);
     assert.equal(JSON.stringify(result).includes(PATIENT), false);
     assert.equal(JSON.stringify(result).includes('user.'), false);
+});
+
+test('default activation grants no profile port or operation even when the host supports it', async () => {
+    const current = fixture(); await current.controller.activateCurrentSelection(INPUT);
+    assert.equal(current.profileAcquisitions(), 0); assert.equal(current.profilePublished(), false);
+    assert.equal(current.forwardedProfile(), undefined);
+});
+
+test('explicit profile projection reaches the private activation and its port retires with the owner', async () => {
+    const current = fixture();
+    await current.controller.activateCurrentSelection({ ...INPUT, patientProfileQuery: { projection: 'notes' } });
+    assert.equal(current.profileAcquisitions(), 1); assert.equal(current.profilePublished(), true);
+    assert.deepEqual({ ...current.forwardedProfile() as object }, { projection: 'notes' });
+    await current.controller.retire('application_lock');
+    assert.equal(current.profileDisposals(), 1); assert.equal(current.profilePublished(), false);
+});
+
+test('lock during profile-port acquisition cannot publish a late grant', async () => {
+    const current = fixture({ profile: 'deferred' });
+    const activation = current.controller.activateCurrentSelection({ ...INPUT, patientProfileQuery: { projection: 'notes' } });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    await current.controller.retire('application_lock'); current.profileAcquisition.resolve();
+    await assert.rejects(activation, { code: 'session_terminal' });
+    assert.equal(current.profileDisposals(), 1); assert.equal(current.profilePublished(), false);
+    assert.equal(current.activations(), 0);
+});
+
+test('selection drift during profile acquisition disposes the new port before IPC activation', async () => {
+    const current = fixture({ profile: 'deferred' });
+    const activation = current.controller.activateCurrentSelection({ ...INPUT, patientProfileQuery: { projection: 'profile' } });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    current.setCapture({ selectionEpoch: INPUT.selectionEpoch + 1 }); current.profileAcquisition.resolve();
+    await assert.rejects(activation, { code: 'selection_conflict' });
+    assert.equal(current.profileDisposals(), 1); assert.equal(current.profilePublished(), false);
+    assert.equal(current.activations(), 0);
+});
+
+test('profile authority remains unpublished until the exact activation acknowledgement', async () => {
+    const current = fixture({ activation: 'deferred' });
+    const activation = current.controller.activateCurrentSelection({ ...INPUT, patientProfileQuery: { projection: 'notes' } });
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(current.profileAcquisitions(), 1); assert.equal(current.profilePublished(), false);
+    current.activation.resolve({ expiresAt: EXPIRES_AT - 1 }); await activation;
+    assert.equal(current.profilePublished(), true);
+    await current.controller.retire('explicit'); assert.equal(current.profilePublished(), false);
 });
 
 test('activates the checkup dependent port only after H1a and drains it on retirement', async () => {

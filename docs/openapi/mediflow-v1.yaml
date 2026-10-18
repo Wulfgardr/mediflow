@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.38.0
+  version: 1.39.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -2153,6 +2153,260 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patient-profile/selection-epoch:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
+    get:
+      tags:
+        - Network
+      operationId: getScopedPatientProfileSelectionEpoch
+      summary: Read the authenticated profile-selection epoch
+      description: >-
+        Requires current pairing, readonly-patient capability, operator session and host-resolved
+        ambulatory scope. No profile data is returned.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      responses:
+        '200':
+          description: Current volatile selection epoch; Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - contractVersion
+                  - selectionEpoch
+                properties:
+                  contractVersion:
+                    const: 1
+                  selectionEpoch:
+                    type: integer
+                    minimum: 0
+        '400':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '401':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '403':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '409':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '410':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '413':
+          description: output_too_large; no profile or handle is returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '503':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+  /api/v1/network/patients/{id}/profile-query:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: x-mediflow-archive-generation
+        in: header
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+        - Network
+      operationId: queryScopedPatientProfile
+      summary: Open or reread an identifier-free patient profile view
+      description: >-
+        Open compares expectedSelectionEpoch with the existing host selection owner before selecting.
+        Read requires handle and expectedRevision; it never implicitly opens or renews a context.
+        Handle reuse is allowed while session, role, pairing, patient, scope, projection, revision and
+        lifetime remain current. No clinical or audit mutation. Providers and MCP are not required.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopedPatientProfileQuery'
+      responses:
+        '200':
+          description: Current scoped view; Cache-Control no-store.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopedPatientProfileResult'
+        '400':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '401':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '403':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '409':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '410':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '413':
+          description: output_too_large; no profile or handle is returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+        '503':
+          description: Denied before profile disclosure.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - error
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
   /api/v1/network/patients/{id}:
     parameters:
       - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
@@ -4056,6 +4310,227 @@ components:
               value:
                 error: Failed to fetch patient
   schemas:
+    ScopedPatientProfileQuery:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - contractVersion
+            - projection
+            - expectedSelectionEpoch
+          properties:
+            kind:
+              const: open
+            contractVersion:
+              const: 1
+            projection:
+              type: string
+              enum:
+                - profile
+                - notes
+            expectedSelectionEpoch:
+              type: integer
+              minimum: 0
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - contractVersion
+            - projection
+            - handle
+            - expectedRevision
+          properties:
+            kind:
+              const: read
+            contractVersion:
+              const: 1
+            projection:
+              type: string
+              enum:
+                - profile
+                - notes
+            handle:
+              type: string
+              pattern: ^pph_[0-9a-f]{64}$
+            expectedRevision:
+              type: integer
+              minimum: 1
+    ScopedPatientProfileResult:
+      description: >-
+        Identifier-free scoped view. UTF-8 JSON is at most 32768 bytes; output_too_large returns HTTP
+        413 without partial data or truncation. ENC strings remain unchanged.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - schemaVersion
+            - operationId
+            - contractVersion
+            - handle
+            - currentness
+            - projection
+            - profile
+          properties:
+            schemaVersion:
+              const: mediflow.patient.profile-view.v1
+            operationId:
+              const: patient-profile.read.v1
+            contractVersion:
+              const: 1
+            handle:
+              type: string
+              pattern: ^pph_[0-9a-f]{64}$
+            currentness:
+              type: object
+              additionalProperties: false
+              required:
+                - revision
+                - selectionEpoch
+                - observedAt
+                - expiresAt
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                selectionEpoch:
+                  type: integer
+                  minimum: 1
+                observedAt:
+                  type: integer
+                  minimum: 0
+                expiresAt:
+                  type: integer
+                  minimum: 1
+            projection:
+              const: profile
+            profile:
+              type: object
+              additionalProperties: false
+              required:
+                - firstName
+                - lastName
+                - taxCode
+                - birthDate
+                - address
+                - phone
+                - caregiver
+                - diagnoses
+                - exemptions
+                - notes
+                - isAdi
+                - isArchived
+                - statusReason
+                - archiveReason
+                - archiveNote
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                taxCode:
+                  type: string
+                birthDate:
+                  type:
+                    - string
+                    - 'null'
+                address:
+                  type:
+                    - string
+                    - 'null'
+                phone:
+                  type:
+                    - string
+                    - 'null'
+                caregiver:
+                  type:
+                    - string
+                    - 'null'
+                diagnoses:
+                  type:
+                    - string
+                    - 'null'
+                exemptions:
+                  type:
+                    - string
+                    - 'null'
+                notes:
+                  type:
+                    - string
+                    - 'null'
+                isAdi:
+                  type:
+                    - boolean
+                    - 'null'
+                isArchived:
+                  type:
+                    - boolean
+                    - 'null'
+                statusReason:
+                  type:
+                    - string
+                    - 'null'
+                archiveReason:
+                  type:
+                    - string
+                    - 'null'
+                archiveNote:
+                  type:
+                    - string
+                    - 'null'
+        - type: object
+          additionalProperties: false
+          required:
+            - schemaVersion
+            - operationId
+            - contractVersion
+            - handle
+            - currentness
+            - projection
+            - profile
+          properties:
+            schemaVersion:
+              const: mediflow.patient.profile-view.v1
+            operationId:
+              const: patient-profile.read.v1
+            contractVersion:
+              const: 1
+            handle:
+              type: string
+              pattern: ^pph_[0-9a-f]{64}$
+            currentness:
+              type: object
+              additionalProperties: false
+              required:
+                - revision
+                - selectionEpoch
+                - observedAt
+                - expiresAt
+              properties:
+                revision:
+                  type: integer
+                  minimum: 1
+                selectionEpoch:
+                  type: integer
+                  minimum: 1
+                observedAt:
+                  type: integer
+                  minimum: 0
+                expiresAt:
+                  type: integer
+                  minimum: 1
+            projection:
+              const: notes
+            profile:
+              type: object
+              additionalProperties: false
+              required:
+                - notes
+              properties:
+                notes:
+                  type:
+                    - string
+                    - 'null'
     WhoArtifactDigest:
       type: string
       pattern: ^sha256:[a-f0-9]{64}$

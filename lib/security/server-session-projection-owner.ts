@@ -13,7 +13,9 @@ import {
 } from './server-session';
 import * as webLifetime from './web-auth-lifecycle-owner-adapter';
 import * as nativeLifetime from './native-inference-lifecycle';
-import type { ResourcePort as WebResourcePort } from './ordinary-session-authority';
+import * as nativeProfileLifetime from './native-profile-lifecycle';
+import type { ResourcePort } from './ordinary-session-authority';
+type WebResourcePort = ResourcePort | nativeProfileLifetime.NativeProfilePort;
 import { bindProjectionBrokerToNativeSessionResource } from './server-session-projection-broker';
 
 type TypedBroker = ReturnType<typeof createTypedProjectionBroker>;
@@ -243,6 +245,9 @@ export type ServerSessionProjectionOwner = Readonly<{
     dispose(): void;
 }>;
 
+export type ServerSessionProfileSelectionOwner = Pick<ServerSessionProjectionOwner,
+    'snapshotSelectionEpoch' | 'issueSelection' | 'withLeaseCriticalSection' | 'dispose'>;
+
 declare const patientInsightLeaseCommitRef: unique symbol;
 declare const ocrLeaseCommitRef: unique symbol;
 declare const documentSynthesisLeaseCommitRef: unique symbol;
@@ -391,7 +396,7 @@ function canonicalClinicalContext(input: unknown, requested: CanonicalPair): Can
         patientVersion: value.patientVersion as number });
 }
 
-type ProjectionOwnerAuthorityKind = 'legacy' | 'port' | 'port-full' | 'native-port-full';
+type ProjectionOwnerAuthorityKind = 'legacy' | 'port' | 'port-full' | 'native-port-full' | 'native-profile';
 
 function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>(authorityKind: ProjectionOwnerAuthorityKind,
     sourceOverrides: Partial<SelectionSources> = {}): Readonly<{
@@ -400,9 +405,10 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
         selectionBindingController: ServerSessionSelectionBindingControllerV1;
         selectionCommitBindingController: ServerSessionSelectionCommitBindingControllerV1;
     }> {
-    const native = authorityKind === 'native-port-full';
+    const nativeProfile = authorityKind === 'native-profile';
+    const native = authorityKind === 'native-port-full' || nativeProfile;
     const { abortResourceUse, beginResourceUse, commitResourceUse, mintResourcePort, releaseResourcePort,
-        registerPrivateResource, unregisterPrivateResource } = native ? nativeLifetime : webLifetime;
+        registerPrivateResource, unregisterPrivateResource } = nativeProfile ? nativeProfileLifetime : native ? nativeLifetime : webLifetime;
     const sources = ObjectFreeze({ ...defaultSources, ...sourceOverrides });
     const owners = new MapConstructor<string, ProjectionOwnerSurface>();
     const registryOwners = new WeakSetConstructor<object>();
@@ -1033,6 +1039,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 },
                 acquireProjectionIngest(presentedSession, input) {
                     rejectLeaseCriticalSectionReentry();
+                    if (nativeProfile) return fail('broker_unavailable');
                     requireCurrentSession(presentedSession);
                     if (authorityKind === 'port') return fail('broker_unavailable');
                     const value = readTuple(input); const current = selection;
@@ -1088,7 +1095,8 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                     } });
                     try {
                         if (portBacked) {
-                            const brokerPort = mintResourcePort(presentedSession);
+                            const brokerPort = native ? nativeLifetime.mintResourcePort(presentedSession)
+                                : webLifetime.mintResourcePort(presentedSession);
                             if (!brokerPort) return fail('session_unavailable');
                             binding.unregister = native
                                 ? bindProjectionBrokerToNativeSessionResource(brokerPort, candidate.control)
@@ -1318,7 +1326,15 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
             const acquisitionUse = beginResourceUse(authorityPort);
             if (!acquisitionUse) { releaseResourcePort(authorityPort); return fail('session_ineligible'); }
             let revealed = false;
-            const exposedOwner = authorityKind === 'port-full' || native ? completedOwner : completedPortOwner;
+            const profileOwner: ServerSessionProfileSelectionOwner = ObjectFreeze({
+                snapshotSelectionEpoch: (presented: ServerSession) => completedOwner.snapshotSelectionEpoch(presented),
+                issueSelection: (input: Parameters<ServerSessionProfileSelectionOwner['issueSelection']>[0]) => completedOwner.issueSelection(input),
+                withLeaseCriticalSection: <T>(presented: ServerSession, callback: (selection: CanonicalPair) => T): T =>
+                    completedOwner.withLeaseCriticalSection(presented, callback),
+                dispose: () => completedOwner.dispose(),
+            });
+            const exposedOwner = nativeProfile ? profileOwner as ProjectionOwnerSurface
+                : authorityKind === 'port-full' || native ? completedOwner : completedPortOwner;
             try {
                 const registration = native ? registerPrivateResource(authorityPort, () => finish(true)) : null;
                 if (native && !registration) return fail('session_ineligible');
@@ -1338,7 +1354,7 @@ function createProjectionOwnerProcessOwner<Owner extends ProjectionOwnerSurface>
                 if (!commitResourceUse(acquisitionUse)) return fail('session_ineligible');
                 portRevealActive = false;
                 revealed = true;
-                if (authorityKind === 'port-full' || native) addOwnerIdentity(authenticOwners, completedOwner);
+                if (authorityKind === 'port-full' || (native && !nativeProfile)) addOwnerIdentity(authenticOwners, completedOwner);
                 return exposedOwner as Owner;
             } finally {
                 if (!revealed) {
@@ -1387,4 +1403,15 @@ export function createServerSessionProjectionOwnerRegistry(sourceOverrides: Part
  * Source overrides cannot mint session, pairing, role or capability authority. */
 export function createNativePortProjectionOwnerProcessOwner(sourceOverrides: Partial<SelectionSources> = {}) {
     return createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('native-port-full', sourceOverrides);
+}
+
+export function createNativeProfileSelectionProcessOwner(sourceOverrides: Partial<SelectionSources> = {}) {
+    const process = createProjectionOwnerProcessOwner<ServerSessionProjectionOwner>('native-profile', sourceOverrides);
+    return ObjectFreeze({
+        ...process,
+        registry: ObjectFreeze({
+            acquire: (session: ServerSession): ServerSessionProfileSelectionOwner => process.registry.acquire(session),
+            snapshotSelectionEpoch: (session: ServerSession) => process.registry.snapshotSelectionEpoch(session),
+        }),
+    });
 }
