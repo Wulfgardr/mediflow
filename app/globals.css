@@ -370,8 +370,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
 
 :root[data-ui-style='redesign'] .identity-lens-pane,
 :root[data-ui-style='redesign'] .patient-actions-summary,
-:root[data-ui-style='redesign'] .clinical-river-card,
-:root[data-ui-style='redesign'] .evidence-stack-tile {
+:root[data-ui-style='redesign'] .clinical-river-card {
   border-radius: 12px;
   background: transparent;
   box-shadow: none;
@@ -431,8 +430,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
 
 :root.dark[data-ui-style='redesign'] .identity-lens-pane,
 :root.dark[data-ui-style='redesign'] .patient-actions-summary,
-:root.dark[data-ui-style='redesign'] .clinical-river-card,
-:root.dark[data-ui-style='redesign'] .evidence-stack-tile {
+:root.dark[data-ui-style='redesign'] .clinical-river-card {
   background-color: var(--lume-surface-field);
   border-color: var(--lume-border-color);
   box-shadow: none;
@@ -1694,7 +1692,6 @@ textarea.input-field {
 :root[data-ui-style='redesign'] .patient-diagnosis-card,
 :root[data-ui-style='redesign'] .patient-quick-context-card,
 :root[data-ui-style='redesign'] .clinical-river-card,
-:root[data-ui-style='redesign'] .evidence-stack-tile,
 :root[data-ui-style='redesign'] .apple-list-row {
   border-radius: var(--lume-radius-card);
   border-color: var(--lume-border-color);
@@ -1721,7 +1718,6 @@ textarea.input-field {
 :root.dark[data-ui-style='redesign'] .patient-diagnosis-card,
 :root.dark[data-ui-style='redesign'] .patient-quick-context-card,
 :root.dark[data-ui-style='redesign'] .clinical-river-card,
-:root.dark[data-ui-style='redesign'] .evidence-stack-tile,
 :root.dark[data-ui-style='redesign'] .apple-list-row {
   border-color: var(--lume-border-color);
   background: var(--lume-surface-field);
