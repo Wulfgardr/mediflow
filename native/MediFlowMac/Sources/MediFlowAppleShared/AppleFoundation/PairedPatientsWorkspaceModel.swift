@@ -185,7 +185,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     @Published private(set) var exemptionCatalogResults: [HomeBaseExemptionSummary] = []
     @Published private(set) var isSearchingExemptionCatalog = false
     @Published private(set) var exemptionCatalogStatusMessage: String?
-    // Patient CREATE form (ADR 0071: served only by the on-device local authority).
     @Published var isCreatingPatient = false
     @Published var newPatientFirstName = ""
     @Published var newPatientLastName = ""
@@ -1629,9 +1628,6 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         Data(SHA256.hash(data: Data(transcript.utf8)))
     }
 
-    // ADR 0071 update: patient CREATE still works through the on-device local
-    // authority when available, and now also has a paired HTTP wire path gated by
-    // network.replica.write-patient-lifecycle.
     // opening controls must not depend on the still-empty draft.
     var canStartCreatingPatient: Bool {
         !isWorking
@@ -4405,23 +4401,11 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         isTerminologySearchAvailable = true
     }
 
-    // ADR 0071: the opt-in adapter retains local list/create and clinical
-    // sub-resource operations. Profile detail and UPDATE always use the HTTP
-    // service. Local authority remains off by default and requires an unlocked key.
-    private func makeClient() -> any HomeBasePatientsDataSource {
+    func makeClient() -> any HomeBasePatientsDataSource {
         if let dataSourceFactory {
             return dataSourceFactory(self)
         }
-        let http = HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
-        guard Self.localAuthorityEnabled, let masterKey else { return http }
-        let dbPath = HomeBaseRuntimeStatusLoader.defaultDataDirectoryURL()
-            .appendingPathComponent("medical.db").path
-        return LocalPatientsDataSource(databasePath: dbPath, masterKey: masterKey, fallback: http)
-    }
-
-    private static var localAuthorityEnabled: Bool {
-        let raw = ProcessInfo.processInfo.environment["MEDIFLOW_LOCAL_AUTHORITY"]?.lowercased()
-        return raw == "1" || raw == "true" || raw == "yes"
+        return HomeBasePatientsClient(configuration: HomeBaseConnectionConfiguration(serverURLString: serverURL, tlsPin: tlsPin))
     }
 
     private func beginPatientLoad(
@@ -4832,7 +4816,7 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
         #if DEBUG
         if AppleFoundationDemoMode.skipsStoredPairing { return false }
         #endif
-        return !Self.localAuthorityEnabled
+        return true
     }
 
     private var patientCacheContext: HomeBasePatientCacheContext? {
