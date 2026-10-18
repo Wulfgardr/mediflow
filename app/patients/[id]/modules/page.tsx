@@ -19,6 +19,8 @@ import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
 import PatientActionModal from '@/components/patient-action-modal';
 import { IntelligentHostCheckupAction } from '@/components/intelligent-host-checkup-action';
+import { PatientProfileNotes } from '@/components/patient-profile-notes';
+import { PatientProfileAccessAction } from '@/components/patient-profile-access-action';
 import { PatientIdentityLens } from '@/components/patient-identity-lens';
 import { PatientSheetActionsMenu } from '@/components/patient-sheet-actions-menu';
 import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-summary';
@@ -648,6 +650,7 @@ export default function PatientDetailPage() {
             primaryAction={{ href: `/patients/${id}/entries/new`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
                 <>
+                    <PatientProfileAccessAction key={`${patient.id}:${patient.ambulatoryId ?? ''}`} patientId={patient.id} ambulatoryId={patient.ambulatoryId ?? null} />
                     <IntelligentHostCheckupAction patientId={patient.id}
                         ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []} />
                     <PatientSheetActionsMenu
@@ -727,7 +730,7 @@ export default function PatientDetailPage() {
                                 captureInput={smartImportFabricCaptureInput}
                                 enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)} />
                         ) : null} />}
-                    notes={patient.notes}
+                    notesContent={<PatientProfileNotes patientId={id} />}
                     leadDiagnosis={leadDiagnosis}
                     otherProblemsCount={otherProblemsCount}
                     signals={synopticSignals}
