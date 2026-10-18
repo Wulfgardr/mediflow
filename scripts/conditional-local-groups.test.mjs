@@ -1,13 +1,75 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { conditionalChildEnvironment, conditionalGroupPlan, conditionalLocalGroups, collectConditionalLocalSelections } from './conditional-local-groups.mjs';
+import { conditionalChildEnvironment, conditionalGroupPlan, conditionalLocalGroups, collectConditionalLocalSelections, copyTrackedWorkspace } from './conditional-local-groups.mjs';
 import { localTestCommands, localInvocationArguments } from './local-test-selection.mjs';
 import { cargoTestCommand } from './native-tool-test-selection.mjs';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const owned = path.join(os.tmpdir(), 'synthetic-conditional-plan');
+
+function trackedWorkspaceFixture(t) {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'conditional-sparse-copy-')));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const source = path.join(directory, 'source'), target = path.join(directory, 'copy');
+  fs.mkdirSync(source); fs.mkdirSync(target);
+  const included = process.platform === 'win32' ? 'source with spaces.ts' : 'source with spaces\nand newline.ts';
+  const omitted = 'sparse-sentinel.sqlite';
+  fs.writeFileSync(path.join(source, included), 'Synthetic source retained.');
+  fs.writeFileSync(path.join(source, omitted), 'Invented sparse sentinel only.');
+  const git = (...args) => execFileSync('git', args, { cwd: source, encoding: 'utf8' });
+  git('init', '--quiet', '--initial-branch=main'); git('add', '.');
+  git('-c', 'user.name=Synthetic fixture', '-c', 'user.email=synthetic@example.invalid', '-c', 'commit.gpgsign=false',
+    'commit', '--quiet', '-m', 'synthetic materialization');
+  fs.mkdirSync(path.join(source, 'node_modules'));
+  return { directory, source, target, included, omitted, git };
+}
+
+test('tracked workspace respects actual sparse skip-worktree entries before metadata or content access', t => {
+  const fixture = trackedWorkspaceFixture(t);
+  const { source, target, included, omitted, git } = fixture;
+  const identity = git('rev-parse', 'HEAD', 'HEAD^{tree}');
+  execFileSync('git', ['sparse-checkout', 'set', '--no-cone', '--stdin'], { cwd: source, input: `/*\n!/${omitted}\n` });
+  assert.equal(git('ls-files', '-t', '-z', '--', omitted), `S ${omitted}\0`);
+  assert.equal(fs.existsSync(path.join(source, omitted)), false);
+  const access = { lstatSync: 0, readFileSync: 0, copyFileSync: 0 };
+  for (const method of Object.keys(access)) {
+    const original = fs[method];
+    t.mock.method(fs, method, function (file, ...args) {
+      if (typeof file === 'string' && path.resolve(file) === path.join(source, omitted)) access[method]++;
+      return Reflect.apply(original, fs, [file, ...args]);
+    });
+  }
+  copyTrackedWorkspace(source, target);
+  assert.deepEqual(access, { lstatSync: 0, readFileSync: 0, copyFileSync: 0 });
+  assert.equal(fs.existsSync(path.join(target, omitted)), false);
+  assert.equal(fs.readFileSync(path.join(target, included), 'utf8'), 'Synthetic source retained.');
+  assert.equal(git('rev-parse', 'HEAD', 'HEAD^{tree}'), identity);
+  assert.equal(git('status', '--porcelain'), '');
+});
+
+test('tracked workspace still refuses an ordinary missing file, including assume-unchanged', t => {
+  const { source, target, included, git } = trackedWorkspaceFixture(t);
+  git('update-index', '--assume-unchanged', '--', included);
+  fs.rmSync(path.join(source, included));
+  assert.equal(git('ls-files', '-t', '-z', '--', included), `H ${included}\0`);
+  assert.throws(() => copyTrackedWorkspace(source, target), { code: 'ENOENT' });
+});
+
+test('tracked workspace still refuses a materialized tracked symlink before copying it', t => {
+  const { directory, source, target, included } = trackedWorkspaceFixture(t);
+  const outside = path.join(directory, 'outside');
+  if (process.platform === 'win32') fs.mkdirSync(outside);
+  else fs.writeFileSync(outside, 'Synthetic target must not be copied.');
+  fs.rmSync(path.join(source, included));
+  fs.symlinkSync(outside, path.join(source, included), process.platform === 'win32' ? 'junction' : 'file');
+  assert.equal(fs.lstatSync(path.join(source, included)).isSymbolicLink(), true);
+  assert.throws(() => copyTrackedWorkspace(source, target), /requires a regular tracked file/u);
+  assert.equal(fs.existsSync(path.join(target, included)), false);
+});
 
 test('browser plans retain all four canonical recipes and owned positional outputs without launching browsers', () => {
   const plan = conditionalGroupPlan(root, 'headless-browser', owned);
