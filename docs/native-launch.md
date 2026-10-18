@@ -48,6 +48,12 @@ durante la preparazione e resta soggetta alla verifica di provenienza già
 prevista prima della materializzazione. Prima di ledger, riuso o copia nel bundle
 il payload deve essere completamente fisico, senza alias né hardlink.
 
+Turbopack genera anche collegamenti intermedi in
+`<distDir>/node_modules/<nome-package>-<16 cifre esadecimali>`. Il preflight
+ammette soltanto questa posizione nell'output corrente, con target esattamente
+alla radice fisica del package nelle dipendenze interamente censite. Non è
+un'eccezione per alias generici nella sorgente o nel payload finale.
+
 La checkout completa contiene una fixture SQLite dei test Swift. La produzione
 usa una checkout Git sparse separata che non materializza **soltanto** quella
 fixture, mantenendo SHA, branch e stato pulito genuini. Non eliminare file dalla

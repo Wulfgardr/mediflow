@@ -76,13 +76,18 @@ export function assertBuildInputMetadata({ sourceRoot, dependencyRoot, payloadRo
       const nodeModules = file.slice(0, file.lastIndexOf(`${path.sep}node_modules${path.sep}`) + '/node_modules'.length);
       const bin = /(?:^|\/)node_modules\/(?:.*\/)?\.bin\/[^/]+$/u.test(file.split(path.sep).join('/'));
       const packageName = path.relative(dependencyRoot, target).split(path.sep).join('/');
-      const packageAlias = inPayload && /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u.test(packageName);
+      const packageRoot = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/u.test(packageName);
+      const packageAlias = inPayload && packageRoot;
+      const intermediateModules = payloadRoot && path.join(path.dirname(path.resolve(payloadRoot)), 'node_modules');
+      const intermediateName = intermediateModules && path.relative(intermediateModules, file).split(path.sep).join('/');
+      const intermediateAlias = !inPayload && packageRoot && intermediateModules && inside(sourceRoot, intermediateModules)
+        && intermediateName.startsWith(packageName + '-') && /^[a-f0-9]{16}$/u.test(intermediateName.slice(packageName.length + 1));
       if (bin && roots.some(value => inside(value, nodeModules)) && inside(nodeModules, target)) physical(target, false, inside(dependencyRoot, target));
       else if (inPayload && inside(path.resolve(payloadRoot), target)) physical(target, fs.lstatSync(target).isDirectory());
-      else if (packageAlias) physical(target, true);
+      else if (packageAlias || intermediateAlias) physical(target, true);
       else fail('unadmitted alias');
       aliases.push({ link: file, target });
-      inspect(target, packageAlias ? dependencyRoot : nodeModules);
+      inspect(target, packageAlias || intermediateAlias ? dependencyRoot : nodeModules);
     } else if (!stat.isFile()) fail('special file');
     else if (stat.nlink !== 1) {
       if (!inside(dependencyRoot, file) || payloadRoot && inside(path.resolve(payloadRoot), file)) fail('multiply linked source or payload file');
