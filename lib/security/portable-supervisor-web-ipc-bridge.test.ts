@@ -6,6 +6,7 @@ import {
     decodePortableSupervisorWebIpcFrameV1,
     encodePortableSupervisorWebIpcFrameV1,
 } from '../../packages/aip/src/portable-supervisor-web-ipc-contract.ts';
+import { encodePatientProfileQueryIpcFrameV1 } from '../../packages/aip/src/patient-profile-query-ipc.ts';
 import {
     PortableSupervisorWebIpcBridgeV1Error,
     createPortableSupervisorWebIpcBridgeV1,
@@ -117,6 +118,55 @@ test('ignores canonical ACKs for another request but disconnects on malformed pa
     await assert.rejects(malformed.bridge.activate(capture), rejects('protocol_invalid'));
     assert.equal(malformed.disconnected(), 1);
     assert.equal(malformed.listeners.size, 0);
+});
+
+const profileQuery = () => encodePatientProfileQueryIpcFrameV1({
+    schemaVersion: 'mediflow.patient-profile.ipc.v1', type: 'query',
+    requestRef: `ppqr_${'a'.repeat(32)}`, operationId: 'patient-profile.read.v1',
+    input: { kind: 'open', contractVersion: 1, projection: 'notes', expectedSelectionEpoch: 7 },
+});
+
+test('canonical profile queries coexist with prepare and activate ACKs without consuming them', async () => {
+    const current = fixture((frame, emit) => {
+        emit(profileQuery());
+        assert.equal(current.listeners.size, 1);
+        emit(ack(frame.requestRef, frame.method === 'prepare' ? 'prepared' : 'activated',
+            frame.method === 'prepare' ? 5_000 : 20_000));
+    });
+    assert.deepEqual({ ...await current.bridge.activate(capture) }, { expiresAt: 20_000 });
+    assert.equal(current.disconnected(), 0); assert.equal(current.listeners.size, 0);
+    assert.equal(current.timers.every(timer => !timer.active), true);
+});
+
+test('canonical profile queries coexist with revoke ACK and cannot satisfy the pending exchange', async () => {
+    let respond: ((frame: unknown) => void) | undefined;
+    let requestRef: unknown;
+    const current = fixture((frame, emit) => { requestRef = frame.requestRef; respond = emit; emit(profileQuery()); });
+    const pending = current.bridge.revokeAll('application_lock');
+    assert.equal(current.listeners.size, 1); assert.equal(current.timers[0]?.active, true);
+    respond!(ack(requestRef, 'revoked'));
+    assert.equal(await pending, true); assert.equal(current.disconnected(), 0);
+    assert.equal(current.listeners.size, 0); assert.equal(current.timers[0]?.active, false);
+});
+
+test('profile demultiplexing rejects malformed, noncanonical, unknown and wrong-direction frames', async () => {
+    const valid = profileQuery();
+    const invalid = [
+        valid.replace('"expectedSelectionEpoch":7', '"expectedSelectionEpoch":-1'),
+        valid.replace('"projection":"notes"', '"projection":"all"'),
+        valid.replace('"type":"query"', '"type":"unknown"'),
+        valid.replace('mediflow.patient-profile.ipc.v1', 'mediflow.unknown.ipc.v1'),
+        valid.replace('{', '{ '), valid.slice(0, -1),
+        encodePatientProfileQueryIpcFrameV1({ schemaVersion: 'mediflow.patient-profile.ipc.v1',
+            type: 'query_result', requestRef: `ppqr_${'a'.repeat(32)}`, operationId: 'patient-profile.read.v1',
+            outcome: 'denied', denialCode: 'scope_denied' }),
+    ];
+    for (const message of invalid) {
+        const current = fixture((_frame, emit) => emit(message));
+        await assert.rejects(current.bridge.activate(capture), rejects('protocol_invalid'));
+        assert.equal(current.disconnected(), 1); assert.equal(current.listeners.size, 0);
+        assert.equal(current.timers.every(timer => !timer.active), true);
+    }
 });
 
 test('rejects expired or overlong challenge windows before reading capture', async () => {

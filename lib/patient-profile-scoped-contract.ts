@@ -41,8 +41,10 @@ export type ProfileQueryErrorCode =
     | 'handle_unavailable' | 'handle_expired' | 'revision_conflict' | 'query_unavailable' | 'output_too_large' | 'cancelled';
 
 export class ProfileQueryError extends Error {
-    constructor(readonly code: ProfileQueryErrorCode) {
+    readonly code: ProfileQueryErrorCode;
+    constructor(code: ProfileQueryErrorCode) {
         super(`Patient profile query unavailable: ${code}`);
+        this.code = code;
         this.name = 'ProfileQueryError';
     }
 }
