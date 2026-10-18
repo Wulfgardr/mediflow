@@ -58,7 +58,7 @@ const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
 const pilotFiles = ['client/tests/flow.rs', 'app/src/clinical_text.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/text_input.rs',
-  'transport/src/catalogs.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/profile_query.rs', 'transport/src/session.rs'].map(file => `${pilot}/${file}`);
+  'transport/src/catalogs.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/profile_query.rs', 'transport/src/session.rs', 'transport/src/bin/mediflow-runtime-probe.rs'].map(file => `${pilot}/${file}`);
 const pilotTestCall = `cargo test --manifest-path ${pilot}/Cargo.toml --workspace --all-targets --locked`;
 function pilotFixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), 'mediflow-cargo-selection-'));
