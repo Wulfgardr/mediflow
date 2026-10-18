@@ -804,3 +804,165 @@ BEGIN gpui-blocker-clippy bytes=174 sha256=789b81876a7f26d2678212fad2358e13f7708
     Checking mediflow-gpui-patient-pilot v0.1.0 (/tmp/mediflow-r08ef12a/fixes/experiments/gpui-patient-pilot/app)
     Finished `dev` profile [unoptimized] target(s) in 1.28s
 END gpui-blocker-clippy
+
+BEGIN selection-fix-tests bytes=9823 sha256=51c172dc4c37593be2171165dbeffe03dd07e797881fd52e29093c7c5d49e998
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 test:test-selection
+> node --test scripts/check-test-selection.test.mjs scripts/unit-test-selection.test.mjs scripts/explicit-npm-test-selection.test.mjs
+
+✔ pending source deletions do not crash discovery and deleted selected tests still fail (4.265915ms)
+✔ a test is found by its name or by the framework it loads, nothing else is (0.682071ms)
+✔ a new or renamed test that no suite takes fails, and so does a stale or contradicted exclusion (0.597783ms)
+✔ an empty or failing selector fails instead of silently selecting nothing (0.226552ms)
+✔ a deleted file still listed by git is not read as a test (0.247154ms)
+✔ GPUI test selection binds the explicit Cargo targets to every native CI platform (40.274725ms)
+✔ GPUI runtime comparison binds all adapters and preparer to the actual CI command (64.658719ms)
+✔ GPUI coverage fails closed when Cargo membership, modules or actual CI invocation diverge (80.364908ms)
+▶ GPUI test-support binding rejects missing, conditional, duplicate or disabled support
+  ✔ missing dev table (6.259516ms)
+  ✔ missing GPUI test support (6.282932ms)
+  ✔ empty feature set (19.103471ms)
+  ✔ optional test support (4.418636ms)
+  ✔ different dependency source (5.62645ms)
+  ✔ different timezone support (5.227207ms)
+  ✔ duplicate dev table (5.112053ms)
+  ✔ duplicate support field (5.59966ms)
+  ✔ conditional dependency table (7.487262ms)
+  ✔ unsupported feature overlay (6.980826ms)
+  ✔ disabled binary harness (6.838402ms)
+  ✔ feature-gated binary target (4.679389ms)
+  ✔ missing appointment module (4.521311ms)
+  ✔ conditional appointment module (4.532518ms)
+  ✔ conditional clinical test module (4.361279ms)
+✔ GPUI test-support binding rejects missing, conditional, duplicate or disabled support (99.32101ms)
+✔ Claims self-test selects the actual guard and records the argument-bearing CI call separately (6.09685ms)
+✔ Claims self-test requires its exact arguments once and rejects ordinary scans or shell mentions (31.996709ms)
+✔ Claims self-test missing or changed npm entrypoint never promotes the guard file (8.866766ms)
+✔ Claims self-test rejects missing, nonregular or out-of-root guard paths (7.857622ms)
+✔ Claims argument-bearing call retains CI disabled, failure and execution-context guards (18.000063ms)
+✔ Claims collection neither reads or imports guard code nor scans directories or launches children (49.962682ms)
+✔ six required npm script bodies and CI bindings select the actual independent expected paths (8.550677ms)
+✔ selection is inert, ordered, and records CI conditions without claiming execution (2.739518ms)
+✔ missing, empty and nonliteral commands fail without partial selection (35.670555ms)
+✔ missing, nonregular, duplicate and escaping files fail (10.369265ms)
+✔ a test file no command names stays unselected until a command names it (2.9921ms)
+✔ CI requires a unique complete literal run block, never a substring (16.778328ms)
+✔ disabled or failure-ignoring jobs and steps are not valid bindings (23.71606ms)
+✔ working directory and shell resolve step over job over workflow (11.254773ms)
+✔ invalid YAML, duplicate keys, merges, missing job or files remain required errors (11.839216ms)
+✔ package and workflow readers reject nonregular, escaping and invalid UTF-8 sources (6.869969ms)
+✔ module import performs no discovery, subprocess or test execution (49.666544ms)
+✔ known runner binding requires the exact npm command and the same CI guards (4.014415ms)
+✔ required guard self-tests select real entrypoints and preserve exact CI provenance (5.832672ms)
+✔ each new guard fails closed for missing self-test, changed npm body or duplicate self-test (20.742687ms)
+✔ OpenAPI companion arguments are exact and restricted to its own self-test binding (6.070942ms)
+✔ registration: route, behavior and private-loader suites each occur once in required units (8.114319ms)
+✔ expands both groups recursively with deterministic ordering and the existing literal order (10.280621ms)
+✔ rejects missing, empty and unreadable lib while other required tests remain (7.210844ms)
+✔ rejects missing, empty and unreadable components while other required tests remain (9.659002ms)
+▶ rejects each missing literal even though the rest of the suite is present
+  ✔ scripts/owned-synthetic-http-suite.test.mjs (7.92326ms)
+  ✔ scripts/launcher-helpers.test.mjs (6.2948ms)
+  ✔ scripts/portable-local-test-selection.test.mjs (5.799522ms)
+  ✔ scripts/conditional-local-groups.test.mjs (7.097383ms)
+  ✔ scripts/ci-disposition-selection.test.mjs (3.893562ms)
+  ✔ app/api/patients/route.test.ts (7.765022ms)
+  ✔ scripts/admin-route-auth-boundary.test.mjs (5.567581ms)
+  ✔ scripts/check-never-regress-icd-who.test.mjs (6.007897ms)
+  ✔ scripts/check-never-regress-ocr-retirement.test.mjs (5.979294ms)
+  ✔ scripts/check-never-regress-tinetti-provenance.test.mjs (5.740022ms)
+  ✔ scripts/inventory-first-party-code.test.mjs (5.276031ms)
+  ✔ scripts/test-data-dir.test.mjs (5.244754ms)
+  ✔ scripts/check-schema-drift.test.ts (9.680985ms)
+  ✔ scripts/run-native-probe.test.mjs (4.376122ms)
+  ✔ scripts/audit-quality-gate.test.mjs (5.14946ms)
+  ✔ scripts/audit-test-config.test.mjs (4.085132ms)
+  ✔ scripts/prosthetic-audit-guard.test.mjs (4.68613ms)
+  ✔ scripts/service-audit-guard.test.mjs (7.186186ms)
+  ✔ scripts/ambulatory-audit-guard.test.mjs (5.543795ms)
+  ✔ scripts/prepare-e2e-db.test.mjs (5.276822ms)
+  ✔ scripts/db-server-data-isolation.test.mjs (5.501592ms)
+  ✔ scripts/native-first-install.test.mjs (4.986313ms)
+  ✔ scripts/sqlite-schema-shape.test.mjs (4.668413ms)
+  ✔ scripts/native-network-bounded-json.test.mjs (5.549394ms)
+  ✔ scripts/native-network-attachment-budget.test.mjs (4.772791ms)
+  ✔ scripts/checkup-parent-lifecycle.test.mjs (5.559008ms)
+  ✔ scripts/checkup-parent-lifecycle-harness.test.mjs (3.225052ms)
+  ✔ scripts/anydoc-consumer-diagnostic.test.mjs (3.827853ms)
+  ✔ scripts/run-unit-suite.test.mjs (5.012693ms)
+  ✔ scripts/network-catalog-smoke-cleanup.test.mjs (4.828234ms)
+  ✔ scripts/e2e-quarantine.test.mjs (6.130582ms)
+  ✔ scripts/run-strip-types.test.mjs (6.173296ms)
+  ✔ scripts/check-motion-budget.test.mjs (5.788805ms)
+  ✔ scripts/node-runtime-contract.test.mjs (5.79124ms)
+  ✔ scripts/generate-runtime-payload-ledger.test.mjs (4.815184ms)
+  ✔ scripts/unit-test-selection.test.mjs (5.325175ms)
+  ✔ scripts/check-test-selection.test.mjs (4.401439ms)
+  ✔ scripts/explicit-npm-test-selection.test.mjs (5.245915ms)
+  ✔ scripts/anydoc-desktop-renderer-trace.test.mjs (5.131873ms)
+  ✔ scripts/anydoc-pdf-smoke-diagnostics.test.mjs (4.927805ms)
+  ✔ scripts/anydoc-windows-icu-preflight.test.mjs (4.009167ms)
+  ✔ scripts/anydoc-windows-icu-text-smoke.test.mjs (5.634573ms)
+  ✔ scripts/attachments-runtime-columns-migration.test.mjs (4.182609ms)
+  ✔ scripts/build-apple-macos-app.test.mjs (4.111392ms)
+  ✔ scripts/build-mobile-sim-app.test.mjs (3.886712ms)
+  ✔ scripts/check-capability-mapping.test.mjs (4.529042ms)
+  ✔ scripts/check-fabric-headless-plane-inventories.test.mjs (4.900854ms)
+  ✔ scripts/check-headless-semantic-plane.test.mjs (4.056259ms)
+  ✔ scripts/check-standalone-runtime-bundle.test.mjs (3.741783ms)
+  ✔ scripts/check-who-local-sidecar-manifest.test.mjs (5.052062ms)
+  ✔ scripts/icd-docker-packaging-retirement.test.mjs (3.367177ms)
+  ✔ scripts/icd-docker-runtime-retirement.test.mjs (3.331544ms)
+  ✔ scripts/launch-bundled-headless-supervisor.test.mjs (5.062718ms)
+  ✔ scripts/mediflow-headless-supervisor.test.mjs (4.013544ms)
+  ✔ scripts/patient-insight-revision-lifecycle.test.mjs (4.487359ms)
+  ✔ scripts/patient-reference-lifecycle.test.mjs (3.838028ms)
+  ✔ scripts/portable-supervisor-child-shutdown.test.mjs (4.182359ms)
+  ✔ scripts/portable-supervisor-import-urls.test.mjs (4.279485ms)
+  ✔ scripts/run-mini-desktop-acceptance.test.mjs (2.822874ms)
+  ✔ scripts/seed-performance-baseline-currentness.test.mjs (4.155618ms)
+  ✔ scripts/web-auth-control-test-client.test.mjs (3.712289ms)
+  ✔ scripts/web-session-resource-reclamation.test.mjs (4.459858ms)
+  ✔ scripts/mobile-home-base-interop-cas-relay.test.mjs (4.112532ms)
+  ✔ scripts/mobile-home-base-interop-module-verifier.test.mjs (4.791189ms)
+  ✔ scripts/mobile-home-base-interop-response-proxy.test.mjs (3.144961ms)
+  ✔ scripts/mobile-home-base-interop.test.mjs (3.192233ms)
+  ✔ scripts/who-local-loopback-transport.test.mjs (3.025501ms)
+  ✔ scripts/who-local-onboarding-portability.test.mjs (3.754141ms)
+  ✔ scripts/who-local-onboarding.test.mjs (3.06415ms)
+  ✔ scripts/who-local-platform.test.mjs (3.165573ms)
+  ✔ scripts/who-local-setup.test.mjs (3.264843ms)
+  ✔ scripts/document-evidence-backfill-currentness-cas.test.ts (3.423471ms)
+  ✔ scripts/local-chat-runtime.test.ts (3.675643ms)
+  ✔ scripts/chatgpt-account/account-service.test.ts (3.523162ms)
+  ✔ scripts/chatgpt-account/account-browser.test.ts (3.023198ms)
+  ✔ scripts/chatgpt-account/account-session-http.test.ts (3.515171ms)
+  ✔ scripts/chatgpt-account/account-transport.test.ts (6.935768ms)
+✔ rejects each missing literal even though the rest of the suite is present (377.723887ms)
+✔ rejects a directory at a required script path (7.041488ms)
+✔ the real runner rejects incomplete selection before bootstrap or suite launch (41.006265ms)
+✔ portable script cohort is selected exactly once through the common runner (5.925512ms)
+✔ serial WHO invocations partition the complete selection exactly once (4.915036ms)
+ℹ tests 131
+ℹ suites 0
+ℹ pass 131
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 560.924545
+END selection-fix-tests
+
+BEGIN selection-fix-check bytes=283 sha256=64c90d0e090c9c3cffa8cff4a2d6e3f1e7520c76ca4fa9637c28e50a2fe1e422
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 check:test-selection
+> node scripts/check-test-selection.mjs
+
+Test files: 1062; taken by a suite: 1033; excluded with a reason: 29
+Test selection: COMPLETE
+END selection-fix-check
+
+BEGIN selection-fix-lint bytes=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+END selection-fix-lint

@@ -71,7 +71,7 @@ function pilotFixture(t) {
     write(file, readFileSync(path.join(sourceRoot, file)));
   }
   for (const file of [...pilotFiles, `${pilot}/client/src/lib.rs`, `${pilot}/transport/src/bin/mediflow-runtime-probe.rs`, `${pilot}/Cargo.lock`]) write(file, 'must not execute');
-  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
+  write(`${pilot}/app/src/main.rs`, '// synthetic binding fixture\nmod appointments;\nmod clinical_text;\nmod components;\nmod demo;\nmod demo_app;\nmod documents;\nmod editing;\nmod icons;\nmod navigation;\nmod patient_forms;\nmod references;\nmod shell;\nmod text_input;\nmod theme;\nfn main() {}');
   write(`${pilot}/transport/src/lib.rs`, '//! Synthetic library binding fixture\n#![forbid(unsafe_code)]\nmod catalogs;\nmod crypto;\nmod dto;\nmod error;\nmod http;\nmod session;\nmod tls;');
   for (const file of ['run.mjs', 'prepare-runtime.mjs', 'js-client.mjs', 'compare.mjs', 'verify-vectors.mjs']) {
     write(`${pilot}/comparison/${file}`, readFileSync(path.join(sourceRoot, pilot, 'comparison', file)));
@@ -132,5 +132,37 @@ test('GPUI coverage fails closed when Cargo membership, modules or actual CI inv
     const selection = collectNativeToolSelections(root)['cargo:gpui-pilot'];
     assert.deepEqual(selection.files, [], `${file}: ${after}`);
     assert.ok(selection.errors.length, `${file}: ${after}`);
+  }
+});
+
+test('GPUI test-support binding rejects missing, conditional, duplicate or disabled support', async t => {
+  const manifest = `${pilot}/app/Cargo.toml`;
+  const main = `${pilot}/app/src/main.rs`;
+  const support = 'gpui = { workspace = true, features = ["test-support"] }';
+  for (const [name, file, before, after] of [
+    ['missing dev table', manifest, '[dev-dependencies]', '# [dev-dependencies]'],
+    ['missing GPUI test support', manifest, support, 'gpui.workspace = true'],
+    ['empty feature set', manifest, support, 'gpui = { workspace = true, features = [] }'],
+    ['optional test support', manifest, support, 'gpui = { workspace = true, features = ["test-support"], optional = true }'],
+    ['different dependency source', manifest, support, 'gpui = { path = "../unbound", features = ["test-support"] }'],
+    ['different timezone support', manifest, 'chrono-tz = "0.10"', 'chrono-tz = "0.9"'],
+    ['duplicate dev table', manifest, '[dev-dependencies]', '[dev-dependencies]\n[dev-dependencies]'],
+    ['duplicate support field', manifest, support, `${support}\n${support}`],
+    ['conditional dependency table', manifest, '[dev-dependencies]', '[target.\'cfg(unix)\'.dev-dependencies]'],
+    ['unsupported feature overlay', manifest, support, `${support}\n[features]\noptional-tests = []`],
+    ['disabled binary harness', manifest, 'path = "src/main.rs"', 'path = "src/main.rs"\nharness = false'],
+    ['feature-gated binary target', manifest, 'path = "src/main.rs"', 'path = "src/main.rs"\nrequired-features = ["optional-tests"]'],
+    ['missing appointment module', main, 'mod appointments;', '// mod appointments;'],
+    ['conditional appointment module', main, 'mod appointments;', '#[cfg(feature = "optional")]\nmod appointments;'],
+    ['conditional clinical test module', main, 'mod clinical_text;', '#[cfg(feature = "optional")]\nmod clinical_text;'],
+  ]) {
+    await t.test(name, child => {
+      const root = pilotFixture(child);
+      assert.deepEqual(collectNativeToolSelections(root)['cargo:gpui-pilot'].errors, []);
+      changePilot(root, file, before, after);
+      const selection = collectNativeToolSelections(root)['cargo:gpui-pilot'];
+      assert.deepEqual(selection.files, [], name);
+      assert.ok(selection.errors.length, name);
+    });
   }
 });
