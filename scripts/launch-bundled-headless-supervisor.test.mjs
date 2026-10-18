@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { physicalRecord, physicalFiles, sha256 } from './launch-bundled-headless-supervisor.mjs';
-import { appLayout, checkHeadlessRuntime, privateDatabaseDependency, sharedRuntimeDependency, traceSourceText } from './stage-headless-runtime.mjs';
+import { appLayout, checkHeadlessRuntime, headlessTraceReadPath, privateDatabaseDependency, sharedRuntimeDependency, traceSourceText } from './stage-headless-runtime.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const template = fs.readFileSync(new URL('./launch-bundled-headless-supervisor.mjs', import.meta.url), 'utf8');
@@ -243,6 +243,21 @@ test('guarded loader executes the unchanged IPC contract and rejects a foreign m
   });
   assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout, '');
 });
+test('Headless read admission accepts NFT Windows package-export separators while retaining root and dot-segment checks', () => {
+  const root = String.raw`D:\synthetic\project`;
+  const native = String.raw`D:\synthetic\project\node_modules\example\dist\esm\index.js`;
+  assert.equal(path.win32.normalize(root), root);
+  assert.equal(path.win32.normalize(native), native);
+  for (const candidate of [native, String.raw`D:\synthetic\project\node_modules\example/dist/esm/index.js`,
+    'D:/synthetic/project/node_modules/example/dist/esm/index.js']) {
+    assert.equal(headlessTraceReadPath(candidate, root, path.win32), native);
+  }
+  for (const candidate of [String.raw`D:\synthetic\project-other\index.js`, String.raw`D:\synthetic\project\..\outside.js`,
+    String.raw`D:\synthetic\project\node_modules\example/../outside.js`, String.raw`C:\synthetic\project\index.js`,
+    String.raw`D:\synthetic\project\.\index.js`]) {
+    assert.throws(() => headlessTraceReadPath(candidate, root, path.win32), /Headless trace escaped its root/u);
+  }
+});
 test('database exclusions cover case-insensitive SQLite names and sidecars on both path styles, not migration inputs', () => {
   for (const root of ['', '/synthetic/root/', 'C:\\synthetic\\root\\']) {
     for (const suffix of ['.db', '.SQLITE', '.sqlite3', '.DB-WAL', '.db-shm', '.sqlite3-journal', '.db-mj1234ABCD']) {
@@ -321,6 +336,17 @@ for (const lane of ['source', 'app']) {
     assert.ok(physicalFiles(f.output).every(name => !/\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal))?$/iu.test(name)));
     assert.equal(fs.readFileSync(path.join(f.output, 'drizzle/0000_synthetic.sql'), 'utf8'), 'SELECT 1;\n');
     assert.equal(fs.readFileSync(path.join(f.output, 'drizzle/meta/_journal.json'), 'utf8'), '{"entries":[]}\n');
+  });
+  test(`${lane} staging preserves a real NFT package-exports dependency without admitting data`, async t => {
+    const f = stagingFixture(t, lane);
+    fs.appendFileSync(path.join(f.source, 'scripts/mediflow-headless-supervisor.mjs'), "\nimport 'synthetic-exports';\n");
+    write(path.join(f.source, 'node_modules/synthetic-exports/package.json'), '{"name":"synthetic-exports","exports":"./dist/esm/index.js"}\n');
+    write(path.join(f.source, 'node_modules/synthetic-exports/dist/esm/index.js'), 'export const synthetic = true;\n');
+    const accesses = observePrivateAccess(t, DATABASE_SENTINELS.map(name => path.join(f.source, name)));
+    await f.stage();
+    assert.equal(fs.readFileSync(path.join(f.output, 'node_modules/synthetic-exports/dist/esm/index.js'), 'utf8'),
+      'export const synthetic = true;\n');
+    assert.deepEqual(accesses, []);
   });
   test(`${lane} trace read hook excludes private files even when the tracer bypasses ignore`, async t => {
     const f = stagingFixture(t, lane);
