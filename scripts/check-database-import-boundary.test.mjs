@@ -79,6 +79,44 @@ test('does not lose a handle through star chains, CommonJS or direct-return fact
     assert.ok(edges.some(e => e.symbols.includes('connection') && e.symbols.includes('bag')));
 });
 
+for (const [name, declaration, consumer] of [
+    ['named default function', 'export default function connection() { return dbServer; }', 'import connection from'],
+    ['anonymous default function', 'export default function() { return dbServer; }', 'import connection from'],
+    ['separately exported function', 'function connection() { return dbServer; } export { connection };', 'import { connection } from'],
+    ['exported destructuring', 'export const { connection } = { connection: dbServer };', 'import { connection } from'],
+]) {
+    test(`new consumer of ${name} creates an edge even when its owner is already admitted`, async t => {
+        const root = await fixture(t, {
+            'lib/db-server.ts': 'export const dbServer = {};',
+            'lib/owner.ts': `import { dbServer } from './db-server'; ${declaration}`,
+            'app/consumer.ts': '',
+        });
+        const baseline = (await analyze(root)).edges;
+        assert.equal(baseline.length, 1);
+        assert.equal(baseline[0].file, 'lib/owner.ts');
+        await writeFile(path.join(root, 'app/consumer.ts'), `${consumer} '../lib/owner';`);
+        const observed = (await analyze(root)).edges;
+        const added = observed.filter(edge => edge.file === 'app/consumer.ts');
+        assert.equal(added.length, 1);
+        assert.equal(added[0].capability, 'server:lib/db-server.ts');
+        const findings = compareDatabaseInventory(observed, baseline);
+        assert.equal(findings.length, 1);
+        assert.match(findings[0], /NEW_EDGE.*app\/consumer\.ts/);
+    });
+}
+
+test('these function and destructuring forms do not propagate unrelated DTO values', async t => {
+    const root = await fixture(t, {
+        'lib/db-server.ts': 'export const dbServer = {};',
+        'lib/owner.ts': `import { dbServer } from './db-server';
+            export default function dto() { return { name: 'synthetic' }; }
+            function other() { return { name: 'synthetic' }; } export { other };
+            export const { view } = { connection: dbServer, view: { name: 'synthetic' } };`,
+        'app/consumer.ts': "import dto, { other, view } from '../lib/owner';",
+    });
+    assert.deepEqual((await analyze(root)).edges.map(edge => edge.file), ['lib/owner.ts']);
+});
+
 test('tracks destructured dynamic handle exports and named CommonJS exports', async t => {
     const root = await fixture(t, {
         'lib/db-server.ts': 'export const dbServer = {};',

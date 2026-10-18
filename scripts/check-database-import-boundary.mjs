@@ -175,7 +175,8 @@ function parseModule(file, source) {
     const declarations = new Map(); const destructured = new Map(); const imported = new Map(); const loads = []; const opaque = [];
     const printer = ts.createPrinter({ removeComments: true });
     const visitDeclarations = node => {
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        if ((ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer)
+            || (ts.isFunctionDeclaration(node) && node.name)) {
             const values = declarations.get(node.name.text) ?? []; values.push(node); declarations.set(node.name.text, values);
         }
         if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer) for (const binding of node.name.elements) {
@@ -331,10 +332,18 @@ export async function analyzeDatabaseImports(root, scope) {
                     if (locals.has(node.text)) return locals.get(node.text);
                     const binding = parsed.destructured.get(node.text);
                     if (binding) {
-                        const load = parsed.loads.find(item => item.node === unwrap(binding.initializer));
-                        return load ? forLoad(load, binding.symbol) : expressionCaps(binding.initializer, next);
+                        const initializer = unwrap(binding.initializer);
+                        const load = parsed.loads.find(item => item.node === initializer);
+                        if (load) return forLoad(load, binding.symbol);
+                        if (ts.isObjectLiteralExpression(initializer)) {
+                            const property = initializer.properties.find(property => (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
+                                && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) && property.name.text === binding.symbol);
+                            if (property) return expressionCaps(ts.isPropertyAssignment(property) ? property.initializer : property.name, next);
+                        }
+                        return expressionCaps(initializer, next);
                     }
-                    return expressionCaps(parsed.declaration(node)?.initializer, next);
+                    const declaration = parsed.declaration(node);
+                    return expressionCaps(declaration?.initializer ?? declaration, next);
                 }
                 if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
                     const base = unwrap(node.expression); const key = member(node);
@@ -373,9 +382,15 @@ export async function analyzeDatabaseImports(root, scope) {
                         } else put('*', forLoad(load));
                     }
                 } else if (ts.isVariableStatement(statement) && statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-                    for (const declaration of statement.declarationList.declarations) if (ts.isIdentifier(declaration.name)) put(declaration.name.text, expressionCaps(declaration.initializer));
-                } else if (ts.isFunctionDeclaration(statement) && statement.name && statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-                    put(statement.name.text, expressionCaps(statement));
+                    for (const declaration of statement.declarationList.declarations) {
+                        if (ts.isIdentifier(declaration.name)) put(declaration.name.text, expressionCaps(declaration.initializer));
+                        else if (ts.isObjectBindingPattern(declaration.name)) for (const binding of declaration.name.elements) {
+                            if (ts.isIdentifier(binding.name)) put(binding.name.text, expressionCaps(binding.name));
+                        }
+                    }
+                } else if (ts.isFunctionDeclaration(statement) && statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
+                    const name = statement.modifiers.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword) ? 'default' : statement.name?.text;
+                    if (name) put(name, expressionCaps(statement));
                 } else if (ts.isExportAssignment(statement)) put('default', expressionCaps(statement.expression));
                 else if (ts.isExpressionStatement(statement) && ts.isBinaryExpression(statement.expression)
                     && statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
