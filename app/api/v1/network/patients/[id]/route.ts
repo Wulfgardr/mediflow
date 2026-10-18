@@ -59,33 +59,11 @@ async function requireNetworkPatientWriteContext(
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-    const pairedClient = await authenticateNetworkPairedClient(request);
-    if (!pairedClient) return unauthorizedResponse();
-
-    // WUL-307: paired-client tokens are inert while home-base mode is off.
-    const modeGateResponse = await getNetworkModeGateResponse();
-    if (modeGateResponse) return modeGateResponse;
-
-    if (!pairedClient.grantedCapabilities.includes('network.replica.readonly-patients')) {
-        return forbiddenResponse();
-    }
-
-    const session = await requireAccountSession(request);
-    if (!session) return unauthorizedResponse();
-
     try {
-        const { id } = await params;
-        const scopeAmbulatoryId = await resolveNetworkScope(session, request);
-        if (!scopeAmbulatoryId) {
-            return NextResponse.json({ error: 'Network scope unavailable' }, { status: 403 });
-        }
-
-        const patient = await getNetworkScopedPatientDetail(id, scopeAmbulatoryId);
-        if (!patient) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        return NextResponse.json(patient);
+        const resolved = await getNetworkScopedPatientDetail(request, async () => (await params).id);
+        if (!resolved.ok) return resolved.response;
+        if (!resolved.profile) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        return NextResponse.json(resolved.profile);
     } catch (error) {
         console.error('API GET /api/v1/network/patients/[id] error:', error);
         return NextResponse.json({ error: 'Failed to fetch patient' }, { status: 500 });
