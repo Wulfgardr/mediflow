@@ -1,11 +1,13 @@
 /* @Codex */
 import { z } from 'zod';
+import { isProfileResult, PROFILE_QUERY_MAX_RESULT_BYTES } from '../../../lib/patient-profile-scoped-contract.ts';
 
 export const TERMINOLOGY_OPERATION_ID = 'mediflow.terminology.search.v1' as const;
 export const OPEN_LOOPS_OPERATION_ID = 'mediflow.patient.open_loops.read.v1' as const;
 export const FOLLOW_UP_PROPOSAL_OPERATION_ID = 'mediflow.patient.open_loops.follow_up.propose.v1' as const;
 export const SEMANTIC_QUERY_OPERATION_ID = 'mediflow.semantic_query_plan.execute.v1' as const;
 export const CHECKUP_STATUS_TRANSITION_OPERATION_ID = 'mediflow.patient.checkup.status.transition.v1' as const;
+export const PATIENT_PROFILE_QUERY_OPERATION_ID = 'patient-profile.read.v1' as const;
 export const HEADLESS_STATUS_TOOL_ID = 'mediflow.system.headless_status.v1' as const;
 export const CAPABILITIES_TOOL_ID = 'mediflow.system.capabilities.v1' as const;
 export const RPC_REQUEST_SCHEMA = 'mediflow.aip.operation.request.v1' as const;
@@ -53,6 +55,10 @@ export const OPERATION_DESCRIPTORS = Object.freeze([Object.freeze({
   maximumStage: 'read_only' as const,
   inputSchema: 'mediflow.semantic-query-operation.input.v1',
   outputSchema: 'mediflow.semantic-query-execution.result.v1',
+}), Object.freeze({
+  operationId: PATIENT_PROFILE_QUERY_OPERATION_ID, capabilityId: PATIENT_PROFILE_QUERY_OPERATION_ID,
+  serviceRef: 'PatientProfileQueryHostPortV1', maximumStage: 'read_only' as const,
+  inputSchema: 'mediflow.patient.profile-query.v1', outputSchema: 'mediflow.patient.profile-view.v1',
 })]);
 export type OperationDescriptor = (typeof OPERATION_DESCRIPTORS)[number];
 
@@ -279,3 +285,25 @@ export function publicCatalog(operations: readonly OperationDescriptor[]) {
     operations: Object.freeze(operations.map(({ operationId, capabilityId, maximumStage, inputSchema, outputSchema }) =>
       Object.freeze({ operationId, capabilityId, maximumStage, inputSchema, outputSchema }))) });
 }
+
+
+export const patientProfileQueryArgumentsSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('open'), contractVersion: z.literal(1), projection: z.enum(['profile', 'notes']),
+    expectedSelectionEpoch: safeInteger }).strict(),
+  z.object({ kind: z.literal('read'), contractVersion: z.literal(1), projection: z.enum(['profile', 'notes']),
+    handle: z.string().regex(/^pph_[0-9a-f]{64}$/u), expectedRevision: safeInteger.min(1) }).strict(),
+]);
+const profileResultBase = { schemaVersion: z.literal('mediflow.patient.profile-view.v1'),
+  operationId: z.literal(PATIENT_PROFILE_QUERY_OPERATION_ID), contractVersion: z.literal(1),
+  handle: z.string().regex(/^pph_[0-9a-f]{64}$/u), currentness: z.object({ revision: safeInteger.min(1),
+    selectionEpoch: safeInteger.min(1), observedAt: safeInteger, expiresAt: safeInteger.min(1) }).strict() };
+const nullableText = z.string().nullable();
+export const patientProfileQueryOutputSchema = z.discriminatedUnion('projection', [
+  z.object({ ...profileResultBase, projection: z.literal('notes'), profile: z.object({ notes: nullableText }).strict() }).strict(),
+  z.object({ ...profileResultBase, projection: z.literal('profile'), profile: z.object({
+    firstName: z.string(), lastName: z.string(), taxCode: z.string(), birthDate: nullableText,
+    address: nullableText, phone: nullableText, caregiver: nullableText, diagnoses: nullableText,
+    exemptions: nullableText, notes: nullableText, isAdi: z.boolean().nullable(), isArchived: z.boolean().nullable(),
+    statusReason: nullableText, archiveReason: nullableText, archiveNote: nullableText,
+  }).strict() }).strict(),
+]).refine(value => isProfileResult(value) && encoder.encode(JSON.stringify(value)).byteLength <= PROFILE_QUERY_MAX_RESULT_BYTES, 'profile_result_invalid');

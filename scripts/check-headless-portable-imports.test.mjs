@@ -72,3 +72,21 @@ test('scans all mandatory surfaces, optional MCP package and rejects symlink esc
         await rm(outside, { recursive: true, force: true });
     } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('admits only the exact dependency-free profile contract and scans its contents', async () => {
+    assert.deepEqual(validateHeadlessPortableSource("import '../../../lib/patient-profile-scoped-contract.ts';", 'packages/aip/src/profile.ts'), []);
+    assert.notDeepEqual(validateHeadlessPortableSource("import '../../../lib/patient-profile-service.ts';", 'packages/aip/src/profile.ts'), []);
+    const root = await mkdtemp(path.join(os.tmpdir(), 'mediflow-profile-leaf-'));
+    try {
+        for (const p of ['packages/aip/src', 'packages/mini/src', 'scripts', 'lib']) await mkdir(path.join(root, p), { recursive: true });
+        await writeFile(path.join(root, 'scripts/intelligent-host-mcp-stdio.mjs'), '');
+        const target = path.join(root, 'lib/patient-profile-scoped-contract.ts');
+        await writeFile(target, 'export const version = 1;');
+        await runHeadlessPortableImportGuard(root);
+        for (const source of ["import 'server-only';", "export * from './helper.ts';",
+            "import Database from 'better-sqlite3';", "await import('./helper.ts');", "require('./helper.ts');"]) {
+            await writeFile(target, source);
+            await assert.rejects(runHeadlessPortableImportGuard(root), /dependency-free leaf/u);
+        }
+    } finally { await rm(root, { recursive: true, force: true }); }
+});

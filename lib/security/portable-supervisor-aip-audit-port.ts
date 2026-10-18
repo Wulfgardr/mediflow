@@ -40,6 +40,7 @@ const OPERATION_STAGES = new Map<string, 'read_only' | 'proposal_only'>([
   ['mediflow.patient.open_loops.follow_up.propose.v1', 'proposal_only'],
   ['mediflow.semantic_query_plan.execute.v1', 'read_only'],
   ['mediflow.patient.checkup.status.transition.v1', 'proposal_only'],
+  ['patient-profile.read.v1', 'read_only'],
 ]);
 const AUTH_DENIALS = new Set(['input_invalid', 'owner_invalid', 'lease_invalid', 'permit_invalid',
   'permit_replay', 'permit_revoked', 'currentness_invalid', 'claim_invalid', 'reference_invalid',

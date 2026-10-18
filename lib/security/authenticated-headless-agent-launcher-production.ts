@@ -15,7 +15,7 @@ import { createPatientOpenLoopsReadInternalCandidateV1 } from './patient-open-lo
 export { createLateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
 const REQUIRED_SOURCE_KEYS = ['readHostContext', 'writeAudit', 'commitTerminalAudit'] as const;
-const OPTIONAL_SOURCE_KEY = 'previewCheckupStatus' as const;
+const OPTIONAL_SOURCE_KEYS = ['previewCheckupStatus', 'patientProfileQueries'] as const;
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 // @Codex Keep the Node --import operand portable across Windows drive-letter paths.
 const LOADER = new URL('../../scripts/register-strip-types-loader.mjs', import.meta.url).href;
@@ -26,23 +26,27 @@ const TARGETS = Object.freeze({
 
 type Sources = Readonly<{ readHostContext: () => unknown; writeAudit: (value: unknown) => unknown;
   commitTerminalAudit: SemanticQueryOperationTerminalAuditCommitV1;
-  previewCheckupStatus?: (value: unknown, signal: AbortSignal) => Promise<unknown> }>;
+  previewCheckupStatus?: (value: unknown, signal: AbortSignal) => Promise<unknown>;
+  patientProfileQueries?: Readonly<{ projection: 'profile' | 'notes';
+    executeProfileQuery: (input: unknown, signal: AbortSignal) => Promise<unknown> }> }>;
 type SpawnChild = (environment: Readonly<Record<string, string>>) => unknown;
 
 function sources(value: unknown): Sources {
   if (!value || typeof value !== 'object' || types.isProxy(value) || Array.isArray(value)) throw new Error('input_invalid');
   const descriptors = Object.getOwnPropertyDescriptors(value) as Record<string, PropertyDescriptor>;
   const ownKeys = Reflect.ownKeys(value);
-  if ((ownKeys.length !== REQUIRED_SOURCE_KEYS.length && ownKeys.length !== REQUIRED_SOURCE_KEYS.length + 1)
+  if ((ownKeys.length < REQUIRED_SOURCE_KEYS.length || ownKeys.length > REQUIRED_SOURCE_KEYS.length + OPTIONAL_SOURCE_KEYS.length)
     || ownKeys.some((key) => typeof key !== 'string'
-      || !([...REQUIRED_SOURCE_KEYS, OPTIONAL_SOURCE_KEY] as string[]).includes(key))
+      || !([...REQUIRED_SOURCE_KEYS, ...OPTIONAL_SOURCE_KEYS] as string[]).includes(key))
     || REQUIRED_SOURCE_KEYS.some((key) =>
     !descriptors[key]?.enumerable || !('value' in descriptors[key]) || typeof descriptors[key].value !== 'function'
     || types.isProxy(descriptors[key].value)
     || (key === 'commitTerminalAudit' && types.isAsyncFunction(descriptors[key].value)))
-    || (descriptors[OPTIONAL_SOURCE_KEY]
-      && (typeof descriptors[OPTIONAL_SOURCE_KEY].value !== 'function'
-        || types.isProxy(descriptors[OPTIONAL_SOURCE_KEY].value)))) throw new Error('input_invalid');
+    || (descriptors.previewCheckupStatus
+      && (!descriptors.previewCheckupStatus.enumerable || !('value' in descriptors.previewCheckupStatus)
+        || typeof descriptors.previewCheckupStatus.value !== 'function' || types.isProxy(descriptors.previewCheckupStatus.value)))
+    || (descriptors.patientProfileQueries
+      && (!descriptors.patientProfileQueries.enumerable || !('value' in descriptors.patientProfileQueries)))) throw new Error('input_invalid');
   return value as Sources;
 }
 
@@ -93,6 +97,7 @@ function createProductionLauncher(
     spawnChild: spawnChildOverride
       ?? ((environment: Readonly<Record<string, string>>) => childPort(TARGETS[kind], environment)),
     createOpenLoopsRead: createPatientOpenLoopsReadInternalCandidateV1,
+    ...(ports.patientProfileQueries ? { patientProfileQueries: ports.patientProfileQueries } : {}),
     previewCheckupStatus: ports.previewCheckupStatus
       ?? (async () => { throw new AuthenticatedAgentLauncherV1Error('operation_unavailable'); }),
   });

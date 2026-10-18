@@ -223,3 +223,14 @@ test('control remains portable and owns no child, Web, database, listener or log
   assert.doesNotMatch(source, /(?:child_process|next\/|server-auth|db-server|sqlite|net|http|listen\s*\(|process\.|console\.|cookie|password|pin)/iu);
   assert.match(source, /PREPARE_TTL_MS\s*=\s*5_000/u);
 });
+
+test('forwards a host profile grant separately from the unchanged activation capture', async () => {
+  let args: unknown[] = [];
+  const control = createPortableSupervisorWebControlV1({ now: () => 1000, nextChallenge: () => CHALLENGE,
+    activate: (...values: unknown[]) => { args = values; return Object.freeze({ expiresAt: 20000 }); }, revoke: () => undefined });
+  await control.handle(request({ method: 'prepare' }));
+  await control.handle(request({ method: 'activate', challenge: CHALLENGE, capture: capture(),
+    patientProfileQuery: { projection: 'notes' } }));
+  assert.equal(Object.keys(args[0] as object).length, 8);
+  assert.deepEqual({ ...(args[1] as object) }, { projection: 'notes' });
+});
