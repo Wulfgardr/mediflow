@@ -49,6 +49,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/anydoc-windows-icu-text-smoke.test.mjs',
   'scripts/attachments-runtime-columns-migration.test.mjs',
   'scripts/build-apple-macos-app.test.mjs',
+  'scripts/build-input-metadata.test.mjs',
   'scripts/build-mobile-sim-app.test.mjs',
   'scripts/check-capability-mapping.test.mjs',
   'scripts/check-fabric-headless-plane-inventories.test.mjs',

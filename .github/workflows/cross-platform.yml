@@ -48,6 +48,17 @@ jobs:
         os: [ubuntu-22.04, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db
+      - name: Verify sparse production source identity
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain --untracked-files=normal)"
+          test ! -e native/MediFlowMac/Tests/MediFlowCoreTests/Fixtures/medical_fixture.db
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24

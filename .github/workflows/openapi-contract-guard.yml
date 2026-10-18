@@ -55,6 +55,11 @@ jobs:
         run: |
           npm run check:ai-clinical-writes
           npm run check:ai-clinical-writes -- --self-test
+      - name: Runtime database import boundary and negative fixtures
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run check:database-import-boundary
+          npm run test:database-import-boundary
       - name: API error leak guard and self-test
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

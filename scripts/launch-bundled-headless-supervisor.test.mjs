@@ -278,7 +278,7 @@ function stagingFixture(t, lane) {
   const trace = { forced: null, probes: [], results: [] };
   globalThis[Symbol.for(key)] = trace;
   t.after(() => { delete globalThis[Symbol.for(key)]; });
-  for (const name of ['scripts/stage-headless-runtime.mjs', 'scripts/launch-bundled-headless-supervisor.mjs',
+  for (const name of ['scripts/stage-headless-runtime.mjs', 'scripts/build-input-metadata.mjs', 'scripts/launch-bundled-headless-supervisor.mjs',
     'scripts/node-runtime-contract.mjs']) write(path.join(source, name), fs.readFileSync(path.join(ROOT, name)));
   write(path.join(source, 'package.json'), JSON.stringify({ engines: { node: '>=24 <25' } }));
   write(path.join(source, '.nvmrc'), '24\n');

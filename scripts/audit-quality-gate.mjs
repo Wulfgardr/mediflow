@@ -73,7 +73,7 @@ const REQUIRED_ROUTE_AUDIT = [
     {
         route: 'app/api/patients/[id]/route.ts', events: ['patient.updated'], reason: 'patient update requires one transactional audit owner',
         writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
-            profileFile: 'lib/patient-profile-service.ts', auditContextExport: 'auditContextFromSession',
+            profileFile: 'lib/patient-profile-service.ts', dispatchFile: 'lib/patient-profile-update-dispatch.ts', auditContextExport: 'auditContextFromSession',
             ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
             target: 'patient-update.web', eventType: 'patient.updated', transactionalPatientUpdate: true }],
     },
@@ -87,7 +87,7 @@ const REQUIRED_ROUTE_AUDIT = [
     {
         route: 'app/api/v1/patients/[id]/route.ts', events: ['patient.updated'], reason: 'native patient update requires one transactional audit owner',
         writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
-            profileFile: 'lib/patient-profile-service.ts', auditContextExport: 'auditContextFromRequest',
+            profileFile: 'lib/patient-profile-service.ts', dispatchFile: 'lib/patient-profile-update-dispatch.ts', auditContextExport: 'auditContextFromRequest',
             ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
             target: 'patient-update.native', eventType: 'patient.updated', transactionalPatientUpdate: true }],
     },
@@ -1254,30 +1254,153 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     return problems;
 }
 
+function validatePatientProfileDispatch(source) {
+    const checked = checkedSource('lib/patient-profile-update-dispatch.ts', source);
+    const { sourceFile, checker } = checked;
+    const problems = [];
+    const tokens = text => {
+        const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, ts.LanguageVariant.Standard, text);
+        const result = [];
+        for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) result.push(scanner.getTokenText());
+        return result.join('');
+    };
+    const compact = node => tokens(node?.getText(sourceFile) ?? '');
+    const statementsEqual = (body, expected) => body?.statements.length === expected.length
+        && expected.every((text, index) => compact(body.statements[index]) === tokens(text));
+    const operation = importedBinding(sourceFile, checker, './patient-update-operation', 'updatePatientOperation');
+    const descriptor = importedBinding(sourceFile, checker, './patient-profile-update-contract', 'PATIENT_PROFILE_UPDATE_OPERATION');
+    const fields = importedBinding(sourceFile, checker, './patient-profile-update-contract', 'PATIENT_PROFILE_UPDATE_FIELDS');
+    const uuid = importedBinding(sourceFile, checker, 'node:crypto', 'randomUUID');
+    const equality = importedBinding(sourceFile, checker, 'node:util', 'isDeepStrictEqual');
+    const executor = namedFunction(sourceFile, 'executeLegacyPatientProfileUpdate');
+    const create = namedFunction(sourceFile, 'createPatientProfileUpdateExecution', true);
+    const dispatch = namedFunction(sourceFile, 'dispatchPatientProfileUpdate', true);
+    const classes = sourceFile.statements.filter(node => ts.isClassDeclaration(node) && node.name?.text === 'ProfileUpdateExecution');
+    const owner = classes.length === 1 ? classes[0] : null;
+    const constructors = owner?.members.filter(ts.isConstructorDeclaration) ?? [];
+    const methods = owner?.members.filter(node => ts.isMethodDeclaration(node) && node.name?.getText(sourceFile) === 'dispatch') ?? [];
+    const constructor = constructors.length === 1 ? constructors[0] : null;
+    const method = methods.length === 1 ? methods[0] : null;
+    const bindings = [operation, descriptor, fields, uuid, equality];
+    if (sourceFile.parseDiagnostics.length || !owner || !constructor || !method || !executor || !create || !dispatch
+        || bindings.some(binding => !binding || bindingIsWritten(sourceFile, checker, binding.symbol))
+        || [method, executor, create, dispatch].some(node => ts.getModifiers(node)?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword))) {
+        return ['profile dispatch must retain its fixed host constructor, dispatcher, legacy executor and real imports'];
+    }
+    const classBinding = checker.getSymbolAtLocation(owner.name);
+    const executorBinding = checker.getSymbolAtLocation(executor.name);
+    if (bindingIsWritten(sourceFile, checker, classBinding) || bindingIsWritten(sourceFile, checker, executorBinding)
+        || !statementsEqual(create.body, ['return new ProfileUpdateExecution(input);'])
+        || !statementsEqual(dispatch.body, [
+            "if (!(execution instanceof ProfileUpdateExecution)) return Promise.reject(new Error('Patient profile execution unavailable'));",
+            'return execution.dispatch(command);',
+        ])) problems.push('profile dispatch must consume only its issued execution with no alternate writer or await');
+    if (!statementsEqual(method.body, [
+        "if (!isDeepStrictEqual(candidate, this.command)) return Promise.reject(new Error('Patient profile execution command mismatch'));",
+        'if (this.#result) return this.#result;',
+        'let resolve!: (result: PatientProfileUpdateOutcome) => void;',
+        'const pending = new Promise<PatientProfileUpdateOutcome>(accept => { resolve = accept; });',
+        'this.#result = pending;',
+        `const identity = { operationId: this.command.operationId, contractVersion: this.command.contractVersion,
+            purpose: this.command.purpose, executionId: this.command.executionId,
+            correlationId: this.command.correlationId, idempotencyKey: this.command.idempotencyKey };`,
+        `try { const result = executeLegacyPatientProfileUpdate(this.command, this.#audit, this.#authorizeCommit);
+            resolve(Object.freeze(result.status === 200 ? { ...identity, kind: 'applied', result } : { ...identity, kind: 'refused', result }));
+        } catch (error) { resolve(Object.freeze({ ...identity, kind: 'uncertain', error })); }`,
+        'return pending;',
+    ]) || bindingCalls(sourceFile, checker, executorBinding).length !== 1) {
+        problems.push('profile execution must register its terminal Promise before the one synchronous writer and bind applied/refused/uncertain outcomes to that execution');
+    }
+    const body = constructor.body?.statements ?? [];
+    const commandStatement = body[4];
+    const assignment = commandStatement && ts.isExpressionStatement(commandStatement) && ts.isBinaryExpression(commandStatement.expression)
+        ? commandStatement.expression : null;
+    const freeze = assignment?.right;
+    const object = freeze && ts.isCallExpression(freeze) && compact(freeze.expression) === 'Object.freeze'
+        && freeze.arguments.length === 1 && ts.isObjectLiteralExpression(freeze.arguments[0]) ? freeze.arguments[0] : null;
+    const expected = {
+        operationId: 'PATIENT_PROFILE_UPDATE_OPERATION.id', contractVersion: 'PATIENT_PROFILE_UPDATE_OPERATION.version',
+        executionId: 'randomUUID()', correlationId: 'input.audit.requestId ?? null', idempotencyKey: 'randomUUID()', executor: "'legacy-node'", purpose: "'patient-profile-update'",
+        author: 'Object.freeze({ kind: input.audit.actorType, ref: input.audit.actorRef, surface: input.audit.sourceSurface })',
+        authorization: "Object.freeze({ kind: 'existing-host-admission', commitGuard: input.authorizeCommit ? 'paired-transaction' : 'archive-audit' })",
+        scope: "Object.freeze(input.scopeAmbulatoryId === undefined ? { kind: 'local' } : { kind: 'ambulatory', ambulatoryId: input.scopeAmbulatoryId })",
+        confirmation: "'legacy-not-attested'", target: 'Object.freeze({ patientId: input.patientId, expectedVersion: input.expectedVersion })',
+        payload: 'Object.freeze(payload)', normalizedAt: 'input.values.updatedAt!.toISOString()', setPrimaryAmbulatory: 'input.setPrimaryAmbulatory',
+    };
+    const props = object && exactPropertyAssignments(object, Object.keys(expected));
+    if (body.length !== 6 || compact(assignment?.left) !== 'this.command'
+        || compact(body[0]) !== "if((input.scopeAmbulatoryId===undefined)!==(input.authorizeCommit===undefined))thrownewError('Patient profile admission mismatch');"
+        || compact(body[1]) !== "constpayload=Object.fromEntries(PATIENT_PROFILE_UPDATE_FIELDS.flatMap(field=>{constvalue=input.values[field];returnvalue===undefined?[]:[[field,valueinstanceofDate?value.toISOString():value]];}))asPatientProfileUpdatePayload;"
+        || compact(body[2]) !== 'this.#audit={...input.audit,flags:[...input.audit.flags]};'
+        || compact(body[3]) !== 'this.#authorizeCommit=input.authorizeCommit;'
+        || compact(body[5]) !== 'Object.freeze(this);'
+        || !props || Object.entries(expected).some(([name, value]) => compact(props.get(name)?.initializer) !== tokens(value))) {
+        problems.push('profile command must be immutable and host-derived with an explicit payload, admission, confirmation, scope and separate execution key');
+    }
+    const calls = bindingCalls(sourceFile, checker, operation.symbol);
+    const call = calls.length === 1 ? calls[0] : null;
+    const input = call?.arguments[0];
+    const writerExpected = {
+        operationId: 'command.operationId', contractVersion: 'command.contractVersion', patientId: 'command.target.patientId',
+        expectedVersion: 'command.target.expectedVersion', values: 'values', setPrimaryAmbulatory: 'command.setPrimaryAmbulatory',
+        scopeAmbulatoryId: "command.scope.kind === 'ambulatory' ? command.scope.ambulatoryId : undefined", authorizeCommit: 'authorizeCommit', audit: 'audit',
+    };
+    const writerProps = input && ts.isObjectLiteralExpression(input) ? exactPropertyAssignments(input, Object.keys(writerExpected)) : null;
+    if (executor.parameters.length !== 3 || !call || call.questionDotToken || call.arguments.length !== 1
+        || !ts.isReturnStatement(call.parent) || call.parent !== executor.body.statements.at(-1)
+        || !isReachableCall(call, executor) || !writerProps || input.properties.at(-1)?.name?.text !== 'audit'
+        || Object.entries(writerExpected).some(([name, value]) => compact(writerProps.get(name)?.initializer ?? writerProps.get(name)?.name) !== tokens(value))
+        || executor.body.statements.length !== 2
+        || compact(executor.body.statements[0]) !== tokens(`const values = { ...command.payload,
+            birthDate: command.payload.birthDate === undefined ? undefined : command.payload.birthDate === null ? null : new Date(command.payload.birthDate),
+            aiSummaryGeneratedAt: command.payload.aiSummaryGeneratedAt === undefined ? undefined : command.payload.aiSummaryGeneratedAt === null ? null : new Date(command.payload.aiSummaryGeneratedAt),
+            version: command.target.expectedVersion + 1, updatedAt: new Date(command.normalizedAt) };`)) {
+        problems.push('legacy profile executor must synchronously pass the canonical command and admitted guard/audit to exactly one original writer');
+    }
+    return problems;
+}
+
 /* The profile port is an explicit extra hop, never an alternative transaction owner. */
-function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
+function validatePatientProfileAuditPort({ spec, routeSource, profileSource, dispatchSource }) {
     const problems = validateDelegatedRouteAudit({
         spec: { ...spec, ownerName: spec.serviceExport }, routeSource, serviceSource: profileSource,
     });
     const profile = checkedSource(spec.profileFile, profileSource);
     const entry = namedFunction(profile.sourceFile, spec.serviceExport, true);
-    const operation = importedBinding(profile.sourceFile, profile.checker, './patient-update-operation', spec.ownerName);
-    const contract = importedBinding(profile.sourceFile, profile.checker, './patient-profile-update-contract', 'PATIENT_PROFILE_UPDATE_OPERATION');
-    const calls = entry && operation ? bindingCalls(entry, profile.checker, operation.symbol) : [];
+    const factory = importedBinding(profile.sourceFile, profile.checker, './patient-profile-update-dispatch', 'createPatientProfileUpdateExecution');
+    const dispatcher = importedBinding(profile.sourceFile, profile.checker, './patient-profile-update-dispatch', 'dispatchPatientProfileUpdate');
+    const calls = entry && factory ? bindingCalls(entry, profile.checker, factory.symbol) : [];
     const call = calls.length === 1 ? calls[0] : null;
+    const executionDeclaration = call && ts.isVariableDeclaration(call.parent) ? call.parent : null;
+    const execution = executionDeclaration && ts.isIdentifier(executionDeclaration.name) ? profile.checker.getSymbolAtLocation(executionDeclaration.name) : null;
+    const dispatchCalls = entry && dispatcher ? bindingCalls(entry, profile.checker, dispatcher.symbol) : [];
+    const dispatch = dispatchCalls.length === 1 ? dispatchCalls[0] : null;
+    const awaitedDispatch = dispatch && ts.isAwaitExpression(dispatch.parent) ? dispatch.parent : null;
+    const dispatchDeclaration = awaitedDispatch && ts.isVariableDeclaration(awaitedDispatch.parent) ? awaitedDispatch.parent : null;
+    const outcome = dispatchDeclaration && ts.isIdentifier(dispatchDeclaration.name) ? profile.checker.getSymbolAtLocation(dispatchDeclaration.name) : null;
     const contextName = entry?.parameters[0]?.name;
     const context = contextName && ts.isIdentifier(contextName) ? profile.checker.getSymbolAtLocation(contextName) : null;
-    if (!entry || !operation || !context || entry.parameters.length !== 2
-        || bindingCalls(profile.sourceFile, profile.checker, operation.symbol).length !== 1
-        || bindingIsWritten(entry, profile.checker, context)
-        || bindingIsWritten(profile.sourceFile, profile.checker, operation.symbol)
+    if (!entry || !factory || !dispatcher || !context || !execution || !outcome || entry.parameters.length !== 2
+        || bindingCalls(profile.sourceFile, profile.checker, factory.symbol).length !== 1
+        || bindingCalls(profile.sourceFile, profile.checker, dispatcher.symbol).length !== 1
+        || bindingIsWritten(entry, profile.checker, context) || bindingIsWritten(entry, profile.checker, execution)
+        || [factory, dispatcher].some(binding => bindingIsWritten(profile.sourceFile, profile.checker, binding.symbol))
         || !call || call.questionDotToken || call.arguments.length !== 1
-        || !ts.isReturnStatement(call.parent) || call.parent.parent !== entry.body
-        || entry.body.statements.at(-1) !== call.parent || !isReachableCall(call, entry)) {
-        problems.push('profile port must directly return exactly one synchronous approved patient-update operation');
+        || executionDeclaration.initializer !== call || executionDeclaration.parent.parent !== entry.body.statements.at(-4)
+        || !(executionDeclaration.parent.flags & ts.NodeFlags.Const) || !isReachableCall(call, entry)
+        || !dispatch || dispatch.questionDotToken || dispatch.arguments.length !== 2
+        || !dispatchDeclaration || dispatchDeclaration.initializer !== awaitedDispatch
+        || dispatchDeclaration.parent.parent !== entry.body.statements.at(-3)
+        || !(dispatchDeclaration.parent.flags & ts.NodeFlags.Const) || !isReachableCall(dispatch, entry)
+        || bindingIsWritten(entry, profile.checker, outcome)
+        || !exactIdentifierBinding(profile.checker, dispatch.arguments[0], execution)
+        || !ts.isPropertyAccessExpression(dispatch.arguments[1]) || dispatch.arguments[1].questionDotToken
+        || dispatch.arguments[1].name.text !== 'command'
+        || !exactIdentifierBinding(profile.checker, dispatch.arguments[1].expression, execution)) {
+        problems.push('profile port must create one admitted execution then consume its one canonical dispatch outcome');
     } else {
         const input = unwrap(call.arguments[0]);
-        const names = ['operationId', 'contractVersion', 'patientId', 'expectedVersion', 'values', 'setPrimaryAmbulatory', 'scopeAmbulatoryId', 'authorizeCommit', 'audit'];
+        const names = ['patientId', 'expectedVersion', 'values', 'setPrimaryAmbulatory', 'scopeAmbulatoryId', 'authorizeCommit', 'audit'];
         const properties = ts.isObjectLiteralExpression(input) && input.properties.every((property) =>
             (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
             && !ts.isComputedPropertyName(property.name)
@@ -1286,23 +1409,28 @@ function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
         const contextProperty = (node, name) => Boolean(node && ts.isPropertyAccessExpression(node)
             && !node.questionDotToken && node.name.text === name
             && exactIdentifierBinding(profile.checker, node.expression, context));
-        const contractProperty = (node, name) => Boolean(contract && node && ts.isPropertyAccessExpression(node)
-            && !node.questionDotToken && node.name.text === name
-            && exactIdentifierBinding(profile.checker, node.expression, contract.symbol));
         const audit = properties?.get('audit')?.initializer;
-        if (!contract || bindingIsWritten(profile.sourceFile, profile.checker, contract.symbol)
-            || !contractProperty(properties?.get('operationId')?.initializer, 'id')
-            || !contractProperty(properties?.get('contractVersion')?.initializer, 'version')
-            || !properties || input.properties.length !== names.length || properties.size !== names.length
+        if (!properties || input.properties.length !== names.length || properties.size !== names.length
             || names.some((name) => !properties.has(name))
-            || !['patientId', 'expectedVersion', 'scopeAmbulatoryId'].every((name) =>
-                contextProperty(properties.get(name)?.initializer, name))
+            || !['patientId', 'expectedVersion', 'scopeAmbulatoryId'].every((name) => contextProperty(properties.get(name)?.initializer, name))
             || properties.get('audit') !== input.properties.at(-1)
             || !audit || !ts.isCallExpression(audit) || audit.questionDotToken || audit.arguments.length !== 0
             || !contextProperty(audit.expression, 'audit')) {
-            problems.push('profile port must bind the same patient context and invoke its mandatory audit callback last, directly in the commit input');
+            problems.push('profile port must bind the same patient context and invoke its mandatory audit callback last, directly in the execution input');
+        }
+        const compact = node => node?.getText(profile.sourceFile).replace(/\s+/gu, '') ?? '';
+        const guard = entry.body.statements.at(-5);
+        const guardDeclaration = ts.isVariableStatement(guard) && guard.declarationList.declarations.length === 1 ? guard.declarationList.declarations[0] : null;
+        if (!guardDeclaration || compact(guardDeclaration) !== 'authorizeCommit=context.prepareCommitGuard?awaitcontext.prepareCommitGuard():undefined'
+            || compact(properties?.get('authorizeCommit')) !== 'authorizeCommit'
+            || compact(properties?.get('values')?.initializer) !== 'normalized.values'
+            || compact(properties?.get('setPrimaryAmbulatory')?.initializer) !== "Object.prototype.hasOwnProperty.call(body,'ambulatoryId')"
+            || compact(entry.body.statements.at(-2)) !== "if(outcome.kind==='uncertain')throwoutcome.error;"
+            || compact(entry.body.statements.at(-1)) !== 'returnoutcome.result;') {
+            problems.push('profile execution must preserve normalized values, primary membership intent and the admitted final guard');
         }
     }
+    problems.push(...validatePatientProfileDispatch(dispatchSource ?? ''));
 
     const route = checkedSource('route.ts', routeSource);
     const handler = namedFunction(route.sourceFile, spec.handler, true);
@@ -1360,9 +1488,9 @@ function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
 }
 
 /* bounded C04 patient-update contract; this source guard complements the real transaction tests. */
-export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource, profileSource = null }) {
+export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource, profileSource = null, dispatchSource = null }) {
     const problems = spec.profileFile
-        ? validatePatientProfileAuditPort({ spec, routeSource, profileSource: profileSource ?? '' })
+        ? validatePatientProfileAuditPort({ spec, routeSource, profileSource: profileSource ?? '', dispatchSource })
         : validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
     const owner = namedFunction(core.sourceFile, spec.ownerName, true);
@@ -2689,6 +2817,7 @@ function checkRouteCoverage(findings) {
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             auditSource: read('lib/security/audit.ts'),
                             profileSource: contract.profileFile && exists(contract.profileFile) ? read(contract.profileFile) : null,
+                            dispatchSource: contract.dispatchFile && exists(contract.dispatchFile) ? read(contract.dispatchFile) : null,
                         })
                     : contract.transactionalPatientDelete
                         ? validateRequiredPatientDeleteAudit({

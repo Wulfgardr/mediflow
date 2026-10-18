@@ -30,10 +30,15 @@ STAGE_EXECUTION_MAC_ASSETS="$ROOT_DIR/scripts/stage-chatgpt-execution-mac-assets
 PROJECT="$ROOT_DIR/native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj"
 SCHEME="MediFlowMacApp"
 CONFIG="${MEDIFLOW_MAC_CONFIG:-Debug}"
-DERIVED="${MEDIFLOW_MAC_DERIVED_DATA:-$ROOT_DIR/tmp-mac-derived-data}"
+DERIVED="$(node "$ROOT_DIR/scripts/build-input-metadata.mjs" --derived "$ROOT_DIR")"
+export MEDIFLOW_MAC_DERIVED_DATA="$DERIVED"
 APP="$DERIVED/Build/Products/$CONFIG/MediFlow.app"
 IDENTITY_HELPER="$ROOT_DIR/scripts/launcher-helpers.mjs"
 BUILD_IDENTITY_FILE="$STANDALONE_DIR/mediflow-build-identity.json"
+
+METADATA_ARGS=(--source "$ROOT_DIR" --payload "$STANDALONE_DIR")
+if [[ "${MEDIFLOW_SKIP_WEB_BUILD:-0}" == 1 ]]; then METADATA_ARGS+=(--materialized); fi
+node "$ROOT_DIR/scripts/build-input-metadata.mjs" "${METADATA_ARGS[@]}"
 
 # use the shared launcher identity rather than a packaging-specific Git
 # formula, then make the exact source visible to the bundled standalone server.
@@ -304,6 +309,7 @@ WEB_NATIVE_TARGETS=(
   "$FRAMEWORKS/mediflow-web-fsevents.node"
 )
 echo "Injecting WebRuntime into the app bundle..."
+node "$ROOT_DIR/scripts/build-input-metadata.mjs" --source "$ROOT_DIR" --payload "$STANDALONE_DIR" --materialized
 rm -rf "$WEB"
 mkdir -p "$WEB"
 cp -R "$STANDALONE_DIR/." "$WEB/"

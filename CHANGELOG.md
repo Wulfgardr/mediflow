@@ -14,6 +14,12 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Avvio
 
+- Prima di compilare o copiare il runtime di produzione, un controllo dei soli
+  metadati rifiuta archivi DB/SQLite e sidecar, directory dati o ambienti privati
+  e alias non ammessi. Il controllo precede anche la verifica delle dipendenze
+  nel comando `npm run build`; un input rifiutato richiede un'area di build pulita.
+  La DerivedData Mac predefinita rimane esterna ai sorgenti
+  ([guida nativa](./docs/native-launch.md)).
 - Un solo lanciatore per macOS, Windows e Linux: `MediFlow.command`,
   `MediFlow.cmd` e `MediFlow.sh` chiedono come vuoi usare MediFlow e avviano
   la build di produzione nell'uso ordinario. La configurazione sta nella
@@ -38,6 +44,16 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
   smoke Windows conserva anche gli errori di avvio e pulizia
   ([#550](https://github.com/Wulfgardr/mediflow/pull/550),
   [#546](https://github.com/Wulfgardr/mediflow/pull/546)).
+
+### Profilo paziente
+
+- Gli ingressi Web, API locale e client abbinati usano un comando interno
+  normalizzato e un dispatch unico verso il writer Node esistente. Una stessa
+  esecuzione riusa il proprio esito senza ripetere gli effetti; richieste HTTP
+  distinte restano protette dal controllo di versione corrente. Non cambiano
+  cifratura, audit, permessi o wire API; non si dichiara idempotenza durevole
+  né una scrittura migrata a Rust
+  ([ADR 0147](./docs/adr/0147-canonical-patient-profile-update-dispatch.md)).
 
 ### Repertori
 
