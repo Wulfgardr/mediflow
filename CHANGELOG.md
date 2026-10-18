@@ -39,6 +39,16 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
   ([#550](https://github.com/Wulfgardr/mediflow/pull/550),
   [#546](https://github.com/Wulfgardr/mediflow/pull/546)).
 
+### Profilo paziente
+
+- Gli ingressi Web, API locale e client abbinati usano un comando interno
+  normalizzato e un dispatch unico verso il writer Node esistente. Una stessa
+  esecuzione riusa il proprio esito senza ripetere gli effetti; richieste HTTP
+  distinte restano protette dal controllo di versione corrente. Non cambiano
+  cifratura, audit, permessi o wire API; non si dichiara idempotenza durevole
+  né una scrittura migrata a Rust
+  ([ADR 0147](./docs/adr/0147-canonical-patient-profile-update-dispatch.md)).
+
 ### Repertori
 
 - ICD-11: ricerca, verifica e salvataggio dei codici con il catalogo WHO MMS

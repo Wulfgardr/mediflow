@@ -116,7 +116,7 @@ function constantDeclaration(statement, name) {
     return declaration;
 }
 
-function assertPatientProfileTombstones({ route, routeSource, profileSource, coreSource, auditSource }) {
+function assertPatientProfileTombstones({ route, routeSource, profileSource, dispatchSource, coreSource, auditSource }) {
     const routeFile = checkedSource(routeSource);
     assertNamedImports(routeFile, '@/lib/patient-profile-service', ['readPatientProfile', 'updatePatientProfile']);
     const get = tryStatements(exportedFunction(routeFile, 'GET'));
@@ -140,7 +140,8 @@ function assertPatientProfileTombstones({ route, routeSource, profileSource, cor
     const profile = checkedSource(profileSource);
     assertNamedImports(profile, 'drizzle-orm', ['and', 'eq']);
     assertNamedImports(profile, './patient-lifecycle', ['activePatients']);
-    assertNamedImports(profile, './patient-update-operation', ['updatePatientOperation']);
+    assertNamedImports(profile, './patient-profile-update-dispatch', ['createPatientProfileUpdateExecution', 'dispatchPatientProfileUpdate']);
+    assertNamedImports(checkedSource(dispatchSource), './patient-update-operation', ['updatePatientOperation']);
     const readBody = exportedFunction(profile, 'readPatientProfile').body.statements;
     assert.equal(readBody.length, 1, 'profile read must dispatch through its host admission');
     const admitted = readBody[0].expression;
@@ -218,7 +219,7 @@ function assertPatientProfileTombstones({ route, routeSource, profileSource, cor
         spec: { handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
             profileFile: 'lib/patient-profile-service.ts', auditContextExport: route.auditContextExport,
             ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation' },
-        routeSource, profileSource, coreSource, auditSource,
+        routeSource, profileSource, dispatchSource, coreSource, auditSource,
     }), [], route.file);
 }
 
@@ -240,7 +241,7 @@ test('patient DELETE routes delegate one version-guarded tombstone and required 
 });
 
 function profileTombstoneSources(route) {
-    return { route, routeSource: read(route.file), profileSource: read('lib/patient-profile-service.ts'),
+    return { route, routeSource: read(route.file), profileSource: read('lib/patient-profile-service.ts'), dispatchSource: read('lib/patient-profile-update-dispatch.ts'),
         coreSource: read('lib/patient-update-operation.ts'), auditSource: read('lib/security/audit.ts') };
 }
 
@@ -282,7 +283,7 @@ test('profile tombstone guard rejects broken imports, delegation, filters, 404s 
         ['profile preflight loses 404', 'profileSource',
             "if (!existing) return { status: 404, value: { error: 'Not found' } };",
             "if (!existing) return { status: 200, value: { error: 'Not found' } };"],
-        ['profile uses another writer', 'profileSource', 'return updatePatientOperation({', 'return uncheckedPatientOperation({'],
+        ['profile uses another writer', 'profileSource', 'const outcome = await dispatchPatientProfileUpdate(execution, execution.command)', 'const outcome = await uncheckedDispatch(execution, execution.command)'],
         ['writer loses 404', 'coreSource',
             "if (!existing) return { status: 404, value: { error: 'Not found' } };",
             "if (!existing) return { status: 200, value: { error: 'Not found' } };"],

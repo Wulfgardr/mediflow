@@ -27,6 +27,7 @@ process.env.MEDIFLOW_LOCAL_API_TOKEN = 'profile-synthetic-local-token';
 const { readPatientProfile: admittedRead, updatePatientProfile } = load('./patient-profile-service.ts') as typeof import('./patient-profile-service');
 const sql = dbServer.$client;
 const { updatePatientOperation } = load('./patient-update-operation.ts') as typeof import('./patient-update-operation');
+const profileDispatch = load('./patient-profile-update-dispatch.ts') as typeof import('./patient-profile-update-dispatch');
 const webRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
 const v1Route = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route');
 const networkRoute = load('../app/api/v1/network/patients/[id]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/route');
@@ -412,4 +413,152 @@ test('paired parameters resolve before the final scope binding and cannot retain
     cookieState.cookies.set('ambulatory_id', 'profile-b'); resolveAgain({ id: patientId });
     assert.equal((await asserted).status, 403);
     assert.deepEqual(snapshot(), before);
+});
+
+function updateRequest(projection: 'web' | 'api-v1' | 'network', body: unknown) {
+    const headers = new Headers(request(projection).headers);
+    headers.set('x-mediflow-archive-generation', currentArchiveGeneration());
+    headers.set('x-request-id', 'synthetic-shared-correlation');
+    headers.set('Content-Type', 'application/json');
+    const prefix = projection === 'web' ? '/api' : projection === 'api-v1' ? '/api/v1' : '/api/v1/network';
+    return new Request('http://127.0.0.1' + prefix + '/patients/' + patientId,
+        { method: 'PUT', headers, body: JSON.stringify(body) });
+}
+
+test('real update adapters issue separate host executions for repeated caller keys: one commit/audit then CAS409', async t => {
+    const commands: ReturnType<typeof profileDispatch.createPatientProfileUpdateExecution>['command'][] = [];
+    const create = profileDispatch.createPatientProfileUpdateExecution;
+    t.mock.method(profileDispatch, 'createPatientProfileUpdateExecution', (input: Parameters<typeof create>[0]) => {
+        const execution = create(input); commands.push(execution.command); return execution;
+    });
+    const body = { version: 4, notes: 'ENC:YWJj:bmV3', operationId: 'untrusted.operation', contractVersion: 999,
+        executionId: 'claimed-execution', idempotencyKey: 'same-caller-key', correlationId: 'claimed-correlation',
+        executor: 'rust', purpose: 'claimed-purpose', path: 'new-writer', confirmation: 'human-confirmed', authorization: { allowed: true },
+        author: { kind: 'doctor', ref: 'forged-author' }, scope: { kind: 'ambulatory', ambulatoryId: 'profile-b' },
+        patientId: 'forged-patient', scopeAmbulatoryId: 'profile-b', expectedVersion: 99, audit: { actorRef: 'forged-audit' } };
+    for (const [route, projection] of [[webRoute, 'web'], [v1Route, 'api-v1'], [networkRoute, 'network']] as const) {
+        reset();
+        if (projection === 'api-v1') cookieState.cookies.clear();
+        if (projection === 'network') { selectSession('native'); grant(['network.replica.write-patient-profile']); }
+        const before = snapshot();
+        const params = { params: Promise.resolve({ id: patientId }) };
+        const first = await route.PUT(updateRequest(projection, body), params);
+        assert.equal(first.status, 200, projection); assert.deepEqual(await first.json(), { success: true });
+        const committed = snapshot();
+        assert.equal(committed.audit.length, before.audit.length + 1);
+        assert.equal((committed.patients[0] as Record<string, unknown>).notes, body.notes);
+        assert.equal((committed.patients[0] as Record<string, unknown>).version, 5);
+        assert.deepEqual(committed.memberships, before.memberships);
+        const retry = await route.PUT(updateRequest(projection, body), params);
+        assert.equal(retry.status, 409, projection); assert.equal((await retry.json()).code, 'VERSION_CONFLICT');
+        assert.deepEqual(snapshot(), committed);
+        const [a, b] = commands.slice(-2);
+        assert.notEqual(a.idempotencyKey, b.idempotencyKey); assert.notEqual(a.executionId, b.executionId);
+        assert.equal(a.correlationId, 'synthetic-shared-correlation');
+        assert.notEqual(a.idempotencyKey, body.idempotencyKey); assert.notEqual(a.executionId, body.executionId);
+        assert.equal(a.operationId, 'patient-profile.update.v1'); assert.equal(a.contractVersion, 1);
+        assert.equal(a.executor, 'legacy-node'); assert.equal(a.confirmation, 'legacy-not-attested');
+        assert.equal(a.purpose, 'patient-profile-update');
+        assert.equal(a.authorization.kind, 'existing-host-admission');
+        assert.deepEqual(a.target, { patientId, expectedVersion: 4 });
+        assert.deepEqual(a.payload, { notes: body.notes });
+        assert.deepEqual(a.scope, projection === 'network' ? { kind: 'ambulatory', ambulatoryId: 'profile-a' } : { kind: 'local' });
+        assert.equal(a.author.ref, projection === 'api-v1' ? 'local-api' : authority.session.userId);
+        assert.equal(a.author.kind, projection === 'api-v1' ? 'system' : 'user');
+        assert.ok(!JSON.stringify(committed.audit.at(-1)).includes('forged'));
+    }
+    assert.equal(commands.length, 6);
+});
+
+test('real update adapters preserve common domain errors and documented absence/field-validation precedence', async () => {
+    const cases = [
+        { body: { notes: sealedNotes }, id: patientId, status: 400, error: 'Version is required' },
+        { body: { version: 4 }, id: patientId, status: 400, error: 'No valid fields to update' },
+        { body: { version: 4, birthDate: 'invalid' }, id: patientId, status: 400, error: 'Invalid birthDate' },
+        { body: { version: 4, notes: sealedNotes }, id: 'missing', status: 404, error: 'Not found' },
+    ];
+    for (const [route, projection] of [[webRoute, 'web'], [v1Route, 'api-v1'], [networkRoute, 'network']] as const) {
+        for (const sample of cases) {
+            reset();
+            if (projection === 'api-v1') cookieState.cookies.clear();
+            if (projection === 'network') { selectSession('native'); grant(['network.replica.write-patient-profile']); }
+            const before = snapshot();
+            const response = await route.PUT(updateRequest(projection, sample.body), { params: Promise.resolve({ id: sample.id }) });
+            assert.equal(response.status, sample.status, projection); assert.deepEqual(await response.json(), { error: sample.error });
+            assert.deepEqual(snapshot(), before);
+        }
+        reset();
+        if (projection === 'api-v1') cookieState.cookies.clear();
+        if (projection === 'network') { selectSession('native'); grant(['network.replica.write-patient-profile']); }
+        const before = snapshot();
+        const response = await route.PUT(updateRequest(projection, { version: 4, birthDate: 'invalid' }), { params: Promise.resolve({ id: 'missing' }) });
+        assert.equal(response.status, projection === 'network' ? 400 : 404);
+        assert.deepEqual(await response.json(), { error: projection === 'network' ? 'Invalid birthDate' : 'Not found' });
+        assert.deepEqual(snapshot(), before);
+    }
+});
+
+test('one admitted execution deduplicates the real SQLite writer and reuses its successful result', async () => {
+    reset(); const before = snapshot();
+    const execution = profileDispatch.createPatientProfileUpdateExecution({ patientId, expectedVersion: 4,
+        values: { notes: 'ENC:YWJj:b25jZQ==', updatedAt: new Date(), version: 5 },
+        setPrimaryAmbulatory: false, audit: audit() });
+    const first = profileDispatch.dispatchPatientProfileUpdate(execution, execution.command);
+    const concurrent = profileDispatch.dispatchPatientProfileUpdate(execution, execution.command);
+    assert.equal(first, concurrent);
+    const [a, b] = await Promise.all([first, concurrent]); assert.equal(a, b); assert.equal(a.kind, 'applied');
+    assert.equal(a.executionId, execution.command.executionId);
+    if (a.kind === 'applied') assert.equal(a.result.status, 200);
+    const committed = snapshot();
+    assert.equal((committed.patients[0] as Record<string, unknown>).version, 5);
+    assert.equal(committed.audit.length, before.audit.length + 1);
+    assert.equal(await profileDispatch.dispatchPatientProfileUpdate(execution, execution.command), a);
+    assert.deepEqual(snapshot(), committed);
+});
+
+test('an uncertain exception after the real writer commits is terminal without a second commit/audit', async t => {
+    reset(); const before = snapshot();
+    const writer = load('./patient-update-operation.ts') as typeof import('./patient-update-operation');
+    const write = writer.updatePatientOperation;
+    const uncertain = new Error('Synthetic outcome unavailable after commit');
+    const call = t.mock.method(writer, 'updatePatientOperation', (input: Parameters<typeof write>[0]) => {
+        assert.equal(write(input).status, 200); throw uncertain;
+    });
+    const execution = profileDispatch.createPatientProfileUpdateExecution({ patientId, expectedVersion: 4,
+        values: { notes: 'ENC:YWJj:b25jZQ==', updatedAt: new Date(), version: 5 },
+        setPrimaryAmbulatory: false, audit: audit() });
+    const first = profileDispatch.dispatchPatientProfileUpdate(execution, execution.command);
+    const outcome = await first;
+    assert.equal(outcome.kind, 'uncertain');
+    assert.equal(outcome.executionId, execution.command.executionId);
+    assert.equal(outcome.purpose, 'patient-profile-update');
+    if (outcome.kind === 'uncertain') assert.equal(outcome.error, uncertain);
+    const committed = snapshot();
+    assert.equal((committed.patients[0] as Record<string, unknown>).version, 5);
+    assert.equal(committed.audit.length, before.audit.length + 1);
+    const retry = profileDispatch.dispatchPatientProfileUpdate(execution, execution.command);
+    assert.equal(retry, first); assert.equal(await retry, outcome);
+    assert.equal(call.mock.callCount(), 1); assert.deepEqual(snapshot(), committed);
+});
+
+test('canonical payload preserves every existing local profile field and timestamp/membership semantics', async () => {
+    reset();
+    const body = { firstName: 'Bea', lastName: 'Sintetica aggiornata', taxCode: 'SYNTHETIC-UPDATED',
+        birthDate: '2000-02-29T00:00:00.000Z', address: 'ENC:YWJj:YQ==', phone: null,
+        caregiver: '', notes: sealedNotes, monitoringProfile: 'profile', statusReason: 'ENC:YWJj:cg==',
+        archiveReason: 'ENC:YWJj:cg==', archiveNote: 'ENC:YWJj:cg==',
+        exemptions: ['synthetic-exemption'], diagnoses: ['synthetic-diagnosis'],
+        aiSummary: 'synthetic-derived', aiSummaryGeneratedAt: '2026-10-18T10:00:00.123Z',
+        aiSummaryContextHash: 'synthetic-hash', documentInsights: 'synthetic-document-insights',
+        isAdi: true, isArchived: true, ambulatoryId: 'profile-b' };
+    assert.equal((await updatePatientProfile({ patientId, expectedVersion: 4, audit }, body)).status, 200);
+    const row = dbServer.select().from(patients).where(eq(patients.id, patientId)).get()!;
+    for (const field of ['firstName', 'lastName', 'taxCode', 'address', 'phone', 'caregiver', 'notes',
+        'monitoringProfile', 'statusReason', 'archiveReason', 'archiveNote', 'aiSummary', 'aiSummaryContextHash',
+        'documentInsights', 'isAdi', 'isArchived', 'ambulatoryId'] as const) assert.equal(row[field], body[field], field);
+    assert.equal(row.birthDate?.toISOString(), body.birthDate);
+    assert.equal(row.aiSummaryGeneratedAt?.toISOString(), '2026-10-18T10:00:00.000Z', 'existing SQLite timestamp precision remains seconds');
+    assert.equal(row.exemptions, '["synthetic-exemption"]'); assert.equal(row.diagnoses, '["synthetic-diagnosis"]');
+    assert.equal(row.version, 5);
+    assert.ok(dbServer.select().from(patientsToAmbulatories).all().some(link => link.patientId === patientId && link.ambulatoryId === 'profile-b'));
 });

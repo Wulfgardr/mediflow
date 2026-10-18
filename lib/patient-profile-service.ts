@@ -4,7 +4,8 @@ import { dbServer } from './db-server';
 import { patients, patientsToAmbulatories } from './schema';
 import { activePatients } from './patient-lifecycle';
 import { normalizePatientUpdateInput } from './patient-write-normalization';
-import { updatePatientOperation, type PatientUpdateOperationResult } from './patient-update-operation';
+import type { PatientUpdateOperationResult } from './patient-update-operation';
+import { createPatientProfileUpdateExecution, dispatchPatientProfileUpdate } from './patient-profile-update-dispatch';
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse, forbiddenResponse } from '@/lib/security/server-auth';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
@@ -13,7 +14,6 @@ import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server'
 import { getNetworkModeGateResponse, resolveNetworkScope, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 import { NETWORK_FSE_VALIDATE_CAPABILITY } from './network-contract';
 import { PATIENT_PROFILE_READ_OPERATION, type PatientProfileActor, type PatientProfileQuery, type PatientProfileView } from './patient-profile-query';
-import { PATIENT_PROFILE_UPDATE_OPERATION } from './patient-profile-update-contract';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 import type { RequiredAuditContext } from './security/audit';
 import { randomBytes } from 'node:crypto';
@@ -443,11 +443,7 @@ export async function updatePatientProfile(
     const normalized = normalizePatientUpdateInput(body, { expectedVersion: context.expectedVersion });
     if (!normalized.ok) return { status: 400, value: { error: normalized.error } };
     const authorizeCommit = context.prepareCommitGuard ? await context.prepareCommitGuard() : undefined;
-    // No await between resolving host audit identity and the synchronous commit.
-    // The existing operation owns the one SQLite transaction, CAS and audit.
-    return updatePatientOperation({
-        operationId: PATIENT_PROFILE_UPDATE_OPERATION.id,
-        contractVersion: PATIENT_PROFILE_UPDATE_OPERATION.version,
+    const execution = createPatientProfileUpdateExecution({
         patientId: context.patientId,
         expectedVersion: context.expectedVersion,
         values: normalized.values,
@@ -456,4 +452,7 @@ export async function updatePatientProfile(
         authorizeCommit,
         audit: context.audit(),
     });
+    const outcome = await dispatchPatientProfileUpdate(execution, execution.command);
+    if (outcome.kind === 'uncertain') throw outcome.error;
+    return outcome.result;
 }

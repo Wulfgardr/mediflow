@@ -28,6 +28,8 @@
     "benchmark:visit-recording:synthetic": "node scripts/run-visit-recording-synthetic-benchmark.mjs",
     "test:mcp:intelligent-host": "node scripts/run-strip-types.mjs --test packages/mcp/src/contracts.test.ts packages/mcp/src/import-boundary.test.ts scripts/intelligent-host-mcp-stdio.test.mjs",
     "check:headless-portable-imports": "node scripts/check-headless-portable-imports.mjs",
+    "check:database-import-boundary": "node scripts/check-database-import-boundary.mjs",
+    "test:database-import-boundary": "node --test scripts/check-database-import-boundary.test.mjs",
     "test:headless-portable": "node scripts/run-headless-portable-tests.mjs",
     "local:tls-proxy": "node scripts/local-api-tls-proxy.mjs",
     "docs:siss-corpus:validate": "node scripts/siss-docs-corpus.mjs validate",
