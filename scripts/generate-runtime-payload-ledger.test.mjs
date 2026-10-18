@@ -7,8 +7,10 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
-import { materializeSourceRuntime } from './source-runtime.mjs';
+import { materializeSourceRuntime, verifySourceRuntime } from './source-runtime.mjs';
 import { assertBuildInputMetadata } from './build-input-metadata.mjs';
+import { readProductIdentity } from './launcher-helpers.mjs';
+import { buildDecision } from './mediflow.mjs';
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const owner = '@mediflow/web-auth-lifecycle-owner';
@@ -312,9 +314,10 @@ function sourceStartFixture(t) {
   f.put(f.sourceRoot, 'package-lock.json', lock);
   f.put(f.sourceRoot, '.gitignore', '.next/\n'); f.commit();
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.sourceRoot, encoding: 'utf8' }).trim();
-  const sourceFingerprint = `synthetic@${revision.slice(0, 12)}:clean`;
+  const branch = execFileSync('git', ['branch', '--show-current'], { cwd: f.sourceRoot, encoding: 'utf8' }).trim();
+  const sourceFingerprint = `${branch}@${revision.slice(0, 12)}:clean`;
   f.put(web, 'mediflow-build-identity.json', { schemaVersion: 1,
-    revision, branch: 'synthetic', worktreeHash: 'clean', sourceFingerprint, buildId: 'synthetic-build' });
+    revision, branch, worktreeHash: 'clean', sourceFingerprint, buildId: 'synthetic-build' });
   const seal = () => f.put(path.dirname(web), 'runtime-payload-ledger.json', generatePayloadLedger(f));
   seal();
   const run = mode => spawnSync(process.execPath, ['--input-type=module', '-e', `
@@ -331,6 +334,50 @@ test('source Web and Headless launch the admitted payload, independently of cwd'
     assert.equal(result.stdout.trim(), `${f.revision.slice(0, 12)} ${f.sourceFingerprint}`);
     assert.equal(fs.readFileSync(f.marker, 'utf8'), mode); fs.unlinkSync(f.marker);
   }
+});
+
+for (const mutation of ['added hardlink', 'censused member hardlink', 'payload alias']) {
+  test(`source reuse metadata rejects ${mutation} before reading payload or ledger`, t => {
+    if (mutation === 'payload alias' && process.platform === 'win32') { t.skip('File symlink creation needs separate Windows privilege'); return; }
+    const f = sourceStartFixture(t);
+    const outside = path.join(f.directory, 'protected.db');
+    if (mutation === 'censused member hardlink') fs.linkSync(path.join(f.payloadRoot, 'server.js'), outside);
+    else {
+      fs.writeFileSync(outside, 'SYNTHETIC PROTECTED SENTINEL\n');
+      const file = path.join(f.payloadRoot, 'innocent.js');
+      if (mutation === 'added hardlink') fs.linkSync(outside, file);
+      else fs.symlinkSync(outside, file);
+    }
+    const original = fs.readFileSync, reads = [];
+    let failure;
+    fs.readFileSync = function (file, ...args) {
+      if (typeof file === 'string' && (file.startsWith(f.payloadRoot + path.sep)
+        || file === path.join(path.dirname(f.payloadRoot), 'runtime-payload-ledger.json'))) reads.push(file);
+      return original.call(this, file, ...args);
+    };
+    try { verifySourceRuntime(f.sourceRoot); } catch (error) { failure = error; }
+    finally { fs.readFileSync = original; }
+    assert.deepEqual(reads, [], 'metadata rejection must precede every payload and ledger read');
+    assert.match(failure?.message ?? '', /Build input metadata:/u);
+    assert.equal(fs.existsSync(f.marker), false);
+  });
+}
+
+test('source reuse verifies only the payload while an ignored primary database remains unopened', t => {
+  const f = sourceStartFixture(t), sentinel = path.join(f.sourceRoot, 'medical.db');
+  f.put(f.sourceRoot, '.git/info/exclude', 'medical.db\n');
+  f.put(f.sourceRoot, 'medical.db', 'SYNTHETIC PRIMARY DATABASE SENTINEL\n');
+  const original = fs.readFileSync, reads = [];
+  fs.readFileSync = function (file, ...args) {
+    if (file === sentinel) { reads.push(file); throw new Error('Primary database must remain unopened'); }
+    return original.call(this, file, ...args);
+  };
+  try {
+    const verified = verifySourceRuntime(f.sourceRoot);
+    assert.equal(buildDecision(readProductIdentity(f.sourceRoot), verified), 'reuse');
+  } finally { fs.readFileSync = original; }
+  assert.deepEqual(reads, []);
+  assert.equal(fs.existsSync(f.marker), false);
 });
 
 for (const mutation of ['missing', 'altered', 'extra', 'node', 'abi', 'arch']) {
