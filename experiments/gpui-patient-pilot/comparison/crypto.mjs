@@ -24,10 +24,12 @@ export function unwrapKey(blob, kek) {
 }
 
 export function openPinWrapping(blob, salt, pin) {
-    const match = /^v([12]):(.*)$/u.exec(blob);
-    if (blob.startsWith('v') && !match) throw new Error('Expected initial PIN wrapping');
+    const match = /^v(\d+):/u.exec(blob);
+    if (match && !['1', '2'].includes(match[1])) throw new Error('Expected initial PIN wrapping');
+    const payload = match ? blob.slice(match[0].length) : blob;
+    if (!/^[A-Za-z0-9+/]{80}$/u.test(payload)) throw new Error('Expected initial PIN wrapping');
     const iterations = match?.[1] === '2' ? 600_000 : 100_000;
-    return unwrapKey(match?.[2] ?? blob, pbkdf2Sync(pin, Buffer.from(salt, 'base64'), iterations, 32, 'sha256'));
+    return unwrapKey(payload, pbkdf2Sync(pin, Buffer.from(salt, 'base64'), iterations, 32, 'sha256'));
 }
 
 export function recoveryWrapping(masterKey) {
