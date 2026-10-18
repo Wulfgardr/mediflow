@@ -77,34 +77,31 @@ function hasProfileFseAdmission(sourcePath, source) {
         && node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword));
     if (!get?.body || get.parameters[0]?.name.getText(file) !== 'request'
         || extractMethods(source).join(',') !== 'GET') return false;
-    let found = false;
-    function visit(node) {
-        if (ts.isFunctionLike(node)) return;
-        if (ts.isBlock(node)) {
-            for (let index = 0; index < node.statements.length - 1; index++) {
-                const statement = node.statements[index];
-                if (!ts.isVariableStatement(statement) || statement.declarationList.declarations.length !== 1) continue;
-                const declaration = statement.declarationList.declarations[0], initializer = declaration.initializer;
-                if (!ts.isIdentifier(declaration.name) || !initializer || !ts.isAwaitExpression(initializer)
-                    || !ts.isCallExpression(initializer.expression)) continue;
-                const call = initializer.expression;
-                if (!ts.isIdentifier(call.expression) || call.expression.text !== 'getNetworkScopedPatientDetail'
-                    || call.arguments.length !== 3 || !ts.isIdentifier(call.arguments[0]) || call.arguments[0].text !== 'request'
-                    || !ts.isArrowFunction(call.arguments[1]) || call.arguments[1].modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
-                    || !ts.isStringLiteral(call.arguments[2]) || call.arguments[2].text !== 'network-fse') continue;
-                const gate = node.statements[index + 1], name = declaration.name.text;
-                if (ts.isIfStatement(gate) && ts.isPrefixUnaryExpression(gate.expression)
-                    && gate.expression.operator === ts.SyntaxKind.ExclamationToken
-                    && ts.isPropertyAccessExpression(gate.expression.operand)
-                    && gate.expression.operand.expression.getText(file) === name && gate.expression.operand.name.text === 'ok'
-                    && ts.isReturnStatement(gate.thenStatement)
-                    && gate.thenStatement.expression?.getText(file) === `${name}.response`) found = true;
-            }
-        }
-        ts.forEachChild(node, visit);
+    const outer = get.body.statements;
+    const statements = outer.length === 1 && ts.isTryStatement(outer[0])
+        && outer[0].catchClause && !outer[0].finallyBlock ? outer[0].tryBlock.statements : outer;
+    for (let index = 0; index < statements.length - 1; index++) {
+        const statement = statements[index];
+        if (!ts.isVariableStatement(statement) || statement.declarationList.declarations.length !== 1) return false;
+        const declaration = statement.declarationList.declarations[0], initializer = declaration.initializer;
+        if (!ts.isIdentifier(declaration.name)) return false;
+        if (!initializer || ts.isLiteralExpression(initializer)
+            || [ts.SyntaxKind.NullKeyword, ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword].includes(initializer.kind)) continue;
+        if (!ts.isAwaitExpression(initializer) || !ts.isCallExpression(initializer.expression)) return false;
+        const call = initializer.expression;
+        if (!ts.isIdentifier(call.expression) || call.expression.text !== 'getNetworkScopedPatientDetail'
+            || call.arguments.length !== 3 || !ts.isIdentifier(call.arguments[0]) || call.arguments[0].text !== 'request'
+            || !ts.isArrowFunction(call.arguments[1]) || call.arguments[1].modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+            || !ts.isStringLiteral(call.arguments[2]) || call.arguments[2].text !== 'network-fse') return false;
+        const gate = statements[index + 1], name = declaration.name.text;
+        return ts.isIfStatement(gate) && !gate.elseStatement && ts.isPrefixUnaryExpression(gate.expression)
+            && gate.expression.operator === ts.SyntaxKind.ExclamationToken
+            && ts.isPropertyAccessExpression(gate.expression.operand)
+            && gate.expression.operand.expression.getText(file) === name && gate.expression.operand.name.text === 'ok'
+            && ts.isReturnStatement(gate.thenStatement)
+            && gate.thenStatement.expression?.getText(file) === `${name}.response`;
     }
-    visit(get.body);
-    return found;
+    return false;
 }
 
 function hasRecognizedApiV1AuthGuard(sourcePath, source) {
@@ -775,6 +772,9 @@ function runSelfTest() {
         })),
         ...[
             { name: 'fixed delegated FSE admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); }", expected: true },
+            { name: 'canonical try delegates FSE admission before operations', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { try { let patientId = null; const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; return Response.json({}); } catch { return Response.json({}, {status:500}); } }", expected: true },
+            { name: 'conditional unreachable admission does not authenticate GET', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { if (false) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; } return Response.json({}); }", expected: false },
+            { name: 'admission after early return does not authenticate GET', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { return Response.json({}); const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; }", expected: false },
             { name: 'comment is not an imported admission', source: "// import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read';\nexport async function GET(request) { return getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); }", expected: false },
             { name: 'untrusted module is not admission', source: "import { getNetworkScopedPatientDetail } from './forged'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', 'network-fse'); if (!resolved.ok) return resolved.response; }", expected: false },
             { name: 'caller purpose cannot select admission', source: "import { getNetworkScopedPatientDetail } from '@/lib/network-patient-read'; export async function GET(request) { const resolved = await getNetworkScopedPatientDetail(request, () => 'synthetic', request.purpose); if (!resolved.ok) return resolved.response; }", expected: false },
