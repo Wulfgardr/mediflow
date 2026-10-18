@@ -1,0 +1,2 @@
+ POST /api/v1/network/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries 201 in 46ms (next.js: 26ms, application-code: 21ms)
+ GET /api/v1/network/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries/dd5236e1-1ed0-4cdd-bb86-ca2f1301c411 200 in 1050ms (next.js: 897ms, application-code: 154ms)

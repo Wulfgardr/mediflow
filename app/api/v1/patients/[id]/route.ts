@@ -1,18 +1,11 @@
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
 import { NextResponse } from 'next/server';
-import { dbServer } from '@/lib/db-server';
-import { patients } from '@/lib/schema';
-import { and, eq } from 'drizzle-orm';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 import { requireLocalApiActorSession } from '@/lib/security/server-auth';
-import type { PatientDetail } from '@/lib/api/v1/types';
 import { parseExpectedVersion } from '@/lib/patient-concurrency';
-// WUL-306 (ADR 0066): soft-delete lifecycle helpers
-import { activePatients } from '@/lib/patient-lifecycle';
-import { normalizePatientUpdateInput } from '@/lib/patient-write-normalization';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
-import { updatePatientOperation } from '@/lib/patient-update-operation';
+import { readPatientProfile, updatePatientProfile } from '@/lib/patient-profile-service';
 import { deletePatientOperation } from '@/lib/patient-delete-operation';
 import { auditContextFromRequest, requestIdFromRequest } from '@/lib/security/audit';
 
@@ -22,53 +15,19 @@ function parsePatientDeletionReason(body: Record<string, unknown>, fallback: str
     return body.deletionReason;
 }
 
-function toIsoString(value: unknown): string | null {
-    if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value as string | number);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const authError = requireLocalApiToken(request);
     if (authError) return authError;
 
     try {
         const { id } = await params;
-        const patient = await dbServer.select().from(patients).where(and(eq(patients.id, id), activePatients())).get();
+        const patient = await readPatientProfile({ patientId: id, projection: 'api-v1' });
 
         if (!patient) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 });
         }
 
-        const result: PatientDetail = {
-            id: patient.id,
-            firstName: patient.firstName,
-            lastName: patient.lastName,
-            birthDate: toIsoString(patient.birthDate),
-            taxCode: patient.taxCode,
-            address: patient.address ?? null,
-            phone: patient.phone ?? null,
-            caregiver: patient.caregiver ?? null,
-            exemptions: patient.exemptions ?? null,
-            diagnoses: patient.diagnoses ?? null,
-            monitoringProfile: patient.monitoringProfile ?? null,
-            statusReason: patient.statusReason ?? null,
-            archiveReason: patient.archiveReason ?? null,
-            archiveNote: patient.archiveNote ?? null,
-            notes: patient.notes ?? null,
-            aiSummary: patient.aiSummary ?? null,
-            aiSummaryGeneratedAt: toIsoString(patient.aiSummaryGeneratedAt),
-            aiSummaryContextHash: patient.aiSummaryContextHash ?? null,
-            documentInsights: patient.documentInsights ?? null,
-            isAdi: patient.isAdi ?? null,
-            isArchived: patient.isArchived ?? null,
-            version: patient.version,
-            ambulatoryId: patient.ambulatoryId ?? null,
-            createdAt: toIsoString(patient.createdAt),
-            updatedAt: toIsoString(patient.updatedAt)
-        };
-
-        return NextResponse.json(result);
+        return NextResponse.json(patient);
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
@@ -92,30 +51,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Version is required' }, { status: 400 });
         }
 
-        // WUL-306: a soft-deleted patient is gone for the wire contract: PUT answers 404.
-        const existing = await dbServer.select({ id: patients.id, isArchived: patients.isArchived }).from(patients).where(and(eq(patients.id, id), activePatients())).get();
-        if (!existing) {
-            return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        }
-
-        const normalized = normalizePatientUpdateInput(body as Record<string, unknown>, {
-            expectedVersion,
-        });
-        if (!normalized.ok) {
-            return NextResponse.json({ error: normalized.error }, { status: 400 });
-        }
-
-        /* the actor was admitted before awaiting request input. */
-        const auditContext = auditContextFromRequest(request, archiveActorSession);
-        const commit = updatePatientOperation({
-            patientId: id, expectedVersion, values: normalized.values,
-            setPrimaryAmbulatory: Object.prototype.hasOwnProperty.call(body, 'ambulatoryId'),
-            audit: {
-                archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
-                sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
-                flags: [`auth:${auditContext.authContext}`],
+        const commit = await updatePatientProfile({
+            patientId: id, expectedVersion,
+            audit: () => {
+                const auditContext = auditContextFromRequest(request, archiveActorSession);
+                return {
+                    archiveGeneration: auditContext.archiveGeneration, actorType: auditContext.actorType, actorRef: auditContext.actorRef,
+                    sourceSurface: auditContext.sourceSurface, requestId: requestIdFromRequest(request),
+                    flags: [`auth:${auditContext.authContext}`],
+                };
             },
-        });
+        }, body);
         if (commit.status !== 200) return NextResponse.json(commit.value, { status: commit.status });
 
         return NextResponse.json({ success: true });

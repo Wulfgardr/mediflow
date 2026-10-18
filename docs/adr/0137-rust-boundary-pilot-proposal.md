@@ -6,6 +6,8 @@ Status: Proposed — non accettato, nessun collegamento al runtime
 
 Issue: [WUL-706](https://linear.app/wulfgardr/issue/WUL-706). Evidenze e decisione
 di questa preparazione nel [dossier](../analysis/2026-09-26-rust-boundary-evaluation.md).
+Il testo del 26 settembre conserva il suo contesto; l'aggiornamento del
+17 ottobre in fondo registra la tranche successiva senza accettare l'ADR.
 
 ## Problema e prerequisiti
 
@@ -142,3 +144,39 @@ L'esito valido può essere KEEP. Restano aperti selezione del pilota, limiti e
 schema finali, owner della connessione, packaging multipiattaforma, FFI misurata
 e beneficio applicativo. Questo ADR non supera ADR 0068 né conferma o revoca la
 raccomandazione storica sul linguaggio di ADR 0071.
+
+## Aggiornamento del 17 ottobre 2026: paziente e client GPUI
+
+Base sorgente: `3d4e5f0ffff8367c5be0bb73c62665b7e2eab1af`, successiva alla
+release sorgente 0.9.0. WUL-735 è conclusa; il riferimento ai tre gate non
+accettati nella sezione storica non descrive più lo stato di WUL-735.
+WUL-573/WUL-580 restano prerequisiti dell'integrazione del servizio Rust.
+
+La verticale selezionata per WUL-574 è scheda paziente / modifica delle sole
+note, proposta come `ReadPatientProfile` e
+`UpdatePatientNotes(id, expectedVersion, notes)`. La
+[caratterizzazione cifrata continua](../analysis/2026-10-17-patient-notes-pilot.md)
+usa le route Web e API v1 e il writer TypeScript condiviso già esistente.
+La [mappa C01](../authority-census.md) registra anche l'autorità Swift locale
+opzionale; la sua destinazione resta in WUL-582. Non si deduce che gli ingressi
+Apple condividano già la stessa transazione/audit dalla prova dei due HTTP.
+
+Il [workspace Rust/GPUI](../../experiments/gpui-patient-pilot/README.md)
+porta in Rust lo stato del client di questa verticale e una finestra nativa
+funzionante con servizio sintetico in memoria. È una preparazione concreta
+di WUL-706/WUL-714: consente di riesaminare selezione, bozza, conferma,
+correlazione delle risposte, conflitto e rilettura usando lo stesso percorso.
+Il [verbale](../analysis/2026-10-17-rust-gpui-patient-pilot.md) distingue il
+build della UI, i test e le dimensioni ancora da misurare.
+
+Questo contributo **non sceglie IPC o FFI** per l'autorità del prodotto.
+Il client Rust resta separato dal trasporto e non acquisisce SQLite, chiavi,
+audit o policy. Il prossimo passaggio è accettare il confine WUL-582 e i
+contratti/prove 0.9.1, poi collegare un adapter alla stessa autorità. Solo dopo
+quel collegamento si può confrontare una sostituzione Rust dell'operazione
+contro la baseline TypeScript, con un solo writer e un rollback verificato.
+
+La candidatura GPUI desktop continua su Linux, macOS e Windows attraverso
+build e prove esplicite; accessibilità, distribuzione e prestazioni installate
+restano criteri WUL-714. La presenza di un backend mobile nel sorgente upstream
+non assegna a GPUI il prodotto iPhone/iPad e non interrompe il lavoro Swift.

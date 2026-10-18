@@ -15,7 +15,7 @@ soltanto alcuni degli ingressi; qui sono censiti i `.md` tracciati, con una
 breve indicazione d’uso.
 
 La mappa precedente era aggiornata al 2026-09-08. Revisione editoriale:
-2026-10-16. I verbali di luglio e le proposte superate rimossi dall’albero
+2026-10-17. I verbali di luglio e le proposte superate rimossi dall’albero
 restano consultabili nell’[indice del tag v0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/docs/markdown-index.md).
 Le voci storiche conservano date, conteggi, revisioni e limiti:
 la data di questo indice non rinnova le prove cui rimandano.
@@ -36,7 +36,20 @@ versione o risalire alla provenienza di un’interfaccia.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [analysis/2026-09-26-rust-boundary-evaluation.md](./analysis/2026-09-26-rust-boundary-evaluation.md) | Preparazione WUL-706, prerequisiti, esperimento codec e confronto GPUI/Tauri/SwiftUI. | Prima della decisione Rust 0.9.2 o della valutazione shell 0.9.6. |
+| [analysis/2026-10-17-rust-gpui-patient-pilot.md](./analysis/2026-10-17-rust-gpui-patient-pilot.md) | Client Rust e UI GPUI della verticale paziente, prove locali e criteri ancora da qualificare. | Per riesaminare WUL-706/WUL-714 senza attribuire al pilota un'autorità clinica. |
+| [analysis/2026-10-17-rust-gpui-connected-client.md](./analysis/2026-10-17-rust-gpui-connected-client.md) | Client paired v3 collegato, copertura delle 17 schermate, confronto old/new, prove e limiti per piattaforma. | Per valutare la migrazione effettiva della shell e i criteri ancora aperti prima della sostituzione. |
+| [analysis/2026-10-17-rust-gpui-keyboard-recovery.md](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md) | Parità della tastiera, resize compatto/desktop e nuove prove native attribuite alla build recuperata. | Per riesaminare focus, input, revisione e blocco distinguendo sequenza accettata, tentativo interrotto e disponibilità delle immagini. |
+| [analysis/2026-10-17-tsc-ts-migration-review.md](./analysis/2026-10-17-tsc-ts-migration-review.md) | Confronto misurato TypeScript 5.9 / TypeScript 7 / tsc-ts, compatibilità, driver e provenienza. | Per decidere sul typecheck sperimentale senza attribuire il risultato alla velocità del prodotto o alla migrazione del writer. |
+| [experiments/gpui-patient-pilot/README.md](../experiments/gpui-patient-pilot/README.md) | Avvio del client collegato e della demo distinta, percorsi, comandi, custodia e dipendenze. | Per compilare, provare o modificare il client Rust e la finestra GPUI. |
+| [experiments/gpui-patient-pilot/comparison/protocol.md](../experiments/gpui-patient-pilot/comparison/protocol.md) | Corpus, protocolli di confronto, scritture nominate, compatibilità della release, provenienza e misure. | Per riprodurre gli assert old/new senza confonderli con una qualifica completa del prodotto. |
+| [experiments/gpui-patient-pilot/evidence/connected-review.md](../experiments/gpui-patient-pilot/evidence/connected-review.md) | Review del trasporto, UI e delta host; regressioni, TLS e provenienza dell'issuer. | Per riesaminare protezioni, test osservati e limiti residui della connessione nativa. |
+| [experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/README.md](../experiments/gpui-patient-pilot/evidence/connected/release-v0.9.0-ui/README.md) | Schermate originali release, origine CI e equivalenza del tree Git. | Per confrontare geometrie e famiglia visuale senza attribuire al vecchio run prove della nuova UI. |
+| [analysis/2026-10-17-patient-notes-pilot.md](./analysis/2026-10-17-patient-notes-pilot.md) | Baseline cifrata continua di lettura/modifica note sui due ingressi HTTP correnti. | Per riprodurre le prove WUL-574 prima del collegamento al servizio condiviso. |
+| [analysis/2026-10-17-patient-profile-port.md](./analysis/2026-10-17-patient-profile-port.md) | Porta comune Web/API v1/paired, writer esistente e prove di conformità e HTTP old/new sul delta ricostruito. | Per valutare il confine condiviso senza dichiarare migrata l'autorità SQLite. |
+| [analysis/2026-10-18-pr558-soft-delete-delivery.md](./analysis/2026-10-18-pr558-soft-delete-delivery.md) | Guard tombstone attraverso route, porta e writer; prove e51 e sequenza WUL-582/573. | Per riprodurre la correzione iniziale senza confonderla con le successive modifiche di produzione. |
+| [analysis/2026-10-18-pr558-full-review-repairs.md](./analysis/2026-10-18-pr558-full-review-repairs.md) | Rilievi della review completa, scope per richiesta, controlli con ora locale, focus e ricevute del candidato. | Per riesaminare le correzioni e cercare nella PR il binding finale di review, CI e merge. |
 | [adr/0137-rust-boundary-pilot-proposal.md](./adr/0137-rust-boundary-pilot-proposal.md) | ADR Proposed: confine Rust condizionato, IPC/FFI, protocollo e rollback. | Per riesaminare la proposta, senza inferire accettazione o runtime. |
+| [adr/0145-rust-gpui-connected-client.md](./adr/0145-rust-gpui-connected-client.md) | Client Rust/GPUI paired v3, roster desktop, contratto visivo e confronto old/new. | Per riesaminare l'integrazione e distinguere shell, writer e qualifica mobile. |
 | [start-here.md](./start-here.md) | Esigenza ambulatoriale, uso senza AI e tre livelli di approfondimento. | Primo accesso al progetto. |
 | [release-085-readiness.md](./release-085-readiness.md) | Evidenze runtime, gate aperti, account Apple e promozione. | Prima di presentare o distribuire la 0.8.5. |
 | [getmediflow-editorial-proposal.md](./getmediflow-editorial-proposal.md) | Ragioni del racconto pubblico e rapporto tra sito, documentazione e runtime. | Revisione del racconto pubblico. |

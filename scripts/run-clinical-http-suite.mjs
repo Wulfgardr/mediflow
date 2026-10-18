@@ -11,6 +11,7 @@ export const CLINICAL_HTTP_TEST_FILES = Object.freeze([
     'scripts/checkup-local-bounded-json.test.mjs',
     'scripts/entry-required-audit-http.test.mjs',
     'scripts/patient-create-required-audit-http.test.mjs',
+    'scripts/patient-notes-pilot-http.test.mjs',
     'scripts/patient-restore-required-audit-http.test.mjs',
     'scripts/therapy-required-audit-http.test.mjs',
 ]);

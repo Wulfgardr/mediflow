@@ -26,6 +26,7 @@ const detail = load('../app/api/v1/network/patients/[id]/route.ts') as typeof im
 const restore = load('../app/api/v1/network/patients/[id]/restore/route.ts') as typeof import('../app/api/v1/network/patients/[id]/restore/route');
 const lifecycle = load('./network-patient-lifecycle.ts') as typeof import('./network-patient-lifecycle');
 const profile = load('./network-patient-write.ts') as typeof import('./network-patient-write');
+const capabilityContext = load('./network-write-context.ts') as typeof import('./network-write-context');
 type Operation = 'create' | 'update' | 'delete' | 'restore';
 
 test.after(() => { clearAllSessions(); cleanupCookies(); dbServer.$client.close(); rmSync(dataDir, { recursive: true, force: true }); });
@@ -88,6 +89,62 @@ function route(operation: Operation, request: Request) {
     return operation === 'create' ? collection.POST(request) : operation === 'update' ? detail.PUT(request, params)
         : operation === 'delete' ? detail.DELETE(request, params) : restore.POST(request, params);
 }
+
+for (const operation of ['create', 'update', 'delete', 'restore'] as const) {
+    test(`${operation}: an explicit different scope is denied at admission without clinical/audit effects`, async () => {
+        const { context, body } = fixture(operation);
+        const before = clinicalSnapshot();
+        const headers = new Headers(context.request.headers);
+        headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-unavailable');
+        const response = await route(operation, new Request(context.request.url, {
+            method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+            headers, body: JSON.stringify(body),
+        }));
+        assert.equal(response.status, 403);
+        assert.deepEqual(clinicalSnapshot(), before);
+    });
+}
+
+test('patient-list, patient-detail and shared capability admissions reject an explicit different scope', async () => {
+    const { context } = fixture('update');
+    setSetting(NETWORK_PAIRING_STATE_KEY, serializeNetworkPairingState({ intents: [], clients: [{
+        ...context.pairedClient,
+        grantedCapabilities: [...context.pairedClient.grantedCapabilities, 'network.replica.readonly-patients'],
+    }] }));
+    const before = clinicalSnapshot();
+    const headers = new Headers(context.request.headers);
+    headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-unavailable');
+    const request = new Request(context.request.url, { headers });
+    assert.equal((await collection.GET(request)).status, 403);
+    assert.equal((await detail.GET(request, { params: Promise.resolve({ id: 'synthetic-patient' }) })).status, 403);
+    const resolved = await capabilityContext.requireNetworkCapabilityContext(request, 'network.replica.write-patient-profile');
+    assert.equal(resolved.ok, false);
+    if (!resolved.ok) assert.equal(resolved.response.status, 403);
+    assert.deepEqual(clinicalSnapshot(), before);
+});
+
+test('the patient commit guard independently rechecks the request scope assertion', async () => {
+    const { context, body } = fixture('create');
+    context.request.headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-unavailable');
+    const before = clinicalSnapshot();
+    // The supplied context still names the available default. Admission is not
+    // sufficient evidence for the transaction to accept a different assertion.
+    const result = await lifecycle.createNetworkScopedPatient(context, body);
+    assert.equal(result.status, 403);
+    assert.deepEqual(clinicalSnapshot(), before);
+});
+
+test('an explicitly matching request scope retains the ordinary patient writer and required audit', async () => {
+    const { context, body } = fixture('create');
+    context.request.headers.set('x-mediflow-expected-ambulatory-id', 'synthetic-a');
+    const before = (dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get() as { n: number }).n;
+    const response = await route('create', new Request(context.request.url, {
+        method: 'POST', headers: context.request.headers, body: JSON.stringify(body),
+    }));
+    assert.equal(response.status, 201);
+    assert.equal((dbServer.$client.prepare('SELECT count(*) n FROM audit_events').get() as { n: number }).n, before + 1);
+    assert.equal(dbServer.select().from(patientsToAmbulatories).get()?.ambulatoryId, 'synthetic-a');
+});
 async function waitFor(predicate: () => boolean) {
     for (let i = 0; i < 1000; i++) { if (predicate()) return; await new Promise<void>(resolve => setImmediate(resolve)); }
     throw new Error('body reader was not reached');

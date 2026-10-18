@@ -1,0 +1,15 @@
+{
+  "result": "pass",
+  "synthetic": true,
+  "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+  "snapshotBeforeSha256": "f29750364416db67b7eaee5180712fb482c245a3194943dde45bef21c00e1e43",
+  "snapshotAfterSha256": "f29750364416db67b7eaee5180712fb482c245a3194943dde45bef21c00e1e43",
+  "snapshotSemanticallyEqual": true,
+  "pairedClinicalWriteRequestCount": 0,
+  "activePatients": 4,
+  "archivedPatients": 1,
+  "entries": 2,
+  "patientVersion": 1,
+  "protocolId": "paired-v3-snapshot-2",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36"
+}

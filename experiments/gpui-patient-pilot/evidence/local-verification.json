@@ -1,0 +1,71 @@
+{
+  "recorded_at_utc": "2026-10-17T14:44:22.667317+00:00",
+  "mediflow_base_commit": "3d4e5f0ffff8367c5be0bb73c62665b7e2eab1af",
+  "gpui_git_revision": "56934ec0560bce8929025497411de7f5322fb6ca",
+  "rust_toolchain": "1.98.1",
+  "target": "x86_64-unknown-linux-gnu",
+  "profile": "dev, debug=0",
+  "display": "X11/Xvfb 1440x1000, window 1200x840, software rendering",
+  "synthetic_only": true,
+  "runtime_authority_connected": false,
+  "source_sha256": {
+    "Cargo.toml": "018203b816b9ea03c24b0e858f845f1b2ee18ff610e582366d04806f8f732601",
+    "Cargo.lock": "a892e3b25c69282b24ec6de97e333467a521955d98c059a1df484683d0a2538a",
+    "rust-toolchain.toml": "887f9be066a15585a2c583578e84b0fcb541126d81546276bad3d2ff00d61167",
+    "client/Cargo.toml": "69bd368b9d4738aec4802a7f0086227555d5f9f94c75593a693c68a83d6ae9b0",
+    "client/src/lib.rs": "bf86b9a62ff691841b75898733734c6cbbd88846db6dec9752b187f418e2a6ff",
+    "client/tests/flow.rs": "8f2ccde68d4a87f652e4a649cecdbf093778d3d5a5f01a2bf1fe76d87a5afe81",
+    "app/Cargo.toml": "1e08b74c09e3da4cde3942777f6be6e2fb6ace98d2d2797148fa660ab729b67d",
+    "app/src/main.rs": "4e8f84f0d1ee4d84f88c91e94c5512c9ad830bfe725495fe8d5e571cb5dd97e6",
+    "app/src/demo.rs": "e6fd5367e4ac26e4c0f0db8918f0e909d24108e4abf38e33c8bcd2769b8c5724",
+    "app/src/text_input.rs": "1b6d8bf0453855c08b31ba8db437bc311737cbdfdaac2517b675217780e6f8a5",
+    "app/src/theme.rs": "22adc7b93a5eb4e4bc89d8850064113646985c495e0e2474afdf58d9dd2f6616"
+  },
+  "binary_sha256": "0a526405153f239e1b9d347fa494c9c7e41fcc169073f1fa143c4c03442da723",
+  "screenshots_sha256": {
+    "linux-review.png": "f39c1ae6dd871d8ed97b90947bbe651375c8040451e8c33873d7d6889ae1c3c1",
+    "linux-saved-grafite.png": "abb17bdc29b37ec02d8a8db6dfbc6142ec29d02c53d796333ef4f6feb1e41d8c"
+  },
+  "checks": {
+    "cargo_tests": {
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0
+    },
+    "cargo_build": "pass",
+    "cargo_fmt": "pass",
+    "cargo_clippy_deny_warnings": "pass",
+    "encrypted_http_notes_test": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "test_selection_tests": {
+      "passed": 28,
+      "failed": 0
+    },
+    "test_inventory": {
+      "total": 1043,
+      "selected": 1014,
+      "preexisting_exclusions": 29
+    },
+    "npm_lint": "pass",
+    "npm_typecheck": "pass",
+    "claims_guard": "pass"
+  },
+  "observed_ui": [
+    "multiline_edit",
+    "single_shortcut_opens_review",
+    "discard_dialog_blocks_confirmation",
+    "explicit_confirmation_then_saved_readback",
+    "day_and_graphite",
+    "hidden_data_blocks_alt_navigation"
+  ],
+  "limits": [
+    "Synthetic process-local service only",
+    "No benchmark comparison or installed package qualification",
+    "No remote CI result included",
+    "No system IME or assistive-technology qualification",
+    "Binary digest identifies this local build; reproducible binary output is not claimed"
+  ]
+}

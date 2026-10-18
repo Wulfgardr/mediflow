@@ -1,0 +1,182 @@
+[
+  {
+    "path": "app/fonts/Newsreader-Native-Bold.ttf",
+    "sha256": "3bab353e796f52aa630f83dd11859cae2e219c8b4a0745f2e138dde44eeded61"
+  },
+  {
+    "path": "app/fonts/Newsreader-Native-BoldItalic.ttf",
+    "sha256": "13de5d2ddffdfa431e274f2e9c64ca0834a5ca0a50cfe99294e76ee4248c52f7"
+  },
+  {
+    "path": "app/fonts/Newsreader-Native-Italic.ttf",
+    "sha256": "dd7b80c14bbe9182d7284ed40637e8684f8bdba8fccfed0c505bb78421fa872a"
+  },
+  {
+    "path": "app/fonts/Newsreader-Native-Regular.ttf",
+    "sha256": "386fd8d5ad0980708689a45129c7ff7f93baa3feb4c8ff4674acbad636016599"
+  },
+  {
+    "path": "docs/design/lume/tokens/lume.tokens.json",
+    "sha256": "fe38b53627a7fac6bc90ca8491b8a972d3e3ad2ad7b0b9327c0981a3e97d6169"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/Cargo.lock",
+    "sha256": "22f8772a26e1af66410b1ee98e02b9463ed39b0b5aa974c7cf18e5154e4be689"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/Cargo.toml",
+    "sha256": "116f0e6d52ef2fb6451fef5f295707de165baa9867ad1a2fa2f76df227dc3e72"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/Cargo.toml",
+    "sha256": "8500ec8018f0fd8b725f815a9c6ec7fc8c6aee11c5b9d2d4b2e34a17db634424"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/clinical_text.rs",
+    "sha256": "b405acf6da37205a85b3979eb1bfc00655b1330db1e99a83eee6925ec621a8eb"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/components.rs",
+    "sha256": "4e2250755064fadfd67515f35638eeab11c915fb0096d52215f4d32a85d93fd5"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/demo.rs",
+    "sha256": "e6fd5367e4ac26e4c0f0db8918f0e909d24108e4abf38e33c8bcd2769b8c5724"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/demo_app.rs",
+    "sha256": "c344740f0e0e1d0625dbbaec4fce9e35e548381d4cf68d422a28dd38f2a1f52d"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/documents.rs",
+    "sha256": "834cc1a8fd0c504afc371c337f299e7cc954c3378ce7b14ce74cedb8f1bd7f43"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/editing.rs",
+    "sha256": "cc0fed86f39430209c786724caec312a5c4928b37ed4594f10c068f01b429bad"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/icons.rs",
+    "sha256": "cd041280e5fd9b262fb663f368c2fb7106e5660b78733479c00311959dd2412c"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/main.rs",
+    "sha256": "3fa10e85429d885580b6261633b9e564b1904f4d4a3fe789e41bd4c6db7c6d43"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/navigation.rs",
+    "sha256": "19fc618a5f6988d12cfd412f0abddec76a6346a39c3a778f5e178569c8780cf4"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/patient_forms.rs",
+    "sha256": "e0525eda911f332da9aaa666fca07780d9ff28e429407849281a0900ce853c6d"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/references.rs",
+    "sha256": "35ec8384a108d4aba4bb4a9a2642d0a55812e6d305490a21962d0250e00ef0a1"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+    "sha256": "20189633bfbb67d74fd1385e6d4cb3e28551b7501029a3aeb7857bf0d1825d77"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/text_input.rs",
+    "sha256": "1b5009a82b11cb0a44db78593b723ff10dd79ff5f5487f255a87288938154332"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/app/src/theme.rs",
+    "sha256": "5ae74d31c2d6d7150f3fd3b50a0ea98a9bf739717b993a0acbdcd6c87d596303"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/client/Cargo.toml",
+    "sha256": "69bd368b9d4738aec4802a7f0086227555d5f9f94c75593a693c68a83d6ae9b0"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/client/src/lib.rs",
+    "sha256": "bf86b9a62ff691841b75898733734c6cbbd88846db6dec9752b187f418e2a6ff"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/client/tests/flow.rs",
+    "sha256": "8f2ccde68d4a87f652e4a649cecdbf093778d3d5a5f01a2bf1fe76d87a5afe81"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+    "sha256": "060ae0bfb858847e3e0dcf29d1b0ea9c2b960eb8872d3137d6b382e88dce8383"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/comparison/crypto-v3-vectors.json",
+    "sha256": "d170d57261e2d3e549edf3e3f778d68eaeb55eddae135e06a0731593216922e9"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/comparison/patient-profile-writes.json",
+    "sha256": "438cb01ee41319657437ec4966313df043ab64eb5a1f257da2ca95a2bfe1943f"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/comparison/resource-writes.json",
+    "sha256": "3563de99c82df4e25960cad49b9a01b84bd5e8f2967366dd105cd333aadadb88"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/rust-toolchain.toml",
+    "sha256": "887f9be066a15585a2c583578e84b0fcb541126d81546276bad3d2ff00d61167"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/Cargo.toml",
+    "sha256": "0276c569b07e8c554f16ceafa183c54e512892057c7b232252582d7ced34d28a"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/bin/mediflow-runtime-probe.rs",
+    "sha256": "5480468dd3a63d8ea8476d13b1aefdfe9eea81d1a845817c858695a77448f34b"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/catalogs.rs",
+    "sha256": "5a3ba53ea5ebb9de5ac9b32d77f8334265fe7a5a4470a70e9d55a8e9adacea5f"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/crypto.rs",
+    "sha256": "436106b3a11fdaf3f31609da982d98486ef1dc78d26e141db1d5172f92114eea"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/dto.rs",
+    "sha256": "c3b781a6b9a6e1022cda32b26f65aa2d35f63e48e0c81901f7c9170609e75d4e"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/error.rs",
+    "sha256": "61f4785230973f6b7d19d5ede1df6158b6bbc9c4268148270ec747b7ca852861"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/http.rs",
+    "sha256": "e4b89244c74fa634508babb93816b56e50ac83e0106a466a4ce50114620aff15"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/lib.rs",
+    "sha256": "9182afa2f9dd33ffcf586d136a6280e6232297d4e9c03e741333b273db11e9b8"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/session.rs",
+    "sha256": "d2cee5b4b53ea50e4930c5ccf261147011882b8ee5dfcfe8178a9df6b1ba0768"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/src/tls.rs",
+    "sha256": "8d7dde6ccf50819996188453168ae5ee23840b3213fed701b93fa6d8cc431c10"
+  },
+  {
+    "path": "experiments/gpui-patient-pilot/transport/tests/opaque-id-vectors.json",
+    "sha256": "1082ebd1de9d9a61061f6133f2c7499a29abb3929cffb68d85a695141fc0452f"
+  },
+  {
+    "path": "native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/IBMPlexMono-Regular.ttf",
+    "sha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46"
+  },
+  {
+    "path": "native/contracts/crypto-golden-vectors.v3.json",
+    "sha256": "a862f2f8a3fcf78bc472f5c28c3c17f06836d2a9fb1933fd9a02ea72582411b8"
+  },
+  {
+    "path": "public/brand/mediflow/punto-giorno.svg",
+    "sha256": "922e09bafb847e76f6abfc007b954e98fefc5921a6ba9cff00b086a2f21ac40e"
+  },
+  {
+    "path": "public/brand/mediflow/punto-grafite.svg",
+    "sha256": "9591341cf0dee6c55fcce160b09548db1ccdc9948bfc4066e1c94752fec94a3a"
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "result": "pass",
+  "goldenVectors": 2,
+  "implementation": "Node crypto",
+  "checks": [
+    "NFKC",
+    "PBKDF2/HKDF",
+    "key wrapping",
+    "ENC JSON",
+    "tamper rejection",
+    "wrong archive key"
+  ]
+}

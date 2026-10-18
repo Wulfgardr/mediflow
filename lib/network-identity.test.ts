@@ -17,6 +17,7 @@ test('deriveNetworkIdentitySummary requires node credentials when only device pa
     assert.equal(summary.usernameHint, 'solo-user');
     assert.equal(summary.scope.source, 'node-default');
     assert.equal(summary.scope.effectiveAmbulatoryId, 'amb-default');
+    assert.equal(summary.scope.requestBinding, 'expected-ambulatory-id-v1');
     assert.equal(summary.audit.actorBinding, 'token-only');
 });
 
@@ -48,5 +49,6 @@ test('deriveNetworkIdentitySummary binds operator and scope when a session conte
     assert.equal(summary.operator.userId, 'user-1');
     assert.equal(summary.scope.source, 'session-context');
     assert.equal(summary.scope.effectiveAmbulatoryId, 'amb-2');
+    assert.equal(summary.scope.requestBinding, 'expected-ambulatory-id-v1');
     assert.equal(summary.audit.actorBinding, 'session-user');
 });

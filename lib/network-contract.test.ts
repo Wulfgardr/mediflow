@@ -22,7 +22,7 @@ test('buildNetworkNodeSummary falls back to clinic or host name and keeps local-
     assert.equal(summary.displayName, 'MediFlow Studio');
     assert.equal(summary.operatingMode, 'local-only');
     assert.equal(summary.transport.localTlsPort, 3443);
-    assert.equal(summary.protocolVersion, '1.11.0');
+    assert.equal(summary.protocolVersion, '1.13.0');
 });
 
 test('buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled', () => {

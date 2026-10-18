@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-17T21:00:06.233217+00:00",
+  "kind": "metadata-only-publication-revision",
+  "originalManifestSha256": "0a09ef6a8bf070f3db2a86d024b9afc437eb9254e49d46ed0a00ed3bf144cdfd",
+  "originalNativeReceiptSha256": "fe218ecfddc586f54aeffc7bfd678c435c0cde3a7b963ac54c70d33ec315a9ae",
+  "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+  "sourceBaseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+  "sourceFiles": [
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/navigation.rs",
+      "sha256": "fb57dacfb88481bb41d266ecb5e9317463844ba9f8f5ead23ec225e4d6ba4c1f"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "sha256": "90e961184dcba6cba9ca2b37deb96e2a6ab24a906bb732bd8d9727e652ed92a0"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/text_input.rs",
+      "sha256": "d462cfc3f52602259c5ff4f6a51f2e756b8b8d62fcb2b9dcdfef2900183af0af"
+    }
+  ],
+  "publicSyntheticCorpus": {
+    "path": "experiments/gpui-patient-pilot/comparison/corpus.json",
+    "canonicalSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36"
+  },
+  "observedPngCount": 9,
+  "pngCountSelectedForCommit": 8,
+  "pngBytesSelectedForCommit": 682752,
+  "scope": "Publication metadata only. No new QA, screenshot capture, image transformation, re-encoding, substitution or upload by this editorial revision. Original test, seed, snapshot and privacy receipts remain unchanged.",
+  "decisionSource": "Parent agent /root relayed the github_create_blob automatic approval review result. Blob identifiers are retained by the parent; artifact identity here uses original paths and SHA-256.",
+  "acceptedOriginalArtifacts": [
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/01-worklist-input.png",
+      "sha256": "2f8f0a1becbf5b91c3a1d857b4376c2a2f9fe3da454d5eb9f75069ae3fea88f6",
+      "bytes": 50219,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/02-wrong-patient-guard.png",
+      "sha256": "a731f841e6b85a75a252b5c2b0bd19b14b9eb434f818879ceb8346b139ef4d4b",
+      "bytes": 73723,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/03-search-active-view.png",
+      "sha256": "d7e9553073ae901281f3087fd88d6632efc82f74e7cef65f7a5d2316382a8172",
+      "bytes": 71283,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/04-compact-menu.png",
+      "sha256": "4e607f9d0056b3816931b8778804603d06338a803acf1f1c67a5063b115b18c1",
+      "bytes": 50752,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/05-new-entry-after-resize.png",
+      "sha256": "ec6885d13bc6629aae8b9a3e8241e174c23835d7a31b7839bb645b4d5b4dffbf",
+      "bytes": 120169,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/06-compact-draft.png",
+      "sha256": "66995be12b2b09c65c9042df968b97bb5b57367871b74e432f190e21d11ae6bf",
+      "bytes": 58890,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/07-desktop-draft.png",
+      "sha256": "93ca705896accd95eebd1c84068b53501076833eca34a8c679e558295bdd8d03",
+      "bytes": 131705,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/08-review-twice.png",
+      "sha256": "526c6468cb9a6b58caea2058646bd84ad632f49051fa2cad2c56c6098e10b4a2",
+      "bytes": 126011,
+      "githubBlobStatus": "create_blob-succeeded-as-reported-by-parent",
+      "selectedForCommit": true
+    }
+  ],
+  "withheldArtifacts": [
+    {
+      "intendedRepositoryPath": "experiments/gpui-patient-pilot/evidence/connected/keyboard-recovery/09-locked-from-editor.png",
+      "sha256": "ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730",
+      "bytes": 45405,
+      "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+      "sourceBaseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+      "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+      "status": "withheld-locally-pending-payload-specific-user-authorization",
+      "localOriginalRetained": true,
+      "includedInCommit": false,
+      "publicationNote": "publication-note.json",
+      "capture": {
+        "file": "09-locked-from-editor.png",
+        "run": "replay",
+        "originalFile": "locked-credentials-cleared.png",
+        "sha256": "ea66b781081ea7020f5775c4aa34ac4a93597e2681dd61e117b315ae227ca730",
+        "bytes": 45405,
+        "width": 1440,
+        "height": 960,
+        "capturedAt": "2026-10-17T20:43:31.340615+00:00",
+        "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+        "caption": "Ctrl+L from the draft title editor locks the session; synthetic username cleared in the native login field before capture.",
+        "focusAndScroll": "Login field focused; username and passphrase fields empty. No image editing.",
+        "transformations": []
+      },
+      "action": "github_create_blob",
+      "decision": "denied-by-automatic-approval-review",
+      "denialReasonAsRelayedByParent": "potentially sensitive clinical or patient-related visual data… broad Autorizzo tutto does not explicitly authorize this exact image payload… provenance/privacy claims cannot establish required end-user authorization",
+      "reasonIsRelayedExcerpt": true,
+      "retriedByThisRevision": false,
+      "embeddedImagePayload": false
+    }
+  ],
+  "authorizationState": "Specific authorization for publishing the withheld image payload remains pending; the parent will request it separately. Existing provenance and privacy review are not substituted for that authorization."
+}

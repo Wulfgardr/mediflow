@@ -1,0 +1,123 @@
+name: Rust GPUI connected client
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/gpui-patient-pilot/**'
+      - 'app/fonts/**'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
+      - 'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json'
+      - 'docs/design/lume/tokens/lume.tokens.json'
+      - 'public/brand/mediflow/*.svg'
+      - 'native/contracts/crypto-golden-vectors.v3.json'
+      - 'app/api/**'
+      - 'lib/**'
+      - 'drizzle/**'
+      - 'packages/web-auth-lifecycle-owner/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/prepare-e2e-db.mjs'
+      - 'scripts/web-auth-control-test-client.mjs'
+      - 'scripts/native-tool-test-selection.mjs'
+      - 'scripts/check-test-selection.test.mjs'
+      - '.github/workflows/rust-gpui-pilot.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'experiments/gpui-patient-pilot/**'
+      - 'app/fonts/**'
+      - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
+      - 'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json'
+      - 'docs/design/lume/tokens/lume.tokens.json'
+      - 'public/brand/mediflow/*.svg'
+      - 'native/contracts/crypto-golden-vectors.v3.json'
+      - 'app/api/**'
+      - 'lib/**'
+      - 'drizzle/**'
+      - 'packages/web-auth-lifecycle-owner/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/prepare-e2e-db.mjs'
+      - 'scripts/web-auth-control-test-client.mjs'
+      - 'scripts/native-tool-test-selection.mjs'
+      - 'scripts/check-test-selection.test.mjs'
+      - '.github/workflows/rust-gpui-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-gpui-pilot-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  native-tests:
+    name: Rust GPUI client (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    env:
+      RUSTUP_TOOLCHAIN: '1.98.1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Install source-pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+      - name: Install Linux GPUI build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y clang pkg-config libfontconfig-dev libglib2.0-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev
+      - name: Ensure macOS Metal compiler is available
+        if: runner.os == 'macOS'
+        run: |
+          if ! xcrun --find metal >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+          fi
+      - name: Check workspace formatting
+        run: cargo fmt --manifest-path experiments/gpui-patient-pilot/Cargo.toml --all --check
+      - name: Check native targets with Clippy
+        run: cargo clippy --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked -- -Dwarnings
+      # Cargo compiles every native target and runs pure synthetic tests. These
+      # checks do not exercise a window, input methods, accessibility or GPU UI.
+      - name: Compile all native targets and run synthetic tests
+        run: cargo test --manifest-path experiments/gpui-patient-pilot/Cargo.toml --workspace --all-targets --locked
+
+  runtime-comparison:
+    name: Existing JavaScript vs Rust on a synthetic runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: '1.98.1'
+      CARGO_INCREMENTAL: '0'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install the locked current runtime
+        run: npm ci
+      - name: Install source-pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+      - name: Build the optimized paired client probe
+        run: cargo build --manifest-path experiments/gpui-patient-pilot/Cargo.toml -p mediflow-runtime-client --bin mediflow-runtime-probe --locked --release
+      - name: Compare decrypted reads, guarded writes and diagnostic timings
+        run: node experiments/gpui-patient-pilot/comparison/run.mjs --rust-probe experiments/gpui-patient-pilot/target/release/mediflow-runtime-probe --output-dir comparison-results --samples 5
+      - name: Retain public synthetic comparison receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rust-javascript-comparison
+          path: comparison-results/
+          if-no-files-found: error

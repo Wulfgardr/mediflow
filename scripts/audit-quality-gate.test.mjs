@@ -330,6 +330,7 @@ test('main checks the real direct and transactional writer contracts and rejects
     const requiredFiles = [
         ...gateSource.matchAll(/\broute:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bownerFile:\s*'([^']+)'/g).map((match) => match[1]),
+        ...gateSource.matchAll(/\bprofileFile:\s*'([^']+)'/g).map((match) => match[1]),
         ...gateSource.matchAll(/\bbridgeFile:\s*'([^']+)'/g).map((match) => match[1]),
         /* include the paired adapter and clear cardinality helper in the isolated gate fixture. */
         ...gateSource.matchAll(/\badapterFile:\s*'([^']+)'/g).map((match) => match[1]),
@@ -1107,6 +1108,78 @@ test('patient-update audit guard binds the PUT delegate, patient subject and req
         assert.notDeepEqual(validatePatient(routeSource, coreSource, auditSource), [], name);
     }
 });
+
+/* Both profile routes must retain the complete route -> port -> transaction -> audit chain. */
+for (const [routePath, auditContextExport] of [
+    ['app/api/patients/[id]/route.ts', 'auditContextFromSession'],
+    ['app/api/v1/patients/[id]/route.ts', 'auditContextFromRequest'],
+]) {
+    test(`patient-profile audit guard follows ${routePath} and rejects a broken intermediate hop`, () => {
+        const spec = {
+            handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
+            profileFile: 'lib/patient-profile-service.ts', auditContextExport,
+            ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
+        };
+        const original = {
+            spec, routeSource: fs.readFileSync(routePath, 'utf8'),
+            profileSource: fs.readFileSync(spec.profileFile, 'utf8'),
+            coreSource: fs.readFileSync(spec.ownerFile, 'utf8'),
+            auditSource: fs.readFileSync('lib/security/audit.ts', 'utf8'),
+        };
+        const validate = (patch = {}) => {
+            const sources = { ...original, ...patch };
+            for (const key of ['routeSource', 'profileSource', 'coreSource', 'auditSource']) {
+                assertParseClean(`${key}.ts`, sources[key]);
+            }
+            return validateRequiredPatientUpdateAudit(sources);
+        };
+        const change = (key, before, after) => ({ [key]: replaceOnce(original[key], before, after) });
+        assert.deepEqual(validate(), []);
+        const mutations = [
+            ['missing profile source', { profileSource: '' }],
+            ['route imports another profile service', change('routeSource', "'@/lib/patient-profile-service'", "'@/lib/fake-profile-service'")],
+            ['route removes the profile call', change('routeSource', 'await updatePatientProfile({', 'await ignoredProfile({')],
+            ['route shadows the profile import', change('routeSource', 'const commit = await updatePatientProfile',
+                'const updatePatientProfile = async () => ({ status: 200 }); const commit = await updatePatientProfile')],
+            ['route uses an optional profile call', change('routeSource', 'await updatePatientProfile({', 'await updatePatientProfile?.({')],
+            ['route obtains audit from the decoded body', change('routeSource', 'audit: () => {', 'audit: body.audit, unused: () => {')],
+            ['route spreads untrusted context', change('routeSource', 'patientId: id, expectedVersion,', 'patientId: id, expectedVersion, ...body,')],
+            ['route creates an asynchronous audit callback', change('routeSource', 'audit: () => {', 'audit: async () => {')],
+            ['route imports a fake audit constructor', change('routeSource', "'@/lib/security/audit'", "'@/lib/fake-audit'")],
+            ['route fabricates the audit identity', change('routeSource', `const auditContext = ${auditContextExport}(`,
+                'const auditContext = fakeAuditContext(')],
+            ['route replaces the audited actor', change('routeSource', 'actorRef: auditContext.actorRef', 'actorRef: body.actorRef')],
+            ['route detaches archive generation', change('routeSource', 'archiveGeneration: auditContext.archiveGeneration', 'archiveGeneration: body.archiveGeneration')],
+            ['route fabricates request identity', change('routeSource', 'requestId: requestIdFromRequest(request)', 'requestId: body.requestId')],
+            ['profile imports another operation', change('profileSource', "'./patient-update-operation'", "'./fake-patient-update-operation'")],
+            ['profile removes the writer hop', change('profileSource', 'return updatePatientOperation({', 'return ignoredOperation({')],
+            ['profile shadows the writer', change('profileSource', 'return updatePatientOperation({',
+                'const updatePatientOperation = () => ({ status: 200 }); return updatePatientOperation({')],
+            ['profile duplicates the writer', change('profileSource', 'return updatePatientOperation({',
+                'updatePatientOperation({} as never); return updatePatientOperation({')],
+            ['profile defers the writer', change('profileSource', 'return updatePatientOperation({', 'return () => updatePatientOperation({')],
+            ['profile awaits the writer', change('profileSource', 'return updatePatientOperation({', 'return await updatePatientOperation({')],
+            ['profile uses an optional writer', change('profileSource', 'return updatePatientOperation({', 'return updatePatientOperation?.({')],
+            ['profile conditionally skips the writer', change('profileSource', 'return updatePatientOperation({', 'if (body.write) return updatePatientOperation({')],
+            ['profile changes the patient subject', change('profileSource', 'patientId: context.patientId,', 'patientId: body.patientId as string,')],
+            ['profile changes the admitted version', change('profileSource', 'expectedVersion: context.expectedVersion,', 'expectedVersion: 0,')],
+            ['profile omits mandatory audit', change('profileSource', 'audit: context.audit(),', 'audit: undefined,')],
+            ['profile reads audit from decoded body', change('profileSource', 'audit: context.audit(),', 'audit: body.audit(),')],
+            ['profile makes audit optional', change('profileSource', 'audit: context.audit(),', 'audit: context.audit?.(),')],
+            ['profile defers audit', change('profileSource', 'audit: context.audit(),', 'audit: context.audit,')],
+            ['profile yields after audit resolution', change('profileSource', 'audit: context.audit(),', 'audit: context.audit(), later: await Promise.resolve(),')],
+            ['profile rewrites the admitted callback', change('profileSource', 'return updatePatientOperation({',
+                'context.audit = () => body.audit; return updatePatientOperation({')],
+            ['operation loses mandatory audit', change('coreSource', 'writeAuditEventInTransaction(tx, {', 'ignoredAudit(tx, {')],
+            ['operation changes transaction behavior', change('coreSource', "behavior: 'immediate'", "behavior: 'deferred'")],
+            ['operation changes audit subject', change('coreSource', 'subjectRef: input.patientId', 'subjectRef: input.otherId')],
+            ['audit writer no longer executes insert', change('auditSource', '.values(row).run()', '.values(row)')],
+        ];
+        for (const [name, patch] of mutations) {
+            assert.notDeepEqual(validate(patch), [], `${routePath}: ${name}`);
+        }
+    });
+}
 
 /* C05 DELETE mutations use the frozen real source shape, without modifying runtime files. */
 test('patient-delete audit guard binds both DELETE routes to one tombstone and required tx writer', () => {

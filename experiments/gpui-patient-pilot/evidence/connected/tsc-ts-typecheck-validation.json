@@ -1,0 +1,752 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded-local-cli-typecheck-comparison",
+  "status": "PASS",
+  "measuredAtUtc": "2026-10-17T20:44:54.062439+00:00",
+  "provenance": {
+    "sourceCommit": "670d36d154b98d84ddbc0d68a70b9ba3ef996e2a",
+    "sourceTree": "0f33f12009c14f1c6f29d46a935a9dfac54b3a49",
+    "repositoryHeadWhenStagedTreeWasArchived": "fb94c9a2fed54b14ca3943856a4850532c03cf23",
+    "comparisonBase": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+    "sourceArchive": {
+      "path": "source.tar",
+      "bytes": 68464640,
+      "sha256": "2d3160c9c7877bff76ebdd1fc1fdfdc9628df4c255389aa7834ea0ce8cbb1079"
+    },
+    "deltaFromComparisonBase": {
+      "path": "source-delta-from-db98.patch",
+      "bytes": 151391,
+      "sha256": "49d3e0c5a5f9051543a8e75e3093dc10970acaec466cdd4d03c2d5a011614e7f"
+    },
+    "changedTypeScriptFilesFromComparisonBase": [
+      {
+        "path": "app/api/patients/[id]/route.ts",
+        "bytes": 5457,
+        "sha256": "679b8fe79f05e4301b21a6c835cfe7f6ffb84dd2d6bf279ecb928e1b15f24aff"
+      },
+      {
+        "path": "app/api/patients/route.test.ts",
+        "bytes": 16737,
+        "sha256": "cbe65438d981b996a3b4c600266957b4bee0bc721fb1e4c78265f1ab13be9fa8"
+      },
+      {
+        "path": "app/api/v1/patients/[id]/route.ts",
+        "bytes": 5651,
+        "sha256": "dced582f81e67864faf0374980d1629ffa6f896c73684a532394703cbdac956d"
+      },
+      {
+        "path": "lib/chatgpt-execution/execution-mac-qualification.ts",
+        "bytes": 30093,
+        "sha256": "f419590cddef5c5f8005ed664f19b4cd1096ceef0ae7251e564334c767276740"
+      },
+      {
+        "path": "lib/network-patient-read.ts",
+        "bytes": 2256,
+        "sha256": "f1a1efa8e59c3a38bbbf5e04c2209ec3d3560fd23e5ce0308aec9f6b4463d1af"
+      },
+      {
+        "path": "lib/network-patient-write.ts",
+        "bytes": 5961,
+        "sha256": "f2149d96f509593e69a8b11c2ecadfecb5000dbb3288137c34a73c6f2c9845d3"
+      },
+      {
+        "path": "lib/patient-create-service.test.ts",
+        "bytes": 12220,
+        "sha256": "be162f903a5d8076a7f8de87a0c7cf618d2db832f7b0a302b237fb7b84a12bcd"
+      },
+      {
+        "path": "lib/patient-profile-service.test.ts",
+        "bytes": 9244,
+        "sha256": "23afc0206474348a9e1aa9dfca5eaf82ec03588f5ea40a5a44e2308da01d579a"
+      },
+      {
+        "path": "lib/patient-profile-service.ts",
+        "bytes": 5375,
+        "sha256": "864d5b9904799043796d75eac1902240b46cea56f0c8802ab8648998caf83912"
+      },
+      {
+        "path": "lib/security/patient-create-context.test.ts",
+        "bytes": 7251,
+        "sha256": "a1e5da8287c9c863b55d8e422c28c54180499ae3cc05dc5a2a6c6cb845d6f0f5"
+      },
+      {
+        "path": "lib/security/web-auth-lifecycle-owner-boundary.test.ts",
+        "bytes": 22564,
+        "sha256": "a137f2ae0574c807da55270336bebc189f87c9cc466081a61b7489af3daf5bb9"
+      }
+    ],
+    "configsAndDependencyManifests": [
+      {
+        "path": "tsconfig.json",
+        "bytes": 1893,
+        "sha256": "1711ebc1f3c7f79c3923f744d9c99ae150f7b9a861ccc344f716788d97d73120"
+      },
+      {
+        "path": "tsconfig.typecheck.json",
+        "bytes": 382,
+        "sha256": "a272c0bcc1f0d366a098d5c8e1c7f2aa61a38bc99942016510beeda825d35029"
+      },
+      {
+        "path": "package.json",
+        "bytes": 27707,
+        "sha256": "0bfdfc1e0b602f7b5b2820176bece82314f7949d857c7686590634f66cc9acfa"
+      },
+      {
+        "path": "package-lock.json",
+        "bytes": 385547,
+        "sha256": "7b7a2a8f41a12b48146c51f033b6c2c632c011adde6da492685b943e48fe3766"
+      }
+    ],
+    "dependencySetup": "Clean npm ci at the root repository; source/node_modules is a symlink to that installation. Node 24.19.0; pinned project TypeScript 5.9.3.",
+    "scope": "Fresh measurements on the reconstructed sources at commit 670d36d. Later audit-gate, reviewed-loader-digest and membership-topology test fixes are outside this snapshot; later TypeScript test fixes affect graph input bytes.",
+    "priorEnvironmentLoss": "The earlier trial raw files were lost. Its timings and package/input hashes are not reproduced or attributed to these bytes."
+  },
+  "packages": [
+    {
+      "name": "tsc-ts",
+      "version": "0.0.2",
+      "metadataUrl": "https://registry.npmjs.org/tsc-ts/0.0.2",
+      "metadataSha256": "b0a1da0ca8673e036c9dc86362aac45e0c60af6a9daf943cc154fce1e9b970ab",
+      "tarballUrl": "https://registry.npmjs.org/tsc-ts/-/tsc-ts-0.0.2.tgz",
+      "tarballBytes": 19428,
+      "sha256": "e40037c8f3acdfa1981f0a8395fd5833feebe0464c4dac6bbb3bf2b23e4b0e59",
+      "sha512Integrity": "sha512-2wk85TpOB6sy4KSV+TA/C4EzI7O9X4RPTipMeqeDEG0+v6h6ubyi0uHeDXcxplKzW9BBy8mLZXiYCevv+KxRbg==",
+      "sha1": "8ddcd06af823d3a8bc17bd195885ddb3581d496a",
+      "npmIntegrityAndShasumMatch": true,
+      "gitHead": null,
+      "tarballFilename": "tsc-ts-0.0.2.tgz"
+    },
+    {
+      "name": "@tsc-ts/linux-x64-gnu",
+      "version": "0.0.2",
+      "metadataUrl": "https://registry.npmjs.org/@tsc-ts%2Flinux-x64-gnu/0.0.2",
+      "metadataSha256": "eb0d9826f197e8a4a0ffa4be3220f306498e96bb8480449c719af5c1db586c6a",
+      "tarballUrl": "https://registry.npmjs.org/@tsc-ts/linux-x64-gnu/-/linux-x64-gnu-0.0.2.tgz",
+      "tarballBytes": 7216710,
+      "sha256": "da7c4006162ec08c6a10f6285cd9f3e303f514ab6c7be7afc599c77f487876d3",
+      "sha512Integrity": "sha512-/+IrlTylDCCTqMtmEvV3pH+jWNnsI7I5+pSFFQj5tMFTYA7ArwROsaygtP6voPZtY6o+jFg6G7gPfxpCLPyYRg==",
+      "sha1": "cb386a2c5dc0ab5de38f741a0a74d3c2e5786b18",
+      "npmIntegrityAndShasumMatch": true,
+      "gitHead": null,
+      "tarballFilename": "tsc-ts-linux-x64-gnu-0.0.2.tgz"
+    },
+    {
+      "name": "typescript",
+      "version": "7.0.2",
+      "metadataUrl": "https://registry.npmjs.org/typescript/7.0.2",
+      "metadataSha256": "28a8ef314c6bbc3fddb831088f80eb2fcac6351cb618c8ac029f7229f587b8aa",
+      "tarballUrl": "https://registry.npmjs.org/typescript/-/typescript-7.0.2.tgz",
+      "tarballBytes": 365612,
+      "sha256": "da2513f4b95176d6dde8b51aab7afe8a927656c9d277369793f77f7e59371c08",
+      "sha512Integrity": "sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==",
+      "sha1": "9ec773d7954a8c182c17cc5bbd575aa28bc51582",
+      "npmIntegrityAndShasumMatch": true,
+      "gitHead": "2bd066d87f5bafd315be9f40889d0a60b9e58e0b",
+      "tarballFilename": "typescript-7.0.2.tgz"
+    },
+    {
+      "name": "@typescript/typescript-linux-x64",
+      "version": "7.0.2",
+      "metadataUrl": "https://registry.npmjs.org/@typescript%2Ftypescript-linux-x64/7.0.2",
+      "metadataSha256": "754a96664c15d55e0c7ccba0d9fbe811311a4cb1c0235ae9b6aab062a281a788",
+      "tarballUrl": "https://registry.npmjs.org/@typescript/typescript-linux-x64/-/typescript-linux-x64-7.0.2.tgz",
+      "tarballBytes": 9669334,
+      "sha256": "7ecad6f67377e831856367ab062ef394f21506a611405bf8ac0ff039348637d3",
+      "sha512Integrity": "sha512-EYdf2cNg7rgCWJnxCdJ+F3V39O8ihb37eHAu1LK8oAFizgTQbPOK7zHHXbPt8rX24COqODXeI3sIf0fCXG7H/A==",
+      "sha1": "73269cb0baba50aea0ca060445a6b88e583f1ce2",
+      "npmIntegrityAndShasumMatch": true,
+      "gitHead": "2bd066d87f5bafd315be9f40889d0a60b9e58e0b",
+      "tarballFilename": "typescript-typescript-linux-x64-7.0.2.tgz"
+    }
+  ],
+  "downloadBounds": {
+    "metadataMaxBytes": 2097152,
+    "tarballMaxBytes": 83886080,
+    "metadataTimeoutSeconds": 20,
+    "tarballTimeoutSeconds": 30
+  },
+  "installation": {
+    "location": "Two isolated prefixes under the temporary trial directory; no project dependency, lockfile or config edits.",
+    "flags": [
+      "--ignore-scripts",
+      "--no-package-lock",
+      "--no-audit",
+      "--no-fund",
+      "--omit=optional",
+      "--offline"
+    ],
+    "platformPackagePolicy": "Both wrapper and exact Linux x64 platform tarballs are explicit install arguments. No optional dependency auto-download or upstream source build.",
+    "packageLifecycleScriptsExecuted": false
+  },
+  "engines": {
+    "typescript-5.9.3": {
+      "version": "Version 5.9.3",
+      "engine": {
+        "path": "source/node_modules/typescript/lib/tsc.js",
+        "bytes": 267,
+        "sha256": "2cffde0b8c6760dfb0b5b0382bbb7e00ba6a8b2d981b9205b256a700a481d983"
+      },
+      "implementationBehindCacheShim": {
+        "path": "source/node_modules/typescript/lib/_tsc.js",
+        "bytes": 6213092,
+        "sha256": "e8f349eabd48486bdb2bf9dc1a00c89d58297270c54b745838879e2859194419"
+      },
+      "nodeExecutable": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "bytes": 125989464,
+        "sha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+      },
+      "commandPrefix": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "source/node_modules/typescript/lib/tsc.js"
+      ]
+    },
+    "tsc-ts-0.0.2": {
+      "version": "Version 7.0.2",
+      "engine": {
+        "path": "tsc-ts-install/node_modules/@tsc-ts/linux-x64-gnu/lib/tsc-ts",
+        "bytes": 17367152,
+        "sha256": "fb24c9cc43533dc004b9dfc9547d7066cea348b807c3239f8e31c7ba062017b6"
+      },
+      "commandPrefix": [
+        "tsc-ts-install/node_modules/@tsc-ts/linux-x64-gnu/lib/tsc-ts"
+      ]
+    },
+    "typescript-7.0.2": {
+      "version": "Version 7.0.2",
+      "engine": {
+        "path": "ts7-install/node_modules/@typescript/typescript-linux-x64/lib/tsc",
+        "bytes": 24101026,
+        "sha256": "4f2de678286401759b3fb4475bafe35b8f32b4b3a07d92642bbf37eadc9b34a4"
+      },
+      "commandPrefix": [
+        "ts7-install/node_modules/@typescript/typescript-linux-x64/lib/tsc"
+      ]
+    }
+  },
+  "environment": {
+    "timestampUtc": "2026-10-17T20:44:54.062439+00:00",
+    "osRelease": "Linux-6.18.55-x86_64-with-glibc2.39",
+    "kernel": "6.18.55",
+    "architecture": "x86_64",
+    "glibc": [
+      "glibc",
+      "2.39"
+    ],
+    "nodeExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "logicalCpuCount": 9,
+    "cpuAffinity": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "cpuMax": "800000 100000",
+    "memoryMax": "8589934592",
+    "cpuModel": "AMD EPYC 9V74 80-Core Processor",
+    "nodeCompileCacheOverride": null,
+    "nodeDisableCompileCacheOverride": null,
+    "goMaxProcsOverride": null,
+    "tscTsLibDirOverride": null,
+    "tscTsCheckersOverride": null,
+    "nodeVersion": "24.19.0",
+    "npmVersion": "11.9.0"
+  },
+  "method": {
+    "driver": {
+      "path": "experiments/gpui-patient-pilot/comparison/typecheck-benchmark.py",
+      "bytes": 14074,
+      "sha256": "9975a1ca971f2a4f939d21441941a977c5f198d3bf39d6fa0036f3675b6ae8a1"
+    },
+    "commonArguments": [
+      "-p",
+      "tsconfig.typecheck.json",
+      "--noEmit",
+      "--incremental",
+      "false",
+      "--pretty",
+      "false"
+    ],
+    "workingDirectory": "source",
+    "perProcessLimitSeconds": 60,
+    "totalBatchLimitSeconds": 180,
+    "orders": [
+      [
+        "typescript-5.9.3",
+        "tsc-ts-0.0.2",
+        "typescript-7.0.2"
+      ],
+      [
+        "typescript-7.0.2",
+        "typescript-5.9.3",
+        "tsc-ts-0.0.2"
+      ],
+      [
+        "tsc-ts-0.0.2",
+        "typescript-7.0.2",
+        "typescript-5.9.3"
+      ]
+    ],
+    "wallAndMemory": "Direct native engines, or Node plus the pinned TS5 CLI. Wall monotonic clock around fork/exec through wait4 for that exact PID. Linux ru_maxrss in KiB from that PID, not cumulative child rusage.",
+    "cacheAndLoadScope": "All compilers have version/config/file-graph preflight before timing; OS and Node compile caches are not flushed. No CPU pinning or cold-start claim. Compilation/QA activity is coordinated to pause during this local sample. Default worker/concurrency choices are retained, so this does not compare equal thread counts.",
+    "quietWindow": "GPUI app, Xvfb and Next QA host were retired at 20:44:27 UTC. Root and CI agents paused local suites until the nine samples completed.",
+    "outputChecks": "Every timed sample required exit 0, no timeout, zero diagnostics and empty stdout/stderr."
+  },
+  "samples": [
+    {
+      "engine": "typescript-5.9.3",
+      "round": 1,
+      "positionInRound": 1,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 34.146098,
+      "userSeconds": 51.004155,
+      "systemSeconds": 3.474827,
+      "maxRssKiB": 1996328
+    },
+    {
+      "engine": "tsc-ts-0.0.2",
+      "round": 1,
+      "positionInRound": 2,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 1.85122,
+      "userSeconds": 12.450974,
+      "systemSeconds": 1.2017229999999999,
+      "maxRssKiB": 1486372
+    },
+    {
+      "engine": "typescript-7.0.2",
+      "round": 1,
+      "positionInRound": 3,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 5.094933,
+      "userSeconds": 20.951595,
+      "systemSeconds": 4.731295,
+      "maxRssKiB": 1904636
+    },
+    {
+      "engine": "typescript-7.0.2",
+      "round": 2,
+      "positionInRound": 1,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 4.156027,
+      "userSeconds": 17.046253,
+      "systemSeconds": 3.678713,
+      "maxRssKiB": 1987024
+    },
+    {
+      "engine": "typescript-5.9.3",
+      "round": 2,
+      "positionInRound": 2,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 30.26322,
+      "userSeconds": 46.880852,
+      "systemSeconds": 1.322446,
+      "maxRssKiB": 1998024
+    },
+    {
+      "engine": "tsc-ts-0.0.2",
+      "round": 2,
+      "positionInRound": 3,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 1.668819,
+      "userSeconds": 12.015023,
+      "systemSeconds": 0.823762,
+      "maxRssKiB": 1497316
+    },
+    {
+      "engine": "tsc-ts-0.0.2",
+      "round": 3,
+      "positionInRound": 1,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 1.658704,
+      "userSeconds": 11.767044,
+      "systemSeconds": 0.836298,
+      "maxRssKiB": 1498076
+    },
+    {
+      "engine": "typescript-7.0.2",
+      "round": 3,
+      "positionInRound": 2,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 4.380135,
+      "userSeconds": 18.366289,
+      "systemSeconds": 3.991217,
+      "maxRssKiB": 1912800
+    },
+    {
+      "engine": "typescript-5.9.3",
+      "round": 3,
+      "positionInRound": 3,
+      "exitCode": 0,
+      "timedOut": false,
+      "diagnosticCount": 0,
+      "elapsedSeconds": 30.513008,
+      "userSeconds": 47.356538,
+      "systemSeconds": 1.4306269999999999,
+      "maxRssKiB": 2052380
+    }
+  ],
+  "sampleOutputs": {
+    "allStdoutAndStderrEmpty": true,
+    "emptyFileSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "filenames": "round-{round}-{engine}.stdout.log and round-{round}-{engine}.stderr.log",
+    "fullRecordManifest": {
+      "path": "measurement-samples.json",
+      "bytes": 9249,
+      "sha256": "ad63173550e2c301646d4a478ac6bde802ed69924a96bb8bb1d4c41cebd35bb2"
+    }
+  },
+  "summary": {
+    "typescript-5.9.3": {
+      "samples": 3,
+      "allExitZero": true,
+      "diagnostics": 0,
+      "elapsedSeconds": {
+        "median": 30.513008,
+        "min": 30.26322,
+        "max": 34.146098
+      },
+      "maxRssKiB": {
+        "median": 1998024,
+        "min": 1996328,
+        "max": 2052380
+      }
+    },
+    "tsc-ts-0.0.2": {
+      "samples": 3,
+      "allExitZero": true,
+      "diagnostics": 0,
+      "elapsedSeconds": {
+        "median": 1.668819,
+        "min": 1.658704,
+        "max": 1.85122
+      },
+      "maxRssKiB": {
+        "median": 1497316,
+        "min": 1486372,
+        "max": 1498076
+      }
+    },
+    "typescript-7.0.2": {
+      "samples": 3,
+      "allExitZero": true,
+      "diagnostics": 0,
+      "elapsedSeconds": {
+        "median": 4.380135,
+        "min": 4.156027,
+        "max": 5.094933
+      },
+      "maxRssKiB": {
+        "median": 1912800,
+        "min": 1904636,
+        "max": 1987024
+      }
+    }
+  },
+  "batchElapsedSeconds": 113.744988,
+  "medianRatios": {
+    "ts5ElapsedDividedByTscTsElapsed": 18.284192593684516,
+    "officialTs7ElapsedDividedByTscTsElapsed": 2.624691473431211,
+    "scope": "Local command with each compiler default concurrency; not a product, language-only or equal-thread comparison."
+  },
+  "inputs": {
+    "allThreeRootListsEqual": true,
+    "rootCount": 1899,
+    "ts7OrderedGraphsEqual": true,
+    "ts7GraphSetsEqual": true,
+    "normalization": "Only the respective native compiler lib directory prefix on lib*.d.ts paths is replaced with <compiler-standard-lib>/. Other file paths are unchanged.",
+    "ts7ResolvedFileCount": 3588,
+    "ts7IncludedStandardLibraries": 89,
+    "ts7StandardLibrariesAvailable": {
+      "tsc-ts-0.0.2": 107,
+      "typescript-7.0.2": 108
+    },
+    "ts7StandardLibraryManifestsByteEqual": false,
+    "ts7SharedStandardLibraries": 107,
+    "ts7SharedStandardLibrariesByteEqual": true,
+    "ts7IncludedStandardLibrariesByteEqual": true,
+    "additionalStandardLibrariesOutsideSharedSet": {
+      "tsc-ts-0.0.2": [],
+      "typescript-7.0.2": [
+        "lib.d.ts"
+      ]
+    },
+    "availableLibraryDifferenceScope": "The official package has an extra lib.d.ts which is absent from both resolved graphs for this tsconfig. The measured graphs and their 89 included standard libraries agree.",
+    "normalizedGraph": {
+      "path": "tsc-ts-0.0.2-normalized-graph.txt",
+      "bytes": 319196,
+      "sha256": "77bca173a41a9f5343cc1d13754a49161e7305038a46db24b15a7c7c35700110"
+    },
+    "normalizedReferenceGraph": {
+      "path": "typescript-7.0.2-normalized-graph.txt",
+      "bytes": 319196,
+      "sha256": "77bca173a41a9f5343cc1d13754a49161e7305038a46db24b15a7c7c35700110"
+    },
+    "ts5ResolvedFileCount": 3596,
+    "fullInputManifestCount": 3600,
+    "inputManifestBefore": {
+      "path": "input-manifest-before.json",
+      "bytes": 770175,
+      "sha256": "7f9104fb3d417ea83c86edd992f58e4f24b1aac1760b7e3d6d2e87cf4713c78f"
+    },
+    "rootFilesManifest": {
+      "path": "root-files.json",
+      "bytes": 301715,
+      "sha256": "ac57e0fd48928259f4c306d2a0cff88b843f0cb4eecff6dc3539d57c52442cf5"
+    },
+    "standardLibraryManifests": {
+      "path": "standard-library-manifests.json",
+      "bytes": 33761,
+      "sha256": "735b537a163f5ce0655c8ecd6951b97d23f8f26e4f89ffa44c72a5539cd32f12"
+    },
+    "inputManifestAfter": {
+      "path": "input-manifest-after.json",
+      "bytes": 770175,
+      "sha256": "7f9104fb3d417ea83c86edd992f58e4f24b1aac1760b7e3d6d2e87cf4713c78f"
+    },
+    "inputManifestBeforeAfterByteEqual": true,
+    "sharedRootListNewlineJoinedSha256": "02caf2146e7de6026637758ee11919843753f18c86025906a5c52ff4c019bdc8",
+    "manifestCoverage": "3,596 TS5 resolved files plus tsconfig.json, tsconfig.typecheck.json, package.json and package-lock.json; native engine and native standard-library bytes are recorded and checked separately.",
+    "pathScope": "Graphs preserve absolute source paths. Only the two native standard-library directory prefixes are normalized for the TS7 comparison. Raw manifest hashes change when a reproduction uses another trial directory.",
+    "initialPreflightFinding": "The first preflight stopped before timing because it also required all available lib*.d.ts files to match. The official package includes an extra lib.d.ts outside both resolved graphs. The measured driver checks equal roots, ordered graphs and all 89 included library bytes; the 107/108 package difference remains reported."
+  },
+  "negativeControl": {
+    "kind": "isolated-negative-control-not-a-performance-sample",
+    "fixture": [
+      {
+        "path": "negative-control/tsconfig.json",
+        "bytes": 165,
+        "sha256": "9ada45733de7a525813ef561253e44115166f9694deccea039ed7f8d279f5607"
+      },
+      {
+        "path": "negative-control/sentinel.ts",
+        "bytes": 72,
+        "sha256": "7395927eba40cf0fe40acbb6053fbabc7a80982fb2c0cf6779888a19be04003f"
+      }
+    ],
+    "source": "const sentinel: number = 'intentional synthetic type error';\nexport {};\n",
+    "config": {
+      "compilerOptions": {
+        "target": "ES2017",
+        "strict": true,
+        "types": [],
+        "noEmit": true,
+        "incremental": false
+      },
+      "files": [
+        "sentinel.ts"
+      ]
+    },
+    "arguments": [
+      "-p",
+      "../negative-control/tsconfig.json",
+      "--noEmit",
+      "--incremental",
+      "false",
+      "--pretty",
+      "false"
+    ],
+    "workingDirectory": "source",
+    "results": [
+      {
+        "engine": "typescript-5.9.3",
+        "exitCode": 2,
+        "diagnostic": "../negative-control/sentinel.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+        "expectedErrorDetected": true
+      },
+      {
+        "engine": "tsc-ts-0.0.2",
+        "exitCode": 1,
+        "diagnostic": "../negative-control/sentinel.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+        "expectedErrorDetected": true
+      },
+      {
+        "engine": "typescript-7.0.2",
+        "exitCode": 1,
+        "diagnostic": "../negative-control/sentinel.ts(1,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+        "expectedErrorDetected": true
+      }
+    ],
+    "allDiagnosticOutputsByteEqual": true,
+    "diagnosticOutput": {
+      "bytes": 102,
+      "sha256": "458e8ed55d1dc7231bcf0737f60616c9d15734db44c9c692964790247efab700"
+    },
+    "scope": "One independent invalid assignment verifies error detection and nonzero exit, not whole-language correctness.",
+    "measuredSourceDirectoryUntouched": true
+  },
+  "freshAnnotationEquivalence": {
+    "schemaVersion": 1,
+    "kind": "reconstructed-source-type-annotation-emission-equivalence",
+    "dateUtc": "2026-10-17T20:25:59.950Z",
+    "sourceBase": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+    "path": "lib/chatgpt-execution/execution-mac-qualification.ts",
+    "typescriptVersion": "5.9.3",
+    "compilerOptions": {
+      "target": "ES2017",
+      "module": "ESNext"
+    },
+    "sourceBeforeSha256": "489fca79ca789a4e02546b094d0d8f2ff8cb422d1b3f18d3c0bdd02f7d9d9fd4",
+    "sourceAfterSha256": "f419590cddef5c5f8005ed664f19b4cd1096ceef0ae7251e564334c767276740",
+    "onlyDelta": "Add PropertyDescriptorMap type annotation to fields",
+    "oldJsSha256": "e5f64015497b12b136f2915a1ca83aa5ac15c4274a8145cc46dc67dc642e3f9b",
+    "newJsSha256": "e5f64015497b12b136f2915a1ca83aa5ac15c4274a8145cc46dc67dc642e3f9b",
+    "oldJsBytes": 29984,
+    "newJsBytes": 29984,
+    "emittedJsIdentical": true,
+    "transpileDiagnosticsBefore": 0,
+    "transpileDiagnosticsAfter": 0,
+    "scope": "This verifies emitted JavaScript equality for this file; semantic type checking is recorded separately."
+  },
+  "historicalInitialTrial": {
+    "evidenceClass": "Conversation record only; original raw logs were lost and have not been reconstructed.",
+    "observation": "Before the PropertyDescriptorMap annotation, both TS7 implementations reported the same two TS2339 errors; the TS5 CLI passed.",
+    "diagnostics": [
+      "lib/chatgpt-execution/execution-mac-qualification.ts(342,39): error TS2339: Property 'includeLayers' does not exist on type '{}'.",
+      "lib/chatgpt-execution/execution-mac-qualification.ts(343,39): error TS2339: Property 'cwd' does not exist on type '{}'."
+    ],
+    "currentEvidence": "The annotation emission equivalence was rerun on reconstructed bytes; all nine current timed commands pass on the annotated snapshot."
+  },
+  "limitations": [
+    "Local three-sample CLI typecheck experiment, not a product speedup or a cross-platform result.",
+    "TS5 versus TS7 changes compiler semantics as well as implementation.",
+    "CLI success does not authorize replacing the runtime TypeScript library APIs used by Mediflow.",
+    "One negative assignment does not qualify complete language correctness.",
+    "Native TS7 resolved graphs agree, but that does not prove all semantic or emit behavior is identical.",
+    "skipLibCheck remains the repository setting. No emit, incremental build, watch, editor integration or runtime TypeScript API qualification is claimed.",
+    "The package CLI reports compiler 7.0.2 while the tsc-ts package is version 0.0.2.",
+    "No Windows, macOS, ARM, production patient data or Rust/GPUI product performance was measured.",
+    "The single-writer transition and existing Rust/GPUI release gates are unaffected by this tool experiment."
+  ],
+  "artifacts": {
+    "originalTrialDirectory": "/tmp/mediflow-tsc-ts-recovery-m24x4a20",
+    "completeManifestsAndLogs": [
+      {
+        "path": "packages.json",
+        "bytes": 7496,
+        "sha256": "b25c8737433ca4a350d6564d434eb275070c8941585445b64b160484e48076af"
+      },
+      {
+        "path": "source-snapshot.json",
+        "bytes": 3693,
+        "sha256": "550699ae82b44a580327be1b283d309736855292bc7abd2cf3bd8d4c0fc3dfdb"
+      },
+      {
+        "path": "preflight.json",
+        "bytes": 11189,
+        "sha256": "3e4c459430ff349eeb6aaea558c6e075f6bbdb7152e23bed13ee615bb9a6c452"
+      },
+      {
+        "path": "graph-comparison.json",
+        "bytes": 2137,
+        "sha256": "0cf16304e13af39843961d6d77accb766d79247b63c49337a2b0bd2cce5b3e70"
+      },
+      {
+        "path": "measurement-environment.json",
+        "bytes": 686,
+        "sha256": "e3ce4e44dae58fc430a264046efefe9d47efc6c0130a713bad35cd8c45afbf0a"
+      },
+      {
+        "path": "measurement-samples.json",
+        "bytes": 9249,
+        "sha256": "ad63173550e2c301646d4a478ac6bde802ed69924a96bb8bb1d4c41cebd35bb2"
+      },
+      {
+        "path": "measurement-summary.json",
+        "bytes": 2455,
+        "sha256": "5c71965fef3e38490d7c4957e6cbb254b9bd4ef2f04921f063e0b79e32c9bb28"
+      },
+      {
+        "path": "measurement-run.log",
+        "bytes": 9722,
+        "sha256": "16419bcfba3408229b8d8af0ff7793090c9196cc18f3b6eb267a7c2be3f24eae"
+      },
+      {
+        "path": "input-manifest-before.json",
+        "bytes": 770175,
+        "sha256": "7f9104fb3d417ea83c86edd992f58e4f24b1aac1760b7e3d6d2e87cf4713c78f"
+      },
+      {
+        "path": "input-manifest-after.json",
+        "bytes": 770175,
+        "sha256": "7f9104fb3d417ea83c86edd992f58e4f24b1aac1760b7e3d6d2e87cf4713c78f"
+      },
+      {
+        "path": "root-files.json",
+        "bytes": 301715,
+        "sha256": "ac57e0fd48928259f4c306d2a0cff88b843f0cb4eecff6dc3539d57c52442cf5"
+      },
+      {
+        "path": "standard-library-manifests.json",
+        "bytes": 33761,
+        "sha256": "735b537a163f5ce0655c8ecd6951b97d23f8f26e4f89ffa44c72a5539cd32f12"
+      },
+      {
+        "path": "tsc-ts-0.0.2-normalized-graph.txt",
+        "bytes": 319196,
+        "sha256": "77bca173a41a9f5343cc1d13754a49161e7305038a46db24b15a7c7c35700110"
+      },
+      {
+        "path": "typescript-7.0.2-normalized-graph.txt",
+        "bytes": 319196,
+        "sha256": "77bca173a41a9f5343cc1d13754a49161e7305038a46db24b15a7c7c35700110"
+      },
+      {
+        "path": "negative-control.json",
+        "bytes": 2773,
+        "sha256": "ca05cd1de7386324fdf74ccb22543bb5c83762067f30f6c118fab219d10c04fa"
+      },
+      {
+        "path": "preflight-availability-check-initial.log",
+        "bytes": 412,
+        "sha256": "22262ed50f710dc96528b48a3d3450c158fa282144a588cb37d941bc31cdaebd"
+      },
+      {
+        "path": "tsc-ts-install.log",
+        "bytes": 334,
+        "sha256": "fd15997df140b3d1cc4ec6fbede794b56b6499aea9b3b2e529ada9df58ac5e4f"
+      },
+      {
+        "path": "ts7-install.log",
+        "bytes": 331,
+        "sha256": "e1c4b1cd385f40bcc60cf0b777e488a7c57d5fc8d2d8e5d8e7eca553b3ff5b87"
+      },
+      {
+        "path": "preflight-run.log",
+        "bytes": 2131,
+        "sha256": "77137d4ea9b80012a562d73aea52a432abbe48ecfa6ccb9bf1e06fdc091c5283"
+      }
+    ],
+    "manifestPublicationPolicy": "Compact receipt is published; the full root/input/graph manifests stay in the trial directory without duplicating thousands of paths here. The included driver regenerates them.",
+    "driver": "experiments/gpui-patient-pilot/comparison/typecheck-benchmark.py",
+    "reproductionInstructions": "docs/analysis/2026-10-17-tsc-ts-migration-review.md"
+  },
+  "primarySources": [
+    "https://github.com/vercel-labs/tsc-ts",
+    "https://github.com/vercel-labs/tsc-ts/blob/main/packages/tsc-ts/README.md",
+    "https://github.com/vercel-labs/tsc-ts/blob/main/upstream.json",
+    "https://github.com/microsoft/TypeScript",
+    "https://github.com/microsoft/typescript-go"
+  ]
+}
