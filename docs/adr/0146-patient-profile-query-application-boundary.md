@@ -36,7 +36,10 @@ Web ritira subito le note se cambia la revisione osservata nel contesto del
 paziente; serve una riapertura esplicita, senza ripubblicare risposte o
 esiti di decrittazione della revisione precedente. Dopo una scrittura, il GET
 dell'epoch può osservare l'invalidazione della selezione precedente e restituire
-l'epoch corrente; non apre una selezione né rinnova un riferimento. Le risposte
+l'epoch corrente; non apre una selezione né rinnova un riferimento. Il trasporto
+Web lega anche questo specifico GET alla generazione dell'archivio osservata dal
+documento: il resolver riconvalida la selezione esistente senza accettare un
+fence assente o appartenente a un altro archivio. Le risposte
 sono `no-store`; i consumer separano cache e continuazioni per selezione e handle.
 Il JSON UTF-8 della vista ha un budget condiviso di 32 KiB, applicato dall'host
 su tutti gli ingressi prima della risposta. Il superamento restituisce soltanto
