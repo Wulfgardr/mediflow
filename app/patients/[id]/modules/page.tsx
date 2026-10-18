@@ -730,7 +730,7 @@ export default function PatientDetailPage() {
                                 captureInput={smartImportFabricCaptureInput}
                                 enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)} />
                         ) : null} />}
-                    notesContent={<PatientProfileNotes patientId={id} />}
+                    notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     leadDiagnosis={leadDiagnosis}
                     otherProblemsCount={otherProblemsCount}
                     signals={synopticSignals}

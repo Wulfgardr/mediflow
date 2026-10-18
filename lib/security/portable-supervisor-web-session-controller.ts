@@ -53,7 +53,7 @@ type Sources = Readonly<{
         terminate(): boolean;
     }>;
     profileQueries?: Readonly<{
-        acquire(projection: ProfileProjection): Promise<PatientProfileQueryHostPort | null>;
+        acquire(projection: ProfileProjection, expiresAt: number): Promise<PatientProfileQueryHostPort | null>;
         publish(port: PatientProfileQueryHostPort | null): void;
     }>;
 }>;
@@ -266,18 +266,21 @@ export function createPortableSupervisorWebSessionControllerV1(sources: Sources)
             }
             if (!acquired) throw fail('selection_unavailable');
             owner = acquired;
-            if (constraint.patientProfileQuery) {
-                const acquiredPort = await sources.profileQueries?.acquire(constraint.patientProfileQuery.projection);
-                if (!acquiredPort) throw fail('host_unavailable');
-                if (phase !== 'activating' || owner !== acquired) { acquiredPort.dispose(); throw fail('session_terminal'); }
-                try { constrainCapture(acquired, constraint); } catch (error) { acquiredPort.dispose(); throw error; }
-                profilePort = acquiredPort;
-            }
             const activated = await sources.activateBridge(() => constrainCapture(acquired, constraint), constraint.patientProfileQuery);
             if (phase !== 'activating' || owner !== acquired) throw fail('session_terminal');
             const currentCapture = constrainCapture(acquired, constraint);
             const expiresAt = bridgeExpiry(activated, currentCapture.expiresAt);
             if (expiresAt === null) throw fail('host_unavailable');
+            if (constraint.patientProfileQuery) {
+                const acquiredPort = await sources.profileQueries?.acquire(constraint.patientProfileQuery.projection, expiresAt);
+                if (!acquiredPort) throw fail('host_unavailable');
+                if (phase !== 'activating' || owner !== acquired) { acquiredPort.dispose(); throw fail('session_terminal'); }
+                try {
+                    const capture = constrainCapture(acquired, constraint);
+                    if (bridgeExpiry(activated, capture.expiresAt) !== expiresAt) throw fail('host_unavailable');
+                } catch (error) { acquiredPort.dispose(); throw error; }
+                profilePort = acquiredPort;
+            }
             const result = record({ state: 'active' as const, expiresAt });
             if (!sources.checkupLifecycle.activate(acquired)) throw fail('host_unavailable');
             phase = 'active';
