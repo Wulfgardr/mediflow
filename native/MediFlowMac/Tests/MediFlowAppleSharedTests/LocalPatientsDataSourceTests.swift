@@ -3,10 +3,8 @@ import Foundation
 import XCTest
 @testable import MediFlowAppleShared
 
-/// ADR 0071 Fase 3: the in-process local-authority adapter serves patient list/detail
-/// from the on-device medical.db. These tests point it at the committed core fixture
-/// (read-only) with the golden-vector master key; the HTTP fallback is a client at a
-/// dead URL that the local-read paths must never invoke.
+/// The profile pilot delegates to the admitted HTTP host. Other local operations
+/// retain coverage against the committed synthetic fixture and writable copies.
 final class LocalPatientsDataSourceTests: XCTestCase {
 
     private let masterKey = SymmetricKey(
@@ -30,6 +28,94 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         return LocalPatientsDataSource(databasePath: fixturePath(), masterKey: masterKey, fallback: fallback)
     }
 
+    private func hostSource(databasePath: String) -> LocalPatientsDataSource {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LocalAccountURLProtocol.self]
+        let client = HomeBasePatientsClient(
+            configuration: HomeBaseConnectionConfiguration(serverURLString: "https://localhost:3443"),
+            session: URLSession(configuration: configuration))
+        return LocalPatientsDataSource(databasePath: databasePath, masterKey: masterKey, fallback: client)
+    }
+
+    private func requestBody(_ request: URLRequest) throws -> [String: Any] {
+        var data = request.httpBody ?? Data()
+        if data.isEmpty, let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count < 0 { throw stream.streamError ?? URLError(.cannotDecodeRawData) }
+                if count == 0 { break }
+                data.append(buffer, count: count)
+            }
+        }
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    }
+
+    func testProfileReadUsesHostWithoutOpeningLocalArchive() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".db")
+        let sentinel = Data("synthetic sentinel, deliberately not SQLite".utf8)
+        try sentinel.write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        var calls = 0
+        LocalAccountURLProtocol.requestHandler = { request in
+            calls += 1
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "/api/v1/network/patients/fixture-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "c")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "t")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"),
+                calls == 1 ? "mediflow_session=test; ambulatory_id=AMB-1" : "mediflow_session=test")
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200,
+                httpVersion: nil, headerFields: nil)!,
+                Data(#"{"id":"fixture-1","firstName":"Host","lastName":"Synthetic","taxCode":"SYNTHETIC01","version":7,"notes":"ENC:opaque"}"#.utf8))
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        let source = hostSource(databasePath: url.path)
+        for scope in ["AMB-1", nil] as [String?] {
+            let detail = try await source.fetchPatient(id: "fixture-1", credentials: credentials,
+                sessionCookie: "mediflow_session=test", ambulatoryId: scope)
+            XCTAssertEqual(detail.firstName, "Host")
+            XCTAssertEqual(detail.version, 7)
+            XCTAssertEqual(detail.notes, "ENC:opaque")
+        }
+        XCTAssertEqual(calls, 2)
+        XCTAssertEqual(try Data(contentsOf: url), sentinel)
+    }
+
+    func testProfileUpdateUsesHostWithoutMutatingLocalArchive() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let before = try Data(contentsOf: URL(fileURLWithPath: path))
+        guard case .sealed(let presealed?) = CryptoService.seal("Nota sintetica", masterKey: masterKey) else {
+            return XCTFail("seal failed")
+        }
+        var calls = 0
+        LocalAccountURLProtocol.requestHandler = { request in
+            calls += 1
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, "/api/v1/network/patients/fixture-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=test; ambulatory_id=AMB-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "c")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "t")
+            let body = try self.requestBody(request)
+            XCTAssertEqual(body["version"] as? Int, 1)
+            XCTAssertEqual(body["notes"] as? String, presealed)
+            XCTAssertTrue(body["address"] is NSNull)
+            XCTAssertNil(body["phone"])
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200,
+                httpVersion: nil, headerFields: nil)!, Data(#"{"success":true}"#.utf8))
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        let ack = try await hostSource(databasePath: path).updatePatient(patientId: "fixture-1",
+            payload: HomeBasePatientUpdatePayload(version: 1, address: .null, notes: .value(presealed)),
+            credentials: credentials, sessionCookie: "mediflow_session=test", ambulatoryId: "AMB-1")
+        XCTAssertTrue(ack.success)
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), before)
+    }
+
     func testFetchPatientsServedLocallyAndScoped() async throws {
         let source = makeSource()
         let inScope = try await source.fetchPatients(credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
@@ -39,11 +125,21 @@ final class LocalPatientsDataSourceTests: XCTestCase {
     }
 
     func testFetchPatientPreservesRawEncryptedFieldsForModelParity() async throws {
-        let detail = try await makeSource().fetchPatient(
+        guard case .sealed(let address?) = CryptoService.seal("Via sintetica 1", masterKey: masterKey) else {
+            return XCTFail("seal failed")
+        }
+        LocalAccountURLProtocol.requestHandler = { request in
+            let body = try JSONSerialization.data(withJSONObject: [
+                "id": "fixture-1", "firstName": "Host", "lastName": "Synthetic", "taxCode": "SYNTHETIC01", "version": 1, "address": address])
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200,
+                httpVersion: nil, headerFields: nil)!, body)
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        let detail = try await hostSource(databasePath: fixturePath()).fetchPatient(
             id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
-        XCTAssertEqual(detail.firstName, "Mario")
-        XCTAssertTrue(detail.address?.hasPrefix(CryptoService.encPrefix) == true)
-        XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via Roma 1, Milano")
+        XCTAssertEqual(detail.firstName, "Host")
+        XCTAssertEqual(detail.address, address)
+        XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via sintetica 1")
     }
 
     func testDiagnosisProjectionIsServedLocallyWithoutHTTPFallback() async throws {
@@ -197,24 +293,43 @@ final class LocalPatientsDataSourceTests: XCTestCase {
     }
 
     func testFetchPatientMissingMaps404() async throws {
+        var calls = 0
+        LocalAccountURLProtocol.requestHandler = { request in
+            calls += 1
+            XCTAssertEqual(request.url?.path, "/api/v1/network/patients/does-not-exist")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=test; ambulatory_id=AMB-1")
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 404,
+                httpVersion: nil, headerFields: nil)!, Data(#"{"error":"Not found"}"#.utf8))
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
         do {
-            _ = try await makeSource().fetchPatient(
-                id: "does-not-exist", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+            _ = try await hostSource(databasePath: fixturePath()).fetchPatient(
+                id: "does-not-exist", credentials: credentials, sessionCookie: "mediflow_session=test", ambulatoryId: "AMB-1")
             XCTFail("expected a 404")
         } catch let HomeBaseClientError.httpStatus(code, _) {
             XCTAssertEqual(code, 404)
         }
+        XCTAssertEqual(calls, 1)
     }
 
     func testFetchPatientOutOfScopeMaps404() async throws {
+        var calls = 0
+        LocalAccountURLProtocol.requestHandler = { request in
+            calls += 1
+            XCTAssertEqual(request.url?.path, "/api/v1/network/patients/fixture-1")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Cookie"), "mediflow_session=test; ambulatory_id=AMB-OTHER")
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 404,
+                httpVersion: nil, headerFields: nil)!, Data(#"{"error":"Not found"}"#.utf8))
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
         do {
-            // fixture-1 exists but is not a member of AMB-OTHER -> membership scope 404.
-            _ = try await makeSource().fetchPatient(
-                id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-OTHER")
+            _ = try await hostSource(databasePath: fixturePath()).fetchPatient(
+                id: "fixture-1", credentials: credentials, sessionCookie: "mediflow_session=test", ambulatoryId: "AMB-OTHER")
             XCTFail("expected a 404")
         } catch let HomeBaseClientError.httpStatus(code, _) {
             XCTAssertEqual(code, 404)
         }
+        XCTAssertEqual(calls, 1)
     }
 
     // MARK: Local writes (Fase 3 slice 3) - on a writable fixture copy
@@ -232,32 +347,77 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         return LocalPatientsDataSource(databasePath: path, masterKey: masterKey, fallback: fallback)
     }
 
-    func testUpdatePatientWritesLocally() async throws {
+    func testProfileHostRejectionsNeverFallBackToLocalArchive() async throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
-        let source = writableSource(path)
-
-        // Pre-seal like the model does for the HTTP path; the store passes it through.
-        guard case .sealed(let presealed?) = CryptoService.seal("Via Nuova 5", masterKey: masterKey) else {
-            return XCTFail("seal failed")
+        let before = try Data(contentsOf: URL(fileURLWithPath: path))
+        let source = hostSource(databasePath: path)
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        for status in [401, 403, 404, 500] {
+            var calls = 0
+            LocalAccountURLProtocol.requestHandler = { request in
+                calls += 1
+                return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: status,
+                    httpVersion: nil, headerFields: nil)!, Data(#"{"error":"Synthetic host rejection"}"#.utf8))
+            }
+            for write in [false, true] {
+                do {
+                    if write {
+                        _ = try await source.updatePatient(patientId: "fixture-1",
+                            payload: HomeBasePatientUpdatePayload(version: 1, firstName: "Must not persist"),
+                            credentials: credentials, sessionCookie: "test", ambulatoryId: "AMB-1")
+                    } else {
+                        _ = try await source.fetchPatient(id: "fixture-1", credentials: credentials,
+                            sessionCookie: "test", ambulatoryId: "AMB-1")
+                    }
+                    XCTFail("expected host rejection")
+                } catch let HomeBaseClientError.httpStatus(code, _) {
+                    XCTAssertEqual(code, status)
+                }
+            }
+            XCTAssertEqual(calls, 2)
+            XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), before)
         }
-        let ack = try await source.updatePatient(
-            patientId: "fixture-1", payload: HomeBasePatientUpdatePayload(version: 1, address: .value(presealed)),
-            credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
-        XCTAssertTrue(ack.success)
+    }
 
-        // Persisted locally + decrypts to the plaintext (no double-encryption).
-        let detail = try await source.fetchPatient(
-            id: "fixture-1", credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
-        XCTAssertTrue(detail.address?.hasPrefix(CryptoService.encPrefix) == true)
-        XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via Nuova 5")
-        XCTAssertEqual(detail.version, 2)
+    func testProfileTransportFailureNeverFallsBackToLocalArchive() async throws {
+        let path = try writableFixtureCopy()
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let before = try Data(contentsOf: URL(fileURLWithPath: path))
+        LocalAccountURLProtocol.requestHandler = { _ in throw URLError(.cannotConnectToHost) }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        let source = hostSource(databasePath: path)
+        for write in [false, true] {
+            do {
+                if write {
+                    _ = try await source.updatePatient(patientId: "fixture-1",
+                        payload: HomeBasePatientUpdatePayload(version: 1, firstName: "Must not persist"),
+                        credentials: credentials, sessionCookie: "test", ambulatoryId: "AMB-1")
+                } else {
+                    _ = try await source.fetchPatient(id: "fixture-1", credentials: credentials,
+                        sessionCookie: "test", ambulatoryId: "AMB-1")
+                }
+                XCTFail("expected transport failure")
+            } catch let HomeBaseClientError.transport(issue) {
+                XCTAssertEqual(issue, .unreachable)
+            }
+        }
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), before)
     }
 
     func testUpdatePatientVersionConflictThrows() async throws {
         let path = try writableFixtureCopy()
         defer { try? FileManager.default.removeItem(atPath: path) }
-        let source = writableSource(path)
+        let before = try Data(contentsOf: URL(fileURLWithPath: path))
+        var calls = 0
+        LocalAccountURLProtocol.requestHandler = { request in
+            calls += 1
+            return (HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 409,
+                httpVersion: nil, headerFields: nil)!,
+                Data(#"{"error":"Conflict","code":"VERSION_CONFLICT","entity":"patient","recordId":"fixture-1","expectedVersion":99,"currentVersion":1,"currentState":"present"}"#.utf8))
+        }
+        defer { LocalAccountURLProtocol.requestHandler = nil }
+        let source = hostSource(databasePath: path)
         do {
             _ = try await source.updatePatient(
                 patientId: "fixture-1", payload: HomeBasePatientUpdatePayload(version: 99, firstName: "Stale"),
@@ -267,6 +427,8 @@ final class LocalPatientsDataSourceTests: XCTestCase {
             XCTAssertEqual(payload.currentVersion, 1)
             XCTAssertEqual(payload.entity, "patient")
         }
+        XCTAssertEqual(calls, 1)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), before)
     }
 
     // MARK: Local patient CREATE (ADR 0071 - only real create path)
@@ -288,8 +450,8 @@ final class LocalPatientsDataSourceTests: XCTestCase {
         // address round-trips to plaintext (seal-on-create works, no double-encryption).
         let list = try await source.fetchPatients(credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
         XCTAssertTrue(list.contains { $0.id == created.id && $0.lastName == "Paziente" })
-        let detail = try await source.fetchPatient(
-            id: created.id, credentials: credentials, sessionCookie: "", ambulatoryId: "AMB-1")
+        let detail = try XCTUnwrap(SQLitePatientStore(path: path).loadRawPatientDetail(
+            id: created.id, scopeAmbulatoryId: "AMB-1"))
         XCTAssertTrue(detail.address?.hasPrefix(CryptoService.encPrefix) == true)
         XCTAssertEqual(PatientFieldCrypto.decryptStringField(detail.address, masterKey: masterKey), "Via Test 1")
         XCTAssertEqual(detail.taxCode, "NVOPZT80A01H501Z")

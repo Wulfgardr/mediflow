@@ -70,11 +70,74 @@ e script di fixture sono classificati qui sotto, non eliminati dall'analisi.
 | Egress consumer e locale AI | [ordinary chokepoint](../lib/chatgpt-execution/ordinary-egress-chokepoint.ts), [Ollama locality](../lib/ai-providers/ollama-locality.ts) | [ADR0134](./adr/0134-chatgpt-subscription-synthesis-execution.md) e [matrice AI](./ai-runtime-serving-matrix.md); loopback e remoto sono distinti. |
 | Terminologia WHO e aggiornamenti | [WHO node HTTPS](../lib/reference-data/icd11-who-node-https-client.ts), [WHO locale](../lib/reference-data/icd11-who-local-node-transport.ts), [update awareness](../lib/update-awareness.ts) | Sorgenti e opt-in nei rispettivi adapter; [ADR0115](./adr/0115-icd11-who-reference-data-adapter.md). Aggiornamenti software non inviano la cartella. |
 | Rete client paired | [TLS proxy](../scripts/local-api-tls-proxy.mjs), [network context](../lib/network-write-context.ts) | Rete autorizzata distinta da API v1 locale; scope e capability nei wrapper, [topologia](./topologia-dati-flussi.md#410-modalità-network-home-base---paired-client-readwrite-limitato). |
-| Autorità Swift locale opzionale | [Factory della scheda Apple](../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift) → [LocalPatientsDataSource](../native/MediFlowMac/Sources/MediFlowAppleShared/LocalPatientsDataSource.swift) → [SQLitePatientStore](../native/MediFlowMac/Sources/MediFlowCore/SQLitePatientStore.swift) / [SQLiteClinicalStore](../native/MediFlowMac/Sources/MediFlowCore/SQLiteClinicalStore.swift) | Con `MEDIFLOW_LOCAL_AUTHORITY=1\|true\|yes` e chiave disponibile, la factory può scegliere store SQLite diretti. Le scritture locali di paziente/Diario richiedono uno scope ambulatoriale non vuoto; in sua assenza passano al client HTTP. I writer locali letti non attraversano l'audit obbligatorio Node. Riscontro statico del 17 ottobre 2026, non prova di attivazione; destinazione e garanzie in [WUL-582](https://linear.app/wulfgardr/issue/WUL-582). Il pilota Web/API non dimostra autorità unica su Apple. |
+| Autorità Swift locale opzionale | [Factory della scheda Apple](../native/MediFlowMac/Sources/MediFlowAppleShared/AppleFoundation/PairedPatientsWorkspaceModel.swift) → [LocalPatientsDataSource](../native/MediFlowMac/Sources/MediFlowAppleShared/LocalPatientsDataSource.swift) → [SQLitePatientStore](../native/MediFlowMac/Sources/MediFlowCore/SQLitePatientStore.swift) / [SQLiteClinicalStore](../native/MediFlowMac/Sources/MediFlowCore/SQLiteClinicalStore.swift) | Con `MEDIFLOW_LOCAL_AUTHORITY=1\|true\|yes` e chiave disponibile, la factory conserva gli store per liste, creazione e sottorisorse cliniche. Il dettaglio e l'UPDATE del profilo passano sempre al client HTTP, senza tentativo SQLite successivo a un errore, secondo l'emendamento di [ADR0071](./adr/0071-tri-os-reversed-flow-shared-core.md). Gli altri writer locali non attraversano l'audit obbligatorio Node: non si dichiara autorità unica per tutta Apple. Prove del perimetro sotto; destinazione nativa/offline preservata. |
 | Import repertori e lanci regionali | [AIFA importer](../lib/aifa-importer.ts), [exemption importer](../lib/exemption-importer.ts), [SISS launcher](../lib/siss-prescription.ts) | File/repertori non sono dati clinici; SISS URL/clipboard è distinto da S-01/S-02/S-03 persistiti. |
 | Export, plaintext, file/cache | [PDF service](../lib/pdf-service.ts), [backup executor](../lib/backup-restore-executor.ts) | La [matrice dati a riposo](./data-at-rest-matrix.md) possiede elenco di colonne, file, cache, chiavi e residui plaintext; non promettere cifratura integrale. |
 | Audit e sink tecnici | [security audit](../lib/security/audit.ts), [egress audit](../lib/ai-egress-audit.ts) | [audit-writers](./audit-writers.md) distingue clinical commit, storico, sicurezza e telemetria. |
 | Scritture sintetiche e migrazioni storiche | [seed baseline](../scripts/seed-performance-baseline.mjs), [restore drill](../scripts/backup-restore-drill.mjs), `scripts/fixtures/`, `scripts/test-support/`, `drizzle/` | Fixture e prove non sono ingressi operativi di cartella; presenza del codice non autorizza esecuzione su dati reali. |
+
+## Verticale profilo e sole note: confine S0
+
+Questa mappa del 18 ottobre 2026 riguarda dettaglio e UPDATE del profilo,
+non creazione, elenco, Diario o altre sottorisorse. [ADR0146](./adr/0146-patient-profile-query-application-boundary.md)
+definisce il confine della lettura; [ADR0071](./adr/0071-tri-os-reversed-flow-shared-core.md)
+spiega la delega temporanea Apple. Il writer resta Node: il client Rust/GPUI
+non apre SQLite e non è una migrazione del nucleo clinico.
+
+| Decisione | Simboli e chiamanti effettivi | Garanzia e limite |
+| --- | --- | --- |
+| Identità e ruolo nella lettura | `readPatientProfile` in [patient-profile-service](../lib/patient-profile-service.ts), chiamato dai GET Web, local-v1, paired e FSE | Web usa `requireSession`; paired usa dispositivo, modalità, capability e `requireAccountSession`; FSE conserva `requireNetworkCapabilityContext` con la propria capability. Local-v1 resta un servizio con token (`requireLocalApiToken`), senza inventare un autore umano o un ruolo medico. |
+| Paziente, scopo e ambito | [PatientProfileQuery](../lib/patient-profile-query.ts), `resolveNetworkScope`, [bindNetworkRequestScope](../lib/network-request-scope.ts) | Il paziente proviene dal parametro della route; purpose e proiezione sono fissati dall'adapter host. Lo scope paired viene risolto dall'host e applicato alla membership; l'header expected-ambulatory è solo un'asserzione. L'accesso Web/local-v1 non acquisisce retroattivamente la policy paired. |
+| Vista e attualità della lettura | `queryPatientProfile` privato, `PatientProfileView`, `activePatients` | Vista interna esplicita, nessun tipo ORM nel contratto. SELECT corrente, tombstone escluse, nessun effetto clinico/audit. Non è un handle durevole né una promessa di validità dopo la risposta: WUL-583 resta separata. |
+| Autorità dell'UPDATE | PUT Web/local-v1 → `updatePatientProfile`; PUT paired → [updateNetworkScopedPatient](../lib/network-patient-write.ts) → stessa porta | Body e metadati non emettono identità o ricevute. L'host sceglie audit e versione attesa; paired ammette solo i campi previsti e richiede ENC per quelli sensibili. L'audit non è costruito dal corpo della richiesta. |
+| Validità al commit | [prepareNetworkPatientCommitGuard](../lib/network-patient-commit-authority.ts), [updatePatientOperation](../lib/patient-update-operation.ts) | Il guard paired ricontrolla generazione, dispositivo, modalità, capability, sessione/ruolo e scope nella transazione IMMEDIATE. Il writer ricontrolla paziente/versione e committa paziente, membership e audit insieme. Questo non estende automaticamente tutti i guard paired al diverso contratto Web/local-v1. |
+| Esito e ricevuta | `updatePatientOperation` → `{success:true}` o errore; client → rilettura | L'ack HTTP attuale non è la futura ricevuta firmata/idempotente del pilota. Timeout e perdita della risposta non provano un rollback; i client non devono ritentare implicitamente la scrittura. WUL-584/585 restano aperte. |
+| Percorso Swift opzionale | `PairedPatientsWorkspaceModel.makeClient` → `LocalPatientsDataSource.fetchPatient/updatePatient` → `HomeBasePatientsClient` | Anche con master key e scope presenti, questi due metodi delegano al servizio host. Le prove usano una sentinella non SQLite e una copia della fixture; errori host e trasporto non aprono un writer locale alternativo. Gli store e i loro test rimangono necessari per gli altri domini. |
+
+### Comando prima della cifratura e custodia delle chiavi
+
+Il punto che vede il testo in chiaro appartiene oggi al client autorizzato:
+
+- Web: la bozza del profilo viene preparata da `patient-edit-session`, quindi
+  la facade [db.ts](../lib/db.ts) applica `encryptItem` e `encryptData` prima
+  dell'invio. I campi bloccati vengono preservati o omessi, non sostituiti
+  con il segnaposto visuale.
+- Apple: `PairedPatientsWorkspaceModel` costruisce `HomeBasePatientUpdatePayload`
+  con versione osservata, trim e `PatchValue`; `encryptedPatientPatchValue`
+  delega a `PatientFieldCrypto.encryptedPatchValue` prima del client HTTP.
+  La master key sbloccata resta nel processo Apple, anche con l'adapter locale.
+- Rust: `Session::update_patient_notes` richiede la lettura corrispondente e
+  prepara versione/note; `Session::seal_fields` serializza e sigilla con la
+  chiave della sessione prima del PUT. `ClinicalApp` conserva il significato
+  del testo ricco e degli esiti incerti; blocco/ritiro eliminano i riferimenti
+  attivi ai buffer senza promettere azzeramento fisico della RAM.
+
+Questi sono punti fidati identificati, **non un canonicalizzatore unico già
+estratto**: per esempio Swift tratta il testo vuoto dopo trim come null,
+mentre gli altri ingressi possono distinguere vuoto e null. I contratti
+attuali e i vettori condivisi restano validi; l'eventuale unificazione deve
+essere esplicita e preservare significato e cifrato precedente.
+`normalizePatientUpdateInput` riceve già ENC e normalizza il contenitore:
+non verifica il significato del plaintext. Le chiavi non vengono spostate
+nel server per aggirare questo limite. Envelope canonico, autorizzazione
+umana monouso ed estrazione portabile restano WUL-584/580.
+
+### Operazione clinica e capacità intelligenti
+
+`PATIENT_PROFILE_READ_OPERATION` in [patient-profile-query](../lib/patient-profile-query.ts)
+è il descrittore host versionato `patient-profile.read.v1`, usato dalla
+costruzione e dal dispatch della query. Non concede capacità, non registra
+un nuovo writer e non è il registro completo delle future operazioni del
+pilota. Il catalogo [application-operation-registry](../lib/headless/application-operation-registry.ts)
+resta statico `denied/unavailable`, con riferimenti operativi null; i cataloghi
+intelligenti/Fabric conservano i propri owner. Nessun agente ottiene un
+commit dalla presenza del descrittore di lettura.
+
+Le prove di comportamento sono in [patient-profile-service.test](../lib/patient-profile-service.test.ts),
+[patient-update-operation.test](../lib/patient-update-operation.test.ts) e
+[LocalPatientsDataSourceTests](../native/MediFlowMac/Tests/MediFlowAppleSharedTests/LocalPatientsDataSourceTests.swift).
+Le prove degli store SQLite restano conservate. CI e qualifica installata
+vanno associate alla revisione effettivamente eseguita, non inferite dalla mappa.
 
 ## Processi, lavori e temporanei del runtime locale
 
