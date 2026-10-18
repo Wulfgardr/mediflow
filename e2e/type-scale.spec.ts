@@ -89,13 +89,13 @@ async function assertType(page: Page, label: string, info: TestInfo, minimum = 1
 }
 
 async function expandDetails(page: Page) {
-  for (const detail of await page.locator('main details:not(nav details):not([open]), [data-testid="settings-subroute-content"] details:not(nav details):not([open])').all()) {
-    if (await detail.isVisible()) await detail.locator('summary').first().click();
+  for (const detail of await page.locator('main details:not(nav details):not(header details), [data-testid="settings-subroute-content"] details:not(nav details):not(header details)').all()) {
+    if (await detail.isVisible() && await detail.getAttribute('open') === null) await detail.locator('summary').first().click();
   }
 }
 
 async function assertDetailMenus(page: Page, label: string, info: TestInfo) {
-  const menus = page.locator('main nav details, [data-testid="settings-subroute-content"] nav details');
+  const menus = page.locator('main nav details, main header details, [data-testid="settings-subroute-content"] nav details, [data-testid="settings-subroute-content"] header details');
   for (const [index, menu] of (await menus.all()).entries()) {
     if (!await menu.isVisible()) continue;
     const summary = menu.locator(':scope > summary');
@@ -286,13 +286,21 @@ test('il misuratore intercetta ereditarietà serif, controlli, stili inline e te
 test('i menu a comparsa vengono misurati e richiusi prima di espandere i dettagli', async ({ page }, info) => {
   await page.setContent(`<style>body { font:400 14px system-ui }</style><main>
     <nav><details><summary>Altre sezioni</summary><div style="position:fixed;inset:0;top:40px">Voce del menu</div></details></nav>
+    <header><details><summary>Accesso assistente</summary><div style="position:fixed;inset:0;top:40px">Voce del menu della testata</div></details></header>
     <details id="clinical"><summary>Proposte dalle fonti cliniche · Smart Import</summary><p>Dettaglio clinico</p></details>
+    <details id="clinical-second"><summary>Patient Insight</summary><p>Secondo dettaglio clinico</p></details>
     </main>`);
   await assertDetailMenus(page, 'fixture', info);
-  const evidence = JSON.parse(info.attachments.at(-1)!.body!.toString()) as { samples: { text: string }[] };
+  const samples = info.attachments.flatMap(attachment =>
+    (JSON.parse(attachment.body!.toString()) as { samples: { text: string }[] }).samples);
+  const evidence = { samples };
   expect(evidence.samples.some(sample => sample.text === 'Voce del menu')).toBe(true);
+  expect(evidence.samples.some(sample => sample.text === 'Voce del menu della testata')).toBe(true);
   await expandDetails(page);
   await expect(page.locator('nav details')).not.toHaveAttribute('open', '');
+  await expect(page.locator('header details')).not.toHaveAttribute('open', '');
   await expect(page.locator('#clinical')).toHaveAttribute('open', '');
+  await expect(page.locator('#clinical-second')).toHaveAttribute('open', '');
   await expect(page.getByText('Dettaglio clinico', { exact: true })).toBeVisible();
+  await expect(page.getByText('Secondo dettaglio clinico', { exact: true })).toBeVisible();
 });
