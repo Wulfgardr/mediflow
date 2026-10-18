@@ -529,3 +529,26 @@ rejected=true; await assert.rejects(window.fetch('/api/patients',{method:'PUT'})
 assert.equal(reloads,2); dispose();`;
     execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
 });
+
+test('archive transport fences only the exact scoped epoch GET and rejects archive replacement', () => {
+    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
+const output=ts.transpileModule(${JSON.stringify(source)},{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+const api=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
+const generation='11111111-1111-4111-8111-111111111111'; const calls=[]; const events=[]; let reloads=0,replaced=false;
+globalThis.window={location:{href:'http://localhost/patients/synthetic/modules',origin:'http://localhost',reload(){reloads++;}},dispatchEvent(event){events.push(event.type);},
+fetch:async(input,init)=>{calls.push({input,init});return Response.json(replaced?{code:'ARCHIVE_REPLACED'}:{contractVersion:1,selectionEpoch:1},{status:replaced?409:200});}};
+api.observeArchiveGeneration(generation); const dispose=api.installArchiveGenerationTransport();
+await window.fetch('/api/patient-profile/selection-epoch',{method:'GET',headers:{'x-mediflow-archive-generation':'caller-value'}});
+assert.equal(new Headers(calls.at(-1).init.headers).get('x-mediflow-archive-generation'),generation);
+await window.fetch(new Request('http://localhost/api/patient-profile/selection-epoch?context=synthetic'));
+assert.equal(new Headers(calls.at(-1).init.headers).get('x-mediflow-archive-generation'),generation);
+for(const url of ['/api/patient-profile/selection-epoch/','/api/patient-profile/selection-epoch-extra','/api/patients','http://127.0.0.1:4444/api/patient-profile/selection-epoch']){
+ await window.fetch(url,{method:'GET'});assert.equal(new Headers(calls.at(-1).init?.headers).has('x-mediflow-archive-generation'),false,url);
+}
+await window.fetch('/api/patient-profile/selection-epoch',{method:'HEAD'});
+assert.equal(new Headers(calls.at(-1).init?.headers).has('x-mediflow-archive-generation'),false);
+replaced=true;await assert.rejects(window.fetch('/api/patient-profile/selection-epoch',{method:'GET'}),/ARCHIVE_REPLACED/);
+assert.equal(reloads,1);assert.deepEqual(events,['mediflow:archive-replaced']);dispose();`;
+    execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
+});

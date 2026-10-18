@@ -327,3 +327,46 @@ test('headless handle deadline intersects the acknowledged host grant despite qu
         assert.equal(await acquirePatientProfileQueryHostPort('notes', NaN), null);
     } finally { Date.now = originalNow; }
 });
+
+test('real browser archive transport permits A then B epoch acquisition while missing and stale fences remain denied', async () => {
+    reset(); select('web');
+    const { observeArchiveGeneration, installArchiveGenerationTransport } = load('./security/client-auth-api.ts') as typeof import('./security/client-auth-api');
+    const { createPatientProfileScopedBrowserAdapter } = load('./patient-profile-scoped-browser-adapter.ts') as typeof import('./patient-profile-scoped-browser-adapter');
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    const calls: Array<{ path: string; generation: string | null; status: number }> = []; let reloads = 0;
+    const browser = { location: { origin: 'http://127.0.0.1', href: 'http://127.0.0.1/patients/synthetic/modules', reload() { reloads++; } },
+        dispatchEvent() {}, fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+            const req = new Request(new URL(input instanceof Request ? input.url : String(input), 'http://127.0.0.1'), init);
+            req.headers.set('origin', 'http://127.0.0.1'); req.headers.set('sec-fetch-site', 'same-origin');
+            const path = new URL(req.url).pathname;
+            const response = path === '/api/patient-profile/selection-epoch' ? await epochWeb.GET(req)
+                : await web.POST(req, { params: Promise.resolve({ id: path.split('/')[3]! }) });
+            calls.push({ path, generation: req.headers.get('x-mediflow-archive-generation'), status: response.status });
+            return response;
+        } };
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: browser });
+    observeArchiveGeneration(currentArchiveGeneration()); const dispose = installArchiveGenerationTransport();
+    try {
+        const sources = { fetch: ((...args: Parameters<typeof fetch>) => browser.fetch(...args)) as typeof fetch };
+        const before = snapshot(); const a = await createPatientProfileScopedBrowserAdapter(sources).open(patientA, 'notes');
+        const unfenced = request('web'); unfenced.headers.delete('x-mediflow-archive-generation');
+        const missingFence = await epochWeb.GET(unfenced); assert.equal(missingFence.status, 409);
+        assert.equal((await missingFence.json()).code, 'ARCHIVE_REPLACED');
+        let b: ProfileResult;
+        try { b = await createPatientProfileScopedBrowserAdapter(sources).open(patientB, 'notes'); }
+        catch { assert.fail(`Browser archive transport failed: ${JSON.stringify(calls)}`); }
+        assert.equal(a.profile.notes, notes); assert.equal(b.profile.notes, notes);
+        assert.ok(b.currentness.selectionEpoch > a.currentness.selectionEpoch);
+        assert.deepEqual(calls.map(call => call.status), [200, 200, 200, 200]);
+        assert.ok(calls.every(call => call.generation === currentArchiveGeneration())); assert.equal(reloads, 0);
+        for (const fence of [null, '11111111-1111-4111-8111-111111111111']) {
+            const req = request('web'); if (fence === null) req.headers.delete('x-mediflow-archive-generation');
+            else req.headers.set('x-mediflow-archive-generation', fence);
+            const denied = await epochWeb.GET(req); assert.equal(denied.status, 409);
+            assert.equal((await denied.json()).code, 'ARCHIVE_REPLACED');
+        }
+        assert.deepEqual(snapshot(), before);
+    } finally {
+        dispose(); if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow); else Reflect.deleteProperty(globalThis, 'window');
+    }
+});
