@@ -56,6 +56,7 @@ enum ProfileSelectionTarget {
     Patient { scope: String, patient: String },
     Creating { scope: String },
 }
+#[derive(Clone)]
 struct ProfileReadBinding {
     selection: Weak<ProfileSelection>,
     selection_epoch: u64,
@@ -75,6 +76,8 @@ pub struct ProfileQueryIntent {
     owner: Weak<SessionInner>,
     active: Arc<Mutex<bool>>,
     selection: Option<Arc<ProfileSelection>>,
+    // Only a patient write captures this consumed preread; read intents do not.
+    write_binding: Option<ProfileReadBinding>,
 }
 impl ProfileQueryIntent {
     pub fn cancel(&self) {
@@ -366,6 +369,11 @@ impl RuntimeSession {
         }
         if let Some(intent) = intent {
             drop(self.profile_intent_guard(intent)?);
+            if let Some(binding) = &intent.write_binding {
+                // Identity negotiation may outlive the consumed preread. Recheck
+                // its original deadline and host epoch immediately before PUT.
+                self.check_profile_write_binding(binding)?;
+            }
         }
         let result = self.inner.client.json(
             method,
@@ -597,7 +605,45 @@ impl RuntimeSession {
                 .lock()
                 .ok()
                 .and_then(|current| current.clone()),
+            write_binding: None,
         }
+    }
+
+    fn profile_write_intent(
+        &self,
+        scope: &str,
+        patient: &str,
+        version: u64,
+        fields: &[&str],
+    ) -> Result<ProfileQueryIntent> {
+        let mut intent = self.profile_query_intent();
+        self.require_read(scope, patient, "patients", patient, version, fields)?;
+        let reads = self.inner.reads.lock().map_err(|_| RuntimeError::Locked)?;
+        let receipt = reads
+            .get(&read_key(scope, patient, "patients", patient))
+            .filter(|receipt| receipt.version == version)
+            .ok_or(RuntimeError::ReadRequired)?;
+        intent.write_binding = Some(receipt.profile.clone().ok_or(RuntimeError::ReadRequired)?);
+        Ok(intent)
+    }
+
+    fn check_profile_write_binding(&self, binding: &ProfileReadBinding) -> Result<()> {
+        let current = self
+            .inner
+            .profile_selection
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        let selected = current.as_ref().ok_or(RuntimeError::ReadRequired)?;
+        if binding
+            .selection
+            .upgrade()
+            .is_none_or(|owner| !Arc::ptr_eq(&owner, selected))
+            || binding.selection_epoch != selected.host_epoch.load(Ordering::Acquire)
+            || Instant::now() >= binding.deadline
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(())
     }
 
     fn profile_intent_guard<'a>(
@@ -950,16 +996,8 @@ impl RuntimeSession {
             .copied()
             .filter(|field| body.get(*field).is_some())
             .collect();
-        let intent = self.profile_query_intent();
         let _guard = self.begin_write()?;
-        self.require_read(
-            scope,
-            patient_id,
-            "patients",
-            patient_id,
-            version,
-            &changed_sensitive,
-        )?;
+        let intent = self.profile_write_intent(scope, patient_id, version, &changed_sensitive)?;
         let mut body = self.seal_fields(body, &changed_sensitive)?;
         body["version"] = json!(version);
         self.forget(scope, patient_id, "patients", patient_id)?;
@@ -978,16 +1016,8 @@ impl RuntimeSession {
         version: u64,
         notes: &str,
     ) -> Result<()> {
-        let intent = self.profile_query_intent();
         let _guard = self.begin_write()?;
-        self.require_read(
-            scope,
-            patient_id,
-            "patients",
-            patient_id,
-            version,
-            &["notes"],
-        )?;
+        let intent = self.profile_write_intent(scope, patient_id, version, &["notes"])?;
         let body = self.seal_fields(json!({ "version": version, "notes": notes }), &["notes"])?;
         self.forget(scope, patient_id, "patients", patient_id)?;
         self.update_with_profile_intent(
@@ -3498,6 +3528,84 @@ mod tests {
             Err(RuntimeError::ReadRequired)
         );
     }
+    #[test]
+    fn profile_receipt_expiring_during_scope_identity_prevents_any_patient_put() {
+        for profile_patch in [false, true] {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+            admit_fixture_read(&session);
+            let deadline = Instant::now() + Duration::from_millis(150);
+            let key = read_key("scope-a", "patient-a", "patients", "patient-a");
+            session
+                .inner
+                .reads
+                .lock()
+                .unwrap()
+                .get_mut(&key)
+                .unwrap()
+                .profile
+                .as_mut()
+                .unwrap()
+                .deadline = deadline;
+            session
+                .inner
+                .profile_reads
+                .lock()
+                .unwrap()
+                .get_mut(&key)
+                .unwrap()
+                .deadline = deadline;
+            let server = thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                assert!(read_request(&mut stream).starts_with("GET /api/v1/network/identity "));
+                thread::sleep(
+                    deadline.saturating_duration_since(Instant::now()) + Duration::from_millis(10),
+                );
+                send_reply(
+                    &mut stream,
+                    r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+                );
+                listener.set_nonblocking(true).unwrap();
+                let until = Instant::now() + Duration::from_millis(150);
+                loop {
+                    match listener.accept() {
+                        Ok((mut stream, _)) => {
+                            let request = read_request(&mut stream);
+                            send_reply(&mut stream, r#"{"success":true}"#);
+                            return Some(request);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            if Instant::now() >= until {
+                                return None;
+                            }
+                            thread::sleep(Duration::from_millis(2));
+                        }
+                        Err(error) => panic!("unexpected accept error: {error}"),
+                    }
+                }
+            });
+            let result = if profile_patch {
+                session.update_patient_profile(
+                    "scope-a",
+                    "patient-a",
+                    1,
+                    &PatientProfilePatch {
+                        first_name: Some("Synthetic".into()),
+                        ..Default::default()
+                    },
+                )
+            } else {
+                session.update_patient_notes("scope-a", "patient-a", 1, "must not be sent")
+            };
+            let sent = server.join().unwrap();
+            assert_eq!(result, Err(RuntimeError::ReadRequired));
+            assert!(
+                sent.is_none(),
+                "expired receipt must send zero PUT requests"
+            );
+        }
+    }
+
     #[test]
     fn selection_change_during_write_scope_check_prevents_the_profile_put() {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
