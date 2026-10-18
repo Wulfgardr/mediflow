@@ -3,8 +3,8 @@
 
 use crate::editing::FieldSpec;
 use mediflow_runtime_client::{
-    NullableStringPatch, PatientCreateDraft, PatientDetail, PatientProfilePatch, RuntimeError,
-    RuntimeSession,
+    NullableStringPatch, PatientCreateDraft, PatientDetail, PatientProfilePatch,
+    ProfileQueryIntent, RuntimeError, RuntimeSession,
 };
 
 const LOCKED_LABEL: &str = "Dato non leggibile con questo accesso. Il campo resta invariato.";
@@ -178,17 +178,21 @@ pub fn profile_patch(
 
 pub enum Creation {
     Verified(Box<PatientDetail>),
-    Unconfirmed { id: String },
+    Unconfirmed {
+        id: String,
+        read_error: Option<RuntimeError>,
+    },
 }
 
 pub fn create(
     session: &RuntimeSession,
     scope: &str,
     values: &[String],
+    intent: &ProfileQueryIntent,
 ) -> Result<Creation, RuntimeError> {
     let draft = create_draft(values).map_err(|_| RuntimeError::InvalidInput)?;
     let created = session.create_patient(scope, &draft)?;
-    match session.read_patient(scope, &created.id) {
+    match session.open_patient_profile(scope, &created.id, intent) {
         Ok(row)
             if row.id == created.id
                 && row.version == 1
@@ -209,7 +213,14 @@ pub fn create(
             Ok(Creation::Verified(Box::new(row)))
         }
         Err(error) if error.is_auth_failure() => Err(error),
-        _ => Ok(Creation::Unconfirmed { id: created.id }),
+        Err(RuntimeError::ProfileTooLarge) => Ok(Creation::Unconfirmed {
+            id: created.id,
+            read_error: Some(RuntimeError::ProfileTooLarge),
+        }),
+        _ => Ok(Creation::Unconfirmed {
+            id: created.id,
+            read_error: None,
+        }),
     }
 }
 
@@ -218,6 +229,7 @@ pub fn update(
     scope: &str,
     original: &PatientDetail,
     values: &[String],
+    intent: &ProfileQueryIntent,
 ) -> Result<Option<PatientDetail>, RuntimeError> {
     let patch = profile_patch(original, values).map_err(|_| RuntimeError::InvalidInput)?;
     let expected = original
@@ -225,7 +237,7 @@ pub fn update(
         .checked_add(1)
         .ok_or(RuntimeError::InvalidInput)?;
     session.update_patient_profile(scope, &original.id, original.version, &patch)?;
-    match session.read_patient(scope, &original.id) {
+    match session.open_patient_profile(scope, &original.id, intent) {
         Ok(row)
             if row.id == original.id
                 && row.version == expected
@@ -258,7 +270,9 @@ pub fn update(
         {
             Ok(Some(row))
         }
-        Err(error) if error.is_auth_failure() => Err(error),
+        Err(error) if error.is_auth_failure() || error == RuntimeError::ProfileTooLarge => {
+            Err(error)
+        }
         _ => Ok(None),
     }
 }

@@ -1,16 +1,18 @@
 use crate::{
     crypto::{self, MasterKey},
     http::{DOCUMENT_LIMIT, JSON_LIMIT},
+    profile_query::{ProfileLease, display_profile, parse_profile_response},
     *,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use reqwest::Method;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
+use std::time::Instant;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, Weak,
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
@@ -29,6 +31,7 @@ struct SessionInner {
     read_epoch: AtomicU64,
     secrets: Mutex<SessionSecrets>,
     reads: Mutex<HashMap<ReadKey, ReadReceipt>>,
+    profile_reads: Mutex<HashMap<ReadKey, ProfileLease>>,
     scopes: Mutex<HashSet<String>>,
     capabilities: Mutex<HashSet<String>>,
 }
@@ -45,6 +48,7 @@ struct ReadKey {
     id: String,
 }
 struct ReadReceipt {
+    deadline: Option<Instant>,
     version: u64,
     locked: Vec<String>,
 }
@@ -52,6 +56,19 @@ struct ReadResponse {
     value: Value,
     epoch: u64,
 }
+#[derive(Clone)]
+pub struct ProfileQueryIntent {
+    owner: Weak<SessionInner>,
+    active: Arc<Mutex<bool>>,
+}
+impl ProfileQueryIntent {
+    pub fn cancel(&self) {
+        if let Ok(mut active) = self.active.lock() {
+            *active = false;
+        }
+    }
+}
+
 struct WriteGuard<'a>(&'a AtomicBool);
 impl Drop for WriteGuard<'_> {
     fn drop(&mut self) {
@@ -110,6 +127,7 @@ impl RuntimeSession {
                     master: Some(master),
                 }),
                 reads: Mutex::new(HashMap::new()),
+                profile_reads: Mutex::new(HashMap::new()),
                 scopes: Mutex::new(HashSet::new()),
                 capabilities: Mutex::new(HashSet::new()),
             }),
@@ -188,6 +206,9 @@ impl RuntimeSession {
         if let Ok(mut reads) = self.inner.reads.lock() {
             reads.clear();
         }
+        if let Ok(mut profiles) = self.inner.profile_reads.lock() {
+            profiles.clear();
+        }
         if let Ok(mut scopes) = self.inner.scopes.lock() {
             scopes.clear();
         }
@@ -221,6 +242,7 @@ impl RuntimeSession {
                     None,
                     true,
                     JSON_LIMIT,
+                    Some(&self.inner.user.archive_generation),
                 )
                 .map(|_| ()),
             _ => Ok(()),
@@ -245,7 +267,25 @@ impl RuntimeSession {
         mutation: bool,
         limit: usize,
     ) -> Result<Value> {
+        self.request_with_profile_intent(method, path, query, scope, body, mutation, limit, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn request_with_profile_intent(
+        &self,
+        method: Method,
+        path: &[&str],
+        query: &[(&str, &str)],
+        scope: Option<&str>,
+        body: Option<&Value>,
+        mutation: bool,
+        limit: usize,
+        intent: Option<&ProfileQueryIntent>,
+    ) -> Result<Value> {
         self.ensure_open()?;
+        if let Some(intent) = intent {
+            drop(self.profile_intent_guard(intent)?);
+        }
         if let Some(scope) = scope {
             validate_scope_id(scope)?;
         }
@@ -295,6 +335,7 @@ impl RuntimeSession {
                 None,
                 false,
                 JSON_LIMIT,
+                Some(&self.inner.user.archive_generation),
             );
             if identity
                 .as_ref()
@@ -306,8 +347,20 @@ impl RuntimeSession {
             require_bound_scope_identity(&identity, scope, &self.inner.user.id)?;
             self.ensure_open()?;
         }
+        if let Some(intent) = intent {
+            drop(self.profile_intent_guard(intent)?);
+        }
         let result = self.inner.client.json(
-            method, path, query, scope, &pairing, &cookie, body, mutation, limit,
+            method,
+            path,
+            query,
+            scope,
+            &pairing,
+            &cookie,
+            body,
+            mutation,
+            limit,
+            Some(&self.inner.user.archive_generation),
         );
         if self.is_locked() {
             return Err(if mutation {
@@ -391,6 +444,224 @@ impl RuntimeSession {
         rows.retain(|row| row.deleted_at.is_none() && row.is_archived == archived);
         self.check_read_epoch(response.epoch)?;
         Ok(rows)
+    }
+
+    pub fn profile_query_intent(&self) -> ProfileQueryIntent {
+        ProfileQueryIntent {
+            owner: Arc::downgrade(&self.inner),
+            active: Arc::new(Mutex::new(true)),
+        }
+    }
+
+    fn profile_intent_guard<'a>(
+        &self,
+        intent: &'a ProfileQueryIntent,
+    ) -> Result<std::sync::MutexGuard<'a, bool>> {
+        self.ensure_open()?;
+        if intent
+            .owner
+            .upgrade()
+            .is_none_or(|owner| !Arc::ptr_eq(&owner, &self.inner))
+        {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let guard = intent
+            .active
+            .lock()
+            .map_err(|_| RuntimeError::ReadRequired)?;
+        if !*guard {
+            return Err(RuntimeError::ReadRequired);
+        }
+        Ok(guard)
+    }
+
+    fn check_profile_intent(&self, intent: &ProfileQueryIntent, epoch: u64) -> Result<()> {
+        drop(self.profile_intent_guard(intent)?);
+        self.check_read_epoch(epoch)
+    }
+
+    pub fn open_patient_profile(
+        &self,
+        scope: &str,
+        patient_id: &str,
+        intent: &ProfileQueryIntent,
+    ) -> Result<PatientDetail> {
+        validate_id(patient_id)?;
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_profile_intent(intent, epoch)?;
+        let value = self.request_with_profile_intent(
+            Method::GET,
+            &["api", "v1", "network", "patient-profile", "selection-epoch"],
+            &[],
+            Some(scope),
+            None,
+            false,
+            JSON_LIMIT,
+            Some(intent),
+        )?;
+        self.check_profile_intent(intent, epoch)?;
+        let object = value.as_object().ok_or(RuntimeError::InvalidResponse)?;
+        let selection_epoch = value["selectionEpoch"]
+            .as_u64()
+            .filter(|number| *number <= MAX_SAFE_VERSION)
+            .ok_or(RuntimeError::InvalidResponse)?;
+        if object.len() != 2 || value["contractVersion"] != 1 {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        let body = json!({"kind":"open","contractVersion":1,"projection":"profile","expectedSelectionEpoch":selection_epoch});
+        self.consume_profile_query(
+            scope,
+            patient_id,
+            intent,
+            epoch,
+            body,
+            None,
+            Some(selection_epoch),
+        )
+    }
+
+    pub fn read_patient_profile(
+        &self,
+        scope: &str,
+        patient_id: &str,
+        intent: &ProfileQueryIntent,
+    ) -> Result<PatientDetail> {
+        validate_id(patient_id)?;
+        let epoch = self.inner.read_epoch.load(Ordering::Acquire);
+        self.check_profile_intent(intent, epoch)?;
+        let key = read_key(scope, patient_id, "patients", patient_id);
+        let lease = self
+            .inner
+            .profile_reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?
+            .get(&key)
+            .cloned()
+            .ok_or(RuntimeError::ReadRequired)?;
+        if Instant::now() >= lease.deadline {
+            return Err(RuntimeError::ReadRequired);
+        }
+        let body = json!({"kind":"read","contractVersion":1,"projection":"profile",
+            "handle":lease.handle.as_str(),"expectedRevision":lease.currentness.revision});
+        self.consume_profile_query(scope, patient_id, intent, epoch, body, Some(lease), None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn consume_profile_query(
+        &self,
+        scope: &str,
+        patient_id: &str,
+        intent: &ProfileQueryIntent,
+        epoch: u64,
+        body: Value,
+        previous: Option<ProfileLease>,
+        expected_selection_epoch: Option<u64>,
+    ) -> Result<PatientDetail> {
+        self.check_profile_intent(intent, epoch)?;
+        {
+            let _intent = self.profile_intent_guard(intent)?;
+            self.forget(scope, patient_id, "patients", patient_id)?;
+            self.inner
+                .profile_reads
+                .lock()
+                .map_err(|_| RuntimeError::Locked)?
+                .remove(&read_key(scope, patient_id, "patients", patient_id));
+        }
+        let started = Instant::now();
+        let result = self
+            .request_with_profile_intent(
+                Method::POST,
+                &[
+                    "api",
+                    "v1",
+                    "network",
+                    "patients",
+                    patient_id,
+                    "profile-query",
+                ],
+                &[],
+                Some(scope),
+                Some(&body),
+                false,
+                32 * 1024,
+                Some(intent),
+            )
+            .map_err(|error| {
+                if error == RuntimeError::TooLarge || error == RuntimeError::Rejected(413) {
+                    RuntimeError::ProfileTooLarge
+                } else {
+                    error
+                }
+            });
+        self.check_profile_intent(intent, epoch)?;
+        let key = read_key(scope, patient_id, "patients", patient_id);
+        let value = match result {
+            Ok(value) => value,
+            Err(error) => {
+                self.inner
+                    .profile_reads
+                    .lock()
+                    .map_err(|_| RuntimeError::Locked)?
+                    .remove(&key);
+                self.forget(scope, patient_id, "patients", patient_id)?;
+                return Err(error);
+            }
+        };
+        let response = parse_profile_response(value, started)?;
+        if response.projection != ProfileProjection::Profile
+            || expected_selection_epoch
+                .is_some_and(|expected| response.lease.currentness.selection_epoch < expected)
+            || previous.as_ref().is_some_and(|old| {
+                old.handle.as_str() != response.lease.handle.as_str()
+                    || old.currentness.selection_epoch != response.lease.currentness.selection_epoch
+                    || old.currentness.revision != response.lease.currentness.revision
+            })
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.check_profile_intent(intent, epoch)?;
+        let mut fields = response.fields;
+        let locked = self.decrypt_fields(&mut fields, PATIENT_FIELDS)?;
+        let row = display_profile(
+            fields,
+            patient_id,
+            response.lease.currentness,
+            locked.clone(),
+        )?;
+        let _intent = self.profile_intent_guard(intent)?;
+        if Instant::now() >= response.lease.deadline {
+            return Err(RuntimeError::ReadRequired);
+        }
+        {
+            let mut reads = self.inner.reads.lock().map_err(|_| RuntimeError::Locked)?;
+            self.check_read_epoch(epoch)?;
+            if reads.get(&key).is_some_and(|old| old.version > row.version) {
+                return Err(RuntimeError::ReadRequired);
+            }
+            if reads.len() >= 2048 {
+                reads.clear();
+            }
+            reads.insert(
+                read_key(scope, patient_id, "patients", patient_id),
+                ReadReceipt {
+                    version: row.version,
+                    locked,
+                    deadline: Some(response.lease.deadline),
+                },
+            );
+        }
+        let mut profiles = self
+            .inner
+            .profile_reads
+            .lock()
+            .map_err(|_| RuntimeError::Locked)?;
+        self.check_read_epoch(epoch)?;
+        if profiles.len() >= 2048 {
+            profiles.clear();
+        }
+        profiles.insert(key, response.lease);
+        self.ensure_open()?;
+        Ok(row)
     }
 
     pub fn read_patient(&self, scope: &str, patient_id: &str) -> Result<PatientDetail> {
@@ -1072,7 +1343,14 @@ impl RuntimeSession {
             .get(&key)
             .is_none_or(|previous| previous.version <= version)
         {
-            reads.insert(key, ReadReceipt { version, locked });
+            reads.insert(
+                key,
+                ReadReceipt {
+                    deadline: None,
+                    version,
+                    locked,
+                },
+            );
         }
         Ok(())
     }
@@ -1093,7 +1371,11 @@ impl RuntimeSession {
         let receipt = reads
             .get(&read_key(scope, patient, domain, id))
             .ok_or(RuntimeError::ReadRequired)?;
-        if receipt.version != version {
+        if receipt.version != version
+            || receipt
+                .deadline
+                .is_some_and(|deadline| Instant::now() >= deadline)
+        {
             return Err(RuntimeError::ReadRequired);
         }
         if receipt
@@ -2285,5 +2567,401 @@ mod tests {
             ),
             Err(RuntimeError::ReadRequired)
         );
+    }
+    fn profile_wire(session: &RuntimeSession) -> Value {
+        let fields = session.seal_fields(json!({"firstName":"Amina","lastName":"Sintetica","taxCode":"SYNTHETIC",
+            "birthDate":null,"address":null,"phone":null,"caregiver":null,"diagnoses":null,"exemptions":null,
+            "notes":"synthetic notes","isAdi":false,"isArchived":false,"statusReason":null,"archiveReason":null,"archiveNote":null}), &["notes"]).unwrap();
+        json!({"schemaVersion":"mediflow.patient.profile-view.v1","operationId":"patient-profile.read.v1","contractVersion":1,
+            "handle":format!("pph_{}", "a".repeat(64)),"projection":"profile",
+            "currentness":{"revision":7,"selectionEpoch":3,"observedAt":1000,"expiresAt":61000},"profile":fields})
+    }
+
+    type ProfileScript = (
+        RuntimeSession,
+        Arc<Mutex<Vec<String>>>,
+        mpsc::Receiver<usize>,
+        mpsc::Sender<()>,
+        thread::JoinHandle<()>,
+    );
+    fn profile_script(steps: Vec<(&str, u16, String)>, pause_last: bool) -> ProfileScript {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let session = session_at(&url);
+        session
+            .inner
+            .scopes
+            .lock()
+            .unwrap()
+            .insert("scope-a".into());
+        let steps: Vec<_> = steps
+            .into_iter()
+            .map(|(prefix, status, body)| (prefix.to_owned(), status, body))
+            .collect();
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let captured = requests.clone();
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            let mut index = 0;
+            while index < steps.len() {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.contains("\r\nx-mediflow-expected-ambulatory-id: scope-a\r\n"));
+                assert!(
+                    request.contains("\r\nx-mediflow-archive-generation: synthetic-generation\r\n")
+                );
+                captured.lock().unwrap().push(request.clone());
+                if request.starts_with("GET /api/v1/network/identity ") {
+                    send_reply(
+                        &mut stream,
+                        r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#,
+                    );
+                    continue;
+                }
+                let (prefix, status, body) = &steps[index];
+                assert!(request.starts_with(prefix), "unexpected route");
+                let _ = seen_tx.send(index);
+                if pause_last && index + 1 == steps.len() {
+                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }
+                write!(stream, "HTTP/1.1 {status} Synthetic\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+                index += 1;
+            }
+        });
+        (session, requests, seen_rx, release_tx, worker)
+    }
+    const EPOCH_GET: &str = "GET /api/v1/network/patient-profile/selection-epoch ";
+    const PROFILE_POST: &str = "POST /api/v1/network/patients/patient-a/profile-query ";
+    fn epoch_wire() -> String {
+        json!({"contractVersion":1,"selectionEpoch":2}).to_string()
+    }
+
+    #[test]
+    fn scoped_profile_open_read_and_existing_put_use_one_exact_projection_without_legacy_get() {
+        let wire = profile_wire(&session()).to_string();
+        let mut fresh = profile_wire(&session());
+        fresh["handle"] = json!(format!("pph_{}", "b".repeat(64)));
+        fresh["currentness"]["revision"] = json!(8);
+        fresh["currentness"]["selectionEpoch"] = json!(4);
+        fresh["profile"]["notes"] = json!("new synthetic notes");
+        let (session, requests, _, _, server) = profile_script(
+            vec![
+                (EPOCH_GET, 200, epoch_wire()),
+                (PROFILE_POST, 200, wire.clone()),
+                (PROFILE_POST, 200, wire),
+                (
+                    "PUT /api/v1/network/patients/patient-a ",
+                    200,
+                    "{\"success\":true}".into(),
+                ),
+                (
+                    EPOCH_GET,
+                    200,
+                    json!({"contractVersion":1,"selectionEpoch":3}).to_string(),
+                ),
+                (PROFILE_POST, 200, fresh.to_string()),
+            ],
+            false,
+        );
+        let intent = session.profile_query_intent();
+        let first = session
+            .open_patient_profile("scope-a", "patient-a", &intent)
+            .unwrap();
+        assert_eq!(first.notes.as_deref(), Some("synthetic notes"));
+        assert_eq!(first.id, "patient-a");
+        assert_eq!(first.version, 7);
+        assert!(first.ambulatory_id.is_none());
+        assert!(first.locked_fields.is_empty());
+        let row = session
+            .read_patient_profile("scope-a", "patient-a", &intent)
+            .unwrap();
+        assert_eq!(row.version, 7);
+        session
+            .update_patient_notes("scope-a", "patient-a", 7, "new synthetic notes")
+            .unwrap();
+        let readback = session
+            .open_patient_profile("scope-a", "patient-a", &intent)
+            .unwrap();
+        assert_eq!(readback.version, 8);
+        assert_eq!(readback.notes.as_deref(), Some("new synthetic notes"));
+        server.join().unwrap();
+        let requests = requests.lock().unwrap();
+        let posts: Vec<Value> = requests
+            .iter()
+            .filter(|r| r.starts_with(PROFILE_POST))
+            .map(|r| serde_json::from_str(r.split("\r\n\r\n").nth(1).unwrap()).unwrap())
+            .collect();
+        assert_eq!(
+            posts[0],
+            json!({"kind":"open","contractVersion":1,"projection":"profile","expectedSelectionEpoch":2})
+        );
+        assert_eq!(
+            posts[1],
+            json!({"kind":"read","contractVersion":1,"projection":"profile","handle":format!("pph_{}","a".repeat(64)),"expectedRevision":7})
+        );
+        let put = requests.iter().find(|r| r.starts_with("PUT ")).unwrap();
+        assert!(!put.contains("pph_"));
+        assert!(!put.contains("new synthetic notes"));
+        assert!(put.contains("ENC:"));
+        assert!(
+            !requests
+                .iter()
+                .any(|r| r.starts_with("GET /api/v1/network/patients/patient-a "))
+        );
+    }
+
+    #[test]
+    fn cancelled_epoch_response_cannot_start_open_or_register_a_receipt() {
+        let (url, seen, release, server) =
+            delayed_server(Some(r#"{"contractVersion":1,"selectionEpoch":2}"#));
+        let session = session_at(&url);
+        session
+            .inner
+            .scopes
+            .lock()
+            .unwrap()
+            .insert("scope-a".into());
+        let intent = session.profile_query_intent();
+        let pending = intent.clone();
+        let clone = session.clone();
+        let worker =
+            thread::spawn(move || clone.open_patient_profile("scope-a", "patient-a", &pending));
+        assert!(
+            seen.recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .starts_with(EPOCH_GET)
+        );
+        intent.cancel();
+        release.send(()).unwrap();
+        assert!(matches!(
+            worker.join().unwrap(),
+            Err(RuntimeError::ReadRequired)
+        ));
+        server.join().unwrap();
+        assert!(session.inner.reads.lock().unwrap().is_empty());
+        assert!(session.inner.profile_reads.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn superseded_or_locked_profile_response_never_arms_the_write_receipt() {
+        for lock in [false, true] {
+            let wire = profile_wire(&session()).to_string();
+            let (session, _, seen, release, server) = profile_script(
+                vec![(EPOCH_GET, 200, epoch_wire()), (PROFILE_POST, 200, wire)],
+                true,
+            );
+            let intent = session.profile_query_intent();
+            let pending = intent.clone();
+            let clone = session.clone();
+            let worker =
+                thread::spawn(move || clone.open_patient_profile("scope-a", "patient-a", &pending));
+            assert_eq!(seen.recv_timeout(Duration::from_secs(5)).unwrap(), 0);
+            assert_eq!(seen.recv_timeout(Duration::from_secs(5)).unwrap(), 1);
+            if lock {
+                session.lock();
+            } else {
+                intent.cancel();
+            }
+            release.send(()).unwrap();
+            let result = worker.join().unwrap();
+            assert!(
+                matches!(result, Err(RuntimeError::Locked)) && lock
+                    || matches!(result, Err(RuntimeError::ReadRequired)) && !lock
+            );
+            server.join().unwrap();
+            assert!(session.inner.reads.lock().unwrap().is_empty());
+            assert!(session.inner.profile_reads.lock().unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn invalid_handle_read_is_not_silently_reopened_and_retires_the_local_write_gate() {
+        let wire = profile_wire(&session()).to_string();
+        let (session, requests, _, _, server) = profile_script(
+            vec![
+                (EPOCH_GET, 200, epoch_wire()),
+                (PROFILE_POST, 200, wire),
+                (PROFILE_POST, 410, "{\"code\":\"handle_expired\"}".into()),
+            ],
+            false,
+        );
+        let intent = session.profile_query_intent();
+        session
+            .open_patient_profile("scope-a", "patient-a", &intent)
+            .unwrap();
+        assert!(matches!(
+            session.read_patient_profile("scope-a", "patient-a", &intent),
+            Err(RuntimeError::Rejected(410))
+        ));
+        server.join().unwrap();
+        assert_eq!(
+            requests
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|r| r.starts_with(EPOCH_GET))
+                .count(),
+            1
+        );
+        assert!(session.inner.profile_reads.lock().unwrap().is_empty());
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+    }
+
+    #[test]
+    fn local_expiry_or_a_different_session_cannot_reuse_profile_receipts() {
+        let wire = profile_wire(&session()).to_string();
+        let (session, _, _, _, server) = profile_script(
+            vec![(EPOCH_GET, 200, epoch_wire()), (PROFILE_POST, 200, wire)],
+            false,
+        );
+        let intent = session.profile_query_intent();
+        session
+            .open_patient_profile("scope-a", "patient-a", &intent)
+            .unwrap();
+        server.join().unwrap();
+        let key = read_key("scope-a", "patient-a", "patients", "patient-a");
+        session
+            .inner
+            .profile_reads
+            .lock()
+            .unwrap()
+            .get_mut(&key)
+            .unwrap()
+            .deadline = Instant::now() - Duration::from_secs(1);
+        session
+            .inner
+            .reads
+            .lock()
+            .unwrap()
+            .get_mut(&key)
+            .unwrap()
+            .deadline = Some(Instant::now() - Duration::from_secs(1));
+        assert!(matches!(
+            session.read_patient_profile("scope-a", "patient-a", &intent),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert_eq!(
+            session.require_read(
+                "scope-a",
+                "patient-a",
+                "patients",
+                "patient-a",
+                7,
+                &["notes"]
+            ),
+            Err(RuntimeError::ReadRequired)
+        );
+        assert!(matches!(
+            session.read_patient_profile("scope-b", "patient-a", &intent),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert!(matches!(
+            session.read_patient_profile("scope-a", "patient-b", &intent),
+            Err(RuntimeError::ReadRequired)
+        ));
+        assert!(matches!(
+            session_at("http://127.0.0.1:1").open_patient_profile("scope-a", "patient-a", &intent),
+            Err(RuntimeError::ReadRequired)
+        ));
+    }
+
+    #[test]
+    fn profile_output_budget_rejects_http_413_and_oversized_json_without_a_legacy_retry() {
+        for status in [200, 413] {
+            let mut wire = profile_wire(&session());
+            wire["profile"]["notes"] = json!("🩺".repeat(9000));
+            let (session, requests, _, _, server) = profile_script(
+                vec![
+                    (EPOCH_GET, 200, epoch_wire()),
+                    (PROFILE_POST, status, wire.to_string()),
+                ],
+                false,
+            );
+            let intent = session.profile_query_intent();
+            assert!(matches!(
+                session.open_patient_profile("scope-a", "patient-a", &intent),
+                Err(RuntimeError::ProfileTooLarge)
+            ));
+            server.join().unwrap();
+            assert!(session.inner.reads.lock().unwrap().is_empty());
+            assert_eq!(
+                requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|r| !r.starts_with("GET /api/v1/network/identity "))
+                    .count(),
+                2
+            );
+        }
+        assert!(
+            RuntimeError::ProfileTooLarge
+                .to_string()
+                .contains("limite di lettura di questo pilota")
+        );
+    }
+
+    #[test]
+    fn cancellation_during_the_scope_identity_check_prevents_the_profile_post() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        session
+            .inner
+            .scopes
+            .lock()
+            .unwrap()
+            .insert("scope-a".into());
+        let (seen_tx, seen_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let server = thread::spawn(move || {
+            for (index, prefix) in [
+                "GET /api/v1/network/identity ",
+                EPOCH_GET,
+                "GET /api/v1/network/identity ",
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = read_request(&mut stream);
+                assert!(request.starts_with(prefix));
+                if index == 2 {
+                    seen_tx.send(()).unwrap();
+                    release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                }
+                let body = if index == 1 {
+                    epoch_wire()
+                } else {
+                    r#"{"scope":{"effectiveAmbulatoryId":"scope-a","requestBinding":"expected-ambulatory-id-v1"},"operator":{"userId":"synthetic-user","authChannel":"native"}}"#.to_owned()
+                };
+                send_reply(&mut stream, &body);
+            }
+        });
+        let intent = session.profile_query_intent();
+        let pending = intent.clone();
+        let clone = session.clone();
+        let worker =
+            thread::spawn(move || clone.open_patient_profile("scope-a", "patient-a", &pending));
+        seen_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        intent.cancel();
+        release_tx.send(()).unwrap();
+        assert!(matches!(
+            worker.join().unwrap(),
+            Err(RuntimeError::ReadRequired)
+        ));
+        server.join().unwrap();
+        assert!(session.inner.reads.lock().unwrap().is_empty());
+        assert!(session.inner.profile_reads.lock().unwrap().is_empty());
     }
 }
