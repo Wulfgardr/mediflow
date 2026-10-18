@@ -17,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use zeroize::Zeroizing;
 
+use crate::appointments::for_write as appointment_for_write;
 use crate::clinical_text;
 use crate::components::{
     brand_icon, button, display_date, heading, notice, plain_text, section, tab,
@@ -608,6 +609,15 @@ impl ClinicalApp {
             }
         });
         app._subscriptions.push(release);
+        // GPUI reports this after replacing the rendered dispatch tree. Restore
+        // the workspace only when its focused control has disappeared (including
+        // responsive controls). Surviving editors and OS window deactivation do
+        // not lose their dispatch path, so they keep their focus. No frame loop
+        // or list of individual state transitions is needed.
+        let focus_lost = cx.on_focus_lost(window, |this, window, cx| {
+            window.focus(&this.focus, cx);
+        });
+        app._subscriptions.push(focus_lost);
         window.focus(&app.focus, cx);
         app
     }
@@ -1471,6 +1481,12 @@ impl ClinicalApp {
                     "clinical-workspace-checkup-date",
                     "Data (AAAA-MM-GG)",
                     today.clone(),
+                    false,
+                ),
+                (
+                    "clinical-workspace-checkup-time",
+                    "Ora locale (HH:MM, secondi facoltativi)",
+                    String::new(),
                     false,
                 ),
                 (
@@ -3578,7 +3594,8 @@ impl ClinicalApp {
                     FormKind::Therapy => "Indica farmaco, dose e data. I repertori sono disponibili nell’area dedicata; nessuna scelta terapeutica viene dedotta.",
                     FormKind::Observation => "Riporta il valore e le codifiche presenti nel referto. Non vengono dedotte unità, intervalli o interpretazioni cliniche.",
                     FormKind::Document => "Il documento scelto verrà aggiunto alla scheda del paziente indicato. Verifica nome, formato e dimensione prima di registrarlo.",
-                    FormKind::Checkup => "Indica il controllo da pianificare. La data è un giorno di calendario; non viene dedotto un orario.",
+                    FormKind::Checkup if form.edit.is_none() => "Indica la data e l'ora del controllo nel fuso del computer. L'orario è richiesto e non viene scelto automaticamente.",
+                    FormKind::Checkup => "Data e ora sono nel fuso del computer. Se non le modifichi, l'orario registrato resta invariato.",
                     FormKind::PatientNew => "La scheda verrà creata nell'ambulatorio selezionato. I campi non compilati resteranno senza un valore riportato.",
                     FormKind::PatientProfile => "La conferma aggiorna soltanto i campi anagrafici che hai modificato. Le note e gli altri dati clinici restano fuori da questa modifica.",
                 }))))
@@ -4279,6 +4296,15 @@ fn calendar_interval<T: chrono::TimeZone>(
 }
 
 fn agenda_group(status: &str, date: &str, today: chrono::NaiveDate) -> AgendaGroup {
+    agenda_group_in_zone(status, date, today, &chrono::Local)
+}
+
+fn agenda_group_in_zone<T: chrono::TimeZone>(
+    status: &str,
+    date: &str,
+    today: chrono::NaiveDate,
+    zone: &T,
+) -> AgendaGroup {
     if matches!(status, "completed" | "cancelled") {
         return AgendaGroup::Closed;
     }
@@ -4286,7 +4312,7 @@ fn agenda_group(status: &str, date: &str, today: chrono::NaiveDate) -> AgendaGro
         return AgendaGroup::Undated;
     }
     let day = chrono::DateTime::parse_from_rfc3339(date)
-        .map(|date| date.with_timezone(&chrono::Local).date_naive())
+        .map(|date| date.with_timezone(zone).date_naive())
         .or_else(|_| chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d"));
     match day {
         Ok(day) if day < today => AgendaGroup::Overdue,
@@ -4296,9 +4322,14 @@ fn agenda_group(status: &str, date: &str, today: chrono::NaiveDate) -> AgendaGro
 }
 
 fn display_appointment(date: &str) -> String {
+    display_appointment_in_zone(date, &chrono::Local)
+}
+
+fn display_appointment_in_zone<T: chrono::TimeZone>(date: &str, zone: &T) -> String {
     chrono::DateTime::parse_from_rfc3339(date)
         .map(|date| {
-            date.with_timezone(&chrono::Local)
+            date.with_timezone(zone)
+                .naive_local()
                 .format("%d/%m/%Y · %H:%M")
                 .to_string()
         })
@@ -4385,11 +4416,6 @@ impl Render for ClinicalApp {
             }
         }
         let layout = Layout::for_window(f32::from(window.viewport_size().width), self.text_scale);
-        // A focused compact selector disappears on desktop. Keep keyboard
-        // dispatch in the workspace without disturbing a surviving editor.
-        if !layout.compact && self.section_selector_focus.contains_focused(window, cx) {
-            window.focus(&self.focus, cx);
-        }
         let connected = self.session.is_some();
         self.sync_patient_targets(cx);
         if std::mem::take(&mut self.focus_search_after_render)
@@ -5391,19 +5417,27 @@ fn date_for_write(value: &str) -> Result<String, String> {
     if value.len() != 10 || date.format("%Y-%m-%d").to_string() != value {
         return Err("Inserisci la data completa nel formato AAAA-MM-GG.".into());
     }
-    // The existing date-only input uses a UTC calendar date. No visit time is
-    // inferred; the form and readback both compare that explicit calendar day.
+    // Preserve the existing UTC calendar representation for date-only records.
+    // Checkups use appointment_for_write with an explicitly supplied local time.
     Ok(format!("{value}T00:00:00.000Z"))
 }
 
 fn validate_form(kind: FormKind, values: &[String]) -> Result<(), String> {
+    validate_form_in_zone(kind, values, &chrono::Local)
+}
+
+fn validate_form_in_zone<T: chrono::TimeZone>(
+    kind: FormKind,
+    values: &[String],
+    zone: &T,
+) -> Result<(), String> {
     let count = match kind {
         FormKind::Notes => 1,
         FormKind::Entry => 3,
         FormKind::Therapy => 4,
         FormKind::Observation => 5,
         FormKind::Document => 0,
-        FormKind::Checkup => 3,
+        FormKind::Checkup => 4,
         FormKind::PatientNew | FormKind::PatientProfile => {
             return Err("Usa il modulo anagrafico dedicato.".into());
         }
@@ -5422,7 +5456,7 @@ fn validate_form(kind: FormKind, values: &[String]) -> Result<(), String> {
     }
     let required: &[usize] = match kind {
         FormKind::Entry => &[0, 1, 2],
-        FormKind::Checkup => &[0, 1],
+        FormKind::Checkup => &[0, 1, 2],
         FormKind::Therapy => &[0, 1, 2],
         FormKind::Observation => &[0, 1, 2, 3, 4],
         _ => &[],
@@ -5436,16 +5470,40 @@ fn validate_form(kind: FormKind, values: &[String]) -> Result<(), String> {
     }) {
         return Err("Completa i campi richiesti prima di rivedere la scrittura.".into());
     }
+    if kind == FormKind::Checkup {
+        appointment_for_write(&values[1], &values[2], zone)?;
+        return Ok(());
+    }
     let date_index = match kind {
-        FormKind::Entry | FormKind::Checkup => 1,
+        FormKind::Entry => 1,
         FormKind::Therapy => 2,
         FormKind::Observation => 4,
-        FormKind::Notes | FormKind::Document | FormKind::PatientNew | FormKind::PatientProfile => {
+        FormKind::Notes
+        | FormKind::Document
+        | FormKind::Checkup
+        | FormKind::PatientNew
+        | FormKind::PatientProfile => {
             unreachable!()
         }
     };
     date_for_write(&values[date_index])?;
     Ok(())
+}
+
+fn new_checkup_draft<T: chrono::TimeZone>(
+    values: &[String],
+    zone: &T,
+) -> Result<CheckupDraft, RuntimeError> {
+    validate_form_in_zone(FormKind::Checkup, values, zone)
+        .map_err(|_| RuntimeError::InvalidInput)?;
+    Ok(CheckupDraft {
+        title: values[0].trim().to_owned(),
+        date: appointment_for_write(&values[1], &values[2], zone)
+            .map_err(|_| RuntimeError::InvalidInput)?,
+        status: "pending".into(),
+        notes: (!values[3].is_empty()).then(|| values[3].clone()),
+        source: Some("manual".into()),
+    })
 }
 
 fn new_observation_draft(values: &[String]) -> Result<ObservationDraft, RuntimeError> {
@@ -5557,13 +5615,7 @@ fn save_new_record(
             )
         }
         FormKind::Checkup => {
-            let draft = CheckupDraft {
-                title: values[0].trim().to_owned(),
-                date: date_for_write(&values[1]).map_err(|_| RuntimeError::InvalidInput)?,
-                status: "pending".into(),
-                notes: (!values[2].is_empty()).then(|| values[2].clone()),
-                source: Some("manual".into()),
-            };
+            let draft = new_checkup_draft(values, &chrono::Local)?;
             let created = session.create_checkup(scope, patient_id, &draft)?;
             after_create_read(
                 session.read_checkup(scope, patient_id, &created.id),
@@ -5601,6 +5653,7 @@ fn ui_error(error: impl std::fmt::Display) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::Focusable;
 
     fn bindings_for_key(key: &str, contexts: &[&str]) -> Vec<KeyBinding> {
         let contexts: Vec<_> = contexts
@@ -5808,6 +5861,110 @@ mod tests {
     }
 
     #[test]
+    fn new_checkups_keep_the_chosen_local_day_time_and_agenda_membership() {
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 10, 18).unwrap();
+        for zone in [chrono_tz::America::New_York, chrono_tz::Europe::Rome] {
+            let interval = calendar_interval("2026-10-18", "2026-10-18", &zone).unwrap();
+            let from =
+                chrono::DateTime::parse_from_rfc3339(interval.from.as_ref().unwrap()).unwrap();
+            let to = chrono::DateTime::parse_from_rfc3339(interval.to.as_ref().unwrap()).unwrap();
+            for time in ["00:00", "09:30", "23:59"] {
+                let values = ["Controllo sintetico", "2026-10-18", time, "Note sintetiche"]
+                    .map(String::from);
+                let draft = new_checkup_draft(&values, &zone).unwrap();
+                assert_eq!(draft.notes.as_deref(), Some("Note sintetiche"));
+                let instant = chrono::DateTime::parse_from_rfc3339(&draft.date).unwrap();
+                assert!(instant >= from && instant <= to, "{zone}: {}", draft.date);
+                assert_eq!(
+                    display_appointment_in_zone(&draft.date, &zone),
+                    format!("18/10/2026 · {time}"),
+                    "{zone}"
+                );
+                assert_eq!(
+                    agenda_group_in_zone("pending", &draft.date, today, &zone),
+                    AgendaGroup::Upcoming,
+                    "{zone}"
+                );
+                assert_eq!(
+                    agenda_group_in_zone("pending", &draft.date, today.succ_opt().unwrap(), &zone),
+                    AgendaGroup::Overdue,
+                    "{zone}"
+                );
+            }
+        }
+        assert_eq!(
+            appointment_for_write("2026-10-18", "09:30", &chrono_tz::America::New_York).unwrap(),
+            "2026-10-18T13:30:00.000Z"
+        );
+        assert_eq!(
+            appointment_for_write("2026-10-18", "09:30", &chrono_tz::Europe::Rome).unwrap(),
+            "2026-10-18T07:30:00.000Z"
+        );
+    }
+
+    #[test]
+    fn new_checkups_require_an_explicit_valid_unambiguous_local_time_before_review_or_write() {
+        for (zone, day, time) in [
+            (chrono_tz::America::New_York, "2026-03-08", "02:30"),
+            (chrono_tz::America::New_York, "2026-11-01", "01:30"),
+            (chrono_tz::Europe::Rome, "2026-03-29", "02:30"),
+            (chrono_tz::Europe::Rome, "2026-10-25", "02:30"),
+            (chrono_tz::Europe::Rome, "2026-02-29", "09:30"),
+            (chrono_tz::Europe::Rome, "2026-10-18", ""),
+            (chrono_tz::Europe::Rome, "2026-10-18", "9:30"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "24:00"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:60"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30Z"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:60"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:00.1"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:00.125"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:00.1234"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:00.123456789"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:00.1234567890"),
+        ] {
+            let values = ["Controllo sintetico", day, time, ""].map(String::from);
+            assert!(
+                validate_form_in_zone(FormKind::Checkup, &values, &zone).is_err(),
+                "review: {zone} {day} {time}"
+            );
+            assert!(
+                new_checkup_draft(&values, &zone).is_err(),
+                "write: {zone} {day} {time}"
+            );
+        }
+        // The old three-field date-only form cannot silently supply midnight.
+        assert!(
+            validate_form(
+                FormKind::Checkup,
+                &["Titolo", "2026-10-18", ""].map(String::from)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn existing_timestamp_appointments_retain_their_instant_and_local_display() {
+        let date = "2026-10-18T00:30:45.123Z";
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 10, 18).unwrap();
+        assert_eq!(
+            display_appointment_in_zone(date, &chrono_tz::America::New_York),
+            "17/10/2026 · 20:30"
+        );
+        assert_eq!(
+            agenda_group_in_zone("pending", date, today, &chrono_tz::America::New_York),
+            AgendaGroup::Overdue
+        );
+        assert_eq!(
+            display_appointment_in_zone(date, &chrono_tz::Europe::Rome),
+            "18/10/2026 · 02:30"
+        );
+        assert_eq!(
+            agenda_group_in_zone("pending", date, today, &chrono_tz::Europe::Rome),
+            AgendaGroup::Upcoming
+        );
+    }
+
+    #[test]
     fn new_observation_preserves_qualified_strings_and_decimal_punctuation() {
         let mut values = vec![
             "Parametro".into(),
@@ -5851,5 +6008,124 @@ mod tests {
         assert_eq!(path_segment("patient-1"), "patient-1");
         assert_eq!(path_segment("../a?secret=x#y"), "..%2Fa%3Fsecret%3Dx%23y");
         assert_eq!(path_segment("è"), "%C3%A8");
+    }
+
+    // These use GPUI's actual render/dispatch tree with its synthetic platform.
+    // No RuntimeSession, archive, network operation or installed OS UI is used.
+    fn render_clinical_window(cx: &mut gpui::VisualTestContext) {
+        for _ in 0..8 {
+            let callbacks = cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+                window.simulate_next_frame(cx)
+            });
+            cx.run_until_parked();
+            if callbacks == 0 {
+                return;
+            }
+        }
+        panic!("workspace rendering did not return to an idle frame");
+    }
+
+    #[gpui::test]
+    fn disappearing_controls_restore_the_real_workspace_keyboard_dispatch(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            bind_keys(cx);
+            crate::text_input::bind_keys(cx);
+        });
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.show_tls_pin = true;
+            cx.notify();
+        });
+        render_clinical_window(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.login_fields[1]
+                .editor
+                .update(cx, |input, cx| input.focus(window, cx));
+            app.login_fields[5]
+                .editor
+                .update(cx, |input, cx| input.set_content("synthetic-input", cx));
+        });
+        render_clinical_window(cx);
+        cx.update(|window, cx| {
+            assert!(
+                view.read(cx).login_fields[1]
+                    .editor
+                    .read(cx)
+                    .focus_handle(cx)
+                    .is_focused(window)
+            );
+        });
+
+        // The old focused entity remains alive but its rendered control is gone,
+        // exactly the condition shared by threshold and responsive transitions.
+        view.update(cx, |app, cx| {
+            app.show_tls_pin = false;
+            cx.notify();
+        });
+        render_clinical_window(cx);
+        cx.update(|window, cx| {
+            assert!(view.read(cx).focus.is_focused(window));
+        });
+        cx.simulate_keystrokes("tab");
+        render_clinical_window(cx);
+        cx.update(|window, cx| {
+            let app = view.read(cx);
+            assert!(app.focus.contains_focused(window, cx));
+            assert!(
+                !app.focus.is_focused(window),
+                "Tab must reach a rendered control"
+            );
+        });
+        cx.simulate_keystrokes("shift-tab");
+        render_clinical_window(cx);
+        cx.simulate_keystrokes(&format!("{}-l", secondary_modifier()));
+        render_clinical_window(cx);
+        view.read_with(cx, |app, cx| {
+            assert!(app.login_fields[5].value(cx).is_empty());
+            assert!(
+                app.message
+                    .as_ref()
+                    .unwrap()
+                    .0
+                    .starts_with("Sessione bloccata.")
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn focus_recovery_preserves_surviving_editors_and_window_deactivation(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        view.update(cx, |app, cx| {
+            app.show_tls_pin = true;
+            cx.notify();
+        });
+        render_clinical_window(cx);
+        let editor = view.read_with(cx, |app, _| app.login_fields[0].editor.clone());
+        cx.update_window_entity(&editor, |input, window, cx| input.focus(window, cx));
+        render_clinical_window(cx);
+        view.update(cx, |app, cx| {
+            app.show_tls_pin = false;
+            cx.notify();
+        });
+        for width in [390., 720., 1200.] {
+            cx.simulate_resize(gpui::size(px(width), px(840.)));
+            render_clinical_window(cx);
+            cx.update(|window, cx| assert!(editor.read(cx).focus_handle(cx).is_focused(window)));
+        }
+        cx.deactivate_window();
+        render_clinical_window(cx);
+        cx.update(|window, cx| {
+            assert!(editor.read(cx).focus_handle(cx).is_focused(window));
+            // The recovery subscription has no animation/frame polling work.
+            assert_eq!(window.simulate_next_frame(cx), 0);
+        });
     }
 }

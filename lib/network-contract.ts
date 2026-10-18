@@ -13,7 +13,7 @@ import type {
     NetworkSessionSummary,
 } from './api/v1/types';
 
-export const NETWORK_PROTOCOL_VERSION = '1.12.0';
+export const NETWORK_PROTOCOL_VERSION = '1.13.0';
 export const NETWORK_NODE_ID_KEY = 'network.nodeId';
 export const NETWORK_MODE_KEY = 'network.mode';
 export const NETWORK_SETTINGS_KEYS = [

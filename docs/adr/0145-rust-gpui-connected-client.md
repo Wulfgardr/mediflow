@@ -60,6 +60,34 @@ Il package dell'issuer viene aggiornato come unità coerente: sorgente,
 versione, tarball locale, provenienza, dipendenza, lockfile e inventario
 standalone. Due pack offline da copie pulite devono produrre byte uguali.
 
+### Correzione di scope emersa dalla review completa del 18 ottobre
+
+La revisione finale della PR 558 aggiunge il protocollo network **1.13.0** e
+la spec OpenAPI **1.38.0**. Il controllo di identità preliminare non vincola
+da solo una richiesta successiva: un ambulatorio eliminato può altrimenti
+essere sostituito dal default prima della risoluzione del contesto.
+
+Il client Rust invia `x-mediflow-expected-ambulatory-id` su ogni operazione
+con scope, usando la stessa codifica canonica `encodeURIComponent` del
+cookie. L'header è un'asserzione rispetto all'autorità già risolta, mai una
+fonte di autorizzazione o selezione. Gli ingressi effettivi di lettura e
+scrittura lo confrontano prima di procedere; il guard del commit paziente
+lo ricontrolla nella transazione insieme allo scope corrente. Un mismatch,
+un valore vuoto, non canonico o una combinazione di header duplicati
+restituisce `403` senza ripiegare sul default.
+
+La compatibilità è esplicita: il nuovo header resta opzionale per i client
+esistenti, che conservano la politica cookie/default e i rispettivi gate.
+`scope.requestBinding: expected-ambulatory-id-v1` è un campo opzionale di
+risposta, presente sui nuovi host. Il client Rust richiede protocollo 1.13+
+e questa dichiarazione prima di una richiesta scoped; un host precedente
+che ignori l'header non viene ammesso. Non si aggiungono capability né si
+ampliano gli override in `contract-policy.json`. Il bump 1.12 documentato
+sopra identifica il precedente incremento del roster Windows/Linux.
+
+Questa correzione non promuove lo stato **Proposed** dell'ADR, non migra il
+writer in Rust e non risolve l'autorità Swift opzionale o i GO riservati.
+
 ## Sblocco e trasporto
 
 Il client riproduce il contratto v3 dell'ADR 0143, usando i vettori dorati

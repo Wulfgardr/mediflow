@@ -1,17 +1,15 @@
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import {
     authenticateNetworkPairedClient,
-    getNetworkIdentitySummary,
 } from '@/lib/network-home-base-server';
 import {
     createNetworkScopedPatient,
     NETWORK_PATIENT_LIFECYCLE_CAPABILITY,
 } from '@/lib/network-patient-lifecycle';
 import { listNetworkScopedPatients } from '@/lib/network-patient-read';
-import { getNetworkModeGateResponse, requireNetworkCapabilityContext } from '@/lib/network-write-context';
+import { getNetworkModeGateResponse, requireNetworkCapabilityContext, resolveNetworkScope } from '@/lib/network-write-context';
 import { forbiddenResponse, unauthorizedResponse } from '@/lib/security/server-auth';
 import { requireAccountSession } from '@/lib/security/paired-native-session';
 
@@ -37,10 +35,7 @@ export async function GET(request: Request) {
     if (!session) return unauthorizedResponse();
 
     try {
-        const cookieStore = await cookies();
-        const activeAmbulatoryId = cookieStore.get('ambulatory_id')?.value ?? null;
-        const identity = await getNetworkIdentitySummary(session, activeAmbulatoryId);
-        const scopeAmbulatoryId = identity.scope.effectiveAmbulatoryId;
+        const scopeAmbulatoryId = await resolveNetworkScope(session, request);
         if (!scopeAmbulatoryId) {
             return NextResponse.json({ error: 'Network scope unavailable' }, { status: 403 });
         }

@@ -1,6 +1,7 @@
 //! Typed edits of already-read clinical records. Rich content and optional
 //! metadata remain byte-for-byte unchanged unless their editable field changes.
 
+use crate::appointments;
 use mediflow_runtime_client::{
     Checkup, CheckupDraft, Entry, EntryDraft, Observation, ObservationDraft, RuntimeError,
     RuntimeSession, Therapy, TherapyDraft,
@@ -99,6 +100,10 @@ impl Record {
         }
     }
     pub fn fields(&self) -> Vec<FieldSpec> {
+        self.fields_in_zone(&chrono::Local)
+    }
+
+    fn fields_in_zone<T: chrono::TimeZone>(&self, zone: &T) -> Vec<FieldSpec> {
         let f = FieldSpec::new;
         match self {
             Self::Entry(row) => {
@@ -238,6 +243,8 @@ impl Record {
                 ),
             ],
             Self::Checkup(row) => {
+                let (day, time) = appointments::fields(&row.date, zone)
+                    .unwrap_or_else(|_| (row.date.clone(), String::new()));
                 let mut fields = vec![
                     f(
                         "clinical-workspace-edit-checkup-title",
@@ -248,7 +255,13 @@ impl Record {
                     f(
                         "clinical-workspace-edit-checkup-date",
                         "Data (AAAA-MM-GG)",
-                        day(&row.date),
+                        day,
+                        false,
+                    ),
+                    f(
+                        "clinical-workspace-edit-checkup-time",
+                        "Ora locale (HH:MM, secondi facoltativi)",
+                        time,
                         false,
                     ),
                     f(
@@ -264,7 +277,7 @@ impl Record {
                         true,
                     ),
                 ];
-                fields[2].choices = &[
+                fields[3].choices = &[
                     ("pending", "Da completare"),
                     ("completed", "Completato"),
                     ("cancelled", "Annullato"),
@@ -274,10 +287,18 @@ impl Record {
         }
     }
     pub fn draft(&self, values: &[String]) -> Result<Draft, String> {
+        self.draft_in_zone(values, &chrono::Local)
+    }
+
+    fn draft_in_zone<T: chrono::TimeZone>(
+        &self,
+        values: &[String],
+        zone: &T,
+    ) -> Result<Draft, String> {
         if !self.readable() {
             return Err("L'elemento non è interamente leggibile o risulta eliminato. Rileggi prima di modificarlo.".into());
         }
-        let fields = self.fields();
+        let fields = self.fields_in_zone(zone);
         if values.len() != fields.len() {
             return Err("Il modulo non corrisponde all'elemento letto.".into());
         }
@@ -308,7 +329,7 @@ impl Record {
             Self::Entry(_) => vec![0, 1, 2],
             Self::Therapy(_) => vec![0, 1, 2, 4],
             Self::Observation(_) => vec![0, 1, 2, 3, 4],
-            Self::Checkup(_) => vec![0, 1, 2],
+            Self::Checkup(_) => vec![0, 1, 2, 3],
         };
         if required
             .into_iter()
@@ -367,9 +388,9 @@ impl Record {
             }
             Self::Checkup(row) => Draft::Checkup(CheckupDraft {
                 title: values[0].clone(),
-                date: edited_date(&values[1], &row.date)?,
-                status: values[2].clone(),
-                notes: optional(&values[3], row.notes.as_ref()),
+                date: appointments::edited(&values[1], &values[2], &row.date, zone)?,
+                status: values[3].clone(),
+                notes: optional(&values[4], row.notes.as_ref()),
                 source: row.source.clone(),
             }),
         })
@@ -596,6 +617,130 @@ fn rich_text(source: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn checkup(date: &str) -> Checkup {
+        serde_json::from_value(serde_json::json!({
+            "id": "synthetic-checkup", "patientId": "synthetic-patient", "date": date,
+            "title": "Controllo sintetico", "notes": "Note sintetiche", "status": "pending",
+            "source": "manual", "version": 3
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn checkup_edit_reopens_the_chosen_local_day_and_preserves_unchanged_timestamps() {
+        for zone in [chrono_tz::America::New_York, chrono_tz::Europe::Rome] {
+            for time in ["00:00", "23:59", "09:30:45"] {
+                let date = appointments::for_write("2026-10-18", time, &zone).unwrap();
+                let record = Record::Checkup(checkup(&date));
+                let fields = record.fields_in_zone(&zone);
+                assert_eq!(fields[1].value, "2026-10-18", "{zone}");
+                assert_eq!(fields[2].value, time, "{zone}");
+                assert_eq!(fields[3].choices[0], ("pending", "Da completare"));
+                let mut values: Vec<_> = fields.into_iter().map(|field| field.value).collect();
+                values[0] = "Titolo modificato".into();
+                let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+                    panic!("checkup draft expected");
+                };
+                assert_eq!(draft.date, date, "{zone}");
+                assert_eq!(draft.status, "pending");
+                assert_eq!(draft.notes.as_deref(), Some("Note sintetiche"));
+                values[3] = "completed".into();
+                values[4] = String::new();
+                let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+                    panic!("checkup draft expected");
+                };
+                assert_eq!(draft.date, date);
+                assert_eq!(draft.status, "completed");
+                assert_eq!(draft.notes, None);
+            }
+        }
+    }
+
+    #[test]
+    fn moving_a_checkup_day_keeps_its_local_clock_across_a_timezone_change() {
+        for (zone, original_day, next_day, expected) in [
+            (
+                chrono_tz::America::New_York,
+                "2026-03-07",
+                "2026-03-08",
+                "2026-03-08T13:30:45.000Z",
+            ),
+            (
+                chrono_tz::Europe::Rome,
+                "2026-03-28",
+                "2026-03-29",
+                "2026-03-29T07:30:45.000Z",
+            ),
+        ] {
+            let date = appointments::for_write(original_day, "09:30:45", &zone).unwrap();
+            let record = Record::Checkup(checkup(&date));
+            let mut values: Vec<_> = record
+                .fields_in_zone(&zone)
+                .into_iter()
+                .map(|field| field.value)
+                .collect();
+            values[1] = next_day.into();
+            let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+                panic!("checkup draft expected");
+            };
+            assert_eq!(draft.date, expected, "{zone}");
+            assert_eq!(
+                appointments::fields(&draft.date, &zone).unwrap(),
+                (next_day.into(), "09:30:45".into())
+            );
+        }
+    }
+
+    #[test]
+    fn ambiguous_checkup_edits_are_rejected_but_known_original_instants_are_preserved() {
+        for (zone, target_day, target_time) in [
+            (chrono_tz::America::New_York, "2026-03-08", "02:30"),
+            (chrono_tz::America::New_York, "2026-11-01", "01:30"),
+            (chrono_tz::Europe::Rome, "2026-03-29", "02:30"),
+            (chrono_tz::Europe::Rome, "2026-10-25", "02:30"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:20.1"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:20.125"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:20.1234"),
+            (chrono_tz::Europe::Rome, "2026-10-18", "09:30:20.123456789"),
+        ] {
+            let date = appointments::for_write("2026-10-18", "09:30", &zone).unwrap();
+            let record = Record::Checkup(checkup(&date));
+            let mut values: Vec<_> = record
+                .fields_in_zone(&zone)
+                .into_iter()
+                .map(|field| field.value)
+                .collect();
+            values[1] = target_day.into();
+            values[2] = target_time.into();
+            assert!(
+                record.draft_in_zone(&values, &zone).is_err(),
+                "{zone}: {target_day} {target_time}"
+            );
+        }
+        for original in [
+            "2026-11-01T01:30:20.125-04:00",
+            "2026-11-01T01:30:20.123456789-05:00",
+        ] {
+            let zone = chrono_tz::America::New_York;
+            let record = Record::Checkup(checkup(original));
+            let mut values: Vec<_> = record
+                .fields_in_zone(&zone)
+                .into_iter()
+                .map(|field| field.value)
+                .collect();
+            values[0] = "Titolo modificato".into();
+            let Draft::Checkup(draft) = record.draft_in_zone(&values, &zone).unwrap() else {
+                panic!("checkup draft expected");
+            };
+            assert_eq!(
+                draft.date, original,
+                "a known instant must not be reinterpreted through a DST fold"
+            );
+            values[2] = "01:31".into();
+            assert!(record.draft_in_zone(&values, &zone).is_err());
+        }
+    }
 
     fn entry() -> Entry {
         serde_json::from_value(serde_json::json!({"id":"entry-1","patientId":"patient-1","type":"note","title":"Titolo","date":"2026-10-17T13:25:40.000Z","content":"<p><s>Voce precedente</s> <strong>Città 🩺</strong></p>","setting":"home","version":7})).unwrap()

@@ -1,5 +1,6 @@
 import type { NetworkIdentitySummary } from './api/v1/types';
 import type { ServerSession } from './security/server-session';
+import { NETWORK_SCOPE_REQUEST_BINDING } from './network-request-scope';
 
 export type NetworkIdentityUser = {
     id: string;
@@ -69,6 +70,7 @@ export function deriveNetworkIdentitySummary(input: NetworkIdentityInput): Netwo
         },
         scope: {
             policy: 'session-context-else-node-default',
+            requestBinding: NETWORK_SCOPE_REQUEST_BINDING,
             effectiveAmbulatoryId: effectiveAmbulatory?.id ?? null,
             effectiveAmbulatoryName: effectiveAmbulatory?.name ?? null,
             defaultAmbulatoryId: input.defaultAmbulatory?.id ?? null,

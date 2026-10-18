@@ -1,0 +1,568 @@
+{
+  "schemaVersion": 1,
+  "runId": "r08ef12a",
+  "recordedUtc": "2026-10-18T07:42:15.537923+00:00",
+  "candidateParent": "e51a86e9f23934ef35815f0a078b8500886fbc91",
+  "baseMain": "2dde0c0503abf828b99d73d7129cb7beed733044",
+  "publicationAttribution": "Local candidate file hashes only. Exact published head, full independent disposition, CI, merge and main CI are recorded in PR #558 after publication; e51 CI is historical.",
+  "candidateFiles": [
+    {
+      "path": "app/api/v1/network/identity/route.ts",
+      "sha256": "b374205aff15e3576163106d9ac720ded8ad9f2412db732764b8ec77dd8cf932",
+      "gitBlob": "a0cbd36a79b27d3efaa38f7db464efbc80272904"
+    },
+    {
+      "path": "app/api/v1/network/patients/[id]/route.ts",
+      "sha256": "97c58a2ff8d2a18b4502489d775afe188b803ac0fbec8e8c194c8c7d07471c79",
+      "gitBlob": "24eeae062e0421ddb1914bca00dd478ac2797521"
+    },
+    {
+      "path": "app/api/v1/network/patients/route.ts",
+      "sha256": "fd63a4efa4df93b709ea62ade29286814d00f757a4f8d2311c0a1195cbdab645",
+      "gitBlob": "3601d5d68cef1542315079ee5cddc471093d4346"
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "8e3172fc8449cc8583cc454efd82619e9998e6806cd3dfca124879948086a0ef",
+      "gitBlob": "1eadfc915b20487fd726fc5fbade4522f8e3d061"
+    },
+    {
+      "path": "docs/adr/0145-rust-gpui-connected-client.md",
+      "sha256": "5ed138401d4a6781495916e2ad86b7aaa393f876996ebdd4a64450bd2d173a9a",
+      "gitBlob": "104c1b6b60b0be6eade499e666b4e5342af48843"
+    },
+    {
+      "path": "docs/analysis/2026-10-17-rust-gpui-patient-pilot.md",
+      "sha256": "01d634aae3b2ad3e536ffc3f41ea8afa4d74f6b37305a4e368b94b7600e3a713",
+      "gitBlob": "f4ac75412716c9ff51df6906bfa8275c50641d55"
+    },
+    {
+      "path": "docs/analysis/2026-10-18-pr558-full-review-repairs.md",
+      "sha256": "e416d61e231f8dfa34b87c900fc7b35299bb4fd151f7ec1b68021f3bb43d30c6",
+      "gitBlob": "26e092859cc9ece9a8061ff56f17c29bfca14412"
+    },
+    {
+      "path": "docs/analysis/2026-10-18-pr558-soft-delete-delivery.md",
+      "sha256": "0af473484dc460dd108b04439ea1f67637814155ca0c1983459bb2fbc3577c98",
+      "gitBlob": "bc2f6a8c237e9114bbc5249bfaa43a1469dde7be"
+    },
+    {
+      "path": "docs/markdown-index.md",
+      "sha256": "4977a41e81b132b91d50923df7b4c30e04d2028eec8b0a011933a3e1680a79f2",
+      "gitBlob": "f1109e0d5bcbb46b2b27782e99a854aeaf96f777"
+    },
+    {
+      "path": "docs/openapi/mediflow-v1.yaml",
+      "sha256": "c2f7f26990470166dd1bc7ecf642f1b51a6fa04649dc16ebfb2b81b99431f31a",
+      "gitBlob": "5cf77190e8378921ea054e79704dbbe7a5afb72c"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/Cargo.lock",
+      "sha256": "69b2278918d3c832755ece9c6986e3bbe1676bc9c90a1af1b7a147ade53ef01c",
+      "gitBlob": "3bd93eb7163061d96eebaab2c1807b4c336f10e6"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/README.md",
+      "sha256": "cd3d2cda4fbdf5bb3b4140597b14419c332c0cb01a6daf86c774861f546c7efa",
+      "gitBlob": "c1dd94c11b98921b4c04bb63a7bf5ffc7f1ec72b"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/Cargo.toml",
+      "sha256": "ab2efd205743067706f3c2125643377e5e353bc4f46ba37c43d6e14b58e66694",
+      "gitBlob": "1c558342ab8827df13b860f3794c9e48250de617"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/appointments.rs",
+      "sha256": "58b298ad408bbb1693731732c242145aeb52cfa62b9cf8cd5076176d70d160d9",
+      "gitBlob": "35d4f68654c3cb00dcf215ed9a7d5ff69b1daa93"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/editing.rs",
+      "sha256": "e68ef09f9884da35de002303631120b98a96a97c74de84e2d616ffe32da3ea5b",
+      "gitBlob": "20d9f8ccb2309600ecaef6188681e40de2385a53"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/main.rs",
+      "sha256": "d95fba8d3e77e6482b477bc50854d669735969c9ae8fd627d8f340a6d8172708",
+      "gitBlob": "7abf031bece3ac2ea176a0fd35149a92f92cc342"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "sha256": "27c0542a584d8029dc881a107441312ca639540cc762ecec76432cdca0c5372e",
+      "gitBlob": "f21d3294ff8a7ffbab44809902642e0101dcc2da"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/transport/src/http.rs",
+      "sha256": "2530a94f62269ece9c4042ac2f56d55754a4faf73cd71c715f4f73008ebab5c6",
+      "gitBlob": "16fb17776fffefd9a1b2010f7c0db5cc173cdea9"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/transport/src/session.rs",
+      "sha256": "70d97c172b1db9b5c70f28e0612508ce28f5fb2fbe27e9ee6fbb2e2f3a4e62e5",
+      "gitBlob": "5c59be80dcbf0e38114471f34c6a640320515827"
+    },
+    {
+      "path": "lib/api/v1/types.ts",
+      "sha256": "f9049b327a1a890f9a239284a39ba758cdb329d7b97f80120520a11105ee17ab",
+      "gitBlob": "959bb02841c574db48add40e8d4d7330817c9190"
+    },
+    {
+      "path": "lib/network-contract.test.ts",
+      "sha256": "2925d93490d13adb18f9b60647f4df75b5bcab5a31179491367a0ebf61bacd3e",
+      "gitBlob": "2945f42698902a041545b9e35019675f55cd5893"
+    },
+    {
+      "path": "lib/network-contract.ts",
+      "sha256": "da443921dd6d2a8833291997d3bab002f1035feaf75bd962fd722787dcd147b8",
+      "gitBlob": "af486e4cf6e9413134cdd79b6487400a2a987180"
+    },
+    {
+      "path": "lib/network-identity-model.ts",
+      "sha256": "108f9411fdd20a1613dea6dd1cc40b54bfe7c63dc5beaf985d5245a943d39e14",
+      "gitBlob": "c54e758d34e2e12bb8cf804c9a31982b095e187d"
+    },
+    {
+      "path": "lib/network-identity.test.ts",
+      "sha256": "46412a06f677df474ab39382b91a33c51ab5cd638e1f83ef6294fcbd5c38a2e0",
+      "gitBlob": "2ae6534fd80a0776367d8f801e97bd562ba53624"
+    },
+    {
+      "path": "lib/network-patient-commit-authority.test.ts",
+      "sha256": "c836da5edcfb0954b2f3a60ee5609a84d863e808cfd08dd066dc46ebf33de6a3",
+      "gitBlob": "b0f5f2e5951e16f3825169c8ee8107812bca2ba1"
+    },
+    {
+      "path": "lib/network-patient-commit-authority.ts",
+      "sha256": "77b148f00accca48575cf557dfd73e2f5f4b0994380b7787a8d0c5bb355a5345",
+      "gitBlob": "cfb8a0e72b9e16de2a634e8446124847783ad254"
+    },
+    {
+      "path": "lib/network-request-scope.test.ts",
+      "sha256": "3eeb1f02ac3ef217a910f153a40f67d7a459331639924c04adbc7cbc78338b5a",
+      "gitBlob": "e9d0d86274cbfd00f9c1216121bc44cd12bcfece"
+    },
+    {
+      "path": "lib/network-request-scope.ts",
+      "sha256": "d2fd017d7e82ad100c3fd40c9328562daf68c55a5837529f813f9784e8dce9b1",
+      "gitBlob": "e0224c46683535e51a925f2f22d0a0c5a718f33f"
+    },
+    {
+      "path": "lib/network-write-context.ts",
+      "sha256": "b00479d124894aa598b99d2c21e683cb3b1f8d2d22fa516e6e4675227c60fc74",
+      "gitBlob": "505c84c8ea2a42bcae0fa4e8245f362c0a745230"
+    },
+    {
+      "path": "scripts/check-openapi-drift.mjs",
+      "sha256": "9f94a9365a7d277d822c44e67b347d056d00cea0c2336f12fffed8edb3f53dd2",
+      "gitBlob": "6e53a1609c3ab3d408ca39783eecdc9bfba9c968"
+    }
+  ],
+  "environment": {
+    "platform": "Linux x64",
+    "node": "24.19.0",
+    "typescript": "5.9.3",
+    "rust": "1.98.1",
+    "data": "New owned temporary synthetic directory, MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1; node scripts/prepare-e2e-db.mjs before the database-backed batch.",
+    "execution": "Authorized normal subprocess and loopback access; no real archive or provider use."
+  },
+  "rootExecutionRecords": [
+    {
+      "name": "scope-final-unit",
+      "command": [
+        "node",
+        "scripts/run-strip-types.mjs",
+        "--test",
+        "--test-reporter=tap",
+        "--test-concurrency=1",
+        "lib/network-request-scope.test.ts",
+        "lib/network-identity.test.ts",
+        "lib/network-contract.test.ts",
+        "lib/network-patient-commit-authority.test.ts"
+      ],
+      "status": 0,
+      "seconds": 3.275
+    },
+    {
+      "name": "scope-final-tombstone-static",
+      "command": [
+        "node",
+        "--test",
+        "scripts/patient-soft-delete.test.mjs"
+      ],
+      "status": 0,
+      "seconds": 1.687
+    },
+    {
+      "name": "scope-final-openapi-selftest",
+      "command": [
+        "node",
+        "scripts/check-openapi-drift.mjs",
+        "--self-test"
+      ],
+      "startedAt": "2026-10-18T07:36:24.695013+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.065,
+      "log": "/tmp/mediflow-r08ef12a/scope-final-openapi-selftest.log",
+      "logSha256": "ec17ff1d5407b401fdc6a320bbf47458880b8975b52cd1d690dc3d58c1564d02"
+    },
+    {
+      "name": "scope-final-openapi-verified",
+      "command": [
+        "node",
+        "scripts/check-openapi-drift.mjs",
+        "--base-ref",
+        "2dde0c0503abf828b99d73d7129cb7beed733044"
+      ],
+      "startedAt": "2026-10-18T07:36:24.759895+00:00",
+      "exitCode": 0,
+      "wallSeconds": 0.415,
+      "log": "/tmp/mediflow-r08ef12a/scope-final-openapi-verified.log",
+      "logSha256": "7f0815b325bd7532f6e7ad9f78ccd71e05bc2a5ef3bda0114e6aefa177174f39"
+    },
+    {
+      "name": "scope-final-typecheck",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "startedAt": "2026-10-18T07:36:25.175338+00:00",
+      "exitCode": 0,
+      "wallSeconds": 4.878,
+      "log": "/tmp/mediflow-r08ef12a/scope-final-typecheck.log",
+      "logSha256": "579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f"
+    },
+    {
+      "name": "scope-final-lint",
+      "command": [
+        "node",
+        "node_modules/eslint/bin/eslint.js",
+        "--quiet",
+        "lib/network-request-scope.ts",
+        "lib/network-request-scope.test.ts",
+        "lib/network-write-context.ts",
+        "lib/network-patient-commit-authority.ts",
+        "lib/network-patient-commit-authority.test.ts",
+        "lib/network-identity-model.ts",
+        "lib/network-identity.test.ts",
+        "lib/network-contract.ts",
+        "lib/network-contract.test.ts",
+        "lib/api/v1/types.ts",
+        "app/api/v1/network/identity/route.ts",
+        "app/api/v1/network/patients/route.ts",
+        "app/api/v1/network/patients/[id]/route.ts",
+        "scripts/check-openapi-drift.mjs"
+      ],
+      "startedAt": "2026-10-18T07:36:30.053346+00:00",
+      "exitCode": 0,
+      "wallSeconds": 1.769,
+      "log": "/tmp/mediflow-r08ef12a/scope-final-lint.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "counts": {
+    "scopeIdentityProtocolCommit": {
+      "pass": 101,
+      "fail": 0,
+      "skip": 0
+    },
+    "tombstoneStatic": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0
+    },
+    "openapiSelftest": {
+      "pass": 28,
+      "fail": 0
+    },
+    "transport": {
+      "pass": 30,
+      "fail": 0,
+      "ignored": 0,
+      "filtered": 0
+    },
+    "gpui": {
+      "pass": 53,
+      "fail": 0,
+      "ignored": 0,
+      "filtered": 0
+    }
+  },
+  "transport": {
+    "author": "/root",
+    "command": [
+      "cargo",
+      "test",
+      "--manifest-path",
+      "experiments/gpui-patient-pilot/Cargo.toml",
+      "-p",
+      "mediflow-runtime-client",
+      "--all-targets",
+      "--locked",
+      "--offline"
+    ],
+    "result": "PASS",
+    "logSection": "scope-rust-tests",
+    "targetDirectory": "/tmp/mediflow-r08ef12a/transport-fix-target"
+  },
+  "gpuiAuthorReceipt": {
+    "run_id": "r08ef12a",
+    "author_agent": "/root/pr558_gpui_blocker_fixes",
+    "recordedUtc": "2026-10-18T07:31:14.451530+00:00",
+    "baseHead": "e51a86e9f23934ef35815f0a078b8500886fbc91",
+    "workingTree": "/tmp/mediflow-r08ef12a/fixes",
+    "sourceFiles": [
+      {
+        "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+        "sha256": "27c0542a584d8029dc881a107441312ca639540cc762ecec76432cdca0c5372e",
+        "gitBlob": "f21d3294ff8a7ffbab44809902642e0101dcc2da"
+      },
+      {
+        "path": "experiments/gpui-patient-pilot/app/src/editing.rs",
+        "sha256": "e68ef09f9884da35de002303631120b98a96a97c74de84e2d616ffe32da3ea5b",
+        "gitBlob": "20d9f8ccb2309600ecaef6188681e40de2385a53"
+      },
+      {
+        "path": "experiments/gpui-patient-pilot/app/src/appointments.rs",
+        "sha256": "58b298ad408bbb1693731732c242145aeb52cfa62b9cf8cd5076176d70d160d9",
+        "gitBlob": "35d4f68654c3cb00dcf215ed9a7d5ff69b1daa93"
+      },
+      {
+        "path": "experiments/gpui-patient-pilot/app/src/main.rs",
+        "sha256": "d95fba8d3e77e6482b477bc50854d669735969c9ae8fd627d8f340a6d8172708",
+        "gitBlob": "7abf031bece3ac2ea176a0fd35149a92f92cc342"
+      },
+      {
+        "path": "experiments/gpui-patient-pilot/app/Cargo.toml",
+        "sha256": "ab2efd205743067706f3c2125643377e5e353bc4f46ba37c43d6e14b58e66694",
+        "gitBlob": "1c558342ab8827df13b860f3794c9e48250de617"
+      },
+      {
+        "path": "experiments/gpui-patient-pilot/Cargo.lock",
+        "sha256": "69b2278918d3c832755ece9c6986e3bbe1676bc9c90a1af1b7a147ade53ef01c",
+        "gitBlob": "3bd93eb7163061d96eebaab2c1807b4c336f10e6"
+      }
+    ],
+    "tests": {
+      "command": "cargo test --offline --locked -p mediflow-gpui-patient-pilot",
+      "result": "PASS",
+      "passed": 53,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "names": [
+        "components::tests::clinical_reading_keeps_paragraphs_and_does_not_render_markup",
+        "clinical_text::tests::html_entities_decode_once_and_clinical_comparisons_remain_literal",
+        "clinical_text::tests::malformed_or_unsupported_rich_content_is_retained_with_an_explicit_label",
+        "demo::tests::ordinary_save_is_only_saved_after_independent_service_reread",
+        "clinical_text::tests::nested_lists_and_blocks_keep_boundaries_numbering_and_continuations",
+        "demo::tests::uncertain_commit_and_failed_reread_do_not_report_success",
+        "clinical_text::tests::headings_quotes_aliases_and_depth_exhaustion_do_not_drop_original_content",
+        "demo::tests::conflict_preserves_other_postation_and_local_draft",
+        "documents::tests::data_url_requires_exact_type_size_canonical_base64_and_raw_limit",
+        "clinical_text::tests::overlapping_emphasis_stays_disjoint_and_crossed_out_text_is_explicit_in_copy",
+        "editing::tests::coded_therapy_name_cannot_diverge_from_its_preserved_identity",
+        "editing::tests::dates_and_nullable_values_change_only_when_explicitly_edited",
+        "editing::tests::checkup_edit_reopens_the_chosen_local_day_and_preserves_unchanged_timestamps",
+        "editing::tests::ambiguous_checkup_edits_are_rejected_but_known_original_instants_are_preserved",
+        "documents::tests::remote_metadata_cannot_supply_a_download_path",
+        "editing::tests::decrypted_and_live_record_is_required_before_constructing_any_update",
+        "editing::tests::title_edit_preserves_rich_body_setting_and_recorded_time_exactly",
+        "navigation::tests::every_product_area_has_a_distinct_test_identifier_and_current_route",
+        "editing::tests::moving_a_checkup_day_keeps_its_local_clock_across_a_timezone_change",
+        "navigation::tests::narrow_and_enlarged_text_reflow_without_hiding_navigation",
+        "navigation::tests::worklist_navigation_uses_visible_order_and_focused_row_before_old_selection",
+        "editing::tests::qualified_observation_results_and_reference_text_survive_unrelated_edits",
+        "navigation::tests::worklist_navigation_stops_at_both_edges_and_accepts_an_empty_result",
+        "patient_forms::tests::changing_a_name_emits_only_that_field_and_never_reserializes_notes",
+        "patient_forms::tests::creation_keeps_missing_dates_missing_and_rejects_invalid_calendar_days",
+        "references::tests::copies_preserve_source_labels_and_distinguish_false_from_missing",
+        "shell::tests::acknowledged_creation_never_becomes_resendable_when_reread_fails",
+        "references::tests::only_systems_implemented_by_this_search_contract_are_offered",
+        "patient_forms::tests::clearing_a_field_differs_from_omitting_it_and_locked_fields_are_preserved",
+        "shell::tests::agenda_groups_use_recorded_status_and_calendar_date_without_inventing_a_due_date",
+        "shell::tests::current_interface_links_cannot_inject_paths_queries_or_fragments",
+        "shell::tests::calendar_intervals_include_whole_local_days_and_preserve_unbounded_ends",
+        "shell::tests::clinical_dates_reject_invalid_days_without_normalizing_into_another_month",
+        "shell::tests::calendar_intervals_reject_invalid_or_reversed_dates_before_a_read",
+        "shell::tests::existing_timestamp_appointments_retain_their_instant_and_local_display",
+        "shell::tests::new_checkups_keep_the_chosen_local_day_time_and_agenda_membership",
+        "shell::tests::new_checkups_require_an_explicit_valid_unambiguous_local_time_before_review_or_write",
+        "shell::tests::new_observation_preserves_qualified_strings_and_decimal_punctuation",
+        "shell::tests::unreadable_diagnoses_are_distinct_from_an_empty_problem_list",
+        "documents::tests::a_copy_never_overwrites_an_existing_file_and_round_trips_exact_bytes",
+        "text_input::tests::caret_reveal_keeps_visible_lines_still_and_scrolls_large_lines_within_content",
+        "shell::tests::new_entry_is_a_separate_action_and_lock_stays_available_inside_inputs",
+        "shell::tests::worklist_keymap_does_not_capture_other_views_or_modified_characters",
+        "shell::tests::worklist_keymap_keeps_characters_and_arrows_in_every_text_input",
+        "tests::launch_does_not_treat_demo_as_a_connected_archive_or_accept_secret_flags",
+        "text_input::tests::committing_identical_preedit_leaves_the_next_character_after_it",
+        "text_input::tests::malformed_offsets_never_slice_inside_a_character",
+        "text_input::tests::ime_highlights_are_disjoint_and_keep_both_styles_in_the_intersection",
+        "text_input::tests::platform_offsets_preserve_italian_and_surrogate_boundaries",
+        "text_input::tests::password_caret_maps_display_bullets_to_unicode_input_without_exposing_text",
+        "text_input::tests::native_surrounding_text_never_exports_passwords_or_stale_ranges",
+        "shell::tests::focus_recovery_preserves_surviving_editors_and_window_deactivation",
+        "shell::tests::disappearing_controls_restore_the_real_workspace_keyboard_dispatch"
+      ],
+      "log": "/tmp/mediflow-r08ef12a/gpui-blocker-tests.log",
+      "sha256": "6a330d16ebf2dccda013afa93cb70e1e1fa9a3081633a3d30a6b974a976e08c4"
+    },
+    "clippy": {
+      "command": "cargo clippy --offline --locked -p mediflow-gpui-patient-pilot --all-targets -- -D warnings",
+      "result": "PASS",
+      "log": "/tmp/mediflow-r08ef12a/gpui-blocker-clippy.log",
+      "sha256": "789b81876a7f26d2678212fad2358e13f770833da814b57b463ca9a54894ab57"
+    },
+    "format": {
+      "command": "cargo fmt -p mediflow-gpui-patient-pilot -- --check",
+      "result": "PASS"
+    },
+    "toolchain": {
+      "rust": "1.98.1",
+      "cargoHome": "/tmp/mediflow-recovery-cargo",
+      "rustupHome": "/tmp/mediflow-recovery-rustup",
+      "target": "/tmp/mediflow-recovery-keyboard-target"
+    },
+    "dependencies": {
+      "receipt": "/tmp/mediflow-r08ef12a/gpui-blocker-dependency-review.json",
+      "oldPackageCount": 688,
+      "newPackageCount": 708,
+      "allExistingPackageIdentitiesAndChecksumsPreserved": true,
+      "productionManifestDependenciesPreserved": true,
+      "newPackagesForDevSupport": 20
+    },
+    "behavior": {
+      "focus": "Pinned GPUI on_focus_lost restores root after a removed focus path; surviving editor and window deactivation retain focus; no polling callbacks.",
+      "checkups": "Explicit initially empty local time, local create/edit/display/group/filter semantics, full-second inputs only, DST gaps/folds rejected before write, no schema/mapper or readback weakening. Unchanged original timestamp bytes preserved.",
+      "otherDateFields": "Entry/Therapy/Observation existing date-only create/edit helpers preserved."
+    },
+    "limits": [
+      "These are app-scoped synthetic tests, not installed native OS/clinical qualification.",
+      "The two GPUI tests render real ClinicalApp on GPUI TestAppContext with a conditional login field removal and editor survival; they do not execute all seven connected-session sequences or a network save. The uniform remedy for those transitions is established by the separate source review.",
+      "No RuntimeSession, real archive, HTTP request, external mutation or image was used by app tests. Only open-source test dependencies were fetched.",
+      "Parent agent owns transport/server changes in the same worktree; these results do not certify those ongoing changes. Published-head CI and independent final review remain required."
+    ]
+  },
+  "gpuiOriginalReceiptSha256": "cbb563ee933ddb995b110dd49397fde05f0f744bfa613d558538aa48aadeeb25",
+  "subreaper": {
+    "schemaVersion": 1,
+    "runId": "r08ef12a",
+    "command": [
+      "node",
+      "scripts/run-strip-types.mjs",
+      "--test",
+      "--test-reporter=tap",
+      "--test-concurrency=1",
+      "lib/network-request-scope.test.ts",
+      "lib/network-identity.test.ts",
+      "lib/network-contract.test.ts",
+      "lib/network-patient-commit-authority.test.ts"
+    ],
+    "startedAt": "2026-10-18T07:24:50.949757+00:00",
+    "finishedAt": "2026-10-18T07:24:54.196978+00:00",
+    "commandExitCode": 0,
+    "signalsSentByWrapper": 0,
+    "reapedAdoptedChildren": [],
+    "hasRemainingOwnedChildren": false
+  },
+  "combinedLog": {
+    "path": "experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-local.log",
+    "bytes": 37542,
+    "sha256": "5dd9e71c3d4a38ecc90ab2a85e95a9f4cf56f729120ab5403b543bc94bee7126",
+    "sections": [
+      {
+        "section": "scope-final-unit",
+        "bytes": 23735,
+        "sha256": "b3dff8237c532b1b95d82f1a1fa80223f26d6dc092e5dff60d2748f43f7c3575"
+      },
+      {
+        "section": "scope-final-tombstone-static",
+        "bytes": 1473,
+        "sha256": "f45570ea14433d7c7c94b5716b7c202074d2bfde389199daba6b4c05f29530c9"
+      },
+      {
+        "section": "scope-final-openapi-selftest",
+        "bytes": 1873,
+        "sha256": "ec17ff1d5407b401fdc6a320bbf47458880b8975b52cd1d690dc3d58c1564d02"
+      },
+      {
+        "section": "scope-final-openapi-verified",
+        "bytes": 31,
+        "sha256": "7f0815b325bd7532f6e7ad9f78ccd71e05bc2a5ef3bda0114e6aefa177174f39"
+      },
+      {
+        "section": "scope-final-typecheck",
+        "bytes": 180,
+        "sha256": "579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f"
+      },
+      {
+        "section": "scope-final-lint",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "section": "scope-rust-tests",
+        "bytes": 3316,
+        "sha256": "1ac64a7720ac7ef2b7829e7cefed5e14b52ad23bcb2bb764e669b9d7bdee1879"
+      },
+      {
+        "section": "gpui-blocker-tests",
+        "bytes": 5523,
+        "sha256": "6a330d16ebf2dccda013afa93cb70e1e1fa9a3081633a3d30a6b974a976e08c4"
+      },
+      {
+        "section": "gpui-blocker-clippy",
+        "bytes": 174,
+        "sha256": "789b81876a7f26d2678212fad2358e13f770833da814b57b463ca9a54894ab57"
+      }
+    ]
+  },
+  "excludedAttempts": [
+    {
+      "attempt": "scope-fix-unit-sandbox-interrupted",
+      "qualifying": false,
+      "reason": "Restricted sandbox did not execute Node child tests correctly; interrupted, not positive evidence.",
+      "logSha256": "644ec3d4d46eae50b57127a9bffff936dab4228d1cc4aa3be5022e50b073607c"
+    },
+    {
+      "attempt": "scope-rust-tests-sandbox-unavailable",
+      "qualifying": false,
+      "reason": "Restricted sandbox denied existing loopback mock listeners; not a valid runtime verdict.",
+      "logSha256": "a5c99fd62525a5a0f0587b2a7a42c4f14abd31ad57bda0f4bee08f39f17a8b8e"
+    },
+    {
+      "attempt": "scope-final-openapi",
+      "qualifying": false,
+      "reason": "Actual old parameter guard rejected the optional header. Corrected semantically and rerun with 13 additional negative/additive cases; no policy override.",
+      "logSha256": "30badbafb3eee7c428fe40b970e760102f3870e96cbf87964fd633c6b3424a7b"
+    }
+  ],
+  "limits": [
+    "Scope tests invoke existing Request/unit fixtures and direct writer authority; no execution of the blocked actual-route temporal reproducer is claimed. That agent-turn automatic content block was not retried.",
+    "GPUI uses real ClinicalApp with synthetic TestAppContext; connected-session transitions and pending network saves are source-reviewed, not all separately executed.",
+    "Whole-second Checkup persistence is enforced before new or temporal writes; unchanged timestamps retain original bytes. No storage, readback or contract-policy expectations were relaxed.",
+    "Historical screenshots, HTTP comparisons, Mac qualification and compiler receipts retain their own source identities. No new screenshot is published.",
+    "The independent full-PR review, final published CI and ordinary protected merge are separate required dispositions. ADR0145 remains Proposed; optional Swift writer, clinical/installed/mobile/full-parity and reserved GO criteria remain open."
+  ],
+  "workspaceFormatCheck": {
+    "command": [
+      "cargo",
+      "fmt",
+      "--manifest-path",
+      "experiments/gpui-patient-pilot/Cargo.toml",
+      "-p",
+      "mediflow-gpui-patient-pilot",
+      "-p",
+      "mediflow-runtime-client",
+      "-p",
+      "mediflow-patient-client",
+      "--",
+      "--check"
+    ],
+    "exitCode": 0,
+    "outputBytes": 0,
+    "author": "/root",
+    "note": "Explicit package arguments are required for this reproduction from the repository root; initial command without packages returned Failed to find targets and was not a formatting result."
+  }
+}

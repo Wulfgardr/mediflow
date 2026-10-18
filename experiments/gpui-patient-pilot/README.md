@@ -28,13 +28,23 @@ Omettere `--server` lascia il campo indirizzo vuoto. L'opzione precompila
 soltanto l'indirizzo: non autentica, non sceglie un archivio locale e non
 riceve passphrase o token dalla riga di comando.
 
-Occorrono un servizio candidato con protocollo network **1.12 o successivo
-nella serie 1.x**, un account con sblocco **v3** e un abbinamento ordinario del
+Occorrono un servizio candidato con protocollo network **1.13 o successivo
+nella serie 1.x**, che dichiari `scope.requestBinding: expected-ambulatory-id-v1`
+nell'identità, un account con sblocco **v3** e un abbinamento ordinario del
 dispositivo con le capability dei percorsi desiderati. Le piattaforme sono
 esplicite: `macos`, `windows`, `linux`; i valori Apple già ammessi restano
 `ios` e `ipados`. La release 0.9.0 con sblocco precedente non è un host
 compatibile per questo accesso nativo v3. Il confronto con quella release
 è una prova distinta di lettura tramite il suo client Web.
+
+Ogni richiesta con un ambulatorio selezionato porta anche
+`x-mediflow-expected-ambulatory-id`, codificato come il relativo cookie.
+Il servizio confronta questa asserzione con lo scope che ha già risolto;
+non la usa per concedere o scegliere uno scope. Uno scope scomparso o
+incoerente riceve `403` anche se esiste un ambulatorio predefinito.
+Un host privo del supporto dichiarato viene rifiutato prima della richiesta
+clinica. L'identità preliminare resta un controllo di compatibilità e
+dell'operatore, non una prova atomica del successivo commit.
 
 1. Inserire indirizzo, identificativo e codice di abbinamento. L'impronta
    SHA-256 del certificato è facoltativa e va usata soltanto se si conosce

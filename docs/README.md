@@ -90,6 +90,9 @@ e tsc-ts, includendo driver, ricevuta e limiti dell'eventuale adozione.
 La [consegna verificabile di PR #558, r08ef12a](./analysis/2026-10-18-pr558-soft-delete-delivery.md)
 documenta il guard dei tombstone attraverso route, porta e writer, le prove
 locali sul candidato e il passaggio di consegne per la successiva verticale.
+La [chiusura dei rilievi della review completa](./analysis/2026-10-18-pr558-full-review-repairs.md)
+documenta scope su ogni richiesta, data/ora dei controlli, recupero del focus,
+contratto compatibile e prove locali, distinguendoli dalla CI finale e dal merge.
 
 ## Percorsi di lettura
 

@@ -284,6 +284,13 @@ impl RuntimeClient {
         );
         headers.insert("cache-control", HeaderValue::from_static("no-store"));
         headers.insert("accept", HeaderValue::from_static("application/json"));
+        if let Some(scope) = scope {
+            validate_scope_id(scope)?;
+            headers.insert(
+                "x-mediflow-expected-ambulatory-id",
+                sensitive_header(&encode_cookie_value(scope))?,
+            );
+        }
         if let Some(cookie) = cookie {
             let cookie = cookie_header(cookie, scope)?;
             headers.insert(COOKIE, sensitive_header(&cookie)?);
