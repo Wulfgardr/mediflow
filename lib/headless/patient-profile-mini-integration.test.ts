@@ -21,7 +21,7 @@ async function fixture(options: Options = {}) {
   const now = Date.now();
   const context = { status: 'available', userRef: 'user.synthetic.profile.0001', parentRef: 'parent.synthetic.profile.0001',
     purposeCode: 'care_coordination', patientId: 'synthetic-internal-patient', ambulatoryId: 'synthetic-internal-ambulatory',
-    generation: 1, revocationGeneration: 0, selectionEpoch: 2, restartGeneration: 1, parentGeneration: 1,
+    generation: 1, revocationGeneration: 0, selectionEpoch: 37, restartGeneration: 1, parentGeneration: 1,
     policyGeneration: 1, bootstrapExpiresAt: now + 5000, expiresAt: now + 60000 };
   let sequence = 0, queryCount = 0, child: ChildProcess | undefined;
   const audits: Array<Record<string, unknown>> = [], requests: ProfileQuery[] = [];
@@ -41,7 +41,7 @@ async function fixture(options: Options = {}) {
       queryCount++; requests.push(frame.input); complete(null);
       const result: ProfileResult = { schemaVersion: 'mediflow.patient.profile-view.v1', operationId: OPERATION,
         contractVersion: 1, handle: HANDLE, projection: frame.input.projection, currentness: { revision: 3,
-          selectionEpoch: 2, observedAt: now, expiresAt: now + 30000 }, profile: frame.input.projection === 'notes' ? { notes: 'Synthetic bounded notes' } : {
+          selectionEpoch: context.selectionEpoch, observedAt: now, expiresAt: now + 30000 }, profile: frame.input.projection === 'notes' ? { notes: 'Synthetic bounded notes' } : {
             firstName: 'Synthetic', lastName: 'Patient', taxCode: 'SYNTHETIC-CODE', birthDate: null, address: null,
             phone: null, caregiver: null, diagnoses: null, exemptions: null, notes: 'Synthetic bounded notes',
             isAdi: false, isArchived: false, statusReason: null, archiveReason: null, archiveNote: null } } as ProfileResult;
@@ -63,7 +63,34 @@ async function fixture(options: Options = {}) {
     },
     commitTerminalAudit: () => { throw new Error('semantic planner must not run'); },
     readHostContext: () => ({ ...context }),
-    createOpenLoopsRead: () => { throw new Error('mirror read must not run'); },
+    createOpenLoopsRead: (value: unknown) => {
+      const sources = value as { current(): unknown; beginPermit(permit: unknown, current: unknown, claim: unknown): object;
+        resolveHostScope(execution: object): { selectionEpoch: number; scopeDigest: string; generation: number; revocationGeneration: number };
+        bindPermit(execution: object, binding: unknown, current: unknown, claim: unknown): object;
+        finalizeBoundPermit(execution: object, binding: unknown, current: unknown, claim: unknown): unknown;
+        denyPermit(execution: object): unknown };
+      const canonical = <T extends object>(v: T) => Object.freeze(Object.assign(Object.create(null), v));
+      return { service: { cancel: () => undefined, dispose: () => undefined,
+        read: async (permit: unknown) => {
+          const operation = 'mediflow.patient.open_loops.read.v1';
+          const claim = canonical({ operation, capabilityId: operation });
+          const execution = sources.beginPermit(permit, sources.current(), claim);
+          try {
+            const scope = sources.resolveHostScope(execution);
+            const binding = canonical({ scopeDigest: scope.scopeDigest, generation: scope.generation,
+              revocationGeneration: scope.revocationGeneration, selectionEpoch: scope.selectionEpoch });
+            const bound = sources.bindPermit(execution, binding, sources.current(), claim);
+            sources.finalizeBoundPermit(bound, binding, sources.current(), claim);
+            return canonical({ schemaVersion: 'mediflow.patient.open_loops.read.result.v1', operationId: operation,
+              capabilityId: operation, outcome: 'read', items: Object.freeze([]), truncated: false, snapshotRevision: 3,
+              receipt: canonical({ schemaVersion: 'mediflow.patient.open_loops.read.receipt.v1',
+                receiptRef: `aipr_${'c'.repeat(64)}`, operationId: operation, capabilityId: operation, outcome: 'read',
+                ownerRefHash: `sha256:${'d'.repeat(64)}`, leaseRefHash: `sha256:${'e'.repeat(64)}`, receiptRefHash: `sha256:${'f'.repeat(64)}`,
+                generation: scope.generation, revocationGeneration: scope.revocationGeneration, selectionEpoch: scope.selectionEpoch,
+                snapshotRevision: 3, itemCount: 0, truncated: false, timestamp: now }) });
+          } catch (error) { sources.denyPermit(execution); throw error; }
+        } } };
+    },
     previewCheckupStatus: async () => { throw new Error('checkup must not run'); },
     ...(options.admitted === false ? {} : { patientProfileQueries: { projection: options.projection ?? 'notes', executeProfileQuery: profile.executeProfileQuery } }),
     spawnChild: (environment: Readonly<Record<string, string>>) => {
@@ -121,18 +148,25 @@ async function fixture(options: Options = {}) {
     const exited = child!.exitCode !== null || child!.signalCode !== null ? Promise.resolve() : once(child!, 'exit');
     session.close(); profile.close(); await exited;
   };
-  return { request, close, audits, requests, replayResult, queryCount: () => queryCount, stderr: () => stderr };
+  const readSelectionEpoch = async () => {
+    const result = await request('open-loops', {});
+    assert.equal(result.ok, true);
+    const epoch = (result.result?.receipt as { selectionEpoch: number }).selectionEpoch;
+    assert.ok(Number.isSafeInteger(epoch)); return epoch;
+  };
+  return { request, close, audits, requests, replayResult, readSelectionEpoch, queryCount: () => queryCount, stderr: () => stderr };
 }
 
 test('real Mini opens then rereads an admitted notes handle through authenticated RPC and correlated Web port without MCP/providers', async () => {
   const current = await fixture();
   try {
-    const first = await current.request('profile-read', open);
+    const expectedSelectionEpoch = await current.readSelectionEpoch();
+    const first = await current.request('profile-read', { ...open, expectedSelectionEpoch });
     assert.equal(first.ok, true, JSON.stringify(first));
     assert.equal(first.result?.handle, HANDLE);
     assert.deepEqual(first.result?.profile, { notes: 'Synthetic bounded notes' });
     const second = await current.request('profile-read', { kind: 'read', contractVersion: 1, projection: 'notes',
-      handle: HANDLE, expectedRevision: 3 });
+      handle: first.result!.handle, expectedRevision: (first.result!.currentness as { revision: number }).revision });
     assert.equal(second.ok, true, JSON.stringify(second)); assert.equal(second.result?.handle, HANDLE);
     assert.equal(current.queryCount(), 2);
     const authorization = current.audits.filter(a => a.operation === OPERATION);
@@ -148,7 +182,7 @@ test('an existing open-loops connection does not automatically receive the profi
     const catalog = await current.request('capabilities', {});
     assert.equal(catalog.ok, true);
     assert.equal(JSON.stringify(catalog).includes(OPERATION), false);
-    assert.equal((await current.request('profile-read', open)).ok, false);
+    assert.equal((await current.request('profile-read', { ...open, expectedSelectionEpoch: await current.readSelectionEpoch() })).ok, false);
     assert.equal(current.queryCount(), 0);
     assert.equal(current.audits.some(a => a.operation === OPERATION), false);
   } finally { await current.close(); }
@@ -158,7 +192,9 @@ test('audit failure and projection escalation deny before the query, scope drift
   for (const mode of ['audit', 'projection', 'drift'] as const) {
     const current = await fixture({ auditFails: mode === 'audit', drift: mode === 'drift' });
     try {
-      const result = await current.request('profile-read', mode === 'projection' ? { ...open, projection: 'profile' } : open);
+      const expectedSelectionEpoch = await current.readSelectionEpoch();
+      const result = await current.request('profile-read', { ...open, expectedSelectionEpoch,
+        ...(mode === 'projection' ? { projection: 'profile' } : {}) });
       assert.equal(result.ok, false, mode);
       assert.equal(current.queryCount(), mode === 'drift' ? 1 : 0, mode);
     } finally { await current.close(); }
@@ -168,11 +204,12 @@ test('audit failure and projection escalation deny before the query, scope drift
 test('real Mini can read the fifteen-field profile and narrow its admitted projection to notes', async () => {
   const current = await fixture({ projection: 'profile' });
   try {
-    const full = await current.request('profile-read', { ...open, projection: 'profile' });
+    const expectedSelectionEpoch = await current.readSelectionEpoch();
+    const full = await current.request('profile-read', { ...open, projection: 'profile', expectedSelectionEpoch });
     assert.equal(full.ok, true);
     assert.equal(Object.keys(full.result?.profile as object).length, 15);
     assert.equal((full.result?.profile as { firstName: string }).firstName, 'Synthetic');
-    const narrowed = await current.request('profile-read', open);
+    const narrowed = await current.request('profile-read', { ...open, expectedSelectionEpoch });
     assert.equal(narrowed.ok, true);
     assert.deepEqual(narrowed.result?.profile, { notes: 'Synthetic bounded notes' });
   } finally { await current.close(); }
@@ -181,7 +218,7 @@ test('real Mini can read the fifteen-field profile and narrow its admitted proje
 test('replays the actual Mini RPC requestId and denies it without a second query or authorization audit', async () => {
   const current = await fixture({ replay: true });
   try {
-    assert.equal((await current.request('profile-read', open)).ok, true);
+    assert.equal((await current.request('profile-read', { ...open, expectedSelectionEpoch: await current.readSelectionEpoch() })).ok, true);
     const replay = await current.replayResult as { outcome: string; denialCode: string };
     assert.equal(replay.outcome, 'denied'); assert.equal(replay.denialCode, 'request_conflict');
     assert.equal(current.queryCount(), 1);
