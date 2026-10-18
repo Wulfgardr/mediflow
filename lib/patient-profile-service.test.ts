@@ -26,6 +26,7 @@ const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 process.env.MEDIFLOW_LOCAL_API_TOKEN = 'profile-synthetic-local-token';
 const { readPatientProfile: admittedRead, updatePatientProfile } = load('./patient-profile-service.ts') as typeof import('./patient-profile-service');
 const sql = dbServer.$client;
+const { updatePatientOperation } = load('./patient-update-operation.ts') as typeof import('./patient-update-operation');
 const webRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');
 const v1Route = load('../app/api/v1/patients/[id]/route.ts') as typeof import('../app/api/v1/patients/[id]/route');
 const networkRoute = load('../app/api/v1/network/patients/[id]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/route');
@@ -140,7 +141,7 @@ test('archived profiles remain readable while scope mismatch and tombstones stay
     assert.equal(await readPatientProfile({ patientId, projection: 'network', scopeAmbulatoryId: 'profile-a' }), null);
 });
 
-test('body cannot spoof host patient, scope, expected version, actor, role, audit or receipt', async () => {
+test('body cannot spoof host patient, scope, expected version, operation contract, actor, role, audit or receipt', async () => {
     reset();
     const before = snapshot();
     const body = {
@@ -149,6 +150,7 @@ test('body cannot spoof host patient, scope, expected version, actor, role, audi
         actorRef: 'forged-actor', actorType: 'system', role: 'admin',
         sourceSurface: 'job', audit: { actorRef: 'forged-audit' },
         receipt: { success: true, idempotencyKey: 'forged-receipt' },
+        operationId: 'patient-profile.read.v1', contractVersion: 999,
     };
     const result = await updatePatientProfile({ patientId, expectedVersion: 4, audit }, body);
     assert.equal(result.status, 200);
@@ -176,6 +178,30 @@ test('body cannot spoof host patient, scope, expected version, actor, role, audi
     const retry = await updatePatientProfile({ patientId, expectedVersion: 4, audit }, body);
     assert.equal(retry.status, 409);
     assert.deepEqual(snapshot(), after);
+});
+
+test('unknown update operation identity or contract version is rejected before transactions, commit guards and database effects', (t) => {
+    const transaction = t.mock.method(dbServer, 'transaction');
+    for (const contract of [
+        {},
+        { operationId: 'patient-profile.read.v1', contractVersion: 1 },
+        { operationId: 'patient-profile.update.v1', contractVersion: 2 },
+    ]) {
+        reset();
+        const before = snapshot();
+        let guardCalls = 0, auditReads = 0;
+        const input = {
+            ...contract, patientId, expectedVersion: 4, values: { notes: 'ENC:YWJj:bmV3' },
+            setPrimaryAmbulatory: false,
+            authorizeCommit: () => { guardCalls += 1; },
+            get audit() { auditReads += 1; return audit(); },
+        } as unknown as Parameters<typeof updatePatientOperation>[0];
+        assert.throws(() => updatePatientOperation(input), /Unsupported patient profile update operation/);
+        assert.equal(transaction.mock.callCount(), 0);
+        assert.equal(guardCalls, 0);
+        assert.equal(auditReads, 0);
+        assert.deepEqual(snapshot(), before);
+    }
 });
 
 test('unscoped profile preserves omitted notes, explicit null and empty string semantics', async () => {

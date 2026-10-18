@@ -13,6 +13,7 @@ import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server'
 import { getNetworkModeGateResponse, resolveNetworkScope, requireNetworkCapabilityContext } from '@/lib/network-write-context';
 import { NETWORK_FSE_VALIDATE_CAPABILITY } from './network-contract';
 import { PATIENT_PROFILE_READ_OPERATION, type PatientProfileActor, type PatientProfileQuery, type PatientProfileView } from './patient-profile-query';
+import { PATIENT_PROFILE_UPDATE_OPERATION } from './patient-profile-update-contract';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 import type { RequiredAuditContext } from './security/audit';
 
@@ -162,6 +163,8 @@ export async function updatePatientProfile(
     // No await between resolving host audit identity and the synchronous commit.
     // The existing operation owns the one SQLite transaction, CAS and audit.
     return updatePatientOperation({
+        operationId: PATIENT_PROFILE_UPDATE_OPERATION.id,
+        contractVersion: PATIENT_PROFILE_UPDATE_OPERATION.version,
         patientId: context.patientId,
         expectedVersion: context.expectedVersion,
         values: normalized.values,
