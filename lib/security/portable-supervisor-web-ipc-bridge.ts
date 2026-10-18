@@ -3,6 +3,7 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import type { ProfileProjection } from '../patient-profile-scoped-contract';
+import { decodePatientProfileQueryIpcFrameV1 } from '../../packages/aip/src/patient-profile-query-ipc.ts';
 
 import {
     decodePortableSupervisorWebIpcFrameV1,
@@ -128,7 +129,11 @@ export function createPortableSupervisorWebIpcBridgeV1(sources: Sources): Readon
                 }
                 let response: PortableSupervisorWebIpcFrameV1;
                 try { response = decodePortableSupervisorWebIpcFrameV1(message); }
-                catch { finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return; }
+                catch {
+                    try { if (decodePatientProfileQueryIpcFrameV1(message).type === 'query') return; }
+                    catch { /* Unknown or malformed frames remain terminal below. */ }
+                    finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return;
+                }
                 if (response.requestRef !== expectedRequest) return;
                 if (response.method !== 'ack') {
                     finish(new PortableSupervisorWebIpcBridgeV1Error('protocol_invalid'), null, true); return;

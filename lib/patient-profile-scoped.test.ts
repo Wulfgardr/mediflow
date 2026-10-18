@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -275,4 +276,11 @@ for (const transition of ['lock', 'role'] as const) test(`dispatcher withholds a
     await pending; const response = decodePatientProfileQueryIpcFrameV1(frames[0]);
     assert.equal(Reflect.get(response, 'outcome'), 'denied'); assert.equal(Reflect.get(response, 'result'), undefined);
     port.dispose();
+});
+
+test('MCP contracts import directly in Node strip-only mode without a transform loader', () => {
+    const moduleUrl = new URL('../packages/mcp/src/contracts.ts', import.meta.url).href;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `await import(${JSON.stringify(moduleUrl)})`],
+        { encoding: 'utf8', timeout: 10_000, env: { ...process.env, NODE_OPTIONS: '' } });
+    assert.equal(result.status, 0, result.stderr || result.error?.message);
 });
