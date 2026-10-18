@@ -314,3 +314,17 @@ e nell'host. Non sono dedotti da una snapshot positiva. Questo harness non
 esegue l'interfaccia, né qualifica IME, accessibilità, stampa, periferiche,
 durabilità, distribuzione o tutte le funzioni cliniche. Le build native sulle
 tre piattaforme e le prove UI restano evidenze separate.
+
+## Lettura scoped Rust del profilo
+
+Il probe Rust apre il profilo con `patient-profile.read.v1`; il suo DTO esclude
+`ambulatoryId`. La selezione locale, il preflight dell'identità e l'header di
+scope già validato dalla sessione ammettono la lettura. Il probe rifiuta inoltre
+il riuso del contesto con un altro scope o paziente. Identità selezionata, CF,
+versione, stato e tutti i sette campi di dominio restano verificati; nessun ID
+interno viene ricostruito nella risposta per soddisfare il confronto.
+
+Il riferimento JavaScript conserva il GET compatibile. Il confronto misura la
+parità dei campi e gli stessi esiti di scrittura, senza attribuire equivalenza
+alle chiamate o ai controlli di autorizzazione dei due percorsi. I tempi restano
+osservazioni diagnostiche e non dimostrano un vantaggio prestazionale di Rust.

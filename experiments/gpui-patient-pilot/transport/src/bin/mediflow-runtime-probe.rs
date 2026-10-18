@@ -409,7 +409,6 @@ fn canonical_hash(value: &Value) -> Result<String, ProbeError> {
 
 fn profile_projection(
     row: &PatientDetail,
-    config: &ProbeConfig,
     id: &str,
     tax_code: &str,
     version: u64,
@@ -419,7 +418,7 @@ fn profile_projection(
     unlocked(&row.locked_fields, phase)?;
     if row.id != id
         || row.tax_code != tax_code
-        || row.ambulatory_id.as_deref() != Some(&config.scope)
+        || row.ambulatory_id.is_some()
         || row.version != version
         || row.is_archived
         || row.deleted_at.is_some()
@@ -504,7 +503,21 @@ fn patient_profile_writes(
     let read = |active: &RuntimeSession, version, expected: &Value| {
         let row = open_profile(active, scope, &created.id)
             .map_err(|e| runtime_error("profile-readback", e))?;
-        profile_projection(&row, config, &created.id, tax_code, version, expected)
+        // The scoped view deliberately omits ambulatoryId. Admission is instead
+        // established by open_profile's selected target and bound HTTP scope.
+        let intent = active.profile_query_intent();
+        for (foreign_scope, foreign_patient) in [
+            (scope.as_str(), "synthetic-unselected-patient"),
+            ("synthetic-unselected-scope", created.id.as_str()),
+        ] {
+            if !matches!(
+                active.read_patient_profile(foreign_scope, foreign_patient, &intent),
+                Err(RuntimeError::ReadRequired)
+            ) {
+                return Err(fail("profile-readback", "foreign-selection-admitted"));
+            }
+        }
+        profile_projection(&row, &created.id, tax_code, version, expected)
     };
     let before = read(session, 1, initial_expected)?;
     let stale = login(client, config)?;
@@ -932,6 +945,59 @@ fn main() -> ExitCode {
                 json!({"schemaVersion":1, "protocolId":null, "client":"rust", "result":"fail", "phase":error.phase, "reason":error.reason, "status":error.status})
             );
             ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scoped_profile_projection_uses_domain_fields_without_internal_ambulatory_id() {
+        let fixture: Value = serde_json::from_slice(PROFILE_FIXTURE).unwrap();
+        let mut value = fixture["create"].clone();
+        value["id"] = json!("synthetic-selected-patient");
+        value["taxCode"] = json!("SYNPROFILERS0001");
+        value["version"] = json!(1);
+        let row: PatientDetail = serde_json::from_value(value.clone()).unwrap();
+        assert!(row.ambulatory_id.is_none());
+        assert!(
+            profile_projection(
+                &row,
+                "synthetic-selected-patient",
+                "SYNPROFILERS0001",
+                1,
+                &fixture["create"]
+            )
+            .is_ok()
+        );
+        for changed in [
+            "id",
+            "taxCode",
+            "version",
+            "isArchived",
+            "address",
+            "ambulatoryId",
+        ] {
+            let mut invalid_value = value.clone();
+            invalid_value[changed] = match changed {
+                "version" => json!(2),
+                "isArchived" => json!(true),
+                _ => json!("synthetic-unexpected-value"),
+            };
+            let invalid: PatientDetail = serde_json::from_value(invalid_value).unwrap();
+            assert!(
+                profile_projection(
+                    &invalid,
+                    "synthetic-selected-patient",
+                    "SYNPROFILERS0001",
+                    1,
+                    &fixture["create"]
+                )
+                .is_err(),
+                "changed {changed} must remain rejected"
+            );
         }
     }
 }
