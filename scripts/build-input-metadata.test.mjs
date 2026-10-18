@@ -104,6 +104,41 @@ test('payload package alias admits only the explicit physical dependency package
   fs.symlinkSync(path.join(f.dependencyRoot, 'synthetic'), path.join(f.payloadRoot, 'node_modules/synthetic'), process.platform === 'win32' ? 'junction' : 'dir');
   withoutContentAccess(f, () => assert.equal(f.inspect().aliases.length, 1));
 });
+for (const [packageName, suffix] of [
+  ['@mediflow/web-auth-lifecycle-owner', '464f1cfdb30b8169'],
+  ['better-sqlite3', '90e2652d1716b047'], ['pm2', '5f8d1824003baeeb'],
+]) {
+  test(`Turbopack intermediate package alias admits ${packageName} before content access`, t => {
+    const f = metadataFixture(t), target = path.join(f.dependencyRoot, packageName);
+    f.put(path.join(target, 'index.js'));
+    const alias = path.join(path.dirname(f.payloadRoot), 'node_modules', `${packageName}-${suffix}`);
+    fs.mkdirSync(path.dirname(alias), { recursive: true });
+    fs.symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    withoutContentAccess(f, () => assert.equal(f.inspect().aliases.length, 1));
+    withoutContentAccess(f, () => assert.equal(assertBuildInputMetadata({ sourceRoot: f.sourceRoot,
+      payloadRoot: f.payloadRoot, allowPayloadAliases: false }).aliases.length, 1));
+  });
+}
+for (const mutation of ['outside position', 'other output', 'unhashed name', 'wrong package name',
+  'external target', 'private target', 'package subdirectory', 'final payload']) {
+  test(`Turbopack intermediate alias rejects ${mutation} before content access`, t => {
+    const f = metadataFixture(t), installed = path.join(f.dependencyRoot, 'synthetic');
+    f.put(path.join(installed, 'index.js'));
+    let target = installed, alias = path.join(path.dirname(f.payloadRoot), 'node_modules/synthetic-0123456789abcdef');
+    if (mutation === 'outside position') alias = path.join(path.dirname(f.payloadRoot), 'synthetic-0123456789abcdef');
+    if (mutation === 'other output') alias = path.join(f.sourceRoot, '.other-next/node_modules/synthetic-0123456789abcdef');
+    if (mutation === 'unhashed name') alias = path.join(path.dirname(alias), 'synthetic');
+    if (mutation === 'wrong package name') alias = path.join(path.dirname(alias), 'other-0123456789abcdef');
+    if (mutation === 'external target') { target = path.join(f.directory, 'outside'); f.put(path.join(target, 'index.js')); }
+    if (mutation === 'private target') f.put(path.join(installed, 'nested/archive.DB-WAL'));
+    if (mutation === 'package subdirectory') { target = path.join(installed, 'nested'); f.put(path.join(target, 'index.js')); }
+    if (mutation === 'final payload') alias = path.join(f.payloadRoot, 'node_modules/synthetic-0123456789abcdef');
+    fs.mkdirSync(path.dirname(alias), { recursive: true });
+    fs.symlinkSync(target, alias, process.platform === 'win32' ? 'junction' : 'dir');
+    withoutContentAccess(f, () => assert.throws(() => assertBuildInputMetadata({ sourceRoot: f.sourceRoot,
+      payloadRoot: f.payloadRoot, allowPayloadAliases: false }), /Build input metadata:/u));
+  });
+}
 test('explicit owned data root is denied even with a name outside the directory conventions', t => {
   const f = metadataFixture(t), data = path.join(f.sourceRoot, 'innocent'); fs.mkdirSync(data);
   withoutContentAccess(f, () => assert.throws(() => assertBuildInputMetadata({ sourceRoot: f.sourceRoot, protectedRoots: [data] }), /data directory/u));
