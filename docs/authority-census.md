@@ -13,6 +13,19 @@ esecuzione di test o qualifica clinica. Il [CSV delle mutazioni](./clinical-writ
 [roster](./clinical-write-roster.md) conserva significati e prove delle famiglie.
 Le fonti storiche restano storia, non una seconda mappa corrente.
 
+Il [confine degli import DB](./database-import-boundary.json) è l'unico elenco
+versionato degli archi diretti non ancora migrati: sorgente, capacità, target,
+simboli e occorrenze esatti. `node scripts/check-database-import-boundary.mjs`
+riconcilia l'AST dei sorgenti runtime TS/JS e degli entry point dichiarati; nuovi
+archi e voci obsolete falliscono, anche dentro file già ammessi. I re-export di
+handle restano accesso DB; facade HTTP, cifratura client, import di soli tipi e
+operatori Drizzle non lo sono. I loader opachi richiedono anche digest dell'intero
+file e motivo. Il controllo non esegue moduli né apre archivi e non è una sandbox
+per JavaScript ostile. L'inventario classifica separatamente gli store Swift
+sperimentali e i client Rust senza SQL, senza attribuire a questo guard una
+copertura sintattica nativa. Il CSV delle mutazioni conserva owner e garanzie:
+non viene duplicato nell'elenco delle dipendenze.
+
 ## Copertura e differenze
 
 La riconciliazione segue route e caller della facade fino ai writer ORM/SQL,
