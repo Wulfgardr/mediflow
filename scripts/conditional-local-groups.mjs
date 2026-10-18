@@ -61,9 +61,14 @@ export function collectConditionalLocalSelections(root) {
   }));
 }
 
-function copyTrackedWorkspace(root, target) {
-  const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
-  for (const file of tracked) {
+export function copyTrackedWorkspace(root, target) {
+  const tracked = execFileSync('git', ['ls-files', '-t', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  for (const entry of tracked) {
+    if (entry.length < 3 || entry[1] !== ' ') throw new Error('Malformed tracked workspace entry');
+    // Only Git's exact skip-worktree tag denotes intentionally unmaterialized
+    // input. Ordinary missing files and materialized symlinks still fail below.
+    if (entry[0] === 'S') continue;
+    const file = entry.slice(2);
     const source = path.join(root, file), destination = path.join(target, file);
     if (!fs.lstatSync(source).isFile()) throw new Error(`Disposable workspace requires a regular tracked file: ${file}`);
     fs.mkdirSync(path.dirname(destination), { recursive: true });

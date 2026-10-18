@@ -7,6 +7,7 @@ export const EXPLICIT_NPM_SUITES = Object.freeze([
   { script: 'test:launcher-helpers', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts' },
   { script: 'test:native-launcher', workflow: '.github/workflows/cross-platform.yml', job: 'headless-contracts', stepIf: "runner.os == 'macOS'" },
   { script: 'test:usage-dashboard', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
+  { script: 'test:database-import-boundary', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:fabric-generative-runtime-crosswalk', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:anydoc-diagnostics', workflow: '.github/workflows/e2e.yml', job: 'e2e' },
   { script: 'test:lume-tokens', workflow: '.github/workflows/web-core.yml', job: 'web-core' },

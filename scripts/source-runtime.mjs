@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory, verifyNativeBinding } from './node-runtime-contract.mjs';
 import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-payload-ledger.mjs';
 import { physicalFiles, physicalRecord } from './launch-bundled-headless-supervisor.mjs';
+import { assertBuildInputMetadata } from './build-input-metadata.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ledgerPath = web => path.join(path.dirname(web), 'runtime-payload-ledger.json');
@@ -73,6 +74,7 @@ export function materializeSourceRuntime(web, sourceRoot = ROOT, directory = web
 }
 
 export async function prepareSourceRuntime(root = ROOT) {
+  assertBuildInputMetadata({ sourceRoot: root, payloadRoot: standaloneDirectory(root), protectedRoots: [process.env.MEDIFLOW_DATA_DIR] });
   assertNodeRuntime(readNodeContract(root));
   const web = standaloneDirectory(root);
   if (fs.realpathSync(web) !== web) throw new Error('Source runtime must be physical');
@@ -97,6 +99,7 @@ export async function prepareSourceRuntime(root = ROOT) {
     [path.join(root, 'public'), path.join(web, 'public')],
     [path.join(path.dirname(web), 'static'), path.join(web, distDir, 'static')],
   ]) fs.cpSync(source, destination, { recursive: true });
+  assertBuildInputMetadata({ sourceRoot: root, payloadRoot: web, protectedRoots: [process.env.MEDIFLOW_DATA_DIR], allowPayloadAliases: false });
   const ledger = generatePayloadLedger({ sourceRoot: root, payloadRoot: web, profile: 'standalone',
     expectedRuntime: { nodeVersion: process.versions.node, nodeAbi: process.versions.modules,
       platform: process.platform, arch: process.arch } });
@@ -108,6 +111,7 @@ export async function prepareSourceRuntime(root = ROOT) {
 // Keep build identity at the build boundary, never stamp an old standalone
 // with the commit of a later preparation. Source production uses committed code.
 async function buildSourceRuntime(root = ROOT, args = []) {
+  assertBuildInputMetadata({ sourceRoot: root, payloadRoot: standaloneDirectory(root), protectedRoots: [process.env.MEDIFLOW_DATA_DIR] });
   const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   if (git(['status', '--porcelain', '--untracked-files=normal'])) throw new Error('Commit source changes before a production build');
   const revision = git(['rev-parse', 'HEAD']);
@@ -119,6 +123,7 @@ async function buildSourceRuntime(root = ROOT, args = []) {
       MEDIFLOW_APP_WORKTREE_HASH: 'clean', MEDIFLOW_APP_SOURCE_FINGERPRINT: sourceFingerprint,
       MEDIFLOW_APP_FINGERPRINT: sourceFingerprint },
   });
+  assertBuildInputMetadata({ sourceRoot: root, payloadRoot: standaloneDirectory(root), protectedRoots: [process.env.MEDIFLOW_DATA_DIR] });
   if (git(['rev-parse', 'HEAD']) !== revision || git(['status', '--porcelain', '--untracked-files=normal'])) {
     throw new Error('Source changed during build');
   }
@@ -132,8 +137,12 @@ async function buildSourceRuntime(root = ROOT, args = []) {
 // Trust comes from the reviewed source/build and its external ledger, not an
 // attacker-replaceable signature in the payload. No application imports here.
 export function verifySourceRuntime(root = ROOT) {
+  const web = standaloneDirectory(root);
+  // Reuse may run from a checkout with private data: inspect only the sealed
+  // payload, before the ledger or any payload content can be read.
+  assertBuildInputMetadata({ sourceRoot: web, payloadRoot: web, allowPayloadAliases: false });
   assertNodeRuntime(readNodeContract(root));
-  const web = standaloneDirectory(root), ledger = readJson(ledgerPath(web));
+  const ledger = readJson(ledgerPath(web));
   if (ledger.profile !== 'standalone' || ledger.closure?.buildIdentity !== 'REVISION_AND_BUILD_ID_MATCH') {
     throw new Error('Source runtime build identity is missing');
   }
