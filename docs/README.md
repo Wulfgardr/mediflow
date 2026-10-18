@@ -62,6 +62,38 @@ separa il codec sperimentale dalla futura verticale clinica e dalla scelta
 della shell. [ADR 0137](./adr/0137-rust-boundary-pilot-proposal.md) resta Proposed;
 non sostituisce i prerequisiti 0.9.0/0.9.1 né autorizza una migrazione runtime.
 
+La [verticale paziente Rust/GPUI del 17 ottobre](./analysis/2026-10-17-rust-gpui-patient-pilot.md)
+aggiunge un [pilota nativo avviabile](../experiments/gpui-patient-pilot/README.md)
+con stato del client in Rust, revisione e rilettura su dati inventati.
+La [baseline cifrata delle note](./analysis/2026-10-17-patient-notes-pilot.md)
+caratterizza separatamente i due ingressi Web/API v1 correnti per WUL-574.
+Le prove e i limiti di entrambe le attività sono nei rispettivi verbali;
+la migrazione del writer e la decisione IPC/FFI restano nel percorso
+0.9.1/0.9.2. Il successivo [ADR 0145](./adr/0145-rust-gpui-connected-client.md)
+definisce il client Rust/GPUI collegato: interfaccia coerente con la release,
+sessione paired v3, piattaforme Windows/Linux esplicite e confronto old/new.
+Il [verbale del client collegato](./analysis/2026-10-17-rust-gpui-connected-client.md)
+documenta l'integrazione reale, la matrice delle schermate, la revisione della
+UI e il confronto riproducibile JavaScript/Rust di letture e scritture.
+L'integrazione del client non equivale alla sostituzione del writer o delle
+superfici mobile.
+La [porta comune del profilo paziente](./analysis/2026-10-17-patient-profile-port.md)
+estrae lettura e preparazione dell'aggiornamento dai quattro adattatori,
+conservando il commit SQLite e l'audit nell'operazione autorevole esistente.
+Il verbale documenta le nuove prove di conformità e HTTP old/new sul delta.
+La [verifica della tastiera GPUI](./analysis/2026-10-17-rust-gpui-keyboard-recovery.md)
+registra ricerca contestuale, lista filtrata, revisione, blocco e ridimensionamento
+con una nuova build Linux e immagini originali attribuite alla loro esecuzione.
+Il [confronto dei compilatori TypeScript](./analysis/2026-10-17-tsc-ts-migration-review.md)
+misura il typecheck di uno snapshot preciso con TypeScript 5.9, TypeScript 7
+e tsc-ts, includendo driver, ricevuta e limiti dell'eventuale adozione.
+La [consegna verificabile di PR #558, r08ef12a](./analysis/2026-10-18-pr558-soft-delete-delivery.md)
+documenta il guard dei tombstone attraverso route, porta e writer, le prove
+locali sul candidato e il passaggio di consegne per la successiva verticale.
+La [chiusura dei rilievi della review completa](./analysis/2026-10-18-pr558-full-review-repairs.md)
+documenta scope su ogni richiesta, data/ora dei controlli, recupero del focus,
+contratto compatibile e prove locali, distinguendoli dalla CI finale e dal merge.
+
 ## Percorsi di lettura
 
 - **Prodotto e uso:** [Inizia qui](./start-here.md),

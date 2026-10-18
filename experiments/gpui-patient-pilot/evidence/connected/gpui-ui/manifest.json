@@ -1,0 +1,363 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "mediflow-native-ui-observations-1",
+  "result": "pass-for-declared-checks",
+  "recordedAt": "2026-10-17T18:05:12.758301+00:00",
+  "environment": {
+    "os": "Linux x86_64",
+    "display": "X11/Xvfb",
+    "renderer": "software/Mesa",
+    "fontFallback": "Noto Color Emoji",
+    "session": "D-Bus with xdg-desktop-portal-gtk for explicit native file choices",
+    "processTimezone": "Europe/Zurich (CEST at the observed dates)",
+    "data": "Owned synthetic candidate runtime; no production archive",
+    "viewports": [
+      [
+        1440,
+        960
+      ],
+      [
+        390,
+        844
+      ]
+    ]
+  },
+  "builds": [
+    {
+      "id": "presentation",
+      "appSha256": "f03e660f94b0ba329e30b305df18c997b665d6f85786f0dabfc880b9d36e731e",
+      "sourceManifest": "presentation-source-manifest.json",
+      "sourceManifestSha256": "afc29b65d89a6743e571748ec797200a95decc06bef8da7963f09a117ac64014"
+    },
+    {
+      "id": "focus",
+      "appSha256": "99ef1ca3ec75d8e9d8ac345dd4c5e79e5f2f2ba798a9cab9edec297f04e86290",
+      "sourceManifest": "focus-source-manifest.json",
+      "sourceManifestSha256": "eb5dcefc5977121570605f6ef5ba636f3755f405344ffcb71a6c21e5062b0c04"
+    },
+    {
+      "id": "clinical-layout",
+      "appSha256": "900120a6f94aab983294014ece77d90487b0651f081302a33e370d658b1307f4",
+      "sourceManifest": "source-manifest.json",
+      "sourceManifestSha256": "5d455e24077883b92d599a3f233b89bd9c9aa0d8a9fc65d6c1a196dea694c955",
+      "finalWhitespaceCleanup": {
+        "path": "experiments/gpui-patient-pilot/transport/Cargo.toml",
+        "change": "Removed one empty line at EOF; package semantics unchanged.",
+        "beforeSourceManifestSha256": "60dc6c4f4d95cfc3d6ec8804991c54138fe9fe77ff3a834cb393b0a2613dc71b",
+        "afterSourceManifestSha256": "5d455e24077883b92d599a3f233b89bd9c9aa0d8a9fc65d6c1a196dea694c955",
+        "rebuildResult": "pass",
+        "binarySha256Unchanged": true
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "agenda-compact.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 54060,
+      "sha256": "e858b09ea701d2fa36ccf9697471d7d83d1766befe7540ca804e03ef6c09265a",
+      "pixelSha256": "0f90483b164e346c939858eff6d8724afa78d2f0e5e85033b30d616349f22982",
+      "capturedAt": "2026-10-17T17:54:21.335376+00:00",
+      "build": "focus",
+      "textScalePercent": 100
+    },
+    {
+      "file": "agenda-invalid-date-compact.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 59482,
+      "sha256": "aa3ac580d22dcecbec4dd3e029826ddf3fed8296b5850b449bdf688f0d35cd92",
+      "pixelSha256": "4d25907735e4336b97bd91fd08eaa7219272914ad1b30a8400b9112b04279f7d",
+      "capturedAt": "2026-10-17T17:54:40.591657+00:00",
+      "build": "focus",
+      "textScalePercent": 100
+    },
+    {
+      "file": "agenda-search-400-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 41505,
+      "sha256": "07bafeeea9494c400dce0f2c1d1866b45a9c0b3665f8a3793e09ee267287e8af",
+      "pixelSha256": "51fadfa89dff2614c44a0af4ad5e370c24a184a3ecac53ab0ab25d4f3f5a467b",
+      "capturedAt": "2026-10-17T18:03:21.758552+00:00",
+      "build": "clinical-layout",
+      "textScalePercent": 400
+    },
+    {
+      "file": "diary-search-400-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 43998,
+      "sha256": "bfbbab3ab4388c92f481bc6953522504239160894e63052f7ef3526753aaca29",
+      "pixelSha256": "e4679065c2124bf10a1acf931cf8da6a1848f5d7121f6e9ee18dae5255ab891e",
+      "capturedAt": "2026-10-17T18:04:09.211644+00:00",
+      "build": "clinical-layout",
+      "textScalePercent": 400
+    },
+    {
+      "file": "menu-400-lock-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 37697,
+      "sha256": "dd891e8c1083cd7027ea4d75edad791355a7a2cfd7dc9bccb774084913f5fa86",
+      "pixelSha256": "49984c45a2647f27e3c71bf00fefc84e058b30408d7a0fc2a130aefa29271be3",
+      "capturedAt": "2026-10-17T17:43:35.726261+00:00",
+      "build": "presentation",
+      "textScalePercent": 400
+    },
+    {
+      "file": "menu-400-settings-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 37993,
+      "sha256": "f77aa7da1203e2a03ae8f21149316afc9740695258c44d1b4bc757e02a9b0024",
+      "pixelSha256": "088cf741fcd6479ebb64c7e2cebf5b88c558d9ba34f6ba41c4393bc06e9c9077",
+      "capturedAt": "2026-10-17T17:43:35.359958+00:00",
+      "build": "presentation",
+      "textScalePercent": 400
+    },
+    {
+      "file": "notes-draft-caret-400.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 42223,
+      "sha256": "e19ec5234657d68bfd9275c4ae3712354a15a3da9daef896dc9fffb4313764b9",
+      "pixelSha256": "8d105bfc1a7ae16a854788348cac6fe24a34673e819f5f2a517b38ff3b24e15d",
+      "capturedAt": "2026-10-17T17:47:33.928344+00:00",
+      "build": "presentation",
+      "textScalePercent": 400
+    },
+    {
+      "file": "notes-review-400.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 43286,
+      "sha256": "cabf24eb2effe08154ae6b4267c8b3baa2da5af191eae045463f43e35c171d83",
+      "pixelSha256": "f1eb3b1987fe0616113368c7ccbd0472466244b941e9cc4bd9f8b8c4a3acaead",
+      "capturedAt": "2026-10-17T17:47:48.324630+00:00",
+      "build": "presentation",
+      "textScalePercent": 400
+    },
+    {
+      "file": "notes-review-second-shortcut-400.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 43286,
+      "sha256": "cabf24eb2effe08154ae6b4267c8b3baa2da5af191eae045463f43e35c171d83",
+      "pixelSha256": "f1eb3b1987fe0616113368c7ccbd0472466244b941e9cc4bd9f8b8c4a3acaead",
+      "capturedAt": "2026-10-17T17:47:48.908642+00:00",
+      "build": "presentation",
+      "textScalePercent": 400
+    },
+    {
+      "file": "notes-verified-400-desktop.png",
+      "width": 1440,
+      "height": 960,
+      "bytes": 114137,
+      "sha256": "16c6bb1a28b39fa4dd74fa1a306b2caf64204c3a27adf27a6dbdb84738bc6406",
+      "pixelSha256": "8cf567db34c4ee1f4f7b86a0fc80e3d914a94f87570a035769dc0021fae67a8b",
+      "capturedAt": "2026-10-17T17:51:33.064254+00:00",
+      "build": "presentation",
+      "textScalePercent": 400
+    },
+    {
+      "file": "patient-list-desktop.png",
+      "width": 1440,
+      "height": 960,
+      "bytes": 84971,
+      "sha256": "d18a88ed46911284d5fceb5cf19d5cb3dfc1bece386d05d3f3e5e0affddc84f5",
+      "pixelSha256": "da2d0f742b18d21188f79adc76cb056e74e6e168cc2113a5f192d17ef42e3f61",
+      "capturedAt": "2026-10-17T17:40:35.041907+00:00",
+      "build": "presentation",
+      "textScalePercent": 100
+    },
+    {
+      "file": "patient-preview-dark-desktop.png",
+      "width": 1440,
+      "height": 960,
+      "bytes": 105733,
+      "sha256": "124199b2ccb462dac0e23974eb30c191b53d5615d31649eeb63dc8f6f35db6fa",
+      "pixelSha256": "605bd5f2b605a099c147c0a981e5b71465b5d3ab5d9f6527fe23b6c24f6bf3b8",
+      "capturedAt": "2026-10-17T17:42:53.413122+00:00",
+      "build": "presentation",
+      "textScalePercent": 100
+    },
+    {
+      "file": "patient-quadro-dark-desktop.png",
+      "width": 1440,
+      "height": 960,
+      "bytes": 137267,
+      "sha256": "c3fae185fb1e726788a207366b83243f06e38d8e667527da1715758c4a78e670",
+      "pixelSha256": "56e93b9f9e31f4f8efefaeefa6dfc335d6dff9ebc6a4cb480d29aa0616c712cc",
+      "capturedAt": "2026-10-17T17:42:54.125144+00:00",
+      "build": "presentation",
+      "textScalePercent": 100
+    },
+    {
+      "file": "patient-quadro-light-compact.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 48451,
+      "sha256": "0152869e0bd83fe989026a207988712eaa345c02f2afdded047884125fd38ba1",
+      "pixelSha256": "748ce4386d68abb59ab635a6af936015152bf2b357381d6666cb0f872e3ebb6f",
+      "capturedAt": "2026-10-17T17:41:51.431152+00:00",
+      "build": "presentation",
+      "textScalePercent": 100
+    },
+    {
+      "file": "patient-quadro-light-desktop.png",
+      "width": 1440,
+      "height": 960,
+      "bytes": 136164,
+      "sha256": "ab1e021443ca8324bd8b1106edbbfd3cb587466b5291229e536a16c90bbfd349",
+      "pixelSha256": "fd466dbb98101b0c601115210d7914ab21c1db13b3acf2e7386073867e95dfc2",
+      "capturedAt": "2026-10-17T17:41:39.510732+00:00",
+      "build": "presentation",
+      "textScalePercent": 100
+    },
+    {
+      "file": "patient-row-400-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 36932,
+      "sha256": "1a2a3053664baecd23dc87952e01a059948ffa5bd506d5663e7583989af41427",
+      "pixelSha256": "fe8f0ee398fadeaa0da636bb26eef42d1cca9f4165641d0b034f549c275dcb0b",
+      "capturedAt": "2026-10-17T17:55:47.868471+00:00",
+      "build": "focus",
+      "textScalePercent": 400
+    },
+    {
+      "file": "patient-search-400-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 37040,
+      "sha256": "13aec22a683dda9578ae03b281e5c346b76e2195133752bf7c5a75c721dedbd5",
+      "pixelSha256": "589e4ec5e333dee6aee3fd89145063437bf4b989c5c1652fde20c03cccde619a",
+      "capturedAt": "2026-10-17T17:55:13.784086+00:00",
+      "build": "focus",
+      "textScalePercent": 400
+    },
+    {
+      "file": "patient-threshold-400.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 44802,
+      "sha256": "31c9b716468147586583d32b42e19798adc5876be6e4700b303145e957ad7727",
+      "pixelSha256": "43f3184f4affb7bc611bb86f09e523cca3ec19a64b1869eb3b9fcb6fbabc8d36",
+      "capturedAt": "2026-10-17T17:55:50.228500+00:00",
+      "build": "focus",
+      "textScalePercent": 400
+    },
+    {
+      "file": "references-input-400-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 43003,
+      "sha256": "d426fc5efc2b337169bd92b938c9d7e016055d0d2ff3bf2887d18563b19858e4",
+      "pixelSha256": "ff85747b322b52e80bd9020cd37f57fb7064ae83efa16ad7eb5143bd7389b9f4",
+      "capturedAt": "2026-10-17T18:05:11.172909+00:00",
+      "build": "clinical-layout",
+      "textScalePercent": 400
+    },
+    {
+      "file": "references-search-400-focus.png",
+      "width": 390,
+      "height": 844,
+      "bytes": 45381,
+      "sha256": "833f4a3dc5e71d66556f80f0ada86c51c22e14c53e5ccb563af9e7c9468cb0fb",
+      "pixelSha256": "04dce59c172d98cf1856f67956bf8d340f70386c9e3ce188c7fbe297eb1a3b3a",
+      "capturedAt": "2026-10-17T18:04:11.403696+00:00",
+      "build": "clinical-layout",
+      "textScalePercent": 400
+    },
+    {
+      "file": "settings-grafite-desktop.png",
+      "width": 1440,
+      "height": 960,
+      "bytes": 64157,
+      "sha256": "4904962e3a935d5adaa8f6a060aaaf948952d676f4c866486dea28cf6a576909",
+      "pixelSha256": "cbc8ecc508ffc0c9ff1280db37229220556aec56c731e3408c73a00f73c47423",
+      "capturedAt": "2026-10-17T17:42:30.560454+00:00",
+      "build": "presentation",
+      "textScalePercent": 100
+    }
+  ],
+  "checks": [
+    {
+      "case": "Paired device and operator v3 login",
+      "result": "pass",
+      "build": "clinical-layout",
+      "observation": "Separate pairing and operator steps; directory read from the current synthetic host. No credential-entry screenshots retained."
+    },
+    {
+      "case": "Release visual family and clinical typography",
+      "result": "pass",
+      "build": "presentation",
+      "observation": "Patient list, preview and chart: Giorno and Grafite; actual bold/italic Newsreader and nested lists; compact single column and bottom navigation."
+    },
+    {
+      "case": "Menu wrapping and keyboard reveal at 400%",
+      "result": "pass",
+      "build": "presentation",
+      "observation": "Tab reaches Settings and Lock with full labels and visible focus inside 390 pixels."
+    },
+    {
+      "case": "Unicode multiline draft and caret at 400%",
+      "result": "pass",
+      "build": "presentation",
+      "observation": "Pasted three-line synthetic text containing accents and an emoji; Ctrl+End keeps the final caret visible in the editor."
+    },
+    {
+      "case": "Review and explicit confirmation",
+      "result": "pass",
+      "build": "presentation",
+      "observation": "First Ctrl+Enter opens review; a second Ctrl+Enter leaves the same visible review pixels. Tab followed by Enter on the explicit confirmation records once; UI reports notes registered and reread."
+    },
+    {
+      "case": "Applied calendar range and invalid draft date",
+      "result": "pass",
+      "build": "focus",
+      "observation": "Applied 2026-10-01 through 2026-10-31, inclusive local days: Elena October control remains; November controls are excluded. Invalid day 99 shows a named error while the applied range and results remain unchanged."
+    },
+    {
+      "case": "Directory search, patient row and idle threshold at 400%",
+      "result": "pass",
+      "build": "focus",
+      "observation": "Menu to Patients, Ctrl+K and typing Carlo reveal the search without a wheel action; Tab reveals the patient row. Status and Refresh occupy separate full-width rows."
+    },
+    {
+      "case": "Aggregate record header at 400%",
+      "result": "pass",
+      "build": "clinical-layout",
+      "observation": "Agenda and Global Diary search focus is visible; full patient name and complete local date/time wrap within 390 pixels."
+    },
+    {
+      "case": "Catalog input, search command and primary focus at 400%",
+      "result": "pass",
+      "build": "clinical-layout",
+      "observation": "Ctrl+K reveals the full-width input; Tab reveals the full-width Search button with a contrasting focus border. This synthetic host has an empty catalog; no positive catalog search hit is claimed."
+    }
+  ],
+  "additionalDevelopmentObservations": {
+    "scope": "Observed on development builds before the final layout build; these are not additional automated test counts or a claim that every flow was repeated on the last binary.",
+    "cases": [
+      "Create the synthetic Sara patient through eight ordinary fields, review, confirm and reread.",
+      "Create a plain diary entry with two Unicode lines through the native form.",
+      "Clear only the synthetic patient phone through a sparse profile update and reread.",
+      "Choose a synthetic text document using the native Open dialog; review, upload and verify it.",
+      "Save the document using the native Save dialog; the new file matches the selected source byte for byte."
+    ],
+    "documentRoundTrip": {
+      "bytes": 63,
+      "sha256": "084036515eb40bee0e009d289bd61dac3f935750ff9dd870c44dea391b0b3aa1"
+    }
+  },
+  "limits": [
+    "The images identify three sequential locally tested builds; they are not all attributed to the final binary.",
+    "The release screenshots use a different synthetic fixture; visual comparison is qualitative, not pixel parity.",
+    "A narrow Linux window is not a physical iPhone or Android device qualification.",
+    "No macOS or Windows window, screen reader, real IME, installer or production performance is certified here.",
+    "Automated Rust and JS checks and paired-runtime differential reports have separate receipts."
+  ]
+}

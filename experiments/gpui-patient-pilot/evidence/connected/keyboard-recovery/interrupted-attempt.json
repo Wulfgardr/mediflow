@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "result": "interrupted",
+  "synthetic": true,
+  "binarySha256": "1803dd7f91f9cd796d6dd9f1136b23456a2dcf3e07beae330dbaaa5d11ea481d",
+  "ownedDirectory": "/tmp/mediflow-transition-keyboard-recovery-BlD3Fu",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "snapshotBeforeSha256": "f29750364416db67b7eaee5180712fb482c245a3194943dde45bef21c00e1e43",
+  "snapshotAfterSha256": "691f0106abb2555ef184b4efd1f95e2c4687bc53a68e1a96d188425b3f145595",
+  "entriesBefore": 2,
+  "entriesAfter": 3,
+  "observedWrite": {
+    "method": "POST",
+    "path": "/api/v1/network/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries",
+    "status": 201,
+    "rereadStatus": 200
+  },
+  "explanation": "A capture lagged behind queued native keystrokes. Re-entering text without rechecking field focus appended to an already populated editor; subsequent Tab/Return/Space reached the normal review/confirm controls. This automation attempt is not accepted as proof of no writes or as a completed resize test. No real data was involved. The code and binary were unchanged; replay uses a fresh owned archive and verifies focus between steps.",
+  "cleanup": {
+    "at": "2026-10-17T20:35:26.055129+00:00",
+    "port43183Closed": true,
+    "x97SocketAbsent": true,
+    "retiredOwnedProcessGroups": {
+      "appPid": 15227,
+      "serverPid": 11815,
+      "xvfbPid": 14334
+    },
+    "dataRetainedPrivatelyForInterruptedAttempt": "/tmp/mediflow-transition-keyboard-recovery-BlD3Fu"
+  },
+  "requestLog": "interrupted-request.log"
+}

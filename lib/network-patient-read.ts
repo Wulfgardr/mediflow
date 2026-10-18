@@ -4,6 +4,7 @@ import { activePatients } from './patient-lifecycle';
 import { dbServer } from './db-server';
 import { patients, patientsToAmbulatories } from './schema';
 import type { PatientDetail, PatientSummary } from './api/v1/types';
+import { readPatientProfile } from './patient-profile-service';
 
 function toIsoString(value: unknown): string | null {
     if (!value) return null;
@@ -28,37 +29,6 @@ function toPatientSummary(patient: typeof patients.$inferSelect, includeDiagnose
     };
 }
 
-function toPatientDetail(patient: typeof patients.$inferSelect): PatientDetail {
-    return {
-        id: patient.id,
-        firstName: patient.firstName,
-        lastName: patient.lastName,
-        birthDate: toIsoString(patient.birthDate),
-        taxCode: patient.taxCode,
-        address: patient.address ?? null,
-        phone: patient.phone ?? null,
-        caregiver: patient.caregiver ?? null,
-        exemptions: patient.exemptions ?? null,
-        diagnoses: patient.diagnoses ?? null,
-        monitoringProfile: patient.monitoringProfile ?? null,
-        statusReason: patient.statusReason ?? null,
-        archiveReason: patient.archiveReason ?? null,
-        archiveNote: patient.archiveNote ?? null,
-        notes: patient.notes ?? null,
-        aiSummary: patient.aiSummary ?? null,
-        aiSummaryGeneratedAt: toIsoString(patient.aiSummaryGeneratedAt),
-        aiSummaryContextHash: patient.aiSummaryContextHash ?? null,
-        documentInsights: patient.documentInsights ?? null,
-        isAdi: patient.isAdi ?? null,
-        isArchived: patient.isArchived ?? null,
-        deletedAt: toIsoString(patient.deletedAt),
-        deletionReason: patient.deletionReason ?? null,
-        version: patient.version,
-        ambulatoryId: patient.ambulatoryId ?? null,
-        createdAt: toIsoString(patient.createdAt),
-        updatedAt: toIsoString(patient.updatedAt),
-    };
-}
 
 export async function listNetworkScopedPatients(
     scopeAmbulatoryId: string,
@@ -83,16 +53,5 @@ export async function getNetworkScopedPatientDetail(
     patientId: string,
     scopeAmbulatoryId: string
 ): Promise<PatientDetail | null> {
-    const row = await dbServer
-        .select({ patient: patients })
-        .from(patients)
-        .innerJoin(patientsToAmbulatories, eq(patients.id, patientsToAmbulatories.patientId))
-        .where(and(
-            eq(patients.id, patientId),
-            eq(patientsToAmbulatories.ambulatoryId, scopeAmbulatoryId),
-            activePatients(),
-        ))
-        .get();
-
-    return row ? toPatientDetail(row.patient) : null;
+    return readPatientProfile({ patientId, projection: 'network', scopeAmbulatoryId });
 }

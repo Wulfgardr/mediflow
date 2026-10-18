@@ -381,6 +381,8 @@ export type NetworkIdentityOperatorSummary = {
 /* @Codex */
 export type NetworkIdentityScopeSummary = {
     policy: 'session-context-else-node-default';
+    /** Absent on older hosts; clients must negotiate before asserting scope. */
+    requestBinding?: 'expected-ambulatory-id-v1';
     effectiveAmbulatoryId: string | null;
     effectiveAmbulatoryName: string | null;
     defaultAmbulatoryId: string | null;
@@ -586,7 +588,7 @@ export type NetworkCapabilitiesResponse = {
 /* @Codex */
 export type NetworkPairingIntentRequest = {
     deviceName: string;
-    clientPlatform: 'macos' | 'ios' | 'ipados';
+    clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
     appVersion?: string | null;
     requestedCapabilities?: string[];
 };
@@ -602,7 +604,7 @@ export type NetworkPairingIntentResponse = {
     expiresAt: string;
     requestedBy: {
         deviceName: string;
-        clientPlatform: 'macos' | 'ios' | 'ipados';
+        clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
         appVersion: string | null;
     };
     requestedCapabilities: string[];
@@ -612,7 +614,7 @@ export type NetworkPairingIntentResponse = {
 export type NetworkPairedClientSummary = {
     clientId: string;
     deviceName: string;
-    clientPlatform: 'macos' | 'ios' | 'ipados';
+    clientPlatform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux';
     appVersion: string | null;
     grantedCapabilities: string[];
     pairedAt: string;

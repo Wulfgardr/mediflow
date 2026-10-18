@@ -1,0 +1,496 @@
+{
+  "schemaVersion": 1,
+  "kind": "patient-profile-common-port-reconstruction-validation",
+  "dateUtc": "2026-10-17T20:30:20.459404+00:00",
+  "claim": "Shared TypeScript application port; Node remains the existing SQLite commit authority for these Web/v1/paired profile operations. Optional local Swift authority is outside this delta. No Rust writer, IPC/FFI choice, installed-platform qualification or overall migration GO is claimed.",
+  "provenance": {
+    "baseCommit": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+    "baseTree": "0c77efadbcd16b2ec17d263b0e29ad221a0dedab",
+    "sourceTreeBeforeDocumentation": "618cd8d0bb13dd6b55048a7b3639fc7f8493f1fd",
+    "sourcePatch": {
+      "path": "/tmp/mediflow-core-recovery-source.patch",
+      "bytes": 31833,
+      "sha256": "caeed7197c5f05309563d8f524c82785a5c72bbe68ecf44f17437e897f21255e"
+    },
+    "reconstruction": true,
+    "priorTransientReceiptsLost": true,
+    "previousResultsNotReattributed": true
+  },
+  "environment": {
+    "os": "Ubuntu 24.04.3 LTS",
+    "kernel": "6.18.55",
+    "architecture": "x86_64",
+    "node": "24.19.0",
+    "nodeAbi": "137",
+    "typescript": "5.9.3",
+    "next": "16.3.8",
+    "betterSqlite3": "12.6.2",
+    "glibc": "2.39"
+  },
+  "dependencies": {
+    "command": "npm ci --no-audit --no-fund --cache /tmp/mediflow-recovery-npm-cache",
+    "exitCode": 0,
+    "packagesInstalled": 602,
+    "sqliteRuntimeProbePassed": true,
+    "log": {
+      "path": "/tmp/mediflow-recovery-npm-ci.log",
+      "bytes": 789,
+      "sha256": "e73018c0f5d92e2e496325e52b64992e7e14d88015d0183d0c61ffe0d19228ba"
+    },
+    "lockfileChanged": false
+  },
+  "changedSources": [
+    {
+      "path": "app/api/patients/[id]/route.ts",
+      "bytes": 5457,
+      "sha256": "679b8fe79f05e4301b21a6c835cfe7f6ffb84dd2d6bf279ecb928e1b15f24aff",
+      "baselineSha256": "d733fb73e02bf50be29ae1c7ef7eab610168a5fb7e5a5326ba9600d0f6c75d2a",
+      "identicalToBaseline": false
+    },
+    {
+      "path": "app/api/v1/patients/[id]/route.ts",
+      "bytes": 5651,
+      "sha256": "dced582f81e67864faf0374980d1629ffa6f896c73684a532394703cbdac956d",
+      "baselineSha256": "9abc88ab6af7e27b5ccf01dd631dcd8a31de3b4c017de5153ef4d69d91c97571",
+      "identicalToBaseline": false
+    },
+    {
+      "path": "lib/network-patient-read.ts",
+      "bytes": 2256,
+      "sha256": "f1a1efa8e59c3a38bbbf5e04c2209ec3d3560fd23e5ce0308aec9f6b4463d1af",
+      "baselineSha256": "31768457b8418cf51790b6121d60979693d6daa727afef403bf16f1ae7d8e686",
+      "identicalToBaseline": false
+    },
+    {
+      "path": "lib/network-patient-write.ts",
+      "bytes": 5961,
+      "sha256": "f2149d96f509593e69a8b11c2ecadfecb5000dbb3288137c34a73c6f2c9845d3",
+      "baselineSha256": "c3e54601adae288b37f8b60605ad68686f3a645203a95a0ae209bfdb3c51e5c6",
+      "identicalToBaseline": false
+    },
+    {
+      "path": "lib/patient-profile-service.ts",
+      "bytes": 5375,
+      "sha256": "864d5b9904799043796d75eac1902240b46cea56f0c8802ab8648998caf83912",
+      "baselineSha256": null,
+      "identicalToBaseline": false
+    },
+    {
+      "path": "lib/patient-profile-service.test.ts",
+      "bytes": 9244,
+      "sha256": "23afc0206474348a9e1aa9dfca5eaf82ec03588f5ea40a5a44e2308da01d579a",
+      "baselineSha256": null,
+      "identicalToBaseline": false
+    },
+    {
+      "path": "lib/chatgpt-execution/execution-mac-qualification.ts",
+      "bytes": 30093,
+      "sha256": "f419590cddef5c5f8005ed664f19b4cd1096ceef0ae7251e564334c767276740",
+      "baselineSha256": "489fca79ca789a4e02546b094d0d8f2ff8cb422d1b3f18d3c0bdd02f7d9d9fd4",
+      "identicalToBaseline": false
+    }
+  ],
+  "unchangedAuthoritySources": [
+    {
+      "path": "lib/patient-update-operation.ts",
+      "bytes": 4770,
+      "sha256": "6d77aadacf42cd7c01145656759166a8bd51389203fdd114244971b226e974b1",
+      "baselineSha256": "6d77aadacf42cd7c01145656759166a8bd51389203fdd114244971b226e974b1",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/patient-write-normalization.ts",
+      "bytes": 7776,
+      "sha256": "85215e41c00b4d52bd4e71f369858fe05d35278b473c47a2557f80d71368d895",
+      "baselineSha256": "85215e41c00b4d52bd4e71f369858fe05d35278b473c47a2557f80d71368d895",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/network-patient-commit-authority.ts",
+      "bytes": 4799,
+      "sha256": "a39ab2c9421521902ad64911c50941c65d242c873a3da273d426169ed9ac440c",
+      "baselineSha256": "a39ab2c9421521902ad64911c50941c65d242c873a3da273d426169ed9ac440c",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/security/audit.ts",
+      "bytes": 18652,
+      "sha256": "8912b24b02dc66e4b12fe88bcef80355917b1a2087a1caf5266c3ff83216963f",
+      "baselineSha256": "8912b24b02dc66e4b12fe88bcef80355917b1a2087a1caf5266c3ff83216963f",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/schema.ts",
+      "bytes": 31256,
+      "sha256": "cee6f835a45408d3bf575322ef0daea34003ae7096c9f989d2d718f0aa391645",
+      "baselineSha256": "cee6f835a45408d3bf575322ef0daea34003ae7096c9f989d2d718f0aa391645",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/security/security.ts",
+      "bytes": 9230,
+      "sha256": "15e7b3ec814bb5cf1f0ecc1d1bc5391178eefc628b5f77f289aab04f58a4be9e",
+      "baselineSha256": "15e7b3ec814bb5cf1f0ecc1d1bc5391178eefc628b5f77f289aab04f58a4be9e",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/patient-ambulatory-membership.ts",
+      "bytes": 1850,
+      "sha256": "3f6e6bdfb99ede350f75b82d696aacba0e70961793c0add12b3106af3e05dde9",
+      "baselineSha256": "3f6e6bdfb99ede350f75b82d696aacba0e70961793c0add12b3106af3e05dde9",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/archive-generation.ts",
+      "bytes": 2005,
+      "sha256": "0e35f093dd5c20c6aa4f374b95aa2e775d7262d1c7a9e459bc82b494abbfa6e2",
+      "baselineSha256": "0e35f093dd5c20c6aa4f374b95aa2e775d7262d1c7a9e459bc82b494abbfa6e2",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/security/archive-session-generation.ts",
+      "bytes": 1950,
+      "sha256": "a2f58006964de24ec6452f383132ff9b7faf58f8b173c38e55fb48e65e187248",
+      "baselineSha256": "a2f58006964de24ec6452f383132ff9b7faf58f8b173c38e55fb48e65e187248",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/patient-lifecycle.ts",
+      "bytes": 1593,
+      "sha256": "63caae4f6cf96dc280acb38a6b0a17fac4d772f9cfbc76c98a82c8b91d5181e4",
+      "baselineSha256": "63caae4f6cf96dc280acb38a6b0a17fac4d772f9cfbc76c98a82c8b91d5181e4",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "app/api/v1/network/patients/[id]/route.ts",
+      "bytes": 6073,
+      "sha256": "b5cda4fe6d7a01584c5f283669e40a0612930b3738f5d6409986eb259d614e3f",
+      "baselineSha256": "b5cda4fe6d7a01584c5f283669e40a0612930b3738f5d6409986eb259d614e3f",
+      "identicalToBaseline": true
+    }
+  ],
+  "unchangedTestInputs": [
+    {
+      "path": "lib/patient-update-operation.test.ts",
+      "bytes": 14382,
+      "sha256": "11f6ae826400e744062be893b9a2dd53987780bc0414fbee133f92e9ed202e7b",
+      "baselineSha256": "11f6ae826400e744062be893b9a2dd53987780bc0414fbee133f92e9ed202e7b",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/patient-required-audit.test.ts",
+      "bytes": 29790,
+      "sha256": "24545433887f5f32c27dd23687518b7ec9863a516746b5323b9eb0c9869d957c",
+      "baselineSha256": "24545433887f5f32c27dd23687518b7ec9863a516746b5323b9eb0c9869d957c",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/network-patient-write.test.ts",
+      "bytes": 5404,
+      "sha256": "7a4e3a4edc30ecab96e511d8be9c05b4cd0d6831c94938f071108330326a2a5a",
+      "baselineSha256": "7a4e3a4edc30ecab96e511d8be9c05b4cd0d6831c94938f071108330326a2a5a",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "lib/network-patient-commit-authority.test.ts",
+      "bytes": 12974,
+      "sha256": "c6ee54c5b9b077b3278c13f656c4982096a99633b761e8c94be2bbd51c198388",
+      "baselineSha256": "c6ee54c5b9b077b3278c13f656c4982096a99633b761e8c94be2bbd51c198388",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "scripts/run-strip-types.mjs",
+      "bytes": 6242,
+      "sha256": "dcc6120e90a13371ec95efae90b7c3d6a6b3a8b40046e374b0ccf38979aa0f4c",
+      "baselineSha256": "dcc6120e90a13371ec95efae90b7c3d6a6b3a8b40046e374b0ccf38979aa0f4c",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "scripts/register-strip-types-loader.mjs",
+      "bytes": 3712,
+      "sha256": "00266698f01078dc734b3d622d04be53c77cc6f51c0a99f3e8e33db53d98bffc",
+      "baselineSha256": "00266698f01078dc734b3d622d04be53c77cc6f51c0a99f3e8e33db53d98bffc",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "scripts/patient-notes-pilot-http.test.mjs",
+      "bytes": 10418,
+      "sha256": "e3341cb6e4900c6dbbc6e2f76814b391a9a577495c0385cfc1e35c27812a2bb1",
+      "baselineSha256": "e3341cb6e4900c6dbbc6e2f76814b391a9a577495c0385cfc1e35c27812a2bb1",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "scripts/network-home-base-write-smoke.sh",
+      "bytes": 3707,
+      "sha256": "5cf9560e73f3033438832996cf9606cc459990c4f8653f51871f0893f83d390d",
+      "baselineSha256": "5cf9560e73f3033438832996cf9606cc459990c4f8653f51871f0893f83d390d",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "scripts/prepare-e2e-db.mjs",
+      "bytes": 8368,
+      "sha256": "8ffa1f030537d00fec69c0ca9a1e54ba13c7eaf124004f2418494a0ada0e6eef",
+      "baselineSha256": "8ffa1f030537d00fec69c0ca9a1e54ba13c7eaf124004f2418494a0ada0e6eef",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "scripts/web-auth-control-test-client.mjs",
+      "bytes": 2976,
+      "sha256": "3fb87516348879e3495d967885f9f3cee405b95772182951a015ed62fdd29efe",
+      "baselineSha256": "3fb87516348879e3495d967885f9f3cee405b95772182951a015ed62fdd29efe",
+      "identicalToBaseline": true
+    }
+  ],
+  "unchangedConfiguration": [
+    {
+      "path": "package.json",
+      "bytes": 27707,
+      "sha256": "0bfdfc1e0b602f7b5b2820176bece82314f7949d857c7686590634f66cc9acfa",
+      "baselineSha256": "0bfdfc1e0b602f7b5b2820176bece82314f7949d857c7686590634f66cc9acfa",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 385547,
+      "sha256": "7b7a2a8f41a12b48146c51f033b6c2c632c011adde6da492685b943e48fe3766",
+      "baselineSha256": "7b7a2a8f41a12b48146c51f033b6c2c632c011adde6da492685b943e48fe3766",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 1893,
+      "sha256": "1711ebc1f3c7f79c3923f744d9c99ae150f7b9a861ccc344f716788d97d73120",
+      "baselineSha256": "1711ebc1f3c7f79c3923f744d9c99ae150f7b9a861ccc344f716788d97d73120",
+      "identicalToBaseline": true
+    },
+    {
+      "path": "tsconfig.typecheck.json",
+      "bytes": 382,
+      "sha256": "a272c0bcc1f0d366a098d5c8e1c7f2aa61a38bc99942016510beeda825d35029",
+      "baselineSha256": "a272c0bcc1f0d366a098d5c8e1c7f2aa61a38bc99942016510beeda825d35029",
+      "identicalToBaseline": true
+    }
+  ],
+  "lineCounts": {
+    "newService": 103,
+    "newTestFile": 166,
+    "productionCoreFiles": 5,
+    "productionCoreNetLines": -20,
+    "typeOnlyAnnotationSeparate": true
+  },
+  "unitConformance": {
+    "command": "MEDIFLOW_DATA_DIR=\"$(mktemp -d /tmp/mediflow-core-recovery-suite.XXXXXX)\" node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/patient-profile-service.test.ts lib/patient-update-operation.test.ts lib/patient-required-audit.test.ts lib/network-patient-write.test.ts lib/network-patient-commit-authority.test.ts",
+    "exitCode": 0,
+    "outsideRunnerSandbox": true,
+    "newCases": 6,
+    "existingCases": 113,
+    "totals": {
+      "tests": 119,
+      "pass": 119,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 14206.776456
+    },
+    "log": {
+      "path": "/tmp/mediflow-core-recovery-tests.log",
+      "bytes": 14387,
+      "sha256": "bbe17b82cef78ba227792ddac678fd4d6e6f14cf494194ad21e53e62b6069d41"
+    }
+  },
+  "httpOldNew": {
+    "harnessSha256": "e3341cb6e4900c6dbbc6e2f76814b391a9a577495c0385cfc1e35c27812a2bb1",
+    "bootstrapSha256": "5cf9560e73f3033438832996cf9606cc459990c4f8653f51871f0893f83d390d",
+    "outsideRunnerSandbox": true,
+    "oldArchiveMethod": "git archive of the exact base commit into an isolated temporary checkout",
+    "fixtureScope": "Synthetic and independently generated per run; same characterization and assertions. Not binary equality of randomly encrypted databases.",
+    "runs": [
+      {
+        "label": "old",
+        "root": "/tmp/mediflow-profile-recovery-old-zlgl39n8",
+        "command": [
+          "bash",
+          "scripts/network-home-base-write-smoke.sh"
+        ],
+        "environment": {
+          "MEDIFLOW_DATA_DIR": "/tmp/mediflow-profile-recovery-old-o67vxnei",
+          "MEDIFLOW_NETWORK_WRITE_DATA_DIR": "/tmp/mediflow-profile-recovery-old-o67vxnei",
+          "MEDIFLOW_E2E_DISABLE_LEGACY_COPY": "1",
+          "MEDIFLOW_LOCAL_AUTHORITY": "0",
+          "MEDIFLOW_PROVIDER_V2_ENABLED": "0",
+          "MEDIFLOW_PROVIDER_V2_NETWORK": "0",
+          "NEXT_TELEMETRY_DISABLED": "1",
+          "E2E_BASE_URL": "http://127.0.0.1:43270",
+          "E2E_USERNAME": "admin",
+          "E2E_PIN": "<unique synthetic secret>",
+          "MEDIFLOW_LOCAL_API_TOKEN": "<unique synthetic secret>",
+          "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT": "scripts/patient-notes-pilot-http.test.mjs"
+        },
+        "exitCode": 0,
+        "timedOut": false,
+        "elapsedSeconds": 9.628994,
+        "log": "/tmp/mediflow-profile-recovery-http-old.log",
+        "logSha256": "b143b1d11ab15268f5a8edc7cb3a27e3cb54c0603594dc80d39101da5409d85d",
+        "dataDir": "/tmp/mediflow-profile-recovery-old-o67vxnei",
+        "totals": {
+          "tests": 1,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "durationMs": 4031.108081
+        },
+        "verifiedPerRun": {
+          "encryptedUpdates": 2,
+          "attributableAuditEvents": 2,
+          "staleReplayConflicts": 4,
+          "tombstoneWriteDenials": 2,
+          "allOtherPatientColumnsAndMembershipsUnchanged": true,
+          "priorAuditUnchanged": true,
+          "ciphertextDecryptedWithLoginKey": true,
+          "webAndApiV1LifecycleReads": true
+        },
+        "serverLog": {
+          "path": "/tmp/mediflow-profile-recovery-old-o67vxnei/logs/next-dev.log",
+          "bytes": 4524,
+          "sha256": "1848ee66db1d8865892c860de527f31762e7134f0100f2061057213f94cea537"
+        },
+        "generatedReportFile": false,
+        "reportNote": "The smoke wrapper prints a conventional JSON report path; this test records assertions in the log and does not create that JSON report."
+      },
+      {
+        "label": "new",
+        "root": "/workspace/scratch/40b5a2cd37a4/mediflow-core-port",
+        "command": [
+          "bash",
+          "scripts/network-home-base-write-smoke.sh"
+        ],
+        "environment": {
+          "MEDIFLOW_DATA_DIR": "/tmp/mediflow-profile-recovery-new-4sjmhus_",
+          "MEDIFLOW_NETWORK_WRITE_DATA_DIR": "/tmp/mediflow-profile-recovery-new-4sjmhus_",
+          "MEDIFLOW_E2E_DISABLE_LEGACY_COPY": "1",
+          "MEDIFLOW_LOCAL_AUTHORITY": "0",
+          "MEDIFLOW_PROVIDER_V2_ENABLED": "0",
+          "MEDIFLOW_PROVIDER_V2_NETWORK": "0",
+          "NEXT_TELEMETRY_DISABLED": "1",
+          "E2E_BASE_URL": "http://127.0.0.1:43271",
+          "E2E_USERNAME": "admin",
+          "E2E_PIN": "<unique synthetic secret>",
+          "MEDIFLOW_LOCAL_API_TOKEN": "<unique synthetic secret>",
+          "MEDIFLOW_NETWORK_WRITE_TEST_SCRIPT": "scripts/patient-notes-pilot-http.test.mjs"
+        },
+        "exitCode": 0,
+        "timedOut": false,
+        "elapsedSeconds": 8.257002,
+        "log": "/tmp/mediflow-profile-recovery-http-new.log",
+        "logSha256": "a40eb91b47a14dd7f25efbd9224c02b9eea852f435a6bfa6c05a735ed632c100",
+        "dataDir": "/tmp/mediflow-profile-recovery-new-4sjmhus_",
+        "totals": {
+          "tests": 1,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "durationMs": 3599.388962
+        },
+        "verifiedPerRun": {
+          "encryptedUpdates": 2,
+          "attributableAuditEvents": 2,
+          "staleReplayConflicts": 4,
+          "tombstoneWriteDenials": 2,
+          "allOtherPatientColumnsAndMembershipsUnchanged": true,
+          "priorAuditUnchanged": true,
+          "ciphertextDecryptedWithLoginKey": true,
+          "webAndApiV1LifecycleReads": true
+        },
+        "serverLog": {
+          "path": "/tmp/mediflow-profile-recovery-new-4sjmhus_/logs/next-dev.log",
+          "bytes": 4488,
+          "sha256": "ecb0965dedea3612205ef26358697c702ceb099c9ae6196c9f6311e1c1830d19"
+        },
+        "generatedReportFile": false,
+        "reportNote": "The smoke wrapper prints a conventional JSON report path; this test records assertions in the log and does not create that JSON report."
+      }
+    ],
+    "performanceClaim": false
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/lib/tsc.js -p tsconfig.typecheck.json --noEmit --incremental false --pretty false",
+    "exitCode": 0,
+    "outsideRunnerSandbox": true,
+    "log": {
+      "path": "/tmp/mediflow-core-recovery-typecheck-noincremental.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "lint": {
+    "command": [
+      "node",
+      "node_modules/eslint/bin/eslint.js",
+      "--quiet",
+      "app/api/patients/[id]/route.ts",
+      "app/api/v1/patients/[id]/route.ts",
+      "lib/network-patient-read.ts",
+      "lib/network-patient-write.ts",
+      "lib/patient-profile-service.ts",
+      "lib/patient-profile-service.test.ts",
+      "lib/chatgpt-execution/execution-mac-qualification.ts"
+    ],
+    "exitCode": 0,
+    "scope": "seven changed TypeScript files",
+    "log": {
+      "path": "/tmp/mediflow-core-recovery-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "testInventory": {
+    "command": "npm run check:test-selection",
+    "exitCode": 0,
+    "files": 1061,
+    "assignedToSuite": 1032,
+    "excludedWithReason": 29,
+    "status": "COMPLETE",
+    "log": {
+      "path": "/tmp/mediflow-core-recovery-test-selection.log",
+      "bytes": 491,
+      "sha256": "92e71300e7882058d40f39a757e818345ca753ac9b391783d64e31e40365c36d"
+    }
+  },
+  "annotationEmissionEquivalence": {
+    "schemaVersion": 1,
+    "kind": "reconstructed-source-type-annotation-emission-equivalence",
+    "dateUtc": "2026-10-17T20:25:59.950Z",
+    "sourceBase": "db98dcf0993d1cae69508186a6e3f7a8d3f2c984",
+    "path": "lib/chatgpt-execution/execution-mac-qualification.ts",
+    "typescriptVersion": "5.9.3",
+    "compilerOptions": {
+      "target": "ES2017",
+      "module": "ESNext"
+    },
+    "sourceBeforeSha256": "489fca79ca789a4e02546b094d0d8f2ff8cb422d1b3f18d3c0bdd02f7d9d9fd4",
+    "sourceAfterSha256": "f419590cddef5c5f8005ed664f19b4cd1096ceef0ae7251e564334c767276740",
+    "onlyDelta": "Add PropertyDescriptorMap type annotation to fields",
+    "oldJsSha256": "e5f64015497b12b136f2915a1ca83aa5ac15c4274a8145cc46dc67dc642e3f9b",
+    "newJsSha256": "e5f64015497b12b136f2915a1ca83aa5ac15c4274a8145cc46dc67dc642e3f9b",
+    "oldJsBytes": 29984,
+    "newJsBytes": 29984,
+    "emittedJsIdentical": true,
+    "transpileDiagnosticsBefore": 0,
+    "transpileDiagnosticsAfter": 0,
+    "scope": "This verifies emitted JavaScript equality for this file; semantic type checking is recorded separately."
+  },
+  "limits": [
+    "Only the shared application port was extracted; the current writer and its atomic audit transaction remain Node/SQLite.",
+    "No new persistent idempotency ledger or client-supplied receipt authority.",
+    "Host context is trusted in-process adapter input, not a sandbox boundary against arbitrary host code.",
+    "HTTP compares equivalent fresh synthetic archives, not installed downgrade on one database.",
+    "GPUI platform, accessibility, mobile, packaging and complete migration gates remain separate.",
+    "Historical pre-reset benchmark and validation logs are not fabricated or assigned to this reconstruction.",
+    "The optional Apple LocalPatientsDataSource/SQLite stores selected by MEDIFLOW_LOCAL_AUTHORITY remain outside the Node required-audit path; this extraction neither observes their activation nor resolves WUL-582 for those stores."
+  ]
+}

@@ -1,0 +1,2250 @@
+BEGIN scope-final-unit bytes=23735 sha256=b3dff8237c532b1b95d82f1a1fa80223f26d6dc092e5dff60d2748f43f7c3575
+TAP version 13
+# Subtest: buildNetworkNodeSummary falls back to clinic or host name and keeps local-only as default
+ok 1 - buildNetworkNodeSummary falls back to clinic or host name and keeps local-only as default
+  ---
+  duration_ms: 1.117168
+  type: 'test'
+  ...
+# Subtest: buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled
+ok 2 - buildNetworkSessionSummary exposes network-unpaired when home-base mode is enabled
+  ---
+  duration_ms: 0.272422
+  type: 'test'
+  ...
+# Subtest: buildNetworkSessionSummary exposes paired-online when at least one trusted client exists
+ok 3 - buildNetworkSessionSummary exposes paired-online when at least one trusted client exists
+  ---
+  duration_ms: 0.188285
+  type: 'test'
+  ...
+# Subtest: buildNetworkCapabilitiesResponse disables pairing bootstrap while node stays local-only
+ok 4 - buildNetworkCapabilitiesResponse disables pairing bootstrap while node stays local-only
+  ---
+  duration_ms: 0.445763
+  type: 'test'
+  ...
+# Subtest: buildNetworkCapabilitiesResponse surfaces centralized AI availability when the node runtime is ready
+ok 5 - buildNetworkCapabilitiesResponse surfaces centralized AI availability when the node runtime is ready
+  ---
+  duration_ms: 0.525233
+  type: 'test'
+  ...
+# Subtest: buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states
+ok 6 - buildNetworkReplicaSummary keeps offline-deferred and conflict-review as explicit preview states
+  ---
+  duration_ms: 0.143086
+  type: 'test'
+  ...
+# Subtest: evaluateNetworkDataPlaneModeGate rejects paired-client requests while home-base mode is off
+ok 7 - evaluateNetworkDataPlaneModeGate rejects paired-client requests while home-base mode is off
+  ---
+  duration_ms: 0.213453
+  type: 'test'
+  ...
+# Subtest: evaluateNetworkDataPlaneModeGate passes paired-client requests while home-base mode is on
+ok 8 - evaluateNetworkDataPlaneModeGate passes paired-client requests while home-base mode is on
+  ---
+  duration_ms: 0.803564
+  type: 'test'
+  ...
+# Subtest: createPairingIntentDraft rejects requests while home-base mode is disabled
+ok 9 - createPairingIntentDraft rejects requests while home-base mode is disabled
+  ---
+  duration_ms: 0.336008
+  type: 'test'
+  ...
+# Subtest: createPairingIntentDraft emits a PHI-safe pending bootstrap when home-base mode is enabled
+ok 10 - createPairingIntentDraft emits a PHI-safe pending bootstrap when home-base mode is enabled
+  ---
+  duration_ms: 1.314896
+  type: 'test'
+  ...
+# Subtest: deriveNetworkIdentitySummary requires node credentials when only device pairing exists
+ok 11 - deriveNetworkIdentitySummary requires node credentials when only device pairing exists
+  ---
+  duration_ms: 0.698836
+  type: 'test'
+  ...
+# Subtest: deriveNetworkIdentitySummary binds operator and scope when a session context exists
+ok 12 - deriveNetworkIdentitySummary binds operator and scope when a session context exists
+  ---
+  duration_ms: 0.15185
+  type: 'test'
+  ...
+# Subtest: create: an explicit different scope is denied at admission without clinical/audit effects
+ok 13 - create: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 121.110952
+  type: 'test'
+  ...
+# Subtest: update: an explicit different scope is denied at admission without clinical/audit effects
+ok 14 - update: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 4.259605
+  type: 'test'
+  ...
+# Subtest: delete: an explicit different scope is denied at admission without clinical/audit effects
+ok 15 - delete: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 3.307277
+  type: 'test'
+  ...
+# Subtest: restore: an explicit different scope is denied at admission without clinical/audit effects
+ok 16 - restore: an explicit different scope is denied at admission without clinical/audit effects
+  ---
+  duration_ms: 2.969546
+  type: 'test'
+  ...
+# Subtest: patient-list, patient-detail and shared capability admissions reject an explicit different scope
+ok 17 - patient-list, patient-detail and shared capability admissions reject an explicit different scope
+  ---
+  duration_ms: 6.838151
+  type: 'test'
+  ...
+# Subtest: the patient commit guard independently rechecks the request scope assertion
+ok 18 - the patient commit guard independently rechecks the request scope assertion
+  ---
+  duration_ms: 2.740881
+  type: 'test'
+  ...
+# Subtest: an explicitly matching request scope retains the ordinary patient writer and required audit
+ok 19 - an explicitly matching request scope retains the ordinary patient writer and required audit
+  ---
+  duration_ms: 6.79108
+  type: 'test'
+  ...
+# Subtest: native create: valid write commits clinical data and one required audit
+ok 20 - native create: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.427569
+  type: 'test'
+  ...
+# Subtest: native create: pending body after pairing revocation has no clinical/audit effect
+ok 21 - native create: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 23.712694
+  type: 'test'
+  ...
+# Subtest: native create: pending body after mode revocation has no clinical/audit effect
+ok 22 - native create: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.317413
+  type: 'test'
+  ...
+# Subtest: native create: pending body after capability revocation has no clinical/audit effect
+ok 23 - native create: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.266004
+  type: 'test'
+  ...
+# Subtest: native create: pending body after token revocation has no clinical/audit effect
+ok 24 - native create: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.017539
+  type: 'test'
+  ...
+# Subtest: native create: pending body after session revocation has no clinical/audit effect
+ok 25 - native create: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.347207
+  type: 'test'
+  ...
+# Subtest: native create: pending body after user revocation has no clinical/audit effect
+ok 26 - native create: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.099022
+  type: 'test'
+  ...
+# Subtest: native create: pending body after scope revocation has no clinical/audit effect
+ok 27 - native create: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.866891
+  type: 'test'
+  ...
+# Subtest: native update: valid write commits clinical data and one required audit
+ok 28 - native update: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 5.106305
+  type: 'test'
+  ...
+# Subtest: native update: pending body after pairing revocation has no clinical/audit effect
+ok 29 - native update: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.99154
+  type: 'test'
+  ...
+# Subtest: native update: pending body after mode revocation has no clinical/audit effect
+ok 30 - native update: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.032702
+  type: 'test'
+  ...
+# Subtest: native update: pending body after capability revocation has no clinical/audit effect
+ok 31 - native update: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.209158
+  type: 'test'
+  ...
+# Subtest: native update: pending body after token revocation has no clinical/audit effect
+ok 32 - native update: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.284092
+  type: 'test'
+  ...
+# Subtest: native update: pending body after session revocation has no clinical/audit effect
+ok 33 - native update: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.192433
+  type: 'test'
+  ...
+# Subtest: native update: pending body after user revocation has no clinical/audit effect
+ok 34 - native update: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.279374
+  type: 'test'
+  ...
+# Subtest: native update: pending body after scope revocation has no clinical/audit effect
+ok 35 - native update: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.17071
+  type: 'test'
+  ...
+# Subtest: native delete: valid write commits clinical data and one required audit
+ok 36 - native delete: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.792049
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after pairing revocation has no clinical/audit effect
+ok 37 - native delete: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.451184
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after mode revocation has no clinical/audit effect
+ok 38 - native delete: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.675422
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after capability revocation has no clinical/audit effect
+ok 39 - native delete: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.688202
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after token revocation has no clinical/audit effect
+ok 40 - native delete: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.222659
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after session revocation has no clinical/audit effect
+ok 41 - native delete: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.778518
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after user revocation has no clinical/audit effect
+ok 42 - native delete: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.849726
+  type: 'test'
+  ...
+# Subtest: native delete: pending body after scope revocation has no clinical/audit effect
+ok 43 - native delete: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.139062
+  type: 'test'
+  ...
+# Subtest: native restore: valid write commits clinical data and one required audit
+ok 44 - native restore: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.764717
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after pairing revocation has no clinical/audit effect
+ok 45 - native restore: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.648361
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after mode revocation has no clinical/audit effect
+ok 46 - native restore: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.72707
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after capability revocation has no clinical/audit effect
+ok 47 - native restore: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.815644
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after token revocation has no clinical/audit effect
+ok 48 - native restore: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 6.445017
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after session revocation has no clinical/audit effect
+ok 49 - native restore: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.527809
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after user revocation has no clinical/audit effect
+ok 50 - native restore: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.521199
+  type: 'test'
+  ...
+# Subtest: native restore: pending body after scope revocation has no clinical/audit effect
+ok 51 - native restore: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.118942
+  type: 'test'
+  ...
+# Subtest: web create: valid write commits clinical data and one required audit
+ok 52 - web create: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 6.124874
+  type: 'test'
+  ...
+# Subtest: web create: pending body after pairing revocation has no clinical/audit effect
+ok 53 - web create: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.991509
+  type: 'test'
+  ...
+# Subtest: web create: pending body after mode revocation has no clinical/audit effect
+ok 54 - web create: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.903196
+  type: 'test'
+  ...
+# Subtest: web create: pending body after capability revocation has no clinical/audit effect
+ok 55 - web create: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.052612
+  type: 'test'
+  ...
+# Subtest: web create: pending body after token revocation has no clinical/audit effect
+ok 56 - web create: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.85288
+  type: 'test'
+  ...
+# Subtest: web create: pending body after session revocation has no clinical/audit effect
+ok 57 - web create: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.773461
+  type: 'test'
+  ...
+# Subtest: web create: pending body after user revocation has no clinical/audit effect
+ok 58 - web create: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.24011
+  type: 'test'
+  ...
+# Subtest: web create: pending body after scope revocation has no clinical/audit effect
+ok 59 - web create: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.589503
+  type: 'test'
+  ...
+# Subtest: web update: valid write commits clinical data and one required audit
+ok 60 - web update: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 4.085913
+  type: 'test'
+  ...
+# Subtest: web update: pending body after pairing revocation has no clinical/audit effect
+ok 61 - web update: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.468149
+  type: 'test'
+  ...
+# Subtest: web update: pending body after mode revocation has no clinical/audit effect
+ok 62 - web update: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.001215
+  type: 'test'
+  ...
+# Subtest: web update: pending body after capability revocation has no clinical/audit effect
+ok 63 - web update: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.559449
+  type: 'test'
+  ...
+# Subtest: web update: pending body after token revocation has no clinical/audit effect
+ok 64 - web update: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 7.494181
+  type: 'test'
+  ...
+# Subtest: web update: pending body after session revocation has no clinical/audit effect
+ok 65 - web update: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 7.319819
+  type: 'test'
+  ...
+# Subtest: web update: pending body after user revocation has no clinical/audit effect
+ok 66 - web update: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.928096
+  type: 'test'
+  ...
+# Subtest: web update: pending body after scope revocation has no clinical/audit effect
+ok 67 - web update: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.431354
+  type: 'test'
+  ...
+# Subtest: web delete: valid write commits clinical data and one required audit
+ok 68 - web delete: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.698408
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after pairing revocation has no clinical/audit effect
+ok 69 - web delete: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.6405
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after mode revocation has no clinical/audit effect
+ok 70 - web delete: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 4.016067
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after capability revocation has no clinical/audit effect
+ok 71 - web delete: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.935585
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after token revocation has no clinical/audit effect
+ok 72 - web delete: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.284362
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after session revocation has no clinical/audit effect
+ok 73 - web delete: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.139222
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after user revocation has no clinical/audit effect
+ok 74 - web delete: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.131201
+  type: 'test'
+  ...
+# Subtest: web delete: pending body after scope revocation has no clinical/audit effect
+ok 75 - web delete: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 6.313018
+  type: 'test'
+  ...
+# Subtest: web restore: valid write commits clinical data and one required audit
+ok 76 - web restore: valid write commits clinical data and one required audit
+  ---
+  duration_ms: 3.293736
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after pairing revocation has no clinical/audit effect
+ok 77 - web restore: pending body after pairing revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.294697
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after mode revocation has no clinical/audit effect
+ok 78 - web restore: pending body after mode revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.416471
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after capability revocation has no clinical/audit effect
+ok 79 - web restore: pending body after capability revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.960212
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after token revocation has no clinical/audit effect
+ok 80 - web restore: pending body after token revocation has no clinical/audit effect
+  ---
+  duration_ms: 6.674644
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after session revocation has no clinical/audit effect
+ok 81 - web restore: pending body after session revocation has no clinical/audit effect
+  ---
+  duration_ms: 2.804978
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after user revocation has no clinical/audit effect
+ok 82 - web restore: pending body after user revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.268558
+  type: 'test'
+  ...
+# Subtest: web restore: pending body after scope revocation has no clinical/audit effect
+ok 83 - web restore: pending body after scope revocation has no clinical/audit effect
+  ---
+  duration_ms: 3.239894
+  type: 'test'
+  ...
+# Subtest: create: revocation in final asynchronous preparation is denied inside transaction
+ok 84 - create: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.31071
+  type: 'test'
+  ...
+# Subtest: update: revocation in final asynchronous preparation is denied inside transaction
+ok 85 - update: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.4633
+  type: 'test'
+  ...
+# Subtest: delete: revocation in final asynchronous preparation is denied inside transaction
+ok 86 - delete: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.528329
+  type: 'test'
+  ...
+# Subtest: restore: revocation in final asynchronous preparation is denied inside transaction
+ok 87 - restore: revocation in final asynchronous preparation is denied inside transaction
+  ---
+  duration_ms: 1.207995
+  type: 'test'
+  ...
+# Subtest: aiSummary=forged: profile and create deny derived fields without clinical/audit effects
+ok 88 - aiSummary=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.300606
+  type: 'test'
+  ...
+# Subtest: aiSummary=null: profile and create deny derived fields without clinical/audit effects
+ok 89 - aiSummary=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.122978
+  type: 'test'
+  ...
+# Subtest: aiSummaryGeneratedAt=forged: profile and create deny derived fields without clinical/audit effects
+ok 90 - aiSummaryGeneratedAt=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.006291
+  type: 'test'
+  ...
+# Subtest: aiSummaryGeneratedAt=null: profile and create deny derived fields without clinical/audit effects
+ok 91 - aiSummaryGeneratedAt=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.331803
+  type: 'test'
+  ...
+# Subtest: aiSummaryContextHash=forged: profile and create deny derived fields without clinical/audit effects
+ok 92 - aiSummaryContextHash=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.166684
+  type: 'test'
+  ...
+# Subtest: aiSummaryContextHash=null: profile and create deny derived fields without clinical/audit effects
+ok 93 - aiSummaryContextHash=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.530793
+  type: 'test'
+  ...
+# Subtest: documentInsights=forged: profile and create deny derived fields without clinical/audit effects
+ok 94 - documentInsights=forged: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 1.94627
+  type: 'test'
+  ...
+# Subtest: documentInsights=null: profile and create deny derived fields without clinical/audit effects
+ok 95 - documentInsights=null: profile and create deny derived fields without clinical/audit effects
+  ---
+  duration_ms: 2.554098
+  type: 'test'
+  ...
+# Subtest: profile allowlist preserves ordinary sealed/null fields and ignores extension metadata
+ok 96 - profile allowlist preserves ordinary sealed/null fields and ignores extension metadata
+  ---
+  duration_ms: 2.049796
+  type: 'test'
+  ...
+# Subtest: a second SQLite writer revokes mode while the patient waits for its IMMEDIATE transaction
+ok 97 - a second SQLite writer revokes mode while the patient waits for its IMMEDIATE transaction
+  ---
+  duration_ms: 200.328161
+  type: 'test'
+  ...
+# Subtest: an expected scope asserts the resolved context and never grants or substitutes a scope
+ok 98 - an expected scope asserts the resolved context and never grants or substitutes a scope
+  ---
+  duration_ms: 16.073444
+  type: 'test'
+  ...
+# Subtest: headerless clients retain the existing resolved cookie/default scope
+ok 99 - headerless clients retain the existing resolved cookie/default scope
+  ---
+  duration_ms: 0.381036
+  type: 'test'
+  ...
+# Subtest: scope assertions preserve opaque IDs with one canonical encoding
+ok 100 - scope assertions preserve opaque IDs with one canonical encoding
+  ---
+  duration_ms: 0.7146
+  type: 'test'
+  ...
+# Subtest: malformed, unencoded, empty and duplicate scope assertions are rejected
+ok 101 - malformed, unencoded, empty and duplicate scope assertions are rejected
+  ---
+  duration_ms: 0.530231
+  type: 'test'
+  ...
+1..101
+# tests 101
+# suites 0
+# pass 101
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2930.83648
+END scope-final-unit
+
+BEGIN scope-final-tombstone-static bytes=1473 sha256=f45570ea14433d7c7c94b5716b7c202074d2bfde389199daba6b4c05f29530c9
+✔ patient DELETE routes delegate one version-guarded tombstone and required audit transaction (120.561973ms)
+✔ patient GET and PUT handlers preserve tombstones through the profile port and writer (404 contract) (89.573068ms)
+✔ profile tombstone guard rejects broken imports, delegation, filters, 404s and final updates (266.832815ms)
+ℹ 20 in-memory rejection cases per route; production files unchanged
+✔ the schema owner keeps the additive ensureColumn guards for the tombstone columns (0.252281ms)
+✔ primary patient list reads exclude soft-deleted patients (0.259482ms)
+✔ ambulatories/clear is membership-based, soft-deletes and stays test-only (0.301125ms)
+✔ the membership-clear helper tombstones with the dedicated reason (0.162926ms)
+✔ AST guard isolates direct patient-read chains and normalizes their fingerprints (2.602452ms)
+✔ AST allowlist consumes fingerprints and rejects stale, substituted, or duplicate reads (0.842663ms)
+✔ AST guard follows a local immutable predicate without accepting aliases, mutation, or shadowing (1.941213ms)
+✔ AST guard follows AND-only predicate paths and invalidates every query after an unsafe use (14.831428ms)
+ℹ 19 rejected AND/escape cases, plus all-use invalidation of two patient queries
+✔ patients table access stays behind activePatients() outside the allowlist (856.093797ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1612.360637
+END scope-final-tombstone-static
+
+BEGIN scope-final-openapi-selftest bytes=1873 sha256=ec17ff1d5407b401fdc6a320bbf47458880b8975b52cd1d690dc3d58c1564d02
+ok   nuovo header opzionale su operazione → additive, senza override
+ok   parametro opzionale di path via ref viene confrontato → additive
+ok   nuovo parametro obbligatorio path via ref → breaking
+ok   nuovo parametro obbligatorio operation via ref → breaking
+ok   parametro preesistente rimosso resta breaking anche con aggiunta opzionale
+ok   override di operazione che rende obbligatorio il parametro di path → breaking
+ok   tipo del parametro referenziato cambiato → breaking
+ok   serializzazione di parametro cambiata → breaking
+ok   ref inlinato, ordine e maiuscole header equivalenti → nessun segnale
+ok   aggiunta opzionale non nasconde una restrizione preesistente
+ok   parametro irrisolto/ciclico/duplicato 1 → errore, mai ignorato
+ok   parametro irrisolto/ciclico/duplicato 2 → errore, mai ignorato
+ok   parametro irrisolto/ciclico/duplicato 3 → errore, mai ignorato
+ok   project native riconosce solo il wrapper autenticato con POST e DELETE
+ok   project native senza wrapper autenticato resta rifiutato
+ok   campo di RISPOSTA nuovo e obbligatorio → breaking (la regressione WUL-542)
+ok   campo di risposta nuovo e opzionale → solo additive
+ok   campo di risposta rimosso → breaking
+ok   campo preesistente che entra nei required → breaking
+ok   campo che esce dai required → additive, mai breaking
+ok   required nuovo dentro un array di risposta → breaking, con [] nel label
+ok   $ref inlinato senza cambiare nulla → nessun segnale
+ok   schema rinominato a contenuto identico → nessun segnale
+ok   varianti oneOf riordinate → nessun segnale
+ok   request body con `required` booleano → nessuna eccezione, e il campo obbligatorio è breaking
+ok   nessuna differenza → nessun segnale
+ok   valore fisso `const` cambiato → segnalato
+ok   valore fisso `const` invariato → nessun segnale
+
+self-test: 28/28 casi passano
+END scope-final-openapi-selftest
+
+BEGIN scope-final-openapi-verified bytes=31 sha256=7f0815b325bd7532f6e7ad9f78ccd71e05bc2a5ef3bda0114e6aefa177174f39
+OpenAPI contract guard passed.
+END scope-final-openapi-verified
+
+BEGIN scope-final-typecheck bytes=180 sha256=579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 typecheck
+> tsc -p tsconfig.typecheck.json --noEmit
+
+END scope-final-typecheck
+
+BEGIN scope-final-lint bytes=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+END scope-final-lint
+
+BEGIN scope-rust-tests bytes=3316 sha256=1ac64a7720ac7ef2b7829e7cefed5e14b52ad23bcb2bb764e669b9d7bdee1879
+    Finished `test` profile [unoptimized] target(s) in 0.25s
+     Running unittests src/lib.rs (/tmp/mediflow-r08ef12a/transport-fix-target/debug/deps/mediflow_runtime_client-1f5fd9bc18b7a7bc)
+
+running 30 tests
+test crypto::tests::v3_normalizes_nfkc_without_trimming_or_scalar_truncation ... ok
+test crypto::tests::web_and_swift_field_golden_matches_bytes ... ok
+test catalogs::tests::catalog_bounds_reject_truncation_and_ambiguous_bulk_codes ... ok
+test catalogs::tests::catalog_dtos_preserve_identifiers_labels_and_nullable_flags ... ok
+test catalogs::tests::terminology_preserves_provenance_and_does_not_invent_missing_translation ... ok
+test crypto::tests::unicode_null_and_reserved_prefix_are_unambiguous ... ok
+test crypto::tests::independent_node_unicode_and_structured_fields_decode ... ok
+test http::tests::write_failures_do_not_claim_rejection_when_effects_are_unknown ... ok
+test http::tests::opaque_cookie_ids_match_node_and_next_golden_without_injection ... ok
+test http::tests::only_explicit_loopback_may_use_http_and_credentials_are_origin_bound ... ok
+test http::tests::query_values_cannot_inject_another_parameter_fragment_or_path ... ok
+test http::tests::opaque_resource_ids_keep_spaces_unicode_and_literal_percent_in_one_segment ... ok
+test session::tests::bad_ciphertext_is_locked_and_nullable_notes_remain_distinct_from_empty ... ok
+test session::tests::catalog_route_query_and_lock_stay_inside_the_existing_session_gate ... ok
+test session::tests::aggregate_filters_reject_invalid_dates_ranges_limits_and_empty_types ... ok
+test session::tests::clone_lock_wipes_key_and_duplicate_gate_is_shared ... ok
+test session::tests::late_read_cannot_reinstall_the_consumed_write_prerequisite ... ok
+test session::tests::agenda_uses_existing_global_route_and_preserves_decrypted_checkup_parent ... ok
+test session::tests::dropped_write_response_is_unknown_and_cannot_be_replayed_without_read ... ok
+test session::tests::patient_profile_patch_distinguishes_absence_clear_and_value_and_requires_matching_read ... ok
+test session::tests::one_inflight_write_blocks_duplicate_and_late_ack_after_lock_is_unknown ... ok
+test session::tests::late_read_after_lock_never_delivers_clinical_data ... ok
+test session::tests::scoped_operations_require_host_support_and_exact_native_identity ... ok
+test session::tests::versions_follow_positive_javascript_safe_integer_contract ... ok
+test session::tests::read_binding_separates_session_patient_scope_version_and_locked_field ... ok
+test session::tests::global_diary_decrypts_in_server_order_and_binds_each_parent_without_fanout ... ok
+test session::tests::patient_creation_seals_optional_fields_and_requires_a_version_one_ack ... ok
+test session::tests::sparse_patient_update_seals_only_changed_fields_and_never_replays_unknown_writes ... ok
+test session::tests::attachment_list_requires_payload_key_omission_before_decrypting ... ok
+test crypto::tests::canonical_native_v3_unlock_and_wrap_golden ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.79s
+
+     Running unittests src/bin/mediflow-runtime-probe.rs (/tmp/mediflow-r08ef12a/transport-fix-target/debug/deps/mediflow_runtime_probe-c44bee38238bad51)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+END scope-rust-tests
+
+BEGIN gpui-blocker-tests bytes=5523 sha256=6a330d16ebf2dccda013afa93cb70e1e1fa9a3081633a3d30a6b974a976e08c4
+   Compiling mediflow-gpui-patient-pilot v0.1.0 (/tmp/mediflow-r08ef12a/fixes/experiments/gpui-patient-pilot/app)
+    Finished `test` profile [unoptimized] target(s) in 2.60s
+     Running unittests src/main.rs (/tmp/mediflow-recovery-keyboard-target/debug/deps/mediflow_gpui_patient_pilot-c31670b25444d792)
+
+running 53 tests
+test components::tests::clinical_reading_keeps_paragraphs_and_does_not_render_markup ... ok
+test clinical_text::tests::html_entities_decode_once_and_clinical_comparisons_remain_literal ... ok
+test clinical_text::tests::malformed_or_unsupported_rich_content_is_retained_with_an_explicit_label ... ok
+test demo::tests::ordinary_save_is_only_saved_after_independent_service_reread ... ok
+test clinical_text::tests::nested_lists_and_blocks_keep_boundaries_numbering_and_continuations ... ok
+test demo::tests::uncertain_commit_and_failed_reread_do_not_report_success ... ok
+test clinical_text::tests::headings_quotes_aliases_and_depth_exhaustion_do_not_drop_original_content ... ok
+test demo::tests::conflict_preserves_other_postation_and_local_draft ... ok
+test documents::tests::data_url_requires_exact_type_size_canonical_base64_and_raw_limit ... ok
+test clinical_text::tests::overlapping_emphasis_stays_disjoint_and_crossed_out_text_is_explicit_in_copy ... ok
+test editing::tests::coded_therapy_name_cannot_diverge_from_its_preserved_identity ... ok
+test editing::tests::dates_and_nullable_values_change_only_when_explicitly_edited ... ok
+test editing::tests::checkup_edit_reopens_the_chosen_local_day_and_preserves_unchanged_timestamps ... ok
+test editing::tests::ambiguous_checkup_edits_are_rejected_but_known_original_instants_are_preserved ... ok
+test documents::tests::remote_metadata_cannot_supply_a_download_path ... ok
+test editing::tests::decrypted_and_live_record_is_required_before_constructing_any_update ... ok
+test editing::tests::title_edit_preserves_rich_body_setting_and_recorded_time_exactly ... ok
+test navigation::tests::every_product_area_has_a_distinct_test_identifier_and_current_route ... ok
+test editing::tests::moving_a_checkup_day_keeps_its_local_clock_across_a_timezone_change ... ok
+test navigation::tests::narrow_and_enlarged_text_reflow_without_hiding_navigation ... ok
+test navigation::tests::worklist_navigation_uses_visible_order_and_focused_row_before_old_selection ... ok
+test editing::tests::qualified_observation_results_and_reference_text_survive_unrelated_edits ... ok
+test navigation::tests::worklist_navigation_stops_at_both_edges_and_accepts_an_empty_result ... ok
+test patient_forms::tests::changing_a_name_emits_only_that_field_and_never_reserializes_notes ... ok
+test patient_forms::tests::creation_keeps_missing_dates_missing_and_rejects_invalid_calendar_days ... ok
+test references::tests::copies_preserve_source_labels_and_distinguish_false_from_missing ... ok
+test shell::tests::acknowledged_creation_never_becomes_resendable_when_reread_fails ... ok
+test references::tests::only_systems_implemented_by_this_search_contract_are_offered ... ok
+test patient_forms::tests::clearing_a_field_differs_from_omitting_it_and_locked_fields_are_preserved ... ok
+test shell::tests::agenda_groups_use_recorded_status_and_calendar_date_without_inventing_a_due_date ... ok
+test shell::tests::current_interface_links_cannot_inject_paths_queries_or_fragments ... ok
+test shell::tests::calendar_intervals_include_whole_local_days_and_preserve_unbounded_ends ... ok
+test shell::tests::clinical_dates_reject_invalid_days_without_normalizing_into_another_month ... ok
+test shell::tests::calendar_intervals_reject_invalid_or_reversed_dates_before_a_read ... ok
+test shell::tests::existing_timestamp_appointments_retain_their_instant_and_local_display ... ok
+test shell::tests::new_checkups_keep_the_chosen_local_day_time_and_agenda_membership ... ok
+test shell::tests::new_checkups_require_an_explicit_valid_unambiguous_local_time_before_review_or_write ... ok
+test shell::tests::new_observation_preserves_qualified_strings_and_decimal_punctuation ... ok
+test shell::tests::unreadable_diagnoses_are_distinct_from_an_empty_problem_list ... ok
+test documents::tests::a_copy_never_overwrites_an_existing_file_and_round_trips_exact_bytes ... ok
+test text_input::tests::caret_reveal_keeps_visible_lines_still_and_scrolls_large_lines_within_content ... ok
+test shell::tests::new_entry_is_a_separate_action_and_lock_stays_available_inside_inputs ... ok
+test shell::tests::worklist_keymap_does_not_capture_other_views_or_modified_characters ... ok
+test shell::tests::worklist_keymap_keeps_characters_and_arrows_in_every_text_input ... ok
+test tests::launch_does_not_treat_demo_as_a_connected_archive_or_accept_secret_flags ... ok
+test text_input::tests::committing_identical_preedit_leaves_the_next_character_after_it ... ok
+test text_input::tests::malformed_offsets_never_slice_inside_a_character ... ok
+test text_input::tests::ime_highlights_are_disjoint_and_keep_both_styles_in_the_intersection ... ok
+test text_input::tests::platform_offsets_preserve_italian_and_surrogate_boundaries ... ok
+test text_input::tests::password_caret_maps_display_bullets_to_unicode_input_without_exposing_text ... ok
+test text_input::tests::native_surrounding_text_never_exports_passwords_or_stale_ranges ... ok
+test shell::tests::focus_recovery_preserves_surviving_editors_and_window_deactivation ... ok
+test shell::tests::disappearing_controls_restore_the_real_workspace_keyboard_dispatch ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+END gpui-blocker-tests
+
+BEGIN gpui-blocker-clippy bytes=174 sha256=789b81876a7f26d2678212fad2358e13f770833da814b57b463ca9a54894ab57
+    Checking mediflow-gpui-patient-pilot v0.1.0 (/tmp/mediflow-r08ef12a/fixes/experiments/gpui-patient-pilot/app)
+    Finished `dev` profile [unoptimized] target(s) in 1.28s
+END gpui-blocker-clippy
+
+BEGIN selection-fix-tests bytes=9823 sha256=51c172dc4c37593be2171165dbeffe03dd07e797881fd52e29093c7c5d49e998
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 test:test-selection
+> node --test scripts/check-test-selection.test.mjs scripts/unit-test-selection.test.mjs scripts/explicit-npm-test-selection.test.mjs
+
+✔ pending source deletions do not crash discovery and deleted selected tests still fail (4.265915ms)
+✔ a test is found by its name or by the framework it loads, nothing else is (0.682071ms)
+✔ a new or renamed test that no suite takes fails, and so does a stale or contradicted exclusion (0.597783ms)
+✔ an empty or failing selector fails instead of silently selecting nothing (0.226552ms)
+✔ a deleted file still listed by git is not read as a test (0.247154ms)
+✔ GPUI test selection binds the explicit Cargo targets to every native CI platform (40.274725ms)
+✔ GPUI runtime comparison binds all adapters and preparer to the actual CI command (64.658719ms)
+✔ GPUI coverage fails closed when Cargo membership, modules or actual CI invocation diverge (80.364908ms)
+▶ GPUI test-support binding rejects missing, conditional, duplicate or disabled support
+  ✔ missing dev table (6.259516ms)
+  ✔ missing GPUI test support (6.282932ms)
+  ✔ empty feature set (19.103471ms)
+  ✔ optional test support (4.418636ms)
+  ✔ different dependency source (5.62645ms)
+  ✔ different timezone support (5.227207ms)
+  ✔ duplicate dev table (5.112053ms)
+  ✔ duplicate support field (5.59966ms)
+  ✔ conditional dependency table (7.487262ms)
+  ✔ unsupported feature overlay (6.980826ms)
+  ✔ disabled binary harness (6.838402ms)
+  ✔ feature-gated binary target (4.679389ms)
+  ✔ missing appointment module (4.521311ms)
+  ✔ conditional appointment module (4.532518ms)
+  ✔ conditional clinical test module (4.361279ms)
+✔ GPUI test-support binding rejects missing, conditional, duplicate or disabled support (99.32101ms)
+✔ Claims self-test selects the actual guard and records the argument-bearing CI call separately (6.09685ms)
+✔ Claims self-test requires its exact arguments once and rejects ordinary scans or shell mentions (31.996709ms)
+✔ Claims self-test missing or changed npm entrypoint never promotes the guard file (8.866766ms)
+✔ Claims self-test rejects missing, nonregular or out-of-root guard paths (7.857622ms)
+✔ Claims argument-bearing call retains CI disabled, failure and execution-context guards (18.000063ms)
+✔ Claims collection neither reads or imports guard code nor scans directories or launches children (49.962682ms)
+✔ six required npm script bodies and CI bindings select the actual independent expected paths (8.550677ms)
+✔ selection is inert, ordered, and records CI conditions without claiming execution (2.739518ms)
+✔ missing, empty and nonliteral commands fail without partial selection (35.670555ms)
+✔ missing, nonregular, duplicate and escaping files fail (10.369265ms)
+✔ a test file no command names stays unselected until a command names it (2.9921ms)
+✔ CI requires a unique complete literal run block, never a substring (16.778328ms)
+✔ disabled or failure-ignoring jobs and steps are not valid bindings (23.71606ms)
+✔ working directory and shell resolve step over job over workflow (11.254773ms)
+✔ invalid YAML, duplicate keys, merges, missing job or files remain required errors (11.839216ms)
+✔ package and workflow readers reject nonregular, escaping and invalid UTF-8 sources (6.869969ms)
+✔ module import performs no discovery, subprocess or test execution (49.666544ms)
+✔ known runner binding requires the exact npm command and the same CI guards (4.014415ms)
+✔ required guard self-tests select real entrypoints and preserve exact CI provenance (5.832672ms)
+✔ each new guard fails closed for missing self-test, changed npm body or duplicate self-test (20.742687ms)
+✔ OpenAPI companion arguments are exact and restricted to its own self-test binding (6.070942ms)
+✔ registration: route, behavior and private-loader suites each occur once in required units (8.114319ms)
+✔ expands both groups recursively with deterministic ordering and the existing literal order (10.280621ms)
+✔ rejects missing, empty and unreadable lib while other required tests remain (7.210844ms)
+✔ rejects missing, empty and unreadable components while other required tests remain (9.659002ms)
+▶ rejects each missing literal even though the rest of the suite is present
+  ✔ scripts/owned-synthetic-http-suite.test.mjs (7.92326ms)
+  ✔ scripts/launcher-helpers.test.mjs (6.2948ms)
+  ✔ scripts/portable-local-test-selection.test.mjs (5.799522ms)
+  ✔ scripts/conditional-local-groups.test.mjs (7.097383ms)
+  ✔ scripts/ci-disposition-selection.test.mjs (3.893562ms)
+  ✔ app/api/patients/route.test.ts (7.765022ms)
+  ✔ scripts/admin-route-auth-boundary.test.mjs (5.567581ms)
+  ✔ scripts/check-never-regress-icd-who.test.mjs (6.007897ms)
+  ✔ scripts/check-never-regress-ocr-retirement.test.mjs (5.979294ms)
+  ✔ scripts/check-never-regress-tinetti-provenance.test.mjs (5.740022ms)
+  ✔ scripts/inventory-first-party-code.test.mjs (5.276031ms)
+  ✔ scripts/test-data-dir.test.mjs (5.244754ms)
+  ✔ scripts/check-schema-drift.test.ts (9.680985ms)
+  ✔ scripts/run-native-probe.test.mjs (4.376122ms)
+  ✔ scripts/audit-quality-gate.test.mjs (5.14946ms)
+  ✔ scripts/audit-test-config.test.mjs (4.085132ms)
+  ✔ scripts/prosthetic-audit-guard.test.mjs (4.68613ms)
+  ✔ scripts/service-audit-guard.test.mjs (7.186186ms)
+  ✔ scripts/ambulatory-audit-guard.test.mjs (5.543795ms)
+  ✔ scripts/prepare-e2e-db.test.mjs (5.276822ms)
+  ✔ scripts/db-server-data-isolation.test.mjs (5.501592ms)
+  ✔ scripts/native-first-install.test.mjs (4.986313ms)
+  ✔ scripts/sqlite-schema-shape.test.mjs (4.668413ms)
+  ✔ scripts/native-network-bounded-json.test.mjs (5.549394ms)
+  ✔ scripts/native-network-attachment-budget.test.mjs (4.772791ms)
+  ✔ scripts/checkup-parent-lifecycle.test.mjs (5.559008ms)
+  ✔ scripts/checkup-parent-lifecycle-harness.test.mjs (3.225052ms)
+  ✔ scripts/anydoc-consumer-diagnostic.test.mjs (3.827853ms)
+  ✔ scripts/run-unit-suite.test.mjs (5.012693ms)
+  ✔ scripts/network-catalog-smoke-cleanup.test.mjs (4.828234ms)
+  ✔ scripts/e2e-quarantine.test.mjs (6.130582ms)
+  ✔ scripts/run-strip-types.test.mjs (6.173296ms)
+  ✔ scripts/check-motion-budget.test.mjs (5.788805ms)
+  ✔ scripts/node-runtime-contract.test.mjs (5.79124ms)
+  ✔ scripts/generate-runtime-payload-ledger.test.mjs (4.815184ms)
+  ✔ scripts/unit-test-selection.test.mjs (5.325175ms)
+  ✔ scripts/check-test-selection.test.mjs (4.401439ms)
+  ✔ scripts/explicit-npm-test-selection.test.mjs (5.245915ms)
+  ✔ scripts/anydoc-desktop-renderer-trace.test.mjs (5.131873ms)
+  ✔ scripts/anydoc-pdf-smoke-diagnostics.test.mjs (4.927805ms)
+  ✔ scripts/anydoc-windows-icu-preflight.test.mjs (4.009167ms)
+  ✔ scripts/anydoc-windows-icu-text-smoke.test.mjs (5.634573ms)
+  ✔ scripts/attachments-runtime-columns-migration.test.mjs (4.182609ms)
+  ✔ scripts/build-apple-macos-app.test.mjs (4.111392ms)
+  ✔ scripts/build-mobile-sim-app.test.mjs (3.886712ms)
+  ✔ scripts/check-capability-mapping.test.mjs (4.529042ms)
+  ✔ scripts/check-fabric-headless-plane-inventories.test.mjs (4.900854ms)
+  ✔ scripts/check-headless-semantic-plane.test.mjs (4.056259ms)
+  ✔ scripts/check-standalone-runtime-bundle.test.mjs (3.741783ms)
+  ✔ scripts/check-who-local-sidecar-manifest.test.mjs (5.052062ms)
+  ✔ scripts/icd-docker-packaging-retirement.test.mjs (3.367177ms)
+  ✔ scripts/icd-docker-runtime-retirement.test.mjs (3.331544ms)
+  ✔ scripts/launch-bundled-headless-supervisor.test.mjs (5.062718ms)
+  ✔ scripts/mediflow-headless-supervisor.test.mjs (4.013544ms)
+  ✔ scripts/patient-insight-revision-lifecycle.test.mjs (4.487359ms)
+  ✔ scripts/patient-reference-lifecycle.test.mjs (3.838028ms)
+  ✔ scripts/portable-supervisor-child-shutdown.test.mjs (4.182359ms)
+  ✔ scripts/portable-supervisor-import-urls.test.mjs (4.279485ms)
+  ✔ scripts/run-mini-desktop-acceptance.test.mjs (2.822874ms)
+  ✔ scripts/seed-performance-baseline-currentness.test.mjs (4.155618ms)
+  ✔ scripts/web-auth-control-test-client.test.mjs (3.712289ms)
+  ✔ scripts/web-session-resource-reclamation.test.mjs (4.459858ms)
+  ✔ scripts/mobile-home-base-interop-cas-relay.test.mjs (4.112532ms)
+  ✔ scripts/mobile-home-base-interop-module-verifier.test.mjs (4.791189ms)
+  ✔ scripts/mobile-home-base-interop-response-proxy.test.mjs (3.144961ms)
+  ✔ scripts/mobile-home-base-interop.test.mjs (3.192233ms)
+  ✔ scripts/who-local-loopback-transport.test.mjs (3.025501ms)
+  ✔ scripts/who-local-onboarding-portability.test.mjs (3.754141ms)
+  ✔ scripts/who-local-onboarding.test.mjs (3.06415ms)
+  ✔ scripts/who-local-platform.test.mjs (3.165573ms)
+  ✔ scripts/who-local-setup.test.mjs (3.264843ms)
+  ✔ scripts/document-evidence-backfill-currentness-cas.test.ts (3.423471ms)
+  ✔ scripts/local-chat-runtime.test.ts (3.675643ms)
+  ✔ scripts/chatgpt-account/account-service.test.ts (3.523162ms)
+  ✔ scripts/chatgpt-account/account-browser.test.ts (3.023198ms)
+  ✔ scripts/chatgpt-account/account-session-http.test.ts (3.515171ms)
+  ✔ scripts/chatgpt-account/account-transport.test.ts (6.935768ms)
+✔ rejects each missing literal even though the rest of the suite is present (377.723887ms)
+✔ rejects a directory at a required script path (7.041488ms)
+✔ the real runner rejects incomplete selection before bootstrap or suite launch (41.006265ms)
+✔ portable script cohort is selected exactly once through the common runner (5.925512ms)
+✔ serial WHO invocations partition the complete selection exactly once (4.915036ms)
+ℹ tests 131
+ℹ suites 0
+ℹ pass 131
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 560.924545
+END selection-fix-tests
+
+BEGIN selection-fix-check bytes=283 sha256=64c90d0e090c9c3cffa8cff4a2d6e3f1e7520c76ca4fa9637c28e50a2fe1e422
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 check:test-selection
+> node scripts/check-test-selection.mjs
+
+Test files: 1062; taken by a suite: 1033; excluded with a reason: 29
+Test selection: COMPLETE
+END selection-fix-check
+
+BEGIN selection-fix-lint bytes=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+END selection-fix-lint
+
+BEGIN envelope-after bytes=51292 sha256=9e1421cfe19383bce7e43567444aa4d016b36c92f43701d8885ed00fac25ae6e
+[
+  "TAP version 13\n",
+  "# API PUT /api/v1/patients/[id] error: SqliteError: synthetic audit failure\n",
+  "#     at PreparedQuery.run (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/better-sqlite3/session.cjs:94:22)\n",
+  "#     at QueryPromise.run (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/sqlite-core/query-builders/insert.cjs:186:28)\n",
+  "#     at writeAuditEventInTransaction (/tmp/mediflow-r08ef12a/envelope-fix/lib/security/audit.ts:292:64)\n",
+  "#     at db_server_1.dbServer.transaction.behavior (/tmp/mediflow-r08ef12a/envelope-fix/lib/patient-update-operation.ts:53:50)\n",
+  "#     at sqliteTransaction (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/better-sqlite3/lib/methods/transaction.js:65:24)\n",
+  "#     at BetterSQLiteSession.transaction (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/better-sqlite3/session.cjs:62:51)\n",
+  "#     at BetterSQLite3Database.transaction (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/sqlite-core/db.cjs:319:25)\n",
+  "#     at updatePatientOperation (/tmp/mediflow-r08ef12a/envelope-fix/lib/patient-update-operation.ts:15:33)\n",
+  "#     at updatePatientProfile (/tmp/mediflow-r08ef12a/envelope-fix/lib/patient-profile-service.ts:74:66)\n",
+  "#     at async Object.PUT (/tmp/mediflow-r08ef12a/envelope-fix/app/api/v1/patients/[id]/route.ts:58:24) {\n",
+  "#   code: 'SQLITE_CONSTRAINT_TRIGGER'\n",
+  "# }\n",
+  "# API PUT /api/v1/network/patients/[id] error: SqliteError: synthetic audit failure\n",
+  "#     at PreparedQuery.run (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/better-sqlite3/session.cjs:94:22)\n",
+  "#     at QueryPromise.run (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/sqlite-core/query-builders/insert.cjs:186:28)\n",
+  "#     at writeAuditEventInTransaction (/tmp/mediflow-r08ef12a/envelope-fix/lib/security/audit.ts:292:64)\n",
+  "#     at db_server_1.dbServer.transaction.behavior (/tmp/mediflow-r08ef12a/envelope-fix/lib/patient-update-operation.ts:53:50)\n",
+  "#     at sqliteTransaction (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/better-sqlite3/lib/methods/transaction.js:65:24)\n",
+  "#     at BetterSQLiteSession.transaction (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/better-sqlite3/session.cjs:62:51)\n",
+  "#     at BetterSQLite3Database.transaction (/workspace/scratch/40b5a2cd37a4/mediflow/node_modules/drizzle-orm/sqlite-core/db.cjs:319:25)\n",
+  "#     at updatePatientOperation (/tmp/mediflow-r08ef12a/envelope-fix/lib/patient-update-operation.ts:15:33)\n",
+  "#     at updatePatientProfile (/tmp/mediflow-r08ef12a/envelope-fix/lib/patient-profile-service.ts:74:66)\n",
+  "#     at async updateNetworkScopedPatient (/tmp/mediflow-r08ef12a/envelope-fix/lib/network-patient-write.ts:106:20) {\n",
+  "#   code: 'SQLITE_CONSTRAINT_TRIGGER'\n",
+  "# }\n",
+  "# Subtest: web rejects null JSON envelope with 400 and no state/audit change\n",
+  "ok 1 - web rejects null JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 19.647074\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web rejects array JSON envelope with 400 and no state/audit change\n",
+  "ok 2 - web rejects array JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 4.943268\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web rejects string JSON envelope with 400 and no state/audit change\n",
+  "ok 3 - web rejects string JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 3.676024\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web rejects number JSON envelope with 400 and no state/audit change\n",
+  "ok 4 - web rejects number JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 3.231882\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web rejects boolean JSON envelope with 400 and no state/audit change\n",
+  "ok 5 - web rejects boolean JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 4.073766\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web rejects malformed JSON envelope with 400 and no state/audit change\n",
+  "ok 6 - web rejects malformed JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 2.74684\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web rejects empty JSON envelope with 400 and no state/audit change\n",
+  "ok 7 - web rejects empty JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 2.448079\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web accepts valid object and required C04 audit\n",
+  "ok 8 - web accepts valid object and required C04 audit\n",
+  "  ---\n",
+  "  duration_ms: 5.799722\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web denies before reading a poisoned body\n",
+  "ok 9 - web denies before reading a poisoned body\n",
+  "  ---\n",
+  "  duration_ms: 3.570224\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web still treats an audit/database fault as 500 with rollback\n",
+  "ok 10 - web still treats an audit/database fault as 500 with rollback\n",
+  "  ---\n",
+  "  duration_ms: 4.710197\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects null JSON envelope with 400 and no state/audit change\n",
+  "ok 11 - v1 rejects null JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 2.847732\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects array JSON envelope with 400 and no state/audit change\n",
+  "ok 12 - v1 rejects array JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.845318\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects string JSON envelope with 400 and no state/audit change\n",
+  "ok 13 - v1 rejects string JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.734701\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects number JSON envelope with 400 and no state/audit change\n",
+  "ok 14 - v1 rejects number JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 2.099362\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects boolean JSON envelope with 400 and no state/audit change\n",
+  "ok 15 - v1 rejects boolean JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.697825\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects malformed JSON envelope with 400 and no state/audit change\n",
+  "ok 16 - v1 rejects malformed JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.96561\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 rejects empty JSON envelope with 400 and no state/audit change\n",
+  "ok 17 - v1 rejects empty JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.979171\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 accepts valid object and required C04 audit\n",
+  "ok 18 - v1 accepts valid object and required C04 audit\n",
+  "  ---\n",
+  "  duration_ms: 3.932832\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 denies before reading a poisoned body\n",
+  "ok 19 - v1 denies before reading a poisoned body\n",
+  "  ---\n",
+  "  duration_ms: 1.818347\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 still treats an audit/database fault as 500 with rollback\n",
+  "ok 20 - v1 still treats an audit/database fault as 500 with rollback\n",
+  "  ---\n",
+  "  duration_ms: 4.685429\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects null JSON envelope with 400 and no state/audit change\n",
+  "ok 21 - network rejects null JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 168.44156\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects array JSON envelope with 400 and no state/audit change\n",
+  "ok 22 - network rejects array JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 2.363782\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects string JSON envelope with 400 and no state/audit change\n",
+  "ok 23 - network rejects string JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.980212\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects number JSON envelope with 400 and no state/audit change\n",
+  "ok 24 - network rejects number JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 2.157219\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects boolean JSON envelope with 400 and no state/audit change\n",
+  "ok 25 - network rejects boolean JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.926701\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects malformed JSON envelope with 400 and no state/audit change\n",
+  "ok 26 - network rejects malformed JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.742362\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network rejects empty JSON envelope with 400 and no state/audit change\n",
+  "ok 27 - network rejects empty JSON envelope with 400 and no state/audit change\n",
+  "  ---\n",
+  "  duration_ms: 1.640469\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network accepts valid object and required C04 audit\n",
+  "ok 28 - network accepts valid object and required C04 audit\n",
+  "  ---\n",
+  "  duration_ms: 4.780593\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network denies before reading a poisoned body\n",
+  "ok 29 - network denies before reading a poisoned body\n",
+  "  ---\n",
+  "  duration_ms: 1.757625\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network still treats an audit/database fault as 500 with rollback\n",
+  "ok 30 - network still treats an audit/database fault as 500 with rollback\n",
+  "  ---\n",
+  "  duration_ms: 4.764779\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network JSON over its existing 4 MiB limit stays 413 before mutation\n",
+  "ok 31 - network JSON over its existing 4 MiB limit stays 413 before mutation\n",
+  "  ---\n",
+  "  duration_ms: 15.172174\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT admits a matching scope assertion through the real resolver and writer\n",
+  "ok 32 - network PUT admits a matching scope assertion through the real resolver and writer\n",
+  "  ---\n",
+  "  duration_ms: 3.71353\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT rejects different scope assertion before body access with zero effects\n",
+  "ok 33 - network PUT rejects different scope assertion before body access with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.777916\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT rejects absent scope before body access with zero effects\n",
+  "ok 34 - network PUT rejects absent scope before body access with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.62115\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web create identity adapter preserves opaque IDs and generates only for omission\n",
+  "ok 35 - web create identity adapter preserves opaque IDs and generates only for omission\n",
+  "  ---\n",
+  "  duration_ms: 4.878161\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST admission precedes poisoned body access\n",
+  "ok 36 - web POST admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 1.729704\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST failed stream is bounded 400 with zero effects\n",
+  "ok 37 - web POST failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 2.175016\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST pre-aborted body has zero effects\n",
+  "ok 38 - web POST pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.659127\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST malformed denied without effects: null\n",
+  "ok 39 - web POST malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.564174\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST malformed denied without effects: []\n",
+  "ok 40 - web POST malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.617223\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST malformed denied without effects: {\n",
+  "ok 41 - web POST malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.375899\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST malformed denied without effects: \"scalar\"\n",
+  "ok 42 - web POST malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.724716\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST malformed denied without effects: \n",
+  "ok 43 - web POST malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.273705\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST chunked oversize (undefined) has zero effects\n",
+  "ok 44 - web POST chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 5.403605\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST chunked oversize (1) has zero effects\n",
+  "ok 45 - web POST chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.777217\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST chunked oversize (nonsense) has zero effects\n",
+  "ok 46 - web POST chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 5.431406\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST chunked oversize (4194305) has zero effects\n",
+  "ok 47 - web POST chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 9.399882\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST abort cancels pending read without effects\n",
+  "ok 48 - web POST abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 13.54137\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST accepts 4194303 bytes and preserves sealed values\n",
+  "ok 49 - web POST accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 17.939123\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web POST accepts 4194304 bytes and preserves sealed values\n",
+  "ok 50 - web POST accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 12.282127\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT admission precedes poisoned body access\n",
+  "ok 51 - web PUT admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 1.706829\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT failed stream is bounded 400 with zero effects\n",
+  "ok 52 - web PUT failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.398633\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT pre-aborted body has zero effects\n",
+  "ok 53 - web PUT pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.476891\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT malformed denied without effects: null\n",
+  "ok 54 - web PUT malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.385062\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT malformed denied without effects: []\n",
+  "ok 55 - web PUT malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.286855\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT malformed denied without effects: {\n",
+  "ok 56 - web PUT malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.399365\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT malformed denied without effects: \"scalar\"\n",
+  "ok 57 - web PUT malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.225041\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT malformed denied without effects: \n",
+  "ok 58 - web PUT malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.279092\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT chunked oversize (undefined) has zero effects\n",
+  "ok 59 - web PUT chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.790608\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT chunked oversize (1) has zero effects\n",
+  "ok 60 - web PUT chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.844399\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT chunked oversize (nonsense) has zero effects\n",
+  "ok 61 - web PUT chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.869478\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT chunked oversize (4194305) has zero effects\n",
+  "ok 62 - web PUT chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.79209\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT abort cancels pending read without effects\n",
+  "ok 63 - web PUT abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 11.789773\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT accepts 4194303 bytes and preserves sealed values\n",
+  "ok 64 - web PUT accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 16.383083\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web PUT accepts 4194304 bytes and preserves sealed values\n",
+  "ok 65 - web PUT accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 16.938402\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE admission precedes poisoned body access\n",
+  "ok 66 - web DELETE admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 2.095235\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE failed stream is bounded 400 with zero effects\n",
+  "ok 67 - web DELETE failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.822484\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE pre-aborted body has zero effects\n",
+  "ok 68 - web DELETE pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.678376\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE malformed denied without effects: null\n",
+  "ok 69 - web DELETE malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 2.325102\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE malformed denied without effects: []\n",
+  "ok 70 - web DELETE malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.731887\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE malformed denied without effects: {\n",
+  "ok 71 - web DELETE malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.982045\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE malformed denied without effects: \"scalar\"\n",
+  "ok 72 - web DELETE malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.759408\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE malformed denied without effects: \n",
+  "ok 73 - web DELETE malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.72127\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE chunked oversize (undefined) has zero effects\n",
+  "ok 74 - web DELETE chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 21.43198\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE chunked oversize (1) has zero effects\n",
+  "ok 75 - web DELETE chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.114206\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE chunked oversize (nonsense) has zero effects\n",
+  "ok 76 - web DELETE chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.73983\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE chunked oversize (4194305) has zero effects\n",
+  "ok 77 - web DELETE chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.144837\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE abort cancels pending read without effects\n",
+  "ok 78 - web DELETE abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 12.127644\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE accepts 4194303 bytes and preserves sealed values\n",
+  "ok 79 - web DELETE accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 8.966127\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: web DELETE accepts 4194304 bytes and preserves sealed values\n",
+  "ok 80 - web DELETE accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 7.650188\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 create identity adapter preserves opaque IDs and generates only for omission\n",
+  "ok 81 - v1 create identity adapter preserves opaque IDs and generates only for omission\n",
+  "  ---\n",
+  "  duration_ms: 4.234507\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST admission precedes poisoned body access\n",
+  "ok 82 - v1 POST admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 1.296088\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST failed stream is bounded 400 with zero effects\n",
+  "ok 83 - v1 POST failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.758557\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST pre-aborted body has zero effects\n",
+  "ok 84 - v1 POST pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.294957\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST malformed denied without effects: null\n",
+  "ok 85 - v1 POST malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.73402\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST malformed denied without effects: []\n",
+  "ok 86 - v1 POST malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.593658\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST malformed denied without effects: {\n",
+  "ok 87 - v1 POST malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.44277\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST malformed denied without effects: \"scalar\"\n",
+  "ok 88 - v1 POST malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.710494\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST malformed denied without effects: \n",
+  "ok 89 - v1 POST malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.774331\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST chunked oversize (undefined) has zero effects\n",
+  "ok 90 - v1 POST chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.916728\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST chunked oversize (1) has zero effects\n",
+  "ok 91 - v1 POST chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.930399\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST chunked oversize (nonsense) has zero effects\n",
+  "ok 92 - v1 POST chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.944349\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST chunked oversize (4194305) has zero effects\n",
+  "ok 93 - v1 POST chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.945251\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST abort cancels pending read without effects\n",
+  "ok 94 - v1 POST abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 11.9669\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST accepts 4194303 bytes and preserves sealed values\n",
+  "ok 95 - v1 POST accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 11.474887\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 POST accepts 4194304 bytes and preserves sealed values\n",
+  "ok 96 - v1 POST accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 17.770579\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT admission precedes poisoned body access\n",
+  "ok 97 - v1 PUT admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 6.568835\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT failed stream is bounded 400 with zero effects\n",
+  "ok 98 - v1 PUT failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 2.069076\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT pre-aborted body has zero effects\n",
+  "ok 99 - v1 PUT pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.752859\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT malformed denied without effects: null\n",
+  "ok 100 - v1 PUT malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.809294\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT malformed denied without effects: []\n",
+  "ok 101 - v1 PUT malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 2.332835\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT malformed denied without effects: {\n",
+  "ok 102 - v1 PUT malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.707029\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT malformed denied without effects: \"scalar\"\n",
+  "ok 103 - v1 PUT malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 2.191411\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT malformed denied without effects: \n",
+  "ok 104 - v1 PUT malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.736684\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT chunked oversize (undefined) has zero effects\n",
+  "ok 105 - v1 PUT chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 34.215235\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT chunked oversize (1) has zero effects\n",
+  "ok 106 - v1 PUT chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.068137\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT chunked oversize (nonsense) has zero effects\n",
+  "ok 107 - v1 PUT chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.885691\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT chunked oversize (4194305) has zero effects\n",
+  "ok 108 - v1 PUT chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.845449\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT abort cancels pending read without effects\n",
+  "ok 109 - v1 PUT abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 12.297009\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT accepts 4194303 bytes and preserves sealed values\n",
+  "ok 110 - v1 PUT accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 8.10837\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 PUT accepts 4194304 bytes and preserves sealed values\n",
+  "ok 111 - v1 PUT accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 7.655837\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE admission precedes poisoned body access\n",
+  "ok 112 - v1 DELETE admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 2.22425\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE failed stream is bounded 400 with zero effects\n",
+  "ok 113 - v1 DELETE failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 2.142517\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE pre-aborted body has zero effects\n",
+  "ok 114 - v1 DELETE pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.514839\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE malformed denied without effects: null\n",
+  "ok 115 - v1 DELETE malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.215046\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE malformed denied without effects: []\n",
+  "ok 116 - v1 DELETE malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.180934\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE malformed denied without effects: {\n",
+  "ok 117 - v1 DELETE malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.407537\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE malformed denied without effects: \"scalar\"\n",
+  "ok 118 - v1 DELETE malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.173713\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE malformed denied without effects: \n",
+  "ok 119 - v1 DELETE malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.202597\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE chunked oversize (undefined) has zero effects\n",
+  "ok 120 - v1 DELETE chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.224202\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE chunked oversize (1) has zero effects\n",
+  "ok 121 - v1 DELETE chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.975476\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE chunked oversize (nonsense) has zero effects\n",
+  "ok 122 - v1 DELETE chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.807873\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE chunked oversize (4194305) has zero effects\n",
+  "ok 123 - v1 DELETE chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.754794\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE abort cancels pending read without effects\n",
+  "ok 124 - v1 DELETE abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 11.767149\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE accepts 4194303 bytes and preserves sealed values\n",
+  "ok 125 - v1 DELETE accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 9.040329\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: v1 DELETE accepts 4194304 bytes and preserves sealed values\n",
+  "ok 126 - v1 DELETE accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 26.384935\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network create identity adapter preserves opaque IDs and generates only for omission\n",
+  "ok 127 - network create identity adapter preserves opaque IDs and generates only for omission\n",
+  "  ---\n",
+  "  duration_ms: 6.892724\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST admission precedes poisoned body access\n",
+  "ok 128 - network POST admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 1.872599\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST failed stream is bounded 400 with zero effects\n",
+  "ok 129 - network POST failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.809714\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST pre-aborted body has zero effects\n",
+  "ok 130 - network POST pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 2.079442\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST malformed denied without effects: null\n",
+  "ok 131 - network POST malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 2.095987\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST malformed denied without effects: []\n",
+  "ok 132 - network POST malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.771507\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST malformed denied without effects: {\n",
+  "ok 133 - network POST malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.907371\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST malformed denied without effects: \"scalar\"\n",
+  "ok 134 - network POST malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.903066\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST malformed denied without effects: \n",
+  "ok 135 - network POST malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.998039\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST chunked oversize (undefined) has zero effects\n",
+  "ok 136 - network POST chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.022578\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST chunked oversize (1) has zero effects\n",
+  "ok 137 - network POST chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.594752\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST chunked oversize (nonsense) has zero effects\n",
+  "ok 138 - network POST chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.879771\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST chunked oversize (4194305) has zero effects\n",
+  "ok 139 - network POST chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.954404\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST abort cancels pending read without effects\n",
+  "ok 140 - network POST abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 11.649713\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST accepts 4194303 bytes and preserves sealed values\n",
+  "ok 141 - network POST accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 9.055962\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network POST accepts 4194304 bytes and preserves sealed values\n",
+  "ok 142 - network POST accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 9.953438\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT admission precedes poisoned body access\n",
+  "ok 143 - network PUT admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 1.591285\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT failed stream is bounded 400 with zero effects\n",
+  "ok 144 - network PUT failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.52178\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT pre-aborted body has zero effects\n",
+  "ok 145 - network PUT pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 7.10197\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT malformed denied without effects: null\n",
+  "ok 146 - network PUT malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.423421\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT malformed denied without effects: []\n",
+  "ok 147 - network PUT malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.496781\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT malformed denied without effects: {\n",
+  "ok 148 - network PUT malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.282418\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT malformed denied without effects: \"scalar\"\n",
+  "ok 149 - network PUT malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.469931\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT malformed denied without effects: \n",
+  "ok 150 - network PUT malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.587849\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT chunked oversize (undefined) has zero effects\n",
+  "ok 151 - network PUT chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.237382\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT chunked oversize (1) has zero effects\n",
+  "ok 152 - network PUT chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.142389\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT chunked oversize (nonsense) has zero effects\n",
+  "ok 153 - network PUT chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.035677\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT chunked oversize (4194305) has zero effects\n",
+  "ok 154 - network PUT chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.843026\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT abort cancels pending read without effects\n",
+  "ok 155 - network PUT abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 12.153382\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT accepts 4194303 bytes and preserves sealed values\n",
+  "ok 156 - network PUT accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 11.592475\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network PUT accepts 4194304 bytes and preserves sealed values\n",
+  "ok 157 - network PUT accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 26.427243\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE admission precedes poisoned body access\n",
+  "ok 158 - network DELETE admission precedes poisoned body access\n",
+  "  ---\n",
+  "  duration_ms: 1.875003\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE failed stream is bounded 400 with zero effects\n",
+  "ok 159 - network DELETE failed stream is bounded 400 with zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.674671\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE pre-aborted body has zero effects\n",
+  "ok 160 - network DELETE pre-aborted body has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 1.377682\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE malformed denied without effects: null\n",
+  "ok 161 - network DELETE malformed denied without effects: null\n",
+  "  ---\n",
+  "  duration_ms: 1.428248\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE malformed denied without effects: []\n",
+  "ok 162 - network DELETE malformed denied without effects: []\n",
+  "  ---\n",
+  "  duration_ms: 1.400846\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE malformed denied without effects: {\n",
+  "ok 163 - network DELETE malformed denied without effects: {\n",
+  "  ---\n",
+  "  duration_ms: 1.48921\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE malformed denied without effects: \"scalar\"\n",
+  "ok 164 - network DELETE malformed denied without effects: \"scalar\"\n",
+  "  ---\n",
+  "  duration_ms: 1.367866\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE malformed denied without effects: \n",
+  "ok 165 - network DELETE malformed denied without effects: \n",
+  "  ---\n",
+  "  duration_ms: 1.441879\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE chunked oversize (undefined) has zero effects\n",
+  "ok 166 - network DELETE chunked oversize (undefined) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.16992\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE chunked oversize (1) has zero effects\n",
+  "ok 167 - network DELETE chunked oversize (1) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 5.04313\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE chunked oversize (nonsense) has zero effects\n",
+  "ok 168 - network DELETE chunked oversize (nonsense) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 4.284673\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE chunked oversize (4194305) has zero effects\n",
+  "ok 169 - network DELETE chunked oversize (4194305) has zero effects\n",
+  "  ---\n",
+  "  duration_ms: 3.996088\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE abort cancels pending read without effects\n",
+  "ok 170 - network DELETE abort cancels pending read without effects\n",
+  "  ---\n",
+  "  duration_ms: 11.903996\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE accepts 4194303 bytes and preserves sealed values\n",
+  "ok 171 - network DELETE accepts 4194303 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 9.231788\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: network DELETE accepts 4194304 bytes and preserves sealed values\n",
+  "ok 172 - network DELETE accepts 4194304 bytes and preserves sealed values\n",
+  "  ---\n",
+  "  duration_ms: 7.884513\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST auth/native/login: admission precedes body; bounded 413 and valid payload\n",
+  "ok 173 - POST auth/native/login: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 330.462931\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/pairing-intents: admission precedes body; bounded 413 and valid payload\n",
+  "ok 174 - POST v1/network/pairing-intents: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 85.775576\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients: admission precedes body; bounded 413 and valid payload\n",
+  "ok 175 - POST v1/network/patients: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 154.848498\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/patients/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 176 - PUT v1/network/patients/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 179.106213\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: DELETE v1/network/patients/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 177 - DELETE v1/network/patients/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 148.950135\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients/[id]/restore: admission precedes body; bounded 413 and valid payload\n",
+  "ok 178 - POST v1/network/patients/[id]/restore: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 110.034175\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients/[id]/attachments: admission precedes body; bounded 413 and valid payload\n",
+  "ok 179 - POST v1/network/patients/[id]/attachments: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 103.184725\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/ambulatories: admission precedes body; bounded 413 and valid payload\n",
+  "ok 180 - POST v1/network/ambulatories: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 76.631111\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/ambulatories/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 181 - PUT v1/network/ambulatories/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 79.991657\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: DELETE v1/network/ambulatories/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 182 - DELETE v1/network/ambulatories/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 70.396311\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/ambulatories/clear: admission precedes body; bounded 413 and valid payload\n",
+  "ok 183 - POST v1/network/ambulatories/clear: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 74.284375\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/fse/validate-document: admission precedes body; bounded 413 and valid payload\n",
+  "ok 184 - POST v1/network/fse/validate-document: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 67.332371\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/visit-draft: admission precedes body; bounded 413 and valid payload\n",
+  "ok 185 - POST v1/network/visit-draft: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 69.751496\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients/[id]/entries: admission precedes body; bounded 413 and valid payload\n",
+  "ok 186 - POST v1/network/patients/[id]/entries: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 231.823247\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/patients/[id]/entries/[entryId]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 187 - PUT v1/network/patients/[id]/entries/[entryId]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 187.490191\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients/[id]/therapies: admission precedes body; bounded 413 and valid payload\n",
+  "ok 188 - POST v1/network/patients/[id]/therapies: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 101.744339\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/patients/[id]/therapies/[therapyId]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 189 - PUT v1/network/patients/[id]/therapies/[therapyId]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 110.704321\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients/[id]/checkups: admission precedes body; bounded 413 and valid payload\n",
+  "ok 190 - POST v1/network/patients/[id]/checkups: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 60.81256\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/patients/[id]/checkups/[checkupId]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 191 - PUT v1/network/patients/[id]/checkups/[checkupId]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 60.470644\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/patients/[id]/observations: admission precedes body; bounded 413 and valid payload\n",
+  "ok 192 - POST v1/network/patients/[id]/observations: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 66.514971\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/patients/[id]/observations/[observationId]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 193 - PUT v1/network/patients/[id]/observations/[observationId]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 70.914633\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/service-prescriptions: admission precedes body; bounded 413 and valid payload\n",
+  "ok 194 - POST v1/network/service-prescriptions: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 41.30027\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/service-prescriptions/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 195 - PUT v1/network/service-prescriptions/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 47.97845\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/service-prescription-items: admission precedes body; bounded 413 and valid payload\n",
+  "ok 196 - POST v1/network/service-prescription-items: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 39.176161\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/service-prescription-items/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 197 - PUT v1/network/service-prescription-items/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 38.690343\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: POST v1/network/prosthetic-prescriptions: admission precedes body; bounded 413 and valid payload\n",
+  "ok 198 - POST v1/network/prosthetic-prescriptions: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 54.110715\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: PUT v1/network/prosthetic-prescriptions/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "ok 199 - PUT v1/network/prosthetic-prescriptions/[id]: admission precedes body; bounded 413 and valid payload\n",
+  "  ---\n",
+  "  duration_ms: 38.225919\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: patient PUT checks mode, capability, account session and scope before reading\n",
+  "ok 200 - patient PUT checks mode, capability, account session and scope before reading\n",
+  "  ---\n",
+  "  duration_ms: 61.496624\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: patient PUT rejects a different scope assertion before parsing or service effects\n",
+  "ok 201 - patient PUT rejects a different scope assertion before parsing or service effects\n",
+  "  ---\n",
+  "  duration_ms: 14.199614\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: patient PUT admits a matching scope assertion with the original request and payload\n",
+  "ok 202 - patient PUT admits a matching scope assertion with the original request and payload\n",
+  "  ---\n",
+  "  duration_ms: 13.545096\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: malformed login and ambulatory DELETE keep existing fallback, not size rejection\n",
+  "ok 203 - malformed login and ambulatory DELETE keep existing fallback, not size rejection\n",
+  "  ---\n",
+  "  duration_ms: 35.408283\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: JSON route inventory stays bounded and has no alternate unbounded body reader\n",
+  "ok 204 - JSON route inventory stays bounded and has no alternate unbounded body reader\n",
+  "  ---\n",
+  "  duration_ms: 23.03348\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "# Subtest: patient JSON wrapper inventory rejects hidden alternate request readers\n",
+  "ok 205 - patient JSON wrapper inventory rejects hidden alternate request readers\n",
+  "  ---\n",
+  "  duration_ms: 13.843947\n",
+  "  type: 'test'\n",
+  "  ...\n",
+  "1..205\n",
+  "# tests 205\n",
+  "# suites 0\n",
+  "# pass 205\n",
+  "# fail 0\n",
+  "# cancelled 0\n",
+  "# skipped 0\n",
+  "# todo 0\n",
+  "# duration_ms 3199.500673\n"
+]
+END envelope-after
+
+BEGIN envelope-lint bytes=0 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+END envelope-lint
+
+BEGIN envelope-typecheck bytes=180 sha256=579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> medical-record-app@0.9.0 typecheck
+> tsc -p tsconfig.typecheck.json --noEmit
+
+END envelope-typecheck

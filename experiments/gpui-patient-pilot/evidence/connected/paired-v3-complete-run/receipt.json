@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "synthetic": true,
+  "protocolId": "paired-v3-snapshot-2",
+  "provenance": {
+    "baseHead": "d0cd18f1b4d1e96ac37712415ae9b42fd059d062",
+    "hostDiffSha256": "dc0b26ae3fcdacbb0e966078f0e4520a6d03ed9f824f820c20713693d6ba6045",
+    "sourceManifestSha256": "99f19668731fdd7c944ef8da04e974488e8ce05b808fe9da2f3c4bee67b7d590",
+    "copiedFileCount": 1926,
+    "ownerVersion": "0.8.11",
+    "ownerPhysicalCopy": true,
+    "nodeVersion": "v24.19.0",
+    "rustProbeSha256": "75d84cc1a08f032a30a73f0cddedf68da17c7d7d51a6ab75bbd96f7de228f228",
+    "runtimeMode": "Next dev --webpack; optimized Rust probe supplied by caller"
+  },
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "snapshotCanonicalSha256": "f29750364416db67b7eaee5180712fb482c245a3194943dde45bef21c00e1e43",
+  "sampleOrder": "Alternating JS/Rust after one discarded warm-up per client; each sample authenticates a fresh session.",
+  "observations": {
+    "javascript": {
+      "login": {
+        "samples": 5,
+        "medianMs": 350.689831,
+        "minMs": 337.230823,
+        "maxMs": 399.881216
+      },
+      "snapshot": {
+        "samples": 5,
+        "medianMs": 363.753442,
+        "minMs": 342.256899,
+        "maxMs": 403.55197499999997
+      }
+    },
+    "rust": {
+      "login": {
+        "samples": 5,
+        "medianMs": 306.055346,
+        "minMs": 279.60533100000004,
+        "maxMs": 343.08828
+      },
+      "snapshot": {
+        "samples": 5,
+        "medianMs": 466.12681299999997,
+        "minMs": 425.03569600000003,
+        "maxMs": 557.077462
+      }
+    }
+  },
+  "qualification": "Diagnostic end-to-end timings on a Next development host. Login includes v3 KDF and HTTP; snapshot includes each client's own protocol preflights. These are not production startup, RSS, rendering or intrinsic language speed measurements.",
+  "checkedWrites": true,
+  "resourceWriteProtocolId": "paired-v3-resource-writes-1",
+  "resourceWritesSha256": "5a3bbfa8fb1b4054afaaa1dfa5ba5f4ee04f2d615626c6d18abe803f168e5103",
+  "checkedResourceWrites": true,
+  "completedAt": "2026-10-17T16:28:35.671Z",
+  "ownedRuntimeRemoved": true
+}

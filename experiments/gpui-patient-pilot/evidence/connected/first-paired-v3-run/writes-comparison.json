@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "protocolId": "paired-v3-snapshot-1",
+  "baseUrl": "http://127.0.0.1:38027",
+  "archiveGeneration": "c4f884bb-6a15-48a9-a353-6902f2aa6a1d",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "snapshotCanonicalSha256": "ada5e5c1d4ecbe3aaf9207690e4049208387c5b5861a7ad350eb1c7f7c365ffa",
+  "checkedWrites": true,
+  "observedDifference": "JavaScript rejects another submit through its journal; Rust requires a new read receipt. Both local retries sent no second write.",
+  "scope": "Declared synthetic read projections, decryption, and explicitly exercised versioned writes. UI, IME, accessibility, durability and complete feature equivalence are not measured by this protocol."
+}

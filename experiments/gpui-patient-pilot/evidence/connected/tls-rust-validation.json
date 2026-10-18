@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "checkedAtUtc": "2026-10-17T16:04:17.560129+00:00",
+  "binarySha256": "2b5438daea465b18d222bcda9442c49e9eca0e82bc9f6d2fb13a242b12f76f07",
+  "certificateDerSha256": "33cd9d8440df702f691768ea4d118a927dd77995afa960c62aeee9df3602f25e",
+  "correctPin": {
+    "result": "pass",
+    "scopeSnapshotRead": true,
+    "clinicalWritesRequested": false,
+    "applicationRequests": 23
+  },
+  "wrongPin": {
+    "result": "blocked-before-http",
+    "phase": "login",
+    "reason": "transport",
+    "applicationRequests": 0,
+    "handshakeFailures": 1
+  },
+  "counts": {
+    "before": {
+      "applicationRequests": 0,
+      "handshakeFailures": 0
+    },
+    "afterCorrectPin": {
+      "applicationRequests": 23,
+      "handshakeFailures": 0
+    },
+    "afterWrongPin": {
+      "applicationRequests": 23,
+      "handshakeFailures": 1
+    }
+  },
+  "result": "pass"
+}

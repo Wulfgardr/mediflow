@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "mode": "candidate",
+  "baseUrl": "http://127.0.0.1:43183",
+  "corpusId": "mediflow-transition-2026-10-17",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "sourceWorkspace": "/tmp/mediflow-transition-keyboard-recovery-BlD3Fu/candidate-current",
+  "authCredential": "passphrase-v3",
+  "requestedCapabilities": [
+    "network.ambulatories.write",
+    "network.replica.readonly-patients",
+    "network.replica.write-patient-profile",
+    "network.replica.write-patient-lifecycle",
+    "network.replica.readonly-clinical-diary",
+    "network.replica.write-clinical-diary",
+    "network.replica.readonly-therapies",
+    "network.replica.write-therapies",
+    "network.replica.readonly-observations",
+    "network.replica.write-observations",
+    "network.replica.readonly-checkups",
+    "network.replica.write-checkups",
+    "network.replica.readonly-documents",
+    "network.replica.write-documents",
+    "network.replica.readonly-agenda",
+    "network.replica.readonly-clinical-diary-global",
+    "network.catalogs.readonly"
+  ],
+  "grantedCapabilities": [
+    "network.ambulatories.write",
+    "network.replica.readonly-patients",
+    "network.replica.write-patient-profile",
+    "network.replica.write-patient-lifecycle",
+    "network.replica.readonly-clinical-diary",
+    "network.replica.write-clinical-diary",
+    "network.replica.readonly-therapies",
+    "network.replica.write-therapies",
+    "network.replica.readonly-observations",
+    "network.replica.write-observations",
+    "network.replica.readonly-checkups",
+    "network.replica.write-checkups",
+    "network.replica.readonly-documents",
+    "network.replica.write-documents",
+    "network.replica.readonly-agenda",
+    "network.replica.readonly-clinical-diary-global",
+    "network.catalogs.readonly"
+  ],
+  "fixtureIds": {
+    "elena": "d713dc01-c6e3-4a6e-a503-000000000001",
+    "bruno": "d713dc01-c6e3-4a6e-a503-000000000002",
+    "amina": "d713dc01-c6e3-4a6e-a503-000000000003",
+    "carlo": "d713dc01-c6e3-4a6e-a503-000000000004",
+    "nora": "d713dc01-c6e3-4a6e-a503-000000000005"
+  },
+  "scope": "29e3945e-2570-4fcf-9495-893028e2292e",
+  "mainPatientVersion": 1,
+  "counts": {
+    "patients": 5,
+    "entries": 2,
+    "therapies": 1,
+    "observations": 2,
+    "checkups": 1,
+    "attachments": 1
+  },
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/api/auth/check",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/passphrase",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ambulatories",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/settings/network.mode",
+      "status": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/api/settings/clinicName",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000002",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000003",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000004",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000005",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries/d713dc02-c6e3-4a6e-a503-000000000001",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries/d713dc02-c6e3-4a6e-a503-000000000002",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/entries",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/therapies/d713dc03-c6e3-4a6e-a503-000000000001",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/therapies",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/observations/d713dc04-c6e3-4a6e-a503-000000000001",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/observations",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/observations/d713dc04-c6e3-4a6e-a503-000000000002",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/observations",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/checkups/d713dc05-c6e3-4a6e-a503-000000000001",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001/checkups",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/attachments/d713dc06-c6e3-4a6e-a503-000000000001",
+      "status": 404
+    },
+    {
+      "method": "POST",
+      "path": "/api/attachments",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/network/pairing-intents",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/network/pairing-intents/62502771-79b6-4929-b27b-d7af9e2a3283/confirm",
+      "status": 201
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients/d713dc01-c6e3-4a6e-a503-000000000001",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/patients",
+      "status": 200
+    }
+  ],
+  "completedAt": "2026-10-17T20:24:17.584Z",
+  "qualification": "Synthetic seed completed through ordinary endpoints; no UI or performance qualification."
+}

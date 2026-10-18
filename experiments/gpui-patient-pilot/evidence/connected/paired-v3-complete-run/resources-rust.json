@@ -1,0 +1,144 @@
+{
+  "archiveGeneration": "407b62fb-75ed-4af6-b4c7-c06d739efd19",
+  "baseUrl": "http://127.0.0.1:42247",
+  "client": "rust",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "protocolId": "paired-v3-snapshot-2",
+  "resourceWrites": {
+    "attachment": {
+      "bytesSha256": "7e33b9beda70bec9cb3aaabac9d222f9782860cb7e38b2da7cfdc8c92abf23e2",
+      "created": true,
+      "dataSha256": "94b9569bf67d17870d282597265c6bb31fbde565ab85fe9a9c5723283fa9d9d1",
+      "listPayloadOmitted": true,
+      "nameSha256": "d4707678d7526959ff32eed7d9365bc9733d15354fd545bda46796beaec120bc",
+      "readback": true,
+      "size": 44
+    },
+    "checkups": {
+      "createdProjectionSha256": "aafbe603165ac1288403c19a1fedf40162fdf14db1073c64c5bd9f88b5af3a2e",
+      "createdVersion": 1,
+      "readback": true,
+      "stalePreserved": true,
+      "staleStatus": 409,
+      "updatedProjectionSha256": "dd59d86ab3387d21be7354822aa15a06281aede9d9a79d47e5e5a02985222a26",
+      "updatedVersion": 2
+    },
+    "fixtureSha256": "5a3bbfa8fb1b4054afaaa1dfa5ba5f4ee04f2d615626c6d18abe803f168e5103",
+    "observations": {
+      "createdProjectionSha256": "9b1842d2f1c12e9475bab955c3bca8e0f327284631e464fa7e67eef2bcba3f67",
+      "createdVersion": 1,
+      "readback": true,
+      "stalePreserved": true,
+      "staleStatus": 409,
+      "updatedProjectionSha256": "cd2d3f1c3d1a69b75993524bc363dd0e79ac3bfa238c1ee361fc3e3fad4e2500",
+      "updatedVersion": 2
+    },
+    "protocolId": "paired-v3-resource-writes-1",
+    "therapies": {
+      "createdProjectionSha256": "922fa6e6df282ed96eeb865c31aadbebd9912e3d227b7ffa52575f983d0a3eed",
+      "createdVersion": 1,
+      "readback": true,
+      "stalePreserved": true,
+      "staleStatus": 409,
+      "updatedProjectionSha256": "191c874510901c6be3fac4b4e60bd3a76696a385349b6d93bd3cffe153c8d186",
+      "updatedVersion": 2
+    }
+  },
+  "result": "pass",
+  "schemaVersion": 1,
+  "snapshot": {
+    "agenda": [
+      {
+        "date": "2026-10-20T09:00:00.000Z",
+        "id": "d713dc05-c6e3-4a6e-a503-000000000001",
+        "notesSha256": "8fbed3bfd2fa3b7e7e1102f4b8f1c526aa85da04a5a23ba77747dec69e0316cf",
+        "patientId": "d713dc01-c6e3-4a6e-a503-000000000001",
+        "status": "pending",
+        "titleSha256": "b6af284d14a38b0608e6ae0cecf3be1e5219f45efe62073d223700bd098f02f6",
+        "version": 1
+      }
+    ],
+    "ambulatories": 1,
+    "archivedPatients": 1,
+    "attachments": [
+      {
+        "dataSha256": "64f972711f81942e2bd318cb2ff00593a77131fd5889c485db78025d09f3e2df",
+        "id": "d713dc06-c6e3-4a6e-a503-000000000001",
+        "nameSha256": "d1422ea29cfc22f3949ee7b8a5cc1727c7873f68e4aa8b25805a11d40d4b71b6",
+        "size": 106
+      }
+    ],
+    "checkups": [
+      {
+        "id": "d713dc05-c6e3-4a6e-a503-000000000001",
+        "notesSha256": "8fbed3bfd2fa3b7e7e1102f4b8f1c526aa85da04a5a23ba77747dec69e0316cf",
+        "version": 1
+      }
+    ],
+    "entries": [
+      {
+        "contentSha256": "768d143ad751d36e4644be30a3ad44635cbd57023b3c6e47ed1a5d33e685b3e1",
+        "id": "d713dc02-c6e3-4a6e-a503-000000000001",
+        "titleSha256": "33e3f39c6eb9d5fb3e636a924b4ce952a80612fe52fd91f1738a895ac60e4508",
+        "version": 1
+      },
+      {
+        "contentSha256": "18f58cb99b0536dddc853f3e11fd80cd030ee2538741c2b1621ed0113e380160",
+        "id": "d713dc02-c6e3-4a6e-a503-000000000002",
+        "titleSha256": "478fbb5bc71d5fd74af462676b2996eab529fe2388864820e5c0875694340ea7",
+        "version": 1
+      }
+    ],
+    "globalDiary": [
+      {
+        "contentSha256": "768d143ad751d36e4644be30a3ad44635cbd57023b3c6e47ed1a5d33e685b3e1",
+        "date": "2026-10-16T09:30:00.000Z",
+        "id": "d713dc02-c6e3-4a6e-a503-000000000001",
+        "patientId": "d713dc01-c6e3-4a6e-a503-000000000001",
+        "setting": "ambulatory",
+        "titleSha256": "33e3f39c6eb9d5fb3e636a924b4ce952a80612fe52fd91f1738a895ac60e4508",
+        "type": "note",
+        "version": 1
+      },
+      {
+        "contentSha256": "18f58cb99b0536dddc853f3e11fd80cd030ee2538741c2b1621ed0113e380160",
+        "date": "2026-10-12T14:00:00.000Z",
+        "id": "d713dc02-c6e3-4a6e-a503-000000000002",
+        "patientId": "d713dc01-c6e3-4a6e-a503-000000000001",
+        "setting": "ambulatory",
+        "titleSha256": "478fbb5bc71d5fd74af462676b2996eab529fe2388864820e5c0875694340ea7",
+        "type": "note",
+        "version": 1
+      }
+    ],
+    "notesSha256": "54dbf5bf81dde7a78f4dee6455da151e342f76b9c84eb5bc445e1e4992006152",
+    "observations": [
+      {
+        "id": "d713dc04-c6e3-4a6e-a503-000000000001",
+        "unitCode": "mm[Hg]",
+        "value": "128",
+        "version": 1
+      },
+      {
+        "id": "d713dc04-c6e3-4a6e-a503-000000000002",
+        "unitCode": "mm[Hg]",
+        "value": "132",
+        "version": 1
+      }
+    ],
+    "patientVersion": 1,
+    "patients": 4,
+    "therapies": [
+      {
+        "id": "d713dc03-c6e3-4a6e-a503-000000000001",
+        "motivationSha256": "1f8d3cbeff1fafe86faa3d7ff32cda5a8ddad7dbaebebf55745353016e52bb4f",
+        "version": 1
+      }
+    ]
+  },
+  "timingsMs": {
+    "login": 322.357463,
+    "snapshot": 552.496598
+  },
+  "writes": null
+}

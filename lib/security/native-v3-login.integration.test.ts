@@ -38,7 +38,7 @@ const username = ['synthetic', 'v3', 'user'].join('-');
 const confirmationPin = ['2', '4', '6', '8'].join('');
 const pairedHeaders = { 'x-mediflow-paired-client-id': clientId, 'x-mediflow-paired-client-token': token };
 dbServer.insert(settings).values({ key: 'network.mode', value: 'network-home-base' }).run();
-function pair(platform: 'macos' | 'ios' | 'ipados' | null) {
+function pair(platform: 'macos' | 'ios' | 'ipados' | 'windows' | 'linux' | null) {
     const state = { ...JSON.parse(serializeNetworkPairingState({ intents: [], clients: platform ? [{ clientId,
         deviceName: 'Synthetic v3 client', clientPlatform: platform, appVersion: null, grantedCapabilities: [],
         pairedAt: '2026-10-16T00:00:00.000Z', lastSeenAt: null, sourceIntentId: 'synthetic-v3-intent',
@@ -98,8 +98,8 @@ test.after(async () => {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     clearAllSessions(); dbServer.$client.close(); fs.rmSync(directory, { recursive: true, force: true });
 });
-test('real HTTPS native routes admit v3 on Mac/iPhone/iPad and reject PIN, mixed input, logout replay and revoked pairing', async () => {
-    for (const platform of ['macos', 'ios', 'ipados'] as const) {
+test('real HTTPS native routes admit v3 on Mac/iPhone/iPad/Windows/Linux and reject PIN, mixed input, logout replay and revoked pairing', async () => {
+    for (const platform of ['macos', 'ios', 'ipados', 'windows', 'linux'] as const) {
         pair(platform);
         const parameters = await call('/api/auth/check');
         assert.deepEqual(parameters.body.unlock, { credential: 'passphrase', kdfVersion: 3, salt: vector.salt });

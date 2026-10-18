@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "mediflow-javascript-gates-1",
+  "result": "pass",
+  "recordedAt": "2026-10-17T17:04:11Z",
+  "repository": "Wulfgardr/mediflow",
+  "runtime": {
+    "nodeVersion": "v24.19.0",
+    "platform": "linux"
+  },
+  "evaluatedSource": {
+    "headSha": "d0cd18f1b4d1e96ac37712415ae9b42fd059d062",
+    "baseRef": "origin/main",
+    "baseSha": "3d4e5f0ffff8367c5be0bb73c62665b7e2eab1af",
+    "workingTreeHadUncommittedChanges": true,
+    "sourceDeltaStatus": "pending integration commit",
+    "sourceDeltaFinalization": "The dirty source delta is finalized and identified by the integration commit. This is a local working-tree receipt, not a remote CI result pinned to a new commit.",
+    "sourceEditsByGateTask": []
+  },
+  "gates": [
+    {
+      "command": "npm run typecheck",
+      "result": "pass",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run lint",
+      "result": "pass",
+      "exitCode": 0,
+      "script": "eslint --quiet"
+    },
+    {
+      "command": "npm run test:test-selection",
+      "result": "pass",
+      "exitCode": 0,
+      "tests": 115,
+      "passed": 115,
+      "failed": 0,
+      "skipped": 0,
+      "sandboxEscalation": true
+    },
+    {
+      "command": "npm run check:test-selection",
+      "result": "pass",
+      "exitCode": 0,
+      "inventory": "COMPLETE",
+      "testFiles": 1060,
+      "takenBySuite": 1031,
+      "excludedWithReason": 29,
+      "sandboxEscalation": true
+    },
+    {
+      "command": "npm run check:never-regress",
+      "result": "pass",
+      "exitCode": 0,
+      "scannedRoots": [
+        "app",
+        "lib",
+        "native"
+      ]
+    },
+    {
+      "command": "npm run check:openapi:drift -- --base-ref origin/main",
+      "result": "pass",
+      "exitCode": 0,
+      "semanticDiffSkipped": false,
+      "sandboxEscalation": true
+    },
+    {
+      "command": "npm run check:openapi:drift -- --self-test",
+      "result": "pass",
+      "exitCode": 0,
+      "passedCases": 15,
+      "totalCases": 15
+    },
+    {
+      "command": "npm run check:claims",
+      "result": "pass",
+      "exitCode": 0,
+      "scannedFiles": 756,
+      "highRiskClaims": 0,
+      "sandboxEscalation": true
+    },
+    {
+      "command": "npm run check:claims -- --self-test",
+      "result": "pass",
+      "exitCode": 0,
+      "syntheticViolationsDetected": 18,
+      "maskingRegressionsDetected": 11,
+      "allowedBoundaryWordingAccepted": true,
+      "sandboxEscalation": true
+    }
+  ],
+  "preliminaryAttempts": {
+    "countedAsVerification": false,
+    "affectedCommands": [
+      "npm run test:test-selection",
+      "npm run check:test-selection",
+      "npm run check:openapi:drift -- --base-ref origin/main"
+    ],
+    "reason": "The restricted context blocked child-process Git execution with EPERM. The initial inventory failed; the initial OpenAPI command skipped its semantic diff after a blocked base read. These commands were rerun successfully with authorized sandbox escalation.",
+    "unresolvedBlockers": []
+  },
+  "connectedRunReview": {
+    "directory": "paired-v3-final-run",
+    "method": "Read-only review and recomputation of the comparator against stored JS/Rust receipts; no new runtime or HTTP tests.",
+    "review": "pass",
+    "storedReceiptFiles": 32,
+    "completedAt": "2026-10-17T16:57:37.669Z",
+    "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+    "profileFixtureSha256": "cc896ab2e91df4843dedb8acbd27eea4ade19031e6c50ab7c462e2f4df6eb3b4",
+    "recomputedProfileComparisonMatchesStored": true,
+    "profileVersions": [
+      1,
+      2,
+      3
+    ],
+    "staleStatus": 409,
+    "distinctPatientIds": true,
+    "snapshotOmitted": true,
+    "ownedRuntimeRemovedObserved": true,
+    "sourceManifestSha256": "a5c9ba28762331bde3216848cd233f037db1766656ec17312519916f61228d5b",
+    "rustProbeSha256": "a44cedface32e41a62339f694614cd0994c07f4bfc0be9fb97fe7c1711c10fd5",
+    "nodeVersion": "v24.19.0",
+    "sourceManifestCanonicalSha256Verified": true,
+    "copiedHostSourceFilesVerified": 1931,
+    "sourceMismatches": 0,
+    "publicJsonFilesInspected": 32,
+    "privateAuthenticationFieldsPresent": false,
+    "comparedProfilesAgainstOwnClientFixtures": true,
+    "authentication401Observation": "Checked on the JavaScript reference HTTP adapter only; no such HTTP observation is attributed to Rust."
+  },
+  "runtimeHandling": {
+    "newRuntimesStartedByGateTask": 0,
+    "persistentRuntimesStoppedByGateTask": 0,
+    "disposableRuntimeFromFinalReceiptObservedRemoved": true
+  },
+  "scope": "Local JavaScript, test-discovery and repository-contract gates. Rust compilation, native GUI behavior and CI for the final integration commit have separate evidence.",
+  "followUps": [
+    {
+      "id": "gpui-drizzle-trigger-coverage",
+      "recordedAt": "2026-10-17T17:41:39.599Z",
+      "result": "pass",
+      "previousReceiptSha256": "b7a2ff6aeb1c3f00736b28c4018d88cac6195655996d7948840910865241193f",
+      "sourceParentHeadSha": "d0cd18f1b4d1e96ac37712415ae9b42fd059d062",
+      "sourceDeltaStatus": "pending integration commit",
+      "change": "Added drizzle/** to pull_request and main push paths in the Rust GPUI workflow and to the selector expected paths, so a database-migration-only change selects the real synthetic runtime comparison.",
+      "sourceFiles": [
+        {
+          "path": ".github/workflows/rust-gpui-pilot.yml",
+          "sha256": "99e556a9b87ea4b3ef6ef21a2b246f0738a5b58bdfd5ca62409c1f7aaafa60ed"
+        },
+        {
+          "path": "scripts/native-tool-test-selection.mjs",
+          "sha256": "7c1f4aa0c7172ee0280e827272c0eadf0a069a54efc8ea69d33a7bee457a3dc0"
+        }
+      ],
+      "validation": [
+        {
+          "command": "node --input-type=module (import and execute collectGpuiPilotSelection and collectGpuiComparisonSelection from scripts/native-tool-test-selection.mjs)",
+          "result": "pass",
+          "exitCode": 0,
+          "selectors": [
+            {
+              "name": "collectGpuiPilotSelection",
+              "selectedFiles": 16,
+              "errors": []
+            },
+            {
+              "name": "collectGpuiComparisonSelection",
+              "selectedFiles": 4,
+              "errors": []
+            }
+          ],
+          "checkedTrigger": "drizzle/**",
+          "checkedEvents": [
+            "pull_request",
+            "push"
+          ]
+        },
+        {
+          "command": "node --test --test-isolation=none --test-name-pattern '^GPUI' --test-reporter=tap scripts/check-test-selection.test.mjs",
+          "result": "pass",
+          "exitCode": 0,
+          "tests": 3,
+          "passed": 3,
+          "failed": 0,
+          "skipped": 0,
+          "testNames": [
+            "GPUI test selection binds the explicit Cargo targets to every native CI platform",
+            "GPUI runtime comparison binds all adapters and preparer to the actual CI command",
+            "GPUI coverage fails closed when Cargo membership, modules or actual CI invocation diverge"
+          ],
+          "sandboxEscalation": false
+        }
+      ],
+      "preliminaryAttempts": [
+        {
+          "command": "node --test --test-name-pattern '^GPUI' scripts/check-test-selection.test.mjs",
+          "exitCode": 0,
+          "countedAsVerification": false,
+          "reason": "The isolated runner only reported one file-level test. The targeted tests were rerun without process isolation to observe all three GPUI test names and outcomes explicitly."
+        }
+      ],
+      "previousExecutionChanged": false,
+      "scope": "Only the two GPUI collectors and their three targeted selector tests were checked. The prior 115-test execution, 1060-file inventory and other gates remain the historical observations above. No broad suite, runtime wrapper or Cargo invocation was repeated."
+    }
+  ]
+}

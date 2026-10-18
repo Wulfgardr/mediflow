@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "paired-v3-patient-profile-1",
+  "result": "pass",
+  "synthetic": true,
+  "client": "javascript",
+  "implementation": "JavaScript production edit session and WebCrypto; reference paired HTTP transport",
+  "baseUrl": "http://127.0.0.1:37743",
+  "archiveGeneration": "ea82b941-e21c-4c55-8c0b-cb1c23f76d90",
+  "corpusSha256": "856df9e282cc803e63d81c45064b2d564fc685381affbba08f4c2d4f65e73b36",
+  "source": {
+    "editorSha256": "42fdb67b60bb1eceb2d6f8c7c84abeba52447bc1331ff0b0509fdb3b18a28b64",
+    "securitySha256": "15e7b3ec814bb5cf1f0ecc1d1bc5391178eefc628b5f77f289aab04f58a4be9e"
+  },
+  "snapshot": null,
+  "snapshotCanonicalSha256": null,
+  "timingsMs": {
+    "login": 411.28027099999997,
+    "snapshot": null
+  },
+  "requestCounts": {
+    "login": 2,
+    "snapshot": 0
+  },
+  "missingSessionStatus": 401,
+  "patientProfileWrites": {
+    "protocolId": "paired-v3-patient-profile-1",
+    "fixtureSha256": "cc896ab2e91df4843dedb8acbd27eea4ade19031e6c50ab7c462e2f4df6eb3b4",
+    "patientIdSha256": "59923067921d6fbbf4161087c5b60359c8be608402e88b3c537e211a1973771b",
+    "taxCodeSha256": "848d56b05a20ad729900d92930e0047acdacec495b133c7f35c53c3ede2102d1",
+    "createdVersion": 1,
+    "updatedVersion": 2,
+    "clearedVersion": 3,
+    "createdProjectionSha256": "de010e265070b74bd5e7ba5af88efdc26b4d14e364ff4af33e11b648288fa283",
+    "updatedProjectionSha256": "a0fe26f5a1463773ef18a1da76c1a816baee1d2f69a903a7d331e03ee05a4959",
+    "clearedProjectionSha256": "d536ace55e0d23bc50df094a16687d4dd0b6dcb2edd09e625c88e670325bad46",
+    "sparsePreserved": true,
+    "clearPreserved": true,
+    "staleStatus": 409,
+    "stalePreserved": true,
+    "readback": true
+  }
+}

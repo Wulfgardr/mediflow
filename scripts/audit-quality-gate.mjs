@@ -72,7 +72,8 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/patients/route.ts', events: ['patient.created'], reason: 'patient creation is a sensitive CRUD path' },
     {
         route: 'app/api/patients/[id]/route.ts', events: ['patient.updated'], reason: 'patient update requires one transactional audit owner',
-        writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
+        writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
+            profileFile: 'lib/patient-profile-service.ts', auditContextExport: 'auditContextFromSession',
             ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
             target: 'patient-update.web', eventType: 'patient.updated', transactionalPatientUpdate: true }],
     },
@@ -85,7 +86,8 @@ const REQUIRED_ROUTE_AUDIT = [
     { route: 'app/api/v1/patients/route.ts', events: ['patient.created'], reason: 'native/shared patient creation must stay auditable' },
     {
         route: 'app/api/v1/patients/[id]/route.ts', events: ['patient.updated'], reason: 'native patient update requires one transactional audit owner',
-        writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-update-operation', serviceExport: 'updatePatientOperation',
+        writerContracts: [{ handler: 'PUT', serviceModule: '@/lib/patient-profile-service', serviceExport: 'updatePatientProfile',
+            profileFile: 'lib/patient-profile-service.ts', auditContextExport: 'auditContextFromRequest',
             ownerFile: 'lib/patient-update-operation.ts', ownerName: 'updatePatientOperation',
             target: 'patient-update.native', eventType: 'patient.updated', transactionalPatientUpdate: true }],
     },
@@ -1252,9 +1254,109 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     return problems;
 }
 
+/* The profile port is an explicit extra hop, never an alternative transaction owner. */
+function validatePatientProfileAuditPort({ spec, routeSource, profileSource }) {
+    const problems = validateDelegatedRouteAudit({
+        spec: { ...spec, ownerName: spec.serviceExport }, routeSource, serviceSource: profileSource,
+    });
+    const profile = checkedSource(spec.profileFile, profileSource);
+    const entry = namedFunction(profile.sourceFile, spec.serviceExport, true);
+    const operation = importedBinding(profile.sourceFile, profile.checker, './patient-update-operation', spec.ownerName);
+    const calls = entry && operation ? bindingCalls(entry, profile.checker, operation.symbol) : [];
+    const call = calls.length === 1 ? calls[0] : null;
+    const contextName = entry?.parameters[0]?.name;
+    const context = contextName && ts.isIdentifier(contextName) ? profile.checker.getSymbolAtLocation(contextName) : null;
+    if (!entry || !operation || !context || entry.parameters.length !== 2
+        || bindingCalls(profile.sourceFile, profile.checker, operation.symbol).length !== 1
+        || bindingIsWritten(entry, profile.checker, context)
+        || bindingIsWritten(profile.sourceFile, profile.checker, operation.symbol)
+        || !call || call.questionDotToken || call.arguments.length !== 1
+        || !ts.isReturnStatement(call.parent) || call.parent.parent !== entry.body
+        || entry.body.statements.at(-1) !== call.parent || !isReachableCall(call, entry)) {
+        problems.push('profile port must directly return exactly one synchronous approved patient-update operation');
+    } else {
+        const input = unwrap(call.arguments[0]);
+        const names = ['patientId', 'expectedVersion', 'values', 'setPrimaryAmbulatory', 'scopeAmbulatoryId', 'authorizeCommit', 'audit'];
+        const properties = ts.isObjectLiteralExpression(input) && input.properties.every((property) =>
+            (ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
+            && !ts.isComputedPropertyName(property.name)
+            && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)))
+            ? new Map(input.properties.map((property) => [property.name.text, property])) : null;
+        const contextProperty = (node, name) => Boolean(node && ts.isPropertyAccessExpression(node)
+            && !node.questionDotToken && node.name.text === name
+            && exactIdentifierBinding(profile.checker, node.expression, context));
+        const audit = properties?.get('audit')?.initializer;
+        if (!properties || input.properties.length !== names.length || properties.size !== names.length
+            || names.some((name) => !properties.has(name))
+            || !['patientId', 'expectedVersion', 'scopeAmbulatoryId'].every((name) =>
+                contextProperty(properties.get(name)?.initializer, name))
+            || properties.get('audit') !== input.properties.at(-1)
+            || !audit || !ts.isCallExpression(audit) || audit.questionDotToken || audit.arguments.length !== 0
+            || !contextProperty(audit.expression, 'audit')) {
+            problems.push('profile port must bind the same patient context and invoke its mandatory audit callback last, directly in the commit input');
+        }
+    }
+
+    const route = checkedSource('route.ts', routeSource);
+    const handler = namedFunction(route.sourceFile, spec.handler, true);
+    const delegate = importedBinding(route.sourceFile, route.checker, spec.serviceModule, spec.serviceExport);
+    const routeCalls = handler && delegate ? bindingCalls(handler, route.checker, delegate.symbol) : [];
+    const routeCall = routeCalls.length === 1 ? routeCalls[0] : null;
+    const input = routeCall?.arguments[0] && unwrap(routeCall.arguments[0]);
+    const callbackProperties = input && ts.isObjectLiteralExpression(input)
+        ? input.properties.filter((property) => ts.isPropertyAssignment(property)
+            && ts.isIdentifier(property.name) && property.name.text === 'audit') : [];
+    const callback = callbackProperties.length === 1 ? callbackProperties[0].initializer : null;
+    const allowedContextExports = ['auditContextFromSession', 'auditContextFromRequest'];
+    const contextImport = allowedContextExports.includes(spec.auditContextExport)
+        ? importedBinding(route.sourceFile, route.checker, '@/lib/security/audit', spec.auditContextExport) : null;
+    const requestIdImport = importedBinding(route.sourceFile, route.checker, '@/lib/security/audit', 'requestIdFromRequest');
+    const statements = callback && ts.isArrowFunction(callback) && ts.isBlock(callback.body)
+        ? [...callback.body.statements] : [];
+    const declaration = statements.length === 2 && ts.isVariableStatement(statements[0])
+        && (statements[0].declarationList.flags & ts.NodeFlags.Const)
+        && statements[0].declarationList.declarations.length === 1 ? statements[0].declarationList.declarations[0] : null;
+    const constructor = declaration?.initializer;
+    const identity = declaration && ts.isIdentifier(declaration.name) ? route.checker.getSymbolAtLocation(declaration.name) : null;
+    const returned = statements[1] && ts.isReturnStatement(statements[1]) ? statements[1].expression : null;
+    const auditProperties = returned && ts.isObjectLiteralExpression(returned)
+        ? exactPropertyAssignments(returned, ['archiveGeneration', 'actorType', 'actorRef', 'sourceSurface', 'requestId', 'flags']) : null;
+    const identityProperty = (node, name) => Boolean(node && ts.isPropertyAccessExpression(node)
+        && !node.questionDotToken && node.name.text === name
+        && exactIdentifierBinding(route.checker, node.expression, identity));
+    const requestId = auditProperties?.get('requestId')?.initializer;
+    const flags = auditProperties?.get('flags')?.initializer;
+    const flag = flags && ts.isArrayLiteralExpression(flags) && flags.elements.length === 1 ? flags.elements[0] : null;
+    if (!routeCall || routeCall.questionDotToken || routeCall.arguments.length !== 2
+        || !input || !ts.isObjectLiteralExpression(input) || input.properties.length !== 3
+        || input.properties.some((property) => !(ts.isPropertyAssignment(property) || ts.isShorthandPropertyAssignment(property))
+            || !ts.isIdentifier(property.name) || !['patientId', 'expectedVersion', 'audit'].includes(property.name.text))
+        || new Set(input.properties.map((property) => property.name.text)).size !== 3
+        || !callback || !ts.isArrowFunction(callback) || callback.parameters.length !== 0
+        || ts.getModifiers(callback)?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+        || !contextImport || !requestIdImport || !identity || !constructor || !ts.isCallExpression(constructor)
+        || constructor.questionDotToken || !exactIdentifierBinding(route.checker, constructor.expression, contextImport.symbol)
+        || bindingCalls(callback, route.checker, contextImport.symbol).length !== 1
+        || !exactArguments(constructor, spec.auditContextExport === 'auditContextFromSession'
+            ? [{ identifier: 'session' }] : [{ identifier: 'request' }, { identifier: 'archiveActorSession' }])
+        || !auditProperties || auditProperties.size !== 6
+        || !['archiveGeneration', 'actorType', 'actorRef', 'sourceSurface'].every((name) =>
+            identityProperty(auditProperties.get(name)?.initializer, name))
+        || !requestId || !ts.isCallExpression(requestId) || requestId.questionDotToken
+        || !exactIdentifierBinding(route.checker, requestId.expression, requestIdImport.symbol)
+        || !exactArguments(requestId, [{ identifier: 'request' }])
+        || !flag || !ts.isTemplateExpression(flag) || flag.head.text !== 'auth:' || flag.templateSpans.length !== 1
+        || flag.templateSpans[0].literal.text !== '' || !identityProperty(flag.templateSpans[0].expression, 'authContext')) {
+        problems.push('profile route must supply a synchronous host-owned audit callback with the approved identity and request fields');
+    }
+    return problems;
+}
+
 /* bounded C04 patient-update contract; this source guard complements the real transaction tests. */
-export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource }) {
-    const problems = validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
+export function validateRequiredPatientUpdateAudit({ spec, routeSource, coreSource, auditSource, profileSource = null }) {
+    const problems = spec.profileFile
+        ? validatePatientProfileAuditPort({ spec, routeSource, profileSource: profileSource ?? '' })
+        : validateDelegatedRouteAudit({ spec, routeSource, serviceSource: coreSource });
     const core = checkedSource(spec.ownerFile, coreSource);
     const owner = namedFunction(core.sourceFile, spec.ownerName, true);
     const db = importedBinding(core.sourceFile, core.checker, './db-server', 'dbServer');
@@ -2579,6 +2681,7 @@ function checkRouteCoverage(findings) {
                         ? validateRequiredPatientUpdateAudit({
                             spec: contract, routeSource: source, coreSource: read(contract.ownerFile),
                             auditSource: read('lib/security/audit.ts'),
+                            profileSource: contract.profileFile && exists(contract.profileFile) ? read(contract.profileFile) : null,
                         })
                     : contract.transactionalPatientDelete
                         ? validateRequiredPatientDeleteAudit({

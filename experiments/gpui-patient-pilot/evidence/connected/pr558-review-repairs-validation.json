@@ -1,0 +1,1197 @@
+{
+  "schemaVersion": 3,
+  "runId": "r08ef12a",
+  "recordedUtc": "2026-10-18T08:54:10.440998+00:00",
+  "candidateParent": "62d876c6b873a1923aeee78732f938ca54ab81b3",
+  "baseMain": "2dde0c0503abf828b99d73d7129cb7beed733044",
+  "publicationAttribution": "This follow-up corrects only the two JSON test harnesses and their evidence. Exact final published head, whole-PR independent review, complete new-head CI, ordinary merge and main CI are recorded on PR #558. The local full-unit attempt is inconclusive; no older CI verdict attests the next head.",
+  "previousValidation": {
+    "commit": "62d876c6b873a1923aeee78732f938ca54ab81b3",
+    "path": "experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-validation.json",
+    "url": "https://github.com/Wulfgardr/mediflow/blob/62d876c6b873a1923aeee78732f938ca54ab81b3/experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-validation.json",
+    "sha256": "c2ba6baacd78a8c5e23143ef1b039413f6166b5ec4410b9ab09a4a666021a3ec",
+    "unchangedRecordedFiles": [
+      "app/api/v1/network/identity/route.ts",
+      "app/api/v1/network/patients/[id]/route.ts",
+      "app/api/v1/network/patients/route.ts",
+      "docs/README.md",
+      "docs/adr/0145-rust-gpui-connected-client.md",
+      "docs/analysis/2026-10-17-rust-gpui-patient-pilot.md",
+      "docs/analysis/2026-10-18-pr558-soft-delete-delivery.md",
+      "docs/markdown-index.md",
+      "docs/openapi/mediflow-v1.yaml",
+      "experiments/gpui-patient-pilot/Cargo.lock",
+      "experiments/gpui-patient-pilot/README.md",
+      "experiments/gpui-patient-pilot/app/Cargo.toml",
+      "experiments/gpui-patient-pilot/app/src/appointments.rs",
+      "experiments/gpui-patient-pilot/app/src/editing.rs",
+      "experiments/gpui-patient-pilot/app/src/main.rs",
+      "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "experiments/gpui-patient-pilot/transport/src/http.rs",
+      "experiments/gpui-patient-pilot/transport/src/session.rs",
+      "lib/api/v1/types.ts",
+      "lib/network-contract.test.ts",
+      "lib/network-contract.ts",
+      "lib/network-identity-model.ts",
+      "lib/network-identity.test.ts",
+      "lib/network-patient-commit-authority.test.ts",
+      "lib/network-patient-commit-authority.ts",
+      "lib/network-request-scope.test.ts",
+      "lib/network-request-scope.ts",
+      "lib/network-write-context.ts",
+      "scripts/check-openapi-drift.mjs",
+      "scripts/check-test-selection.test.mjs",
+      "scripts/native-tool-test-selection.mjs"
+    ],
+    "changedRecordedFiles": [
+      "docs/analysis/2026-10-18-pr558-full-review-repairs.md"
+    ],
+    "interpretation": "31 prior file records still match exactly; only the explanatory document changed. Original source-bound local executions, including CI-01, remain in this immutable prior receipt. The two JSON harnesses are newly recorded here."
+  },
+  "candidateFiles": [
+    {
+      "path": "app/api/v1/network/identity/route.ts",
+      "sha256": "b374205aff15e3576163106d9ac720ded8ad9f2412db732764b8ec77dd8cf932",
+      "gitBlob": "a0cbd36a79b27d3efaa38f7db464efbc80272904"
+    },
+    {
+      "path": "app/api/v1/network/patients/[id]/route.ts",
+      "sha256": "97c58a2ff8d2a18b4502489d775afe188b803ac0fbec8e8c194c8c7d07471c79",
+      "gitBlob": "24eeae062e0421ddb1914bca00dd478ac2797521"
+    },
+    {
+      "path": "app/api/v1/network/patients/route.ts",
+      "sha256": "fd63a4efa4df93b709ea62ade29286814d00f757a4f8d2311c0a1195cbdab645",
+      "gitBlob": "3601d5d68cef1542315079ee5cddc471093d4346"
+    },
+    {
+      "path": "docs/README.md",
+      "sha256": "8e3172fc8449cc8583cc454efd82619e9998e6806cd3dfca124879948086a0ef",
+      "gitBlob": "1eadfc915b20487fd726fc5fbade4522f8e3d061"
+    },
+    {
+      "path": "docs/adr/0145-rust-gpui-connected-client.md",
+      "sha256": "5ed138401d4a6781495916e2ad86b7aaa393f876996ebdd4a64450bd2d173a9a",
+      "gitBlob": "104c1b6b60b0be6eade499e666b4e5342af48843"
+    },
+    {
+      "path": "docs/analysis/2026-10-17-rust-gpui-patient-pilot.md",
+      "sha256": "01d634aae3b2ad3e536ffc3f41ea8afa4d74f6b37305a4e368b94b7600e3a713",
+      "gitBlob": "f4ac75412716c9ff51df6906bfa8275c50641d55"
+    },
+    {
+      "path": "docs/analysis/2026-10-18-pr558-full-review-repairs.md",
+      "sha256": "727b5e1e5d68b4d4e8d3a924dbd6101ba25b3b38a6d71c788b2a6af3ab37dd6f",
+      "gitBlob": "864ac2008e3dbf743af023b2a59acc4d7793d8e5"
+    },
+    {
+      "path": "docs/analysis/2026-10-18-pr558-soft-delete-delivery.md",
+      "sha256": "0af473484dc460dd108b04439ea1f67637814155ca0c1983459bb2fbc3577c98",
+      "gitBlob": "bc2f6a8c237e9114bbc5249bfaa43a1469dde7be"
+    },
+    {
+      "path": "docs/markdown-index.md",
+      "sha256": "4977a41e81b132b91d50923df7b4c30e04d2028eec8b0a011933a3e1680a79f2",
+      "gitBlob": "f1109e0d5bcbb46b2b27782e99a854aeaf96f777"
+    },
+    {
+      "path": "docs/openapi/mediflow-v1.yaml",
+      "sha256": "c2f7f26990470166dd1bc7ecf642f1b51a6fa04649dc16ebfb2b81b99431f31a",
+      "gitBlob": "5cf77190e8378921ea054e79704dbbe7a5afb72c"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/Cargo.lock",
+      "sha256": "69b2278918d3c832755ece9c6986e3bbe1676bc9c90a1af1b7a147ade53ef01c",
+      "gitBlob": "3bd93eb7163061d96eebaab2c1807b4c336f10e6"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/README.md",
+      "sha256": "cd3d2cda4fbdf5bb3b4140597b14419c332c0cb01a6daf86c774861f546c7efa",
+      "gitBlob": "c1dd94c11b98921b4c04bb63a7bf5ffc7f1ec72b"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/Cargo.toml",
+      "sha256": "ab2efd205743067706f3c2125643377e5e353bc4f46ba37c43d6e14b58e66694",
+      "gitBlob": "1c558342ab8827df13b860f3794c9e48250de617"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/appointments.rs",
+      "sha256": "58b298ad408bbb1693731732c242145aeb52cfa62b9cf8cd5076176d70d160d9",
+      "gitBlob": "35d4f68654c3cb00dcf215ed9a7d5ff69b1daa93"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/editing.rs",
+      "sha256": "e68ef09f9884da35de002303631120b98a96a97c74de84e2d616ffe32da3ea5b",
+      "gitBlob": "20d9f8ccb2309600ecaef6188681e40de2385a53"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/main.rs",
+      "sha256": "d95fba8d3e77e6482b477bc50854d669735969c9ae8fd627d8f340a6d8172708",
+      "gitBlob": "7abf031bece3ac2ea176a0fd35149a92f92cc342"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/app/src/shell.rs",
+      "sha256": "27c0542a584d8029dc881a107441312ca639540cc762ecec76432cdca0c5372e",
+      "gitBlob": "f21d3294ff8a7ffbab44809902642e0101dcc2da"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/transport/src/http.rs",
+      "sha256": "2530a94f62269ece9c4042ac2f56d55754a4faf73cd71c715f4f73008ebab5c6",
+      "gitBlob": "16fb17776fffefd9a1b2010f7c0db5cc173cdea9"
+    },
+    {
+      "path": "experiments/gpui-patient-pilot/transport/src/session.rs",
+      "sha256": "70d97c172b1db9b5c70f28e0612508ce28f5fb2fbe27e9ee6fbb2e2f3a4e62e5",
+      "gitBlob": "5c59be80dcbf0e38114471f34c6a640320515827"
+    },
+    {
+      "path": "lib/api/v1/types.ts",
+      "sha256": "f9049b327a1a890f9a239284a39ba758cdb329d7b97f80120520a11105ee17ab",
+      "gitBlob": "959bb02841c574db48add40e8d4d7330817c9190"
+    },
+    {
+      "path": "lib/network-contract.test.ts",
+      "sha256": "2925d93490d13adb18f9b60647f4df75b5bcab5a31179491367a0ebf61bacd3e",
+      "gitBlob": "2945f42698902a041545b9e35019675f55cd5893"
+    },
+    {
+      "path": "lib/network-contract.ts",
+      "sha256": "da443921dd6d2a8833291997d3bab002f1035feaf75bd962fd722787dcd147b8",
+      "gitBlob": "af486e4cf6e9413134cdd79b6487400a2a987180"
+    },
+    {
+      "path": "lib/network-identity-model.ts",
+      "sha256": "108f9411fdd20a1613dea6dd1cc40b54bfe7c63dc5beaf985d5245a943d39e14",
+      "gitBlob": "c54e758d34e2e12bb8cf804c9a31982b095e187d"
+    },
+    {
+      "path": "lib/network-identity.test.ts",
+      "sha256": "46412a06f677df474ab39382b91a33c51ab5cd638e1f83ef6294fcbd5c38a2e0",
+      "gitBlob": "2ae6534fd80a0776367d8f801e97bd562ba53624"
+    },
+    {
+      "path": "lib/network-patient-commit-authority.test.ts",
+      "sha256": "c836da5edcfb0954b2f3a60ee5609a84d863e808cfd08dd066dc46ebf33de6a3",
+      "gitBlob": "b0f5f2e5951e16f3825169c8ee8107812bca2ba1"
+    },
+    {
+      "path": "lib/network-patient-commit-authority.ts",
+      "sha256": "77b148f00accca48575cf557dfd73e2f5f4b0994380b7787a8d0c5bb355a5345",
+      "gitBlob": "cfb8a0e72b9e16de2a634e8446124847783ad254"
+    },
+    {
+      "path": "lib/network-request-scope.test.ts",
+      "sha256": "3eeb1f02ac3ef217a910f153a40f67d7a459331639924c04adbc7cbc78338b5a",
+      "gitBlob": "e9d0d86274cbfd00f9c1216121bc44cd12bcfece"
+    },
+    {
+      "path": "lib/network-request-scope.ts",
+      "sha256": "d2fd017d7e82ad100c3fd40c9328562daf68c55a5837529f813f9784e8dce9b1",
+      "gitBlob": "e0224c46683535e51a925f2f22d0a0c5a718f33f"
+    },
+    {
+      "path": "lib/network-write-context.ts",
+      "sha256": "b00479d124894aa598b99d2c21e683cb3b1f8d2d22fa516e6e4675227c60fc74",
+      "gitBlob": "505c84c8ea2a42bcae0fa4e8245f362c0a745230"
+    },
+    {
+      "path": "lib/patient-json-envelope.test.ts",
+      "sha256": "1d26cf35d6dbb455cf0cb2b0ce067d283400c35e30da7bc1ca82b76f5306127c",
+      "gitBlob": "4fde5737ae0b80a895742aab336304f87b72f897"
+    },
+    {
+      "path": "scripts/check-openapi-drift.mjs",
+      "sha256": "9f94a9365a7d277d822c44e67b347d056d00cea0c2336f12fffed8edb3f53dd2",
+      "gitBlob": "6e53a1609c3ab3d408ca39783eecdc9bfba9c968"
+    },
+    {
+      "path": "scripts/check-test-selection.test.mjs",
+      "sha256": "878d580e7e11994d959ec4627d6f55106511635494c53beef77b1badc3ba34be",
+      "gitBlob": "0ec2ce947b739c2884da9d98309ffcccb140fb26"
+    },
+    {
+      "path": "scripts/native-network-bounded-json.test.mjs",
+      "sha256": "0748493f069990f1d963cd336b8a1afa2ebd6f5bb106a0837b3516dc186e5ce9",
+      "gitBlob": "67f03d6ca6723abed412cb1dd0382ef67468d4b0"
+    },
+    {
+      "path": "scripts/native-tool-test-selection.mjs",
+      "sha256": "21c05afe6ed9bc013c2d010ddea26358cbbeb42b01ff4f7e3bf05794a03bf4fd",
+      "gitBlob": "def3d8e1f6a99e929c5b8b48052169a4d4b29c86"
+    }
+  ],
+  "environment": {
+    "platform": "Linux x64",
+    "node": "24.19.0",
+    "typescript": "5.9.3",
+    "rust": "1.98.1",
+    "data": "New owned temporary synthetic directory, MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1; node scripts/prepare-e2e-db.mjs before the database-backed batch.",
+    "execution": "Authorized normal subprocess and loopback access; no real archive or provider use."
+  },
+  "selectionGuardCorrection": {
+    "author": "/root",
+    "failure": {
+      "run": 39110303479,
+      "job": 117624811357,
+      "head": "8cfb7d7065c7c7f114e49e04bb5412dfcebb3b6e",
+      "checkout": "cb45b9f9a4e395d445447ce4ce412b3c046bc1b3",
+      "localBefore": {
+        "pass": 113,
+        "fail": 2,
+        "skip": 0,
+        "unpublishedLogSha256": "853bb9ef781f664c185b206b1b2b509809c8f63c0ee760f953637a0c2ff758a3",
+        "publishedFailureLog": "https://github.com/Wulfgardr/mediflow/actions/runs/39110303479/job/117624811357"
+      },
+      "cause": "The closed Cargo binding lacked app [dev-dependencies] and the unconditional appointments module prefix."
+    },
+    "localRuns": [
+      {
+        "name": "selection-fix-tests",
+        "command": [
+          "npm",
+          "run",
+          "test:test-selection"
+        ],
+        "startedAt": "2026-10-18T08:15:42.353121+00:00",
+        "exitCode": 0,
+        "wallSeconds": 0.717,
+        "log": "/tmp/mediflow-r08ef12a/selection-fix-tests.log",
+        "logSha256": "51c172dc4c37593be2171165dbeffe03dd07e797881fd52e29093c7c5d49e998"
+      },
+      {
+        "name": "selection-fix-check",
+        "command": [
+          "npm",
+          "run",
+          "check:test-selection"
+        ],
+        "startedAt": "2026-10-18T08:15:43.070006+00:00",
+        "exitCode": 0,
+        "wallSeconds": 0.616,
+        "log": "/tmp/mediflow-r08ef12a/selection-fix-check.log",
+        "logSha256": "64c90d0e090c9c3cffa8cff4a2d6e3f1e7520c76ca4fa9637c28e50a2fe1e422"
+      },
+      {
+        "name": "selection-fix-lint",
+        "command": [
+          "node",
+          "node_modules/eslint/bin/eslint.js",
+          "--quiet",
+          "scripts/native-tool-test-selection.mjs",
+          "scripts/check-test-selection.test.mjs"
+        ],
+        "startedAt": "2026-10-18T08:15:43.685886+00:00",
+        "exitCode": 0,
+        "wallSeconds": 1.167,
+        "log": "/tmp/mediflow-r08ef12a/selection-fix-lint.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "counts": {
+      "pass": 131,
+      "fail": 0,
+      "skip": 0,
+      "newNegativeSubtests": 15
+    },
+    "inventory": {
+      "testFiles": 1062,
+      "selected": 1033,
+      "existingReasonedExclusions": 29,
+      "status": "COMPLETE",
+      "exclusionsModified": false
+    },
+    "scope": "Two guard/test files only; explicit app test-support dependencies and module prefix modeled, target/feature/overlay and CI command/platform divergence remain rejected."
+  },
+  "priorLocalCounts": {
+    "scopeIdentityProtocolCommit": {
+      "pass": 101,
+      "fail": 0,
+      "skip": 0
+    },
+    "tombstoneStatic": {
+      "pass": 12,
+      "fail": 0,
+      "skip": 0
+    },
+    "openapiSelftest": {
+      "pass": 28,
+      "fail": 0
+    },
+    "transport": {
+      "pass": 30,
+      "fail": 0,
+      "ignored": 0,
+      "filtered": 0
+    },
+    "gpui": {
+      "pass": 53,
+      "fail": 0,
+      "ignored": 0,
+      "filtered": 0
+    }
+  },
+  "combinedLog": {
+    "path": "experiments/gpui-patient-pilot/evidence/connected/pr558-review-repairs-local.log",
+    "bytes": 99891,
+    "sha256": "71b1e960e4eb8fe10dfd3d305b478067816a5e72750d9885c491584bdef2d36b",
+    "sections": [
+      {
+        "section": "scope-final-unit",
+        "bytes": 23735,
+        "sha256": "b3dff8237c532b1b95d82f1a1fa80223f26d6dc092e5dff60d2748f43f7c3575"
+      },
+      {
+        "section": "scope-final-tombstone-static",
+        "bytes": 1473,
+        "sha256": "f45570ea14433d7c7c94b5716b7c202074d2bfde389199daba6b4c05f29530c9"
+      },
+      {
+        "section": "scope-final-openapi-selftest",
+        "bytes": 1873,
+        "sha256": "ec17ff1d5407b401fdc6a320bbf47458880b8975b52cd1d690dc3d58c1564d02"
+      },
+      {
+        "section": "scope-final-openapi-verified",
+        "bytes": 31,
+        "sha256": "7f0815b325bd7532f6e7ad9f78ccd71e05bc2a5ef3bda0114e6aefa177174f39"
+      },
+      {
+        "section": "scope-final-typecheck",
+        "bytes": 180,
+        "sha256": "579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f"
+      },
+      {
+        "section": "scope-final-lint",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "section": "scope-rust-tests",
+        "bytes": 3316,
+        "sha256": "1ac64a7720ac7ef2b7829e7cefed5e14b52ad23bcb2bb764e669b9d7bdee1879"
+      },
+      {
+        "section": "gpui-blocker-tests",
+        "bytes": 5523,
+        "sha256": "6a330d16ebf2dccda013afa93cb70e1e1fa9a3081633a3d30a6b974a976e08c4"
+      },
+      {
+        "section": "gpui-blocker-clippy",
+        "bytes": 174,
+        "sha256": "789b81876a7f26d2678212fad2358e13f770833da814b57b463ca9a54894ab57"
+      },
+      {
+        "section": "selection-fix-tests",
+        "bytes": 9823,
+        "sha256": "51c172dc4c37593be2171165dbeffe03dd07e797881fd52e29093c7c5d49e998"
+      },
+      {
+        "section": "selection-fix-check",
+        "bytes": 283,
+        "sha256": "64c90d0e090c9c3cffa8cff4a2d6e3f1e7520c76ca4fa9637c28e50a2fe1e422"
+      },
+      {
+        "section": "selection-fix-lint",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "section": "envelope-after",
+        "bytes": 51292,
+        "sha256": "9e1421cfe19383bce7e43567444aa4d016b36c92f43701d8885ed00fac25ae6e",
+        "encoding": "json-array-of-utf8-lines",
+        "rawBytes": 42391,
+        "rawSha256": "821f52e786ec46e9e3da56ed0cd008db72e02256b9cb577ac29a47cbd3aa5b3b"
+      },
+      {
+        "section": "envelope-lint",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "section": "envelope-typecheck",
+        "bytes": 180,
+        "sha256": "579d4bca72a72c510704c915c33513533d4a6dd62919df877f2388700e66df2f"
+      }
+    ]
+  },
+  "limits": [
+    "Scope tests invoke existing Request/unit fixtures and direct writer authority; no execution of the blocked actual-route temporal reproducer is claimed. That agent-turn automatic content block was not retried.",
+    "GPUI uses real ClinicalApp with synthetic TestAppContext; connected-session transitions and pending network saves are source-reviewed, not all separately executed.",
+    "Whole-second Checkup persistence is enforced before new or temporal writes; unchanged timestamps retain original bytes. No storage, readback or contract-policy expectations were relaxed.",
+    "Historical screenshots, HTTP comparisons, Mac qualification and compiler receipts retain their own source identities. No new screenshot is published.",
+    "The independent full-PR review, final published CI and ordinary protected merge are separate required dispositions. ADR0145 remains Proposed; optional Swift writer, clinical/installed/mobile/full-parity and reserved GO criteria remain open.",
+    "The new selection checks use static repository fixtures and source discovery. They do not execute GPUI, clinical operations, a native OS window or the blocked HTTP reproducer.",
+    "Prior receipt and its first nine log sections describe the earlier source-bound local runs; the three appended sections contain the final successful guard/check/lint commands. The failed before-case is recorded separately by digest and its matching published CI failure.",
+    "The 297-file source review of 8cfb7d7 is a historical baseline with CI blocked. New whole-PR reconciliation and all required CI checks must succeed for the next published head before ordinary merge.",
+    "CI-02 local full-unit run is inconclusive and was manually stopped for environmental prerequisites; no pass total or completed cleanup is inferred. The separate targeted 205 cases, lint and integrated-tree typecheck passed. Canonical unit completion including serial groups must be verified in new-head CI.",
+    "The 62d full-PR review and all its CI results remain historical. The final diff includes two additional existing harness files; every path must be reconciled with the final published head and actual integration before merge.",
+    "WUL-574 contains a later comparison of patient notes-only versus diary content-only in its full Linear description, attributed to 0de709b8. The older repository F10 table does not prove that a second candidate is missing. Its reconciliation with current writers and all four acceptance criteria is recorded in the final PR/Linear disposition. WUL-735/630 remain Done; reserved GO decisions are separate."
+  ],
+  "jsonHarnessCorrection": {
+    "author": "/root",
+    "productionCodeChanged": false,
+    "failure": {
+      "run": 39111174889,
+      "job": 117627448105,
+      "head": "62d876c6b873a1923aeee78732f938ca54ab81b3",
+      "checkout": "9b157b3a8bc6f66dd9cf03a19a8a33d822fecc81",
+      "url": "https://github.com/Wulfgardr/mediflow/actions/runs/39111174889/job/117627448105",
+      "tests": 7116,
+      "pass": 7057,
+      "fail": 25,
+      "skip": 34,
+      "logSha256": "a46e728bf8ebf449f1a719c79f60d061b236c6146c20c0e332e3a9a4ca5da9ee",
+      "cause": "Both harnesses lacked resolveNetworkScope after the patient PUT route delegated scope resolution; 23 SQLite envelope and 2 bounded JSON cases failed. No CI-01 failures remain."
+    },
+    "targetedBefore": {
+      "head": "62d876c6b873a1923aeee78732f938ca54ab81b3",
+      "tests": 200,
+      "pass": 175,
+      "fail": 25,
+      "skip": 0,
+      "runner": {
+        "schemaVersion": 1,
+        "runId": "r08ef12a",
+        "command": [
+          "node",
+          "scripts/run-strip-types.mjs",
+          "--test",
+          "lib/patient-json-envelope.test.ts",
+          "scripts/native-network-bounded-json.test.mjs"
+        ],
+        "startedAt": "2026-10-18T08:36:10.786663+00:00",
+        "finishedAt": "2026-10-18T08:36:14.179466+00:00",
+        "commandExitCode": 1,
+        "signalsSentByWrapper": 0,
+        "reapedAdoptedChildren": [],
+        "hasRemainingOwnedChildren": false
+      },
+      "unpublishedLogPath": "/tmp/mediflow-r08ef12a/envelope-before.log",
+      "bytes": 49517,
+      "unpublishedLogSha256": "dee20a220f8870298c10733a412029bcc325d776c97b205647ca8a0c362d8ada"
+    },
+    "targetedAfter": {
+      "tests": 205,
+      "pass": 205,
+      "fail": 0,
+      "skip": 0,
+      "existingCasesPreserved": 200,
+      "newCases": 5,
+      "runner": {
+        "schemaVersion": 1,
+        "runId": "r08ef12a",
+        "command": [
+          "node",
+          "scripts/run-strip-types.mjs",
+          "--test",
+          "--test-reporter=tap",
+          "lib/patient-json-envelope.test.ts",
+          "scripts/native-network-bounded-json.test.mjs"
+        ],
+        "startedAt": "2026-10-18T08:38:08.617237+00:00",
+        "finishedAt": "2026-10-18T08:38:12.133895+00:00",
+        "commandExitCode": 0,
+        "signalsSentByWrapper": 0,
+        "reapedAdoptedChildren": [],
+        "hasRemainingOwnedChildren": false
+      },
+      "combinedLogSection": "envelope-after",
+      "logSha256": "821f52e786ec46e9e3da56ed0cd008db72e02256b9cb577ac29a47cbd3aa5b3b",
+      "combinedLogEncoding": "json-array-of-utf8-lines; join the decoded strings to reproduce the exact raw TAP bytes and raw SHA256 without losing trailing spaces in empty-body test names"
+    },
+    "lint": {
+      "command": [
+        "node",
+        "node_modules/eslint/bin/eslint.js",
+        "lib/patient-json-envelope.test.ts",
+        "scripts/native-network-bounded-json.test.mjs"
+      ],
+      "exitCode": 0,
+      "combinedLogSection": "envelope-lint"
+    },
+    "typecheck": {
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "baseCheckout": "9b157b3a8bc6f66dd9cf03a19a8a33d822fecc81",
+      "sourceDelta": [
+        "lib/patient-json-envelope.test.ts",
+        "scripts/native-network-bounded-json.test.mjs"
+      ],
+      "combinedLogSection": "envelope-typecheck"
+    },
+    "localFullUnitAttempt": {
+      "schemaVersion": 1,
+      "runId": "r08ef12a",
+      "headParent": "62d876c6b873a1923aeee78732f938ca54ab81b3",
+      "command": [
+        "npm",
+        "run",
+        "test:unit"
+      ],
+      "sourceFiles": {
+        "lib/patient-json-envelope.test.ts": "1d26cf35d6dbb455cf0cb2b0ce067d283400c35e30da7bc1ca82b76f5306127c",
+        "scripts/native-network-bounded-json.test.mjs": "0748493f069990f1d963cd336b8a1afa2ebd6f5bb106a0837b3516dc186e5ce9"
+      },
+      "startedAt": "2026-10-18T08:39:07.207189+00:00",
+      "exitCode": 143,
+      "finishedAt": "2026-10-18T08:50:00.466351+00:00",
+      "logPath": "/tmp/mediflow-r08ef12a/envelope-full-unit.log",
+      "syntheticDataDir": "/tmp/mediflow-ci02-unit-oztthiwk",
+      "legacyCopyDisabled": true,
+      "syntheticDataRemoved": true,
+      "status": "INCONCLUSIVE_ENVIRONMENT_INTERRUPTED",
+      "publishedRawLog": false,
+      "manualStop": {
+        "schemaVersion": 1,
+        "runId": "r08ef12a",
+        "at": "2026-10-18T08:50:00.443867+00:00",
+        "reason": "Local full-unit attempt cannot attest CI: inherited New York timezone, missing Chromium, dependencies outside PDF package root, and uid0 cannot exercise post-stop chmod500 denial. Only the identified owned blocked unit process tree was stopped. No test expectation changed. Canonical completion is required in new-head Web Core.",
+        "signals": [
+          {
+            "pid": 79790,
+            "signal": "SIGTERM",
+            "parent": 79669
+          },
+          {
+            "pid": 79669,
+            "signal": "SIGTERM",
+            "parent": 78651
+          },
+          {
+            "pid": 78651,
+            "signal": "SIGTERM",
+            "parent": 69860
+          },
+          {
+            "pid": 69860,
+            "signal": "SIGTERM",
+            "parent": 69846
+          },
+          {
+            "pid": 69846,
+            "signal": "SIGTERM",
+            "parent": 69828
+          },
+          {
+            "pid": 69828,
+            "signal": "SIGTERM",
+            "parent": 69827
+          }
+        ]
+      },
+      "subreaper": {
+        "schemaVersion": 1,
+        "runId": "r08ef12a",
+        "command": [
+          "npm",
+          "run",
+          "test:unit"
+        ],
+        "startedAt": "2026-10-18T08:39:07.229490+00:00",
+        "finishedAt": "2026-10-18T08:50:00.460759+00:00",
+        "commandExitCode": 143,
+        "signalsSentByWrapper": 0,
+        "reapedAdoptedChildren": [
+          {
+            "pid": 70081,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 70102,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 70155,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 76997,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 78551,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 78562,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 82090,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84174,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84198,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84209,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84221,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84255,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84271,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84278,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84303,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 84330,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86071,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86139,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86219,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86232,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86251,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86258,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86271,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86284,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86314,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86321,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86340,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86422,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86482,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86552,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86605,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86657,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86674,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86726,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86782,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86790,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86804,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86829,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86851,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86873,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86894,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 86947,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87079,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87107,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87119,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87162,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87167,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87193,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87217,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87226,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87265,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87278,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87360,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87381,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87437,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87448,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87509,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87519,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87576,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87587,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87653,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87664,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87724,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87756,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87772,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87911,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 87966,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88054,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88063,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88193,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88278,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88498,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88505,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88537,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88562,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88642,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88728,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88734,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88756,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88952,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 88964,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 89019,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 91347,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 91890,
+            "waitStatus": 15,
+            "exitCode": -15
+          },
+          {
+            "pid": 91812,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 91839,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 91854,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 96127,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 98362,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 100469,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 100731,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 102905,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 102973,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 103081,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 103210,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 103339,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 105435,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 105659,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 105964,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 107600,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 109221,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 109357,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 109660,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 109920,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 110180,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 110440,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 110555,
+            "waitStatus": 0,
+            "exitCode": 0
+          },
+          {
+            "pid": 69846,
+            "waitStatus": 15,
+            "exitCode": -15
+          }
+        ],
+        "hasRemainingOwnedChildren": true
+      },
+      "blockedSyntheticFixtureCleanup": {
+        "at": "2026-10-18T08:51:21.816928+00:00",
+        "syntheticPath": "/tmp/mediflow-managed-web-synthetic-WfZhYA",
+        "remainingProcesses": [],
+        "removed": true
+      },
+      "interpretation": "No complete unit PASS or total is claimed. Serial unit groups were not reached. The new-head Web Core canonical test:unit command must complete successfully before merge. Zero helper signals does not mean zero manual interruption or synchronous cleanup: see manualStop and hasRemainingOwnedChildren.",
+      "logSha256AtRunnerReturn": "7ad575619f45219f3964a688a2d25046a2f257a4e553238f93c487556dbf2f6f",
+      "logSnapshotAfterStop": {
+        "recordedAt": "2026-10-18T09:02:36.544583+00:00",
+        "unpublishedPath": "/tmp/mediflow-r08ef12a/envelope-full-unit.log",
+        "bytes": 927926,
+        "sha256": "05a975785518d9840d40397adaa55e4b7ed13cfdace1597c26f1cbb8cc8efcc5"
+      },
+      "originalRunnerReceipt": {
+        "unpublishedPath": "/tmp/mediflow-r08ef12a/envelope-full-unit-receipt.json",
+        "sha256": "696dadb328ac79ccd77a5dd04270bfd219919f70caeb616cf6cd3f7f5d78a065"
+      },
+      "logAttribution": "The log digest captured at runner return and the later post-stop snapshot differ; both are retained explicitly. The parent return was not a synchronous end/cleanup of every owned child. Neither log snapshot establishes complete unit execution or a PASS total."
+    },
+    "environmentDiagnostics": [
+      {
+        "finding": "Inherited OS timezone America/New_York changed UTC-midnight date fixtures; explicitly setting TZ=UTC restored the isolated AI context case. No application/test changes.",
+        "unpublishedLogPath": "/tmp/mediflow-r08ef12a/envelope-unit-environment-diagnostic.log",
+        "bytes": 5742,
+        "unpublishedLogSha256": "d46cc3399a95d329335b3049f59682ac572f9f2d94d86eb73f250a1f0dcbb476"
+      },
+      {
+        "finding": "Pinned Chromium headless executable was missing; UTC AI context case passed while browser and PDF prerequisites still failed.",
+        "unpublishedLogPath": "/tmp/mediflow-r08ef12a/envelope-unit-prerequisites-diagnostic.log",
+        "bytes": 3144,
+        "unpublishedLogSha256": "77f287a24fbc81d81f19f1666083daa93ecb26ce92ec839678219ed55a490a17"
+      },
+      {
+        "finding": "The PDF worker denied dependencies outside its package root. Copying installed dependencies into the integration checkout restored the isolated mixed-PDF fixture without changing read permissions.",
+        "unpublishedLogPath": "/tmp/mediflow-r08ef12a/envelope-unit-contained-deps.log",
+        "bytes": 341,
+        "unpublishedLogSha256": "be7e537f7a301afb5fc1574138a67a240f298eef9670ca16553110c93622c0ba"
+      },
+      {
+        "finding": "Official pinned full Chromium download returned truncated/invalid ZIP; installer exit1. No alternate version, dependency bypass or paid provider.",
+        "unpublishedLogPath": "/tmp/mediflow-r08ef12a/envelope-playwright-install.log",
+        "bytes": 4947,
+        "unpublishedLogSha256": "1b6c5286e74ec4888020e1b4a369162fbb88005dd93aa0e7fbaca1700fe9584f"
+      },
+      {
+        "finding": "Official --only-shell pinned Chromium download also returned truncated/invalid ZIP; installer exit1.",
+        "unpublishedLogPath": "/tmp/mediflow-r08ef12a/envelope-playwright-shell-install.log",
+        "bytes": 5178,
+        "unpublishedLogSha256": "410279f753741c29730da613c215cdb203a9f8996983264a6a08c9fd4bf2deec"
+      }
+    ],
+    "validationBoundary": "Real resolveNetworkScope and bindNetworkRequestScope execute under closed synthetic identity/auth dependencies. All prior JSON size/error/abort/cancel/no-state/audit assertions remain. Missing scope still denies before headers/body/parse; mismatching assertion denies before body/service. No generic exclusions or always-success scope stubs."
+  }
+}

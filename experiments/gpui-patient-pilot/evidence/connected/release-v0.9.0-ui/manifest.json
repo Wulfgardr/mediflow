@@ -1,0 +1,577 @@
+{
+  "schema": "mediflow.release-ui-artifact-subset.v1",
+  "assembledAt": "2026-10-17T16:43:02.097162+00:00",
+  "repository": "Wulfgardr/mediflow",
+  "release": {
+    "tag": "v0.9.0",
+    "commit": "9c7b3adf2eb18551b7c03b61e0fa6ee2303d31d0",
+    "url": "https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0"
+  },
+  "checkout": {
+    "commit": "8e0a4e9bde7cc2d115c627cd5f25142091aa1b8d",
+    "kind": "pull-request merge",
+    "tree": "13a1cf283dc18dbf06a0dad3f55d48f741e326e7",
+    "releaseTree": "13a1cf283dc18dbf06a0dad3f55d48f741e326e7",
+    "sameSourceTreeAsRelease": true,
+    "verifiedBy": [
+      "https://api.github.com/repos/Wulfgardr/mediflow/commits/8e0a4e9bde7cc2d115c627cd5f25142091aa1b8d",
+      "https://api.github.com/repos/Wulfgardr/mediflow/commits/9c7b3adf2eb18551b7c03b61e0fa6ee2303d31d0"
+    ]
+  },
+  "workflowRun": {
+    "id": 38783064909,
+    "attempt": 1,
+    "name": "E2E (Playwright)",
+    "workflowPath": ".github/workflows/e2e.yml",
+    "headSha": "9c7b3adf2eb18551b7c03b61e0fa6ee2303d31d0",
+    "event": "pull_request",
+    "conclusion": "success",
+    "url": "https://github.com/Wulfgardr/mediflow/actions/runs/38783064909"
+  },
+  "artifact": {
+    "id": 11998142170,
+    "name": "playwright-report",
+    "bytes": 13064604,
+    "sha256": "c731dc0bdb4da2717142e17d1eb2e6013f8ab9dd45b8e96449adbbb0c984af8a",
+    "githubDigestMatchesDownloadedBytes": true,
+    "createdAt": "2026-10-15T18:29:59Z",
+    "expiresAt": "2026-10-22T18:29:57Z",
+    "archiveUrl": "https://api.github.com/repos/Wulfgardr/mediflow/actions/artifacts/11998142170/zip",
+    "originalArchivePublished": false
+  },
+  "reports": [
+    {
+      "path": "playwright-report/index.html",
+      "sha256": "487a8959deec68736ace20a5273a5ba55ad36e081908819f89fe1dd60a093260",
+      "recordedCheckout": "8e0a4e9bde7cc2d115c627cd5f25142091aa1b8d",
+      "startedAt": "2026-10-15T18:10:14.770000+00:00",
+      "stats": {
+        "total": 251,
+        "expected": 198,
+        "unexpected": 0,
+        "flaky": 0,
+        "skipped": 53,
+        "ok": true
+      }
+    },
+    {
+      "path": "playwright-report/official-ui/index.html",
+      "sha256": "aa1cbc3b0381b82fa8cdb2ab89466d6a8402ee7ecee72578e5d023e5b08e08c2",
+      "recordedCheckout": "8e0a4e9bde7cc2d115c627cd5f25142091aa1b8d",
+      "startedAt": "2026-10-15T18:28:23.575000+00:00",
+      "stats": {
+        "total": 6,
+        "expected": 6,
+        "unexpected": 0,
+        "flaky": 0,
+        "skipped": 0,
+        "ok": true
+      }
+    }
+  ],
+  "runtime": {
+    "browser": "Playwright Chromium installed by the pinned workflow",
+    "server": "Next production standalone bundle built by the pinned workflow",
+    "data": "Dedicated synthetic temporary archives, with legacy data copy disabled",
+    "freshCaptureDuringMigration": false
+  },
+  "sourceFileSha256": {
+    "e2e/lume-worklist.spec.ts": "e1e0e81a71efd9f5268da2256c72a128ab676dd00491f39a770c903dec30fa40",
+    "e2e/lume-quadro.spec.ts": "bf40e13e35cd0e03418bfcd89a8261066f9389231b3014554f33b1b4ece23205",
+    "e2e/official-ui.spec.ts": "07de545469c74e5dc1e31935036ac8dcc2cda739426759142e7883e7efe5e4d8",
+    "e2e/work-profile-onboarding.spec.ts": "fb5c0df18c89a4b1f813434942bc5a994945535302f108be764325efdc9b73a6",
+    "e2e/utils.ts": "cd19047c5a938cb703ab51ebe0ba2e0e316dc26eed3a287265c9ea87c79a65b4",
+    ".github/workflows/e2e.yml": "3c888f67094ba3cbef004cadb5fc601ab4e52d1a1cf6a2454aed87f66f2a0c9f",
+    "scripts/prepare-e2e-db.mjs": "8ffa1f030537d00fec69c0ca9a1e54ba13c7eaf124004f2418494a0ada0e6eef"
+  },
+  "screenshots": [
+    {
+      "file": "patient-list-desktop.png",
+      "archivePath": "test-results/lume-worklist-la-worklist--4e0ba-pleto-e-apre-la-sola-Scheda/virtual-wide.png",
+      "sha256": "0aba7501e1f5690e01e51785520b9520cb34e4c8728da5c77d58b85ea383a328",
+      "bytes": 153340,
+      "imageDimensionsPx": {
+        "width": 1440,
+        "height": 900
+      },
+      "viewportCssPx": {
+        "width": 1440,
+        "height": 900
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/?area=incarico",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot; no explicit theme override in this testcase.",
+      "capture": {
+        "sourceLine": 157,
+        "fullPage": false,
+        "animations": "disabled",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "9a9839dcc17c8ceadf44.json",
+        "id": "9a9839dcc17c8ceadf44-53558132cf4f57043754",
+        "title": "la worklist virtuale attraversa l’indice completo e apre la sola Scheda",
+        "source": "e2e/lume-worklist.spec.ts",
+        "sourceSha256": "e1e0e81a71efd9f5268da2256c72a128ab676dd00491f39a770c903dec30fa40",
+        "sourceLine": 95,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:20:46.112Z"
+      },
+      "observedState": "Keyboard-paged virtual list of 120 API-created synthetic records. Desktop includes the selected-record preview; viewport is intentionally scrolled.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-list-phone.png",
+      "archivePath": "test-results/lume-worklist-la-worklist--4e0ba-pleto-e-apre-la-sola-Scheda/virtual-phone.png",
+      "sha256": "b8e27a14fedd07a7a3d7a9db260a910de0238d4e63b8e863a7b8268b74096522",
+      "bytes": 70549,
+      "imageDimensionsPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportCssPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/?area=incarico",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot; no explicit theme override in this testcase.",
+      "capture": {
+        "sourceLine": 165,
+        "fullPage": false,
+        "animations": "disabled",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "9a9839dcc17c8ceadf44.json",
+        "id": "9a9839dcc17c8ceadf44-53558132cf4f57043754",
+        "title": "la worklist virtuale attraversa l’indice completo e apre la sola Scheda",
+        "source": "e2e/lume-worklist.spec.ts",
+        "sourceSha256": "e1e0e81a71efd9f5268da2256c72a128ab676dd00491f39a770c903dec30fa40",
+        "sourceLine": 95,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:20:46.112Z"
+      },
+      "observedState": "Keyboard-paged virtual list of 120 API-created synthetic records. Desktop includes the selected-record preview; viewport is intentionally scrolled.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-quadro-light-desktop.png",
+      "archivePath": "test-results/lume-quadro-quadro-Lume-giorno-wide/quadro.png",
+      "sha256": "96ff238664896664d73d748840d4054e877e9c307b6a55a6bc153cb06753633b",
+      "bytes": 106091,
+      "imageDimensionsPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportCssPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/modules#quadro",
+      "theme": "light",
+      "themeBasis": "Test sets mediflow-theme plus the production root light/dark class.",
+      "capture": {
+        "sourceLine": 199,
+        "fullPage": true,
+        "animations": "disabled",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "f17e551a9d043333d58c.json",
+        "id": "f17e551a9d043333d58c-451e154d1270cfd61f34",
+        "title": "quadro Lume giorno wide",
+        "source": "e2e/lume-quadro.spec.ts",
+        "sourceSha256": "bf40e13e35cd0e03418bfcd89a8261066f9389231b3014554f33b1b4ece23205",
+        "sourceLine": 190,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:18:13.633Z"
+      },
+      "observedState": "Actual synoptic patient reader with API-created diagnosis, therapy, observation and planned checkup. Focus and internal scroll position result from prior keyboard assertions; phone captures do not contain the full patient header.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-quadro-dark-desktop.png",
+      "archivePath": "test-results/lume-quadro-quadro-Lume-grafite-wide/quadro.png",
+      "sha256": "f0f9541a493194f22d61292fd67de020d7edeae376975a557a6ef0003131f04a",
+      "bytes": 107851,
+      "imageDimensionsPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportCssPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/modules#quadro",
+      "theme": "dark",
+      "themeBasis": "Test sets mediflow-theme plus the production root light/dark class.",
+      "capture": {
+        "sourceLine": 199,
+        "fullPage": true,
+        "animations": "disabled",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "f17e551a9d043333d58c.json",
+        "id": "f17e551a9d043333d58c-d327e2b2dfe5e1bf246e",
+        "title": "quadro Lume grafite wide",
+        "source": "e2e/lume-quadro.spec.ts",
+        "sourceSha256": "bf40e13e35cd0e03418bfcd89a8261066f9389231b3014554f33b1b4ece23205",
+        "sourceLine": 190,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:18:35.634Z"
+      },
+      "observedState": "Actual synoptic patient reader with API-created diagnosis, therapy, observation and planned checkup. Focus and internal scroll position result from prior keyboard assertions; phone captures do not contain the full patient header.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-quadro-light-phone.png",
+      "archivePath": "test-results/lume-quadro-quadro-Lume-giorno-phone/quadro.png",
+      "sha256": "426c83252396b1189f425a3881ec94c61043169d5e22600eeebbb3f28b37c73b",
+      "bytes": 49565,
+      "imageDimensionsPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportCssPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/modules#quadro",
+      "theme": "light",
+      "themeBasis": "Test sets mediflow-theme plus the production root light/dark class.",
+      "capture": {
+        "sourceLine": 199,
+        "fullPage": true,
+        "animations": "disabled",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "f17e551a9d043333d58c.json",
+        "id": "f17e551a9d043333d58c-0063adf64224908428b8",
+        "title": "quadro Lume giorno phone",
+        "source": "e2e/lume-quadro.spec.ts",
+        "sourceSha256": "bf40e13e35cd0e03418bfcd89a8261066f9389231b3014554f33b1b4ece23205",
+        "sourceLine": 190,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:18:02.676Z"
+      },
+      "observedState": "Actual synoptic patient reader with API-created diagnosis, therapy, observation and planned checkup. Focus and internal scroll position result from prior keyboard assertions; phone captures do not contain the full patient header.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-quadro-dark-phone.png",
+      "archivePath": "test-results/lume-quadro-quadro-Lume-grafite-phone/quadro.png",
+      "sha256": "c3dfefdc705fe408c980c959f44ee1363a5640646087dfde144e08a8487fd0a4",
+      "bytes": 50158,
+      "imageDimensionsPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportCssPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/modules#quadro",
+      "theme": "dark",
+      "themeBasis": "Test sets mediflow-theme plus the production root light/dark class.",
+      "capture": {
+        "sourceLine": 199,
+        "fullPage": true,
+        "animations": "disabled",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "f17e551a9d043333d58c.json",
+        "id": "f17e551a9d043333d58c-f3c4558f487d76b335a8",
+        "title": "quadro Lume grafite phone",
+        "source": "e2e/lume-quadro.spec.ts",
+        "sourceSha256": "bf40e13e35cd0e03418bfcd89a8261066f9389231b3014554f33b1b4ece23205",
+        "sourceLine": 190,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:18:24.655Z"
+      },
+      "observedState": "Actual synoptic patient reader with API-created diagnosis, therapy, observation and planned checkup. Focus and internal scroll position result from prior keyboard assertions; phone captures do not contain the full patient header.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-diary-desktop.png",
+      "archivePath": "test-results/official-ui/official-ui-both-layouts-r-8698f-ow-and-short-viewport-sizes/stream-1440.png",
+      "sha256": "4cf9146e4a5c502e97bac8eb05ca46c3b67996184f010acdd4f32443eca9a10a",
+      "bytes": 88685,
+      "imageDimensionsPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportCssPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/modules",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot; testcase varies composition preference, not theme.",
+      "capture": {
+        "sourceLine": 297,
+        "fullPage": false,
+        "animations": "default",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/official-ui/index.html",
+        "embeddedReportData": "afd5e34c9b1a2214428e.json",
+        "id": "afd5e34c9b1a2214428e-35f0e821654ace818421",
+        "title": "both layouts reload and reflow at desktop, phone, narrow and short viewport sizes",
+        "source": "e2e/official-ui.spec.ts",
+        "sourceSha256": "07de545469c74e5dc1e31935036ac8dcc2cda739426759142e7883e7efe5e4d8",
+        "sourceLine": 281,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:28:39.604Z"
+      },
+      "observedState": "Actual patient record containing a synthetic entry written and read by the preceding serial testcase. The phone screenshot shows the entry header but its body continues below the viewport.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "patient-diary-phone.png",
+      "archivePath": "test-results/official-ui/official-ui-both-layouts-r-8698f-ow-and-short-viewport-sizes/stream-390.png",
+      "sha256": "a8bbbaa50ed2d6f0931cdcc5488e75efcc98cdb8905ded0facc59cd07f25f873",
+      "bytes": 58187,
+      "imageDimensionsPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportCssPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/modules",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot; testcase varies composition preference, not theme.",
+      "capture": {
+        "sourceLine": 297,
+        "fullPage": false,
+        "animations": "default",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/official-ui/index.html",
+        "embeddedReportData": "afd5e34c9b1a2214428e.json",
+        "id": "afd5e34c9b1a2214428e-35f0e821654ace818421",
+        "title": "both layouts reload and reflow at desktop, phone, narrow and short viewport sizes",
+        "source": "e2e/official-ui.spec.ts",
+        "sourceSha256": "07de545469c74e5dc1e31935036ac8dcc2cda739426759142e7883e7efe5e4d8",
+        "sourceLine": 281,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:28:39.604Z"
+      },
+      "observedState": "Actual patient record containing a synthetic entry written and read by the preceding serial testcase. The phone screenshot shows the entry header but its body continues below the viewport.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "new-entry-desktop.png",
+      "archivePath": "test-results/official-ui/official-ui-both-layouts-r-8698f-ow-and-short-viewport-sizes/entry-1440.png",
+      "sha256": "3d500264eec36886b1f67a28f7bc44d268bbc1138c90c7a4e25ce3ea1e26ec62",
+      "bytes": 85997,
+      "imageDimensionsPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportCssPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/entries/new",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot; testcase varies composition preference, not theme.",
+      "capture": {
+        "sourceLine": 302,
+        "fullPage": false,
+        "animations": "default",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/official-ui/index.html",
+        "embeddedReportData": "afd5e34c9b1a2214428e.json",
+        "id": "afd5e34c9b1a2214428e-35f0e821654ace818421",
+        "title": "both layouts reload and reflow at desktop, phone, narrow and short viewport sizes",
+        "source": "e2e/official-ui.spec.ts",
+        "sourceSha256": "07de545469c74e5dc1e31935036ac8dcc2cda739426759142e7883e7efe5e4d8",
+        "sourceLine": 281,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:28:39.604Z"
+      },
+      "observedState": "Actual empty new-entry composer, after the testcase selected stream composition.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "new-entry-phone.png",
+      "archivePath": "test-results/official-ui/official-ui-both-layouts-r-8698f-ow-and-short-viewport-sizes/entry-390.png",
+      "sha256": "0a00ac9478923f60034e9197911c43124e1ca39e0d4b73e1e488113b96e15229",
+      "bytes": 54710,
+      "imageDimensionsPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportCssPx": {
+        "width": 390,
+        "height": 844
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/patients/{synthetic-id}/entries/new",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot; testcase varies composition preference, not theme.",
+      "capture": {
+        "sourceLine": 302,
+        "fullPage": false,
+        "animations": "default",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/official-ui/index.html",
+        "embeddedReportData": "afd5e34c9b1a2214428e.json",
+        "id": "afd5e34c9b1a2214428e-35f0e821654ace818421",
+        "title": "both layouts reload and reflow at desktop, phone, narrow and short viewport sizes",
+        "source": "e2e/official-ui.spec.ts",
+        "sourceSha256": "07de545469c74e5dc1e31935036ac8dcc2cda739426759142e7883e7efe5e4d8",
+        "sourceLine": 281,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:28:39.604Z"
+      },
+      "observedState": "Actual empty new-entry composer, after the testcase selected stream composition.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    },
+    {
+      "file": "settings-profile-desktop.png",
+      "archivePath": "test-results/work-profile-onboarding-on-8df2f-entry-conflict-and-rollback/saved-profile.png",
+      "sha256": "b214e8d4ce7c8d75bc214b8ca5551e7851a2b4833e4b8d03c1a1148856c1344b",
+      "bytes": 87545,
+      "imageDimensionsPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportCssPx": {
+        "width": 1440,
+        "height": 960
+      },
+      "viewportBasis": "Explicit setViewportSize in the pinned test source; PNG IHDR dimensions match.",
+      "routeTemplate": "/settings/profilo",
+      "theme": "light",
+      "themeBasis": "Theme observed in the preserved screenshot.",
+      "capture": {
+        "sourceLine": 157,
+        "fullPage": true,
+        "animations": "default",
+        "modified": false
+      },
+      "test": {
+        "report": "playwright-report/index.html",
+        "embeddedReportData": "5d6a7345b4fb00c292fa.json",
+        "id": "5d6a7345b4fb00c292fa-fe29c5b08ab2544b89c4",
+        "title": "onboarding: persisted preview, resume, changed recommendation, manual entry, conflict and rollback",
+        "source": "e2e/work-profile-onboarding.spec.ts",
+        "sourceSha256": "fb5c0df18c89a4b1f813434942bc5a994945535302f108be764325efdc9b73a6",
+        "sourceLine": 8,
+        "status": "passed",
+        "retry": 0,
+        "startedAt": "2026-10-15T18:28:10.802Z"
+      },
+      "observedState": "Actual settings profile after accepted Agent work-profile readback. Displays the synthetic Dr. E2E Smoke and Ambulatorio E2E fixture. The testcase used deliberate conflict/lost-response interception earlier and removed those routes before this screenshot.",
+      "inspection": {
+        "realApplicationScreen": true,
+        "loadingOrErrorOnly": false,
+        "syntheticOnly": true,
+        "inspectedOriginalBytes": true
+      }
+    }
+  ],
+  "subset": {
+    "count": 11,
+    "pngBytes": 912678,
+    "reencodedOrCropped": false,
+    "archiveDuplicatePngsOmitted": true,
+    "videosTracesLogsRecoveryMaterialOmitted": true
+  },
+  "limits": [
+    "Historical CI screenshots from 2026-10-15; extraction is not a fresh UI execution or a fresh visual acceptance test.",
+    "Fixtures differ from the JS/Rust connected-comparison corpus. These images support review of layout and visual conventions, not pixel equality or same-record functional parity.",
+    "Only the selected viewports and displayed states are preserved. Patient-list navigation is paged; some patient and settings content lies below or outside the captured viewport.",
+    "The four quadro images exercise light/dark via the production CSS class and storage contract, not a user theme-switch interaction.",
+    "The official UI report is a separate successful six-test production run; its same tests are deliberately skipped in the main report. Do not turn the main report skips into passes.",
+    "The artifact includes other screenshots and test material. This subset deliberately omits them and does not claim exhaustive release UI coverage."
+  ]
+}

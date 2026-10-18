@@ -1,0 +1,30 @@
+[package]
+name = "mediflow-runtime-client"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "mediflow-runtime-probe"
+path = "src/bin/mediflow-runtime-probe.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+aes-gcm = { version = "0.10", features = ["zeroize"] }
+base64 = "0.22"
+getrandom = "0.3"
+hkdf = "0.12"
+pbkdf2 = "0.12"
+sha2 = "0.10"
+subtle = "2.6"
+unicode-normalization = "0.1"
+zeroize = { version = "1.8", features = ["derive"] }
