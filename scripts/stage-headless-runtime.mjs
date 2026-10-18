@@ -74,10 +74,14 @@ async function trace(nodeFileTrace, seeds, root, options = {}) {
   });
   if (result.warnings.size) deny(`Headless trace is not closed:\n${[...result.warnings].map(value => value.message).sort().join('\n')}`);
   return [...result.fileList].sort().map(relative => {
+    if (privateDatabaseDependency(relative)) deny('Unexpected Headless database dependency.');
     const file = path.join(root, relative);
     if (!file.startsWith(`${root}${path.sep}`) || path.normalize(file) !== file) deny('Trace escaped its root.');
     physicalPath(file); return relative.split(path.sep).join('/');
   });
+}
+export function privateDatabaseDependency(file) {
+  return /\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal|mj[0-9a-f]+))?$/iu.test(file.replaceAll('\\', '/'));
 }
 // NFT supplies native relative paths, including backslashes on Windows.
 export function sharedRuntimeDependency(file) {
@@ -92,11 +96,17 @@ async function sourceClosure() {
     // Share the already-normalized SQLite loader/native target, never a second Mach-O.
     // Web standalone is shared separately. Mini is a different delivery lane,
     // and SQLite uses the normalized/signed copy already inside the app.
-    ignore: file => sharedRuntimeDependency(file)
+    ignore: file => privateDatabaseDependency(file) || sharedRuntimeDependency(file)
       || file.replaceAll('\\', '/') === 'scripts/headless-web-server.mjs',
     readFile: async file => {
+      if (!file.startsWith(`${ROOT}${path.sep}`) || path.normalize(file) !== file) deny('Headless trace escaped its root.');
+      if (privateDatabaseDependency(file)) return null;
       let bytes;
-      try { bytes = await fs.promises.readFile(file, 'utf8'); }
+      try {
+        if (fs.lstatSync(file).isDirectory()) return null;
+        physicalPath(file);
+        bytes = await fs.promises.readFile(file, 'utf8');
+      }
       catch (error) { if (error.code === 'ENOENT' || error.code === 'EISDIR') return null; throw error; }
       return /\.[cm]?[jt]sx?$/u.test(file) && !file.includes(`${path.sep}node_modules${path.sep}`)
         ? traceSourceText(ts, file, bytes, ROOT) : bytes;
