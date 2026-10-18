@@ -126,10 +126,14 @@ umana monouso ed estrazione portabile restano WUL-584/580.
 ### Operazione clinica e capacità intelligenti
 
 `PATIENT_PROFILE_READ_OPERATION` in [patient-profile-query](../lib/patient-profile-query.ts)
-è il descrittore host versionato `patient-profile.read.v1`, usato dalla
-costruzione e dal dispatch della query. Non concede capacità, non registra
-un nuovo writer e non è il registro completo delle future operazioni del
-pilota. Il catalogo [application-operation-registry](../lib/headless/application-operation-registry.ts)
+identifica `patient-profile.read.v1`, usato dalla costruzione e dal dispatch della
+query. `PATIENT_PROFILE_UPDATE_OPERATION` in [patient-profile-update-contract](../lib/patient-profile-update-contract.ts)
+identifica `patient-profile.update.v1`, versione 1: `updatePatientProfile` ne
+assegna il discriminatore interno e `updatePatientOperation` ne verifica identità e
+versione prima di aprire la transazione esistente. Il body non sceglie il
+dispatch. Questi contratti operativi coprono lettura e UPDATE della verticale;
+non concedono capacità, non registrano un nuovo writer e non sono il registro
+completo delle future operazioni del pilota. Il catalogo [application-operation-registry](../lib/headless/application-operation-registry.ts)
 resta statico `denied/unavailable`, con riferimenti operativi null; i cataloghi
 intelligenti/Fabric conservano i propri owner. Nessun agente ottiene un
 commit dalla presenza del descrittore di lettura.
