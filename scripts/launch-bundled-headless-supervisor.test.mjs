@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { physicalRecord, physicalFiles, sha256 } from './launch-bundled-headless-supervisor.mjs';
-import { appLayout, checkHeadlessRuntime, sharedRuntimeDependency, traceSourceText } from './stage-headless-runtime.mjs';
+import { appLayout, checkHeadlessRuntime, headlessTraceReadPath, privateDatabaseDependency, sharedRuntimeDependency, traceSourceText } from './stage-headless-runtime.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const template = fs.readFileSync(new URL('./launch-bundled-headless-supervisor.mjs', import.meta.url), 'utf8');
@@ -243,6 +243,156 @@ test('guarded loader executes the unchanged IPC contract and rejects a foreign m
   });
   assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout, '');
 });
+test('Headless read admission accepts NFT Windows package-export separators while retaining root and dot-segment checks', () => {
+  const root = String.raw`D:\synthetic\project`;
+  const native = String.raw`D:\synthetic\project\node_modules\example\dist\esm\index.js`;
+  assert.equal(path.win32.normalize(root), root);
+  assert.equal(path.win32.normalize(native), native);
+  for (const candidate of [native, String.raw`D:\synthetic\project\node_modules\example/dist/esm/index.js`,
+    'D:/synthetic/project/node_modules/example/dist/esm/index.js']) {
+    assert.equal(headlessTraceReadPath(candidate, root, path.win32), native);
+  }
+  for (const candidate of [String.raw`D:\synthetic\project-other\index.js`, String.raw`D:\synthetic\project\..\outside.js`,
+    String.raw`D:\synthetic\project\node_modules\example/../outside.js`, String.raw`C:\synthetic\project\index.js`,
+    String.raw`D:\synthetic\project\.\index.js`]) {
+    assert.throws(() => headlessTraceReadPath(candidate, root, path.win32), /Headless trace escaped its root/u);
+  }
+});
+test('database exclusions cover case-insensitive SQLite names and sidecars on both path styles, not migration inputs', () => {
+  for (const root of ['', '/synthetic/root/', 'C:\\synthetic\\root\\']) {
+    for (const suffix of ['.db', '.SQLITE', '.sqlite3', '.DB-WAL', '.db-shm', '.sqlite3-journal', '.db-mj1234ABCD']) {
+      assert.equal(privateDatabaseDependency(root + 'archive' + suffix), true);
+    }
+    for (const name of ['drizzle/0000_migration.sql', 'drizzle/meta/_journal.json', 'node_modules/better-sqlite3/index.js', 'schema.db.js']) {
+      assert.equal(privateDatabaseDependency(root + name), false);
+    }
+  }
+});
+const DATABASE_SENTINELS = ['medical.db', 'nested/archive.SQLITE', 'nested/cache.sqlite3-wal',
+  'nested/archive.db-shm', 'nested/archive.db-journal'];
+function stagingFixture(t, lane) {
+  const f = fixture(t), source = path.join(f.directory, 'synthetic-source');
+  fs.rmSync(f.runtime, { recursive: true }); fs.unlinkSync(f.launcher);
+  const require = createRequire(path.join(ROOT, 'package.json'));
+  const key = `headless-stage-${source}`;
+  const trace = { forced: null, probes: [], results: [] };
+  globalThis[Symbol.for(key)] = trace;
+  t.after(() => { delete globalThis[Symbol.for(key)]; });
+  for (const name of ['scripts/stage-headless-runtime.mjs', 'scripts/launch-bundled-headless-supervisor.mjs',
+    'scripts/node-runtime-contract.mjs']) write(path.join(source, name), fs.readFileSync(path.join(ROOT, name)));
+  write(path.join(source, 'package.json'), JSON.stringify({ engines: { node: '>=24 <25' } }));
+  write(path.join(source, '.nvmrc'), '24\n');
+  write(path.join(source, 'LICENSE'), 'Synthetic license fixture\n');
+  write(path.join(source, 'CREDITS.md'), 'Synthetic credits fixture\n');
+  write(path.join(source, 'drizzle/0000_synthetic.sql'), 'SELECT 1;\n');
+  write(path.join(source, 'drizzle/meta/_journal.json'), '{"entries":[]}\n');
+  write(path.join(source, 'lib/security/portable-supervisor-production.ts'), 'export const synthetic = true;\n');
+  for (const name of ['scripts/intelligent-host-mcp-stdio.mjs', 'scripts/register-strip-types-loader.mjs',
+    'scripts/run-strip-types.mjs', 'scripts/headless-web-server.mjs']) write(path.join(source, name), 'export {};\n');
+  write(path.join(source, 'scripts/mediflow-headless-supervisor.mjs'),
+    "import fs from 'node:fs'; import path from 'node:path'; import '../lib/security/portable-supervisor-production.ts';\n"
+    + DATABASE_SENTINELS.map(name => `fs.readFileSync(path.join(process.cwd(), ${JSON.stringify(name)}));`).join('\n'));
+  for (const name of DATABASE_SENTINELS) write(path.join(source, name), 'SYNTHETIC DATABASE SENTINEL\n');
+  write(path.join(source, 'node_modules/typescript/index.js'), `module.exports = require(${JSON.stringify(require.resolve('typescript'))});`);
+  write(path.join(source, 'node_modules/next/dist/compiled/@vercel/nft/index.js'), `
+    const real = require(${JSON.stringify(require.resolve('next/dist/compiled/@vercel/nft'))});
+    exports.nodeFileTrace = async (seeds, options) => {
+      const state = globalThis[Symbol.for(${JSON.stringify(key)})];
+      for (const file of state.probes) state.results.push(await options.readFile(file));
+      if (state.forced) return { fileList: new Set(state.forced), warnings: new Set() };
+      return real.nodeFileTrace(seeds, options);
+    };
+  `);
+  write(path.join(f.web, 'node_modules/better-sqlite3/package.json'), '{"main":"index.js"}');
+  write(path.join(f.web, 'node_modules/better-sqlite3/index.js'), 'module.exports = {};\n');
+  write(path.join(f.contents, 'Frameworks/mediflow-web-better-sqlite3.node'), 'SYNTHETIC NATIVE FILE, NEVER LOADED\n');
+  const output = lane === 'app' ? f.runtime : path.join(f.directory, 'source-output');
+  if (lane === 'source') fs.mkdirSync(output);
+  const stage = async () => {
+    const stager = await import(pathToFileURL(path.join(source, 'scripts/stage-headless-runtime.mjs')).href);
+    if (lane === 'app') await stager.stageHeadlessRuntime(f.app);
+    else await stager.stageSourceHeadlessRuntime(output);
+  };
+  return { ...f, source, output, trace, stage };
+}
+function observePrivateAccess(t, targets) {
+  const paths = new Set(targets.map(file => path.resolve(file))), accesses = [];
+  for (const [owner, method] of [[fs.promises, 'readFile'], [fs, 'readFileSync'], [fs, 'openSync'], [fs, 'copyFileSync']]) {
+    const original = owner[method];
+    t.mock.method(owner, method, function (file, ...args) {
+      const value = file instanceof URL ? fileURLToPath(file) : file;
+      if (typeof value === 'string' && paths.has(path.resolve(value))) accesses.push(method);
+      return original.call(this, file, ...args);
+    });
+  }
+  return accesses;
+}
+for (const lane of ['source', 'app']) {
+  test(`${lane} staging excludes computed database references before any read, hash or copy`, async t => {
+    const f = stagingFixture(t, lane);
+    const accesses = observePrivateAccess(t, DATABASE_SENTINELS.map(name => path.join(f.source, name)));
+    await f.stage();
+    assert.deepEqual(accesses, []);
+    assert.ok(physicalFiles(f.output).every(name => !/\.(?:db|sqlite|sqlite3)(?:-(?:wal|shm|journal))?$/iu.test(name)));
+    assert.equal(fs.readFileSync(path.join(f.output, 'drizzle/0000_synthetic.sql'), 'utf8'), 'SELECT 1;\n');
+    assert.equal(fs.readFileSync(path.join(f.output, 'drizzle/meta/_journal.json'), 'utf8'), '{"entries":[]}\n');
+  });
+  test(`${lane} staging preserves a real NFT package-exports dependency without admitting data`, async t => {
+    const f = stagingFixture(t, lane);
+    fs.appendFileSync(path.join(f.source, 'scripts/mediflow-headless-supervisor.mjs'), "\nimport 'synthetic-exports';\n");
+    write(path.join(f.source, 'node_modules/synthetic-exports/package.json'), '{"name":"synthetic-exports","exports":"./dist/esm/index.js"}\n');
+    write(path.join(f.source, 'node_modules/synthetic-exports/dist/esm/index.js'), 'export const synthetic = true;\n');
+    const accesses = observePrivateAccess(t, DATABASE_SENTINELS.map(name => path.join(f.source, name)));
+    await f.stage();
+    assert.equal(fs.readFileSync(path.join(f.output, 'node_modules/synthetic-exports/dist/esm/index.js'), 'utf8'),
+      'export const synthetic = true;\n');
+    assert.deepEqual(accesses, []);
+  });
+  test(`${lane} trace read hook excludes private files even when the tracer bypasses ignore`, async t => {
+    const f = stagingFixture(t, lane);
+    f.trace.probes = DATABASE_SENTINELS.map(name => path.join(f.source, name));
+    f.trace.probes.push(path.join(f.source, 'missing.js'), path.join(f.source, 'drizzle'));
+    const accesses = observePrivateAccess(t, DATABASE_SENTINELS.map(name => path.join(f.source, name)));
+    await f.stage();
+    assert.deepEqual(f.trace.results, f.trace.probes.map(() => null));
+    assert.deepEqual(accesses, []);
+  });
+  test(`${lane} unexpected database closure is denied before magic, hashing and staging writes`, async t => {
+    const f = stagingFixture(t, lane);
+    const accesses = observePrivateAccess(t, DATABASE_SENTINELS.map(name => path.join(f.source, name)));
+    for (const name of [...DATABASE_SENTINELS, String.raw`nested\ARCHIVE.SQLITE3-WAL`]) {
+      f.trace.forced = [name];
+      await assert.rejects(f.stage(), /Unexpected Headless database dependency/u);
+      assert.deepEqual(accesses, []);
+      assert.deepEqual(fs.existsSync(f.output) ? physicalFiles(f.output) : [], []);
+    }
+  });
+  for (const alias of ['file', 'ancestor']) {
+    test(`${lane} trace denies a ${alias} alias before reading a database sentinel`, async t => {
+      if (process.platform === 'win32') { t.skip('Symbolic-link creation needs a separately provisioned Windows privilege.'); return; }
+      const f = stagingFixture(t, lane), database = path.join(f.source, 'medical.db');
+      const target = alias === 'file' ? path.join(f.source, 'innocent.js') : path.join(f.source, 'alias/innocent.js');
+      if (alias === 'file') fs.symlinkSync(database, target);
+      else {
+        const external = path.join(f.directory, 'synthetic-external');
+        write(path.join(external, 'innocent.js'), 'SYNTHETIC PRIVATE SENTINEL\n');
+        fs.symlinkSync(external, path.join(f.source, 'alias'));
+      }
+      f.trace.probes = [target];
+      const accesses = observePrivateAccess(t, [target, database]);
+      await assert.rejects(f.stage());
+      assert.deepEqual(accesses, []);
+      assert.deepEqual(fs.existsSync(f.output) ? physicalFiles(f.output) : [], []);
+    });
+  }
+  test(`${lane} trace denies an external file before reading its content`, async t => {
+    const f = stagingFixture(t, lane), external = write(path.join(f.directory, 'outside.js'), 'SYNTHETIC PRIVATE SENTINEL\n');
+    f.trace.probes = [external];
+    const accesses = observePrivateAccess(t, [external]);
+    await assert.rejects(f.stage()); assert.deepEqual(accesses, []);
+  });
+}
+
 test('builder commits the Headless roster after inner signing and before outer sealing (source order only)', () => {
   const source = fs.readFileSync(path.join(ROOT, 'scripts/build-apple-macos-app.sh'), 'utf8');
   const stage = source.indexOf('stage-headless-runtime.mjs" --stage');
